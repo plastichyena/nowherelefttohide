@@ -1,0 +1,22 @@
+# Local agent guidance (kept only in this workspace)
+AGENTS.md
+
+# Superseded requirements draft
+/Doc/ゾンビ・サバイバル大戦略 PoC要件定義 v0.2.md
+
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+
+# Local configuration and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
