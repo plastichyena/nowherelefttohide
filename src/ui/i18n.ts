@@ -5,8 +5,8 @@ export interface TranslationTable {
 }
 
 const JA: TranslationTable = {
-  title: '逃げ場なし',
-  subtitle: 'NOWHERE LEFT TO HIDE',
+  title: 'Nowhere Left to Hide',
+  subtitle: 'ゾンビ・ヘックス戦略',
   start: 'ゲームスタート',
   continue: '続きから',
   newGame: '新規ゲーム',
