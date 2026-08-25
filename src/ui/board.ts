@@ -16,6 +16,9 @@ export interface BoardCallbacks {
   onTileTap(position: HexCoord): void;
 }
 
+type LabelEntity = 'facility' | 'checkpoint' | 'unit';
+type LabelPurpose = 'icon' | 'infection' | 'status' | 'detail';
+
 const HEX_SIZE = 30;
 const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
 const HEX_HEIGHT = HEX_SIZE * 2;
@@ -38,7 +41,8 @@ function distance(a: { x: number; y: number }, b: { x: number; y: number }): num
 export class HexBoardScene extends Phaser.Scene {
   private readonly callbacks: BoardCallbacks;
   private graphics!: Phaser.GameObjects.Graphics;
-  private labels: Phaser.GameObjects.Text[] = [];
+  private readonly labels = new Map<string, Phaser.GameObjects.Text>();
+  private readonly activeLabelKeys = new Set<string>();
   private current: BoardRenderState | null = null;
   private dragStart: { x: number; y: number; scrollX: number; scrollY: number } | null = null;
   private pointerDown: { x: number; y: number; screenX: number; screenY: number } | null = null;
@@ -57,6 +61,7 @@ export class HexBoardScene extends Phaser.Scene {
   create(): void {
     this.graphics = this.add.graphics();
     this.cameras.main.setBackgroundColor('#071019');
+    this.events.once('shutdown', this.handleShutdown, this);
     this.input.on('pointerdown', this.handlePointerDown, this);
     this.input.on('pointermove', this.handlePointerMove, this);
     this.input.on('pointerup', this.handlePointerUp, this);
@@ -225,8 +230,7 @@ export class HexBoardScene extends Phaser.Scene {
   private draw(render: BoardRenderState): void {
     const { state } = render;
     this.graphics.clear();
-    for (const label of this.labels) label.destroy();
-    this.labels = [];
+    this.activeLabelKeys.clear();
     const legal = new Set((render.legalDestinations ?? []).map((position) => `${position.q},${position.r}`));
     const path = new Set((render.pendingPath ?? []).map((position) => `${position.q},${position.r}`));
     const attackTargets = new Set(render.attackTargetIds ?? []);
@@ -272,22 +276,56 @@ export class HexBoardScene extends Phaser.Scene {
               : facility.owner === 'player'
                 ? '#c9f0d1'
                 : '#d7c7a0';
-        this.addLabel(icon, center.x, center.y - 5, color, 14, true);
+        this.addLabel(`facility:${facility.id}:icon`, icon, center.x, center.y - 5, color, 14, true);
         if (facility.infected > 0) {
           this.graphics.lineStyle(3, 0xff665f, 0.95);
           this.graphics.strokeCircle(center.x, center.y, 15);
-          this.addLabel(`!${facility.infected}`, center.x + 13, center.y - 18, '#ff8d82', 8, true);
+          this.addLabel(
+            `facility:${facility.id}:infection`,
+            `!${facility.infected}`,
+            center.x + 13,
+            center.y - 18,
+            '#ff8d82',
+            8,
+            true,
+          );
         } else if (facility.operationalStatus === 'stopped' && facility.owner === 'player') {
-          this.addLabel('×', center.x + 12, center.y - 14, '#a8b3b9', 9, true);
+          this.addLabel(`facility:${facility.id}:status`, '×', center.x + 12, center.y - 14, '#a8b3b9', 9, true);
         }
         if (tileSelected) {
-          this.addLabel(`${facility.id} W${facility.workers} I${facility.infected}`, center.x, center.y + 21, '#f3f7f9', 8, true);
+          this.addLabel(
+            `facility:${facility.id}:detail`,
+            `${facility.id} W${facility.workers} I${facility.infected}`,
+            center.x,
+            center.y + 21,
+            '#f3f7f9',
+            8,
+            true,
+          );
         }
       }
       const checkpoint = state.checkpoints.find((candidate) => sameHex(candidate.position, tile));
       if (checkpoint) {
-        this.addLabel('▤', center.x, center.y + 10, checkpoint.infected > 0 ? '#ff9b7d' : checkpoint.status === 'operational' ? '#a4e8ff' : '#df8080', 11, true);
-        if (checkpoint.infected > 0) this.addLabel(`!${checkpoint.infected}`, center.x + 13, center.y + 13, '#ff8d82', 8, true);
+        this.addLabel(
+          `checkpoint:${checkpoint.id}:icon`,
+          '▤',
+          center.x,
+          center.y + 10,
+          checkpoint.infected > 0 ? '#ff9b7d' : checkpoint.status === 'operational' ? '#a4e8ff' : '#df8080',
+          11,
+          true,
+        );
+        if (checkpoint.infected > 0) {
+          this.addLabel(
+            `checkpoint:${checkpoint.id}:infection`,
+            `!${checkpoint.infected}`,
+            center.x + 13,
+            center.y + 13,
+            '#ff8d82',
+            8,
+            true,
+          );
+        }
       }
 
       const unit = state.units.find((candidate) => candidate.actionState !== 'destroyed' && sameHex(candidate.position, tile));
@@ -298,9 +336,27 @@ export class HexBoardScene extends Phaser.Scene {
         this.graphics.lineStyle(isTarget ? 3 : isSelected ? 2 : 1, isTarget ? 0xff8c69 : 0x071019, 1);
         this.graphics.fillCircle(center.x, center.y + 1, isSelected || isTarget ? 10 : 8);
         this.graphics.strokeCircle(center.x, center.y + 1, isSelected || isTarget ? 10 : 8);
-        this.addLabel(unit.type === 'zombie' ? 'Z' : unit.type === 'nationalGuard' ? 'G' : 'P', center.x, center.y - 5, '#071019', 9, true);
+        this.addLabel(
+          `unit:${unit.id}:icon`,
+          unit.type === 'zombie' ? 'Z' : unit.type === 'nationalGuard' ? 'G' : 'P',
+          center.x,
+          center.y - 5,
+          '#071019',
+          9,
+          true,
+        );
         if (unit.hp < unit.maxHp) this.drawHealth(center, unit.hp / Math.max(unit.maxHp, 1));
-        if (isSelected) this.addLabel(`${unit.id} HP ${unit.hp}/${unit.maxHp}`, center.x, center.y + 23, '#f3f7f9', 8, true);
+        if (isSelected) {
+          this.addLabel(
+            `unit:${unit.id}:detail`,
+            `${unit.id} HP ${unit.hp}/${unit.maxHp}`,
+            center.x,
+            center.y + 23,
+            '#f3f7f9',
+            8,
+            true,
+          );
+        }
       }
     }
     if (render.pendingPath && render.pendingPath.length > 1) {
@@ -310,6 +366,9 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.moveTo(points[0]!.x, points[0]!.y);
       for (const point of points.slice(1)) this.graphics.lineTo(point.x, point.y);
       this.graphics.strokePath();
+    }
+    for (const [key, label] of this.labels) {
+      if (!this.activeLabelKeys.has(key)) label.setVisible(false);
     }
   }
 
@@ -325,17 +384,40 @@ export class HexBoardScene extends Phaser.Scene {
     this.graphics.fillRect(center.x - 10, center.y + 12, Math.max(0, 20 * ratio), 3);
   }
 
-  private addLabel(text: string, x: number, y: number, color: string, size: number, center = false): void {
-    const label = this.add.text(x, y, text, {
-      color,
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: `${size}px`,
-      fontStyle: 'bold',
-      stroke: '#071019',
-      strokeThickness: 2,
-    });
-    if (center) label.setOrigin(0.5, 0.5);
-    this.labels.push(label);
+  private addLabel(
+    key: `${LabelEntity}:${string}:${LabelPurpose}`,
+    text: string,
+    x: number,
+    y: number,
+    color: string,
+    size: number,
+    center = false,
+  ): void {
+    let label = this.labels.get(key);
+    if (!label) {
+      label = this.add.text(x, y, text, {
+        color: '#ffffff',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: `${size}px`,
+        fontStyle: 'bold',
+        stroke: '#071019',
+        strokeThickness: 2,
+      });
+      if (center) label.setOrigin(0.5, 0.5);
+      this.labels.set(key, label);
+    } else if (label.text !== text) {
+      label.setText(text);
+    }
+    label.setPosition(x, y);
+    label.setVisible(true);
+    label.setTint(Phaser.Display.Color.HexStringToColor(color).color);
+    this.activeLabelKeys.add(key);
+  }
+
+  private handleShutdown(): void {
+    for (const label of this.labels.values()) label.destroy();
+    this.labels.clear();
+    this.activeLabelKeys.clear();
   }
 }
 

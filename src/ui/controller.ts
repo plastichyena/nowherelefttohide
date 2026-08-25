@@ -6,6 +6,7 @@ import type {
   CheckpointPolicy,
   GameAction,
   GameConfig,
+  GamePhase,
   GameResult,
   GameState,
   HeadlessGame,
@@ -57,6 +58,44 @@ export type EngineFactory = () => UiGameEngine;
 type Screen = 'title' | 'game';
 type SheetState = 'collapsed' | 'standard' | 'expanded';
 type Selection = { kind: 'unit'; id: string } | { kind: 'facility'; id: string } | null;
+
+const PHASE_LABELS: Record<GamePhase, [string, string]> = {
+  player: ['行動', 'Player'],
+  economy: ['経済', 'Economy'],
+  refugees: ['避難民', 'Refugees'],
+  infection: ['感染', 'Infection'],
+  zombie: ['ゾンビ', 'Zombies'],
+  horde: ['Horde', 'Horde'],
+  gameOver: ['終了', 'Game over'],
+};
+
+export interface PhaseIndicatorViewModel {
+  phase: GamePhase;
+  shortLabel: string;
+  label: string;
+}
+
+/**
+ * Keep the serialized phase value separate from the decorative dot's
+ * presentation. The localized short label is rendered beside the dot so a
+ * phase never becomes visible text inside the compact HUD indicator.
+ */
+export function phaseIndicatorViewModel(phase: GamePhase, locale: Locale): PhaseIndicatorViewModel {
+  const translator = createTranslator(locale);
+  const shortLabel = PHASE_LABELS[phase][locale === 'ja' ? 0 : 1];
+  return {
+    phase,
+    shortLabel,
+    label: `${translator('phase')}: ${shortLabel}`,
+  };
+}
+
+export function loadValidationError(
+  result: { valid: boolean; errors: readonly string[] },
+  fallback: string,
+): string | null {
+  return result.valid ? null : result.errors[0] ?? fallback;
+}
 
 const SHEET_ORDER: SheetState[] = ['collapsed', 'standard', 'expanded'];
 
@@ -296,11 +335,12 @@ export class GameUiController {
   private renderGame(): void {
     if (!this.state || !this.engine) return;
     const t = this.translator();
+    const phaseIndicator = phaseIndicatorViewModel(this.state.phase, this.locale);
     this.root.className = 'app-shell game-screen';
     this.root.innerHTML = `
       <header class="top-hud">
         <div class="hud-brand"><span class="hud-glyph">◇</span><span>${escapeHtml(t('title'))}</span></div>
-        <div class="hud-turn"><span data-bind="turn">—</span><small>${escapeHtml(t('turn'))}</small><span class="phase-dot" data-bind="phase"></span></div>
+        <div class="hud-turn"><span data-bind="turn">—</span><small>${escapeHtml(t('turn'))}</small><span class="phase-dot" data-bind="phase" data-phase="${escapeHtml(phaseIndicator.phase)}" aria-hidden="true"></span><span class="phase-label" data-bind="phase-label" title="${escapeHtml(phaseIndicator.label)}">${escapeHtml(phaseIndicator.shortLabel)}</span></div>
         <div class="hud-pop"><span data-bind="population">—</span><small>${escapeHtml(t('population'))}</small></div>
         <button class="icon-button" aria-label="${escapeHtml(t('help'))}" data-action="help">?</button>
       </header>
@@ -448,9 +488,19 @@ export class GameUiController {
   private updateHud(): void {
     if (!this.state) return;
     const hordeVisible = this.state.turn >= this.state.config.horde.warningStartTurn;
+    const phaseIndicator = phaseIndicatorViewModel(this.state.phase, this.locale);
+    const phaseDot = this.root.querySelector<HTMLElement>('[data-bind="phase"]');
+    if (phaseDot) {
+      phaseDot.dataset.phase = phaseIndicator.phase;
+      phaseDot.textContent = '';
+    }
+    const phaseLabel = this.root.querySelector<HTMLElement>('[data-bind="phase-label"]');
+    if (phaseLabel) {
+      phaseLabel.textContent = phaseIndicator.shortLabel;
+      phaseLabel.title = phaseIndicator.label;
+    }
     const bindings: Record<string, string> = {
       turn: `${this.state.turn}/${this.state.maxTurns}`,
-      phase: this.state.phase,
       population: String(this.state.population.employed + this.state.population.unemployed + this.state.population.police + this.state.population.nationalGuard),
       food: String(this.state.resources.food),
       civilianGoods: String(this.state.resources.civilianGoods),
@@ -677,19 +727,22 @@ export class GameUiController {
       this.renderGame();
       this.autosave();
     } catch (error) {
-      this.showToast(`${this.translator()('loadError')}: ${error instanceof Error ? error.message : String(error)}`);
+      const message = `${this.translator()('loadError')}: ${error instanceof Error ? error.message : String(error)}`;
+      if (this.root.querySelector('[data-load-error]')) this.showLoadModalError(message);
+      else this.showToast(message);
     }
   }
 
   private showLoadModal(): void {
     const t = this.translator();
     this.root.className = 'app-shell modal-screen';
-    this.root.innerHTML = `<section class="modal-card" aria-labelledby="load-heading"><button class="icon-button modal-close" data-action="title">×</button><h2 id="load-heading">${escapeHtml(t('load'))}</h2><label>${escapeHtml(t('saveCode'))}<textarea data-input="save-code" rows="5" spellcheck="false" placeholder="Base64URL …"></textarea></label><div class="modal-actions"><button class="primary-button" data-action="load-code">${escapeHtml(t('load'))}</button><button class="ghost-button" data-action="title">${escapeHtml(t('cancel'))}</button></div><hr/><label>${escapeHtml(t('import'))}<input type="file" accept="application/json,.json" data-action="file-import" /></label></section>`;
+    this.root.innerHTML = `<section class="modal-card" aria-labelledby="load-heading"><button class="icon-button modal-close" data-action="title">×</button><h2 id="load-heading">${escapeHtml(t('load'))}</h2><p class="warning-text load-error" data-load-error role="alert" aria-live="assertive" hidden></p><label>${escapeHtml(t('saveCode'))}<textarea data-input="save-code" rows="5" spellcheck="false" placeholder="Base64URL …"></textarea></label><div class="modal-actions"><button class="primary-button" data-action="load-code">${escapeHtml(t('load'))}</button><button class="ghost-button" data-action="title">${escapeHtml(t('cancel'))}</button></div><hr/><label>${escapeHtml(t('import'))}<input type="file" accept="application/json,.json" data-action="file-import" /></label></section>`;
     this.bindRootEvents();
     this.root.querySelector('[data-action="load-code"]')?.addEventListener('click', () => {
       const code = this.root.querySelector<HTMLTextAreaElement>('[data-input="save-code"]')?.value ?? '';
       const decoded = decodeSaveCode(code);
-      if (!decoded.valid || !decoded.state) this.showToast(decoded.errors[0] ?? t('loadError'));
+      const error = loadValidationError(decoded, t('loadError'));
+      if (error || !decoded.state) this.showLoadModalError(error ?? t('loadError'));
       else this.loadState(decoded.state);
     });
   }
@@ -725,9 +778,19 @@ export class GameUiController {
     if (!file) return;
     void file.text().then((text) => {
       const loaded = importSaveJson(text);
-      if (!loaded.valid || !loaded.state) this.showToast(loaded.errors[0] ?? this.translator()('loadError'));
+      const error = loadValidationError(loaded, this.translator()('loadError'));
+      if (error || !loaded.state) this.showLoadModalError(error ?? this.translator()('loadError'));
       else this.loadState(loaded.state);
+    }).catch((error: unknown) => {
+      this.showLoadModalError(`${this.translator()('loadError')}: ${error instanceof Error ? error.message : String(error)}`);
     });
+  }
+
+  private showLoadModalError(message: string): void {
+    const error = this.root.querySelector<HTMLElement>('[data-load-error]');
+    if (!error) return;
+    error.hidden = false;
+    error.textContent = message;
   }
 
   private dismissModal(): void {
