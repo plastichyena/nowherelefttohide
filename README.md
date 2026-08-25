@@ -1,4 +1,4 @@
-# 逃げ場なし / Nowhere Left to Hide
+# Nowhere Left to Hide
 
 モバイル縦画面を基準にした、ターン制ゾンビ・ヘックス戦略ゲームのPoCです。限られた人口・部隊・物資で施設と生産力を広げながら、予告されたHordeに備えます。
 
@@ -104,7 +104,7 @@ npm run build
 
 Coreテストでは、移動・戦闘、資源・電力、不足被害、感染・鎮圧・陥落・復旧、避難民、Horde、勝敗、保存往復、不変条件、Seed再現性を確認します。Random Test Agentは完全なGameStateと合法手からActionを選び、各Action後/ターン後に不変条件を検査します。失敗時にはVersion、Config、Map ID、Seed、Action列、直前Stateを出力します。
 
-`test:random` はPhase 3のRandom Test Agentが提供するスクリプト名です。未統合の作業ツリーでは未定義のため、このコマンドとCIの同ステップは意図的に失敗します。CIから欠落を見逃さないため、Workflowではスキップしていません。
+`test:random` は現在 `package.json` に統合済みで、`npm run test:random -- --games=100` でRandom Test Agentを100ゲーム実行できます。CIでも同じコマンドを実行し、不変条件違反や再現性の問題を検出します。
 
 ## GitHub ActionsとPages
 
