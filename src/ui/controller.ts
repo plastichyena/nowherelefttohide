@@ -57,7 +57,37 @@ export type EngineFactory = () => UiGameEngine;
 
 type Screen = 'title' | 'game';
 type SheetState = 'collapsed' | 'standard' | 'expanded';
-type Selection = { kind: 'unit'; id: string } | { kind: 'facility'; id: string } | null;
+export type NavigationMode = 'map' | 'domestic';
+export type Selection = { kind: 'unit'; id: string } | { kind: 'facility'; id: string } | null;
+
+/**
+ * Resolve a tapped tile according to the active navigation mode.
+ *
+ * This is deliberately a pure view concern. It never changes GameState and
+ * it keeps the map-mode priority (player unit, then facility) separate from
+ * the domestic-mode priority (facility only).
+ */
+export function resolveTileSelection(
+  state: Readonly<GameState>,
+  position: HexCoord,
+  mode: NavigationMode,
+): Selection {
+  const facility = findFacilityAt(state, position);
+  if (mode === 'domestic') return facility ? { kind: 'facility', id: facility.id } : null;
+
+  const unit = state.units.find(
+    (candidate) => candidate.actionState !== 'destroyed' && candidate.isPlayerUnit &&
+      candidate.position.q === position.q && candidate.position.r === position.r,
+  );
+  if (unit) return { kind: 'unit', id: unit.id };
+  return facility ? { kind: 'facility', id: facility.id } : null;
+}
+
+function unselectedPrompt(mode: NavigationMode, locale: Locale): string {
+  const t = createTranslator(locale);
+  if (mode === 'domestic') return locale === 'ja' ? '施設を選択してください' : 'Select a facility';
+  return t('selectUnit');
+}
 
 const PHASE_LABELS: Record<GamePhase, [string, string]> = {
   player: ['行動', 'Player'],
@@ -170,6 +200,7 @@ export class GameUiController {
   private locale: Locale = getInitialLocale();
   private screen: Screen = 'title';
   private sheetState: SheetState = 'standard';
+  private navMode: NavigationMode = 'map';
   private engine: UiGameEngine | null = null;
   private state: Readonly<GameState> | null = null;
   private boardGame: Phaser.Game | null = null;
@@ -304,6 +335,7 @@ export class GameUiController {
       this.state = this.engine.reset(seed, config);
       this.screen = 'game';
       this.sheetState = 'standard';
+      this.navMode = 'map';
       this.selection = null;
       this.pendingMove = null;
       this.guideShown = !this.hasSeenGuide();
@@ -358,7 +390,7 @@ export class GameUiController {
         <div class="sheet-header"><div><strong data-bind="selection-title">${escapeHtml(t('selectUnit'))}</strong><small data-bind="selection-summary">${escapeHtml(stateSummary(this.state, this.locale))}</small></div><span data-bind="sheet-state">${escapeHtml(t('standard'))}</span></div>
         <div class="sheet-body" data-bind="sheet-body"></div>
       </section>
-      <nav class="bottom-nav" aria-label="${escapeHtml(t('map'))}"><button data-nav="map" class="active">▦<span>${escapeHtml(t('map'))}</span></button><button data-nav="domestic">⌂<span>${escapeHtml(t('domestic'))}</span></button><button data-action="end-turn" class="nav-end">▶<span>${escapeHtml(t('endTurn'))}</span></button><button data-action="save">▤<span>${escapeHtml(t('saveCode'))}</span></button></nav>`;
+      <nav class="bottom-nav" aria-label="${escapeHtml(t('map'))}"><button data-nav="map" class="${this.navMode === 'map' ? 'active' : ''}" aria-current="${this.navMode === 'map' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'map'}">▦<span>${escapeHtml(t('map'))}</span></button><button data-nav="domestic" class="${this.navMode === 'domestic' ? 'active' : ''}" aria-current="${this.navMode === 'domestic' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'domestic'}">⌂<span>${escapeHtml(t('domestic'))}</span></button><button data-action="end-turn" class="nav-end">▶<span>${escapeHtml(t('endTurn'))}</span></button><button data-action="save">▤<span>${escapeHtml(t('saveCode'))}</span></button></nav>`;
     this.bindRootEvents();
     this.createBoard();
     this.updateView();
@@ -449,15 +481,15 @@ export class GameUiController {
   }
 
   private onNav(nav: string): void {
-    if (nav === 'domestic') {
-      this.sheetState = 'expanded';
-      this.updateView();
-      this.root.querySelectorAll('[data-nav]').forEach((item) => item.classList.toggle('active', (item as HTMLElement).dataset.nav === nav));
-    } else if (nav === 'map') {
-      this.sheetState = 'standard';
-      this.updateView();
-      this.root.querySelectorAll('[data-nav]').forEach((item) => item.classList.toggle('active', (item as HTMLElement).dataset.nav === nav));
-    }
+    if (nav !== 'domestic' && nav !== 'map') return;
+    const mode = nav as NavigationMode;
+    const selected = this.selectedPosition();
+    this.navMode = mode;
+    this.pendingMove = null;
+    if (this.state && selected) this.selection = resolveTileSelection(this.state, selected, mode);
+    else if (mode === 'domestic' && this.selection?.kind === 'unit') this.selection = null;
+    this.sheetState = mode === 'domestic' ? 'expanded' : 'standard';
+    this.updateView();
   }
 
   private onInput(event: Event): void {
@@ -482,7 +514,17 @@ export class GameUiController {
     sheet?.setAttribute('data-sheet', this.sheetState);
     const sheetState = this.root.querySelector<HTMLElement>('[data-bind="sheet-state"]');
     if (sheetState) sheetState.textContent = this.sheetState;
+    this.updateNavigation();
     this.renderToast();
+  }
+
+  private updateNavigation(): void {
+    this.root.querySelectorAll<HTMLButtonElement>('[data-nav]').forEach((button) => {
+      const active = button.dataset.nav === this.navMode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-current', active ? 'page' : 'false');
+      button.setAttribute('aria-pressed', String(active));
+    });
   }
 
   private updateHud(): void {
@@ -556,8 +598,13 @@ export class GameUiController {
 
   private onTileTap(position: HexCoord): void {
     if (!this.state || !this.engine) return;
+    if (this.navMode === 'domestic') {
+      this.pendingMove = null;
+      this.selection = resolveTileSelection(this.state, position, this.navMode);
+      this.updateView();
+      return;
+    }
     const unit = findUnitAt(this.state, position);
-    const facility = findFacilityAt(this.state, position);
     if (this.pendingMove && this.selection?.kind === 'unit' && this.pendingMove.destination.q === position.q && this.pendingMove.destination.r === position.r) {
       this.updateView();
       return;
@@ -576,12 +623,9 @@ export class GameUiController {
         return;
       }
     }
-    if (unit && unit.isPlayerUnit) {
-      this.selection = { kind: 'unit', id: unit.id };
-      this.pendingMove = null;
-      this.updateView();
-    } else if (facility) {
-      this.selection = { kind: 'facility', id: facility.id };
+    const resolved = resolveTileSelection(this.state, position, this.navMode);
+    if (resolved) {
+      this.selection = resolved;
       this.pendingMove = null;
       this.updateView();
     } else {
@@ -722,6 +766,7 @@ export class GameUiController {
       if (result.error) throw new Error(result.error.message);
       this.state = result.state;
       this.screen = 'game';
+      this.navMode = 'map';
       this.selection = null;
       this.pendingMove = null;
       this.renderGame();
@@ -826,9 +871,10 @@ export class GameUiController {
     if (!body || !title || !summary) return;
     const t = this.translator();
     if (!this.selection) {
-      title.textContent = t('selectUnit');
+      const prompt = unselectedPrompt(this.navMode, this.locale);
+      title.textContent = prompt;
       summary.textContent = stateSummary(this.state, this.locale);
-      body.innerHTML = `<div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(t('selectDestination'))}</p><p class="muted">${escapeHtml(t('helpBody'))}</p></div>`;
+      body.innerHTML = `<div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p><p class="muted">${escapeHtml(t('helpBody'))}</p></div>`;
       return;
     }
     if (this.selection.kind === 'unit') {
