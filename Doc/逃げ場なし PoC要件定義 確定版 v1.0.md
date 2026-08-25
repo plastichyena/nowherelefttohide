@@ -77,16 +77,20 @@ PoCでは完成品相当のコンテンツ量や演出を目指さず、情報�
 - 日本語・英語表示切り替え（デフォルト日本語）
 - 初回ガイド、常設ヘルプ、ゲーム終了時の基本統計
 - Core主要ルールと不変条件の自動テスト
+- Phaserなしで完全進行できるHeadless Game Interface
+- 完全なGameStateと合法手を使用するRandom Test Agent
+- 複数Seedの自動完走試験と、失敗Seed・Action列の出力
 - GitHub Actionsによるテスト・ビルド・GitHub Pages公開
 
 ## 2.2 今回は対象外
 
-- Random Agent
 - Rule Based Agent
 - 外部LLM Agent
 - AI観戦、AI思考表示、AI After Action Report
+- ユーザー向けAIプレイ機能
+- AI向けObservationと情報制限
 - Replayの記録・再生
-- Batch Simulation
+- バランス分析を目的とする大規模Batch Simulation
 - 高度な統計・戦略比較
 - Fog of War
 - ランダムマップ生成
@@ -303,6 +307,47 @@ UIおよびPhaser側からGameStateを直接変更してはならない。
 - Configで有効化した初期生存者・感染者抽選
 
 同じVersion、Config、Map、Seed、Action列から同じ結果を得られる構造にする。Replay機能自体は今回対象外とする。
+
+## 6.4 Headless Game Interface
+
+ゲームはPhaser、DOM、描画、音響、ブラウザ入力なしでも、初期化からGame Overまで完全に進行可能にする。
+
+最低限、概念的に以下のインターフェースを提供する。
+
+```ts
+interface HeadlessGame {
+  reset(seed: number, config: GameConfig): Readonly<GameState>;
+  getState(): Readonly<GameState>;
+  getLegalActions(): GameAction[];
+  step(action: GameAction): StepResult;
+  isGameOver(): boolean;
+  getResult(): GameResult | null;
+}
+```
+
+- Test Agentには情報制限を設けず、完全なGameStateを渡す
+- Fog of WarやAI向けObservationは介在させない
+- 人間UIとTest Agentは同じGameAction、ActionValidator、GameEngineを使用する
+- `step`はAction適用結果、発生イベント、エラー、Game Over状態を返す
+- Game Over後の`step`は状態を変更せずエラーを返す
+- Headless実行のためだけの別ルールや状態変更経路を作らない
+
+`getLegalActions()`は現在状態から実行可能な原子的Actionを返す。労働者配置は、施設と設定可能人数を個別Actionとして表し、複数施設の全組み合わせを一括列挙しない。
+
+## 6.5 Random Test Agent
+
+Random Test Agentはゲーム攻略能力ではなく、GameEngineの破壊テストを目的とする開発・CI専用機能とする。
+
+- 完全なGameStateと`getLegalActions()`を利用可能
+- 合法手からSeed付きでActionを選ぶ
+- 移動、攻撃、待機、労働者配置、編成、検問所建設、方針変更、ターン終了を対象にする
+- 同一ターン内の再配置ループ等を避けるため、1ターンの最大Action数をConfigで制限する
+- 上限到達時は、合法なら`EndTurn`を強制選択する
+- 各Action後と各ターン後に不変条件を検査する
+- Game Overまで進行するか、明示した安全上限へ到達した時点で失敗として報告する
+- 失敗時はVersion、Config、Map ID、Seed、Action列、エラー、不一致直前のGameStateを保存する
+
+Test Agentの判断理由表示、勝利を目指す戦略、Persona、観戦UIは実装しない。
 
 ---
 
@@ -988,7 +1033,17 @@ UnitPopulation >= 0
 - 感染施設へ労働者を追加・撤収しない
 - 同一SeedとAction列で乱数結果が一致する
 
-Random Agent、Replay、Batch Simulationのテストは後続フェーズとする。
+## 18.3 Random Test Agent Test
+
+- Headless Game Interfaceだけを使用し、UIを起動せずゲームを進行する
+- 各Action後と各ターン後に18.2の不変条件を検査する
+- CIでは異なるSeedで最低100ゲームを実行する
+- ローカルではConfig指定により1,000ゲーム以上を実行可能にする
+- 1ゲームのAction数とターン数に安全上限を設け、無限ループを失敗として検出する
+- 同じ失敗SeedとAction列を再実行し、同じ失敗状態が再現することを確認可能にする
+- Game Overまで完走したこと自体を攻略AIの性能評価として扱わない
+
+Replay UI、Rule Based Agent、バランス統計を生成する大規模Batch Simulationは後続フェーズとする。
 
 ---
 
@@ -1014,8 +1069,12 @@ Random Agent、Replay、Batch Simulationのテストは後続フェーズとす�
 16. 初回ガイド、常設ヘルプ、終了統計を表示
 17. 自動保存、セーブコード、JSON保存・復元が機能
 18. 主要ルールと不変条件の自動テストが通る
-19. 許諾的ライセンスの依存だけを使用し、第三者通知を保存
-20. GitHub Actionsでテスト・ビルド・GitHub Pages公開が可能
+19. Phaserなしで同じGameEngineを初期化し、Game Overまで進行可能
+20. Random Test Agentが完全なGameStateと合法手を使用してゲームを操作可能
+21. CIで最低100ゲームを実行し、不変条件違反、クラッシュ、無限ループがない
+22. 自動試験失敗時にSeed、Config、Action列、直前状態を取得可能
+23. 許諾的ライセンスの依存だけを使用し、第三者通知を保存
+24. GitHub Actionsでテスト・ビルド・GitHub Pages公開が可能
 
 ---
 
@@ -1026,6 +1085,7 @@ Random Agent、Replay、Batch Simulationのテストは後続フェーズとす�
 - Vite / TypeScript / Phaserセットアップ
 - ライセンス確認
 - Config、GameState、GameAction、Seeded RNG
+- Headless Game Interface
 - 固定ヘックスマップモデル
 
 ## Phase 2 — Game Core
@@ -1043,6 +1103,9 @@ Random Agent、Replay、Batch Simulationのテストは後続フェーズとす�
 - 主要ルールUnit Test
 - Invariant Test
 - Seed再現性
+- Random Test Agent
+- 複数Seed自動完走試験
+- 失敗ケース出力・再実行
 - 保存・復元検証
 
 ## Phase 4 — Playable UI
@@ -1079,11 +1142,10 @@ Random Agent、Replay、Batch Simulationのテストは後続フェーズとす�
 1. 地形種別、道路移動ボーナス、防御補正
 2. スマートフォン横向きとPC向け最適化
 3. Replay
-4. Random Agent
-5. Rule Based Agent
-6. Headless Batch Simulation
-7. Observationと外部LLM Agent
-8. AI Governor観戦
-9. After Action Reportと戦略比較
+4. 勝利を目指すRule Based Agent
+5. バランス分析用の大規模Headless Batch Simulation
+6. Observationと外部LLM Agent
+7. AI Governor観戦
+8. After Action Reportと戦略比較
 
 CoreとUIの分離、GameAction経由の一方向更新、JSON化可能なGameState、Seed付き乱数は、これらの将来拡張を可能にする境界として初回PoCから維持する。
