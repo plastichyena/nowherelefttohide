@@ -1,6 +1,11 @@
 # Local agent guidance (kept only in this workspace)
 AGENTS.md
+/.agents/
+/.codex/
 .codex-remote-attachments/
+
+# Safe delete archive
+.safe-delete/
 
 # Superseded requirements draft
 /Doc/ゾンビ・サバイバル大戦略 PoC要件定義 v0.2.md
