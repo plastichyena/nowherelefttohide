@@ -1,0 +1,87 @@
+name: CI and GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, tests, random agent, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run unit and invariant tests
+        run: npm test
+
+      # The Phase 3 Random Test Agent is expected to expose this script. Keep
+      # this command explicit so a missing script fails CI instead of silently
+      # skipping the required 100-game smoke run.
+      - name: Run 100 seeded Random Agent games
+        run: npm run test:random -- --games=100 --failure-file=random-agent-failures.json
+
+      - name: Upload Random Agent failure artifact
+        if: failure() && hashFiles('random-agent-failures.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: random-agent-failures-${{ github.run_id }}
+          path: random-agent-failures.json
+          if-no-files-found: ignore
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Configure GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

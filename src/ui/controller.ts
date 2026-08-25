@@ -1,0 +1,814 @@
+import { createDefaultConfig } from '../core/config';
+import { forecastEndTurn } from '../core/engine';
+import Phaser from 'phaser';
+import type {
+  CardinalDirection,
+  CheckpointPolicy,
+  GameAction,
+  GameConfig,
+  GameResult,
+  GameState,
+  HeadlessGame,
+  HexCoord,
+  UnitState,
+} from '../core/types';
+import {
+  actionForCheckpointPolicy,
+  actionForWorkerAssignment,
+  findFacilityAt,
+  findUnit,
+  findUnitAt,
+  isLegalAction,
+  legalActionsForUnit,
+  legalAttackTargets,
+  legalMoveDestinations,
+} from './actions';
+import { createBoardGame, type BoardRenderState, type HexBoardScene } from './board';
+import {
+  createTranslator,
+  getInitialLocale,
+  persistLocale,
+  toggleLocale,
+  type Locale,
+} from './i18n';
+import {
+  AutoSaveStore,
+  decodeSaveCode,
+  encodeSaveCode,
+  exportSaveJson,
+  importSaveJson,
+} from '../persistence/save';
+
+export interface MovePreview {
+  path: HexCoord[];
+  destination: HexCoord;
+  interceptionRisk?: number | string;
+  firstInterception?: HexCoord | null;
+  [key: string]: unknown;
+}
+
+/** Narrow adapter expected from src/core/engine.ts. */
+export interface UiGameEngine extends HeadlessGame {
+  previewMove?: (unitId: string, destination: HexCoord) => MovePreview | unknown;
+}
+
+export type EngineFactory = () => UiGameEngine;
+
+type Screen = 'title' | 'game';
+type SheetState = 'collapsed' | 'standard' | 'expanded';
+type Selection = { kind: 'unit'; id: string } | { kind: 'facility'; id: string } | null;
+
+const SHEET_ORDER: SheetState[] = ['collapsed', 'standard', 'expanded'];
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function numberValue(value: string | null | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function formatDirection(direction: CardinalDirection, locale: Locale): string {
+  if (locale === 'en') return direction;
+  return ({ north: '北', east: '東', south: '南', west: '西' } as Record<CardinalDirection, string>)[direction];
+}
+
+function facilityLabel(type: string, locale: Locale): string {
+  const names: Record<string, [string, string]> = {
+    capital: ['州都', 'Capital'],
+    city: ['地方都市', 'City'],
+    farm: ['農場', 'Farm'],
+    civilianFactory: ['民需工場', 'Civilian Factory'],
+    militaryFactory: ['軍需工場', 'Military Factory'],
+    refinery: ['製油所', 'Refinery'],
+    powerPlant: ['発電所', 'Power Plant'],
+  };
+  return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
+}
+
+function unitLabel(type: UnitState['type'], locale: Locale): string {
+  const names: Record<UnitState['type'], [string, string]> = {
+    police: ['警察', 'Police'],
+    nationalGuard: ['州兵', 'National Guard'],
+    zombie: ['ゾンビ', 'Zombie'],
+  };
+  return names[type][locale === 'ja' ? 0 : 1];
+}
+
+function stateSummary(state: Readonly<GameState>, locale: Locale): string {
+  const t = createTranslator(locale);
+  const selectedPopulation = state.population.employed + state.population.unemployed;
+  return `${t('population')} ${selectedPopulation} · ${t('facilities')} ${state.facilities.filter((facility) => facility.owner === 'player').length}/16`;
+}
+
+function asPreview(value: unknown, fallback: { unit: UnitState; destination: HexCoord }): MovePreview {
+  if (value && typeof value === 'object') {
+    const candidate = value as Partial<MovePreview>;
+    if (Array.isArray(candidate.path) && candidate.path.length > 0) {
+      const interception = candidate.interception;
+      return {
+        ...candidate,
+        path: candidate.path as HexCoord[],
+        destination: candidate.destination ?? fallback.destination,
+        interceptionRisk: candidate.interceptionRisk ?? (interception ? 'high' : 'low'),
+      };
+    }
+  }
+  return { path: [fallback.unit.position, fallback.destination], destination: fallback.destination, interceptionRisk: 'unknown' };
+}
+
+export class GameUiController {
+  private readonly root: HTMLElement;
+  private readonly createEngine: EngineFactory;
+  private readonly store: AutoSaveStore;
+  private noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  private locale: Locale = getInitialLocale();
+  private screen: Screen = 'title';
+  private sheetState: SheetState = 'standard';
+  private engine: UiGameEngine | null = null;
+  private state: Readonly<GameState> | null = null;
+  private boardGame: Phaser.Game | null = null;
+  private boardScene: HexBoardScene | null = null;
+  private selection: Selection = null;
+  private pendingMove: MovePreview | null = null;
+  private lastSaveCode: string | null = null;
+  private toastMessage: string | null = null;
+  private guideShown = false;
+  private sheetPointerY: number | null = null;
+  private sheetDragged = false;
+
+  constructor(root: HTMLElement, createEngine: EngineFactory) {
+    this.root = root;
+    this.createEngine = createEngine;
+    this.store = new AutoSaveStore({ onError: (message) => this.showToast(message) });
+  }
+
+  mount(): void {
+    this.showTitle();
+  }
+
+  private translator(): (key: string, fallback?: string) => string {
+    return createTranslator(this.locale);
+  }
+
+  private showTitle(): void {
+    this.screen = 'title';
+    this.state = null;
+    this.engine = null;
+    this.selection = null;
+    this.pendingMove = null;
+    this.destroyBoard();
+    const t = this.translator();
+    const canContinue = this.store.hasSave();
+    this.root.className = 'app-shell title-screen';
+    this.root.innerHTML = `
+      <main class="title-card" aria-labelledby="title-heading">
+        <div class="title-mark" aria-hidden="true">◇</div>
+        <p class="eyebrow">${escapeHtml(t('subtitle'))}</p>
+        <h1 id="title-heading">${escapeHtml(t('title'))}</h1>
+        <p class="title-copy">${escapeHtml(t('guideBody'))}</p>
+        <div class="title-actions">
+          <button class="primary-button large-button" data-action="new-game">${escapeHtml(t('start'))}</button>
+          <button class="secondary-button large-button" data-action="continue" ${canContinue ? '' : 'disabled'}>${escapeHtml(t('continue'))}</button>
+          <button class="ghost-button large-button" data-action="load">${escapeHtml(t('load'))}</button>
+          <button class="ghost-button large-button" data-action="options">${escapeHtml(t('options'))}</button>
+          <button class="ghost-button large-button" data-action="help">${escapeHtml(t('help'))}</button>
+          <button class="text-button" data-action="toggle-language">${escapeHtml(t('language'))}</button>
+        </div>
+        <p class="title-status" aria-live="polite">${canContinue ? escapeHtml(t('saved')) : ''}</p>
+      </main>`;
+    this.bindRootEvents();
+    this.renderToast();
+  }
+
+  private beginNewGame(): void {
+    const t = this.translator();
+    this.root.className = 'app-shell modal-screen';
+    this.root.innerHTML = `
+      <section class="modal-card" aria-labelledby="new-game-heading">
+        <button class="icon-button modal-close" aria-label="${escapeHtml(t('back'))}" data-action="title">×</button>
+        <p class="eyebrow">${escapeHtml(t('options'))}</p>
+        <h2 id="new-game-heading">${escapeHtml(t('newGame'))}</h2>
+        <form data-form="new-game" class="settings-form">
+          <label>${escapeHtml(t('newSeed'))}<input name="seed" type="number" inputmode="numeric" value="${Date.now() % 2147483647}" /></label>
+          <label>${escapeHtml(t('maxTurns'))}<input name="maxTurns" type="number" min="1" max="999" value="30" /></label>
+          <label>${escapeHtml(t('hordeCycle'))}<input name="hordeCycle" type="number" min="1" value="5" /></label>
+          <label>${escapeHtml(t('hordeInitial'))}<input name="hordeInitial" type="number" min="0" value="2" /></label>
+          <label>${escapeHtml(t('hordeIncrement'))}<input name="hordeIncrement" type="number" min="0" value="2" /></label>
+          <label>${escapeHtml(t('hordeWarningStart'))}<input name="hordeWarningStart" type="number" min="1" value="1" /></label>
+          <label>${escapeHtml(t('refugeeIntervalMin'))}<input name="refugeeIntervalMin" type="number" min="1" value="2" /></label>
+          <label>${escapeHtml(t('refugeeIntervalMax'))}<input name="refugeeIntervalMax" type="number" min="1" value="4" /></label>
+          <label>${escapeHtml(t('refugeePeopleMin'))}<input name="refugeePeopleMin" type="number" min="1" value="5" /></label>
+          <label>${escapeHtml(t('refugeePeopleMax'))}<input name="refugeePeopleMax" type="number" min="1" value="10" /></label>
+          <label>${escapeHtml(t('screeningCapacity'))}<input name="screeningCapacity" type="number" min="1" value="10" /></label>
+          <label>${escapeHtml(t('resourceMultiplier'))}<input name="resourceMultiplier" type="number" min="0.25" max="4" step="0.25" value="1" /></label>
+          <label>${escapeHtml(t('infectionMultiplier'))}<input name="infectionMultiplier" type="number" min="0.25" max="4" step="0.25" value="1" /></label>
+          <div class="modal-actions"><button class="primary-button" type="submit">${escapeHtml(t('start'))}</button><button class="ghost-button" type="button" data-action="title">${escapeHtml(t('cancel'))}</button></div>
+        </form>
+      </section>`;
+    this.bindRootEvents();
+    const form = this.root.querySelector<HTMLFormElement>('[data-form="new-game"]');
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const values = new FormData(form);
+      const refugeeIntervalMin = Math.max(1, Math.floor(numberValue(values.get('refugeeIntervalMin')?.toString(), 2)));
+      const refugeeIntervalMax = Math.max(refugeeIntervalMin, Math.floor(numberValue(values.get('refugeeIntervalMax')?.toString(), 4)));
+      const refugeePeopleMin = Math.max(1, Math.floor(numberValue(values.get('refugeePeopleMin')?.toString(), 5)));
+      const refugeePeopleMax = Math.max(refugeePeopleMin, Math.floor(numberValue(values.get('refugeePeopleMax')?.toString(), 10)));
+      const config = createDefaultConfig({
+        maxTurns: Math.max(1, Math.floor(numberValue(values.get('maxTurns')?.toString(), 30))),
+        horde: {
+          cycle: Math.max(1, Math.floor(numberValue(values.get('hordeCycle')?.toString(), 5))),
+          initialCount: Math.max(0, Math.floor(numberValue(values.get('hordeInitial')?.toString(), 2))),
+          increment: Math.max(0, Math.floor(numberValue(values.get('hordeIncrement')?.toString(), 2))),
+          warningStartTurn: Math.max(1, Math.floor(numberValue(values.get('hordeWarningStart')?.toString(), 1))),
+        },
+        refugees: {
+          arrivalIntervalMin: refugeeIntervalMin,
+          arrivalIntervalMax: refugeeIntervalMax,
+          arrivalPeopleMin: refugeePeopleMin,
+          arrivalPeopleMax: refugeePeopleMax,
+          screeningCapacity: Math.max(1, Math.floor(numberValue(values.get('screeningCapacity')?.toString(), 10))),
+        },
+      });
+      const resourceMultiplier = Math.min(4, Math.max(0.25, numberValue(values.get('resourceMultiplier')?.toString(), 1)));
+      const infectionMultiplier = Math.min(4, Math.max(0.25, numberValue(values.get('infectionMultiplier')?.toString(), 1)));
+      for (const resource of ['food', 'civilianGoods', 'militaryGoods', 'fuel'] as const) {
+        config.economy.initialResources[resource] = Math.round(config.economy.initialResources[resource] * resourceMultiplier);
+      }
+      for (const facility of Object.values(config.facilities)) {
+        for (const resource of Object.keys(facility.production.outputs) as Array<keyof typeof facility.production.outputs>) {
+          const value = facility.production.outputs[resource];
+          if (value !== undefined) facility.production.outputs[resource] = Math.max(0, Math.round(value * resourceMultiplier));
+        }
+      }
+      config.infection.facilitySpreadPerTurn = Math.max(1, Math.round(config.infection.facilitySpreadPerTurn * infectionMultiplier));
+      config.infection.fallBackInfectionRate = Math.min(1, config.infection.fallBackInfectionRate * infectionMultiplier);
+      for (const policy of Object.values(config.refugees.policies)) {
+        policy.infectionRate = Math.min(1, policy.infectionRate * infectionMultiplier);
+        policy.infectionPopulationRate = Math.min(1, policy.infectionPopulationRate * infectionMultiplier);
+      }
+      const seed = Math.trunc(numberValue(values.get('seed')?.toString(), Date.now()));
+      this.startGame(seed, config);
+    });
+  }
+
+  private startGame(seed: number, config: GameConfig): void {
+    try {
+      this.engine = this.createEngine();
+      this.state = this.engine.reset(seed, config);
+      this.screen = 'game';
+      this.sheetState = 'standard';
+      this.selection = null;
+      this.pendingMove = null;
+      this.guideShown = !this.hasSeenGuide();
+      this.renderGame();
+      this.autosave();
+      if (this.guideShown) this.showGuide();
+    } catch (error) {
+      this.showToast(`ゲームを開始できません: ${error instanceof Error ? error.message : String(error)}`);
+      this.showTitle();
+    }
+  }
+
+  private hasSeenGuide(): boolean {
+    try {
+      return globalThis.localStorage?.getItem('nowhere-left-to-hide:guide:v1') === 'seen';
+    } catch {
+      return false;
+    }
+  }
+
+  private markGuideSeen(): void {
+    try {
+      globalThis.localStorage?.setItem('nowhere-left-to-hide:guide:v1', 'seen');
+    } catch {
+      // The guide can be shown again on the next visit if storage is blocked.
+    }
+  }
+
+  private renderGame(): void {
+    if (!this.state || !this.engine) return;
+    const t = this.translator();
+    this.root.className = 'app-shell game-screen';
+    this.root.innerHTML = `
+      <header class="top-hud">
+        <div class="hud-brand"><span class="hud-glyph">◇</span><span>${escapeHtml(t('title'))}</span></div>
+        <div class="hud-turn"><span data-bind="turn">—</span><small>${escapeHtml(t('turn'))}</small><span class="phase-dot" data-bind="phase"></span></div>
+        <div class="hud-pop"><span data-bind="population">—</span><small>${escapeHtml(t('population'))}</small></div>
+        <button class="icon-button" aria-label="${escapeHtml(t('help'))}" data-action="help">?</button>
+      </header>
+      <section class="resource-strip" aria-label="${escapeHtml(t('resources'))}">
+        <span class="resource-pill food-pill">◉ <b data-bind="food">0</b><small>${escapeHtml(t('food'))}</small></span>
+        <span class="resource-pill civ-pill">▣ <b data-bind="civilianGoods">0</b><small>${escapeHtml(t('civilianGoods'))}</small></span>
+        <span class="resource-pill mil-pill">✦ <b data-bind="militaryGoods">0</b><small>${escapeHtml(t('militaryGoods'))}</small></span>
+        <span class="resource-pill fuel-pill">◌ <b data-bind="fuel">0</b><small>${escapeHtml(t('fuel'))}</small></span>
+        <span class="resource-pill power-pill">⚡ <b data-bind="power">0/0</b><small>${escapeHtml(t('electricity'))}</small></span>
+      </section>
+      <section class="horde-card" aria-live="polite"><div><strong>${escapeHtml(t('horde'))}</strong><span data-bind="horde-direction">—</span></div><b><span data-bind="horde-remaining">—</span> <small>${escapeHtml(t('remaining'))}</small></b></section>
+      <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
+      <section class="bottom-sheet" data-sheet="standard" aria-label="${escapeHtml(t('selected'))}">
+        <button class="sheet-handle" type="button" data-action="sheet-toggle"><span></span><span class="sr-only">${escapeHtml(t('selected'))}</span></button>
+        <div class="sheet-header"><div><strong data-bind="selection-title">${escapeHtml(t('selectUnit'))}</strong><small data-bind="selection-summary">${escapeHtml(stateSummary(this.state, this.locale))}</small></div><span data-bind="sheet-state">${escapeHtml(t('standard'))}</span></div>
+        <div class="sheet-body" data-bind="sheet-body"></div>
+      </section>
+      <nav class="bottom-nav" aria-label="${escapeHtml(t('map'))}"><button data-nav="map" class="active">▦<span>${escapeHtml(t('map'))}</span></button><button data-nav="domestic">⌂<span>${escapeHtml(t('domestic'))}</span></button><button data-action="end-turn" class="nav-end">▶<span>${escapeHtml(t('endTurn'))}</span></button><button data-action="save">▤<span>${escapeHtml(t('saveCode'))}</span></button></nav>`;
+    this.bindRootEvents();
+    this.createBoard();
+    this.updateView();
+  }
+
+  private createBoard(): void {
+    const parent = this.root.querySelector<HTMLElement>('#board-canvas');
+    if (!parent) return;
+    this.destroyBoard();
+    this.boardGame = createBoardGame(parent, { onTileTap: (position) => this.onTileTap(position) });
+    const game = this.boardGame;
+    const resolveScene = (): void => {
+      const scene = game.scene.getScene('hex-board');
+      if (scene instanceof Object && 'updateState' in scene) {
+        this.boardScene = scene as HexBoardScene;
+        this.updateBoard();
+      }
+    };
+    game.events.once('ready', resolveScene);
+    window.setTimeout(resolveScene, 100);
+  }
+
+  private destroyBoard(): void {
+    this.boardScene = null;
+    if (this.boardGame) {
+      this.boardGame.destroy(true);
+      this.boardGame = null;
+    }
+  }
+
+  private bindRootEvents(): void {
+    this.root.onclick = (event) => {
+      const target = event.target as HTMLElement;
+      const action = target.closest<HTMLElement>('[data-action]')?.dataset.action;
+      const nav = target.closest<HTMLElement>('[data-nav]')?.dataset.nav;
+      if (action && !(action === 'sheet-toggle' && this.sheetDragged)) this.onAction(action, target.closest<HTMLElement>('[data-action]') ?? target);
+      this.sheetDragged = false;
+      if (nav) this.onNav(nav);
+    };
+    this.root.onpointerdown = (event) => {
+      if ((event.target as HTMLElement).closest('.sheet-handle')) {
+        this.sheetPointerY = event.clientY;
+        this.sheetDragged = false;
+      }
+    };
+    this.root.onpointerup = (event) => {
+      if (this.sheetPointerY === null) return;
+      const delta = event.clientY - this.sheetPointerY;
+      this.sheetPointerY = null;
+      if (Math.abs(delta) < 20) return;
+      const index = SHEET_ORDER.indexOf(this.sheetState);
+      this.sheetState = SHEET_ORDER[Math.max(0, Math.min(SHEET_ORDER.length - 1, index + (delta < 0 ? 1 : -1)))]!;
+      this.sheetDragged = true;
+      this.updateView();
+    };
+    this.root.oninput = (event) => this.onInput(event);
+    this.root.onchange = (event) => this.onInput(event);
+  }
+
+  private onAction(action: string, element: HTMLElement): void {
+    switch (action) {
+      case 'new-game': this.beginNewGame(); break;
+      case 'continue': this.loadAutosave(); break;
+      case 'load': this.showLoadModal(); break;
+      case 'options': this.beginNewGame(); break;
+      case 'toggle-language': this.locale = toggleLocale(this.locale); persistLocale(this.locale); this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
+      case 'title': this.showTitle(); break;
+      case 'help': this.showHelp(); break;
+      case 'sheet-toggle': this.toggleSheet(); break;
+      case 'confirm-move': this.confirmMove(); break;
+      case 'cancel-move': this.pendingMove = null; this.updateView(); break;
+      case 'wait': this.waitSelected(); break;
+      case 'suppress': this.suppressSelected(); break;
+      case 'end-turn': this.endTurn(); break;
+      case 'end-turn-confirm': this.dismissModal(); this.commitEndTurn(); break;
+      case 'save': this.showSaveModal(); break;
+      case 'copy-code': this.copySaveCode(element); break;
+      case 'download-json': this.downloadJson(); break;
+      case 'file-import': this.readJsonFile(element); break;
+      case 'dismiss-modal': this.dismissModal(); break;
+      case 'guide-close': this.markGuideSeen(); this.dismissModal(); break;
+      case 'assign-workers': this.assignWorkers(); break;
+      case 'produce-police': this.produce('police'); break;
+      case 'produce-guard': this.produce('nationalGuard'); break;
+      case 'build-checkpoint': this.buildCheckpoint(); break;
+      default: break;
+    }
+  }
+
+  private onNav(nav: string): void {
+    if (nav === 'domestic') {
+      this.sheetState = 'expanded';
+      this.updateView();
+      this.root.querySelectorAll('[data-nav]').forEach((item) => item.classList.toggle('active', (item as HTMLElement).dataset.nav === nav));
+    } else if (nav === 'map') {
+      this.sheetState = 'standard';
+      this.updateView();
+      this.root.querySelectorAll('[data-nav]').forEach((item) => item.classList.toggle('active', (item as HTMLElement).dataset.nav === nav));
+    }
+  }
+
+  private onInput(event: Event): void {
+    const target = event.target as HTMLInputElement | HTMLSelectElement;
+    if (target.dataset.action === 'file-import' && event.type === 'change') this.readJsonFile(target);
+    if (target.dataset.workerInput === 'true' && event.type === 'change') this.assignWorkers();
+    if (target.dataset.policy && event.type === 'change') this.setPolicy(target.dataset.policy, target.value as CheckpointPolicy);
+  }
+
+  private toggleSheet(): void {
+    const index = SHEET_ORDER.indexOf(this.sheetState);
+    this.sheetState = SHEET_ORDER[(index + 1) % SHEET_ORDER.length]!;
+    this.updateView();
+  }
+
+  private updateView(): void {
+    if (!this.state || !this.engine || this.screen !== 'game') return;
+    this.updateHud();
+    this.renderSheetBody();
+    this.updateBoard();
+    const sheet = this.root.querySelector<HTMLElement>('.bottom-sheet');
+    sheet?.setAttribute('data-sheet', this.sheetState);
+    const sheetState = this.root.querySelector<HTMLElement>('[data-bind="sheet-state"]');
+    if (sheetState) sheetState.textContent = this.sheetState;
+    this.renderToast();
+  }
+
+  private updateHud(): void {
+    if (!this.state) return;
+    const hordeVisible = this.state.turn >= this.state.config.horde.warningStartTurn;
+    const bindings: Record<string, string> = {
+      turn: `${this.state.turn}/${this.state.maxTurns}`,
+      phase: this.state.phase,
+      population: String(this.state.population.employed + this.state.population.unemployed + this.state.population.police + this.state.population.nationalGuard),
+      food: String(this.state.resources.food),
+      civilianGoods: String(this.state.resources.civilianGoods),
+      militaryGoods: String(this.state.resources.militaryGoods),
+      fuel: String(this.state.resources.fuel),
+      power: `${this.state.resources.electricityCapacity}/${this.state.resources.electricityRequired}`,
+      'horde-direction': hordeVisible ? formatDirection(this.state.horde.nextDirection, this.locale) : this.translator()('warningPending'),
+      'horde-remaining': hordeVisible ? String(this.state.horde.turnsRemaining) : '—',
+    };
+    for (const [key, value] of Object.entries(bindings)) {
+      const element = this.root.querySelector<HTMLElement>(`[data-bind="${key}"]`);
+      if (element) element.textContent = value;
+    }
+  }
+
+  private updateBoard(): void {
+    if (!this.state || !this.boardScene) return;
+    const render: BoardRenderState = {
+      state: this.state,
+      selectedPosition: this.selectedPosition(),
+      selectedUnitId: this.selection?.kind === 'unit' ? this.selection.id : null,
+      legalDestinations: this.selectedUnitLegalMoves(),
+      attackTargetIds: this.selectedUnitAttackTargets(),
+      pendingPath: this.pendingMove?.path,
+      hordeDirection: this.state.turn >= this.state.config.horde.warningStartTurn ? this.state.horde.nextDirection : undefined,
+    };
+    this.boardScene.updateState(render);
+  }
+
+  private selectedPosition(): HexCoord | null {
+    if (!this.state || !this.selection) return null;
+    if (this.selection.kind === 'unit') return findUnit(this.state, this.selection.id)?.position ?? null;
+    return this.state.facilities.find((facility) => facility.id === this.selection?.id)?.position ?? null;
+  }
+
+  private legalActions(): GameAction[] {
+    try {
+      return this.engine?.getLegalActions() ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  private selectedUnitLegalMoves(): HexCoord[] {
+    if (!this.selection || this.selection.kind !== 'unit') return [];
+    return legalMoveDestinations(this.legalActions(), this.selection.id);
+  }
+
+  private selectedUnitAttackTargets(): string[] {
+    if (!this.selection || this.selection.kind !== 'unit') return [];
+    return legalAttackTargets(this.legalActions(), this.selection.id);
+  }
+
+  private onTileTap(position: HexCoord): void {
+    if (!this.state || !this.engine) return;
+    const unit = findUnitAt(this.state, position);
+    const facility = findFacilityAt(this.state, position);
+    if (this.pendingMove && this.selection?.kind === 'unit' && this.pendingMove.destination.q === position.q && this.pendingMove.destination.r === position.r) {
+      this.updateView();
+      return;
+    }
+    if (this.selection?.kind === 'unit') {
+      const targets = this.selectedUnitAttackTargets();
+      if (unit && targets.includes(unit.id)) {
+        this.apply({ type: 'Attack', attackerId: this.selection.id, targetId: unit.id });
+        return;
+      }
+      const move = this.selectedUnitLegalMoves().find((candidate) => candidate.q === position.q && candidate.r === position.r);
+      if (move) {
+        this.pendingMove = this.preview(this.selection.id, move);
+        this.sheetState = 'standard';
+        this.updateView();
+        return;
+      }
+    }
+    if (unit && unit.isPlayerUnit) {
+      this.selection = { kind: 'unit', id: unit.id };
+      this.pendingMove = null;
+      this.updateView();
+    } else if (facility) {
+      this.selection = { kind: 'facility', id: facility.id };
+      this.pendingMove = null;
+      this.updateView();
+    } else {
+      this.selection = null;
+      this.pendingMove = null;
+      this.updateView();
+    }
+  }
+
+  private preview(unitId: string, destination: HexCoord): MovePreview {
+    const unit = this.state ? findUnit(this.state, unitId) : undefined;
+    if (!unit) return { path: [destination], destination, interceptionRisk: 'unknown' };
+    let result: unknown;
+    try {
+      result = this.engine?.previewMove?.(unitId, destination);
+    } catch (error) {
+      this.showToast(`プレビューを取得できません: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return asPreview(result, { unit, destination });
+  }
+
+  private confirmMove(): void {
+    if (!this.pendingMove || !this.selection || this.selection.kind !== 'unit') return;
+    const action: GameAction = { type: 'Move', unitId: this.selection.id, destination: this.pendingMove.destination };
+    this.pendingMove = null;
+    this.apply(action);
+  }
+
+  private waitSelected(): void {
+    if (this.selection?.kind !== 'unit') return;
+    this.apply({ type: 'Wait', unitId: this.selection.id });
+  }
+
+  private suppressSelected(): void {
+    if (!this.selection || this.selection.kind !== 'unit' || !this.state) return;
+    const unit = findUnit(this.state, this.selection.id);
+    if (!unit) return;
+    const facility = this.state.facilities.find((candidate) => candidate.position.q === unit.position.q && candidate.position.r === unit.position.r && candidate.infected > 0);
+    if (!facility) return;
+    this.apply({ type: 'SuppressInfection', unitId: unit.id, facilityId: facility.id });
+  }
+
+  private endTurn(): void {
+    if (!this.state) return;
+    const forecast = forecastEndTurn(this.state);
+    const shortages = [
+      ['food', forecast.food.shortage],
+      ['civilianGoods', forecast.civilianGoods.shortage],
+      ['militaryGoods', forecast.militaryGoods.shortage],
+      ['fuel', forecast.fuel.shortage],
+      ['electricity', forecast.electricity.shortage],
+    ] as const;
+    const projected = shortages.filter(([, amount]) => amount > 0);
+    if (projected.length > 0) {
+      const t = this.translator();
+      const details = projected
+        .map(([resource, amount]) => `<li>${escapeHtml(t(resource))}: <b>${amount}</b></li>`)
+        .join('');
+      this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="shortage"><section class="modal-card floating-card" aria-labelledby="shortage-heading"><h2 id="shortage-heading">${escapeHtml(t('shortageWarning'))}</h2><p>${escapeHtml(t('shortageWarningBody'))}</p><ul class="warning-list">${details}</ul><div class="modal-actions"><button class="primary-button" data-action="end-turn-confirm">${escapeHtml(t('proceedAnyway'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('back'))}</button></div></section></div>`);
+      return;
+    }
+    this.commitEndTurn();
+  }
+
+  private commitEndTurn(): void {
+    const result = this.apply({ type: 'EndTurn' });
+    if (result && this.state?.gameOver) this.showStatistics(this.state.result);
+  }
+
+  private assignWorkers(): void {
+    if (!this.selection || this.selection.kind !== 'facility' || !this.state) return;
+    const input = this.root.querySelector<HTMLInputElement>('[data-worker-input="true"]');
+    const facility = this.state.facilities.find((candidate) => candidate.id === this.selection?.id);
+    if (!input || !facility) return;
+    const workers = Math.max(0, Math.min(facility.workerCapacity, Math.trunc(numberValue(input.value, facility.workers))));
+    const action = actionForWorkerAssignment(this.legalActions(), facility.id, workers);
+    if (action) this.apply(action);
+    else this.showToast('その労働者配置は現在実行できません。');
+  }
+
+  private setPolicy(checkpointId: string, policy: CheckpointPolicy): void {
+    const action = actionForCheckpointPolicy(this.legalActions(), checkpointId, policy);
+    if (action) this.apply(action);
+  }
+
+  private produce(unitType: 'police' | 'nationalGuard'): void {
+    const action = this.legalActions().find((candidate) => candidate.type === 'ProduceUnit' && candidate.unitType === unitType);
+    if (action) this.apply(action);
+    else this.showToast('編成条件を満たしていません。');
+  }
+
+  private buildCheckpoint(): void {
+    const selected = this.selectedPosition();
+    const candidates = this.legalActions().filter((action): action is Extract<GameAction, { type: 'BuildCheckpoint' }> => action.type === 'BuildCheckpoint');
+    const action = candidates.find((candidate) => !selected || (candidate.position.q === selected.q && candidate.position.r === selected.r)) ?? candidates[0];
+    if (action) this.apply(action);
+    else this.showToast('道路上の警察が必要です。');
+  }
+
+  private apply(action: GameAction): boolean {
+    if (!this.engine || !this.state) return false;
+    if (!isLegalAction(this.legalActions(), action) && action.type !== 'EndTurn') {
+      this.showToast('その操作は現在の状態では実行できません。');
+      return false;
+    }
+    const result = this.engine.step(action);
+    if (result.error) {
+      this.showToast(result.error.message);
+      return false;
+    }
+    this.state = result.state;
+    this.autosave();
+    this.updateView();
+    if (result.gameOver && result.result) this.showStatistics(result.result);
+    return true;
+  }
+
+  private autosave(): void {
+    if (!this.state) return;
+    const result = this.store.save(this.state);
+    if (result.ok) this.lastSaveCode = result.code;
+  }
+
+  private loadAutosave(): void {
+    const loaded = this.store.load();
+    if (!loaded.valid || !loaded.state) {
+      this.showToast(loaded.errors[0] ?? this.translator()('loadError'));
+      return;
+    }
+    this.loadState(loaded.state);
+  }
+
+  private loadState(snapshot: GameState): void {
+    try {
+      this.engine = this.createEngine();
+      this.engine.reset(snapshot.seed, snapshot.config);
+      const result = this.engine.step({ type: 'LoadSnapshot', snapshot });
+      if (result.error) throw new Error(result.error.message);
+      this.state = result.state;
+      this.screen = 'game';
+      this.selection = null;
+      this.pendingMove = null;
+      this.renderGame();
+      this.autosave();
+    } catch (error) {
+      this.showToast(`${this.translator()('loadError')}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private showLoadModal(): void {
+    const t = this.translator();
+    this.root.className = 'app-shell modal-screen';
+    this.root.innerHTML = `<section class="modal-card" aria-labelledby="load-heading"><button class="icon-button modal-close" data-action="title">×</button><h2 id="load-heading">${escapeHtml(t('load'))}</h2><label>${escapeHtml(t('saveCode'))}<textarea data-input="save-code" rows="5" spellcheck="false" placeholder="Base64URL …"></textarea></label><div class="modal-actions"><button class="primary-button" data-action="load-code">${escapeHtml(t('load'))}</button><button class="ghost-button" data-action="title">${escapeHtml(t('cancel'))}</button></div><hr/><label>${escapeHtml(t('import'))}<input type="file" accept="application/json,.json" data-action="file-import" /></label></section>`;
+    this.bindRootEvents();
+    this.root.querySelector('[data-action="load-code"]')?.addEventListener('click', () => {
+      const code = this.root.querySelector<HTMLTextAreaElement>('[data-input="save-code"]')?.value ?? '';
+      const decoded = decodeSaveCode(code);
+      if (!decoded.valid || !decoded.state) this.showToast(decoded.errors[0] ?? t('loadError'));
+      else this.loadState(decoded.state);
+    });
+  }
+
+  private showSaveModal(): void {
+    if (!this.state) return;
+    const t = this.translator();
+    const code = this.lastSaveCode ?? encodeSaveCode(this.state);
+    this.lastSaveCode = code;
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="save"><section class="modal-card floating-card" aria-labelledby="save-heading"><button class="icon-button modal-close" data-action="dismiss-modal">×</button><h2 id="save-heading">${escapeHtml(t('saveCode'))}</h2><textarea data-input="save-code" rows="7" spellcheck="false" readonly>${escapeHtml(code)}</textarea><div class="modal-actions"><button class="primary-button" data-action="copy-code">${escapeHtml(t('copy'))}</button><button class="secondary-button" data-action="download-json">${escapeHtml(t('download'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
+  }
+
+  private copySaveCode(_element?: HTMLElement): void {
+    const code = this.lastSaveCode;
+    if (!code) return;
+    void navigator.clipboard?.writeText(code).then(() => this.showToast(this.translator()('copy'))).catch(() => this.showToast(code));
+  }
+
+  private downloadJson(): void {
+    if (!this.state) return;
+    const blob = new Blob([exportSaveJson(this.state)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `nowhere-left-to-hide-turn-${this.state.turn}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private readJsonFile(element: HTMLElement): void {
+    const input = element as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    void file.text().then((text) => {
+      const loaded = importSaveJson(text);
+      if (!loaded.valid || !loaded.state) this.showToast(loaded.errors[0] ?? this.translator()('loadError'));
+      else this.loadState(loaded.state);
+    });
+  }
+
+  private dismissModal(): void {
+    this.root.querySelector('[data-modal]')?.remove();
+  }
+
+  private showGuide(): void {
+    const t = this.translator();
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="guide"><section class="modal-card floating-card guide-card" aria-labelledby="guide-heading"><div class="guide-icon">◇</div><h2 id="guide-heading">${escapeHtml(t('guideTitle'))}</h2><p>${escapeHtml(t('guideBody'))}</p><button class="primary-button" data-action="guide-close">${escapeHtml(t('confirm'))}</button></section></div>`);
+  }
+
+  private showHelp(): void {
+    const t = this.translator();
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card" aria-labelledby="help-heading"><button class="icon-button modal-close" data-action="dismiss-modal">×</button><h2 id="help-heading">${escapeHtml(t('help'))}</h2><p>${escapeHtml(t('helpBody'))}</p><h3>${escapeHtml(t('move'))}</h3><p>${escapeHtml(t('guideBody'))}</p><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></section></div>`);
+  }
+
+  private showStatistics(result: GameResult | null): void {
+    if (!result || this.root.querySelector('[data-modal="statistics"]')) return;
+    const t = this.translator();
+    const stats = result.statistics;
+    const finalPopulation = this.state
+      ? this.state.population.employed + this.state.population.unemployed + this.state.population.police + this.state.population.nationalGuard
+      : 0;
+    const finalFacilities = this.state?.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length ?? 0;
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="statistics"><section class="modal-card floating-card" aria-labelledby="statistics-heading"><p class="eyebrow">${escapeHtml(t('gameOver'))}</p><h2 id="statistics-heading">${escapeHtml(result.outcome === 'won' ? t('victory') : t('defeat'))}</h2><div class="stats-grid"><span>${escapeHtml(t('survivedTurns'))}<b>${result.turn}</b></span><span>${escapeHtml(t('finalPopulation'))}<b>${finalPopulation}</b></span><span>${escapeHtml(t('maxPopulation'))}<b>${stats.maxPopulation}</b></span><span>${escapeHtml(t('finalFacilities'))}<b>${finalFacilities}</b></span><span>${escapeHtml(t('maxFacilities'))}<b>${stats.maxSecuredFacilities}</b></span><span>${escapeHtml(t('civilianLosses'))}<b>${stats.civilianLosses}</b></span><span>${escapeHtml(t('unitLosses'))}<b>${stats.unitLosses}</b></span><span>${escapeHtml(t('infectionLosses'))}<b>${stats.infectionLosses}</b></span><span>${escapeHtml(t('shortageLosses'))}<b>${stats.resourceShortageLosses}</b></span><span>${escapeHtml(t('hordeInterceptions'))}<b>${stats.hordeInterceptions}</b></span><span>${escapeHtml(t('defeatReason'))}<b>${escapeHtml(result.reason)}</b></span></div><div class="modal-actions"><button class="primary-button" data-action="title">${escapeHtml(t('reset'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
+  }
+
+  private renderSheetBody(): void {
+    if (!this.state) return;
+    const body = this.root.querySelector<HTMLElement>('[data-bind="sheet-body"]');
+    const title = this.root.querySelector<HTMLElement>('[data-bind="selection-title"]');
+    const summary = this.root.querySelector<HTMLElement>('[data-bind="selection-summary"]');
+    if (!body || !title || !summary) return;
+    const t = this.translator();
+    if (!this.selection) {
+      title.textContent = t('selectUnit');
+      summary.textContent = stateSummary(this.state, this.locale);
+      body.innerHTML = `<div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(t('selectDestination'))}</p><p class="muted">${escapeHtml(t('helpBody'))}</p></div>`;
+      return;
+    }
+    if (this.selection.kind === 'unit') {
+      const unit = findUnit(this.state, this.selection.id);
+      if (!unit) return;
+      const actions = legalActionsForUnit(this.state, this.legalActions(), unit.id);
+      title.textContent = `${unitLabel(unit.type, this.locale)} · ${unit.id}`;
+      summary.textContent = `HP ${unit.hp}/${unit.maxHp} · ${t('move')} ${unit.movement} · ${t('attack')} ${unit.attack}`;
+      const risk = this.pendingMove?.interceptionRisk;
+      const riskText = typeof risk === 'number' ? risk <= 0.2 ? t('low') : risk <= 0.5 ? t('medium') : t('high') : String(risk ?? t('none'));
+      const canWait = actions.some((action) => action.type === 'Wait');
+      const canSuppress = actions.some((action) => action.type === 'SuppressInfection');
+      body.innerHTML = `${this.pendingMove ? `<div class="preview-card"><strong>${escapeHtml(t('preview'))}</strong><p>${escapeHtml(t('path'))}: ${this.pendingMove.path.length} <span>→ ${this.pendingMove.destination.q},${this.pendingMove.destination.r}</span></p><p>${escapeHtml(t('interceptionRisk'))}: <b class="risk-${riskText.toLowerCase()}">${escapeHtml(riskText)}</b></p><div class="action-row"><button class="primary-button" data-action="confirm-move">${escapeHtml(t('confirm'))}</button><button class="ghost-button" data-action="cancel-move">${escapeHtml(t('cancel'))}</button></div></div>` : ''}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}${canSuppress ? `<button class="secondary-button" data-action="suppress">${escapeHtml(t('infected'))}</button>` : ''}</div><p class="muted">${escapeHtml(t('selectDestination'))}</p>`;
+      return;
+    }
+    const facility = this.state.facilities.find((candidate) => candidate.id === this.selection?.id);
+    if (!facility) return;
+    title.textContent = facilityLabel(facility.type, this.locale);
+    summary.textContent = `${facility.owner === 'player' ? t('owned') : facility.status === 'ruined' ? t('ruined') : t('unowned')} · ${facility.operationalStatus === 'operational' ? t('operational') : facility.operationalStatus === 'stopped' ? t('stopped') : t('ruined')}`;
+    const owned = facility.owner === 'player' && facility.status !== 'ruined';
+    const checkpoint = this.state.checkpoints.find((candidate) => candidate.position.q === facility.position.q && candidate.position.r === facility.position.r);
+    const workerAction = actionForWorkerAssignment(this.legalActions(), facility.id, facility.workers);
+    body.innerHTML = `${owned ? `<div class="facility-editor"><label>${escapeHtml(t('workers'))}<output>${facility.workers}/${facility.workerCapacity}</output><input type="range" min="0" max="${facility.workerCapacity}" value="${facility.workers}" data-worker-input="true" /></label><button class="secondary-button" data-action="assign-workers" ${workerAction ? '' : 'disabled'}>${escapeHtml(t('assignWorkers'))}</button></div>` : ''}${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${checkpoint ? `<div class="facility-editor"><label>${escapeHtml(t('checkpointPolicy'))}<select data-policy="${checkpoint.id}"><option value="passThrough" ${checkpoint.currentPolicy === 'passThrough' ? 'selected' : ''}>${escapeHtml(t('passThrough'))}</option><option value="normal" ${checkpoint.currentPolicy === 'normal' ? 'selected' : ''}>${escapeHtml(t('normal'))}</option><option value="strict" ${checkpoint.currentPolicy === 'strict' ? 'selected' : ''}>${escapeHtml(t('strict'))}</option></select></label><p class="muted">${escapeHtml(t('workers'))}: ${checkpoint.waiting + checkpoint.screening}</p></div>` : ''}<div class="action-row"><button class="secondary-button" data-action="produce-police">${escapeHtml(t('producePolice'))}</button><button class="secondary-button" data-action="produce-guard">${escapeHtml(t('produceGuard'))}</button><button class="secondary-button" data-action="build-checkpoint">${escapeHtml(t('buildCheckpoint'))}</button></div>`;
+  }
+
+  private showToast(message: string): void {
+    this.toastMessage = message;
+    this.renderToast();
+    if (this.noticeTimer) clearTimeout(this.noticeTimer);
+    const timer = setTimeout(() => {
+      this.toastMessage = null;
+      this.renderToast();
+    }, 4500);
+    this.noticeTimer = timer;
+  }
+
+  private renderToast(): void {
+    const toast = this.root.querySelector<HTMLElement>('#toast');
+    if (toast) {
+      toast.textContent = this.toastMessage ?? '';
+      toast.classList.toggle('visible', Boolean(this.toastMessage));
+    }
+    const status = this.root.querySelector<HTMLElement>('.title-status');
+    if (status && this.toastMessage) status.textContent = this.toastMessage;
+  }
+}
