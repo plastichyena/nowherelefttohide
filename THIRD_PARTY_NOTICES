@@ -3,10 +3,18 @@
 Project: 逃げ場なし / Nowhere Left to Hide
 
 This inventory was checked against `package-lock.json` (lockfileVersion 3) on
-2026-08-25. It covers the 107 installed `node_modules/*` entries recorded by
-the lockfile, including optional platform packages. No lockfile entry was
+2026-08-25. It covers all 107 non-root `node_modules/*` entries recorded by
+the lockfile, including optional platform packages. No package entry was
 missing a license field. The project itself does not currently claim a
 separate public license.
+
+The current Windows checkout materializes 57 package directories. Four of
+those packages (`@esbuild/win32-x64`, `@rollup/rollup-win32-x64-gnu`,
+`@rollup/rollup-win32-x64-msvc`, and `stackback`) do not ship a standalone
+`LICENSE*`, `LICENCE*`, `COPYING*`, or `NOTICE*` file; their MIT declarations in
+the installed `package.json` and lockfile are retained as the applicable
+license metadata. The remaining materialized packages include a standalone
+license file.
 
 ## Primary copyright attributions
 
@@ -16,7 +24,8 @@ later retains its own `LICENSE*`/`COPYING*` notice in the package archive
 identified by `package-lock.json`; those notices must remain intact when the
 dependency tree is redistributed.
 
-- `phaser` 3.90.0 — Copyright (c) 2024 Richard Davey, Phaser Studio Inc.; MIT.
+- `phaser` 4.2.1 — Copyright (c) 2026 Richard Davey, Phaser Studio Inc.; MIT.
+- `fflate` 0.8.3 — Copyright (c) 2026 Arjun Barrett; MIT.
 - `vite` 6.4.3 — Copyright (c) 2019-present, VoidZero Inc. and Vite contributors; MIT.
 - `vitest` 3.2.7 — Copyright (c) 2021-Present Vitest Team; MIT.
 - `typescript` 5.9.3 — Microsoft Corp.; Apache-2.0.
@@ -38,7 +47,7 @@ License references:
 
 | Package | Version in lockfile | License |
 | --- | ---: | --- |
-| `phaser` | 3.90.0 | MIT |
+| `phaser` | 4.2.1 | MIT |
 | `fflate` | 0.8.3 | MIT |
 | `vite` | 6.4.3 | MIT |
 | `vitest` | 3.2.7 | MIT |
@@ -151,7 +160,7 @@ above. Packages sharing an exact version and license are grouped together.
 - `nanoid` 3.3.18
 - `pathe` 2.0.3
 - `pathval` 2.0.1
-- `phaser` 3.90.0
+- `phaser` 4.2.1
 - `picomatch` 4.0.7
 - `postcss` 8.5.26
 - `std-env` 3.10.0

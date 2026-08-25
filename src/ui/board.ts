@@ -220,10 +220,10 @@ export class HexBoardScene extends Phaser.Scene {
     return nearest?.position ?? null;
   }
 
-  private hexPoints(center: { x: number; y: number }): Phaser.Geom.Point[] {
+  private hexPoints(center: { x: number; y: number }): Phaser.Math.Vector2[] {
     return Array.from({ length: 6 }, (_, index) => {
       const angle = Phaser.Math.DegToRad(60 * index + 30);
-      return new Phaser.Geom.Point(center.x + HEX_SIZE * Math.cos(angle), center.y + HEX_SIZE * Math.sin(angle));
+      return new Phaser.Math.Vector2(center.x + HEX_SIZE * Math.cos(angle), center.y + HEX_SIZE * Math.sin(angle));
     });
   }
 
