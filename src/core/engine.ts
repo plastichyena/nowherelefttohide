@@ -1440,6 +1440,20 @@ function setCheckpointPolicy(state: GameState, action: Extract<GameAction, { typ
   return null;
 }
 
+function unitProductionCosts(state: Readonly<GameState>, unitType: HumanUnitType): {
+  population: number;
+  civilianGoods: number;
+  militaryGoods: number;
+} {
+  const materialCosts = unitType === 'police'
+    ? { civilianGoods: 10, militaryGoods: 10 }
+    : { civilianGoods: 20, militaryGoods: 25 };
+  return {
+    population: state.config.units[unitType].population,
+    ...materialCosts,
+  };
+}
+
 function produceUnit(state: GameState, action: Extract<GameAction, { type: 'ProduceUnit' }>): ActionError | null {
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
@@ -1460,9 +1474,7 @@ function produceUnit(state: GameState, action: Extract<GameAction, { type: 'Prod
     );
   }
   if (state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) return error(action, 'city_busy', 'This city already has a reservation');
-  const costs = action.unitType === 'police'
-    ? { population: 5, civilianGoods: 10, militaryGoods: 10 }
-    : { population: 10, civilianGoods: 20, militaryGoods: 25 };
+  const costs = unitProductionCosts(state, action.unitType);
   if (
     availableSupplyPopulation(state) < costs.population ||
     civilianWorkerCount(state) - costs.population <= 0 ||
@@ -1679,12 +1691,12 @@ export class GameEngine implements HeadlessGame {
       if (!this.state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) {
         for (const unitType of HUMAN_UNIT_TYPES) {
           if (unitType === 'nationalGuard' && city.type !== 'capital') continue;
-          const costs = unitType === 'police' ? { population: 5, civilian: 10, military: 10 } : { population: 10, civilian: 20, military: 25 };
+          const costs = unitProductionCosts(this.state, unitType);
           if (
             availableSupplyPopulation(this.state) >= costs.population &&
             civilianWorkerCount(this.state) - costs.population > 0 &&
-            this.state.resources.civilianGoods >= costs.civilian &&
-            this.state.resources.militaryGoods >= costs.military
+            this.state.resources.civilianGoods >= costs.civilianGoods &&
+            this.state.resources.militaryGoods >= costs.militaryGoods
           ) {
             actions.push({ type: 'ProduceUnit', unitType, destination: { ...city.position } });
           }

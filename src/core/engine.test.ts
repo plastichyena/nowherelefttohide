@@ -136,6 +136,52 @@ describe('GameEngine', () => {
     expect(engine.getState().units.filter((unit) => unit.type === 'police')).toHaveLength(2);
   });
 
+  it('uses configured unit populations for recruitment, legal actions, and completion', () => {
+    const engine = new GameEngine(32, createDefaultConfig({
+      maxTurns: 3,
+      units: {
+        police: { population: 6 },
+        nationalGuard: { population: 11 },
+      },
+      economy: {
+        initialZombieCount: 0,
+        initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 },
+      },
+    }));
+    const initialLedger = populationLedgerTotal(engine.getState() as ReturnType<typeof createInitialState>);
+    expect(engine.getLegalActions()).toEqual(expect.arrayContaining([
+      { type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } },
+      { type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 7, r: 7 } },
+    ]));
+
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } }).error).toBeNull();
+    expect(engine.getState().pendingUnitProductions[0]?.population).toBe(6);
+    expect(engine.getState().population.healthyCivilians).toBe(94);
+    expect(engine.getState().population.unitPopulation).toBe(23);
+    expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    expect(engine.getState().units.filter((unit) => unit.type === 'police').map((unit) => unit.population)).toEqual([6, 6]);
+
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 7, r: 7 } }).error).toBeNull();
+    expect(engine.getState().pendingUnitProductions[0]?.population).toBe(11);
+    expect(engine.getState().population.healthyCivilians).toBe(83);
+    expect(engine.getState().population.unitPopulation).toBe(34);
+    expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    expect(engine.getState().units.filter((unit) => unit.type === 'nationalGuard').map((unit) => unit.population)).toEqual([11, 11]);
+    expect(populationLedgerTotal(engine.getState() as ReturnType<typeof createInitialState>)).toBe(initialLedger);
+    expect(validateInvariants(engine.getState() as ReturnType<typeof createInitialState>)).toEqual({ valid: true, errors: [] });
+  });
+
+  it('does not expose recruitment when configured population exceeds eligible city supply', () => {
+    const engine = new GameEngine(33, createDefaultConfig({
+      units: { police: { population: 42 } },
+      economy: { initialZombieCount: 0 },
+    }));
+    expect(engine.getLegalActions().some((action) => action.type === 'ProduceUnit' && action.unitType === 'police')).toBe(false);
+    const before = engine.getState();
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } }).error?.code).toBe('insufficient_production_cost');
+    expect(engine.getState()).toEqual(before);
+  });
+
   it('builds a cardinal road checkpoint and resolves pass-through refugees', () => {
     const config = createDefaultConfig({
       maxTurns: 3,
