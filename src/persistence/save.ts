@@ -2,20 +2,32 @@ import { gzipSync, gunzipSync, strFromU8, strToU8 } from 'fflate';
 import { validateGameConfig } from '../core/config';
 import { validateInvariants } from '../core/invariants';
 import { validateFixedMap } from '../core/map';
+import { GAME_VERSION, isCityFacility } from '../core/state';
 import type {
+  CardinalDirection,
+  CheckpointPolicy,
   CheckpointState,
   FacilityState,
+  GameEventType,
+  GamePhase,
   GameState,
+  GameOverReason,
+  HexCoord,
+  HumanUnitType,
+  UnitActionState,
   UnitState,
+  UnitType,
 } from '../core/types';
 
-/**
- * Save format is deliberately independent from the game version.  A future
- * game version may still be able to migrate an older save envelope, while an
- * unknown envelope version must never be applied to the running game.
- */
+/** The only game version accepted by this save implementation. */
+export const CURRENT_GAME_VERSION = GAME_VERSION;
+/** Alias useful to callers that want to label a generated save explicitly. */
+export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
+
+/** Stable envelope identifier shared by autosaves, codes, and JSON exports. */
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
 export const SAVE_FORMAT_VERSION = 1;
+/** Keep the key stable so a v1.0 autosave is found and rejected with an explanation. */
 export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v1';
 
 export interface SaveEnvelope {
@@ -49,15 +61,60 @@ export interface StorageLike {
 
 export type SaveErrorListener = (message: string, error?: unknown) => void;
 
+const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
+const CHECKPOINT_POLICIES: readonly CheckpointPolicy[] = ['passThrough', 'normal', 'strict'];
+const GAME_PHASES: readonly GamePhase[] = ['player', 'economy', 'refugees', 'infection', 'zombie', 'horde', 'gameOver'];
+const UNIT_TYPES: readonly UnitType[] = ['police', 'nationalGuard', 'zombie'];
+const HUMAN_UNIT_TYPES: readonly HumanUnitType[] = ['police', 'nationalGuard'];
+const UNIT_ACTION_STATES: readonly UnitActionState[] = ['ready', 'moved', 'acted', 'destroyed'];
+const GAME_OVER_REASONS: readonly GameOverReason[] = [
+  'capitalLost',
+  'healthyCiviliansLost',
+  'maxTurnsSurvived',
+  'abandoned',
+  'error',
+];
+const GAME_EVENT_TYPES: readonly GameEventType[] = [
+  'unit_moved',
+  'interception',
+  'attack',
+  'damage',
+  'unit_destroyed',
+  'facility_captured',
+  'workers_assigned',
+  'population_transferred',
+  'population_conscripted',
+  'resource_produced',
+  'resource_consumed',
+  'resource_shortage',
+  'refugees_arrived',
+  'refugees_screened',
+  'latent_infection',
+  'infection_spread',
+  'infection_suppressed',
+  'facility_overrun',
+  'facility_recovered',
+  'checkpoint_built',
+  'horde_spawned',
+  'game_over',
+];
+const FACILITY_TYPES = [
+  'capital',
+  'city',
+  'farm',
+  'civilianFactory',
+  'militaryFactory',
+  'refinery',
+  'powerPlant',
+] as const;
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
 /** Sort object keys while keeping array ordering stable for deterministic saves. */
 function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => canonicalize(entry));
-  }
+  if (Array.isArray(value)) return value.map((entry) => canonicalize(entry));
   if (value !== null && typeof value === 'object') {
     const record = value as Record<string, unknown>;
     return Object.fromEntries(
@@ -86,15 +143,10 @@ function bytesToBase64(bytes: Uint8Array): string {
     }
     return globalThis.btoa(binary);
   }
-
-  // Node's global btoa is available on supported runtimes, but this fallback
-  // keeps the helper usable in older test runners without bundling Buffer.
   const nodeBuffer = (globalThis as unknown as {
     Buffer?: { from(data: Uint8Array): { toString(encoding: string): string } };
   }).Buffer;
-  if (nodeBuffer) {
-    return nodeBuffer.from(bytes).toString('base64');
-  }
+  if (nodeBuffer) return nodeBuffer.from(bytes).toString('base64');
   throw new Error('Base64 encoder is unavailable in this environment');
 }
 
@@ -102,18 +154,13 @@ function base64ToBytes(value: string): Uint8Array {
   if (typeof globalThis.atob === 'function') {
     const binary = globalThis.atob(value);
     const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
-    }
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
     return bytes;
   }
-
   const nodeBuffer = (globalThis as unknown as {
     Buffer?: { from(data: string, encoding: string): Uint8Array };
   }).Buffer;
-  if (nodeBuffer) {
-    return nodeBuffer.from(value, 'base64');
-  }
+  if (nodeBuffer) return nodeBuffer.from(value, 'base64');
   throw new Error('Base64 decoder is unavailable in this environment');
 }
 
@@ -125,9 +172,7 @@ function toBase64Url(value: Uint8Array): string {
 }
 
 function fromBase64Url(value: string): Uint8Array {
-  if (!/^[A-Za-z0-9_-]*$/u.test(value)) {
-    throw new Error('Save code contains an invalid Base64URL character');
-  }
+  if (!/^[A-Za-z0-9_-]+$/u.test(value)) throw new Error('Save code contains an invalid Base64URL character');
   const padded = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
   return base64ToBytes(padded);
 }
@@ -162,161 +207,694 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function pushUnique(errors: string[], message: string): void {
+  if (!errors.includes(message)) errors.push(message);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isFiniteNonNegative(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function requireRecord(errors: string[], value: unknown, path: string): value is Record<string, unknown> {
+  if (!isRecord(value)) {
+    errors.push(`${path} must be an object`);
+    return false;
+  }
+  return true;
+}
+
+function requireArray(errors: string[], value: unknown, path: string): value is unknown[] {
+  if (!Array.isArray(value)) {
+    errors.push(`${path} must be an array`);
+    return false;
+  }
+  return true;
+}
+
+function requireString(errors: string[], value: unknown, path: string): value is string {
+  if (typeof value !== 'string' || value.length === 0) {
+    errors.push(`${path} must be a non-empty string`);
+    return false;
+  }
+  return true;
+}
+
+function requireInteger(errors: string[], value: unknown, path: string, minimum = 0): value is number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum) {
+    errors.push(`${path} must be a safe integer >= ${minimum}`);
+    return false;
+  }
+  return true;
+}
+
+function requireBoolean(errors: string[], value: unknown, path: string): value is boolean {
+  if (typeof value !== 'boolean') {
+    errors.push(`${path} must be a boolean`);
+    return false;
+  }
+  return true;
+}
+
+function requireEnum<T extends string>(errors: string[], value: unknown, path: string, values: readonly T[]): value is T {
+  if (typeof value !== 'string' || !values.includes(value as T)) {
+    errors.push(`${path} has an unsupported value: ${String(value)}`);
+    return false;
+  }
+  return true;
+}
+
 function nonNegative(errors: string[], value: unknown, path: string): void {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    errors.push(`${path} must be a finite number >= 0`);
-  }
+  if (!isFiniteNonNegative(value)) errors.push(`${path} must be a finite number >= 0`);
 }
 
-function validateUnit(state: GameState, unit: UnitState, errors: string[], index: number): void {
-  const path = `state.units[${index}]`;
-  if (!unit || typeof unit !== 'object') {
-    errors.push(`${path} must be an object`);
+function nonNegativeInteger(errors: string[], value: unknown, path: string): void {
+  if (!isNonNegativeInteger(value)) errors.push(`${path} must be a non-negative integer`);
+}
+
+function validateCoordinate(errors: string[], value: unknown, path: string, width = 15, height = 15): value is HexCoord {
+  if (!isRecord(value)) {
+    errors.push(`${path} must be a coordinate object`);
+    return false;
+  }
+  const q = value.q;
+  const r = value.r;
+  const validQ = requireInteger(errors, q, `${path}.q`);
+  const validR = requireInteger(errors, r, `${path}.r`);
+  if (validQ && validR && (q >= width || r >= height)) {
+    errors.push(`${path} is outside the map`);
+    return false;
+  }
+  return validQ && validR;
+}
+
+function parseVersion(value: string): [number, number, number] | null {
+  const match = /^v?(\d+)\.(\d+)(?:\.(\d+))?/u.exec(value.trim());
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
+}
+
+function versionError(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0 || value === CURRENT_GAME_VERSION) return null;
+  const parsed = parseVersion(value);
+  const old = parsed !== null && (parsed[0] < 1 || (parsed[0] === 1 && parsed[1] < 1));
+  if (old) return `保存データは旧バージョン (old version ${value}) のため読み込めません。現在のVersionは${CURRENT_GAME_VERSION}です。最初から開始してください。`;
+  return `unsupported game version: ${value}; current game version is ${CURRENT_GAME_VERSION}`;
+}
+
+function addVersionValidation(errors: string[], value: unknown, path: string): void {
+  if (typeof value !== 'string' || value.length === 0) {
+    errors.push(`${path} is required`);
     return;
   }
-  if (typeof unit.id !== 'string' || unit.id.length === 0) errors.push(`${path}.id is required`);
-  const mapTiles = Array.isArray(state.map?.tiles) ? state.map.tiles : [];
-  if (!mapTiles.some((tile) => tile.q === unit.position?.q && tile.r === unit.position?.r)) {
-    errors.push(`${path}.position is outside the map`);
-  }
-  for (const key of ['hp', 'maxHp', 'attack', 'movement', 'range', 'population'] as const) {
-    nonNegative(errors, unit[key], `${path}.${key}`);
-  }
-  if (unit.hp > unit.maxHp) errors.push(`${path}.hp cannot exceed maxHp`);
-  if (unit.actionState === 'destroyed' && unit.hp !== 0) {
-    errors.push(`${path} destroyed unit must have hp 0`);
-  }
+  const message = versionError(value);
+  if (message) pushUnique(errors, `${path}: ${message}`);
 }
 
-function validateFacility(facility: FacilityState, errors: string[], index: number): void {
+function validateMap(errors: string[], value: unknown, expectedMapId: unknown): value is GameState['map'] {
+  if (!isRecord(value)) {
+    errors.push('state.map must be an object');
+    return false;
+  }
+  const map: Record<string, unknown> = value;
+  if (!requireString(errors, map.id, 'state.map.id')) return false;
+  if (typeof expectedMapId === 'string' && map.id !== expectedMapId) errors.push('state.map.id does not match mapId');
+  if (map.width !== 15 || map.height !== 15) errors.push('state.map must be exactly 15x15');
+  const tilesValid = Array.isArray(map.tiles);
+  if (!tilesValid) errors.push('state.map.tiles must be an array');
+  const roadTilesValid = Array.isArray(map.roadTiles);
+  if (!roadTilesValid) errors.push('state.map.roadTiles must be an array');
+  const facilitiesValid = Array.isArray(map.facilities);
+  if (!facilitiesValid) errors.push('state.map.facilities must be an array');
+  const entrancesValid = Array.isArray(map.hordeEntrances);
+  if (!entrancesValid) errors.push('state.map.hordeEntrances must be an array');
+  const zombiesValid = Array.isArray(map.initialZombiePositions);
+  if (!zombiesValid) errors.push('state.map.initialZombiePositions must be an array');
+  let traversable = tilesValid && facilitiesValid && entrancesValid && zombiesValid;
+
+  if (tilesValid) {
+    const tiles = map.tiles as unknown[];
+    if (tiles.length !== 225) errors.push('state.map.tiles must contain 225 tiles');
+    const tileKeys = new Set<string>();
+    for (const [index, rawTile] of tiles.entries()) {
+      const path = `state.map.tiles[${index}]`;
+      if (!isRecord(rawTile)) {
+        errors.push(`${path} must be an object`);
+        traversable = false;
+        continue;
+      }
+      const tile: Record<string, unknown> = rawTile;
+      const validCoordinate = validateCoordinate(errors, tile, path);
+      const tileData = tile as unknown as Record<string, unknown>;
+      const key = typeof tileData.key === 'string' ? tileData.key : '';
+      if (!key) errors.push(`${path}.key must be a non-empty string`);
+      if (validCoordinate && key !== `${tileData.q},${tileData.r}`) errors.push(`${path}.key does not match its coordinate`);
+      if (key && tileKeys.has(key)) errors.push(`duplicate map tile: ${key}`);
+      if (key) tileKeys.add(key);
+      if (tileData.terrain !== 'land' && tileData.terrain !== 'road') errors.push(`${path}.terrain is invalid`);
+      requireBoolean(errors, tileData.road, `${path}.road`);
+      if (tileData.movementCost !== 1) errors.push(`${path}.movementCost must be 1`);
+      if (tileData.facilityId !== null && typeof tileData.facilityId !== 'string') errors.push(`${path}.facilityId is invalid`);
+      if (!Array.isArray(tileData.hordeEntranceDirections)) errors.push(`${path}.hordeEntranceDirections must be an array`);
+      else for (const direction of tileData.hordeEntranceDirections) requireEnum(errors, direction, `${path}.hordeEntranceDirections`, CARDINAL_DIRECTIONS);
+    }
+  }
+  if (roadTilesValid) for (const [index, position] of (map.roadTiles as unknown[]).entries()) validateCoordinate(errors, position, `state.map.roadTiles[${index}]`);
+  if (facilitiesValid) {
+    const facilities = map.facilities as unknown[];
+    if (facilities.length !== 16) errors.push('state.map.facilities must contain exactly 16 facilities');
+    const ids = new Set<string>();
+    const positions = new Set<string>();
+    for (const [index, rawFacility] of facilities.entries()) {
+      const path = `state.map.facilities[${index}]`;
+      if (!isRecord(rawFacility)) {
+        errors.push(`${path} must be an object`);
+        traversable = false;
+        continue;
+      }
+      const id = typeof rawFacility.id === 'string' ? rawFacility.id : '';
+      if (!id) errors.push(`${path}.id must be a non-empty string`);
+      if (id && ids.has(id)) errors.push(`duplicate map facility: ${id}`);
+      if (id) ids.add(id);
+      requireEnum(errors, rawFacility.type, `${path}.type`, FACILITY_TYPES);
+      const validCoordinate = validateCoordinate(errors, rawFacility.position, `${path}.position`);
+      if (validCoordinate) {
+        const position = rawFacility.position as Record<string, unknown>;
+        const key = `${position.q},${position.r}`;
+        if (positions.has(key)) errors.push(`duplicate map facility position: ${key}`);
+        positions.add(key);
+      }
+      requireString(errors, rawFacility.nameKey, `${path}.nameKey`);
+      requireInteger(errors, rawFacility.workerCapacity, `${path}.workerCapacity`, 1);
+      requireBoolean(errors, rawFacility.startingOwned, `${path}.startingOwned`);
+      requireInteger(errors, rawFacility.startingWorkers, `${path}.startingWorkers`);
+      requireInteger(errors, rawFacility.startingInfected, `${path}.startingInfected`);
+    }
+  }
+  if (entrancesValid) {
+    const entrances = map.hordeEntrances as unknown[];
+    if (entrances.length !== 4) errors.push('state.map.hordeEntrances must contain four entrances');
+    const directions = new Set<string>();
+    for (const [index, rawEntrance] of entrances.entries()) {
+      const path = `state.map.hordeEntrances[${index}]`;
+      if (!isRecord(rawEntrance)) {
+        errors.push(`${path} must be an object`);
+        traversable = false;
+        continue;
+      }
+      if (requireEnum(errors, rawEntrance.direction, `${path}.direction`, CARDINAL_DIRECTIONS)) {
+        if (directions.has(rawEntrance.direction)) errors.push(`duplicate Horde entrance direction: ${rawEntrance.direction}`);
+        directions.add(rawEntrance.direction);
+      }
+      validateCoordinate(errors, rawEntrance.tile, `${path}.tile`);
+      if (!Array.isArray(rawEntrance.roadTiles)) errors.push(`${path}.roadTiles must be an array`);
+      else for (const [roadIndex, position] of rawEntrance.roadTiles.entries()) validateCoordinate(errors, position, `${path}.roadTiles[${roadIndex}]`);
+    }
+  }
+  if (zombiesValid) {
+    const initialZombiePositions = map.initialZombiePositions as unknown[];
+    if (initialZombiePositions.length !== 4) errors.push('state.map.initialZombiePositions must contain four positions');
+    for (const [index, position] of initialZombiePositions.entries()) validateCoordinate(errors, position, `state.map.initialZombiePositions[${index}]`);
+  }
+  if (traversable) {
+    try {
+      const mapResult = validateFixedMap(value as unknown as GameState['map']);
+      if (!mapResult.valid) errors.push(...mapResult.errors.map((error) => `map: ${error}`));
+    } catch (error) {
+      errors.push(`map: could not validate map (${error instanceof Error ? error.message : String(error)})`);
+    }
+  }
+  return true;
+}
+
+function validateFacility(
+  facility: unknown,
+  errors: string[],
+  index: number,
+  mapFacilityById: Map<string, Record<string, unknown>>,
+  configFacilities: Record<string, unknown> | null,
+): facility is FacilityState {
   const path = `state.facilities[${index}]`;
-  if (!facility || typeof facility !== 'object') {
+  if (!isRecord(facility)) {
     errors.push(`${path} must be an object`);
-    return;
+    return false;
   }
-  nonNegative(errors, facility.workers, `${path}.workers`);
-  nonNegative(errors, facility.infected, `${path}.infected`);
-  if (facility.workers + facility.infected > facility.workerCapacity) {
-    errors.push(`${path}.workers and infected exceed workerCapacity`);
+  const idValid = requireString(errors, facility.id, `${path}.id`);
+  const id = typeof facility.id === 'string' ? facility.id : '';
+  requireEnum(errors, facility.type, `${path}.type`, FACILITY_TYPES);
+  const type = typeof facility.type === 'string' ? facility.type : '';
+  requireString(errors, facility.nameKey, `${path}.nameKey`);
+  validateCoordinate(errors, facility.position, `${path}.position`);
+  requireInteger(errors, facility.workerCapacity, `${path}.workerCapacity`, 1);
+  requireBoolean(errors, facility.startingOwned, `${path}.startingOwned`);
+  requireInteger(errors, facility.startingWorkers, `${path}.startingWorkers`);
+  requireInteger(errors, facility.startingInfected, `${path}.startingInfected`);
+  requireEnum(errors, facility.owner, `${path}.owner`, ['player', 'none'] as const);
+  requireEnum(errors, facility.status, `${path}.status`, ['unowned', 'owned', 'ruined'] as const);
+  requireEnum(errors, facility.operationalStatus, `${path}.operationalStatus`, ['operational', 'stopped', 'infected', 'ruined'] as const);
+  nonNegativeInteger(errors, facility.workers, `${path}.workers`);
+  nonNegativeInteger(errors, facility.infected, `${path}.infected`);
+  if (typeof facility.workerCapacity === 'number' && typeof facility.workers === 'number' && typeof facility.infected === 'number' && type !== 'capital' && type !== 'city' && facility.workers + facility.infected > facility.workerCapacity) errors.push(`${path}.workers and infected exceed workerCapacity`);
+  if (facility.securedOrder !== null) nonNegativeInteger(errors, facility.securedOrder, `${path}.securedOrder`);
+  nonNegativeInteger(errors, facility.lastAssignedOrder, `${path}.lastAssignedOrder`);
+  requireInteger(errors, facility.populationOperationalTurn, `${path}.populationOperationalTurn`, 1);
+
+  const definition = idValid ? mapFacilityById.get(id) : undefined;
+  if (idValid && !definition) errors.push(`${path}.id does not exist in state.map.facilities`);
+  if (definition) {
+    if (facility.type !== definition.type) errors.push(`${path}.type differs from state.map.facilities`);
+    if (facility.nameKey !== definition.nameKey) errors.push(`${path}.nameKey differs from state.map.facilities`);
+    const position = facility.position;
+    const definitionPosition = definition.position;
+    if (isRecord(position) && isRecord(definitionPosition) && (position.q !== definitionPosition.q || position.r !== definitionPosition.r)) errors.push(`${path}.position differs from state.map.facilities`);
+    if (facility.startingOwned !== definition.startingOwned || facility.startingWorkers !== definition.startingWorkers || facility.startingInfected !== definition.startingInfected) errors.push(`${path} starting definition differs from state.map.facilities`);
   }
+  if (configFacilities && type && isRecord(configFacilities[type]) && facility.workerCapacity !== configFacilities[type].workerCapacity) errors.push(`${path}.workerCapacity differs from config.facilities.${type}`);
+  if (facility.status === 'unowned' && facility.owner !== 'none') errors.push(`${path} unowned facility must not have a player owner`);
+  if (facility.status === 'owned' && facility.owner !== 'player') errors.push(`${path} owned facility must have a player owner`);
+  if (facility.status === 'ruined' && facility.owner !== 'none') errors.push(`${path} ruined facility must not have a player owner`);
+  if (facility.status === 'ruined' && facility.workers !== 0) errors.push(`${path} ruined facility cannot retain workers`);
+  if (facility.status === 'ruined' && facility.operationalStatus !== 'ruined') errors.push(`${path} ruined facility must use ruined operational status`);
+  return true;
 }
 
-function validateCheckpoint(checkpoint: CheckpointState, errors: string[], index: number): void {
-  const path = `state.checkpoints[${index}]`;
-  if (!checkpoint || typeof checkpoint !== 'object') {
+function validateUnit(
+  unit: unknown,
+  errors: string[],
+  index: number,
+  tileKeys: Set<string>,
+  configUnits: Record<string, unknown> | null,
+): unit is UnitState {
+  const path = `state.units[${index}]`;
+  if (!isRecord(unit)) {
     errors.push(`${path} must be an object`);
+    return false;
+  }
+  requireString(errors, unit.id, `${path}.id`);
+  const typeValid = requireEnum(errors, unit.type, `${path}.type`, UNIT_TYPES);
+  const type = typeof unit.type === 'string' ? unit.type : '';
+  const positionValid = validateCoordinate(errors, unit.position, `${path}.position`);
+  if (positionValid && isRecord(unit.position) && !tileKeys.has(`${unit.position.q},${unit.position.r}`)) errors.push(`${path}.position is not a map tile`);
+  for (const key of ['hp', 'maxHp', 'attack', 'movement', 'range', 'population'] as const) nonNegativeInteger(errors, unit[key], `${path}.${key}`);
+  requireEnum(errors, unit.actionState, `${path}.actionState`, UNIT_ACTION_STATES);
+  requireBoolean(errors, unit.canAttack, `${path}.canAttack`);
+  requireBoolean(errors, unit.canMove, `${path}.canMove`);
+  requireBoolean(errors, unit.isPlayerUnit, `${path}.isPlayerUnit`);
+  if (isRecord(unit.activity)) for (const key of ['moved', 'attacked', 'intercepted', 'suppressed'] as const) requireBoolean(errors, unit.activity[key], `${path}.activity.${key}`);
+  else errors.push(`${path}.activity must be an object`);
+  if (typeof unit.hp === 'number' && typeof unit.maxHp === 'number' && unit.hp > unit.maxHp) errors.push(`${path}.hp cannot exceed maxHp`);
+  if (unit.actionState === 'destroyed') errors.push(`${path} destroyed units must not be present in a save`);
+  if (typeValid) {
+    const expectedPlayerUnit = type !== 'zombie';
+    if (unit.isPlayerUnit !== expectedPlayerUnit) errors.push(`${path}.isPlayerUnit does not match type`);
+    const configured = configUnits?.[type];
+    if (isRecord(configured)) {
+      if (unit.maxHp !== configured.hp) errors.push(`${path}.maxHp differs from config.units.${type}.hp`);
+      for (const key of ['attack', 'movement', 'range', 'population'] as const) if (unit[key] !== configured[key]) errors.push(`${path}.${key} differs from config.units.${type}.${key}`);
+    }
+  }
+  return true;
+}
+
+function validateCheckpoint(
+  checkpoint: unknown,
+  errors: string[],
+  index: number,
+  tileKeys: Set<string>,
+  roadTiles: Set<string>,
+  maxPerDirection: number | null,
+  directionsSeen: Map<string, number>,
+): checkpoint is CheckpointState {
+  const path = `state.checkpoints[${index}]`;
+  if (!isRecord(checkpoint)) {
+    errors.push(`${path} must be an object`);
+    return false;
+  }
+  requireString(errors, checkpoint.id, `${path}.id`);
+  const positionValid = validateCoordinate(errors, checkpoint.position, `${path}.position`);
+  if (positionValid && isRecord(checkpoint.position)) {
+    const key = `${checkpoint.position.q},${checkpoint.position.r}`;
+    if (!tileKeys.has(key)) errors.push(`${path}.position is not a map tile`);
+    if (!roadTiles.has(key)) errors.push(`${path}.position must be on a road`);
+  }
+  const directionValid = requireEnum(errors, checkpoint.direction, `${path}.direction`, CARDINAL_DIRECTIONS);
+  if (directionValid) {
+    const direction = checkpoint.direction as CardinalDirection;
+    const count = (directionsSeen.get(direction) ?? 0) + 1;
+    directionsSeen.set(direction, count);
+    if (maxPerDirection !== null && count > maxPerDirection) errors.push(`${path} exceeds checkpoint limit for ${checkpoint.direction}`);
+  }
+  requireEnum(errors, checkpoint.status, `${path}.status`, ['operational', 'ruined'] as const);
+  for (const key of ['waiting', 'screening', 'approved', 'remainingTurns', 'infected'] as const) nonNegativeInteger(errors, checkpoint[key], `${path}.${key}`);
+  requireEnum(errors, checkpoint.screeningPolicy, `${path}.screeningPolicy`, CHECKPOINT_POLICIES);
+  requireEnum(errors, checkpoint.currentPolicy, `${path}.currentPolicy`, CHECKPOINT_POLICIES);
+  if (checkpoint.nextArrivalTurn !== null) requireInteger(errors, checkpoint.nextArrivalTurn, `${path}.nextArrivalTurn`, 1);
+  return true;
+}
+
+function validateCityPopulationSnapshot(state: Record<string, unknown>, errors: string[], facilities: Record<string, unknown>[]): void {
+  const rawSnapshot = state.cityPopulationSnapshot;
+  if (!isRecord(rawSnapshot)) {
+    errors.push('state.cityPopulationSnapshot must be an object');
     return;
   }
-  for (const key of ['waiting', 'screening', 'remainingTurns'] as const) {
-    nonNegative(errors, checkpoint[key], `${path}.${key}`);
+  const turn = state.turn;
+  if (!requireInteger(errors, rawSnapshot.turn, 'state.cityPopulationSnapshot.turn', 1)) return;
+  if (typeof turn === 'number' && rawSnapshot.turn !== turn) errors.push('state.cityPopulationSnapshot.turn must match state.turn');
+  const supplyValid = Array.isArray(rawSnapshot.supply);
+  if (!supplyValid) errors.push('state.cityPopulationSnapshot.supply must be an array');
+  const receptionValid = Array.isArray(rawSnapshot.reception);
+  if (!receptionValid) errors.push('state.cityPopulationSnapshot.reception must be an array');
+  if (!supplyValid || !receptionValid) return;
+  const facilityById = new Map<string, Record<string, unknown>>();
+  for (const facility of facilities) if (typeof facility.id === 'string') facilityById.set(facility.id, facility);
+  const parseEntries = (entries: unknown[], path: string): Map<string, { facilityId: string; population: number; eligible: boolean }> => {
+    const result = new Map<string, { facilityId: string; population: number; eligible: boolean }>();
+    for (const [index, rawEntry] of entries.entries()) {
+      const entryPath = `${path}[${index}]`;
+      if (!isRecord(rawEntry)) {
+        errors.push(`${entryPath} must be an object`);
+        continue;
+      }
+      const idValid = requireString(errors, rawEntry.facilityId, `${entryPath}.facilityId`);
+      const id = typeof rawEntry.facilityId === 'string' ? rawEntry.facilityId : '';
+      const populationValid = requireInteger(errors, rawEntry.population, `${entryPath}.population`);
+      const eligibleValid = requireBoolean(errors, rawEntry.eligible, `${entryPath}.eligible`);
+      if (idValid && result.has(id)) errors.push(`${path} contains duplicate facility ${id}`);
+      if (idValid && !facilityById.has(id)) errors.push(`${entryPath}.facilityId is not a facility in the state`);
+      if (idValid && facilityById.has(id) && !isCityFacility(facilityById.get(id) as Pick<FacilityState, 'type'>)) errors.push(`${entryPath}.facilityId must refer to a city`);
+      if (idValid && populationValid && eligibleValid) result.set(id, { facilityId: id, population: rawEntry.population as number, eligible: rawEntry.eligible as boolean });
+    }
+    return result;
+  };
+  const supply = parseEntries(rawSnapshot.supply as unknown[], 'state.cityPopulationSnapshot.supply');
+  const reception = parseEntries(rawSnapshot.reception as unknown[], 'state.cityPopulationSnapshot.reception');
+  if (supply.size !== reception.size || [...supply.keys()].some((id) => !reception.has(id))) errors.push('cityPopulationSnapshot supply and reception entries must contain the same cities');
+  for (const [id, entry] of supply) {
+    const other = reception.get(id);
+    if (other && (entry.population !== other.population || entry.eligible !== other.eligible)) errors.push(`cityPopulationSnapshot entry ${id} differs between supply and reception`);
+    const facility = facilityById.get(id);
+    if (entry.eligible && facility && typeof rawSnapshot.turn === 'number' && typeof facility.populationOperationalTurn === 'number' && facility.populationOperationalTurn > rawSnapshot.turn) errors.push(`cityPopulationSnapshot entry ${id} is eligible before populationOperationalTurn`);
   }
+  const supplyExpected = [...supply.values()].sort((left, right) => right.population - left.population || left.facilityId.localeCompare(right.facilityId));
+  const receptionExpected = [...reception.values()].sort((left, right) => left.population - right.population || left.facilityId.localeCompare(right.facilityId));
+  if (JSON.stringify(supplyExpected) !== JSON.stringify([...supply.values()])) errors.push('cityPopulationSnapshot.supply is not in deterministic order');
+  if (JSON.stringify(receptionExpected) !== JSON.stringify([...reception.values()])) errors.push('cityPopulationSnapshot.reception is not in deterministic order');
+}
+
+function isJsonValue(value: unknown): boolean {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every((entry) => isJsonValue(entry));
+  if (isRecord(value)) return Object.values(value).every((entry) => isJsonValue(entry));
+  return false;
+}
+
+function validateGameState(value: Record<string, unknown>, errors: string[]): boolean {
+  const requiredFields = [
+    'gameVersion', 'config', 'seed', 'rngState', 'turn', 'maxTurns', 'actionsTakenThisTurn', 'phase', 'mapId', 'map', 'facilities',
+    'population', 'cityPopulationSnapshot', 'resources', 'units', 'checkpoints', 'pendingUnitProductions', 'nextUnitNumber', 'nextEventNumber',
+    'nextAssignmentOrder', 'horde', 'events', 'statistics', 'gameOver', 'result',
+  ];
+  for (const field of requiredFields) if (!hasOwn(value, field)) errors.push(`state.${field} is required for a v1.1 save`);
+  addVersionValidation(errors, value.gameVersion, 'state.gameVersion');
+  if (hasOwn(value, 'pendingAdmissions')) errors.push('state.pendingAdmissions is a legacy v1.0 field and is not supported');
+  if (!isRecord(value.config)) {
+    errors.push('state.config must be an object');
+    return false;
+  }
+  const config: Record<string, unknown> = value.config;
+  if (config.version !== CURRENT_GAME_VERSION) {
+    const message = versionError(config.version);
+    pushUnique(errors, message ? `state.config.version: ${message}` : `state.config.version must be ${CURRENT_GAME_VERSION}`);
+  }
+  try {
+    const configResult = validateGameConfig(config as unknown as GameState['config']);
+    if (!configResult.valid) errors.push(...configResult.errors.map((error) => `config: ${error}`));
+  } catch (error) {
+    errors.push(`config: could not validate configuration (${error instanceof Error ? error.message : String(error)})`);
+  }
+  if (isRecord(config.economy) && hasOwn(config.economy, 'initialUnemployed')) errors.push('config.economy.initialUnemployed is a legacy v1.0 field and is not supported');
+
+  requireInteger(errors, value.seed, 'state.seed', -Number.MAX_SAFE_INTEGER);
+  const maxTurns = value.maxTurns;
+  const turn = value.turn;
+  const maxTurnsValid = requireInteger(errors, maxTurns, 'state.maxTurns', 1);
+  const turnValid = requireInteger(errors, turn, 'state.turn', 1);
+  if (maxTurnsValid && turnValid && turn > maxTurns) errors.push('state.turn must not exceed state.maxTurns');
+  if (typeof config.maxTurns === 'number' && maxTurnsValid && maxTurns !== config.maxTurns) errors.push('state.maxTurns must match config.maxTurns');
+  requireInteger(errors, value.actionsTakenThisTurn, 'state.actionsTakenThisTurn');
+  if (typeof config.maxActionsPerTurn === 'number' && typeof value.actionsTakenThisTurn === 'number' && value.actionsTakenThisTurn > config.maxActionsPerTurn) errors.push('state.actionsTakenThisTurn exceeds config.maxActionsPerTurn');
+  requireEnum(errors, value.phase, 'state.phase', GAME_PHASES);
+  requireString(errors, value.mapId, 'state.mapId');
+  if (typeof config.mapId === 'string' && value.mapId !== config.mapId) errors.push('state.mapId must match config.mapId');
+
+  const rngState = value.rngState;
+  if (isRecord(rngState)) {
+    if (rngState.algorithm !== 'xorshift32-v1') errors.push('state.rngState.algorithm must be xorshift32-v1');
+    requireInteger(errors, rngState.seed, 'state.rngState.seed');
+    requireInteger(errors, rngState.state, 'state.rngState.state');
+    requireInteger(errors, rngState.calls, 'state.rngState.calls');
+    if (typeof value.seed === 'number' && typeof rngState.seed === 'number' && (value.seed >>> 0) !== rngState.seed) errors.push('state.rngState.seed must match state.seed');
+    if (typeof rngState.seed === 'number' && rngState.seed > 0xffffffff) errors.push('state.rngState.seed must be uint32');
+    if (typeof rngState.state === 'number' && rngState.state > 0xffffffff) errors.push('state.rngState.state must be uint32');
+  } else errors.push('state.rngState must be an object');
+
+  const mapValid = validateMap(errors, value.map, value.mapId);
+  const mapRecord = isRecord(value.map) ? value.map : null;
+  const mapFacilityById = new Map<string, Record<string, unknown>>();
+  const tileKeys = new Set<string>();
+  const roadTiles = new Set<string>();
+  if (mapRecord && Array.isArray(mapRecord.facilities)) for (const facility of mapRecord.facilities as unknown[]) if (isRecord(facility) && typeof facility.id === 'string') mapFacilityById.set(facility.id, facility);
+  if (mapRecord && Array.isArray(mapRecord.tiles)) for (const tile of mapRecord.tiles as unknown[]) if (isRecord(tile) && typeof tile.q === 'number' && typeof tile.r === 'number') tileKeys.add(`${tile.q},${tile.r}`);
+  if (mapRecord && Array.isArray(mapRecord.roadTiles)) for (const position of mapRecord.roadTiles as unknown[]) if (isRecord(position) && typeof position.q === 'number' && typeof position.r === 'number') roadTiles.add(`${position.q},${position.r}`);
+  if (!mapValid) errors.push('state.map is invalid');
+
+  const rawFacilities = value.facilities;
+  const facilities: Record<string, unknown>[] = [];
+  const facilityIds = new Set<string>();
+  const configFacilities = isRecord(config.facilities) ? config.facilities : null;
+  if (Array.isArray(rawFacilities)) {
+    if (mapRecord && Array.isArray(mapRecord.facilities) && rawFacilities.length !== (mapRecord.facilities as unknown[]).length) errors.push('state.facilities count must match state.map.facilities');
+    for (const [index, rawFacility] of rawFacilities.entries()) {
+      if (validateFacility(rawFacility, errors, index, mapFacilityById, configFacilities)) {
+        const facility = rawFacility as unknown as Record<string, unknown>;
+        facilities.push(facility);
+        if (typeof facility.id === 'string' && facilityIds.has(facility.id)) errors.push(`duplicate state facility id: ${facility.id}`);
+        if (typeof facility.id === 'string') facilityIds.add(facility.id);
+      }
+    }
+  } else errors.push('state.facilities must be an array');
+
+  const population = value.population;
+  if (isRecord(population)) {
+    for (const field of ['initialPopulation', 'cityResidents', 'productionWorkers', 'healthyCivilians', 'police', 'nationalGuard', 'unitPopulation', 'waitingRefugees', 'screeningRefugees', 'approvedRefugees', 'facilityInfected', 'checkpointInfected', 'cumulativeDeaths', 'cumulativeArrivals', 'cumulativeDepartures', 'cumulativeDiscoveredInfected']) nonNegativeInteger(errors, population[field], `state.population.${field}`);
+    if (hasOwn(population, 'employed') || hasOwn(population, 'unemployed')) errors.push('state.population uses the legacy employed/unemployed model and cannot be loaded');
+    const rawFacilityWorkers = population.facilityWorkers;
+    if (requireArray(errors, rawFacilityWorkers, 'state.population.facilityWorkers')) {
+      const seen = new Set<string>();
+      let previousId = '';
+      for (const [index, rawEntry] of rawFacilityWorkers.entries()) {
+        const path = `state.population.facilityWorkers[${index}]`;
+        if (!isRecord(rawEntry)) {
+          errors.push(`${path} must be an object`);
+          continue;
+        }
+        const idValid = requireString(errors, rawEntry.facilityId, `${path}.facilityId`);
+        nonNegativeInteger(errors, rawEntry.workers, `${path}.workers`);
+        if (idValid && typeof rawEntry.facilityId === 'string') {
+          if (seen.has(rawEntry.facilityId)) errors.push(`${path}.facilityId is duplicated`);
+          if (previousId && previousId.localeCompare(rawEntry.facilityId) > 0) errors.push('state.population.facilityWorkers must be sorted by facilityId');
+          previousId = rawEntry.facilityId;
+          seen.add(rawEntry.facilityId);
+          const facility = facilities.find((candidate) => candidate.id === rawEntry.facilityId);
+          if (!facility || facility.owner !== 'player') errors.push(`${path}.facilityId must refer to an owned facility`);
+          else if (rawEntry.workers !== facility.workers) errors.push(`${path}.workers does not match its facility`);
+        }
+      }
+      const ownedCount = facilities.filter((facility) => facility.owner === 'player').length;
+      if (rawFacilityWorkers.length !== ownedCount) errors.push('state.population.facilityWorkers must include every owned facility exactly once');
+    }
+    const cityResidents = facilities.filter((facility) => facility.owner === 'player' && (facility.type === 'capital' || facility.type === 'city')).reduce((total, facility) => total + (typeof facility.workers === 'number' ? facility.workers : 0), 0);
+    const productionWorkers = facilities.filter((facility) => facility.owner === 'player' && facility.type !== 'capital' && facility.type !== 'city').reduce((total, facility) => total + (typeof facility.workers === 'number' ? facility.workers : 0), 0);
+    if (population.cityResidents !== cityResidents) errors.push('state.population.cityResidents is out of sync with facilities');
+    if (population.productionWorkers !== productionWorkers) errors.push('state.population.productionWorkers is out of sync with facilities');
+    if (population.healthyCivilians !== cityResidents + productionWorkers) errors.push('state.population.healthyCivilians is out of sync with facilities');
+  } else errors.push('state.population must be an object');
+
+  const resources = value.resources;
+  if (isRecord(resources)) {
+    for (const field of ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricityCapacity', 'electricityRequired']) nonNegativeInteger(errors, resources[field], `state.resources.${field}`);
+    requireBoolean(errors, resources.militarySupplyAvailable, 'state.resources.militarySupplyAvailable');
+  } else errors.push('state.resources must be an object');
+
+  const rawUnits = value.units;
+  const unitIds = new Set<string>();
+  const configUnits = isRecord(config.units) ? config.units : null;
+  if (Array.isArray(rawUnits)) {
+    const occupied = new Set<string>();
+    for (const [index, rawUnit] of rawUnits.entries()) {
+      if (validateUnit(rawUnit, errors, index, tileKeys, configUnits)) {
+        const unit = rawUnit as unknown as Record<string, unknown>;
+        if (typeof unit.id === 'string' && unitIds.has(unit.id)) errors.push(`duplicate state unit id: ${unit.id}`);
+        if (typeof unit.id === 'string') unitIds.add(unit.id);
+        if (isRecord(unit.position) && unit.actionState !== 'destroyed') {
+          const key = `${unit.position.q},${unit.position.r}`;
+          if (occupied.has(key)) errors.push(`multiple living units occupy ${key}`);
+          occupied.add(key);
+        }
+      }
+    }
+  } else errors.push('state.units must be an array');
+
+  const rawCheckpoints = value.checkpoints;
+  const checkpointIds = new Set<string>();
+  if (Array.isArray(rawCheckpoints)) {
+    const checkpointTiles = new Set<string>();
+    const directionsSeen = new Map<string, number>();
+    const maxPerDirection = isRecord(config.checkpoint) && isNonNegativeInteger(config.checkpoint.maxPerDirection) ? config.checkpoint.maxPerDirection : null;
+    for (const [index, rawCheckpoint] of rawCheckpoints.entries()) {
+      if (validateCheckpoint(rawCheckpoint, errors, index, tileKeys, roadTiles, maxPerDirection, directionsSeen)) {
+        const checkpoint = rawCheckpoint as unknown as Record<string, unknown>;
+        if (typeof checkpoint.id === 'string' && checkpointIds.has(checkpoint.id)) errors.push(`duplicate checkpoint id: ${checkpoint.id}`);
+        if (typeof checkpoint.id === 'string') checkpointIds.add(checkpoint.id);
+        if (isRecord(checkpoint.position)) {
+          const key = `${checkpoint.position.q},${checkpoint.position.r}`;
+          if (checkpointTiles.has(key)) errors.push(`multiple checkpoints occupy ${key}`);
+          checkpointTiles.add(key);
+        }
+      }
+    }
+  } else errors.push('state.checkpoints must be an array');
+
+  validateCityPopulationSnapshot(value, errors, facilities);
+
+  const pendingOrders = value.pendingUnitProductions;
+  const pendingIds = new Set<string>();
+  if (Array.isArray(pendingOrders)) {
+    for (const [index, rawOrder] of pendingOrders.entries()) {
+      const path = `state.pendingUnitProductions[${index}]`;
+      if (!isRecord(rawOrder)) {
+        errors.push(`${path} must be an object`);
+        continue;
+      }
+      requireString(errors, rawOrder.id, `${path}.id`);
+      if (typeof rawOrder.id === 'string' && pendingIds.has(rawOrder.id)) errors.push(`${path}.id is duplicated`);
+      if (typeof rawOrder.id === 'string') pendingIds.add(rawOrder.id);
+      const city = typeof rawOrder.cityFacilityId === 'string' ? facilities.find((facility) => facility.id === rawOrder.cityFacilityId) : undefined;
+      requireString(errors, rawOrder.cityFacilityId, `${path}.cityFacilityId`);
+      // A reservation is retained while a city is temporarily infected or
+      // lost; the engine retries it after the city becomes operational again.
+      // Therefore the save only needs to ensure that the target remains a
+      // known city facility, not that it is owned at this exact turn.
+      if (!city || (city.type !== 'capital' && city.type !== 'city')) errors.push(`${path}.cityFacilityId must refer to a city facility`);
+      requireEnum(errors, rawOrder.unitType, `${path}.unitType`, HUMAN_UNIT_TYPES);
+      requireInteger(errors, rawOrder.population, `${path}.population`, 1);
+      requireInteger(errors, rawOrder.readyTurn, `${path}.readyTurn`, 1);
+    }
+  } else errors.push('state.pendingUnitProductions must be an array');
+
+  for (const field of ['nextUnitNumber', 'nextEventNumber', 'nextAssignmentOrder']) requireInteger(errors, value[field], `state.${field}`);
+
+  const horde = value.horde;
+  if (isRecord(horde)) {
+    for (const field of ['spawnedCount', 'totalSpawned', 'turnsRemaining']) nonNegativeInteger(errors, horde[field], `state.horde.${field}`);
+    requireEnum(errors, horde.nextDirection, 'state.horde.nextDirection', CARDINAL_DIRECTIONS);
+    if (horde.nextSpawnTurn !== null) requireInteger(errors, horde.nextSpawnTurn, 'state.horde.nextSpawnTurn', 1);
+    if (horde.lastSpawnTurn !== null) requireInteger(errors, horde.lastSpawnTurn, 'state.horde.lastSpawnTurn', 1);
+  } else errors.push('state.horde must be an object');
+
+  const statistics = value.statistics;
+  if (isRecord(statistics)) for (const field of ['maxPopulation', 'maxSecuredFacilities', 'civilianLosses', 'unitLosses', 'infectionLosses', 'resourceShortageLosses', 'hordeInterceptions']) nonNegativeInteger(errors, statistics[field], `state.statistics.${field}`);
+  else errors.push('state.statistics must be an object');
+
+  const events = value.events;
+  if (Array.isArray(events)) {
+    const eventIds = new Set<string>();
+    for (const [index, rawEvent] of events.entries()) {
+      const path = `state.events[${index}]`;
+      if (!isRecord(rawEvent)) {
+        errors.push(`${path} must be an object`);
+        continue;
+      }
+      requireString(errors, rawEvent.id, `${path}.id`);
+      if (typeof rawEvent.id === 'string' && eventIds.has(rawEvent.id)) errors.push(`${path}.id is duplicated`);
+      if (typeof rawEvent.id === 'string') eventIds.add(rawEvent.id);
+      requireInteger(errors, rawEvent.turn, `${path}.turn`, 1);
+      if (typeof value.turn === 'number' && typeof rawEvent.turn === 'number' && rawEvent.turn > value.turn) errors.push(`${path}.turn cannot be after current turn`);
+      requireEnum(errors, rawEvent.phase, `${path}.phase`, GAME_PHASES);
+      requireEnum(errors, rawEvent.type, `${path}.type`, GAME_EVENT_TYPES);
+      if (!requireRecord(errors, rawEvent.payload, `${path}.payload`) || !isJsonValue(rawEvent.payload)) errors.push(`${path}.payload must contain JSON values only`);
+    }
+  } else errors.push('state.events must be an array');
+
+  const gameOverValid = requireBoolean(errors, value.gameOver, 'state.gameOver');
+  if (value.gameOver === true && value.phase !== 'gameOver') errors.push('gameOver state must use gameOver phase');
+  if (value.gameOver === false && value.phase === 'gameOver') errors.push('non-game-over state cannot use gameOver phase');
+  if (value.result === null) {
+    if (value.gameOver === true) errors.push('gameOver state must include a result');
+  } else if (isRecord(value.result)) {
+    if (value.gameOver === false) errors.push('non-game-over state cannot include a result');
+    requireEnum(errors, value.result.outcome, 'state.result.outcome', ['won', 'lost'] as const);
+    requireEnum(errors, value.result.reason, 'state.result.reason', GAME_OVER_REASONS);
+    requireInteger(errors, value.result.turn, 'state.result.turn', 1);
+    if (typeof value.turn === 'number' && typeof value.result.turn === 'number' && value.result.turn !== value.turn) errors.push('state.result.turn must match state.turn');
+    if (!requireRecord(errors, value.result.statistics, 'state.result.statistics')) {
+      // Error already recorded by requireRecord.
+    } else for (const field of ['maxPopulation', 'maxSecuredFacilities', 'civilianLosses', 'unitLosses', 'infectionLosses', 'resourceShortageLosses', 'hordeInterceptions']) nonNegativeInteger(errors, value.result.statistics[field], `state.result.statistics.${field}`);
+  } else errors.push('state.result must be an object or null');
+  if (gameOverValid && typeof value.gameOver === 'boolean' && value.gameOver !== (value.result !== null)) errors.push('state.gameOver and state.result must agree');
+
+  return true;
 }
 
 /** Validate a decoded snapshot before it can reach GameEngine.LoadSnapshot. */
 export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
-  if (!isRecord(value)) {
-    return { valid: false, errors: ['Save envelope must be an object'], state: null, envelope: null };
-  }
+  if (!isRecord(value)) return { valid: false, errors: ['Save envelope must be an object'], state: null, envelope: null };
+  // Inspect versions before returning on envelope errors so old saves always get
+  // the actionable incompatibility message rather than a generic parse error.
+  addVersionValidation(errors, value.gameVersion, 'gameVersion');
+  const nestedState = isRecord(value.state) ? value.state : null;
+  if (nestedState && typeof nestedState.gameVersion === 'string' && nestedState.gameVersion !== CURRENT_GAME_VERSION) addVersionValidation(errors, nestedState.gameVersion, 'state.gameVersion');
+  // v1.0 exports used `version` in a few envelope/state variants.  Inspect it
+  // even when a nested state exists so every legacy representation receives
+  // the same explicit incompatibility explanation.
+  if (typeof value.gameVersion !== 'string' && typeof value.version === 'string') addVersionValidation(errors, value.version, 'version');
+  if (nestedState && typeof nestedState.gameVersion !== 'string' && typeof nestedState.version === 'string') addVersionValidation(errors, nestedState.version, 'state.version');
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) errors.push('unsupported save format version');
-  if (typeof value.gameVersion !== 'string' || value.gameVersion.length === 0) errors.push('gameVersion is required');
-  if (typeof value.mapId !== 'string' || value.mapId.length === 0) errors.push('mapId is required');
-  if (typeof value.seed !== 'number' || !Number.isInteger(value.seed)) errors.push('seed must be an integer');
+  requireString(errors, value.mapId, 'mapId');
+  if (typeof value.seed !== 'number' || !Number.isSafeInteger(value.seed)) errors.push('seed must be a safe integer');
   if (typeof value.checksum !== 'string' || !/^[0-9a-f]{8}$/u.test(value.checksum)) errors.push('checksum is invalid');
-  if (!isRecord(value.state)) errors.push('state is required');
-  if (errors.length > 0) return { valid: false, errors, state: null, envelope: null };
+  if (!nestedState) errors.push('state is required');
+  if (!nestedState || value.format !== SAVE_FORMAT || value.formatVersion !== SAVE_FORMAT_VERSION || typeof value.mapId !== 'string' || typeof value.seed !== 'number' || typeof value.checksum !== 'string') return { valid: false, errors: [...new Set(errors)], state: null, envelope: null };
 
-  const state = value.state as unknown as GameState;
-  const payload = {
-    format: value.format,
-    formatVersion: value.formatVersion,
-    gameVersion: value.gameVersion,
-    mapId: value.mapId,
-    seed: value.seed,
-    state,
-  } as Omit<SaveEnvelope, 'checksum'>;
+  const payload = { format: value.format, formatVersion: value.formatVersion, gameVersion: value.gameVersion, mapId: value.mapId, seed: value.seed, state: nestedState } as unknown as Omit<SaveEnvelope, 'checksum'>;
   if (checksum(envelopePayload(payload)) !== value.checksum) errors.push('checksum mismatch');
-  if (state.gameVersion !== value.gameVersion) errors.push('state/gameVersion does not match envelope');
-  if (state.mapId !== value.mapId) errors.push('state/mapId does not match envelope');
-  if (state.seed !== value.seed) errors.push('state/seed does not match envelope');
+  if (nestedState.gameVersion !== value.gameVersion) errors.push('state/gameVersion does not match envelope');
+  if (nestedState.mapId !== value.mapId) errors.push('state/mapId does not match envelope');
+  if (nestedState.seed !== value.seed) errors.push('state/seed does not match envelope');
+  validateGameState(nestedState, errors);
+  const uniqueErrors = [...new Set(errors)];
+  if (uniqueErrors.length > 0) return { valid: false, errors: uniqueErrors, state: null, envelope: null };
 
-  const configResult = validateGameConfig(state.config);
-  if (!configResult.valid) errors.push(...configResult.errors.map((error) => `config: ${error}`));
-  const mapResult = validateFixedMap(state.map);
-  if (!mapResult.valid) errors.push(...mapResult.errors.map((error) => `map: ${error}`));
-  if (isRecord(state.config) && state.mapId !== state.config.mapId) errors.push('mapId must match config.mapId');
-  if (!Number.isInteger(state.turn) || state.turn < 1 || state.turn > state.maxTurns) {
-    errors.push('turn must be between 0 and maxTurns');
+  const state = clone(nestedState as unknown as GameState);
+  try {
+    const invariantResult = validateInvariants(state);
+    if (!invariantResult.valid) return { valid: false, errors: invariantResult.errors.map((error) => `invariant: ${error}`), state: null, envelope: null };
+  } catch (error) {
+    return { valid: false, errors: [`invariant: could not validate snapshot structure (${error instanceof Error ? error.message : String(error)})`], state: null, envelope: null };
   }
-  if (!Number.isInteger(state.maxTurns) || state.maxTurns < 1) errors.push('maxTurns must be a positive integer');
-  if (
-    isRecord(state.map) &&
-    isRecord(state.config) &&
-    isRecord(state.population) &&
-    isRecord(state.resources) &&
-    Array.isArray(state.facilities) &&
-    Array.isArray(state.units) &&
-    Array.isArray(state.checkpoints)
-  ) {
-    try {
-      const invariantResult = validateInvariants(state);
-      if (!invariantResult.valid) errors.push(...invariantResult.errors.map((error) => `invariant: ${error}`));
-    } catch (error) {
-      errors.push(`invariant: could not validate snapshot structure (${error instanceof Error ? error.message : String(error)})`);
-    }
-  }
-
-  const population = state.population;
-  if (!population || typeof population !== 'object') {
-    errors.push('population is required');
-  } else {
-    for (const key of [
-      'employed',
-      'unemployed',
-      'police',
-      'nationalGuard',
-      'unitPopulation',
-      'waitingRefugees',
-      'screeningRefugees',
-      'facilityInfected',
-    ] as const) nonNegative(errors, population[key], `population.${key}`);
-  }
-  const resources = state.resources;
-  if (!resources || typeof resources !== 'object') {
-    errors.push('resources is required');
-  } else {
-    for (const key of ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricityCapacity', 'electricityRequired'] as const) {
-      nonNegative(errors, resources[key], `resources.${key}`);
-    }
-  }
-  if (!Array.isArray(state.units)) errors.push('units must be an array');
-  if (!Array.isArray(state.facilities)) errors.push('facilities must be an array');
-  if (!Array.isArray(state.checkpoints)) errors.push('checkpoints must be an array');
-  for (const [index, unit] of (state.units ?? []).entries()) validateUnit(state, unit, errors, index);
-  for (const [index, facility] of (state.facilities ?? []).entries()) validateFacility(facility, errors, index);
-  for (const [index, checkpoint] of (state.checkpoints ?? []).entries()) validateCheckpoint(checkpoint, errors, index);
-
-  const occupied = new Map<string, string>();
-  for (const unit of state.units ?? []) {
-    if (!unit || typeof unit !== 'object' || !unit.position || typeof unit.position !== 'object') continue;
-    if (unit.actionState === 'destroyed') continue;
-    const key = `${unit.position.q},${unit.position.r}`;
-    const previous = occupied.get(key);
-    if (previous) errors.push(`multiple living units occupy ${key}: ${previous}, ${unit.id}`);
-    occupied.set(key, unit.id);
-  }
-
-  const envelope: SaveEnvelope = {
-    format: SAVE_FORMAT,
-    formatVersion: SAVE_FORMAT_VERSION,
-    gameVersion: value.gameVersion as string,
-    mapId: value.mapId as string,
-    seed: value.seed as number,
-    state: clone(state),
-    checksum: value.checksum as string,
-  };
-  return { valid: errors.length === 0, errors, state: errors.length === 0 ? clone(state) : null, envelope: errors.length === 0 ? envelope : null };
+  const envelope: SaveEnvelope = { format: SAVE_FORMAT, formatVersion: SAVE_FORMAT_VERSION, gameVersion: value.gameVersion as string, mapId: value.mapId as string, seed: value.seed as number, state, checksum: value.checksum as string };
+  return { valid: true, errors: [], state: clone(state), envelope };
 }
 
 /** Create a checksummed, URL-safe save code from a complete GameState. */
@@ -328,14 +906,10 @@ export function encodeSaveCode(state: GameState): string {
 
 /** Decode and validate a save code without mutating any caller-owned object. */
 export function decodeSaveCode(code: string): SaveValidationResult {
-  if (typeof code !== 'string' || code.trim().length === 0) {
-    return { valid: false, errors: ['Save code is empty'], state: null, envelope: null };
-  }
+  if (typeof code !== 'string' || code.trim().length === 0) return { valid: false, errors: ['Save code is empty'], state: null, envelope: null };
   try {
     const compressed = fromBase64Url(code.trim());
-    if (compressed[0] !== 0x1f || compressed[1] !== 0x8b) {
-      return { valid: false, errors: ['Save code is not gzip-compressed'], state: null, envelope: null };
-    }
+    if (compressed.length < 2 || compressed[0] !== 0x1f || compressed[1] !== 0x8b) return { valid: false, errors: ['Save code is not gzip-compressed'], state: null, envelope: null };
     const parsed: unknown = JSON.parse(strFromU8(gunzipSync(compressed)));
     return validateSnapshot(parsed);
   } catch (error) {
@@ -348,9 +922,7 @@ export function exportSaveJson(state: GameState): string {
 }
 
 export function importSaveJson(json: string): SaveValidationResult {
-  if (typeof json !== 'string' || json.trim().length === 0) {
-    return { valid: false, errors: ['Save JSON is empty'], state: null, envelope: null };
-  }
+  if (typeof json !== 'string' || json.trim().length === 0) return { valid: false, errors: ['Save JSON is empty'], state: null, envelope: null };
   try {
     return validateSnapshot(JSON.parse(json) as unknown);
   } catch (error) {
@@ -380,6 +952,11 @@ export class AutoSaveStore {
   }
 
   save(state: GameState): SaveOperationResult {
+    const oldVersion = versionError(state?.gameVersion);
+    if (oldVersion) {
+      this.onError?.(oldVersion);
+      return { ok: false, code: null, error: oldVersion };
+    }
     if (!this.storage) {
       const message = 'ブラウザのローカル保存領域を利用できません。セーブコードを使用してください。';
       this.onError?.(message);
@@ -397,9 +974,7 @@ export class AutoSaveStore {
   }
 
   load(): SaveValidationResult {
-    if (!this.storage) {
-      return { valid: false, errors: ['ブラウザのローカル保存領域を利用できません'], state: null, envelope: null };
-    }
+    if (!this.storage) return { valid: false, errors: ['ブラウザのローカル保存領域を利用できません'], state: null, envelope: null };
     try {
       const code = this.storage.getItem(this.key);
       if (!code) return { valid: false, errors: ['保存データがありません'], state: null, envelope: null };

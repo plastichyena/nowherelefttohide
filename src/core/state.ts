@@ -15,7 +15,15 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '1.0.0';
+export const GAME_VERSION = '1.1.0';
+
+export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
+  return facility.type === 'capital' || facility.type === 'city';
+}
+
+export function isProductionFacility(facility: Pick<FacilityState, 'type'>): boolean {
+  return !isCityFacility(facility);
+}
 
 export function cloneState(state: GameState): GameState {
   return JSON.parse(JSON.stringify(state)) as GameState;
@@ -75,34 +83,51 @@ export function createUnit(
 
 /** Keep all denormalized population information in sync after a state change. */
 export function synchronizePopulation(state: GameState): void {
-  const employed = state.facilities.reduce(
-    (total, facility) => total + (facility.owner === 'player' ? facility.workers : 0),
-    0,
-  );
+  const ownedHealthy = state.facilities.filter((facility) => facility.owner === 'player');
+  const cityResidents = ownedHealthy
+    .filter(isCityFacility)
+    .reduce((total, facility) => total + facility.workers, 0);
+  const productionWorkers = ownedHealthy
+    .filter(isProductionFacility)
+    .reduce((total, facility) => total + facility.workers, 0);
   const facilityInfected = state.facilities.reduce((total, facility) => total + facility.infected, 0);
   const police = state.units
     .filter((unit) => unit.type === 'police')
-    .reduce((total, unit) => total + unit.population, 0);
+    .reduce((total, unit) => total + unit.population, 0) +
+    state.pendingUnitProductions
+      .filter((order) => order.unitType === 'police')
+      .reduce((total, order) => total + order.population, 0);
   const nationalGuard = state.units
     .filter((unit) => unit.type === 'nationalGuard')
-    .reduce((total, unit) => total + unit.population, 0);
+    .reduce((total, unit) => total + unit.population, 0) +
+    state.pendingUnitProductions
+      .filter((order) => order.unitType === 'nationalGuard')
+      .reduce((total, order) => total + order.population, 0);
   const waiting = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.waiting, 0);
   const screening = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.screening, 0);
+  const approved = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.approved, 0);
+  const checkpointInfected = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.infected, 0);
 
-  state.population.employed = employed;
+  state.population.cityResidents = cityResidents;
+  state.population.productionWorkers = productionWorkers;
+  state.population.healthyCivilians = cityResidents + productionWorkers;
   state.population.police = police;
   state.population.nationalGuard = nationalGuard;
   state.population.unitPopulation = police + nationalGuard;
   state.population.waitingRefugees = waiting;
   state.population.screeningRefugees = screening;
+  state.population.approvedRefugees = approved;
   state.population.facilityInfected = facilityInfected;
+  state.population.checkpointInfected = checkpointInfected;
   state.population.facilityWorkers = state.facilities
     .filter((facility) => facility.owner === 'player')
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((facility) => ({ facilityId: facility.id, workers: facility.workers }));
 
-  const civilianPopulation = employed + state.population.unemployed;
-  state.statistics.maxPopulation = Math.max(state.statistics.maxPopulation, civilianPopulation + police + nationalGuard);
+  state.statistics.maxPopulation = Math.max(
+    state.statistics.maxPopulation,
+    cityResidents + productionWorkers + waiting + screening + approved + police + nationalGuard,
+  );
   state.statistics.maxSecuredFacilities = Math.max(
     state.statistics.maxSecuredFacilities,
     state.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length,
@@ -110,11 +135,53 @@ export function synchronizePopulation(state: GameState): void {
 }
 
 export function civilianWorkerCount(state: GameState): number {
-  return state.population.employed + state.population.unemployed;
+  return state.facilities
+    .filter((facility) => facility.owner === 'player')
+    .reduce((total, facility) => total + facility.workers, 0);
 }
 
 export function resourceConsumerPopulation(state: GameState): number {
   return civilianWorkerCount(state) + state.population.unitPopulation;
+}
+
+/** Auditable population ledger used to prove that atomic actions never create or lose people. */
+export function populationLedgerTotal(state: GameState): number {
+  const facilities = state.facilities.reduce(
+    (total, facility) => total + facility.workers + facility.infected,
+    0,
+  );
+  const units = state.units
+    .filter(isHumanUnit)
+    .reduce((total, unit) => total + unit.population, 0);
+  const reservedUnits = state.pendingUnitProductions.reduce((total, order) => total + order.population, 0);
+  const checkpoints = state.checkpoints.reduce(
+    (total, checkpoint) =>
+      total + checkpoint.waiting + checkpoint.screening + checkpoint.approved + checkpoint.infected,
+    0,
+  );
+  return facilities + units + reservedUnits + checkpoints + state.population.cumulativeDeaths;
+}
+
+export function createCityPopulationSnapshot(state: GameState): void {
+  const entries = state.facilities
+    .filter((facility) => facility.owner === 'player' && facility.status !== 'ruined' && isCityFacility(facility))
+    .map((facility) => ({
+      facilityId: facility.id,
+      population: facility.workers,
+      eligible:
+        facility.status === 'owned' &&
+        facility.infected === 0 &&
+        facility.populationOperationalTurn <= state.turn,
+    }));
+  state.cityPopulationSnapshot = {
+    turn: state.turn,
+    supply: [...entries].sort(
+      (left, right) => right.population - left.population || left.facilityId.localeCompare(right.facilityId),
+    ),
+    reception: [...entries].sort(
+      (left, right) => left.population - right.population || left.facilityId.localeCompare(right.facilityId),
+    ),
+  };
 }
 
 function facilityStateFromDefinition(
@@ -148,6 +215,7 @@ function facilityStateFromDefinition(
     infected,
     securedOrder,
     lastAssignedOrder: securedOrder ?? 0,
+    populationOperationalTurn: owned ? 1 : Number.MAX_SAFE_INTEGER,
   };
 }
 
@@ -228,16 +296,25 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     mapId: map.id,
     map,
     facilities,
+    cityPopulationSnapshot: { turn: 1, supply: [], reception: [] },
     population: {
-      employed: 0,
-      unemployed: stateConfig.economy.initialUnemployed,
+      initialPopulation: 0,
+      cityResidents: 0,
+      productionWorkers: 0,
+      healthyCivilians: 0,
       police: 0,
       nationalGuard: 0,
       unitPopulation: 0,
       facilityWorkers: [],
       waitingRefugees: 0,
       screeningRefugees: 0,
+      approvedRefugees: 0,
       facilityInfected: 0,
+      checkpointInfected: 0,
+      cumulativeDeaths: 0,
+      cumulativeArrivals: 0,
+      cumulativeDepartures: 0,
+      cumulativeDiscoveredInfected: 0,
     },
     resources: {
       food: resources.food,
@@ -256,7 +333,6 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       ),
     ],
     checkpoints: [],
-    pendingAdmissions: [],
     pendingUnitProductions: [],
     nextUnitNumber: 2,
     nextEventNumber: 1,
@@ -283,6 +359,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     result: null,
   };
   synchronizePopulation(state);
+  state.population.initialPopulation = populationLedgerTotal(state);
+  createCityPopulationSnapshot(state);
   return state;
 }
 

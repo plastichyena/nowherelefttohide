@@ -37,7 +37,7 @@ async function boot(): Promise<void> {
       return engine;
     };
   } catch (error) {
-    root.innerHTML = `<main class="title-card"><h1>逃げ場なし</h1><p class="title-copy">Game Coreを読み込めません。${String(error instanceof Error ? error.message : error)}</p></main>`;
+    root.innerHTML = `<main class="title-card"><h1>Nowhere Left to Hide</h1><p class="title-copy">Game Coreを読み込めません。${String(error instanceof Error ? error.message : error)}</p></main>`;
     return;
   }
   new GameUiController(root, engineFactory).mount();

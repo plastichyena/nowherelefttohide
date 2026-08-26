@@ -136,6 +136,9 @@ function actionKey(action: GameAction): string {
   if (action.type === 'Wait') return `Wait|${action.unitId}`;
   if (action.type === 'SuppressInfection') return `SuppressInfection|${action.unitId}|${action.facilityId}`;
   if (action.type === 'AssignWorkers') return `AssignWorkers|${action.facilityId}|${action.workers}`;
+  if (action.type === 'TransferPopulation') {
+    return `TransferPopulation|${action.fromFacilityId}|${action.toFacilityId}|${action.people}`;
+  }
   if (action.type === 'SetCheckpointPolicy') return `SetCheckpointPolicy|${action.checkpointId}|${action.policy}`;
   if (action.type === 'BuildCheckpoint') return `BuildCheckpoint|${action.position.q},${action.position.r}`;
   if (action.type === 'ProduceUnit') {

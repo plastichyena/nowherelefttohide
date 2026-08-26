@@ -73,7 +73,7 @@ export type GamePhase =
 
 export type GameOverReason =
   | 'capitalLost'
-  | 'workersLost'
+  | 'healthyCiviliansLost'
   | 'maxTurnsSurvived'
   | 'abandoned'
   | 'error';
@@ -144,12 +144,19 @@ export interface FacilityState extends FacilityDefinition {
   securedOrder: number | null;
   /** Stable ordering key used for deterministic worker-shortage casualties. */
   lastAssignedOrder: number;
+  /** First player turn on which population actions and recruitment are legal. */
+  populationOperationalTurn: number;
 }
 
 export interface PopulationState {
-  /** Workers currently assigned to owned facilities. */
-  employed: number;
-  unemployed: number;
+  /** Population present at new-game creation, including initial human units. */
+  initialPopulation: number;
+  /** Derived healthy civilians living in owned cities. */
+  cityResidents: number;
+  /** Derived healthy civilians assigned to owned production facilities. */
+  productionWorkers: number;
+  /** Derived healthy civilians in all owned normal facilities. */
+  healthyCivilians: number;
   police: number;
   nationalGuard: number;
   /** Population in units is tracked separately from civilian workers. */
@@ -158,7 +165,29 @@ export interface PopulationState {
   facilityWorkers: Array<{ facilityId: FacilityId; workers: number }>;
   waitingRefugees: number;
   screeningRefugees: number;
+  approvedRefugees: number;
   facilityInfected: number;
+  checkpointInfected: number;
+  /** Population deaths used to audit the population conservation ledger. */
+  cumulativeDeaths: number;
+  /** Refugees entering checkpoint custody. */
+  cumulativeArrivals: number;
+  /** Screened people who do not join the managed population. */
+  cumulativeDepartures: number;
+  /** Previously uncounted infected revealed by the configured overrun floor. */
+  cumulativeDiscoveredInfected: number;
+}
+
+export interface CityPopulationSnapshotEntry {
+  facilityId: FacilityId;
+  population: number;
+  eligible: boolean;
+}
+
+export interface CityPopulationSnapshot {
+  turn: number;
+  supply: CityPopulationSnapshotEntry[];
+  reception: CityPopulationSnapshotEntry[];
 }
 
 export interface UnitState {
@@ -192,18 +221,13 @@ export interface CheckpointState {
   status: CheckpointStatus;
   waiting: number;
   screening: number;
+  approved: number;
   remainingTurns: number;
   screeningPolicy: CheckpointPolicy;
   currentPolicy: CheckpointPolicy;
   nextArrivalTurn: number | null;
   /** Infection is tracked separately from people still waiting for processing. */
   infected: number;
-}
-
-export interface PendingAdmission {
-  checkpointId: string;
-  acceptedWorkers: number;
-  latentInfected: number;
 }
 
 export interface UnitProductionOrder {
@@ -231,6 +255,8 @@ export type GameEventType =
   | 'unit_destroyed'
   | 'facility_captured'
   | 'workers_assigned'
+  | 'population_transferred'
+  | 'population_conscripted'
   | 'resource_produced'
   | 'resource_consumed'
   | 'resource_shortage'
@@ -285,6 +311,12 @@ export interface ForecastResourceRequirement {
 
 export interface EndTurnForecast {
   populationConsumers: number;
+  overcrowding: {
+    /** Exact sum represented as per-city rational terms. */
+    cities: Array<{ facilityId: FacilityId; excess: number; softCap: number }>;
+    additionalFood: number;
+    additionalCivilianGoods: number;
+  };
   food: ForecastResourceRequirement;
   civilianGoods: ForecastResourceRequirement;
   militaryGoods: ForecastResourceRequirement;
@@ -310,10 +342,10 @@ export interface GameState {
   map: FixedMap;
   facilities: FacilityState[];
   population: PopulationState;
+  cityPopulationSnapshot: CityPopulationSnapshot;
   resources: ResourceState;
   units: UnitState[];
   checkpoints: CheckpointState[];
-  pendingAdmissions: PendingAdmission[];
   pendingUnitProductions: UnitProductionOrder[];
   nextUnitNumber: number;
   nextEventNumber: number;
@@ -361,6 +393,13 @@ export interface AssignWorkersAction {
   workers: number;
 }
 
+export interface TransferPopulationAction {
+  type: 'TransferPopulation';
+  fromFacilityId: FacilityId;
+  toFacilityId: FacilityId;
+  people: number;
+}
+
 export interface SetCheckpointPolicyAction {
   type: 'SetCheckpointPolicy';
   checkpointId: string;
@@ -400,6 +439,7 @@ export type GameAction =
   | WaitAction
   | SuppressInfectionAction
   | AssignWorkersAction
+  | TransferPopulationAction
   | SetCheckpointPolicyAction
   | BuildCheckpointAction
   | ProduceUnitAction
@@ -503,7 +543,6 @@ export interface EconomyConfig {
   militaryGoodsPerUnitPopulation: number;
   initialResources: ResourceStock;
   initialWorkersByFacility: Record<FacilityId, number>;
-  initialUnemployed: number;
   initialZombieCount: number;
 }
 

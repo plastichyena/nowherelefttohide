@@ -7,6 +7,7 @@ import { SeededRng } from './rng';
 import {
   civilianWorkerCount,
   cloneState,
+  createCityPopulationSnapshot,
   createInitialState,
   createUnit,
   getCheckpointAt,
@@ -14,8 +15,11 @@ import {
   getUnit,
   getUnitAt,
   isHumanUnit,
+  isCityFacility,
+  isProductionFacility,
   nextHumanUnitId,
   positionKey,
+  populationLedgerTotal,
   resourceConsumerPopulation,
   synchronizePopulation,
 } from './state';
@@ -39,7 +43,6 @@ import type {
   HumanUnitType,
   JsonObject,
   MoveAction,
-  PendingAdmission,
   ResourceType,
   StepResult,
   UnitProductionOrder,
@@ -132,6 +135,7 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string): void {
   state.units.splice(index, 1);
   if (isHumanUnit(unit)) {
     state.statistics.unitLosses += 1;
+    state.population.cumulativeDeaths += unit.population;
   }
   emit(state, 'unit_destroyed', { unitId: unit.id, cause });
 }
@@ -206,6 +210,7 @@ function tryCapture(state: GameState, unit: UnitState): void {
   );
   facility.securedOrder = previousOrder + 1;
   facility.lastAssignedOrder = state.nextAssignmentOrder++;
+  facility.populationOperationalTurn = state.turn + 1;
   emit(state, 'facility_captured', { facilityId: facility.id, unitId: unit.id });
 }
 
@@ -315,59 +320,134 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
 }
 
 function totalCheckpointPeople(checkpoint: CheckpointState): number {
-  return checkpoint.waiting + checkpoint.screening;
+  return checkpoint.waiting + checkpoint.screening + checkpoint.approved;
 }
 
-function removeCheckpointPeople(checkpoint: CheckpointState, amount: number): number {
+function removeCheckpointPeople(
+  checkpoint: CheckpointState,
+  amount: number,
+  order: Array<'waiting' | 'screening' | 'approved'> = ['waiting', 'screening', 'approved'],
+): number {
   let remaining = Math.max(0, Math.floor(amount));
-  const fromWaiting = Math.min(remaining, checkpoint.waiting);
-  checkpoint.waiting -= fromWaiting;
-  remaining -= fromWaiting;
-  const fromScreening = Math.min(remaining, checkpoint.screening);
-  checkpoint.screening -= fromScreening;
-  return fromWaiting + fromScreening;
+  let removed = 0;
+  for (const pool of order) {
+    const fromPool = Math.min(remaining, checkpoint[pool]);
+    checkpoint[pool] -= fromPool;
+    remaining -= fromPool;
+    removed += fromPool;
+    if (remaining === 0) break;
+  }
+  return removed;
 }
 
-function availableAdmissionFacility(state: GameState): FacilityState[] {
-  return stableFacilities(state).filter(
-    (facility) => facility.owner === 'player' && facility.status === 'owned' && facility.workers > 0,
-  );
+function eligibleSnapshotCities(
+  state: GameState,
+  order: 'supply' | 'reception',
+): FacilityState[] {
+  if (state.cityPopulationSnapshot.turn !== state.turn) return [];
+  return state.cityPopulationSnapshot[order]
+    .filter((entry) => entry.eligible)
+    .map((entry) => getFacilityState(state, entry.facilityId))
+    .filter(
+      (facility): facility is FacilityState =>
+        facility !== undefined &&
+        facility.owner === 'player' &&
+        facility.status === 'owned' &&
+        facility.infected === 0 &&
+        facility.populationOperationalTurn <= state.turn &&
+        isCityFacility(facility),
+    );
 }
 
-function establishLatentInfection(
+function availableSupplyPopulation(state: GameState): number {
+  return eligibleSnapshotCities(state, 'supply').reduce((total, city) => total + city.workers, 0);
+}
+
+function withdrawFromSupplyCities(state: GameState, amount: number): Array<{ facilityId: string; people: number }> | null {
+  let remaining = amount;
+  const changes: Array<{ facilityId: string; people: number }> = [];
+  for (const city of eligibleSnapshotCities(state, 'supply')) {
+    const people = Math.min(remaining, city.workers);
+    if (people > 0) changes.push({ facilityId: city.id, people });
+    remaining -= people;
+    if (remaining === 0) break;
+  }
+  if (remaining > 0) return null;
+  for (const change of changes) {
+    getFacilityState(state, change.facilityId)!.workers -= change.people;
+  }
+  return changes;
+}
+
+function distributeToReceptionCities(state: GameState, amount: number): Array<{ facilityId: string; people: number }> | null {
+  const cities = eligibleSnapshotCities(state, 'reception');
+  if (amount > 0 && cities.length === 0) return null;
+  let remaining = amount;
+  const assigned = new Map<string, number>();
+  for (const city of cities) {
+    const softCap = state.config.facilities[city.type].workerCapacity;
+    const people = Math.min(remaining, Math.max(0, softCap - city.workers));
+    city.workers += people;
+    assigned.set(city.id, (assigned.get(city.id) ?? 0) + people);
+    remaining -= people;
+    if (remaining === 0) break;
+  }
+  let index = 0;
+  while (remaining > 0) {
+    const city = cities[index % cities.length]!;
+    city.workers += 1;
+    assigned.set(city.id, (assigned.get(city.id) ?? 0) + 1);
+    remaining -= 1;
+    index += 1;
+  }
+  return [...assigned.entries()]
+    .filter(([, people]) => people > 0)
+    .map(([facilityId, people]) => ({ facilityId, people }));
+}
+
+function healthyLatentInfectionTargets(state: GameState): FacilityState[] {
+  return state.facilities
+    .filter(
+      (facility) =>
+        facility.owner === 'player' &&
+        facility.status === 'owned' &&
+        facility.workers > 0,
+    )
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function establishLatentInfectionInState(
   state: GameState,
   rng: SeededRng,
   checkpointId: string,
-  acceptedWorkers: number,
   latentInfected: number,
 ): void {
-  if (latentInfected <= 0) {
-    state.population.unemployed += acceptedWorkers;
-    return;
-  }
-  const candidates = availableAdmissionFacility(state);
-  if (candidates.length === 0) {
-    state.pendingAdmissions.push({ checkpointId, acceptedWorkers, latentInfected });
-    return;
-  }
+  if (latentInfected <= 0) return;
+  const candidates = healthyLatentInfectionTargets(state);
+  if (candidates.length === 0) return;
   const target = rng.pick(candidates);
   const converted = Math.min(target.workers, latentInfected);
   target.workers -= converted;
   target.infected += converted;
-  state.population.unemployed += acceptedWorkers;
+  target.operationalStatus = 'infected';
   emit(state, 'latent_infection', { checkpointId, facilityId: target.id, infected: converted });
 }
 
-function resolvePendingAdmissions(state: GameState, rng: SeededRng): void {
-  const pending = [...state.pendingAdmissions];
-  state.pendingAdmissions = [];
-  for (const admission of pending) {
-    const candidates = availableAdmissionFacility(state);
-    if (candidates.length === 0) {
-      state.pendingAdmissions.push(admission);
-      continue;
+function placeApprovedRefugees(state: GameState): void {
+  for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (checkpoint.status !== 'operational' || checkpoint.approved <= 0) continue;
+    const people = checkpoint.approved;
+    const placements = distributeToReceptionCities(state, people);
+    if (!placements) continue;
+    checkpoint.approved = 0;
+    for (const placement of placements) {
+      emit(state, 'population_transferred', {
+        from: checkpoint.id,
+        to: placement.facilityId,
+        people: placement.people,
+        reason: 'approved_refugees',
+      });
     }
-    establishLatentInfection(state, rng, admission.checkpointId, admission.acceptedWorkers, admission.latentInfected);
   }
 }
 
@@ -380,6 +460,7 @@ function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rn
   checkpoint.screening = 0;
   checkpoint.remainingTurns = 0;
   const acceptedWorkers = Math.floor(screened * policy.workerRate);
+  state.population.cumulativeDepartures += screened - acceptedWorkers;
   let latentInfected = 0;
   if (acceptedWorkers > 0 && policy.infectionRate > 0 && rng.chance(policy.infectionRate)) {
     latentInfected = Math.ceil(acceptedWorkers * policy.infectionPopulationRate);
@@ -390,7 +471,32 @@ function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rn
     acceptedWorkers,
     policy: checkpoint.screeningPolicy,
   });
-  establishLatentInfection(state, rng, checkpoint.id, acceptedWorkers, latentInfected);
+  const placements = distributeToReceptionCities(state, acceptedWorkers);
+  if (placements) {
+    for (const placement of placements) {
+      emit(state, 'population_transferred', {
+        from: checkpoint.id,
+        to: placement.facilityId,
+        people: placement.people,
+        reason: 'screening_approved',
+      });
+    }
+    establishLatentInfectionInState(state, rng, checkpoint.id, latentInfected);
+  } else {
+    checkpoint.approved += acceptedWorkers;
+    const converted = removeCheckpointPeople(
+      checkpoint,
+      latentInfected,
+      ['approved', 'screening', 'waiting'],
+    );
+    checkpoint.infected += converted;
+    if (converted > 0) {
+      emit(state, 'latent_infection', { checkpointId: checkpoint.id, infected: converted, pool: 'checkpoint' });
+    }
+    if (totalCheckpointPeople(checkpoint) === 0 && checkpoint.infected > 0) {
+      overrunCheckpoint(state, checkpoint, rng);
+    }
+  }
 }
 
 function processRefugees(state: GameState, rng: SeededRng): void {
@@ -401,6 +507,7 @@ function processRefugees(state: GameState, rng: SeededRng): void {
     if (checkpoint.nextArrivalTurn !== null && checkpoint.nextArrivalTurn === state.turn) {
       const people = rng.nextInt(state.config.refugees.arrivalPeopleMin, state.config.refugees.arrivalPeopleMax);
       checkpoint.waiting += people;
+      state.population.cumulativeArrivals += people;
       checkpoint.nextArrivalTurn = state.turn + rng.nextInt(
         state.config.refugees.arrivalIntervalMin,
         state.config.refugees.arrivalIntervalMax,
@@ -424,13 +531,16 @@ function processRefugees(state: GameState, rng: SeededRng): void {
       }
     }
   }
-  resolvePendingAdmissions(state, rng);
 }
 
 function powerAndProduction(state: GameState): void {
   const outputs: Record<ResourceType, number> = { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0 };
   const activeFacilities = stableFacilities(state).filter(
-    (facility) => facility.owner === 'player' && facility.status === 'owned' && facility.workers > 0,
+    (facility) =>
+      facility.owner === 'player' &&
+      facility.status === 'owned' &&
+      facility.infected === 0 &&
+      facility.workers > 0,
   );
   const capacity = activeFacilities
     .filter((facility) => facility.type === 'powerPlant')
@@ -448,8 +558,14 @@ function powerAndProduction(state: GameState): void {
   );
   let remainingCapacity = capacity;
   for (const facility of stableFacilities(state)) {
-    if (facility.owner !== 'player' || facility.status !== 'owned' || facility.workers <= 0) {
-      facility.operationalStatus = facility.status === 'ruined' ? 'ruined' : 'stopped';
+    if (
+      facility.owner !== 'player' ||
+      facility.status !== 'owned' ||
+      facility.workers <= 0 ||
+      facility.infected > 0
+    ) {
+      facility.operationalStatus =
+        facility.status === 'ruined' ? 'ruined' : facility.infected > 0 ? 'infected' : 'stopped';
       continue;
     }
     const rule = state.config.facilities[facility.type].production;
@@ -468,7 +584,9 @@ function powerAndProduction(state: GameState): void {
       continue;
     }
     const rule = state.config.facilities[facility.type].production;
-    let working = facility.workers;
+    let working = isCityFacility(facility)
+      ? Math.min(facility.workers, state.config.facilities[facility.type].workerCapacity)
+      : facility.workers;
     for (const [resource, perWorker] of Object.entries(rule.inputs) as Array<[ResourceType, number]>) {
       if (perWorker > 0) {
         working = Math.min(working, Math.floor(state.resources[resource] / perWorker));
@@ -493,27 +611,87 @@ function powerAndProduction(state: GameState): void {
   }
 }
 
-function removeWorkersForShortage(state: GameState, amount: number): number {
+function removeWorkersForShortage(state: GameState, amount: number, resource: 'food' | 'civilianGoods'): number {
   let remaining = Math.max(0, Math.floor(amount));
-  const unemployedLosses = Math.min(remaining, state.population.unemployed);
-  state.population.unemployed -= unemployedLosses;
-  remaining -= unemployedLosses;
-  let removed = unemployedLosses;
+  let removed = 0;
+  const cities = state.cityPopulationSnapshot.supply
+    .map((entry) => getFacilityState(state, entry.facilityId))
+    .filter(
+      (facility): facility is FacilityState =>
+        facility !== undefined && facility.owner === 'player' && isCityFacility(facility) && facility.workers > 0,
+    );
+  for (const facility of cities) {
+    const loss = Math.min(remaining, facility.workers);
+    facility.workers -= loss;
+    remaining -= loss;
+    removed += loss;
+    if (loss > 0) emit(state, 'resource_shortage', { resource, facilityId: facility.id, populationLost: loss });
+    if (remaining === 0) break;
+  }
   const facilities = [...state.facilities]
-    .filter((facility) => facility.owner === 'player' && facility.workers > 0)
-    .sort((left, right) => right.lastAssignedOrder - left.lastAssignedOrder || right.id.localeCompare(left.id));
+    .filter(
+      (facility) =>
+        facility.owner === 'player' && isProductionFacility(facility) && facility.workers > 0,
+    )
+    .sort(
+      (left, right) =>
+        (right.securedOrder ?? -1) - (left.securedOrder ?? -1) || left.id.localeCompare(right.id),
+    );
   for (const facility of facilities) {
     const loss = Math.min(remaining, facility.workers);
     facility.workers -= loss;
     remaining -= loss;
     removed += loss;
+    if (loss > 0) emit(state, 'resource_shortage', { resource, facilityId: facility.id, populationLost: loss });
     if (remaining === 0) {
       break;
     }
   }
   state.statistics.civilianLosses += removed;
   state.statistics.resourceShortageLosses += removed;
+  state.population.cumulativeDeaths += removed;
   return removed;
+}
+
+function overcrowdingTerms(state: Readonly<GameState>): Array<{ facilityId: string; excess: number; softCap: number }> {
+  return state.facilities
+    .filter(
+      (facility) =>
+        facility.owner === 'player' && facility.status === 'owned' && isCityFacility(facility),
+    )
+    .map((facility) => ({
+      facilityId: facility.id,
+      excess: Math.max(0, facility.workers - state.config.facilities[facility.type].workerCapacity),
+      softCap: state.config.facilities[facility.type].workerCapacity,
+    }))
+    .filter((term) => term.excess > 0)
+    .sort((left, right) => left.facilityId.localeCompare(right.facilityId));
+}
+
+function gcdBigInt(left: bigint, right: bigint): bigint {
+  let a = left < 0n ? -left : left;
+  let b = right < 0n ? -right : right;
+  while (b !== 0n) {
+    const next = a % b;
+    a = b;
+    b = next;
+  }
+  return a;
+}
+
+function overcrowdingAdditionalConsumption(normal: number, terms: ReturnType<typeof overcrowdingTerms>): number {
+  if (normal <= 0 || terms.length === 0) return 0;
+  let numerator = 0n;
+  let denominator = 1n;
+  for (const term of terms) {
+    numerator = numerator * BigInt(term.softCap) + BigInt(term.excess) * denominator;
+    denominator *= BigInt(term.softCap);
+    const divisor = gcdBigInt(numerator, denominator);
+    numerator /= divisor;
+    denominator /= divisor;
+  }
+  const amount = (BigInt(normal) * numerator + denominator - 1n) / denominator;
+  return Math.max(1, Number(amount));
 }
 
 /**
@@ -524,17 +702,20 @@ function removeWorkersForShortage(state: GameState, amount: number): number {
  */
 export function forecastEndTurn(state: Readonly<GameState>): EndTurnForecast {
   const snapshot = state as GameState;
-  const employed = snapshot.facilities.reduce(
+  const healthyFacilityPopulation = snapshot.facilities.reduce(
     (total, facility) => total + (facility.owner === 'player' ? facility.workers : 0),
     0,
   );
-  const unitPopulation = snapshot.units
-    .filter((unit) => unit.isPlayerUnit)
-    .reduce((total, unit) => total + unit.population, 0);
-  const populationConsumers = employed + snapshot.population.unemployed + unitPopulation;
+  const unitPopulation = snapshot.population.unitPopulation;
+  const populationConsumers = healthyFacilityPopulation + unitPopulation;
+  const overcrowding = overcrowdingTerms(snapshot);
+  const normalFood = populationConsumers * snapshot.config.economy.populationConsumption.food;
+  const normalCivilianGoods = populationConsumers * snapshot.config.economy.populationConsumption.civilianGoods;
+  const additionalFood = overcrowdingAdditionalConsumption(normalFood, overcrowding);
+  const additionalCivilianGoods = overcrowdingAdditionalConsumption(normalCivilianGoods, overcrowding);
   const maintenance: Record<ResourceType, number> = {
-    food: populationConsumers * snapshot.config.economy.populationConsumption.food,
-    civilianGoods: populationConsumers * snapshot.config.economy.populationConsumption.civilianGoods,
+    food: normalFood + additionalFood,
+    civilianGoods: normalCivilianGoods + additionalCivilianGoods,
     militaryGoods: unitPopulation * snapshot.config.economy.militaryGoodsPerUnitPopulation,
     fuel: 0,
   };
@@ -546,7 +727,11 @@ export function forecastEndTurn(state: Readonly<GameState>): EndTurnForecast {
   };
 
   const activeFacilities = stableFacilities(snapshot).filter(
-    (facility) => facility.owner === 'player' && facility.status === 'owned' && facility.workers > 0,
+    (facility) =>
+      facility.owner === 'player' &&
+      facility.status === 'owned' &&
+      facility.infected === 0 &&
+      facility.workers > 0,
   );
   const electricityCapacity = activeFacilities
     .filter((facility) => facility.type === 'powerPlant')
@@ -567,7 +752,10 @@ export function forecastEndTurn(state: Readonly<GameState>): EndTurnForecast {
     if (rule.requiresPower && remainingCapacity < rule.powerCapacity) continue;
     if (rule.requiresPower) remainingCapacity -= rule.powerCapacity;
     for (const [resource, amount] of Object.entries(rule.inputs) as Array<[ResourceType, number]>) {
-      productionInput[resource] += amount * facility.workers;
+      const workers = isCityFacility(facility)
+        ? Math.min(facility.workers, snapshot.config.facilities[facility.type].workerCapacity)
+        : facility.workers;
+      productionInput[resource] += amount * workers;
     }
   }
 
@@ -587,6 +775,11 @@ export function forecastEndTurn(state: Readonly<GameState>): EndTurnForecast {
 
   return {
     populationConsumers,
+    overcrowding: {
+      cities: overcrowding,
+      additionalFood,
+      additionalCivilianGoods,
+    },
     food: resourceForecast('food'),
     civilianGoods: resourceForecast('civilianGoods'),
     militaryGoods: resourceForecast('militaryGoods'),
@@ -602,23 +795,41 @@ export function forecastEndTurn(state: Readonly<GameState>): EndTurnForecast {
 function processEconomy(state: GameState): void {
   synchronizePopulation(state);
   const consumers = resourceConsumerPopulation(state);
-  const foodNeed = consumers * state.config.economy.populationConsumption.food;
-  const civilianNeed = consumers * state.config.economy.populationConsumption.civilianGoods;
+  const overcrowding = overcrowdingTerms(state);
+  const normalFoodNeed = consumers * state.config.economy.populationConsumption.food;
+  const normalCivilianNeed = consumers * state.config.economy.populationConsumption.civilianGoods;
+  const foodNeed = normalFoodNeed + overcrowdingAdditionalConsumption(normalFoodNeed, overcrowding);
+  const civilianNeed = normalCivilianNeed + overcrowdingAdditionalConsumption(normalCivilianNeed, overcrowding);
   const foodShortage = Math.max(0, foodNeed - state.resources.food);
   const civilianShortage = Math.max(0, civilianNeed - state.resources.civilianGoods);
   const foodSpent = Math.min(foodNeed, state.resources.food);
   const civilianSpent = Math.min(civilianNeed, state.resources.civilianGoods);
   state.resources.food -= foodSpent;
   state.resources.civilianGoods -= civilianSpent;
-  emit(state, 'resource_consumed', { resource: 'food', amount: foodSpent, population: consumers });
-  emit(state, 'resource_consumed', { resource: 'civilianGoods', amount: civilianSpent, population: consumers });
+  emit(state, 'resource_consumed', {
+    resource: 'food',
+    amount: foodSpent,
+    population: consumers,
+    normal: normalFoodNeed,
+    overcrowding: foodNeed - normalFoodNeed,
+  });
+  emit(state, 'resource_consumed', {
+    resource: 'civilianGoods',
+    amount: civilianSpent,
+    population: consumers,
+    normal: normalCivilianNeed,
+    overcrowding: civilianNeed - normalCivilianNeed,
+  });
   if (foodShortage + civilianShortage > 0) {
     emit(state, 'resource_shortage', { food: foodShortage, civilianGoods: civilianShortage });
-    removeWorkersForShortage(state, foodShortage + civilianShortage);
+    removeWorkersForShortage(state, foodShortage, 'food');
     synchronizePopulation(state);
     if (checkImmediateDefeat(state)) {
       return;
     }
+    removeWorkersForShortage(state, civilianShortage, 'civilianGoods');
+    synchronizePopulation(state);
+    if (checkImmediateDefeat(state)) return;
   }
 
   const militaryNeed = state.population.unitPopulation * state.config.economy.militaryGoodsPerUnitPopulation;
@@ -676,15 +887,18 @@ function overrunFacility(state: GameState, facility: FacilityState, rng: SeededR
     return;
   }
   facility.status = 'ruined';
-  // A disconnected facility can be overrun before the player reaches it.
-  // Preserve that lack of ownership; recovery by a stationed player unit
-  // will claim the site only after its internal infection reaches zero.
+  // Ruined facilities are no longer owned. Recovery by a stationed player
+  // unit claims the site again after its internal infection reaches zero.
+  facility.owner = 'none';
   facility.operationalStatus = 'ruined';
   const capacityFallback = facility.workerCapacity * state.config.infection.fallBackCapacityRate;
   const rounded = state.config.infection.fallBackCapacityRounding === 'ceil' ? Math.ceil(capacityFallback) : Math.floor(capacityFallback);
+  const previousInfected = facility.infected;
   facility.infected = Math.max(facility.infected, rounded);
+  const discoveredInfected = facility.infected - previousInfected;
+  state.population.cumulativeDiscoveredInfected += discoveredInfected;
   facility.workers = 0;
-  emit(state, 'facility_overrun', { facilityId: facility.id });
+  emit(state, 'facility_overrun', { facilityId: facility.id, discoveredInfected });
   spawnZombies(state, facility.position, state.config.facilities[facility.type].overrunSpawnCount, rng, 'facility_overrun');
 }
 
@@ -693,14 +907,18 @@ function overrunCheckpoint(state: GameState, checkpoint: CheckpointState, rng: S
     return;
   }
   checkpoint.status = 'ruined';
+  const previousInfected = checkpoint.infected;
   checkpoint.infected = Math.max(
     checkpoint.infected,
     Math.ceil(state.config.refugees.screeningCapacity * state.config.infection.fallBackCapacityRate),
   );
+  const discoveredInfected = checkpoint.infected - previousInfected;
+  state.population.cumulativeDiscoveredInfected += discoveredInfected;
   checkpoint.waiting = 0;
   checkpoint.screening = 0;
+  checkpoint.approved = 0;
   checkpoint.remainingTurns = 0;
-  emit(state, 'facility_overrun', { checkpointId: checkpoint.id });
+  emit(state, 'facility_overrun', { checkpointId: checkpoint.id, discoveredInfected });
   spawnZombies(state, checkpoint.position, state.config.facilities.capital.overrunSpawnCount, rng, 'checkpoint_overrun');
 }
 
@@ -709,7 +927,9 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
     return false;
   }
   const amount = unit.type === 'police' ? state.config.infection.policeSuppression : state.config.infection.nationalGuardSuppression;
-  facility.infected = Math.max(0, facility.infected - amount);
+  const suppressed = Math.min(facility.infected, amount);
+  facility.infected -= suppressed;
+  state.population.cumulativeDeaths += suppressed;
   if (unit.type === 'nationalGuard') {
     const civilianLosses = Math.min(
       facility.workers,
@@ -717,34 +937,43 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
     );
     facility.workers -= civilianLosses;
     state.statistics.civilianLosses += civilianLosses;
+    state.population.cumulativeDeaths += civilianLosses;
   }
   unit.canAttack = false;
   unit.canMove = false;
   unit.actionState = 'acted';
   unit.activity.suppressed = true;
   emit(state, 'infection_suppressed', { facilityId: facility.id, unitId: unit.id, remaining: facility.infected });
+  if (facility.infected > 0) {
+    facility.operationalStatus = facility.status === 'ruined' ? 'ruined' : 'infected';
+  }
+  else if (facility.status === 'owned') facility.operationalStatus = facility.workers > 0 ? 'operational' : 'stopped';
   if (facility.infected === 0 && facility.status === 'ruined') {
     facility.owner = 'player';
     facility.status = 'owned';
     facility.operationalStatus = 'stopped';
     facility.workers = 0;
+    facility.populationOperationalTurn = state.turn + 1;
     emit(state, 'facility_recovered', { facilityId: facility.id, unitId: unit.id });
   }
   return true;
 }
 
-function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit: UnitState): boolean {
+function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit: UnitState, rng: SeededRng): boolean {
   if (!unit.canAttack || unit.activity.attacked || unit.activity.intercepted || checkpoint.infected <= 0) {
     return false;
   }
   const amount = unit.type === 'police' ? state.config.infection.policeSuppression : state.config.infection.nationalGuardSuppression;
-  checkpoint.infected = Math.max(0, checkpoint.infected - amount);
+  const suppressed = Math.min(checkpoint.infected, amount);
+  checkpoint.infected -= suppressed;
+  state.population.cumulativeDeaths += suppressed;
   if (unit.type === 'nationalGuard') {
     const civilianLosses = removeCheckpointPeople(
       checkpoint,
       Math.ceil(amount * state.config.infection.nationalGuardCivilianDamageRate),
     );
     state.statistics.civilianLosses += civilianLosses;
+    state.population.cumulativeDeaths += civilianLosses;
   }
   unit.canAttack = false;
   unit.canMove = false;
@@ -753,6 +982,10 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
   emit(state, 'infection_suppressed', { checkpointId: checkpoint.id, unitId: unit.id, remaining: checkpoint.infected });
   if (checkpoint.infected === 0 && checkpoint.status === 'ruined') {
     checkpoint.status = 'operational';
+    checkpoint.nextArrivalTurn = state.turn + rng.nextInt(
+      state.config.refugees.arrivalIntervalMin,
+      state.config.refugees.arrivalIntervalMax,
+    );
     emit(state, 'facility_recovered', { checkpointId: checkpoint.id, unitId: unit.id });
   }
   return true;
@@ -772,6 +1005,7 @@ function processInternalInfection(state: GameState, rng: SeededRng): void {
       const spread = Math.min(facility.workers, facility.infected * state.config.infection.facilitySpreadPerTurn);
       facility.workers -= spread;
       facility.infected += spread;
+      facility.operationalStatus = facility.status === 'ruined' ? 'ruined' : 'infected';
       if (spread > 0) {
         state.statistics.civilianLosses += spread;
         state.statistics.infectionLosses += spread;
@@ -792,7 +1026,7 @@ function processInternalInfection(state: GameState, rng: SeededRng): void {
     const occupant = getUnitAt(state, checkpoint.position);
     const guarded = occupant?.isPlayerUnit === true;
     if (guarded) {
-      suppressCheckpoint(state, checkpoint, occupant!);
+      suppressCheckpoint(state, checkpoint, occupant!, rng);
     }
     if (!guarded && checkpoint.infected > 0) {
       const spread = Math.min(totalCheckpointPeople(checkpoint), checkpoint.infected * state.config.infection.facilitySpreadPerTurn);
@@ -908,6 +1142,7 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
         const converted = Math.min(zombie.attack, facility.workers);
         facility.workers -= converted;
         facility.infected += converted;
+        if (converted > 0) facility.operationalStatus = 'infected';
         if (converted > 0) {
           state.statistics.civilianLosses += converted;
           state.statistics.infectionLosses += converted;
@@ -978,7 +1213,7 @@ function checkImmediateDefeat(state: GameState): boolean {
   }
   synchronizePopulation(state);
   if (civilianWorkerCount(state) === 0) {
-    finishGame(state, 'lost', 'workersLost');
+    finishGame(state, 'lost', 'healthyCiviliansLost');
     return true;
   }
   return false;
@@ -1009,6 +1244,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
     }
     const city = getFacilityState(state, order.cityFacilityId);
     if (!city || city.owner !== 'player' || city.status !== 'owned') {
+      state.pendingUnitProductions.push(order);
       continue;
     }
     const nearestPositions = findNearestOpenTiles(state.map, city.position, occupiedKeys(state));
@@ -1019,6 +1255,8 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
     }
     state.units.push(createUnit(state, nextHumanUnitId(state, order.unitType), order.unitType, position));
   }
+  createCityPopulationSnapshot(state);
+  placeApprovedRefugees(state);
   synchronizePopulation(state);
   checkImmediateDefeat(state);
   saveRng(state, rng);
@@ -1065,16 +1303,75 @@ function assignWorkers(state: GameState, action: Extract<GameAction, { type: 'As
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   const facility = getFacilityState(state, action.facilityId);
-  if (!facility || facility.owner !== 'player' || facility.status !== 'owned') return error(action, 'invalid_facility', 'Facility is not owned and usable');
+  if (
+    !facility ||
+    facility.owner !== 'player' ||
+    facility.status !== 'owned' ||
+    !isProductionFacility(facility)
+  ) return error(action, 'invalid_facility', 'Only an owned production facility can receive workers');
   if (!Number.isInteger(action.workers) || action.workers < 0 || action.workers > facility.workerCapacity) return error(action, 'invalid_workers', 'Worker count is outside capacity');
   if (facility.infected > 0) return error(action, 'infected_facility', 'Workers cannot be moved into or out of an infected facility');
+  if (facility.populationOperationalTurn > state.turn) {
+    return error(action, 'facility_not_yet_operational', 'Newly secured or recovered facilities become available next turn');
+  }
   const difference = action.workers - facility.workers;
-  if (difference > state.population.unemployed) return error(action, 'insufficient_workers', 'Not enough unemployed workers');
-  state.population.unemployed -= difference;
+  if (difference === 0) return error(action, 'no_change', 'Worker assignment is unchanged');
+  let movements: Array<{ facilityId: string; people: number }> | null;
+  if (difference > 0) {
+    if (availableSupplyPopulation(state) < difference) {
+      return error(action, 'insufficient_city_population', 'Eligible cities cannot supply enough population');
+    }
+    movements = withdrawFromSupplyCities(state, difference);
+  } else {
+    if (eligibleSnapshotCities(state, 'reception').length === 0) {
+      return error(action, 'no_safe_return_city', 'No eligible safe city can receive withdrawn workers');
+    }
+    movements = distributeToReceptionCities(state, -difference);
+  }
+  if (!movements) return error(action, 'population_move_failed', 'Population movement could not be completed');
   facility.workers = action.workers;
   facility.lastAssignedOrder = state.nextAssignmentOrder++;
   state.actionsTakenThisTurn += 1;
-  emit(state, 'workers_assigned', { facilityId: facility.id, workers: action.workers });
+  emit(state, 'workers_assigned', {
+    facilityId: facility.id,
+    workers: action.workers,
+    difference,
+    movements,
+  });
+  synchronizePopulation(state);
+  return null;
+}
+
+function transferPopulation(
+  state: GameState,
+  action: Extract<GameAction, { type: 'TransferPopulation' }>,
+): ActionError | null {
+  const budget = playerActionBudgetError(state, action);
+  if (budget) return budget;
+  if (!Number.isInteger(action.people) || action.people <= 0) {
+    return error(action, 'invalid_population', 'Population transfer must be a positive integer');
+  }
+  if (action.fromFacilityId === action.toFacilityId) {
+    return error(action, 'same_city', 'Population transfer requires two different cities');
+  }
+  const eligible = new Set(eligibleSnapshotCities(state, 'supply').map((city) => city.id));
+  const from = getFacilityState(state, action.fromFacilityId);
+  const to = getFacilityState(state, action.toFacilityId);
+  if (!from || !to || !eligible.has(from.id) || !eligible.has(to.id)) {
+    return error(action, 'ineligible_city', 'Both cities must be safe and eligible in the turn-start snapshot');
+  }
+  if (from.workers < action.people) {
+    return error(action, 'insufficient_city_population', 'The source city does not have enough residents');
+  }
+  from.workers -= action.people;
+  to.workers += action.people;
+  state.actionsTakenThisTurn += 1;
+  emit(state, 'population_transferred', {
+    from: from.id,
+    to: to.id,
+    people: action.people,
+    reason: 'city_transfer',
+  });
   synchronizePopulation(state);
   return null;
 }
@@ -1119,6 +1416,7 @@ function buildCheckpoint(state: GameState, action: Extract<GameAction, { type: '
     status: 'operational',
     waiting: 0,
     screening: 0,
+    approved: 0,
     remainingTurns: 0,
     screeningPolicy: 'normal',
     currentPolicy: 'normal',
@@ -1146,21 +1444,35 @@ function produceUnit(state: GameState, action: Extract<GameAction, { type: 'Prod
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   if (!HUMAN_UNIT_TYPES.includes(action.unitType)) return error(action, 'invalid_unit_type', 'Only police and national guard can be produced');
-  const possibleCities = stableFacilities(state).filter(
-    (facility) => facility.owner === 'player' && facility.status === 'owned' && (facility.type === 'capital' || facility.type === 'city'),
+  const possibleCities = eligibleSnapshotCities(state, 'supply').filter(
+    (facility) => action.unitType === 'police' || facility.type === 'capital',
   );
   const city = action.destination
     ? possibleCities.find((facility) => hexKey(facility.position) === hexKey(action.destination!))
     : possibleCities[0];
-  if (!city) return error(action, 'no_city', 'An owned city is required');
+  if (!city) {
+    return error(
+      action,
+      'invalid_recruitment_hub',
+      action.unitType === 'police'
+        ? 'Police can only be recruited in an eligible city'
+        : 'National Guard can only be recruited in the eligible capital',
+    );
+  }
   if (state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) return error(action, 'city_busy', 'This city already has a reservation');
   const costs = action.unitType === 'police'
     ? { population: 5, civilianGoods: 10, militaryGoods: 10 }
     : { population: 10, civilianGoods: 20, militaryGoods: 25 };
-  if (state.population.unemployed < costs.population || state.resources.civilianGoods < costs.civilianGoods || state.resources.militaryGoods < costs.militaryGoods) {
-    return error(action, 'insufficient_production_cost', 'Insufficient unemployed population or military supplies');
+  if (
+    availableSupplyPopulation(state) < costs.population ||
+    civilianWorkerCount(state) - costs.population <= 0 ||
+    state.resources.civilianGoods < costs.civilianGoods ||
+    state.resources.militaryGoods < costs.militaryGoods
+  ) {
+    return error(action, 'insufficient_production_cost', 'Insufficient eligible city population or supplies, or recruitment would use the last healthy civilian');
   }
-  state.population.unemployed -= costs.population;
+  const sources = withdrawFromSupplyCities(state, costs.population);
+  if (!sources) return error(action, 'population_move_failed', 'Recruitment population could not be conscripted atomically');
   state.resources.civilianGoods -= costs.civilianGoods;
   state.resources.militaryGoods -= costs.militaryGoods;
   const order: UnitProductionOrder = {
@@ -1172,6 +1484,12 @@ function produceUnit(state: GameState, action: Extract<GameAction, { type: 'Prod
   };
   state.pendingUnitProductions.push(order);
   state.actionsTakenThisTurn += 1;
+  emit(state, 'population_conscripted', {
+    cityFacilityId: city.id,
+    unitType: action.unitType,
+    people: costs.population,
+    sources,
+  });
   synchronizePopulation(state);
   return null;
 }
@@ -1226,16 +1544,45 @@ function manualSuppress(state: GameState, action: Extract<GameAction, { type: 'S
   suppressFacility(state, facility, unit);
   state.actionsTakenThisTurn += 1;
   synchronizePopulation(state);
+  checkImmediateDefeat(state);
   return null;
 }
 
 /** Lightweight, non-mutating validation for callers that need an error reason. */
 export function validateAction(state: Readonly<GameState>, action: GameAction): ActionError | null {
   if (state.gameOver) return error(action, 'game_over', 'The game is over');
-  if (action.type === 'EndTurn' || action.type === 'StartNewGame' || action.type === 'LoadSnapshot') return null;
+  if (action.type === 'StartNewGame') {
+    try {
+      createInitialState(action.seed, action.config);
+      return null;
+    } catch (reason) {
+      return error(action, 'invalid_new_game', reason instanceof Error ? reason.message : 'Invalid new game');
+    }
+  }
+  if (action.type === 'LoadSnapshot') {
+    const valid = validateInvariants(action.snapshot);
+    if (action.snapshot.gameVersion !== state.gameVersion || !valid.valid) {
+      return error(action, 'invalid_snapshot', valid.errors.join('; ') || 'Unsupported game version');
+    }
+    return null;
+  }
+  if (action.type === 'EndTurn') {
+    return state.phase === 'player' ? null : error(action, 'wrong_phase', 'Turn can only end during the player phase');
+  }
   if (state.phase !== 'player') return error(action, 'wrong_phase', 'Actions are only accepted during the player phase');
   if (state.actionsTakenThisTurn >= state.config.maxActionsPerTurn) return error(action, 'action_limit', 'The action limit for this turn has been reached');
-  return null;
+  const candidate = cloneState(state as GameState);
+  const rng = SeededRng.fromState(candidate.rngState);
+  if (action.type === 'Move') return move(candidate, action);
+  if (action.type === 'Attack') return attack(candidate, action);
+  if (action.type === 'Wait') return wait(candidate, action);
+  if (action.type === 'SuppressInfection') return manualSuppress(candidate, action);
+  if (action.type === 'AssignWorkers') return assignWorkers(candidate, action);
+  if (action.type === 'TransferPopulation') return transferPopulation(candidate, action);
+  if (action.type === 'SetCheckpointPolicy') return setCheckpointPolicy(candidate, action);
+  if (action.type === 'BuildCheckpoint') return buildCheckpoint(candidate, action, rng);
+  if (action.type === 'ProduceUnit') return produceUnit(candidate, action);
+  return error(action, 'unknown_action', 'Unknown action');
 }
 
 export class GameEngine implements HeadlessGame {
@@ -1284,10 +1631,35 @@ export class GameEngine implements HeadlessGame {
       }
     }
     for (const facility of stableFacilities(this.state)) {
-      if (facility.owner !== 'player' || facility.status !== 'owned' || facility.infected > 0) continue;
-      const maximum = Math.min(facility.workerCapacity, facility.workers + this.state.population.unemployed);
+      if (
+        facility.owner !== 'player' ||
+        facility.status !== 'owned' ||
+        facility.infected > 0 ||
+        !isProductionFacility(facility) ||
+        facility.populationOperationalTurn > this.state.turn
+      ) continue;
+      const maximum = Math.min(facility.workerCapacity, facility.workers + availableSupplyPopulation(this.state));
       for (let workers = 0; workers <= maximum; workers += 1) {
-        if (workers !== facility.workers) actions.push({ type: 'AssignWorkers', facilityId: facility.id, workers });
+        if (
+          workers !== facility.workers &&
+          (workers > facility.workers || eligibleSnapshotCities(this.state, 'reception').length > 0)
+        ) actions.push({ type: 'AssignWorkers', facilityId: facility.id, workers });
+      }
+    }
+    const cities = eligibleSnapshotCities(this.state, 'supply');
+    for (const from of cities) {
+      if (from.workers <= 0) continue;
+      for (const to of cities) {
+        if (from.id === to.id) continue;
+        actions.push({ type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 });
+        if (from.workers > 1) {
+          actions.push({
+            type: 'TransferPopulation',
+            fromFacilityId: from.id,
+            toFacilityId: to.id,
+            people: from.workers,
+          });
+        }
       }
     }
     for (const checkpoint of this.state.checkpoints.filter((candidate) => candidate.status === 'operational').sort((a, b) => a.id.localeCompare(b.id))) {
@@ -1303,11 +1675,17 @@ export class GameEngine implements HeadlessGame {
         }
       }
     }
-    for (const city of stableFacilities(this.state).filter((facility) => facility.owner === 'player' && facility.status === 'owned' && (facility.type === 'capital' || facility.type === 'city'))) {
+    for (const city of cities) {
       if (!this.state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) {
         for (const unitType of HUMAN_UNIT_TYPES) {
+          if (unitType === 'nationalGuard' && city.type !== 'capital') continue;
           const costs = unitType === 'police' ? { population: 5, civilian: 10, military: 10 } : { population: 10, civilian: 20, military: 25 };
-          if (this.state.population.unemployed >= costs.population && this.state.resources.civilianGoods >= costs.civilian && this.state.resources.militaryGoods >= costs.military) {
+          if (
+            availableSupplyPopulation(this.state) >= costs.population &&
+            civilianWorkerCount(this.state) - costs.population > 0 &&
+            this.state.resources.civilianGoods >= costs.civilian &&
+            this.state.resources.militaryGoods >= costs.military
+          ) {
             actions.push({ type: 'ProduceUnit', unitType, destination: { ...city.position } });
           }
         }
@@ -1345,6 +1723,7 @@ export class GameEngine implements HeadlessGame {
     }
 
     const candidate = cloneState(original);
+    const populationBeforeAction = populationLedgerTotal(original);
     const rng = SeededRng.fromState(candidate.rngState);
     const eventCount = candidate.events.length;
     let actionError: ActionError | null = null;
@@ -1355,6 +1734,7 @@ export class GameEngine implements HeadlessGame {
     else if (action.type === 'Attack') actionError = attack(candidate, action);
     else if (action.type === 'Wait') actionError = wait(candidate, action);
     else if (action.type === 'AssignWorkers') actionError = assignWorkers(candidate, action);
+    else if (action.type === 'TransferPopulation') actionError = transferPopulation(candidate, action);
     else if (action.type === 'SetCheckpointPolicy') actionError = setCheckpointPolicy(candidate, action);
     else if (action.type === 'BuildCheckpoint') actionError = buildCheckpoint(candidate, action, rng);
     else if (action.type === 'ProduceUnit') actionError = produceUnit(candidate, action);
@@ -1365,6 +1745,15 @@ export class GameEngine implements HeadlessGame {
     }
     saveRng(candidate, rng);
     synchronizePopulation(candidate);
+    if (action.type !== 'EndTurn' && populationLedgerTotal(candidate) !== populationBeforeAction) {
+      return {
+        state: this.getState(),
+        events: [],
+        error: error(action, 'population_conservation_failure', 'Atomic action violated the population conservation ledger'),
+        gameOver: this.isGameOver(),
+        result: this.getResult(),
+      };
+    }
     try {
       assertInvariants(candidate);
     } catch (reason) {

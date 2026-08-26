@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { hexDistance } from './hex';
 import { FIXED_FACILITY_COUNT, FIXED_MAP, createFixedMap, validateFixedMap } from './map';
 
 describe('fixed map', () => {
@@ -22,7 +23,7 @@ describe('fixed map', () => {
     expect(counts.refinery).toBe(2);
     expect(counts.powerPlant).toBe(2);
     expect(FIXED_MAP.facilities.filter((facility) => facility.startingOwned)).toHaveLength(5);
-    expect(FIXED_MAP.facilities.reduce((sum, facility) => sum + facility.startingWorkers, 0)).toBe(59);
+    expect(FIXED_MAP.facilities.reduce((sum, facility) => sum + facility.startingWorkers, 0)).toBe(100);
   });
 
   it('has a four-way road cross and one Horde entrance per cardinal direction', () => {
@@ -42,11 +43,24 @@ describe('fixed map', () => {
     }
   });
 
+  it('places the four initial zombies at least four hexes from every starting facility', () => {
+    expect(FIXED_MAP.initialZombiePositions).toEqual([
+      { q: 4, r: 4 },
+      { q: 11, r: 3 },
+      { q: 3, r: 11 },
+      { q: 11, r: 10 },
+    ]);
+    const startingFacilities = FIXED_MAP.facilities.filter((facility) => facility.startingOwned);
+    for (const zombie of FIXED_MAP.initialZombiePositions) {
+      expect(Math.min(...startingFacilities.map((facility) => hexDistance(zombie, facility.position)))).toBeGreaterThanOrEqual(4);
+    }
+  });
+
   it('returns independent map snapshots', () => {
     const copy = createFixedMap();
     copy.tiles[0]!.road = !copy.tiles[0]!.road;
     copy.facilities[0]!.startingWorkers = 99;
     expect(copy.tiles[0]!.road).not.toBe(FIXED_MAP.tiles[0]!.road);
-    expect(FIXED_MAP.facilities[0]!.startingWorkers).toBe(0);
+    expect(FIXED_MAP.facilities[0]!.startingWorkers).toBe(41);
   });
 });

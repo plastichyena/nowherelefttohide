@@ -3,7 +3,22 @@ import { createDefaultConfig } from './config';
 import { forecastEndTurn, GameEngine, previewMove } from './engine';
 import { validateInvariants } from './invariants';
 import { findNearestOpenTiles } from './path';
-import { createInitialState, createUnit, synchronizePopulation } from './state';
+import {
+  createCityPopulationSnapshot,
+  createInitialState,
+  createUnit,
+  populationLedgerTotal,
+  synchronizePopulation as synchronizeDerivedPopulation,
+} from './state';
+
+function synchronizePopulation(state: ReturnType<typeof createInitialState>): void {
+  synchronizeDerivedPopulation(state);
+  state.population.initialPopulation =
+    populationLedgerTotal(state) -
+    state.population.cumulativeArrivals -
+    state.population.cumulativeDiscoveredInfected +
+    state.population.cumulativeDepartures;
+}
 
 describe('GameEngine', () => {
   it('creates a complete deterministic initial state', () => {
@@ -13,7 +28,11 @@ describe('GameEngine', () => {
     expect(first).toEqual(second);
     expect(first.facilities).toHaveLength(16);
     expect(first.facilities.filter((facility) => facility.status === 'owned')).toHaveLength(5);
-    expect(first.population.employed + first.population.unemployed).toBe(100);
+    expect(first.population.healthyCivilians).toBe(100);
+    expect(first.facilities.find((facility) => facility.id === 'capital')?.workers).toBe(41);
+    expect(first.map.initialZombiePositions).toEqual([
+      { q: 4, r: 4 }, { q: 11, r: 3 }, { q: 3, r: 11 }, { q: 11, r: 10 },
+    ]);
     expect(first.units.filter((unit) => unit.isPlayerUnit)).toHaveLength(2);
     expect(validateInvariants(first)).toEqual({ valid: true, errors: [] });
   });
@@ -26,8 +45,39 @@ describe('GameEngine', () => {
     expect(engine.getState()).toEqual(before);
   });
 
+  it('rejects snapshots with a broken fixed map or stale derived population', () => {
+    const engine = new GameEngine(71, createDefaultConfig());
+    const before = engine.getState();
+    const brokenMap = engine.getState() as ReturnType<typeof createInitialState>;
+    brokenMap.map.tiles = [];
+    expect(engine.step({ type: 'LoadSnapshot', snapshot: brokenMap }).error?.code).toBe('invalid_snapshot');
+    expect(engine.getState()).toEqual(before);
+
+    const brokenFacilityLink = engine.getState() as ReturnType<typeof createInitialState>;
+    brokenFacilityLink.map.tiles.find((tile) => tile.q === 7 && tile.r === 7)!.facilityId = null;
+    expect(engine.step({ type: 'LoadSnapshot', snapshot: brokenFacilityLink }).error?.code).toBe('invalid_snapshot');
+    expect(engine.getState()).toEqual(before);
+
+    const stalePopulation = engine.getState() as ReturnType<typeof createInitialState>;
+    stalePopulation.population.facilityWorkers = [];
+    expect(engine.step({ type: 'LoadSnapshot', snapshot: stalePopulation }).error?.code).toBe('invalid_snapshot');
+    expect(engine.getState()).toEqual(before);
+  });
+
+  it('detects an unexplained population change in the conservation ledger', () => {
+    const state = createInitialState(70, createDefaultConfig());
+    state.facilities.find((facility) => facility.id === 'capital')!.workers += 1;
+    synchronizeDerivedPopulation(state);
+    const result = validateInvariants(state);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Population conservation ledger is out of balance');
+  });
+
   it('provides an interception preview and stops movement on interception', () => {
     const engine = new GameEngine(7, createDefaultConfig());
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    snapshot.units.find((unit) => unit.type === 'zombie')!.position = { q: 7, r: 5 };
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const preview = previewMove(engine.getState(), 'police-1', { q: 7, r: 6 });
     expect(preview.legal).toBe(true);
     expect(preview.interception).not.toBeNull();
@@ -80,7 +130,8 @@ describe('GameEngine', () => {
     const before = engine.getState();
     expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } }).error).toBeNull();
     expect(engine.getState().pendingUnitProductions).toHaveLength(1);
-    expect(engine.getState().population.unemployed).toBe(before.population.unemployed - 5);
+    expect(engine.getState().population.healthyCivilians).toBe(before.population.healthyCivilians - 5);
+    expect(engine.getState().population.unitPopulation).toBe(before.population.unitPopulation + 5);
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.getState().units.filter((unit) => unit.type === 'police')).toHaveLength(2);
   });
@@ -97,10 +148,10 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'BuildCheckpoint', position: { q: 7, r: 6 } }).error).toBeNull();
     const checkpointId = engine.getState().checkpoints[0]!.id;
     expect(engine.step({ type: 'SetCheckpointPolicy', checkpointId, policy: 'passThrough' }).error).toBeNull();
-    const unemployed = engine.getState().population.unemployed;
+    const residents = engine.getState().population.cityResidents;
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().population.unemployed).toBeGreaterThanOrEqual(unemployed + 2);
+    expect(engine.getState().population.cityResidents).toBeGreaterThanOrEqual(residents + 2);
   });
 
   it('applies combined food and civilian shortages before production', () => {
@@ -111,7 +162,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
-    expect(result.result?.reason).toBe('workersLost');
+    expect(result.result?.reason).toBe('healthyCiviliansLost');
     expect(result.events.some((event) => event.type === 'resource_shortage')).toBe(true);
   });
 
@@ -160,6 +211,7 @@ describe('GameEngine', () => {
       status: 'operational',
       waiting: 5,
       screening: 0,
+      approved: 0,
       remainingTurns: 0,
       screeningPolicy: 'normal',
       currentPolicy: 'normal',
@@ -171,7 +223,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const checkpoint = engine.getState().checkpoints[0]!;
     expect(checkpoint.infected).toBe(5);
-    expect(checkpoint.waiting + checkpoint.screening).toBe(5);
+    expect(checkpoint.waiting + checkpoint.screening + checkpoint.approved).toBe(5);
     expect(checkpoint.status).toBe('operational');
   });
 
@@ -182,6 +234,7 @@ describe('GameEngine', () => {
     const zombie = snapshot.units.find((unit) => unit.type === 'zombie')!;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit || unit.id === zombie.id);
     zombie.position = { q: 7, r: 7 };
+    snapshot.facilities.find((facility) => facility.id === 'capital')!.workers = 0;
     snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 5, r: 7 };
     snapshot.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 2, r: 2 };
     synchronizePopulation(snapshot);
@@ -261,12 +314,12 @@ describe('GameEngine', () => {
     const forecast = forecastEndTurn(snapshot);
     expect(JSON.stringify(snapshot)).toBe(before);
     expect(forecast.fuel).toMatchObject({ available: 5, productionInputRequired: 46, shortage: 41 });
-    expect(forecast.electricity).toMatchObject({ capacity: 15, required: 10, shortage: 0 });
+    expect(forecast.electricity).toMatchObject({ capacity: 15, required: 15, shortage: 0 });
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
     expect(result.state.resources.fuel).toBe(50);
     expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'food' && event.payload.amount === 25)).toBe(true);
-    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'civilianGoods')).toBe(false);
+    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'civilianGoods' && event.payload.amount === 41)).toBe(true);
 
     const noPower = engine.getState() as ReturnType<typeof createInitialState>;
     noPower.turn = 1;
@@ -276,9 +329,10 @@ describe('GameEngine', () => {
     noPower.resources.fuel = 100;
     noPower.facilities.find((facility) => facility.id === 'power-plant-1')!.workers = 0;
     synchronizePopulation(noPower);
+    createCityPopulationSnapshot(noPower);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: noPower }).error).toBeNull();
     const unpowered = forecastEndTurn(engine.getState());
-    expect(unpowered.electricity).toMatchObject({ capacity: 0, required: 10, shortage: 10 });
+    expect(unpowered.electricity).toMatchObject({ capacity: 0, required: 15, shortage: 15 });
     expect(unpowered.fuel.productionInputRequired).toBe(0);
   });
 
@@ -311,13 +365,13 @@ describe('GameEngine', () => {
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
-      waiting: 0, screening: 4, remainingTurns: 1, screeningPolicy: 'normal', currentPolicy: 'strict', nextArrivalTurn: null, infected: 0,
+      waiting: 0, screening: 4, approved: 0, remainingTurns: 1, screeningPolicy: 'normal', currentPolicy: 'strict', nextArrivalTurn: null, infected: 0,
     });
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
-    const beforeNormal = engine.getState().population.unemployed;
+    const beforeNormal = engine.getState().population.cityResidents;
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().population.unemployed).toBe(beforeNormal + 3);
+    expect(engine.getState().population.cityResidents).toBe(beforeNormal + 3);
 
     const passThrough = engine.getState() as ReturnType<typeof createInitialState>;
     const checkpoint = passThrough.checkpoints[0]!;
@@ -327,9 +381,9 @@ describe('GameEngine', () => {
     checkpoint.nextArrivalTurn = null;
     synchronizePopulation(passThrough);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: passThrough }).error).toBeNull();
-    const beforePass = engine.getState().population.unemployed;
+    const beforePass = engine.getState().population.cityResidents;
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().population.unemployed).toBe(beforePass + 4);
+    expect(engine.getState().population.cityResidents).toBe(beforePass + 4);
 
     const strict = engine.getState() as ReturnType<typeof createInitialState>;
     strict.checkpoints[0]!.waiting = 4;
@@ -338,9 +392,9 @@ describe('GameEngine', () => {
     strict.checkpoints[0]!.nextArrivalTurn = null;
     synchronizePopulation(strict);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: strict }).error).toBeNull();
-    const beforeStrict = engine.getState().population.unemployed;
+    const beforeStrict = engine.getState().population.cityResidents;
     for (let turn = 0; turn < 6; turn += 1) expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().population.unemployed).toBe(beforeStrict + 2);
+    expect(engine.getState().population.cityResidents).toBe(beforeStrict + 2);
   });
 
   it('overruns and recovers a facility through infection, and loses immediately when the capital falls', () => {
@@ -360,7 +414,7 @@ describe('GameEngine', () => {
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().facilities.find((facility) => facility.id === farm.id)?.status).toBe('ruined');
+    expect(engine.getState().facilities.find((facility) => facility.id === farm.id)).toMatchObject({ owner: 'none', status: 'ruined' });
 
     const recovery = engine.getState() as ReturnType<typeof createInitialState>;
     recovery.units = recovery.units.filter((unit) => unit.isPlayerUnit);
@@ -382,6 +436,35 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'EndTurn' }).result?.reason).toBe('capitalLost');
   });
 
+  it('reschedules refugee arrivals after a ruined checkpoint is recovered', () => {
+    const engine = new GameEngine(114, createDefaultConfig({
+      maxTurns: 10,
+      economy: { initialZombieCount: 0, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
+    }));
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    const position = { q: 7, r: 6 };
+    snapshot.units.find((unit) => unit.id === 'police-1')!.position = position;
+    snapshot.checkpoints.push({
+      id: 'checkpoint-north-1', position, direction: 'north', status: 'ruined',
+      waiting: 0, screening: 0, approved: 0, remainingTurns: 0,
+      screeningPolicy: 'normal', currentPolicy: 'normal', nextArrivalTurn: 1, infected: 1,
+    });
+    synchronizePopulation(snapshot);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    const recovered = engine.getState().checkpoints[0]!;
+    expect(recovered.status).toBe('operational');
+    expect(recovered.nextArrivalTurn).toBeGreaterThan(engine.getState().turn);
+    const scheduledTurn = recovered.nextArrivalTurn!;
+    while (!engine.isGameOver() && engine.getState().turn <= scheduledTurn) {
+      expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    }
+    expect(engine.getState().events.some(
+      (event) => event.type === 'refugees_arrived' && event.payload.checkpointId === recovered.id,
+    )).toBe(true);
+    expect(engine.getState().checkpoints[0]!.nextArrivalTurn).toBeGreaterThan(scheduledTurn);
+  });
+
   it('applies fixed and seeded disconnected-facility population Config without treating it as player workers', () => {
     const config = createDefaultConfig({
       initialFacilityPopulation: {
@@ -396,7 +479,7 @@ describe('GameEngine', () => {
     expect(first).toEqual(second);
     expect(farm).toMatchObject({ owner: 'none', status: 'unowned', workers: 7, infected: 3, operationalStatus: 'infected' });
     expect(city).toMatchObject({ owner: 'none', status: 'unowned', workers: 4, infected: 2, operationalStatus: 'infected' });
-    expect(first.population.employed).toBe(59);
+    expect(first.population.healthyCivilians).toBe(100);
     expect(validateInvariants(first)).toEqual({ valid: true, errors: [] });
   });
 
@@ -434,5 +517,224 @@ describe('GameEngine', () => {
     expect(engine.getState().horde).toMatchObject({ spawnedCount: 2, totalSpawned: 6 });
     expect(engine.step({ type: 'EndTurn' }).result?.reason).toBe('maxTurnsSurvived');
     expect(engine.getState().horde.totalSpawned).toBe(6);
+  });
+
+  it('freezes deterministic supply and reception rankings for the whole player turn', () => {
+    const engine = new GameEngine(201, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    for (const [id, workers] of [['city-1', 20], ['city-2', 20]] as const) {
+      const city = snapshot.facilities.find((facility) => facility.id === id)!;
+      city.owner = 'player';
+      city.status = 'owned';
+      city.workers = workers;
+      city.infected = 0;
+      city.populationOperationalTurn = 1;
+      city.securedOrder = id === 'city-1' ? 5 : 6;
+    }
+    synchronizePopulation(snapshot);
+    createCityPopulationSnapshot(snapshot);
+    expect(snapshot.cityPopulationSnapshot.supply.map((entry) => entry.facilityId).slice(0, 3)).toEqual([
+      'capital', 'city-1', 'city-2',
+    ]);
+    expect(snapshot.cityPopulationSnapshot.reception.map((entry) => entry.facilityId).slice(0, 3)).toEqual([
+      'city-1', 'city-2', 'capital',
+    ]);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    expect(engine.step({ type: 'TransferPopulation', fromFacilityId: 'capital', toFacilityId: 'city-2', people: 10 }).error).toBeNull();
+    expect(engine.getState().cityPopulationSnapshot).toEqual(snapshot.cityPopulationSnapshot);
+    const beforeInvalid = engine.getState();
+    expect(engine.step({ type: 'TransferPopulation', fromFacilityId: 'city-1', toFacilityId: 'city-2', people: 99 }).error?.code).toBe('insufficient_city_population');
+    expect(engine.getState()).toEqual(beforeInvalid);
+  });
+
+  it('moves production workers atomically through frozen city supply and reception order', () => {
+    const engine = new GameEngine(202, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const before = engine.getState();
+    const ledgerBefore = populationLedgerTotal(before as ReturnType<typeof createInitialState>);
+    expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-1', workers: 25 }).error).toBeNull();
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')?.workers).toBe(39);
+    expect(engine.getState().population.healthyCivilians).toBe(before.population.healthyCivilians);
+    expect(populationLedgerTotal(engine.getState() as ReturnType<typeof createInitialState>)).toBe(ledgerBefore);
+    expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-1', workers: 20 }).error).toBeNull();
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')?.workers).toBe(44);
+    const unchanged = engine.getState();
+    const rejected = engine.step({ type: 'AssignWorkers', facilityId: 'farm-1', workers: 99 });
+    expect(rejected.error?.code).toBe('invalid_workers');
+    expect(engine.getState()).toEqual(unchanged);
+  });
+
+  it('fills reception cities to their soft caps, then distributes excess round-robin', () => {
+    const engine = new GameEngine(209, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    const populations: Record<string, number> = { capital: 100, 'city-1': 49, 'city-2': 50 };
+    for (const [id, workers] of Object.entries(populations)) {
+      const city = snapshot.facilities.find((facility) => facility.id === id)!;
+      city.owner = 'player';
+      city.status = 'owned';
+      city.workers = workers;
+      city.populationOperationalTurn = 1;
+      city.securedOrder ??= id === 'city-1' ? 5 : 6;
+    }
+    snapshot.facilities.find((facility) => facility.id === 'farm-1')!.workers = 5;
+    synchronizePopulation(snapshot);
+    createCityPopulationSnapshot(snapshot);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-1', workers: 0 }).error).toBeNull();
+    expect(engine.getState().facilities.find((facility) => facility.id === 'city-1')!.workers).toBe(52);
+    expect(engine.getState().facilities.find((facility) => facility.id === 'city-2')!.workers).toBe(51);
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(101);
+  });
+
+  it('keeps newly secured production facilities unavailable until the next player turn', () => {
+    const engine = new GameEngine(203, createDefaultConfig({ maxTurns: 3, economy: { initialZombieCount: 0 } }));
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 6, r: 5 };
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    expect(engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 6, r: 4 } }).error).toBeNull();
+    expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-2', workers: 1 }).error?.code).toBe('facility_not_yet_operational');
+    expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-2', workers: 1 }).error).toBeNull();
+  });
+
+  it('applies city soft caps to production and exact overcrowding forecasts', () => {
+    const config = createDefaultConfig({
+      maxTurns: 2,
+      economy: {
+        initialZombieCount: 0,
+        initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 },
+      },
+    });
+    const engine = new GameEngine(204, config);
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    for (const facility of snapshot.facilities) {
+      if (facility.owner === 'player') facility.workers = 0;
+    }
+    const city = snapshot.facilities.find((facility) => facility.id === 'city-1')!;
+    city.owner = 'player';
+    city.status = 'owned';
+    city.workers = 51;
+    city.populationOperationalTurn = 1;
+    city.securedOrder = 5;
+    snapshot.facilities.find((facility) => facility.id === 'power-plant-1')!.workers = 1;
+    synchronizePopulation(snapshot);
+    createCityPopulationSnapshot(snapshot);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    const forecast = forecastEndTurn(engine.getState());
+    expect(forecast.overcrowding).toMatchObject({ additionalFood: 2, additionalCivilianGoods: 2 });
+    const result = engine.step({ type: 'EndTurn' });
+    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'civilianGoods' && event.payload.amount === 50)).toBe(true);
+  });
+
+  it('adds exact overcrowding fractions from multiple cities without a rate cap', () => {
+    const engine = new GameEngine(210, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    snapshot.facilities.find((facility) => facility.id === 'capital')!.workers = 110;
+    for (const id of ['city-1', 'city-2']) {
+      const city = snapshot.facilities.find((facility) => facility.id === id)!;
+      city.owner = 'player';
+      city.status = 'owned';
+      city.workers = 55;
+      city.populationOperationalTurn = 1;
+      city.securedOrder = id === 'city-1' ? 5 : 6;
+    }
+    synchronizePopulation(snapshot);
+    createCityPopulationSnapshot(snapshot);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    const forecast = forecastEndTurn(engine.getState());
+    expect(forecast.overcrowding.cities).toHaveLength(3);
+    expect(forecast.overcrowding.additionalFood).toBe(Math.ceil(forecast.populationConsumers * 0.3));
+    expect(forecast.overcrowding.additionalCivilianGoods).toBe(Math.ceil(forecast.populationConsumers * 0.3));
+  });
+
+  it('enforces recruitment hubs, supply-order conscription, and the last-civilian guard', () => {
+    const engine = new GameEngine(205, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 5, r: 7 } }).error?.code).toBe('invalid_recruitment_hub');
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 7, r: 7 } }).error).toBeNull();
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')?.workers).toBe(31);
+
+    const last = engine.getState() as ReturnType<typeof createInitialState>;
+    last.pendingUnitProductions = [];
+    for (const facility of last.facilities) if (facility.owner === 'player') facility.workers = 0;
+    last.facilities.find((facility) => facility.id === 'capital')!.workers = 5;
+    synchronizePopulation(last);
+    createCityPopulationSnapshot(last);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot: last }).error).toBeNull();
+    const before = engine.getState();
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } }).error?.code).toBe('insufficient_production_cost');
+    expect(engine.getState()).toEqual(before);
+  });
+
+  it('uses the specified three-pool infection orders and auto-places approved refugees', () => {
+    const config = createDefaultConfig({
+      maxTurns: 3,
+      economy: { initialZombieCount: 0, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
+      units: { zombie: { movement: 0 } },
+    });
+    const engine = new GameEngine(206, config);
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    snapshot.checkpoints.push({
+      id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
+      waiting: 2, screening: 2, approved: 2, remainingTurns: 2, screeningPolicy: 'normal', currentPolicy: 'normal', nextArrivalTurn: null, infected: 0,
+    });
+    snapshot.units.push(createUnit(snapshot, 'zombie-pools', 'zombie', { q: 7, r: 6 }));
+    synchronizePopulation(snapshot);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    const attacked = engine.getState().checkpoints[0]!;
+    expect(attacked).toMatchObject({ waiting: 0, screening: 0, approved: 0, infected: 5, status: 'operational' });
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(42);
+
+    const placement = engine.getState() as ReturnType<typeof createInitialState>;
+    placement.units = placement.units.filter((unit) => unit.isPlayerUnit);
+    placement.checkpoints[0]!.waiting = 0;
+    placement.checkpoints[0]!.screening = 0;
+    placement.checkpoints[0]!.approved = 3;
+    placement.checkpoints[0]!.infected = 0;
+    synchronizePopulation(placement);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot: placement }).error).toBeNull();
+    const capitalBefore = placement.facilities.find((facility) => facility.id === 'capital')!.workers;
+    expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    expect(engine.getState().checkpoints[0]!.approved).toBe(0);
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(capitalBefore + 3);
+  });
+
+  it('converts latent infection at a blocked checkpoint in approved-first order and overruns immediately', () => {
+    const config = createDefaultConfig({
+      maxTurns: 2,
+      economy: { initialZombieCount: 0, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
+      refugees: { policies: { passThrough: { infectionRate: 1, infectionPopulationRate: 1 } } },
+    });
+    const engine = new GameEngine(207, config);
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    snapshot.cityPopulationSnapshot.supply.forEach((entry) => { entry.eligible = false; });
+    snapshot.cityPopulationSnapshot.reception.forEach((entry) => { entry.eligible = false; });
+    snapshot.checkpoints.push({
+      id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
+      waiting: 2, screening: 0, approved: 0, remainingTurns: 0, screeningPolicy: 'passThrough', currentPolicy: 'passThrough', nextArrivalTurn: null, infected: 0,
+    });
+    synchronizePopulation(snapshot);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    expect(engine.getState().checkpoints[0]).toMatchObject({ waiting: 0, screening: 0, approved: 0, status: 'ruined' });
+    expect(engine.getState().checkpoints[0]!.infected).toBeGreaterThan(0);
+  });
+
+  it('spreads checkpoint internal infection waiting-first and applies shortage losses to cities first', () => {
+    const config = createDefaultConfig({
+      maxTurns: 1,
+      economy: { initialZombieCount: 0, initialResources: { food: 100, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
+    });
+    const engine = new GameEngine(208, config);
+    const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    snapshot.checkpoints.push({
+      id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
+      waiting: 1, screening: 2, approved: 3, remainingTurns: 2, screeningPolicy: 'normal', currentPolicy: 'normal', nextArrivalTurn: null, infected: 2,
+    });
+    synchronizePopulation(snapshot);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    expect(engine.getState().checkpoints[0]).toMatchObject({ waiting: 0, screening: 1, approved: 3, infected: 4 });
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(26);
+    expect(engine.getState().facilities.find((facility) => facility.id === 'farm-1')!.workers).toBe(23);
   });
 });

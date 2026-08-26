@@ -14,7 +14,7 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '1.0.0';
+export const CONFIG_VERSION = '1.1.0';
 export const DEFAULT_MAP_ID = 'fixed-15x15-v1';
 
 const facilityIds: FacilityId[] = [
@@ -101,7 +101,7 @@ const initialResources: ResourceStock = {
 };
 
 const initialWorkersByFacility: Record<FacilityId, number> = {
-  capital: 0,
+  capital: 41,
   'city-1': 0,
   'city-2': 0,
   'city-3': 0,
@@ -124,7 +124,6 @@ const defaultEconomy: EconomyConfig = {
   militaryGoodsPerUnitPopulation: 1,
   initialResources,
   initialWorkersByFacility,
-  initialUnemployed: 41,
   initialZombieCount: 4,
 };
 
@@ -282,8 +281,8 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (!config || typeof config !== 'object') {
     return { valid: false, errors: ['Config must be an object'] };
   }
-  if (typeof config.version !== 'string' || config.version.length === 0) {
-    errors.push('version must be a non-empty string');
+  if (config.version !== CONFIG_VERSION) {
+    errors.push(`version must be ${CONFIG_VERSION}`);
   }
   if (typeof config.mapId !== 'string' || config.mapId.length === 0) {
     errors.push('mapId must be a non-empty string');
@@ -404,7 +403,6 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (!economy || typeof economy !== 'object') {
     errors.push('economy is required');
   } else {
-    requireInteger(errors, economy.initialUnemployed, 'economy.initialUnemployed', 0);
     requireInteger(errors, economy.initialZombieCount, 'economy.initialZombieCount', 0);
     if (economy.initialZombieCount > 4) {
       errors.push('economy.initialZombieCount cannot exceed the four fixed-map positions');

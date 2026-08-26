@@ -32,7 +32,7 @@ const facilitySpecs: Array<{
   startingOwned: boolean;
   startingWorkers: number;
 }> = [
-  { id: 'capital', type: 'capital', position: { q: 7, r: 7 }, startingOwned: true, startingWorkers: 0 },
+  { id: 'capital', type: 'capital', position: { q: 7, r: 7 }, startingOwned: true, startingWorkers: 41 },
   { id: 'city-1', type: 'city', position: { q: 7, r: 3 }, startingOwned: false, startingWorkers: 0 },
   { id: 'city-2', type: 'city', position: { q: 11, r: 7 }, startingOwned: false, startingWorkers: 0 },
   { id: 'city-3', type: 'city', position: { q: 7, r: 11 }, startingOwned: false, startingWorkers: 0 },
@@ -218,7 +218,7 @@ function buildFixedMap(): FixedMap {
     }),
     facilities,
     hordeEntrances,
-    initialZombiePositions: [coord(6, 6), coord(8, 6), coord(6, 9), coord(9, 8)],
+    initialZombiePositions: [coord(4, 4), coord(11, 3), coord(3, 11), coord(11, 10)],
   };
 }
 
@@ -230,6 +230,22 @@ function cloneMap(map: FixedMap): FixedMap {
 
 /** A template map for read-only inspection; use createFixedMap for game state. */
 export const FIXED_MAP: FixedMap = cloneMap(baseFixedMap);
+
+function canonicalMapJson(value: unknown): string {
+  const normalize = (entry: unknown): unknown => {
+    if (Array.isArray(entry)) return entry.map(normalize);
+    if (entry !== null && typeof entry === 'object') {
+      const record = entry as Record<string, unknown>;
+      return Object.fromEntries(
+        Object.keys(record).sort().map((key) => [key, normalize(record[key])]),
+      );
+    }
+    return entry;
+  };
+  return JSON.stringify(normalize(value));
+}
+
+const FIXED_MAP_CANONICAL_JSON = canonicalMapJson(baseFixedMap);
 
 /** Return a fresh JSON-compatible copy for a new GameState. */
 export function createFixedMap(): FixedMap {
@@ -322,6 +338,9 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
   }
   if (!Array.isArray(map?.initialZombiePositions) || map.initialZombiePositions.length !== 4) {
     errors.push('map must contain four initial zombie positions');
+  }
+  if (map && canonicalMapJson(map) !== FIXED_MAP_CANONICAL_JSON) {
+    errors.push('map must match the fixed map template');
   }
   return { valid: errors.length === 0, errors };
 }

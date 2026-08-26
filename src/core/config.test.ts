@@ -8,6 +8,7 @@ import {
 describe('GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
+    expect(DEFAULT_CONFIG.version).toBe('1.1.0');
     expect(DEFAULT_CONFIG.maxTurns).toBe(30);
     expect(DEFAULT_CONFIG.horde).toMatchObject({ cycle: 5, initialCount: 2, increment: 2 });
     expect(DEFAULT_CONFIG.refugees).toMatchObject({
@@ -19,6 +20,13 @@ describe('GameConfig', () => {
     });
     expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, attack: 5, movement: 5, range: 1, population: 5 });
     expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, attack: 10, movement: 5, range: 2, population: 10 });
+    expect(DEFAULT_CONFIG.economy.initialWorkersByFacility).toMatchObject({
+      capital: 41,
+      'farm-1': 23,
+      'civilian-factory-1': 23,
+      'refinery-1': 10,
+      'power-plant-1': 3,
+    });
   });
 
   it('deep-merges options without mutating the default snapshot', () => {
@@ -44,6 +52,12 @@ describe('GameConfig', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((error) => error.includes('arrival interval'))).toBe(true);
     expect(result.errors.some((error) => error.includes('workerRate'))).toBe(true);
+  });
+
+  it('rejects a pre-v1.1 Config version', () => {
+    const config = createDefaultConfig();
+    config.version = '1.0.0';
+    expect(validateGameConfig(config)).toMatchObject({ valid: false });
   });
 
   it('validates initial disconnected population ranges against their facility capacity', () => {
