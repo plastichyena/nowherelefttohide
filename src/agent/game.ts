@@ -1,0 +1,200 @@
+import { assertValidGameConfig, cloneConfig, createDefaultConfig, DEFAULT_MAP_ID } from '../core/config';
+import { GameEngine } from '../core/engine';
+import type { DeepPartial, GameAction, GameConfig, GameState, JsonValue } from '../core/types';
+import { actionKey, cloneAction, cloneJson, sortActions } from './action';
+import { createAgentObservation, createAgentResult } from './observation';
+import {
+  AGENT_API_VERSION,
+  APP_VERSION,
+  BRIDGE_API_VERSION,
+  OBSERVATION_API_VERSION,
+  type AgentActionError,
+  type AgentGame,
+  type AgentObservation,
+  type AgentResetOptions,
+  type AgentRunArtifact,
+  type AgentStepResult,
+} from './types';
+
+const DEFAULT_AGENT_SEED = 1;
+const MAX_AGENT_ID_LENGTH = 64;
+const MAX_CONFIG_JSON_LENGTH = 64_000;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function validateKnownKeys(value: unknown, template: unknown, path: string): void {
+  if (!isPlainObject(value)) return;
+  if (!isPlainObject(template)) throw new Error(`${path || 'configOverrides'} must not contain nested fields here`);
+  for (const [key, child] of Object.entries(value)) {
+    if (!Object.prototype.hasOwnProperty.call(template, key)) throw new Error(`Unknown field: ${path}${key}`);
+    validateKnownKeys(child, template[key], `${path}${key}.`);
+  }
+}
+
+function validateFiniteNumbers(value: unknown, path = 'options'): void {
+  if (typeof value === 'number' && !Number.isFinite(value)) throw new Error(`${path} contains a non-finite number`);
+  if (Array.isArray(value)) value.forEach((item, index) => validateFiniteNumbers(item, `${path}[${index}]`));
+  else if (isPlainObject(value)) Object.entries(value).forEach(([key, item]) => validateFiniteNumbers(item, `${path}.${key}`));
+}
+
+function normalizeResetOptions(value: AgentResetOptions | undefined): Required<Pick<AgentResetOptions, 'seed'>> & AgentResetOptions {
+  const options = value ?? {};
+  if (!isPlainObject(options)) throw new Error('Reset options must be an object');
+  for (const key of Object.keys(options)) {
+    if (!['seed', 'configOverrides', 'agent'].includes(key)) throw new Error(`Unknown reset option: ${key}`);
+  }
+  validateFiniteNumbers(options);
+  const seedValue: unknown = options.seed ?? DEFAULT_AGENT_SEED;
+  if (typeof seedValue !== 'number' || !Number.isSafeInteger(seedValue)) throw new Error('seed must be a safe integer');
+  if (options.agent !== undefined) {
+    if (!isPlainObject(options.agent) || Object.keys(options.agent).some((key) => key !== 'id')) {
+      throw new Error('agent must contain only id');
+    }
+    if (typeof options.agent.id !== 'string' || !/^[A-Za-z0-9._-]+$/.test(options.agent.id) || options.agent.id.length > MAX_AGENT_ID_LENGTH) {
+      throw new Error(`agent.id must use 1-${MAX_AGENT_ID_LENGTH} safe ASCII characters`);
+    }
+  }
+  return { ...options, seed: seedValue };
+}
+
+function buildConfig(overrides: DeepPartial<GameConfig> | undefined): GameConfig {
+  if (overrides !== undefined) {
+    if (!isPlainObject(overrides)) throw new Error('configOverrides must be an object');
+    if (JSON.stringify(overrides).length > MAX_CONFIG_JSON_LENGTH) throw new Error('configOverrides is too large');
+    validateKnownKeys(overrides, createDefaultConfig(), 'configOverrides.');
+  }
+  const config = createDefaultConfig(overrides);
+  if (config.mapId !== DEFAULT_MAP_ID) throw new Error(`mapId must be ${DEFAULT_MAP_ID}`);
+  assertValidGameConfig(config);
+  return config;
+}
+
+function publicError(code: string, message: string): AgentActionError {
+  return { code, message };
+}
+
+function safeUnknownClone(value: unknown): unknown {
+  try {
+    return cloneJson(value as JsonValue);
+  } catch {
+    return null;
+  }
+}
+
+export interface AgentGameAdapterOptions {
+  buildId?: string;
+  bridgeApiVersion?: string;
+}
+
+export class AgentGameAdapter implements AgentGame {
+  private engine: GameEngine;
+  private seed = DEFAULT_AGENT_SEED;
+  private config = createDefaultConfig();
+  private agentId = 'external-agent';
+  private acceptedActions: GameAction[] = [];
+  private invalidAttempts: AgentRunArtifact['invalidAttempts'] = [];
+  private readonly buildId: string;
+  private readonly bridgeApiVersion: string;
+
+  public constructor(options: AgentGameAdapterOptions = {}) {
+    this.engine = new GameEngine(this.seed, this.config);
+    this.buildId = options.buildId ?? 'local-unknown';
+    this.bridgeApiVersion = options.bridgeApiVersion ?? BRIDGE_API_VERSION;
+  }
+
+  public reset(options?: AgentResetOptions): AgentObservation {
+    const normalized = normalizeResetOptions(options);
+    const config = buildConfig(normalized.configOverrides);
+    const next = new GameEngine(normalized.seed, config);
+    this.engine = next;
+    this.seed = normalized.seed;
+    this.config = cloneConfig(config);
+    this.agentId = normalized.agent?.id ?? 'external-agent';
+    this.acceptedActions = [];
+    this.invalidAttempts = [];
+    return this.getObservation();
+  }
+
+  public getObservation(): AgentObservation {
+    return createAgentObservation(this.engine.getState());
+  }
+
+  public getLegalActions(): GameAction[] {
+    return sortActions(this.engine.getLegalActions()).map(cloneAction);
+  }
+
+  public step(action: GameAction): AgentStepResult {
+    const legal = this.getLegalActions();
+    let matched: GameAction | undefined;
+    try {
+      const candidateKey = actionKey(action);
+      matched = legal.find((candidate) => actionKey(candidate) === candidateKey);
+    } catch {
+      matched = undefined;
+    }
+    if (!matched) {
+      const error = publicError('action_not_legal', 'Action is not in the current legal action list');
+      this.invalidAttempts.push({ decision: this.acceptedActions.length + this.invalidAttempts.length + 1, action: safeUnknownClone(action), error });
+      return {
+        observation: this.getObservation(),
+        events: [],
+        error,
+        gameOver: this.isGameOver(),
+        result: this.getResult(),
+      };
+    }
+    const result = this.engine.step(matched);
+    if (result.error) {
+      const error = publicError(result.error.code, result.error.message);
+      this.invalidAttempts.push({ decision: this.acceptedActions.length + this.invalidAttempts.length + 1, action: cloneAction(matched), error });
+      return { observation: this.getObservation(), events: [], error, gameOver: result.gameOver, result: this.getResult() };
+    }
+    this.acceptedActions.push(cloneAction(matched));
+    return {
+      observation: this.getObservation(),
+      events: cloneJson(result.events),
+      error: null,
+      gameOver: result.gameOver,
+      result: this.getResult(),
+    };
+  }
+
+  public isGameOver(): boolean {
+    return this.engine.isGameOver();
+  }
+
+  public getResult() {
+    return createAgentResult(this.engine.getResult());
+  }
+
+  public getRunArtifact(): AgentRunArtifact {
+    const observation = this.getObservation();
+    return cloneJson({
+      appVersion: APP_VERSION,
+      gameRulesVersion: observation.gameRulesVersion,
+      agentApiVersion: AGENT_API_VERSION,
+      observationApiVersion: OBSERVATION_API_VERSION,
+      bridgeApiVersion: this.bridgeApiVersion,
+      buildId: this.buildId,
+      mapId: observation.map.id,
+      seed: this.seed,
+      config: this.config,
+      agent: { id: this.agentId },
+      acceptedActions: this.acceptedActions,
+      invalidAttempts: this.invalidAttempts,
+      decisionTrace: [],
+      result: this.getResult(),
+    });
+  }
+
+  /** Local/CI failure diagnostics only. Not part of AgentGame or window.NLTH. */
+  public getDebugState(): Readonly<GameState> {
+    return this.engine.getState();
+  }
+}
+
+export function createAgentGame(options: AgentGameAdapterOptions = {}): AgentGameAdapter {
+  return new AgentGameAdapter(options);
+}

@@ -11,6 +11,7 @@ AGENTS.md
 node_modules/
 dist/
 coverage/
+output/
 
 # Local configuration and logs
 .env

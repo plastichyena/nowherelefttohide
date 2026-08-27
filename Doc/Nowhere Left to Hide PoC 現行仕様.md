@@ -3,9 +3,9 @@
 ## PoC 現行仕様
 
 - ステータス: 現行正本
-- 現行Version: v1.1
-- 基準日: 2026-08-26
-- 直近の変更要件: `Nowhere Left to Hide PoC v1.1アップデート要件 確定版.md`
+- 現行Version: v1.2
+- 基準日: 2026-08-27
+- 直近の変更要件: `Nowhere Left to Hide PoC v1.2アップデート要件 確定版.md`
 
 本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。過去の要件定義・仕様書・反映済みアップデート文書は`Doc/archive/`へ保管し、現行判断には使用しない。
 
@@ -46,16 +46,19 @@
 - 日本語・英語切り替え（デフォルト日本語）
 - 初回ガイド、常設ヘルプ、終了統計
 - Phaserなしで進行できるHeadless Game Interface
-- 完全なGameStateと合法手を使うRandom Test Agent
+- 公開情報だけを返すAgent ObservationとAgentGame Adapter
+- 共通Runnerを使う決定的なRandom Test AgentとBalanced Agent
+- 同一Seed比較、Metrics、Replay／Failure Artifact、JSON／CSV出力を持つBatch Simulation CLI
+- 通常UI・保存領域と分離したDeveloper / Browser Bridge
 - Unit Test、不変条件試験、複数Seed自動完走試験
 - GitHub Actionsによるテスト、ビルド、GitHub Pages公開
 
 ## 2.2 対象外
 
 - Fog of War、ランダムマップ、地形別移動コスト・防御補正
-- Replay UI、攻略用Rule Based Agent、外部LLM Agent
-- AI観戦、AI思考表示、After Action Report
-- 大規模バランスBatch Simulationと高度な統計
+- Replay UI、外部LLM Agent、`balanced`以外の組み込みStrategy
+- AI観戦、AI思考表示、After Action Report、Browser BridgeからのBatch実行
+- 強化学習、Minimax、MCTS、人間より強いAIの保証
 - リアルタイム操作、大量個体描画、複雑な基地建築
 - 完成品相当のアート、アニメーション、音響
 
@@ -67,6 +70,7 @@
 - Game CoreはPhaser、DOM、描画、入力へ依存させない。
 - UIはGameStateをRead Onlyで参照し、変更は必ずGameActionをGameEngineへ渡す。
 - UI、Headless、Test Agentのために別ルールや別状態変更経路を作らない。
+- AgentはGameStateを直接参照せず、AgentObservationと合法手だけからActionを選ぶ。
 - GameState、Config、Action、EventはJSON化可能にする。
 - ゲームルール内で`Math.random()`を使用しない。
 - 依存物は原則MIT、Apache-2.0、BSD、ISC等の許諾的ライセンスに限定し、第三者通知を保存する。
@@ -207,6 +211,60 @@ interface HeadlessGame {
 - Game Over後の`step`は状態を変更せず拒否する。
 - `getLegalActions()`は原子的Actionを返し、人口配置の全組合せを一括列挙しない。
 - Random Test Agentは同一ターンのループを避けるAction上限を持ち、合法ならEndTurnへ進める。
+
+## 6.5 Version境界
+
+- App / Release Versionは`1.2.0`とする。
+- ゲームルールと必須GameStateを変更していないため、Game Rules / GameState VersionとConfig Versionは`1.1.0`を維持する。
+- Save Format Versionも現行値を維持し、v1.1セーブを読み込める。
+- Agent、Observation、Browser Bridgeは個別のSemVerを持ち、Build IDはCIではGit commit SHA、ローカルではSHAとdirty状態または`local-unknown`を記録する。
+- Build IDは乱数とゲーム結果へ影響させない。
+
+## 6.6 Agent ObservationとAgentGame
+
+Agent向け正式入力はGameStateではなく、JSON互換の`AgentObservation`とする。最低限、API／Game Rules Version、Turn、Phase、静的マップ、公開中の資源・人口・施設・部隊・ゾンビ・検問所、Horde方向と残りターン、EndTurn Forecast、勝敗を含む。
+
+- PRNG内部状態、将来乱数、出現前Horde規模、デバッグ専用値を含めない。
+- 配列順を決定的にし、取得によってStateを変更せず、返却値と内部参照を共有しない。
+- Game Over後の合法手は空配列とする。
+- Agent向けStepResultはObservation、公開Event、理由コード付きError、勝敗だけを返し、GameStateを含めない。
+- 一覧外または不正なActionはState、RNG、正規Action列を変更せず、不正試行として分離記録する。
+
+```ts
+interface AgentGame {
+  reset(options?: AgentResetOptions): AgentObservation;
+  getObservation(): AgentObservation;
+  getLegalActions(): GameAction[];
+  step(action: GameAction): AgentStepResult;
+  isGameOver(): boolean;
+  getResult(): AgentGameResult | null;
+  getRunArtifact(): AgentRunArtifact;
+}
+```
+
+## 6.7 組み込みAgentと統一Runner
+
+- `random`と`balanced`は同じAgentGame、Runner、安全上限、Metrics、Artifact形式を使用する。
+- Random Agentの選択乱数はGameEngineから独立したSeed付き乱数とする。
+- Balanced Agentは独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
+- Balancedは即時敗北回避、Horde防衛、感染鎮圧、食料・民需品・燃料・電力、過密、施設確保、部隊編成と損傷、検問所建設・方針、有益なActionがない場合のEndTurnを評価する。
+- 評価重みと閾値をデータとして分離し、Decisionごとに優先目標、選択Actionと点数、上位候補、理由コードを機械可読Traceとして残す。文章上の思考過程は保存しない。
+- Runnerは1ターン、1ゲーム、最大ターンの安全上限をGameConfigと別管理し、上限、例外、不変条件違反、不正Action、Agent停止を技術的失敗として扱う。ゲーム内敗北は正常完遂である。
+- 既定では失敗Artifactを残して次のゲームを続け、`fail-fast`指定時だけ停止する。
+
+## 6.8 Batch SimulationとBrowser Bridge
+
+`npm run sim -- --agent=balanced --games=1000 --seed=1 --out=output/simulations/run-name`相当のCLIを提供する。Agent、Seed集合、完全Configまたは検証済みoverride、Runner上限、出力先、fail-fastを指定でき、Random／Balancedを同一Seed・標準Configで比較できる。
+
+- 正本JSON、固定列UTF-8 CSV、成功・敗北を含むゲーム単位Replay Artifact、技術的失敗時のFailure Artifactを出力する。
+- 既存出力を既定で上書きせず、明示指定時だけ許可する。
+- Artifactは各Version、Build ID、Map、Seed、Config、Agent、受理Action列、不正試行、Result、Metrics、Balanced Traceを持つ。
+- Failure Artifactは直前Observation、エラー、Decision番号と、ローカル／CIデバッグ用途の直前・直後GameStateを追加できる。
+- ReplayはAction列を再実行し、最終Result、Action数、Observationの不一致理由を報告する。
+
+ゲームページでは追加設定なしに`window.NLTH`を公開する。Bridgeは通常UIとは別のインメモリAgentGameを1つだけ保持し、ページ再読み込みで破棄する。自動保存、localStorage、セーブコード、通常UI状態、ネットワーク、ファイル、Batchへアクセスしない。
+
+公開メソッドは`getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact`だけとし、`getState`、`LoadSnapshot`、`StartNewGame`を公開しない。入力を境界で検証し、1回の`step`で1Actionだけを処理する。API説明ページ、最小プロンプト、Smoke手順、外部AI E2Eチェックリストを公開する。
 
 ---
 
@@ -577,7 +635,8 @@ WIN CHECK / NEXT TURN
 - 同内容をJSONファイルで入出力できる。
 - Version不一致、破損、不正Config、不変条件違反を検出し、現在状態へ適用しない。
 - ロード後は保存時Configを使う。
-- v1.1はv1.0以前の自動保存、セーブコード、JSONと互換性を持たない。
+- v1.2 AppはGame Rules / GameState / Save Format `1.1.0`を維持し、v1.1の自動保存、セーブコード、JSONを読み込める。
+- v1.0以前の自動保存、セーブコード、JSONとは互換性を持たない。
 - 旧データ検出時は「旧バージョンのため読み込めない」と表示し、「最初から」を促す。
 - 旧データを自動変換、自動削除、自動上書きしない。
 
@@ -597,6 +656,15 @@ WIN CHECK / NEXT TURN
 - Horde迎撃数、主な敗北原因
 
 人口を変えるEventは移動元、移動先、人数、理由を追跡可能にする。
+
+Agentゲーム単位Metricsは、各Version、Build ID、Map、Seed、Config、Agent、勝敗、Game Over理由、最終Turn、Decision／受理／不正Action数、Action／優先目標別件数に加え、次を記録する。
+
+- 初期・最終・最大人口、民間人損失、感染・資源不足損失、受入避難民、最大過密
+- 確保・喪失・最終所有施設数
+- 警察・州兵編成、ユニット損失、Zombie撃破、Horde迎撃
+- 最終食料、民需品、軍需品、燃料
+
+Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値の平均・中央値・最小・最大・p10・p90、Game Over理由、Action／優先目標件数、同一Seed差分を持つ。
 
 ---
 
@@ -650,6 +718,16 @@ Resources >= 0
 - ローカルではConfig指定で1,000ゲーム以上実行可能にする。
 - 失敗時にVersion、Config、Map、Seed、Action列、エラー、直前GameStateを保存する。
 
+## 17.4 Agent／Batch／Bridge
+
+- ObservationがJSON互換、非共有、決定的で、取得時にStateを変更せず、非公開情報を含まないことを試験する。
+- Legal Actionsがすべて受理され、一覧外ActionでStateとRNGが変わらず、AgentStepResultにGameStateを含まないことを試験する。
+- Balancedの即時敗北、資源、電力、感染、Horde、過密、拡張、編成、損傷、検問所、EndTurnの固定シナリオを意図ベースで試験する。
+- 標準Configの固定Seed 1～100でBalancedが技術的失敗なく完遂する。
+- Random／Balancedの同一Seed比較、決定性、JSON／CSV／ゲーム単位Artifact、失敗継続、fail-fast、Replay一致を試験する。
+- Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
+- 公開Pagesではブラウザ操作可能な外部Agentを使い、API発見、不正Action訂正、Game Over、Result／Artifact取得とReplayを手動E2E確認する。勝利は合格条件にしない。
+
 ---
 
 # 18. PoC完成条件
@@ -666,3 +744,8 @@ Resources >= 0
 10. 自動保存、セーブコード、JSON保存・復元と旧Version拒否が機能する。
 11. Headless、主要Unit Test、不変条件試験、最低100ゲームのRandom Testが成功する。
 12. 許諾的ライセンスだけを使用し、GitHub Actionsでテスト・ビルド・Pages公開が可能である。
+13. AgentObservationとAgentGameが非公開GameStateを渡さず、合法手とstepだけで進行できる。
+14. Balancedが公開情報だけを使って決定的に動作し、11領域の固定シナリオとSeed 1～100を完遂する。
+15. 統一RunnerとBatch CLIが同一Seed比較、Metrics、JSON／CSV、Replay／Failure Artifactを生成し再生できる。
+16. Production Buildで通常UI・保存と分離した`window.NLTH`とAPI説明を利用できる。
+17. v1.1セーブ互換を維持し、App v1.2とGame Rules / State `1.1.0`のVersion境界が整合する。

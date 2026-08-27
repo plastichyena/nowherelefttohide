@@ -1,0 +1,63 @@
+import { describe, expect, it } from 'vitest';
+import { createDefaultConfig } from '../core/config';
+import type { AgentGame } from './types';
+import { createAgentGame } from './game';
+import { BalancedAgent, RandomAgent, replayArtifact, runAgentGame } from './runner';
+
+describe('unified Agent Runner', () => {
+  it('runs a deterministic random game and records a replay artifact', () => {
+    const config = createDefaultConfig({ maxTurns: 3, maxActionsPerTurn: 4 });
+    const first = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } });
+    const second = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } });
+    expect(first.technicalFailure).toBe(false);
+    expect(first.actions).toEqual(second.actions);
+    expect(first.artifact.artifactType).toBe('replay');
+    const replay = replayArtifact(first.artifact);
+    expect(replay.reproduced).toBe(true);
+    expect(replay.mismatch).toBeNull();
+    expect(replay.actionsReplayed).toBe(first.actions.length);
+  });
+
+  it('forces EndTurn at the runner per-turn limit for agents without traces', () => {
+    const config = createDefaultConfig({ maxTurns: 2, maxActionsPerTurn: 100 });
+    const run = runAgentGame(12, {
+      config,
+      agent: new RandomAgent(12),
+      limits: { maxTurns: 4, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 20 },
+    });
+    expect(run.technicalFailure).toBe(false);
+    expect(run.actions.filter((action) => action.type === 'EndTurn').length).toBeGreaterThan(0);
+  });
+
+  it('uses Observation only in the Balanced Agent decision contract', () => {
+    const agent = new BalancedAgent();
+    const observation = createAgentGame().reset({ seed: 1 });
+    const action = { type: 'EndTurn' } as const;
+    expect(agent.decide(observation, [action]).action).toEqual(action);
+  });
+
+  it('captures a debug state on technical failure without exposing it to the Agent', () => {
+    let state = { value: 0 };
+    const initialObservation = createAgentGame().reset({ seed: 1 });
+    const game: AgentGame = {
+      reset: () => initialObservation,
+      getObservation: () => initialObservation,
+      getLegalActions: () => [{ type: 'EndTurn' }],
+      step: () => { state.value = 1; throw new Error('boom'); },
+      isGameOver: () => false,
+      getResult: () => null,
+      getRunArtifact: () => ({}) as never,
+    };
+    const run = runAgentGame(1, {
+      gameFactory: () => game,
+      agent: { id: 'fake', version: '1.0.0', decide: () => ({ action: { type: 'EndTurn' } }) },
+      config: createDefaultConfig({ maxTurns: 1 }),
+      debugSnapshot: () => ({ value: state.value }),
+      limits: { maxTurns: 2, maxDecisionsPerTurn: 2, maxDecisionsPerGame: 2 },
+    });
+    expect(run.technicalFailure).toBe(true);
+    expect(run.failure?.code).toBe('STEP_THREW');
+    expect(run.failure?.stateBeforeFailure).toEqual({ value: 0 });
+    expect(run.failure?.stateAfterFailure).toEqual({ value: 1 });
+  });
+});

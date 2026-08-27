@@ -1,5 +1,6 @@
 import 'phaser';
 import './styles.css';
+import { installBrowserBridge } from './browser/bridge';
 import { GameUiController, type UiGameEngine } from './ui/controller';
 
 const root = document.querySelector<HTMLElement>('#app');
@@ -43,4 +44,8 @@ async function boot(): Promise<void> {
   new GameUiController(root, engineFactory).mount();
 }
 
+// Keep the Developer / Browser Bridge available from the first page script
+// evaluation.  It owns a separate in-memory AgentGame and never reuses the
+// UI controller's engine or persistence store.
+installBrowserBridge();
 void boot();

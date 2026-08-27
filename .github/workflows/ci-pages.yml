@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck, tests, random agent, and build
+    name: Typecheck, tests, agents, bridge smoke, and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -45,18 +45,39 @@ jobs:
       # this command explicit so a missing script fails CI instead of silently
       # skipping the required 100-game smoke run.
       - name: Run 100 seeded Random Agent games
-        run: npm run test:random -- --games=100 --failure-file=random-agent-failures.json
+        run: npm run test:random -- --games=100
 
       - name: Upload Random Agent failure artifact
-        if: failure() && hashFiles('random-agent-failures.json') != ''
+        if: failure() && hashFiles('output/simulations/random-smoke/**') != ''
         uses: actions/upload-artifact@v4
         with:
           name: random-agent-failures-${{ github.run_id }}
-          path: random-agent-failures.json
+          path: output/simulations/random-smoke
+          if-no-files-found: ignore
+
+      # The Phase 4 Balanced Agent is expected to expose this script. Keep the
+      # command explicit so a missing script fails CI instead of skipping the
+      # required fixed-seed 100-game run.
+      - name: Run 100 seeded Balanced Agent games
+        run: npm run test:balanced -- --games=100
+
+      - name: Upload Balanced Agent failure artifact
+        if: failure() && hashFiles('output/simulations/balanced-smoke/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: balanced-agent-failures-${{ github.run_id }}
+          path: output/simulations/balanced-smoke
           if-no-files-found: ignore
 
       - name: Build production bundle
         run: npm run build
+        env:
+          VITE_BUILD_ID: ${{ github.sha }}
+
+      # This smoke intentionally has no browser-driver dependency: it checks
+      # the generated Pages artifact and its public bridge contract.
+      - name: Smoke test Browser Bridge in production bundle
+        run: npm run test:browser-bridge -- --dist=dist
 
       - name: Configure GitHub Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

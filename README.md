@@ -4,6 +4,8 @@
 
 公開ページ（GitHub Pages）: <https://plastichyena.github.io/nowherelefttohide/>
 
+ブラウザAgent向けAPI説明: <https://plastichyena.github.io/nowherelefttohide/agent-api.html>
+
 ## PoCの範囲
 
 - 固定15×15ヘックス、16施設、東西南北の道路とHorde入口
@@ -15,8 +17,10 @@
 - Seed付き乱数によるゾンビAI、避難民、感染、Hordeの再現
 - 自動保存、セーブコード、JSON保存・復元
 - 日本語（デフォルト）/英語切り替え、初回ガイド、常設ヘルプ、終了統計
+- ブラウザJavaScriptから利用できる、通常UI・保存領域と分離したDeveloper / Browser Bridge
+- 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。現在のアップデート要件は [`Doc/Nowhere Left to Hide PoC v1.1アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.1アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。現在のアップデート要件は [`Doc/Nowhere Left to Hide PoC v1.2アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.2アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
 
 ## ローカルで起動する
 
@@ -35,6 +39,29 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+## Browser Agent Bridge
+
+ゲームページでは、追加設定やクエリパラメータなしで `window.NLTH` を利用できます。APIの説明ページは [Agent API](https://plastichyena.github.io/nowherelefttohide/agent-api.html) です。Bridgeは通常UIとは別のインメモリセッションで動作し、自動保存・`localStorage`・セーブコードへアクセスしません。
+
+最小プロンプト例:
+
+```text
+Open https://plastichyena.github.io/nowherelefttohide/ and use the documented window.NLTH browser bridge. Read getApiInfo(), reset with seed 1, then repeatedly inspect getObservation() and getLegalActions(), submit exactly one legal action per step(), and continue until Game Over. Finally report getResult() and getRunArtifact().
+```
+
+公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
+
+## Agent Simulation CLI
+
+Random／Balancedは共通RunnerとAgentGameを使います。BalancedはGameStateを参照せず、公開Observationと合法手だけから完全に決定的なActionを選びます。
+
+```bash
+npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-run
+npm run sim -- --agent=random,balanced --seeds=1,2,3 --out=output/simulations/comparison
+```
+
+出力先には正本`run.json`、固定列UTF-8の`games.csv`、成功・敗北・技術的失敗を含むゲーム単位Artifactを生成します。既存の非空出力先は既定で上書きしません。上書きする場合だけ`--overwrite`を明示してください。ゲーム内敗北は正常完遂であり、技術的失敗が1件でもある場合だけExit Codeが非0になります。
 
 ## 操作
 
@@ -92,7 +119,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。v1.1はv1.0以前の保存データと非互換であり、旧データは自動変換・削除・上書きせず、理由を表示して「最初から」を案内します。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App v1.2はGame Rules / State / Save Format `1.1.0`を維持するためv1.1セーブを読み込めます。v1.0以前の保存データは非互換で、自動変換・削除・上書きせず、理由を表示して「最初から」を案内します。
 
 ## テスト
 
@@ -100,12 +127,14 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 npm run typecheck
 npm test
 npm run test:random -- --games=100
+npm run test:balanced -- --games=100
 npm run build
+npm run test:browser-bridge -- --dist=dist
 ```
 
-Coreテストでは、移動・戦闘、資源・電力、不足被害、感染・鎮圧・陥落・復旧、避難民、Horde、勝敗、保存往復、不変条件、Seed再現性を確認します。Random Test Agentは完全なGameStateと合法手からActionを選び、各Action後/ターン後に不変条件を検査します。失敗時にはVersion、Config、Map ID、Seed、Action列、直前Stateを出力します。
+Coreテストでは、移動・戦闘、資源・電力、不足被害、感染・鎮圧・陥落・復旧、避難民、Horde、勝敗、保存往復、不変条件、Seed再現性を確認します。Random／Balancedは公開Observationと合法手だけを使う統一Runnerで実行し、失敗時にはVersion、Config、Map ID、Seed、Action列、直前Observationとデバッグ用Stateを出力します。
 
-`test:random` は現在 `package.json` に統合済みで、`npm run test:random -- --games=100` でRandom Test Agentを100ゲーム実行できます。CIでも同じコマンドを実行し、不変条件違反や再現性の問題を検出します。
+`test:random`と`test:balanced`は標準ConfigのSeed群を共通Batch CLIで実行します。CIでは各100ゲームに加え、Observation境界、Replay、Production Bridge smokeを検証します。
 
 ## GitHub ActionsとPages
 
@@ -116,8 +145,10 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 3. `npm run typecheck`
 4. `npm test`
 5. `npm run test:random -- --games=100`
-6. `npm run build`
-7. `main`へのpush時だけGitHub Pagesへデプロイ
+6. `npm run test:balanced -- --games=100`
+7. `npm run build`
+8. `npm run test:browser-bridge -- --dist=dist`
+9. `main`へのpush時だけGitHub Pagesへデプロイ
 
 Workflowは`actions/configure-pages`でPagesの有効化を要求し、相対asset URLで生成した`dist`を公開します。リポジトリ/組織ポリシーが自動有効化を拒否した場合だけ、Pages設定のSourceを「GitHub Actions」に変更してください。
 

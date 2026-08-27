@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111827" />
+    <title>Nowhere Left to Hide — Agent API</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, -apple-system, sans-serif; }
+      body { max-width: 860px; margin: 0 auto; padding: 24px; background: #111827; color: #e5e7eb; line-height: 1.6; }
+      a { color: #93c5fd; }
+      code, pre { background: #1f2937; border-radius: 6px; }
+      code { padding: 2px 5px; }
+      pre { overflow-x: auto; padding: 14px; }
+      h1, h2 { line-height: 1.25; }
+      .note { border-left: 3px solid #60a5fa; padding-left: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="./">← Nowhere Left to Hide</a></p>
+      <h1>Nowhere Left to Hide — Agent API</h1>
+      <p class="note">The game page exposes <code>window.NLTH</code> for a browser JavaScript agent. This is an in-memory developer bridge, not an HTTP API.</p>
+
+      <h2>Available methods</h2>
+      <p><code>getApiInfo()</code>, <code>reset(options?)</code>, <code>getObservation()</code>, <code>getLegalActions()</code>, <code>step(action)</code>, <code>isGameOver()</code>, <code>getResult()</code>, and <code>getRunArtifact()</code>.</p>
+      <p>Call <code>getApiInfo()</code> for machine-readable versions, schemas, the recommended order, and the complete minimal example. Every returned value is a JSON-compatible copy. The bridge never reads or writes <code>localStorage</code>, save codes, or the normal UI session.</p>
+
+      <h2>Minimal browser example</h2>
+      <pre><code>const api = window.NLTH;
+api.reset({ seed: 1, agent: { id: 'browser-agent' } });
+while (!api.isGameOver()) {
+  const legal = api.getLegalActions();
+  if (legal.length === 0) break;
+  api.step(legal[0]);
+}
+console.log(api.getResult(), api.getRunArtifact());</code></pre>
+
+      <h2>Browser smoke check</h2>
+      <p>Build the production bundle, then run the dependency-free static bridge smoke check:</p>
+      <pre><code>npm run build
+npm run test:browser-bridge -- --dist=dist</code></pre>
+      <p>A real browser can additionally open the game URL, evaluate <code>window.NLTH.getApiInfo()</code>, reset a seed, fetch observations and legal actions, then replay the returned action list.</p>
+
+      <h2>External-agent checklist</h2>
+      <ul>
+        <li>Discover the bridge from this page and the game URL without UI clicks or query parameters.</li>
+        <li>Read API information, observation, and legal actions before choosing one action per <code>step()</code>.</li>
+        <li>After an invalid action, read its error, choose a listed legal action, and continue until Game Over.</li>
+        <li>Collect the result and run artifact; the artifact contains replay inputs, not the private GameState or hidden chain of thought.</li>
+      </ul>
+
+      <h2>Not exposed</h2>
+      <p><code>getState</code>, <code>LoadSnapshot</code>, arbitrary code execution, file operations, save operations, local storage, network access, and Batch execution are not part of the public bridge.</p>
+    </main>
+  </body>
+</html>
