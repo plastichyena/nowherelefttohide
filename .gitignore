@@ -19,6 +19,9 @@ output/
 !.env.example
 *.log
 
+# Local draft for the next update plan
+/Doc/Nowhere_Left_to_Hide_v1.2.5_spec_draft.md
+
 # Editor / OS files
 .DS_Store
 Thumbs.db

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { hexDistance } from '../core/hex';
 import type { GameAction } from '../core/types';
 import { BalancedAgent } from './balancedAgent';
 import { createAgentGame } from './game';
@@ -69,14 +70,24 @@ describe('Balanced Agent scenario intentions', () => {
     expect(result.action).toMatchObject({ type: 'SuppressInfection', unitId: police.id });
   });
 
-  it('moves toward the announced Horde front when arrival is imminent', () => {
+  it('positions National Guard at a frontline facility when Horde arrival is imminent', () => {
     const unit = observation.units[0]!;
     const entrance = observation.map.tiles.find((tile) => tile.hordeEntranceDirections.includes(observation.horde.direction))!;
+    const frontline = observation.facilities
+      .filter((facility) => facility.owner === 'player' && facility.healthyPopulation > 0)
+      .sort((left, right) =>
+        hexDistance(left.position, entrance) - hexDistance(right.position, entrance) || left.id.localeCompare(right.id),
+      )[0]!;
     const result = decide([
-      { type: 'Move', unitId: unit.id, destination: { q: entrance.q, r: entrance.r } },
+      { type: 'Move', unitId: unit.id, destination: frontline.position },
       { type: 'EndTurn' },
-    ], (value) => { value.horde.turnsRemaining = 1; });
+    ], (value) => {
+      value.horde.turnsRemaining = 1;
+      value.zombies = [];
+      value.units.find((candidate) => candidate.id === unit.id)!.position = { q: 7, r: 7 };
+    });
     expect(result.action.type).toBe('Move');
+    expect(result.trace?.reasonCodes).toContain('DEFEND_FRONTLINE_FACILITY');
   });
 
   it('relieves severe city overcrowding', () => {
@@ -150,4 +161,3 @@ describe('Balanced Agent scenario intentions', () => {
     );
   });
 });
-

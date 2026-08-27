@@ -246,8 +246,16 @@ interface AgentGame {
 
 - `random`と`balanced`は同じAgentGame、Runner、安全上限、Metrics、Artifact形式を使用する。
 - Random Agentの選択乱数はGameEngineから独立したSeed付き乱数とする。
-- Balanced Agentは独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
-- Balancedは即時敗北回避、Horde防衛、感染鎮圧、食料・民需品・燃料・電力、過密、施設確保、部隊編成と損傷、検問所建設・方針、有益なActionがない場合のEndTurnを評価する。
+- Balanced Agent Versionは`2.0.0`とする。独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
+- Balancedは即時敗北回避、施設接触拒否、感染鎮圧、Horde防衛、軍需備蓄、食料・民需品・燃料・電力、州都人口バッファ、過密、生産冗長性を含む施設確保、部隊編成と損傷、検問所建設・方針、有益なActionがない場合のEndTurnを評価する。
+- 所有中かつ健全民間人口がいる施設に対し、各Zombieが現在接触中か、次のZombie Turnに移動力内から接触可能かを公開Observationだけで予測する。州都、単一供給源、軍需工場、健全民間人口の多い施設を高脅威として扱う。
+- National Guardは射程2と対Zombie確殺を利用する接触拒否火力として扱い、接触脅威への攻撃、安全な射撃位置、Horde方向側の所有施設防衛を優先する。Horde入口へ直接進出すること自体は目的にしない。
+- Policeは感染鎮圧用として温存し、通常の前線移動・攻撃を抑制する。ただし州都への接触を他の手段で防げない場合は防衛へ参加できる。
+- 複数Zombieが次の敵行動で到達できる位置への移動・攻撃を露出として減点し、低HP Unitの危険接近を抑制する。
+- 軍需品は現在のUnit人口から3ターン分の維持費と編成用バッファを評価し、供給停止前に軍需工場の確保・稼働を進める。National Guardが1隊だけで、軍需品・人口・生産基盤を維持できる場合は2隊目を編成する。
+- 州都の健全民間人口は平時15人、州都への接触脅威がある場合20人を目標バッファとする。これを下回る人口配置・編成を減点し、安全都市からの帰還を評価する。
+- Farm、Civilian Factory、Refinery、Power Plant、Military Factoryの単一依存を検出し、黒字時でも代替施設の確保と適量稼働を評価する。労働者は最大投入ではなく、不足解消、冗長性、入力資源、州都人口を考慮した目標人数へ近づける。
+- 同一ターン内で同じ施設の労働者数や検問所方針を繰り返し変更しないようAction Family単位の反復抑制を行う。接触脅威や感染が残っていても、対応可能なUnit Actionがなければ不要な内政Actionを挟まずEndTurnできる。
 - 評価重みと閾値をデータとして分離し、Decisionごとに優先目標、選択Actionと点数、上位候補、理由コードを機械可読Traceとして残す。文章上の思考過程は保存しない。
 - Runnerは1ターン、1ゲーム、最大ターンの安全上限をGameConfigと別管理し、上限、例外、不変条件違反、不正Action、Agent停止を技術的失敗として扱う。ゲーム内敗北は正常完遂である。
 - 既定では失敗Artifactを残して次のゲームを続け、`fail-fast`指定時だけ停止する。
@@ -722,7 +730,8 @@ Resources >= 0
 
 - ObservationがJSON互換、非共有、決定的で、取得時にStateを変更せず、非公開情報を含まないことを試験する。
 - Legal Actionsがすべて受理され、一覧外ActionでStateとRNGが変わらず、AgentStepResultにGameStateを含まないことを試験する。
-- Balancedの即時敗北、資源、電力、感染、Horde、過密、拡張、編成、損傷、検問所、EndTurnの固定シナリオを意図ベースで試験する。
+- Balancedの即時敗北、施設接触拒否、National Guardの射撃位置、Police温存、資源、電力、軍需備蓄、州都人口、感染、Horde、過密、冗長化、拡張、編成、損傷、検問所、EndTurnの固定シナリオを意図ベースで試験する。
+- 標準Configの固定Seed 1～30では、最短生存Turn 10以上、中央値20以上、Seed 1の生存Turn 20以上を回帰基準とする。
 - 標準Configの固定Seed 1～100でBalancedが技術的失敗なく完遂する。
 - Random／Balancedの同一Seed比較、決定性、JSON／CSV／ゲーム単位Artifact、失敗継続、fail-fast、Replay一致を試験する。
 - Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
@@ -745,7 +754,7 @@ Resources >= 0
 11. Headless、主要Unit Test、不変条件試験、最低100ゲームのRandom Testが成功する。
 12. 許諾的ライセンスだけを使用し、GitHub Actionsでテスト・ビルド・Pages公開が可能である。
 13. AgentObservationとAgentGameが非公開GameStateを渡さず、合法手とstepだけで進行できる。
-14. Balancedが公開情報だけを使って決定的に動作し、11領域の固定シナリオとSeed 1～100を完遂する。
+14. Balanced v2が公開情報だけを使って決定的に動作し、施設接触拒否と役割分担を含む固定シナリオ、Seed 1～30の生存回帰基準、Seed 1～100の技術的失敗なし完遂を満たす。
 15. 統一RunnerとBatch CLIが同一Seed比較、Metrics、JSON／CSV、Replay／Failure Artifactを生成し再生できる。
 16. Production Buildで通常UI・保存と分離した`window.NLTH`とAPI説明を利用できる。
 17. v1.1セーブ互換を維持し、App v1.2とGame Rules / State `1.1.0`のVersion境界が整合する。

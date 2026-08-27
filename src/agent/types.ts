@@ -23,7 +23,7 @@ export const APP_VERSION = '1.2.0';
 export const AGENT_API_VERSION = '1.0.0';
 export const OBSERVATION_API_VERSION = '1.0.0';
 export const BRIDGE_API_VERSION = '1.0.0';
-export const BALANCED_AGENT_VERSION = '1.0.0';
+export const BALANCED_AGENT_VERSION = '2.0.0';
 export const RANDOM_AGENT_VERSION = '1.0.0';
 
 export interface AgentMapTileObservation {
@@ -169,8 +169,11 @@ export interface InvalidActionAttempt {
 
 export type AgentPriorityGoal =
   | 'avoid_defeat'
+  | 'prevent_facility_contact'
+  | 'rescue_critical_infection'
   | 'defend_horde'
   | 'suppress_infection'
+  | 'restore_military_supply'
   | 'restore_economy'
   | 'reduce_overcrowding'
   | 'build_forces'
@@ -235,4 +238,3 @@ export interface AgentGame {
 
 export type AgentStrategyId = 'random' | 'balanced';
 export type AgentProducedUnit = HumanUnitType;
-

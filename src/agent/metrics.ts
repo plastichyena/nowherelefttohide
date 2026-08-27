@@ -25,8 +25,11 @@ export const ACTION_TYPES = [
 
 export const PRIORITY_GOALS = [
   'avoid_defeat',
+  'prevent_facility_contact',
+  'rescue_critical_infection',
   'defend_horde',
   'suppress_infection',
+  'restore_military_supply',
   'restore_economy',
   'reduce_overcrowding',
   'build_forces',
