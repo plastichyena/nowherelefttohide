@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
 import { createAgentGame } from './game';
-import { parseSimulationArgs, runSimulation, writeSimulationOutput } from './sim-cli';
+import { csvColumns, parseSimulationArgs, runSimulation, writeSimulationOutput } from './sim-cli';
 import type { AgentGame } from './types';
 
 describe('Batch Simulation CLI', () => {
@@ -31,6 +31,8 @@ describe('Batch Simulation CLI', () => {
     expect(report.comparisons).toHaveLength(2);
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.exitCode).toBe(0);
+    expect(report.schemaVersion).toBe('1.1.0');
+    expect(report.appVersion).toBe('1.2.5');
   });
 
   it('continues after a technical failure by default and stops only with fail-fast', () => {
@@ -62,6 +64,8 @@ describe('Batch Simulation CLI', () => {
     expect(paths.artifacts).toHaveLength(1);
     expect(paths.runJson.endsWith('run.json')).toBe(true);
     expect(paths.gamesCsv.endsWith('games.csv')).toBe(true);
+    expect(csvColumns()).toContain('arrivals.north');
+    expect(csvColumns()).toContain('checkpointsRelocated');
     expect(() => writeSimulationOutput(report, output)).toThrow(/overwrite|empty/i);
   });
 });

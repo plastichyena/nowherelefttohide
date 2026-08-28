@@ -12,7 +12,8 @@ export function actionKey(action: GameAction): string {
   if (action.type === 'AssignWorkers') return `AssignWorkers|${action.facilityId}|${action.workers}`;
   if (action.type === 'TransferPopulation') return `TransferPopulation|${action.fromFacilityId}|${action.toFacilityId}|${action.people}`;
   if (action.type === 'SetCheckpointPolicy') return `SetCheckpointPolicy|${action.checkpointId}|${action.policy}`;
-  if (action.type === 'BuildCheckpoint') return `BuildCheckpoint|${action.position.q},${action.position.r}`;
+  if (action.type === 'BuildCheckpoint') return `BuildCheckpoint|${action.branchId ?? ''}|${action.position.q},${action.position.r}`;
+  if (action.type === 'RelocateCheckpoint') return `RelocateCheckpoint|${action.checkpointId}|${action.branchId ?? ''}|${action.position.q},${action.position.r}`;
   if (action.type === 'ProduceUnit') {
     const destination = action.destination ? `${action.destination.q},${action.destination.r}` : '';
     return `ProduceUnit|${action.unitType}|${destination}`;
@@ -29,4 +30,3 @@ export function cloneAction(action: GameAction): GameAction {
 export function sortActions(actions: readonly GameAction[]): GameAction[] {
   return [...actions].sort((left, right) => actionKey(left).localeCompare(actionKey(right)));
 }
-

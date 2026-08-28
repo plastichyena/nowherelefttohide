@@ -60,7 +60,9 @@ export type UnitActionState = 'ready' | 'moved' | 'acted' | 'destroyed';
 
 export type CheckpointPolicy = 'passThrough' | 'normal' | 'strict';
 
-export type CheckpointStatus = 'operational' | 'ruined';
+export type CheckpointStatus = 'operational' | 'remnant' | 'ruined' | 'abandoned';
+
+export type RoadBranchId = string;
 
 export type GamePhase =
   | 'player'
@@ -112,6 +114,16 @@ export interface HordeEntrance {
   roadTiles: HexCoord[];
 }
 
+export interface RoadBranchDefinition {
+  id: RoadBranchId;
+  direction: CardinalDirection;
+  /** Shared capital intersection; checkpoints cannot be built here. */
+  capitalConnection: HexCoord;
+  /** Branch tiles ordered from the capital outward, excluding the capital. */
+  roadTiles: HexCoord[];
+  entrance: HexCoord;
+}
+
 export interface FacilityDefinition {
   id: FacilityId;
   type: FacilityType;
@@ -131,6 +143,7 @@ export interface FixedMap {
   roadTiles: HexCoord[];
   facilities: FacilityDefinition[];
   hordeEntrances: HordeEntrance[];
+  roadBranches: RoadBranchDefinition[];
   initialZombiePositions: HexCoord[];
 }
 
@@ -218,6 +231,7 @@ export interface CheckpointState {
   id: string;
   position: HexCoord;
   direction: CardinalDirection;
+  branchId?: RoadBranchId;
   status: CheckpointStatus;
   waiting: number;
   screening: number;
@@ -228,6 +242,15 @@ export interface CheckpointState {
   nextArrivalTurn: number | null;
   /** Infection is tracked separately from people still waiting for processing. */
   infected: number;
+  /** Prevents repeated overrun effects while a non-operational site remains infected. */
+  overrunProcessed?: boolean;
+}
+
+export interface RoadBranchState {
+  branchId: RoadBranchId;
+  nextArrivalTurn: number;
+  checkpointActionsThisTurn: number;
+  activeCheckpointId: string | null;
 }
 
 export interface UnitProductionOrder {
@@ -268,6 +291,13 @@ export type GameEventType =
   | 'facility_overrun'
   | 'facility_recovered'
   | 'checkpoint_built'
+  | 'checkpoint_relocated'
+  | 'checkpoint_remnant_created'
+  | 'checkpoint_removed'
+  | 'checkpoint_abandoned'
+  | 'checkpoint_recovered'
+  | 'supply_changed'
+  | 'supply_action_rejected'
   | 'horde_spawned'
   | 'game_over';
 
@@ -288,6 +318,23 @@ export interface GameStatistics {
   infectionLosses: number;
   resourceShortageLosses: number;
   hordeInterceptions: number;
+  refugeeArrivalsByBranch: Record<RoadBranchId, number>;
+  unmanagedPassThrough: number;
+  refugeesScreenedByPolicy: Record<CheckpointPolicy, number>;
+  refugeesAccepted: number;
+  refugeesDeparted: number;
+  checkpointsBuilt: number;
+  checkpointsRelocated: number;
+  checkpointRetreats: number;
+  checkpointsRuined: number;
+  checkpointsRecovered: number;
+  checkpointsAbandoned: number;
+  checkpointsRemoved: number;
+  unmanagedBranchTurns: number;
+  maxSuppliedFacilities: number;
+  maxSupplyRadius: number;
+  supplyLosses: number;
+  supplyRejections: number;
 }
 
 export interface GameResult {
@@ -346,7 +393,9 @@ export interface GameState {
   resources: ResourceState;
   units: UnitState[];
   checkpoints: CheckpointState[];
+  roadBranches: RoadBranchState[];
   pendingUnitProductions: UnitProductionOrder[];
+  nextCheckpointNumber: number;
   nextUnitNumber: number;
   nextEventNumber: number;
   nextAssignmentOrder: number;
@@ -408,6 +457,14 @@ export interface SetCheckpointPolicyAction {
 
 export interface BuildCheckpointAction {
   type: 'BuildCheckpoint';
+  branchId?: RoadBranchId;
+  position: HexCoord;
+}
+
+export interface RelocateCheckpointAction {
+  type: 'RelocateCheckpoint';
+  checkpointId: string;
+  branchId?: RoadBranchId;
   position: HexCoord;
 }
 
@@ -442,6 +499,7 @@ export type GameAction =
   | TransferPopulationAction
   | SetCheckpointPolicyAction
   | BuildCheckpointAction
+  | RelocateCheckpointAction
   | ProduceUnitAction
   | EndTurnAction
   | StartNewGameAction
@@ -533,6 +591,7 @@ export interface CheckpointConfig {
   maxPerDirection: number;
   requiresPolice: boolean;
   consumesPower: boolean;
+  initialSupplyRadius: number;
 }
 
 export interface EconomyConfig {

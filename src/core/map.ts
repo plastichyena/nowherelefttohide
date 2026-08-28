@@ -8,6 +8,7 @@ import type {
   HexCoord,
   HexTile,
   HordeEntrance,
+  RoadBranchDefinition,
 } from './types';
 
 export const FIXED_MAP_ID = DEFAULT_MAP_ID;
@@ -179,11 +180,46 @@ function createEntrances(): HordeEntrance[] {
   ];
 }
 
+function createRoadBranches(): RoadBranchDefinition[] {
+  const capitalConnection = coord(ROAD_COLUMN, ROAD_ROW);
+  return [
+    {
+      id: 'north',
+      direction: 'north',
+      capitalConnection,
+      roadTiles: Array.from({ length: ROAD_ROW }, (_, index) => coord(ROAD_COLUMN, ROAD_ROW - 1 - index)),
+      entrance: coord(ROAD_COLUMN, 0),
+    },
+    {
+      id: 'east',
+      direction: 'east',
+      capitalConnection,
+      roadTiles: Array.from({ length: FIXED_MAP_WIDTH - ROAD_COLUMN - 1 }, (_, index) => coord(ROAD_COLUMN + 1 + index, ROAD_ROW)),
+      entrance: coord(FIXED_MAP_WIDTH - 1, ROAD_ROW),
+    },
+    {
+      id: 'south',
+      direction: 'south',
+      capitalConnection,
+      roadTiles: Array.from({ length: FIXED_MAP_HEIGHT - ROAD_ROW - 1 }, (_, index) => coord(ROAD_COLUMN, ROAD_ROW + 1 + index)),
+      entrance: coord(ROAD_COLUMN, FIXED_MAP_HEIGHT - 1),
+    },
+    {
+      id: 'west',
+      direction: 'west',
+      capitalConnection,
+      roadTiles: Array.from({ length: ROAD_COLUMN }, (_, index) => coord(ROAD_COLUMN - 1 - index, ROAD_ROW)),
+      entrance: coord(0, ROAD_ROW),
+    },
+  ];
+}
+
 function buildFixedMap(): FixedMap {
   const roads = roadKeySet();
   const tiles = createTiles(roads);
   const facilities = createFacilities();
   const hordeEntrances = createEntrances();
+  const roadBranches = createRoadBranches();
 
   const tileByKey = new Map(tiles.map((tile) => [tile.key, tile]));
   for (const facility of facilities) {
@@ -218,6 +254,7 @@ function buildFixedMap(): FixedMap {
     }),
     facilities,
     hordeEntrances,
+    roadBranches,
     initialZombiePositions: [coord(4, 4), coord(11, 3), coord(3, 11), coord(11, 10)],
   };
 }
@@ -323,6 +360,25 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
   }
   if (!Array.isArray(map?.hordeEntrances) || map.hordeEntrances.length !== 4) {
     errors.push('map must contain north/east/south/west Horde entrances');
+  }
+  if (!Array.isArray(map?.roadBranches) || map.roadBranches.length !== 4) {
+    errors.push('map must contain four road branches');
+  } else {
+    const branchIds = new Set<string>();
+    for (const branch of map.roadBranches) {
+      if (branchIds.has(branch.id)) errors.push(`duplicate road branch: ${branch.id}`);
+      branchIds.add(branch.id);
+      if (branch.roadTiles.length === 0) errors.push(`road branch is empty: ${branch.id}`);
+      for (const position of branch.roadTiles) {
+        if (!isRoad(map, position)) errors.push(`road branch tile is not a road: ${branch.id}:${hexKey(position)}`);
+        if (hexKey(position) === hexKey(branch.capitalConnection)) {
+          errors.push(`road branch contains the capital intersection: ${branch.id}`);
+        }
+      }
+      if (hexKey(branch.roadTiles.at(-1) ?? branch.capitalConnection) !== hexKey(branch.entrance)) {
+        errors.push(`road branch must end at its entrance: ${branch.id}`);
+      }
+    }
   }
   if (map) {
     for (const direction of cardinalDirections) {

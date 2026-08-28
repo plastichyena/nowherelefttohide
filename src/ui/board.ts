@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { getHordeEntrance } from '../core/map';
+import { getSectorBranchIds } from '../core/supply';
 import type { CardinalDirection, GameState, HexCoord } from '../core/types';
 
 export interface BoardRenderState {
@@ -10,6 +11,12 @@ export interface BoardRenderState {
   attackTargetIds?: readonly string[];
   pendingPath?: readonly HexCoord[];
   hordeDirection?: CardinalDirection | null;
+  supplyOverlay?: boolean;
+  suppliedTileKeys?: readonly string[];
+  branchRadii?: readonly { branchId: string; radius: number }[];
+  checkpointPreviewPositions?: readonly HexCoord[];
+  checkpointPreviewSelected?: HexCoord | null;
+  blockedZombieIds?: readonly string[];
 }
 
 export interface BoardCallbacks {
@@ -234,6 +241,12 @@ export class HexBoardScene extends Phaser.Scene {
     const legal = new Set((render.legalDestinations ?? []).map((position) => `${position.q},${position.r}`));
     const path = new Set((render.pendingPath ?? []).map((position) => `${position.q},${position.r}`));
     const attackTargets = new Set(render.attackTargetIds ?? []);
+    const suppliedTiles = new Set(render.suppliedTileKeys ?? []);
+    const checkpointPreview = new Set((render.checkpointPreviewPositions ?? []).map((position) => String(position.q) + ',' + String(position.r)));
+    const selectedCheckpointPreview = render.checkpointPreviewSelected
+      ? `${render.checkpointPreviewSelected.q},${render.checkpointPreviewSelected.r}`
+      : null;
+    const blockedZombies = new Set(render.blockedZombieIds ?? []);
     const selected = render.selectedPosition;
     const hordeDirection = render.hordeDirection ?? null;
     const entrance = hordeDirection ? getHordeEntrance(state.map, hordeDirection) : undefined;
@@ -261,8 +274,24 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.lineStyle(tileSelected || isLegal ? 2 : 1, line, 1);
       this.graphics.fillPoints(this.hexPoints(center), true);
       this.graphics.strokePoints(this.hexPoints(center), true);
+      if (render.supplyOverlay) {
+        const supplied = suppliedTiles.has(tile.key) || suppliedTiles.has(key);
+        this.graphics.fillStyle(supplied ? 0x38a9a4 : 0x02070b, supplied ? 0.18 : 0.52);
+        this.graphics.fillPoints(this.hexPoints(center), true);
+        const sectorBoundary = getSectorBranchIds(state.map, { q: tile.q, r: tile.r }).length > 1;
+        if (sectorBoundary) {
+          this.graphics.lineStyle(2, 0xf0c867, 0.82);
+          this.graphics.strokePoints(this.hexPoints(center), true);
+        }
+      }
       if (isLegal) this.drawMarker(center, 0x54d7ff, 0.32);
       if (isPath) this.drawMarker(center, 0xffcf66, 0.18);
+      if (checkpointPreview.has(key)) {
+        const previewSelected = selectedCheckpointPreview === key;
+        this.graphics.lineStyle(previewSelected ? 4 : 2, previewSelected ? 0xffd36e : 0x72e0c2, 0.95);
+        this.graphics.strokeCircle(center.x, center.y, HEX_SIZE * 0.78);
+        this.drawMarker(center, previewSelected ? 0xffd36e : 0x72e0c2, previewSelected ? 0.52 : 0.3);
+      }
 
       const facility = state.facilities.find((candidate) => sameHex(candidate.position, tile));
       if (facility) {
@@ -291,6 +320,8 @@ export class HexBoardScene extends Phaser.Scene {
           );
         } else if (facility.operationalStatus === 'stopped' && facility.owner === 'player') {
           this.addLabel(`facility:${facility.id}:status`, '×', center.x + 12, center.y - 14, '#a8b3b9', 9, true);
+        } else if (render.supplyOverlay && facility.owner === 'player' && !suppliedTiles.has(tile.key) && !suppliedTiles.has(key)) {
+          this.addLabel(`facility:${facility.id}:status`, '⊘', center.x + 12, center.y - 14, '#ef8c7a', 9, true);
         }
         if (tileSelected) {
           this.addLabel(
@@ -306,12 +337,21 @@ export class HexBoardScene extends Phaser.Scene {
       }
       const checkpoint = state.checkpoints.find((candidate) => sameHex(candidate.position, tile));
       if (checkpoint) {
+        const checkpointColor = checkpoint.infected > 0
+          ? '#ff9b7d'
+          : checkpoint.status === 'operational'
+            ? '#a4e8ff'
+            : checkpoint.status === 'remnant'
+              ? '#d5c58e'
+              : checkpoint.status === 'ruined'
+                ? '#df8080'
+                : '#9e7895';
         this.addLabel(
           `checkpoint:${checkpoint.id}:icon`,
           '▤',
           center.x,
           center.y + 10,
-          checkpoint.infected > 0 ? '#ff9b7d' : checkpoint.status === 'operational' ? '#a4e8ff' : '#df8080',
+          checkpointColor,
           11,
           true,
         );
@@ -332,8 +372,9 @@ export class HexBoardScene extends Phaser.Scene {
       if (unit) {
         const isTarget = attackTargets.has(unit.id);
         const isSelected = render.selectedUnitId === unit.id;
+        const isBlockedZombie = unit.type === 'zombie' && blockedZombies.has(unit.id);
         this.graphics.fillStyle(unit.type === 'zombie' ? 0xa24c55 : unit.type === 'nationalGuard' ? 0xb6d8ff : 0x7fc7a0, 1);
-        this.graphics.lineStyle(isTarget ? 3 : isSelected ? 2 : 1, isTarget ? 0xff8c69 : 0x071019, 1);
+        this.graphics.lineStyle(isBlockedZombie ? 3 : isTarget ? 3 : isSelected ? 2 : 1, isBlockedZombie ? 0xff6b64 : isTarget ? 0xff8c69 : 0x071019, 1);
         this.graphics.fillCircle(center.x, center.y + 1, isSelected || isTarget ? 10 : 8);
         this.graphics.strokeCircle(center.x, center.y + 1, isSelected || isTarget ? 10 : 8);
         this.addLabel(
@@ -346,6 +387,9 @@ export class HexBoardScene extends Phaser.Scene {
           true,
         );
         if (unit.hp < unit.maxHp) this.drawHealth(center, unit.hp / Math.max(unit.maxHp, 1));
+        if (render.supplyOverlay && unit.type !== 'zombie' && !suppliedTiles.has(tile.key) && !suppliedTiles.has(key)) {
+          this.addLabel(`unit:${unit.id}:status`, '⊘', center.x - 13, center.y - 14, '#ef8c7a', 9, true);
+        }
         if (isSelected) {
           this.addLabel(
             `unit:${unit.id}:detail`,
@@ -359,6 +403,7 @@ export class HexBoardScene extends Phaser.Scene {
         }
       }
     }
+    if (render.supplyOverlay) this.drawSupplyRadii(state, render.branchRadii ?? []);
     if (render.pendingPath && render.pendingPath.length > 1) {
       this.graphics.lineStyle(3, 0xffcf66, 0.9);
       const points = render.pendingPath.map((position) => this.hexToWorld(state, position));
@@ -369,6 +414,22 @@ export class HexBoardScene extends Phaser.Scene {
     }
     for (const [key, label] of this.labels) {
       if (!this.activeLabelKeys.has(key)) label.setVisible(false);
+    }
+  }
+
+  private drawSupplyRadii(
+    state: Readonly<GameState>,
+    branchRadii: readonly { branchId: string; radius: number }[],
+  ): void {
+    const capital = state.facilities.find((facility) => facility.type === 'capital');
+    if (!capital) return;
+    const center = this.hexToWorld(state, capital.position);
+    this.graphics.lineStyle(1, 0x67d0d4, 0.35);
+    this.graphics.strokeCircle(center.x, center.y, Math.max(1, state.config.checkpoint.initialSupplyRadius) * HEX_SIZE * 1.4);
+    for (const [index, branch] of [...branchRadii].sort((left, right) => left.branchId.localeCompare(right.branchId)).entries()) {
+      const radius = Math.max(state.config.checkpoint.initialSupplyRadius, branch.radius);
+      this.graphics.lineStyle(1, index % 2 === 0 ? 0x72e0c2 : 0xf0c867, 0.24);
+      this.graphics.strokeCircle(center.x, center.y, radius * HEX_SIZE * 1.4);
     }
   }
 

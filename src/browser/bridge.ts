@@ -1,8 +1,10 @@
 import { cloneAction, cloneJson } from '../agent/action';
 import { createAgentGame } from '../agent/game';
+import { collectGameMetrics } from '../agent/metrics';
 import {
   AGENT_API_VERSION,
   APP_VERSION,
+  ARTIFACT_SCHEMA_VERSION,
   BRIDGE_API_VERSION,
   OBSERVATION_API_VERSION,
   type AgentActionError,
@@ -32,6 +34,7 @@ export interface BrowserBridgeApi {
 
 export interface AgentApiInfo {
   appVersion: string;
+  artifactSchemaVersion: string;
   agentApiVersion: string;
   observationApiVersion: string;
   bridgeApiVersion: string;
@@ -187,7 +190,14 @@ function isBridgeAction(value: unknown): value is GameAction {
           (value.policy === 'passThrough' || value.policy === 'normal' || value.policy === 'strict')
         );
       case 'BuildCheckpoint':
-        return hasOnlyKeys(value, ['type', 'position']) && isCoordinate(value.position);
+        return hasOnlyKeys(value, ['type', 'position'], ['branchId']) &&
+          isCoordinate(value.position) &&
+          (value.branchId === undefined || isSafeId(value.branchId));
+      case 'RelocateCheckpoint':
+        return hasOnlyKeys(value, ['type', 'checkpointId', 'position'], ['branchId']) &&
+          isSafeId(value.checkpointId) &&
+          isCoordinate(value.position) &&
+          (value.branchId === undefined || isSafeId(value.branchId));
       case 'ProduceUnit':
         return (
           hasOnlyKeys(value, ['type', 'unitType'], ['destination']) &&
@@ -217,6 +227,7 @@ function resolveBuildId(explicit: string | undefined): string {
 function createApiInfo(): AgentApiInfo {
   return {
     appVersion: APP_VERSION,
+    artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     agentApiVersion: AGENT_API_VERSION,
     observationApiVersion: OBSERVATION_API_VERSION,
     bridgeApiVersion: BRIDGE_API_VERSION,
@@ -224,18 +235,18 @@ function createApiInfo(): AgentApiInfo {
     methodSchemas: {
       getApiInfo: { arguments: 'none', returns: 'AgentApiInfo', description: 'Returns this API description.' },
       reset: { arguments: 'AgentResetOptions? { seed?, configOverrides?, agent?: { id } }', returns: 'AgentObservation', description: 'Replaces the in-memory Agent session.' },
-      getObservation: { arguments: 'none', returns: 'AgentObservation', description: 'Returns the public read-only observation.' },
+       getObservation: { arguments: 'none', returns: 'AgentObservation 1.1.0 (roadBranches, supply, availability)', description: 'Returns the public read-only observation, including road arrivals and supply status.' },
       getLegalActions: { arguments: 'none', returns: 'GameAction[]', description: 'Returns deterministic currently legal actions.' },
-      step: { arguments: 'GameAction (one action)', returns: 'AgentStepResult', description: 'Validates and applies one action.' },
+       step: { arguments: 'GameAction (one action; BuildCheckpoint or RelocateCheckpoint)', returns: 'AgentStepResult', description: 'Validates and applies one action using GameEngine legality.' },
       isGameOver: { arguments: 'none', returns: 'boolean', description: 'Reports whether the Agent session ended.' },
       getResult: { arguments: 'none', returns: 'AgentGameResult|null', description: 'Returns the public result, if ended.' },
-      getRunArtifact: { arguments: 'none', returns: 'AgentRunArtifact', description: 'Returns the in-memory replay artifact.' },
+       getRunArtifact: { arguments: 'none', returns: 'AgentRunArtifact 1.1.0', description: 'Returns the in-memory artifact with versions, road schedule, metrics, and accepted actions.' },
     },
     recommendedCallOrder: ['getApiInfo', 'reset', 'getObservation', 'getLegalActions', 'step', 'isGameOver', 'getResult', 'getRunArtifact'],
     publicInformation: [
-      'Observation includes public map, facilities, units, zombies, checkpoints, resources, forecasts, Horde warning, and result.',
+       'Observation includes public map, road branches, supply coverage, facilities, units, zombies, checkpoints, resources, forecasts, Horde warning, and result.',
       'All returned values are JSON-compatible copies.',
-      'Run artifacts contain accepted actions and invalid attempts for the current in-memory session only.',
+       'Run artifacts contain the initial road schedule, accepted actions, invalid attempts, metrics, and events for the current in-memory session only.',
     ],
     prohibited: [
       'getState is not public.',
@@ -317,7 +328,32 @@ export function createBrowserBridge(options: BrowserBridgeOptions = {}): Browser
     // The Adapter records semantically invalid actions.  Replace its decision
     // list with the bridge-level chronological list so malformed boundary
     // inputs are visible too, without exposing GameState.
-    return cloneJson({ ...artifact, invalidAttempts });
+    const observationTrace = artifact.observationTrace ?? [game.getObservation()];
+    const initialObservation = observationTrace[0]!;
+    const finalObservation = observationTrace.at(-1) ?? initialObservation;
+    const events = artifact.events ?? [];
+    const actions = artifact.acceptedActions ?? [];
+    const metrics = collectGameMetrics({
+      initialObservation,
+      finalObservation,
+      observations: observationTrace,
+      actions,
+      events,
+      result: artifact.result,
+      invalidAttemptCount: invalidAttempts.length,
+      invalidAttempts,
+      totalAgentDecisions: actions.length + invalidAttempts.length,
+      agent: { id: artifact.agent.id, version: artifact.agent.version ?? 'external' },
+      config: artifact.config,
+      buildId: artifact.buildId,
+      seed: artifact.seed,
+      appVersion: artifact.appVersion,
+      gameRulesVersion: artifact.gameRulesVersion,
+      agentApiVersion: artifact.agentApiVersion,
+      observationApiVersion: artifact.observationApiVersion,
+      bridgeApiVersion: artifact.bridgeApiVersion,
+    });
+    return cloneJson({ ...artifact, invalidAttempts, metrics });
   };
 
   return Object.freeze({

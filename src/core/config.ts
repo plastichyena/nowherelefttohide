@@ -14,7 +14,7 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '1.1.0';
+export const CONFIG_VERSION = '1.2.0';
 export const DEFAULT_MAP_ID = 'fixed-15x15-v1';
 
 const facilityIds: FacilityId[] = [
@@ -205,10 +205,11 @@ export const DEFAULT_CONFIG: GameConfig = {
     nationalGuardCivilianDamageRate: 0.5,
   },
   checkpoint: {
-    constructionCivilianGoods: 25,
+    constructionCivilianGoods: 5,
     maxPerDirection: 1,
-    requiresPolice: true,
+    requiresPolice: false,
     consumesPower: false,
+    initialSupplyRadius: 5,
   },
 };
 
@@ -456,6 +457,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   } else {
     requireInteger(errors, checkpoint.constructionCivilianGoods, 'checkpoint.constructionCivilianGoods', 0);
     requireInteger(errors, checkpoint.maxPerDirection, 'checkpoint.maxPerDirection', 1);
+    requireInteger(errors, checkpoint.initialSupplyRadius, 'checkpoint.initialSupplyRadius', 0);
     if (typeof checkpoint.requiresPolice !== 'boolean' || typeof checkpoint.consumesPower !== 'boolean') {
       errors.push('checkpoint flags must be boolean');
     }

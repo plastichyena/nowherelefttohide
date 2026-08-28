@@ -17,7 +17,7 @@ jobs:
   verify:
     name: Typecheck, tests, agents, bridge smoke, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     permissions:
       contents: read
       pages: write

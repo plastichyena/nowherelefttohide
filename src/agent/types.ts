@@ -1,6 +1,7 @@
 import type {
   CardinalDirection,
   CheckpointPolicy,
+  CheckpointStatus,
   DeepPartial,
   EndTurnForecast,
   FacilityOperationalStatus,
@@ -18,13 +19,17 @@ import type {
   UnitActionState,
   UnitType,
 } from '../core/types';
+import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.2.0';
-export const AGENT_API_VERSION = '1.0.0';
-export const OBSERVATION_API_VERSION = '1.0.0';
-export const BRIDGE_API_VERSION = '1.0.0';
-export const BALANCED_AGENT_VERSION = '2.0.0';
-export const RANDOM_AGENT_VERSION = '1.0.0';
+export const APP_VERSION = '1.2.5';
+export const GAME_RULES_VERSION = '1.2.0';
+export const SAVE_FORMAT_VERSION = '2';
+export const AGENT_API_VERSION = '1.1.0';
+export const OBSERVATION_API_VERSION = '1.1.0';
+export const BRIDGE_API_VERSION = '1.1.0';
+export const BALANCED_AGENT_VERSION = '2.1.0';
+export const RANDOM_AGENT_VERSION = '1.1.0';
+export const ARTIFACT_SCHEMA_VERSION = '1.1.0';
 
 export interface AgentMapTileObservation {
   q: number;
@@ -43,6 +48,26 @@ export interface AgentMapObservation {
   tiles: AgentMapTileObservation[];
 }
 
+export interface AgentRoadBranchObservation {
+  branchId: string;
+  direction: CardinalDirection;
+  capitalConnection: HexCoord;
+  roadTiles: HexCoord[];
+  entrance: HexCoord;
+  nextArrivalTurn: number;
+  turnsUntilArrival: number;
+  activeCheckpointId: string | null;
+  activeCheckpointStatus: CheckpointStatus | null;
+  checkpointActionsThisTurn: number;
+  checkpointActionAvailable: boolean;
+}
+
+export interface AgentSupplyObservation {
+  initialRadius: number;
+  suppliedTileKeys: string[];
+  branchRadii: Array<{ branchId: string; radius: number }>;
+}
+
 export interface AgentFacilityObservation {
   id: string;
   type: FacilityType;
@@ -56,6 +81,11 @@ export interface AgentFacilityObservation {
   populationLimitKind: 'soft' | 'hard';
   populationOperational: boolean;
   populationUnavailableReason: string | null;
+  inSupply: boolean;
+  populationIncreaseAvailable: boolean;
+  populationDecreaseAvailable: boolean;
+  recruitmentAvailable: boolean;
+  recruitmentUnavailableReason: string | null;
 }
 
 export interface AgentUnitObservation {
@@ -71,13 +101,17 @@ export interface AgentUnitObservation {
   actionState: UnitActionState;
   canAttack: boolean;
   canMove: boolean;
+  inSupply: boolean;
+  recoveryAvailable: boolean;
+  recoveryUnavailableReason: string | null;
 }
 
 export interface AgentCheckpointObservation {
   id: string;
+  branchId: string;
   position: HexCoord;
   direction: CardinalDirection;
-  status: 'operational' | 'ruined';
+  status: 'operational' | 'remnant' | 'ruined' | 'abandoned';
   waiting: number;
   screening: number;
   approved: number;
@@ -85,6 +119,7 @@ export interface AgentCheckpointObservation {
   remainingTurns: number;
   currentPolicy: CheckpointPolicy;
   nextPolicy: CheckpointPolicy;
+  nextArrivalTurn: number | null;
 }
 
 export interface AgentGameResult {
@@ -99,6 +134,23 @@ export interface AgentGameResult {
     infectionLosses: number;
     resourceShortageLosses: number;
     hordeInterceptions: number;
+    refugeeArrivalsByBranch: Record<string, number>;
+    unmanagedPassThrough: number;
+    refugeesScreenedByPolicy: Record<CheckpointPolicy, number>;
+    refugeesAccepted: number;
+    refugeesDeparted: number;
+    checkpointsBuilt: number;
+    checkpointsRelocated: number;
+    checkpointRetreats: number;
+    checkpointsRuined: number;
+    checkpointsRecovered: number;
+    checkpointsAbandoned: number;
+    checkpointsRemoved: number;
+    unmanagedBranchTurns: number;
+    maxSuppliedFacilities: number;
+    maxSupplyRadius: number;
+    supplyLosses: number;
+    supplyRejections: number;
   };
 }
 
@@ -124,6 +176,8 @@ export interface AgentObservation {
   units: AgentUnitObservation[];
   zombies: AgentUnitObservation[];
   checkpoints: AgentCheckpointObservation[];
+  roadBranches: AgentRoadBranchObservation[];
+  supply: AgentSupplyObservation;
   horde: {
     direction: CardinalDirection;
     turnsRemaining: number;
@@ -210,6 +264,8 @@ export interface GameAgent {
 }
 
 export interface AgentRunArtifact {
+  artifactSchemaVersion: string;
+  artifactType?: 'replay' | 'failure';
   appVersion: string;
   gameRulesVersion: string;
   agentApiVersion: string;
@@ -220,10 +276,16 @@ export interface AgentRunArtifact {
   seed: number;
   config: GameConfig;
   agent: { id: string; version?: string; strategy?: string };
+  initialRoadArrivalSchedule: Array<{ branchId: string; nextArrivalTurn: number }>;
   acceptedActions: GameAction[];
   invalidAttempts: InvalidActionAttempt[];
   decisionTrace: AgentDecisionTrace[];
   result: AgentGameResult | null;
+  /** Public observations at reset and after each accepted action, when retained by a runner. */
+  observationTrace?: AgentObservation[];
+  /** Present on complete Runner artifacts and optionally on a live AgentGame. */
+  metrics?: GameMetrics;
+  events?: AgentPublicEvent[];
 }
 
 export interface AgentGame {

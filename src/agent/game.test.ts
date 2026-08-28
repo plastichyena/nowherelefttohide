@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAgentGame } from './game';
+import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, OBSERVATION_API_VERSION } from './types';
 
 describe('AgentGame public boundary', () => {
   it('returns a deterministic JSON observation without private random state', () => {
@@ -12,6 +13,11 @@ describe('AgentGame public boundary', () => {
     expect(encoded).not.toContain('rngState');
     expect(encoded).not.toContain('spawnedCount');
     expect(first.map.tiles).toHaveLength(225);
+    expect(first.apiVersion).toBe(OBSERVATION_API_VERSION);
+    expect(first.roadBranches).toHaveLength(4);
+    expect(first.roadBranches.every((branch) => branch.turnsUntilArrival >= 0)).toBe(true);
+    expect(first.supply.initialRadius).toBeGreaterThan(0);
+    expect(first.units.every((unit) => typeof unit.inSupply === 'boolean')).toBe(true);
   });
 
   it('does not share returned references with the private engine state', () => {
@@ -31,6 +37,8 @@ describe('AgentGame public boundary', () => {
     expect(rejected.error?.code).toBe('action_not_legal');
     expect(rejected.observation).toEqual(before);
     expect(game.getRunArtifact().acceptedActions).toHaveLength(0);
+    expect(game.getRunArtifact().artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
+    expect(game.getRunArtifact().appVersion).toBe(APP_VERSION);
     expect(game.getRunArtifact().invalidAttempts).toHaveLength(1);
     expect(() => game.reset({ seed: 10, configOverrides: { unknown: 1 } as never })).toThrow(/Unknown field/);
     expect(game.getObservation()).toEqual(before);
@@ -50,5 +58,16 @@ describe('AgentGame public boundary', () => {
       expect(result.observation).not.toHaveProperty('rngState');
     }
   });
-});
 
+  it('does not canonicalize a checkpoint action with the wrong branch', () => {
+    const game = createAgentGame();
+    const before = game.reset({ seed: 12, configOverrides: { economy: { initialZombieCount: 0 } } });
+    const legalBuild = game.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
+    expect(legalBuild).toBeDefined();
+    const wrongBranch = before.roadBranches.find((branch) => branch.branchId !== legalBuild!.branchId)!.branchId;
+    const result = game.step({ ...legalBuild!, branchId: wrongBranch });
+    expect(result.error?.code).toBe('action_not_legal');
+    expect(game.getObservation()).toEqual(before);
+    expect(game.getRunArtifact().acceptedActions).toHaveLength(0);
+  });
+});

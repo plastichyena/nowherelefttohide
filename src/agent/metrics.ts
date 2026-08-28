@@ -1,12 +1,14 @@
-import type { GameAction, GameConfig } from '../core/types';
+import type { CheckpointPolicy, GameAction, GameConfig } from '../core/types';
 import {
   APP_VERSION,
   AGENT_API_VERSION,
+  BRIDGE_API_VERSION,
   OBSERVATION_API_VERSION,
   type AgentDecisionTrace,
   type AgentGameResult,
   type AgentObservation,
   type AgentPublicEvent,
+  type InvalidActionAttempt,
 } from './types';
 
 /** Keep these orders stable: they are also the canonical CSV column order. */
@@ -19,6 +21,7 @@ export const ACTION_TYPES = [
   'TransferPopulation',
   'SetCheckpointPolicy',
   'BuildCheckpoint',
+  'RelocateCheckpoint',
   'ProduceUnit',
   'EndTurn',
 ] as const;
@@ -54,6 +57,7 @@ export interface GameMetrics {
   strategy: string;
   agentApiVersion: string;
   observationApiVersion: string;
+  bridgeApiVersion: string;
   buildId: string;
   mapId: string;
   seed: number;
@@ -73,6 +77,23 @@ export interface GameMetrics {
   infectionLosses: number;
   resourceShortageLosses: number;
   refugeesAccepted: number;
+  refugeeArrivalsByBranch: Record<string, number>;
+  totalRefugeeArrivals: number;
+  unmanagedPassThrough: number;
+  refugeesScreenedByPolicy: Record<CheckpointPolicy, number>;
+  refugeesDeparted: number;
+  checkpointsBuilt: number;
+  checkpointsRelocated: number;
+  checkpointRetreats: number;
+  checkpointsRuined: number;
+  checkpointsRecovered: number;
+  checkpointsAbandoned: number;
+  checkpointsRemoved: number;
+  unmanagedBranchTurns: number;
+  maxSuppliedFacilities: number;
+  maxSupplyRadius: number;
+  supplyLosses: number;
+  supplyRejections: number;
   maxOvercrowding: number;
   maxOvercrowdingAdditionalFood: number;
   maxOvercrowdingAdditionalCivilianGoods: number;
@@ -101,6 +122,7 @@ export interface GameMetricsInput {
   decisionTrace?: readonly AgentDecisionTrace[];
   result: AgentGameResult | null;
   invalidAttemptCount?: number;
+  invalidAttempts?: readonly InvalidActionAttempt[];
   totalAgentDecisions?: number;
   agent: { id: string; version: string; strategy?: string };
   config: GameConfig;
@@ -111,6 +133,7 @@ export interface GameMetricsInput {
   gameRulesVersion?: string;
   agentApiVersion?: string;
   observationApiVersion?: string;
+  bridgeApiVersion?: string;
 }
 
 function numberOrZero(value: unknown): number {
@@ -145,6 +168,29 @@ function eventPayloadNumber(event: AgentPublicEvent, key: string): number {
   return numberOrZero(event.payload[key]);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function numericRecord(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, item]) => typeof item === 'number' && Number.isFinite(item))
+      .map(([key, item]) => [key, item as number]),
+  );
+}
+
+function statisticNumber(statistics: unknown, key: string): number | null {
+  if (!isRecord(statistics)) return null;
+  const value = statistics[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function eventBranchId(event: AgentPublicEvent): string | null {
+  return typeof event.payload.branchId === 'string' ? event.payload.branchId : null;
+}
+
 /**
  * Convert public observations, events, actions, and the final result into the
  * stable game-level Metrics record used by both JSON and CSV output.
@@ -166,6 +212,78 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   }
 
   const statistics = input.result?.statistics;
+  const statisticArrivals = numericRecord(statistics && isRecord(statistics) ? statistics.refugeeArrivalsByBranch : undefined);
+  const observedBranchIds = new Set<string>([
+    ...input.initialObservation.roadBranches.map((branch) => branch.branchId),
+    ...Object.keys(statisticArrivals),
+    ...events.map(eventBranchId).filter((branchId): branchId is string => branchId !== null),
+  ]);
+  const refugeeArrivalsByBranch = Object.fromEntries(
+    [...observedBranchIds].sort().map((branchId) => {
+      const hasStatistic = Object.prototype.hasOwnProperty.call(statisticArrivals, branchId);
+      const eventTotal = events
+        .filter((event) => event.type === 'refugees_arrived' && eventBranchId(event) === branchId)
+        .reduce((total, event) => total + eventPayloadNumber(event, 'people'), 0);
+      return [branchId, hasStatistic ? statisticArrivals[branchId]! : eventTotal];
+    }),
+  );
+  const totalRefugeeArrivals = Object.values(refugeeArrivalsByBranch).reduce((total, value) => total + value, 0);
+  const statisticPolicies = numericRecord(statistics && isRecord(statistics) ? statistics.refugeesScreenedByPolicy : undefined);
+  const refugeesScreenedByPolicy = (['passThrough', 'normal', 'strict'] as const).reduce(
+    (record, policy) => {
+      const hasStatistic = Object.prototype.hasOwnProperty.call(statisticPolicies, policy);
+      const eventTotal = events
+        .filter((event) => event.type === 'refugees_screened' && event.payload.policy === policy)
+        .reduce((total, event) => total + eventPayloadNumber(event, 'screened'), 0);
+      record[policy] = hasStatistic ? statisticPolicies[policy]! : eventTotal;
+      return record;
+    },
+    { passThrough: 0, normal: 0, strict: 0 } as Record<CheckpointPolicy, number>,
+  );
+  const refugeesAcceptedFromEvents = events
+    .filter((event) => event.type === 'refugees_screened')
+    .reduce((total, event) => total + eventPayloadNumber(event, 'acceptedWorkers'), 0);
+  const refugeesAccepted = statisticNumber(statistics, 'refugeesAccepted') ?? refugeesAcceptedFromEvents;
+  const refugeesDeparted = statisticNumber(statistics, 'refugeesDeparted') ?? events
+    .filter((event) => event.type === 'refugees_screened')
+    .reduce((total, event) => total + Math.max(0, eventPayloadNumber(event, 'screened') - eventPayloadNumber(event, 'acceptedWorkers')), 0);
+  const eventCount = (type: string): number => events.filter((event) => event.type === type).length;
+  const checkpointsBuilt = statisticNumber(statistics, 'checkpointsBuilt') ?? eventCount('checkpoint_built');
+  const checkpointsRelocated = statisticNumber(statistics, 'checkpointsRelocated') ?? eventCount('checkpoint_relocated');
+  const checkpointRetreats = statisticNumber(statistics, 'checkpointRetreats') ?? events.filter(
+    (event) => event.type === 'checkpoint_built' && event.payload.retreat === true,
+  ).length;
+  const checkpointsRuined = statisticNumber(statistics, 'checkpointsRuined') ?? events.filter(
+    (event) => event.type === 'facility_overrun' && typeof event.payload.checkpointId === 'string' && event.payload.previousStatus === 'operational',
+  ).length;
+  const checkpointsRecovered = statisticNumber(statistics, 'checkpointsRecovered') ?? eventCount('checkpoint_recovered');
+  const checkpointsAbandoned = statisticNumber(statistics, 'checkpointsAbandoned') ?? eventCount('checkpoint_abandoned');
+  const checkpointsRemoved = statisticNumber(statistics, 'checkpointsRemoved') ?? eventCount('checkpoint_removed');
+  const unmanagedBranchTurns = statisticNumber(statistics, 'unmanagedBranchTurns') ?? observations.reduce(
+    (total, observation) => total + observation.roadBranches.filter((branch) => branch.activeCheckpointId === null).length,
+    0,
+  );
+  const maxSuppliedFacilitiesObservation = Math.max(
+    ...observations.map((observation) => observation.facilities.filter((facility) => facility.inSupply).length),
+    0,
+  );
+  const maxSuppliedFacilities = Math.max(
+    statisticNumber(statistics, 'maxSuppliedFacilities') ?? 0,
+    maxSuppliedFacilitiesObservation,
+  );
+  const maxSupplyRadiusObservation = Math.max(
+    ...observations.flatMap((observation) => observation.supply.branchRadii.map((branch) => branch.radius)),
+    ...observations.map((observation) => observation.supply.initialRadius),
+    0,
+  );
+  const maxSupplyRadius = Math.max(statisticNumber(statistics, 'maxSupplyRadius') ?? 0, maxSupplyRadiusObservation);
+  const supplyLossesFromEvents = events.filter(
+    (event) => event.type === 'supply_changed' && eventPayloadNumber(event, 'beforeTileCount') > eventPayloadNumber(event, 'afterTileCount'),
+  ).length;
+  const supplyLosses = statisticNumber(statistics, 'supplyLosses') ?? supplyLossesFromEvents;
+  const supplyRejections = statisticNumber(statistics, 'supplyRejections') ?? events.filter(
+    (event) => event.type === 'supply_action_rejected',
+  ).length + (input.invalidAttempts ?? []).filter((attempt) => /supply|out_of_supply/i.test(attempt.error.code)).length;
   const actionProducedPolice = input.actions.filter(
     (action) => action.type === 'ProduceUnit' && action.unitType === 'police',
   ).length;
@@ -194,6 +312,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     strategy: input.agent.strategy ?? input.agent.id,
     agentApiVersion: input.agentApiVersion ?? AGENT_API_VERSION,
     observationApiVersion: input.observationApiVersion ?? input.initialObservation.apiVersion ?? OBSERVATION_API_VERSION,
+    bridgeApiVersion: input.bridgeApiVersion ?? BRIDGE_API_VERSION,
     buildId: input.buildId ?? 'local-unknown',
     mapId: input.initialObservation.map.id,
     seed: input.seed ?? 0,
@@ -212,9 +331,26 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     civilianLosses: numberOrZero(statistics?.civilianLosses),
     infectionLosses: numberOrZero(statistics?.infectionLosses),
     resourceShortageLosses: numberOrZero(statistics?.resourceShortageLosses),
-    refugeesAccepted: events
-      .filter((event) => event.type === 'refugees_screened')
-      .reduce((total, event) => total + eventPayloadNumber(event, 'acceptedWorkers'), 0),
+    refugeesAccepted,
+    refugeeArrivalsByBranch,
+    totalRefugeeArrivals,
+    unmanagedPassThrough: statisticNumber(statistics, 'unmanagedPassThrough') ?? events
+      .filter((event) => event.type === 'refugees_arrived' && event.payload.unmanaged === true)
+      .reduce((total, event) => total + eventPayloadNumber(event, 'people'), 0),
+    refugeesScreenedByPolicy,
+    refugeesDeparted,
+    checkpointsBuilt,
+    checkpointsRelocated,
+    checkpointRetreats,
+    checkpointsRuined,
+    checkpointsRecovered,
+    checkpointsAbandoned,
+    checkpointsRemoved,
+    unmanagedBranchTurns,
+    maxSuppliedFacilities,
+    maxSupplyRadius,
+    supplyLosses,
+    supplyRejections,
     maxOvercrowding: maxOvercrowdingObservation,
     maxOvercrowdingAdditionalFood: maxAdditionalFood,
     maxOvercrowdingAdditionalCivilianGoods: maxAdditionalCivilianGoods,
@@ -294,6 +430,21 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'infectionLosses',
   'resourceShortageLosses',
   'refugeesAccepted',
+  'totalRefugeeArrivals',
+  'unmanagedPassThrough',
+  'refugeesDeparted',
+  'checkpointsBuilt',
+  'checkpointsRelocated',
+  'checkpointRetreats',
+  'checkpointsRuined',
+  'checkpointsRecovered',
+  'checkpointsAbandoned',
+  'checkpointsRemoved',
+  'unmanagedBranchTurns',
+  'maxSuppliedFacilities',
+  'maxSupplyRadius',
+  'supplyLosses',
+  'supplyRejections',
   'maxOvercrowding',
   'maxOvercrowdingAdditionalFood',
   'maxOvercrowdingAdditionalCivilianGoods',
@@ -370,7 +521,10 @@ export const summarizeMetrics = aggregateMetrics;
  * Compare rows by seed. A missing agent row is represented as a technical
  * failure so consumers can detect incomplete comparisons deterministically.
  */
-export function compareMetricsBySeed(games: readonly GameMetrics[]): SeedComparison[] {
+export function compareMetricsBySeed(
+  games: readonly GameMetrics[],
+  expectedAgentIds?: readonly string[],
+): SeedComparison[] {
   const bySeed = new Map<number, Map<string, GameMetrics>>();
   for (const game of games) {
     const agents = bySeed.get(game.seed) ?? new Map<string, GameMetrics>();
@@ -381,11 +535,25 @@ export function compareMetricsBySeed(games: readonly GameMetrics[]): SeedCompari
     .sort(([left], [right]) => left - right)
     .map(([seed, agents]) => ({
       seed,
-      agents: Object.fromEntries([...agents.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([agentId, game]) => [agentId, {
-        outcome: game.outcome,
-        finalTurn: game.finalTurn,
-        acceptedActionCount: game.acceptedActionCount,
-        technicalFailure: game.outcome === 'technical_failure',
-      }])),
+      agents: Object.fromEntries(
+        [...new Set([...(expectedAgentIds ?? []), ...agents.keys()])]
+          .sort((left, right) => left.localeCompare(right))
+          .map((agentId) => {
+            const game = agents.get(agentId);
+            return [agentId, game
+              ? {
+                outcome: game.outcome,
+                finalTurn: game.finalTurn,
+                acceptedActionCount: game.acceptedActionCount,
+                technicalFailure: game.outcome === 'technical_failure',
+              }
+              : {
+                outcome: 'technical_failure' as const,
+                finalTurn: 0,
+                acceptedActionCount: 0,
+                technicalFailure: true,
+              }];
+          }),
+      ),
     }));
 }

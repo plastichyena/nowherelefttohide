@@ -6,7 +6,9 @@ import { createAgentGame } from './game';
 import {
   AGENT_API_VERSION,
   APP_VERSION,
+  ARTIFACT_SCHEMA_VERSION,
   BRIDGE_API_VERSION,
+  GAME_RULES_VERSION,
   OBSERVATION_API_VERSION,
   type AgentActionError,
   type AgentDecision,
@@ -183,8 +185,10 @@ function placeholderArtifact(
   actions: readonly GameAction[],
   traces: readonly AgentDecisionTrace[],
   result: AgentGameResult | null,
+  initialObservation: AgentObservation | null,
 ): AgentRunArtifact {
   return {
+    artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     appVersion: APP_VERSION,
     gameRulesVersion: config.version,
     agentApiVersion: AGENT_API_VERSION,
@@ -195,6 +199,10 @@ function placeholderArtifact(
     seed,
     config: cloneConfig(config),
     agent: { id: agent.id, version: agent.version, strategy: strategyForAgent(agent) },
+    initialRoadArrivalSchedule: initialObservation?.roadBranches.map((branch) => ({
+      branchId: branch.branchId,
+      nextArrivalTurn: branch.nextArrivalTurn,
+    })) ?? [],
     acceptedActions: clone([...actions]),
     invalidAttempts: [],
     decisionTrace: clone([...traces]),
@@ -212,11 +220,12 @@ function enrichArtifact(
   strategy: string,
 ): AgentRunArtifact {
   const artifact = source && isRecord(source) ? clone(source) : fallback;
-  artifact.appVersion = artifact.appVersion || APP_VERSION;
-  artifact.gameRulesVersion = artifact.gameRulesVersion || fallback.gameRulesVersion;
-  artifact.agentApiVersion = artifact.agentApiVersion || AGENT_API_VERSION;
-  artifact.observationApiVersion = artifact.observationApiVersion || OBSERVATION_API_VERSION;
-  artifact.bridgeApiVersion = artifact.bridgeApiVersion || BRIDGE_API_VERSION;
+  artifact.artifactSchemaVersion = ARTIFACT_SCHEMA_VERSION;
+  artifact.appVersion = APP_VERSION;
+  artifact.gameRulesVersion = fallback.gameRulesVersion;
+  artifact.agentApiVersion = AGENT_API_VERSION;
+  artifact.observationApiVersion = OBSERVATION_API_VERSION;
+  artifact.bridgeApiVersion = BRIDGE_API_VERSION;
   artifact.buildId = artifact.buildId || fallback.buildId;
   artifact.mapId = artifact.mapId || fallback.mapId;
   artifact.seed = seedSafe(artifact.seed, fallback.seed);
@@ -226,6 +235,9 @@ function enrichArtifact(
   artifact.invalidAttempts = Array.isArray(artifact.invalidAttempts) ? clone(artifact.invalidAttempts) : [];
   artifact.decisionTrace = clone([...traces]);
   artifact.result = clone(result);
+  if (!Array.isArray(artifact.initialRoadArrivalSchedule)) {
+    artifact.initialRoadArrivalSchedule = clone(fallback.initialRoadArrivalSchedule);
+  }
   return artifact;
 }
 
@@ -504,9 +516,16 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       if (!runFailure) fail('ARTIFACT_THREW', thrown instanceof Error ? thrown.message : String(thrown), null, thrown);
     }
   }
-  const fallback = placeholderArtifact(seed, config, agent, buildId, actions, decisionTrace, result);
+  const fallback = placeholderArtifact(seed, config, agent, buildId, actions, decisionTrace, result, observations[0] ?? null);
   const strategyName = strategyForAgent(agent, options.strategy);
   const baseArtifact = enrichArtifact(sourceArtifact, fallback, actions, decisionTrace, result, agent, strategyName);
+  baseArtifact.observationTrace = clone(observations);
+  if (observations[0]) {
+    baseArtifact.initialRoadArrivalSchedule = observations[0].roadBranches.map((branch) => ({
+      branchId: branch.branchId,
+      nextArrivalTurn: branch.nextArrivalTurn,
+    }));
+  }
   if (invalidAttempts.length > 0) {
     const existing = baseArtifact.invalidAttempts;
     for (const attempt of invalidAttempts) {
@@ -524,6 +543,8 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       maxTurns: config.maxTurns,
       phase: 'gameOver',
       map: { id: config.mapId, width: 15, height: 15, coordinateSystem: 'axial-q-r', tiles: [] },
+      roadBranches: [],
+      supply: { initialRadius: config.checkpoint.initialSupplyRadius, suppliedTileKeys: [], branchRadii: [] },
       resources: { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0, electricityCapacity: 0, electricityRequired: 0, militarySupplyAvailable: false },
       population: { healthyCivilians: 0, cityResidents: 0, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
       facilities: [], units: [], zombies: [], checkpoints: [],
@@ -538,7 +559,8 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     events,
     decisionTrace,
     result,
-    invalidAttemptCount: invalidAttempts.length,
+    invalidAttemptCount: baseArtifact.invalidAttempts.length,
+    invalidAttempts: baseArtifact.invalidAttempts,
     totalAgentDecisions,
     agent: { id: agent.id, version: agent.version, strategy: strategyName },
     config,
@@ -547,6 +569,9 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     failure: metricFailure,
   });
 
+  baseArtifact.metrics = clone(metrics);
+  baseArtifact.events = clone(events);
+  baseArtifact.artifactType = recordedFailure ? 'failure' : 'replay';
   const replayArtifact: AgentReplayArtifact = {
     ...baseArtifact,
     artifactType: runFailure ? 'failure' : 'replay',
@@ -651,6 +676,41 @@ export function createAgent(strategy: AgentStrategyId, seed: number): GameAgent 
   return defaultAgent(strategy, seed);
 }
 
+function artifactValidationError(artifact: AgentRunArtifact): AgentActionError | null {
+  if (!isRecord(artifact)) return publicActionError('artifact_invalid', 'Replay artifact must be a JSON object');
+  const versions: Array<[string, unknown, string]> = [
+    ['artifactSchemaVersion', artifact.artifactSchemaVersion, ARTIFACT_SCHEMA_VERSION],
+    ['appVersion', artifact.appVersion, APP_VERSION],
+    ['gameRulesVersion', artifact.gameRulesVersion, GAME_RULES_VERSION],
+    ['agentApiVersion', artifact.agentApiVersion, AGENT_API_VERSION],
+    ['observationApiVersion', artifact.observationApiVersion, OBSERVATION_API_VERSION],
+    ['bridgeApiVersion', artifact.bridgeApiVersion, BRIDGE_API_VERSION],
+  ];
+  const mismatch = versions.find(([, actual, expected]) => actual !== expected);
+  if (mismatch) return publicActionError('artifact_version_unsupported', `${mismatch[0]} must be ${mismatch[2]}`);
+  if (artifact.artifactType === 'failure') return publicActionError('artifact_not_replayable', 'Failure artifacts are diagnostics and cannot be replayed');
+  if (!Number.isSafeInteger(artifact.seed)) return publicActionError('artifact_invalid', 'Replay artifact seed is invalid');
+  if (!Array.isArray(artifact.acceptedActions)) return publicActionError('artifact_invalid', 'Replay artifact acceptedActions is invalid');
+  if (!Array.isArray(artifact.initialRoadArrivalSchedule)) return publicActionError('artifact_invalid', 'Replay artifact road schedule is missing');
+  if (!artifact.result) return publicActionError('artifact_incomplete', 'Replay requires a completed Result');
+  if (!isRecord(artifact.agent) || typeof artifact.agent.id !== 'string') return publicActionError('artifact_invalid', 'Replay artifact agent metadata is invalid');
+  if (artifact.observationTrace !== undefined && (
+    !Array.isArray(artifact.observationTrace) ||
+    artifact.observationTrace.length !== artifact.acceptedActions.length + 1
+  )) return publicActionError('artifact_invalid', 'Replay artifact observation trace is incomplete');
+  const strategy = artifact.agent?.strategy;
+  if (strategy !== undefined && strategy !== 'random' && strategy !== 'balanced') {
+    return publicActionError('artifact_invalid', 'Replay artifact agent strategy is unsupported');
+  }
+  return null;
+}
+
+function scheduleFromObservation(observation: AgentObservation): Array<{ branchId: string; nextArrivalTurn: number }> {
+  return observation.roadBranches
+    .map((branch) => ({ branchId: branch.branchId, nextArrivalTurn: branch.nextArrivalTurn }))
+    .sort((left, right) => left.branchId.localeCompare(right.branchId));
+}
+
 /** Replay a completed artifact through a fresh AgentGame. */
 export function replayArtifact(
   artifact: AgentRunArtifact,
@@ -663,7 +723,25 @@ export function replayArtifact(
   reproduced: boolean;
   mismatch: string | null;
 } {
-  const config = cloneConfig(options.config ?? artifact.config);
+  const validationError = artifactValidationError(artifact);
+  if (validationError) {
+    return {
+      result: null,
+      observation: null,
+      actionsReplayed: 0,
+      error: validationError,
+      reproduced: false,
+      mismatch: validationError.message,
+    };
+  }
+  let config: GameConfig;
+  try {
+    config = cloneConfig(options.config ?? artifact.config);
+    assertValidGameConfig(config);
+  } catch (thrown) {
+    const message = thrown instanceof Error ? thrown.message : 'Replay artifact config is invalid';
+    return { result: null, observation: null, actionsReplayed: 0, error: publicActionError('artifact_invalid', message), reproduced: false, mismatch: message };
+  }
   const agent = artifact.agent.strategy === 'random' ? new RandomAgent(artifact.seed) : new BalancedAgent();
   const game = (options.gameFactory ?? defaultFactory(options.buildId ?? artifact.buildId))(artifact.seed, config, agent);
   let observation: AgentObservation;
@@ -672,9 +750,60 @@ export function replayArtifact(
   } catch (thrown) {
     return { result: null, observation: null, actionsReplayed: 0, error: publicActionError('RESET_THREW', thrown instanceof Error ? thrown.message : String(thrown)), reproduced: false, mismatch: 'Replay reset failed' };
   }
+  const expectedSchedule = artifact.initialRoadArrivalSchedule
+    .map((entry) => ({ branchId: entry.branchId, nextArrivalTurn: entry.nextArrivalTurn }))
+    .sort((left, right) => left.branchId.localeCompare(right.branchId));
+  if (JSON.stringify(scheduleFromObservation(observation)) !== JSON.stringify(expectedSchedule)) {
+    return {
+      result: null,
+      observation,
+      actionsReplayed: 0,
+      error: publicActionError('replay_schedule_mismatch', 'Replay initial road-arrival schedule differs from the artifact'),
+      reproduced: false,
+      mismatch: 'Replay initial road-arrival schedule differs from the artifact',
+    };
+  }
+  const expectedObservations = artifact.observationTrace;
+  if (expectedObservations && JSON.stringify(expectedObservations[0]) !== JSON.stringify(observation)) {
+    return {
+      result: null,
+      observation,
+      actionsReplayed: 0,
+      error: publicActionError('replay_observation_mismatch', 'Replay initial observation differs from the artifact'),
+      reproduced: false,
+      mismatch: 'Replay initial observation differs from the artifact',
+    };
+  }
   let actionsReplayed = 0;
   for (const action of artifact.acceptedActions) {
-    const step = game.step(cloneAction(action));
+    let replayAction: GameAction;
+    try {
+      replayAction = cloneAction(action);
+    } catch (thrown) {
+      const message = thrown instanceof Error ? thrown.message : 'Replay action is invalid';
+      return {
+        result: clone(game.getResult()),
+        observation,
+        actionsReplayed,
+        error: publicActionError('artifact_invalid', message),
+        reproduced: false,
+        mismatch: `Replay action ${actionsReplayed + 1} is invalid`,
+      };
+    }
+    let step: AgentStepResult;
+    try {
+      step = game.step(replayAction);
+    } catch (thrown) {
+      const message = thrown instanceof Error ? thrown.message : 'Replay step failed';
+      return {
+        result: clone(game.getResult()),
+        observation,
+        actionsReplayed,
+        error: publicActionError('REPLAY_STEP_THREW', message),
+        reproduced: false,
+        mismatch: `Replay action ${actionsReplayed + 1} threw`,
+      };
+    }
     if (step.error) return {
       result: clone(game.getResult()),
       observation: clone(step.observation),
@@ -685,6 +814,16 @@ export function replayArtifact(
     };
     actionsReplayed += 1;
     observation = clone(step.observation);
+    if (expectedObservations && JSON.stringify(expectedObservations[actionsReplayed]) !== JSON.stringify(observation)) {
+      return {
+        result: clone(game.getResult()),
+        observation,
+        actionsReplayed,
+        error: publicActionError('replay_observation_mismatch', `Replay observation ${actionsReplayed} differs from the artifact`),
+        reproduced: false,
+        mismatch: `Replay observation ${actionsReplayed} differs from the artifact`,
+      };
+    }
     if (step.gameOver || observation.gameOver) break;
   }
   const result = clone(game.getResult());

@@ -145,6 +145,69 @@ describe('Balanced Agent scenario intentions', () => {
     expect(policy.action.type).toBe('SetCheckpointPolicy');
   });
 
+  it('prioritizes an imminent unmanaged road and distinguishes relocation', () => {
+    const branch = observation.roadBranches[0]!;
+    const build = decide([
+      { type: 'BuildCheckpoint', branchId: branch.branchId, position: branch.roadTiles[0]! },
+      { type: 'EndTurn' },
+    ], (value) => {
+      const target = value.roadBranches.find((candidate) => candidate.branchId === branch.branchId)!;
+      target.turnsUntilArrival = 1;
+      target.nextArrivalTurn = value.turn + 1;
+      target.activeCheckpointId = null;
+    });
+    expect(build.action.type).toBe('BuildCheckpoint');
+    expect(build.trace?.reasonCodes).toContain('ROAD_ARRIVAL_IMMINENT');
+
+    const checkpoint = {
+      id: 'checkpoint-north-1',
+      branchId: branch.branchId,
+      position: { ...branch.roadTiles[0]! },
+      direction: branch.direction,
+      status: 'operational' as const,
+      waiting: 0,
+      screening: 0,
+      approved: 0,
+      infected: 0,
+      remainingTurns: 0,
+      currentPolicy: 'normal' as const,
+      nextPolicy: 'normal' as const,
+      nextArrivalTurn: branch.nextArrivalTurn,
+    };
+    const relocate = decide([
+      { type: 'RelocateCheckpoint', checkpointId: checkpoint.id, branchId: branch.branchId, position: { ...branch.roadTiles[1]! } },
+      { type: 'EndTurn' },
+    ], (value) => {
+      value.checkpoints = [checkpoint];
+      value.roadBranches.find((candidate) => candidate.branchId === branch.branchId)!.activeCheckpointId = checkpoint.id;
+    });
+    expect(relocate.action.type).toBe('RelocateCheckpoint');
+    expect(relocate.trace?.reasonCodes).toContain('RELOCATE_CHECKPOINT');
+  });
+
+  it('does not choose supply-blocked worker increases or recovery waits', () => {
+    const facility = observation.facilities.find((candidate) => candidate.type === 'farm' && candidate.owner === 'player')!;
+    const unit = observation.units.find((candidate) => candidate.hp === candidate.maxHp)!;
+    const assign = decide([
+      { type: 'AssignWorkers', facilityId: facility.id, workers: facility.healthyPopulation + 1 },
+      { type: 'EndTurn' },
+    ], (value) => {
+      value.facilities.find((candidate) => candidate.id === facility.id)!.inSupply = false;
+    });
+    expect(assign.action.type).toBe('EndTurn');
+
+    const wait = decide([
+      { type: 'Wait', unitId: unit.id },
+      { type: 'EndTurn' },
+    ], (value) => {
+      const target = value.units.find((candidate) => candidate.id === unit.id)!;
+      target.hp = Math.max(1, target.maxHp - 1);
+      target.inSupply = false;
+      target.recoveryAvailable = false;
+    });
+    expect(wait.action.type).toBe('EndTurn');
+  });
+
   it('chooses EndTurn when there is no useful action', () => {
     const result = decide([{ type: 'Wait', unitId }, { type: 'EndTurn' }], (value) => {
       const unit = value.units.find((candidate) => candidate.id === unitId)!;

@@ -10,7 +10,7 @@ vi.mock('phaser', () => ({
 }));
 
 import type { FacilityState, GameState, UnitState } from '../core/types';
-import { loadValidationError, phaseIndicatorViewModel, resolveTileSelection } from './controller';
+import { loadValidationError, localizeActionError, phaseIndicatorViewModel, resolveTileSelection } from './controller';
 
 function testState(units: Partial<UnitState>[], facilities: Partial<FacilityState>[] = []): GameState {
   return { units, facilities } as unknown as GameState;
@@ -74,5 +74,12 @@ describe('controller view models', () => {
     state.checkpoints = [{ id: 'checkpoint-north-1', position: { q: 7, r: 5 } }] as GameState['checkpoints'];
     expect(resolveTileSelection(state, { q: 7, r: 5 }, 'map')).toEqual({ kind: 'checkpoint', id: 'checkpoint-north-1' });
     expect(resolveTileSelection(state, { q: 7, r: 5 }, 'domestic')).toEqual({ kind: 'checkpoint', id: 'checkpoint-north-1' });
+  });
+
+  it('localizes v1.2.5 supply and checkpoint action errors', () => {
+    expect(localizeActionError('facility_out_of_supply', 'ja')).toContain('供給外');
+    expect(localizeActionError('recruitment_out_of_supply', 'en')).toContain('outside the supply');
+    expect(localizeActionError('checkpoint_supply_zombie_blocked', 'ja')).toContain('ゾンビ');
+    expect(localizeActionError('checkpoint_branch_action_limit', 'en')).toContain('branch');
   });
 });

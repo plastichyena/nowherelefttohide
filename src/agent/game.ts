@@ -6,15 +6,18 @@ import { createAgentObservation, createAgentResult } from './observation';
 import {
   AGENT_API_VERSION,
   APP_VERSION,
+  ARTIFACT_SCHEMA_VERSION,
   BRIDGE_API_VERSION,
   OBSERVATION_API_VERSION,
   type AgentActionError,
   type AgentGame,
   type AgentObservation,
+  type AgentPublicEvent,
   type AgentResetOptions,
   type AgentRunArtifact,
   type AgentStepResult,
 } from './types';
+import { collectGameMetrics } from './metrics';
 
 const DEFAULT_AGENT_SEED = 1;
 const MAX_AGENT_ID_LENGTH = 64;
@@ -95,6 +98,9 @@ export class AgentGameAdapter implements AgentGame {
   private agentId = 'external-agent';
   private acceptedActions: GameAction[] = [];
   private invalidAttempts: AgentRunArtifact['invalidAttempts'] = [];
+  private initialObservation: AgentObservation | null = null;
+  private observations: AgentObservation[] = [];
+  private events: AgentPublicEvent[] = [];
   private readonly buildId: string;
   private readonly bridgeApiVersion: string;
 
@@ -102,6 +108,9 @@ export class AgentGameAdapter implements AgentGame {
     this.engine = new GameEngine(this.seed, this.config);
     this.buildId = options.buildId ?? 'local-unknown';
     this.bridgeApiVersion = options.bridgeApiVersion ?? BRIDGE_API_VERSION;
+    const observation = this.getObservation();
+    this.initialObservation = cloneJson(observation);
+    this.observations = [cloneJson(observation)];
   }
 
   public reset(options?: AgentResetOptions): AgentObservation {
@@ -114,7 +123,11 @@ export class AgentGameAdapter implements AgentGame {
     this.agentId = normalized.agent?.id ?? 'external-agent';
     this.acceptedActions = [];
     this.invalidAttempts = [];
-    return this.getObservation();
+    this.events = [];
+    const observation = this.getObservation();
+    this.initialObservation = cloneJson(observation);
+    this.observations = [cloneJson(observation)];
+    return observation;
   }
 
   public getObservation(): AgentObservation {
@@ -149,12 +162,17 @@ export class AgentGameAdapter implements AgentGame {
     if (result.error) {
       const error = publicError(result.error.code, result.error.message);
       this.invalidAttempts.push({ decision: this.acceptedActions.length + this.invalidAttempts.length + 1, action: cloneAction(matched), error });
-      return { observation: this.getObservation(), events: [], error, gameOver: result.gameOver, result: this.getResult() };
+      const observation = this.getObservation();
+      return { observation, events: [], error, gameOver: result.gameOver, result: this.getResult() };
     }
     this.acceptedActions.push(cloneAction(matched));
+    const observation = this.getObservation();
+    const events = cloneJson(result.events);
+    this.events.push(...events);
+    this.observations.push(cloneJson(observation));
     return {
-      observation: this.getObservation(),
-      events: cloneJson(result.events),
+      observation,
+      events,
       error: null,
       gameOver: result.gameOver,
       result: this.getResult(),
@@ -171,7 +189,25 @@ export class AgentGameAdapter implements AgentGame {
 
   public getRunArtifact(): AgentRunArtifact {
     const observation = this.getObservation();
+    const initialObservation = this.initialObservation ?? observation;
+    const metrics = collectGameMetrics({
+      initialObservation,
+      finalObservation: observation,
+      observations: this.observations.length > 0 ? this.observations : [observation],
+      actions: this.acceptedActions,
+      events: this.events,
+      result: this.getResult(),
+      invalidAttemptCount: this.invalidAttempts.length,
+      invalidAttempts: this.invalidAttempts,
+      totalAgentDecisions: this.acceptedActions.length + this.invalidAttempts.length,
+      agent: { id: this.agentId, version: 'external' },
+      config: this.config,
+      buildId: this.buildId,
+      seed: this.seed,
+    });
     return cloneJson({
+      artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
+      artifactType: this.isGameOver() ? 'replay' : undefined,
       appVersion: APP_VERSION,
       gameRulesVersion: observation.gameRulesVersion,
       agentApiVersion: AGENT_API_VERSION,
@@ -182,10 +218,17 @@ export class AgentGameAdapter implements AgentGame {
       seed: this.seed,
       config: this.config,
       agent: { id: this.agentId },
+      initialRoadArrivalSchedule: initialObservation.roadBranches.map((branch) => ({
+        branchId: branch.branchId,
+        nextArrivalTurn: branch.nextArrivalTurn,
+      })),
       acceptedActions: this.acceptedActions,
       invalidAttempts: this.invalidAttempts,
       decisionTrace: [],
       result: this.getResult(),
+      observationTrace: this.observations,
+      metrics,
+      events: this.events,
     });
   }
 

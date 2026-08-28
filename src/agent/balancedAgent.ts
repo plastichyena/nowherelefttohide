@@ -110,7 +110,7 @@ function primaryGoal(
   if (legalActions.some((action) => action.type === 'Attack')) return 'combat';
   if (legalActions.some((action) => action.type === 'ProduceUnit')) return 'build_forces';
   if (legalActions.some((action) => action.type === 'Move') && observation.facilities.some((facility) => facility.owner === 'none')) return 'secure_facilities';
-  if (legalActions.some((action) => action.type === 'BuildCheckpoint' || action.type === 'SetCheckpointPolicy')) return 'manage_checkpoint';
+  if (legalActions.some((action) => action.type === 'BuildCheckpoint' || action.type === 'RelocateCheckpoint' || action.type === 'SetCheckpointPolicy')) return 'manage_checkpoint';
   return 'end_turn';
 }
 
@@ -137,8 +137,27 @@ function repeatSensitiveActionFamily(action: GameAction, observation: AgentObser
   }
   if (action.type === 'TransferPopulation') return 'TransferPopulation';
   if (action.type === 'SetCheckpointPolicy') return `SetCheckpointPolicy|${action.checkpointId}`;
-  if (action.type === 'BuildCheckpoint') return 'BuildCheckpoint';
+  if (action.type === 'BuildCheckpoint') return `BuildCheckpoint|${action.branchId ?? 'unknown'}`;
+  if (action.type === 'RelocateCheckpoint') return `RelocateCheckpoint|${action.checkpointId}`;
   return null;
+}
+
+function branchFor(observation: AgentObservation, branchId: string | undefined) {
+  return observation.roadBranches.find((branch) => branch.branchId === branchId);
+}
+
+function checkpointBranch(observation: AgentObservation, checkpointId: string) {
+  return observation.checkpoints.find((checkpoint) => checkpoint.id === checkpointId)?.branchId;
+}
+
+function unmanagedRoadUrgency(observation: AgentObservation): number {
+  return observation.roadBranches.reduce((score, branch) => {
+    if (branch.activeCheckpointId !== null) return score;
+    if (branch.turnsUntilArrival <= 0) return score + 5;
+    if (branch.turnsUntilArrival <= 1) return score + 3;
+    if (branch.turnsUntilArrival <= 2) return score + 1;
+    return score;
+  }, 0);
 }
 
 function scoreAction(
@@ -159,6 +178,7 @@ function scoreAction(
   const urgentHorde = observation.horde.turnsRemaining <= BALANCED_THRESHOLDS.hordeUrgentTurns;
   const urgentThreats = threats.filter((threat) => threat.contactNextTurn);
   const reserveDeficit = militaryReserveDeficit(observation);
+  const roadUrgency = unmanagedRoadUrgency(observation);
 
   if (action.type === 'Attack') {
     const attacker = units.get(action.attackerId);
@@ -224,6 +244,12 @@ function scoreAction(
     const facility = facilities.get(action.facilityId);
     if (facility) {
       const delta = action.workers - facility.healthyPopulation;
+      if (delta > 0 && !facility.inSupply) {
+        score -= 10_000;
+        reasonCodes.push('SUPPLY_OUTSIDE_REJECTS_WORKER_INCREASE');
+      } else if (delta < 0 && !facility.inSupply) {
+        reasonCodes.push('WORKER_DECREASE_OUTSIDE_SUPPLY');
+      }
       let targetWorkers = facility.healthyPopulation;
       let need = facilityResourceValue(facility.type, observation);
       if (facility.type === 'farm') {
@@ -434,9 +460,12 @@ function scoreAction(
     }
   } else if (action.type === 'Wait') {
     const unit = units.get(action.unitId);
-    if (unit && unit.hp < unit.maxHp) {
+    if (unit && unit.hp < unit.maxHp && unit.recoveryAvailable) {
       score += weights.recoveryWait * (1 - unit.hp / unit.maxHp);
-      reasonCodes.push('RECOVER_DAMAGED_UNIT');
+      reasonCodes.push('RECOVER_DAMAGED_UNIT_IN_SUPPLY');
+    } else if (unit && unit.hp < unit.maxHp && !unit.inSupply) {
+      score -= weights.recoveryWait;
+      reasonCodes.push('RECOVERY_OUT_OF_SUPPLY');
     }
     if (unit?.type === 'police' && observation.population.infected === 0 && !urgentThreats.some((threat) => threat.threatensCapital)) {
       score += weights.policePreservation * 0.35;
@@ -454,6 +483,17 @@ function scoreAction(
     );
     score += weights.production + (urgentHorde ? weights.hordeDefense * 2 : 0) + Math.max(0, 3 - unitCount) * 20;
     reasonCodes.push(urgentHorde ? 'PRODUCE_HORDE_DEFENDER' : 'BUILD_RESERVE');
+    if (action.destination) {
+      const destination = observation.facilities.find((facility) =>
+        facility.position.q === action.destination!.q && facility.position.r === action.destination!.r,
+      );
+      if (destination && !destination.inSupply) {
+        score -= 10_000;
+        reasonCodes.push('SUPPLY_OUTSIDE_REJECTS_RECRUITMENT');
+      } else if (destination?.recruitmentAvailable) {
+        reasonCodes.push('RECRUIT_IN_SUPPLIED_CITY');
+      }
+    }
     if (action.unitType === 'police' && observation.population.infected > 0) {
       score += 60;
       reasonCodes.push('PRODUCE_SUPPRESSION_UNIT');
@@ -494,14 +534,50 @@ function scoreAction(
       reasonCodes.push('PRESERVE_CIVILIANS');
     }
   } else if (action.type === 'BuildCheckpoint') {
+    const branch = branchFor(observation, action.branchId);
     score += weights.checkpoint + (urgentHorde ? 30 : 0);
+    if (branch) {
+      score += branch.turnsUntilArrival <= 1 ? 140 : branch.turnsUntilArrival <= 2 ? 65 : 0;
+      if (branch.activeCheckpointId === null) reasonCodes.push('ROAD_UNMANAGED_ARRIVAL');
+      if (branch.checkpointActionAvailable) reasonCodes.push('CHECKPOINT_BUILD_AVAILABLE');
+      if (branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_ARRIVAL_IMMINENT');
+    }
+    score += roadUrgency * 15;
     reasonCodes.push('BUILD_CHECKPOINT');
+  } else if (action.type === 'RelocateCheckpoint') {
+    const checkpoint = observation.checkpoints.find((candidate) => candidate.id === action.checkpointId);
+    const branch = branchFor(observation, action.branchId ?? checkpoint?.branchId);
+    const capital = observation.facilities.find((facility) => facility.type === 'capital');
+    const sourceDistance = checkpoint && capital ? hexDistance(capital.position, checkpoint.position) : 0;
+    const destinationDistance = capital ? hexDistance(capital.position, action.position) : sourceDistance;
+    const movingOutward = destinationDistance > sourceDistance;
+    const movingInward = destinationDistance < sourceDistance;
+    score += weights.checkpoint;
+    if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival <= 2) {
+      score += 50;
+      reasonCodes.push('ROAD_ARRIVAL_IMMINENT');
+    }
+    if (movingOutward) {
+      score += branch?.activeCheckpointStatus === 'operational' ? 35 : 0;
+      reasonCodes.push('CHECKPOINT_ADVANCE_OUTWARD');
+    }
+    if (movingInward && (urgentThreats.length > 0 || observation.population.infected > 0)) {
+      score += 120;
+      reasonCodes.push('CHECKPOINT_RETREAT_FOR_DEFENSE');
+    } else if (movingInward) {
+      score -= 35;
+      reasonCodes.push('CHECKPOINT_RETREAT');
+    }
+    reasonCodes.push('RELOCATE_CHECKPOINT');
   } else if (action.type === 'SetCheckpointPolicy') {
     const checkpoint = observation.checkpoints.find((candidate) => candidate.id === action.checkpointId);
+    const branch = branchFor(observation, checkpoint?.branchId);
     if (action.policy === 'strict' && observation.population.healthyCivilians > 30) score += 55;
     if (action.policy === 'passThrough' && observation.population.healthyCivilians < 25) score += 50;
     if (action.policy === 'normal') score += 25;
     if (checkpoint && checkpoint.currentPolicy === action.policy) score -= 100;
+    if (branch?.activeCheckpointId === null) score -= 100;
+    if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_POLICY_BEFORE_ARRIVAL');
     reasonCodes.push(`SET_POLICY_${action.policy.toUpperCase()}`);
   } else if (action.type === 'EndTurn') {
     const readyUnits = observation.units.filter((unit) => unit.actionState !== 'acted').length;

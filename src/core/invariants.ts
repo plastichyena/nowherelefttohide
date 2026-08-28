@@ -30,9 +30,11 @@ export function validateInvariants(state: GameState): InvariantResult {
     !state.config ||
     !state.population ||
     !state.resources ||
+    !state.statistics ||
     !Array.isArray(state.facilities) ||
     !Array.isArray(state.units) ||
-    !Array.isArray(state.checkpoints)
+    !Array.isArray(state.checkpoints) ||
+    !Array.isArray(state.roadBranches)
   ) {
     return { valid: false, errors: ['State is missing required collections'] };
   }
@@ -80,7 +82,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       errors.push(`Population ${field} must be a non-negative integer`);
     }
   }
-  if (!isNonNegativeInteger(state.actionsTakenThisTurn) || !isNonNegativeInteger(state.nextUnitNumber) || !isNonNegativeInteger(state.nextEventNumber) || !isNonNegativeInteger(state.nextAssignmentOrder)) {
+  if (!isNonNegativeInteger(state.actionsTakenThisTurn) || !isNonNegativeInteger(state.nextUnitNumber) || !isNonNegativeInteger(state.nextCheckpointNumber) || !isNonNegativeInteger(state.nextEventNumber) || !isNonNegativeInteger(state.nextAssignmentOrder)) {
     errors.push('State sequence counters must be non-negative integers');
   }
   for (const resource of nonNegativeFields) {
@@ -90,6 +92,39 @@ export function validateInvariants(state: GameState): InvariantResult {
   }
   if (!isNonNegativeInteger(state.resources.electricityCapacity) || !isNonNegativeInteger(state.resources.electricityRequired)) {
     errors.push('Electricity capacity and requirement must be non-negative integers');
+  }
+  for (const field of [
+    'maxPopulation',
+    'maxSecuredFacilities',
+    'civilianLosses',
+    'unitLosses',
+    'infectionLosses',
+    'resourceShortageLosses',
+    'hordeInterceptions',
+    'unmanagedPassThrough',
+    'refugeesAccepted',
+    'refugeesDeparted',
+    'checkpointsBuilt',
+    'checkpointsRelocated',
+    'checkpointRetreats',
+    'checkpointsRuined',
+    'checkpointsRecovered',
+    'checkpointsAbandoned',
+    'checkpointsRemoved',
+    'unmanagedBranchTurns',
+    'maxSuppliedFacilities',
+    'maxSupplyRadius',
+    'supplyLosses',
+    'supplyRejections',
+  ] as const) {
+    if (!isNonNegativeInteger(state.statistics[field])) {
+      errors.push(`Statistic ${field} must be a non-negative integer`);
+    }
+  }
+  for (const policy of ['passThrough', 'normal', 'strict'] as const) {
+    if (!isNonNegativeInteger(state.statistics.refugeesScreenedByPolicy?.[policy])) {
+      errors.push(`Statistic refugeesScreenedByPolicy.${policy} must be a non-negative integer`);
+    }
   }
 
   const mapFacilityById = new Map(state.map.facilities.map((facility) => [facility.id, facility]));
@@ -163,12 +198,15 @@ export function validateInvariants(state: GameState): InvariantResult {
   }
 
   const checkpointTiles = new Set<string>();
+  const checkpointIds = new Set<string>();
   for (const checkpoint of state.checkpoints) {
     const key = hexKey(checkpoint.position);
     if (checkpointTiles.has(key)) {
       errors.push(`Duplicate checkpoint tile ${key}`);
     }
     checkpointTiles.add(key);
+    if (checkpointIds.has(checkpoint.id)) errors.push(`Duplicate checkpoint id ${checkpoint.id}`);
+    checkpointIds.add(checkpoint.id);
     if (!isRoad(state.map, checkpoint.position)) {
       errors.push(`Checkpoint ${checkpoint.id} is not on a road`);
     }
@@ -176,6 +214,47 @@ export function validateInvariants(state: GameState): InvariantResult {
       if (!isNonNegativeInteger(checkpoint[field])) {
         errors.push(`Checkpoint ${checkpoint.id}.${field} must be non-negative`);
       }
+    }
+    const branchId = checkpoint.branchId ?? checkpoint.direction;
+    const branch = state.map.roadBranches.find((candidate) => candidate.id === branchId);
+    if (!branch || !branch.roadTiles.some((position) => hexKey(position) === key)) {
+      errors.push(`Checkpoint ${checkpoint.id} is not on its declared branch`);
+    }
+    if (!['operational', 'remnant', 'ruined', 'abandoned'].includes(checkpoint.status)) {
+      errors.push(`Checkpoint ${checkpoint.id} has an invalid status`);
+    }
+  }
+
+  const roadBranchIds = new Set<string>();
+  if (state.roadBranches.length !== state.map.roadBranches.length) {
+    errors.push('Road branch state count must match map branches');
+  }
+  for (const branch of state.roadBranches) {
+    if (roadBranchIds.has(branch.branchId)) errors.push(`Duplicate road branch state ${branch.branchId}`);
+    roadBranchIds.add(branch.branchId);
+    if (!state.map.roadBranches.some((definition) => definition.id === branch.branchId)) {
+      errors.push(`Unknown road branch state ${branch.branchId}`);
+    }
+    if (!isNonNegativeInteger(branch.nextArrivalTurn) || branch.nextArrivalTurn < state.turn) {
+      errors.push(`Road branch ${branch.branchId} has an invalid next arrival turn`);
+    }
+    if (!isNonNegativeInteger(branch.checkpointActionsThisTurn) || branch.checkpointActionsThisTurn > 1) {
+      errors.push(`Road branch ${branch.branchId} has an invalid checkpoint action count`);
+    }
+    const operational = state.checkpoints.filter(
+      (checkpoint) =>
+        checkpoint.status === 'operational' &&
+        (checkpoint.branchId ?? checkpoint.direction) === branch.branchId,
+    );
+    if (operational.length > 1) errors.push(`Road branch ${branch.branchId} has multiple operational checkpoints`);
+    if (
+      branch.activeCheckpointId !== null &&
+      !operational.some((checkpoint) => checkpoint.id === branch.activeCheckpointId)
+    ) {
+      errors.push(`Road branch ${branch.branchId} active checkpoint is invalid`);
+    }
+    if (!isNonNegativeInteger(state.statistics.refugeeArrivalsByBranch?.[branch.branchId])) {
+      errors.push(`Statistic refugeeArrivalsByBranch.${branch.branchId} must be a non-negative integer`);
     }
   }
 

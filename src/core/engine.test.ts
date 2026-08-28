@@ -189,7 +189,7 @@ describe('GameEngine', () => {
     });
     const engine = new GameEngine(12, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
-    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 7, r: 6 };
+    snapshot.units = snapshot.units.filter((unit) => unit.type !== 'zombie');
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'BuildCheckpoint', position: { q: 7, r: 6 } }).error).toBeNull();
     const checkpointId = engine.getState().checkpoints[0]!.id;
@@ -213,7 +213,10 @@ describe('GameEngine', () => {
   });
 
   it('previews Horde spawning deterministically and never spawns on the final turn', () => {
-    const engine = new GameEngine(55, createDefaultConfig({ maxTurns: 6 }));
+    const engine = new GameEngine(55, createDefaultConfig({
+      maxTurns: 6,
+      refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 },
+    }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
     synchronizePopulation(snapshot);
@@ -482,7 +485,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'EndTurn' }).result?.reason).toBe('capitalLost');
   });
 
-  it('reschedules refugee arrivals after a ruined checkpoint is recovered', () => {
+  it('preserves the road arrival schedule after a ruined checkpoint is recovered', () => {
     const engine = new GameEngine(114, createDefaultConfig({
       maxTurns: 10,
       economy: { initialZombieCount: 0, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
@@ -495,13 +498,13 @@ describe('GameEngine', () => {
       waiting: 0, screening: 0, approved: 0, remainingTurns: 0,
       screeningPolicy: 'normal', currentPolicy: 'normal', nextArrivalTurn: 1, infected: 1,
     });
+    const scheduledTurn = snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.nextArrivalTurn;
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const recovered = engine.getState().checkpoints[0]!;
     expect(recovered.status).toBe('operational');
-    expect(recovered.nextArrivalTurn).toBeGreaterThan(engine.getState().turn);
-    const scheduledTurn = recovered.nextArrivalTurn!;
+    expect(recovered.nextArrivalTurn).toBe(scheduledTurn);
     while (!engine.isGameOver() && engine.getState().turn <= scheduledTurn) {
       expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     }

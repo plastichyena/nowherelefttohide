@@ -1,5 +1,13 @@
 import { createDefaultConfig } from '../core/config';
 import { forecastEndTurn, validateAction } from '../core/engine';
+import {
+  deriveSupplySnapshot,
+  getBlockingZombiesForCheckpoint,
+  getBranchSupplyRadius,
+  getRoadBranch,
+  getSuppliedTileKeys,
+  isHexSupplied,
+} from '../core/supply';
 import Phaser from 'phaser';
 import type {
   CardinalDirection,
@@ -13,6 +21,7 @@ import type {
   GameState,
   HeadlessGame,
   HexCoord,
+  RoadBranchId,
   UnitState,
 } from '../core/types';
 import {
@@ -66,6 +75,12 @@ export type EngineFactory = () => UiGameEngine;
 
 type Screen = 'title' | 'game';
 type SheetState = 'collapsed' | 'standard' | 'expanded';
+type CheckpointPlacement = {
+  mode: 'build' | 'relocate';
+  checkpointId?: string;
+  branchId?: RoadBranchId;
+};
+type CheckpointPreviewTarget = { branchId: RoadBranchId; position: HexCoord };
 export type NavigationMode = 'map' | 'domestic';
 export type Selection =
   | { kind: 'unit'; id: string }
@@ -158,7 +173,8 @@ function sheetStateLabel(state: SheetState, locale: Locale): string {
   return t('standard');
 }
 
-function escapeHtml(value: string): string {
+function escapeHtml(value: string | null | undefined): string {
+  if (value === null || value === undefined) return '';
   return value
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -210,7 +226,7 @@ function formatPercent(value: number, locale: Locale): string {
   }).format(Math.max(0, value));
 }
 
-function localizeActionError(code: string | undefined, locale: Locale): string {
+export function localizeActionError(code: string | undefined, locale: Locale): string {
   const t = createTranslator(locale);
   const messages: Record<string, string> = {
     facility_not_yet_operational: t('facilityNotReady'),
@@ -244,6 +260,19 @@ function localizeActionError(code: string | undefined, locale: Locale): string {
     city_busy: locale === 'ja' ? 'この都市には既に編成予約があります。' : 'This city already has a recruitment reservation.',
     no_production_city: locale === 'ja' ? '編成できる都市がありません。' : 'No eligible city can produce this unit.',
     no_change_policy: locale === 'ja' ? '審査方針は変更されていません。' : 'The screening policy is unchanged.',
+    facility_out_of_supply: locale === 'ja' ? '供給外の施設には労働者を追加できません。' : 'Workers cannot be added to a facility outside the supply network.',
+    recruitment_out_of_supply: locale === 'ja' ? '供給外では新しいユニットを編成できません。' : 'New units cannot be recruited outside the supply network.',
+    recovery_out_of_supply: locale === 'ja' ? '供給外では自然回復しません。' : 'Natural recovery does not occur outside the supply network.',
+    checkpoint_supply_zombie_blocked: t('blockedZombie'),
+    checkpoint_branch_action_limit: t('checkpointActionLimit'),
+    checkpoint_infection_blocked: t('checkpointInfected'),
+    checkpoint_requires_relocation: locale === 'ja' ? 'この方面には稼働中の検問所があります。移設を選択してください。' : 'This branch has an operational checkpoint. Choose relocation.',
+    invalid_checkpoint_branch: locale === 'ja' ? '指定した道路タイルは有効な方面に属していません。' : 'The selected road tile does not belong to a valid branch.',
+    unknown_road_branch: locale === 'ja' ? '道路方面を確認できません。' : 'The road branch is unknown.',
+    checkpoint_wrong_branch: locale === 'ja' ? '検問所は現在の方面内だけで移設できます。' : 'A checkpoint can only relocate within its current branch.',
+    checkpoint_same_position: locale === 'ja' ? '別の道路タイルを選択してください。' : 'Choose a different road tile.',
+    unknown_operational_checkpoint: locale === 'ja' ? '移設できる稼働中の検問所を選択してください。' : 'Select an operational checkpoint to relocate.',
+    checkpoint_abandoned_forward_block: t('abandonedForwardBlock'),
   };
   return messages[code ?? ''] ?? t('invalidAction');
 }
@@ -306,6 +335,9 @@ export class GameUiController {
   private boardScene: HexBoardScene | null = null;
   private selection: Selection = null;
   private pendingMove: MovePreview | null = null;
+  private checkpointPlacement: CheckpointPlacement | null = null;
+  private checkpointPreviewTarget: CheckpointPreviewTarget | null = null;
+  private supplyOverlay = false;
   private lastSaveCode: string | null = null;
   private toastMessage: string | null = null;
   private guideShown = false;
@@ -332,6 +364,9 @@ export class GameUiController {
     this.engine = null;
     this.selection = null;
     this.pendingMove = null;
+    this.checkpointPlacement = null;
+    this.checkpointPreviewTarget = null;
+    this.supplyOverlay = false;
     this.destroyBoard();
     const t = this.translator();
     const canContinue = this.store.hasSave();
@@ -437,6 +472,9 @@ export class GameUiController {
       this.navMode = 'map';
       this.selection = null;
       this.pendingMove = null;
+      this.checkpointPlacement = null;
+      this.checkpointPreviewTarget = null;
+      this.supplyOverlay = false;
       this.guideShown = !this.hasSeenGuide();
       this.renderGame();
       this.autosave();
@@ -473,6 +511,7 @@ export class GameUiController {
         <div class="hud-brand"><span class="hud-glyph">◇</span><span>${escapeHtml(t('title'))}</span></div>
         <div class="hud-turn"><span data-bind="turn">—</span><small>${escapeHtml(t('turn'))}</small><span class="phase-dot" data-bind="phase" data-phase="${escapeHtml(phaseIndicator.phase)}" aria-hidden="true"></span><span class="phase-label" data-bind="phase-label" title="${escapeHtml(phaseIndicator.label)}">${escapeHtml(phaseIndicator.shortLabel)}</span></div>
         <div class="hud-pop"><span data-bind="population">—</span><small>${escapeHtml(t('population'))}</small></div>
+        <button class="icon-button supply-toggle" aria-label="${escapeHtml(t('supplyOverlay'))}" aria-pressed="${this.supplyOverlay}" data-action="toggle-supply" title="${escapeHtml(this.supplyOverlay ? t('supplyOn') : t('supplyOff'))}">◎</button>
         <button class="icon-button" aria-label="${escapeHtml(t('help'))}" data-action="help">?</button>
       </header>
       <section class="resource-strip" aria-label="${escapeHtml(t('resources'))}">
@@ -549,6 +588,12 @@ export class GameUiController {
     };
     this.root.oninput = (event) => this.onInput(event);
     this.root.onchange = (event) => this.onInput(event);
+    const previewCandidate = (event: Event): void => {
+      const element = (event.target as HTMLElement).closest<HTMLElement>('.checkpoint-candidate');
+      if (element) this.previewCheckpointCandidate(element);
+    };
+    this.root.onpointerover = previewCandidate;
+    (this.root as HTMLElement & { onfocusin: ((event: FocusEvent) => void) | null }).onfocusin = previewCandidate;
   }
 
   private onAction(action: string, element: HTMLElement): void {
@@ -560,6 +605,7 @@ export class GameUiController {
       case 'toggle-language': this.locale = toggleLocale(this.locale); persistLocale(this.locale); this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
       case 'title': this.showTitle(); break;
       case 'help': this.showHelp(); break;
+      case 'toggle-supply': this.supplyOverlay = !this.supplyOverlay; this.updateView(); break;
       case 'sheet-toggle': this.toggleSheet(); break;
       case 'confirm-move': this.confirmMove(); break;
       case 'cancel-move': this.pendingMove = null; this.updateView(); break;
@@ -578,6 +624,10 @@ export class GameUiController {
       case 'produce-police': this.produce('police'); break;
       case 'produce-guard': this.produce('nationalGuard'); break;
       case 'build-checkpoint': this.buildCheckpoint(); break;
+      case 'relocate-checkpoint': this.startRelocation(); break;
+      case 'checkpoint-place-cancel': this.checkpointPlacement = null; this.checkpointPreviewTarget = null; this.updateView(); break;
+      case 'checkpoint-build-at': this.buildCheckpointAt(element); break;
+      case 'checkpoint-relocate-at': this.relocateCheckpointAt(element); break;
       default: break;
     }
   }
@@ -588,6 +638,8 @@ export class GameUiController {
     const selected = this.selectedPosition();
     this.navMode = mode;
     this.pendingMove = null;
+    this.checkpointPlacement = null;
+    this.checkpointPreviewTarget = null;
     if (this.state && selected) this.selection = resolveTileSelection(this.state, selected, mode);
     else if (mode === 'domestic' && this.selection?.kind === 'unit') this.selection = null;
     this.sheetState = mode === 'domestic' ? 'expanded' : 'standard';
@@ -613,11 +665,20 @@ export class GameUiController {
     if (!this.state || !this.engine || this.screen !== 'game') return;
     this.updateHud();
     this.renderSheetBody();
+    const sheetBody = this.root.querySelector<HTMLElement>('[data-bind="sheet-body"]');
+    if (this.selection?.kind === 'facility') this.updateFacilitySupplementalControls();
+    if (sheetBody && !this.selection) sheetBody.insertAdjacentHTML('beforeend', this.renderBranchFlow());
+    if (sheetBody && this.checkpointPlacement) sheetBody.insertAdjacentHTML('beforeend', this.renderCheckpointPlacement());
     this.updateBoard();
     const sheet = this.root.querySelector<HTMLElement>('.bottom-sheet');
     sheet?.setAttribute('data-sheet', this.sheetState);
     const sheetState = this.root.querySelector<HTMLElement>('[data-bind="sheet-state"]');
     if (sheetState) sheetState.textContent = sheetStateLabel(this.sheetState, this.locale);
+    const supplyToggle = this.root.querySelector<HTMLButtonElement>('[data-action="toggle-supply"]');
+    if (supplyToggle) {
+      supplyToggle.setAttribute('aria-pressed', String(this.supplyOverlay));
+      supplyToggle.title = this.translator()(this.supplyOverlay ? 'supplyOn' : 'supplyOff');
+    }
     this.updateNavigation();
     this.renderToast();
   }
@@ -667,6 +728,18 @@ export class GameUiController {
 
   private updateBoard(): void {
     if (!this.state || !this.boardScene) return;
+    const supply = deriveSupplySnapshot(this.state);
+    const supplyContext = this.supplyOverlay || Boolean(this.checkpointPlacement) || this.selection?.kind === 'facility' || this.selection?.kind === 'checkpoint';
+    const preview = this.checkpointPreview();
+    const previewTarget = this.checkpointPlacement ? this.checkpointPreviewTarget : null;
+    const suppliedTileKeys = previewTarget
+      ? getSuppliedTileKeys(this.state, { branchId: previewTarget.branchId, checkpointPosition: previewTarget.position })
+      : supply.suppliedTileKeys;
+    const branchRadii = previewTarget
+      ? supply.branchRadii.map((entry) => entry.branchId === previewTarget.branchId
+        ? { ...entry, radius: getBranchSupplyRadius(this.state!, entry.branchId, previewTarget.position) }
+        : entry)
+      : supply.branchRadii;
     const render: BoardRenderState = {
       state: this.state,
       selectedPosition: this.selectedPosition(),
@@ -675,8 +748,37 @@ export class GameUiController {
       attackTargetIds: this.selectedUnitAttackTargets(),
       pendingPath: this.pendingMove?.path,
       hordeDirection: this.state.turn >= this.state.config.horde.warningStartTurn ? this.state.horde.nextDirection : undefined,
+      supplyOverlay: supplyContext,
+      suppliedTileKeys,
+      branchRadii,
+      checkpointPreviewPositions: preview.positions,
+      blockedZombieIds: preview.blockedZombieIds,
+      checkpointPreviewSelected: previewTarget?.position,
     };
     this.boardScene.updateState(render);
+  }
+
+  private checkpointPreview(): { positions: HexCoord[]; blockedZombieIds: string[] } {
+    if (!this.state || !this.checkpointPlacement) return { positions: [], blockedZombieIds: [] };
+    const branchIds = this.checkpointPlacement.branchId
+      ? [this.checkpointPlacement.branchId]
+      : this.state.map.roadBranches.map((branch) => branch.id);
+    const positions: HexCoord[] = [];
+    for (const branchId of branchIds) {
+      const branch = getRoadBranch(this.state.map, branchId);
+      if (!branch) continue;
+      for (const position of branch.roadTiles) {
+        positions.push({ ...position });
+      }
+    }
+    const blockedZombieIds = this.checkpointPreviewTarget
+      ? getBlockingZombiesForCheckpoint(
+        this.state,
+        this.checkpointPreviewTarget.branchId,
+        this.checkpointPreviewTarget.position,
+      ).map((zombie) => zombie.id)
+      : [];
+    return { positions, blockedZombieIds };
   }
 
   private selectedPosition(): HexCoord | null {
@@ -706,6 +808,34 @@ export class GameUiController {
 
   private onTileTap(position: HexCoord): void {
     if (!this.state || !this.engine) return;
+    if (this.checkpointPlacement) {
+      const branch = this.state.map.roadBranches.find((candidate) =>
+        candidate.roadTiles.some((tile) => tile.q === position.q && tile.r === position.r),
+      );
+      const action = this.legalActions().find((candidate) => {
+        if (this.checkpointPlacement?.mode === 'build' && candidate.type !== 'BuildCheckpoint') return false;
+        if (this.checkpointPlacement?.mode === 'relocate' && candidate.type !== 'RelocateCheckpoint') return false;
+        if (candidate.type === 'BuildCheckpoint') {
+          return candidate.branchId === branch?.id && candidate.position.q === position.q && candidate.position.r === position.r;
+        }
+        if (candidate.type === 'RelocateCheckpoint') {
+          return candidate.checkpointId === this.checkpointPlacement?.checkpointId &&
+            candidate.branchId === branch?.id &&
+            candidate.position.q === position.q &&
+            candidate.position.r === position.r;
+        }
+        return false;
+      });
+      if (action && this.apply(action)) {
+        this.checkpointPlacement = null;
+        this.checkpointPreviewTarget = null;
+        this.supplyOverlay = true;
+        this.updateView();
+      } else if (!action) {
+        this.showToast(this.checkpointActionReason(this.checkpointPlacement.mode, this.checkpointPlacement.checkpointId));
+      }
+      return;
+    }
     if (this.navMode === 'domestic') {
       this.pendingMove = null;
       this.selection = resolveTileSelection(this.state, position, this.navMode);
@@ -981,14 +1111,142 @@ export class GameUiController {
   }
 
   private buildCheckpoint(): void {
-    const selected = this.selectedPosition();
     const candidates = this.legalActions().filter((action): action is Extract<GameAction, { type: 'BuildCheckpoint' }> => action.type === 'BuildCheckpoint');
-    const action = candidates.find((candidate) => !selected || (candidate.position.q === selected.q && candidate.position.r === selected.r)) ?? candidates[0];
-    if (action) {
-      this.apply(action);
+    if (candidates.length === 0) {
+      this.showToast(this.checkpointActionReason('build'));
       return;
     }
-    this.showToast(this.locale === 'ja' ? '道路上の行動権がある警察が必要です。' : 'An active police unit on a road is required.');
+    this.checkpointPlacement = { mode: 'build' };
+    const first = candidates[0]!;
+    this.checkpointPreviewTarget = first.branchId
+      ? { branchId: first.branchId, position: { ...first.position } }
+      : null;
+    this.supplyOverlay = true;
+    this.sheetState = 'standard';
+    this.updateView();
+  }
+
+  private startRelocation(): void {
+    if (!this.state || this.selection?.kind !== 'checkpoint') {
+      this.showToast(this.translator()('unknownOperationalCheckpoint'));
+      return;
+    }
+    const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === this.selection?.id);
+    if (!checkpoint || checkpoint.status !== 'operational') {
+      this.showToast(this.translator()('unknownOperationalCheckpoint'));
+      return;
+    }
+    const candidates = this.legalActions().filter((action): action is Extract<GameAction, { type: 'RelocateCheckpoint' }> => action.type === 'RelocateCheckpoint' && action.checkpointId === checkpoint.id);
+    if (candidates.length === 0) {
+      this.showToast(this.checkpointActionReason('relocate', checkpoint.id));
+      return;
+    }
+    this.checkpointPlacement = {
+      mode: 'relocate',
+      checkpointId: checkpoint.id,
+      branchId: checkpoint.branchId ?? checkpoint.direction,
+    };
+    const first = candidates[0]!;
+    this.checkpointPreviewTarget = first.branchId
+      ? { branchId: first.branchId, position: { ...first.position } }
+      : null;
+    this.supplyOverlay = true;
+    this.sheetState = 'standard';
+    this.updateView();
+  }
+
+  private checkpointActionReason(mode: 'build' | 'relocate', checkpointId?: string): string {
+    if (!this.state) return this.translator()('invalidAction');
+    const branchIds = this.state.map.roadBranches.map((branch) => branch.id);
+    for (const branchId of branchIds) {
+      const branch = getRoadBranch(this.state.map, branchId);
+      if (!branch) continue;
+      for (const position of branch.roadTiles) {
+        const action: GameAction = mode === 'build'
+          ? { type: 'BuildCheckpoint', branchId, position: { ...position } }
+          : checkpointId
+            ? { type: 'RelocateCheckpoint', checkpointId, branchId, position: { ...position } }
+            : { type: 'BuildCheckpoint', branchId, position: { ...position } };
+        const reason = actionReasonFor(this.state, action, this.locale);
+        if (reason) return reason;
+      }
+    }
+    return this.translator()('invalidAction');
+  }
+
+  private buildCheckpointAt(element: HTMLElement): void {
+    if (!this.state) return;
+    const branchId = element.dataset.branchId;
+    const q = numberValue(element.dataset.q, NaN);
+    const r = numberValue(element.dataset.r, NaN);
+    if (!branchId || !Number.isInteger(q) || !Number.isInteger(r)) return;
+    const action = this.legalActions().find(
+      (candidate): candidate is Extract<GameAction, { type: 'BuildCheckpoint' }> =>
+        candidate.type === 'BuildCheckpoint' &&
+        candidate.branchId === branchId &&
+        candidate.position.q === q &&
+        candidate.position.r === r,
+    );
+    if (!action) {
+      const requested: Extract<GameAction, { type: 'BuildCheckpoint' }> = {
+        type: 'BuildCheckpoint',
+        branchId,
+        position: { q, r },
+      };
+      this.showToast(actionReasonFor(this.state, requested, this.locale) ?? this.checkpointActionReason('build'));
+      return;
+    }
+    if (this.apply(action)) {
+      this.checkpointPlacement = null;
+      this.checkpointPreviewTarget = null;
+      this.supplyOverlay = true;
+      this.updateView();
+    }
+  }
+
+  private relocateCheckpointAt(element: HTMLElement): void {
+    if (!this.state || !this.checkpointPlacement?.checkpointId) return;
+    const branchId = element.dataset.branchId;
+    const q = numberValue(element.dataset.q, NaN);
+    const r = numberValue(element.dataset.r, NaN);
+    if (!branchId || !Number.isInteger(q) || !Number.isInteger(r)) return;
+    const action = this.legalActions().find(
+      (candidate): candidate is Extract<GameAction, { type: 'RelocateCheckpoint' }> =>
+        candidate.type === 'RelocateCheckpoint' &&
+        candidate.checkpointId === this.checkpointPlacement?.checkpointId &&
+        candidate.branchId === branchId &&
+        candidate.position.q === q &&
+        candidate.position.r === r,
+    );
+    if (!action) {
+      const requested: Extract<GameAction, { type: 'RelocateCheckpoint' }> = {
+        type: 'RelocateCheckpoint',
+        checkpointId: this.checkpointPlacement.checkpointId,
+        branchId,
+        position: { q, r },
+      };
+      this.showToast(actionReasonFor(this.state, requested, this.locale) ?? this.checkpointActionReason('relocate', requested.checkpointId));
+      return;
+    }
+    if (this.apply(action)) {
+      this.checkpointPlacement = null;
+      this.checkpointPreviewTarget = null;
+      this.supplyOverlay = true;
+      this.updateView();
+    }
+  }
+
+  private previewCheckpointCandidate(element: HTMLElement): void {
+    if (!this.state || !this.checkpointPlacement) return;
+    const branchId = element.dataset.branchId;
+    const q = numberValue(element.dataset.q, NaN);
+    const r = numberValue(element.dataset.r, NaN);
+    if (!branchId || !Number.isInteger(q) || !Number.isInteger(r)) return;
+    if (!this.state.map.roadBranches.some((branch) => branch.id === branchId)) return;
+    const current = this.checkpointPreviewTarget;
+    if (current?.branchId === branchId && current.position.q === q && current.position.r === r) return;
+    this.checkpointPreviewTarget = { branchId, position: { q, r } };
+    this.updateBoard();
   }
 
   private updateRecruitmentReasons(): void {
@@ -1063,6 +1321,8 @@ export class GameUiController {
       this.navMode = 'map';
       this.selection = null;
       this.pendingMove = null;
+      this.checkpointPlacement = null;
+      this.checkpointPreviewTarget = null;
       this.renderGame();
       this.autosave();
     } catch (error) {
@@ -1152,10 +1412,30 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card" aria-labelledby="help-heading"><button class="icon-button modal-close" data-action="dismiss-modal">×</button><h2 id="help-heading">${escapeHtml(t('help'))}</h2><p>${escapeHtml(t('helpBody'))}</p><h3>${escapeHtml(t('move'))}</h3><p>${escapeHtml(t('guideSteps'))}</p><h3>${escapeHtml(t('tipsTitle'))}</h3><ul class="tips-list">${tips}</ul><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></section></div>`);
+  }
+
+  private updateFacilitySupplementalControls(): void {
+    if (!this.state || this.selection?.kind !== 'facility') return;
+    const facility = this.state.facilities.find((candidate) => candidate.id === this.selection?.id);
+    const body = this.root.querySelector<HTMLElement>('[data-bind="sheet-body"]');
+    if (!facility || !body) return;
+    const t = this.translator();
+    const supplied = getSuppliedTileKeys(this.state).includes(String(facility.position.q) + ',' + String(facility.position.r));
+    const locationCard = body.querySelector<HTMLElement>('.location-card');
+    if (locationCard) {
+      locationCard.insertAdjacentHTML('afterbegin', '<p class="supply-status ' + (supplied ? 'is-supplied' : 'is-out-of-supply') + '">' +
+        escapeHtml(supplied ? t('supplied') : t('outOfSupply')) + '</p>');
+    }
+    const buildButton = body.querySelector<HTMLButtonElement>('[data-action="build-checkpoint"]');
+    const buildCandidates = this.legalActions().some((action) => action.type === 'BuildCheckpoint');
+    if (buildButton) {
+      buildButton.disabled = !buildCandidates;
+      buildButton.title = buildCandidates ? '' : this.checkpointActionReason('build');
+    }
   }
 
   private showStatistics(result: GameResult | null): void {
@@ -1165,6 +1445,73 @@ export class GameUiController {
     const finalPopulation = this.state ? populationLocationTotals(this.state).total : 0;
     const finalFacilities = this.state?.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length ?? 0;
     this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="statistics"><section class="modal-card floating-card" aria-labelledby="statistics-heading"><p class="eyebrow">${escapeHtml(t('gameOver'))}</p><h2 id="statistics-heading">${escapeHtml(result.outcome === 'won' ? t('victory') : t('defeat'))}</h2><div class="stats-grid"><span>${escapeHtml(t('survivedTurns'))}<b>${result.turn}</b></span><span>${escapeHtml(t('finalPopulation'))}<b>${finalPopulation}</b></span><span>${escapeHtml(t('maxPopulation'))}<b>${stats.maxPopulation}</b></span><span>${escapeHtml(t('finalFacilities'))}<b>${finalFacilities}</b></span><span>${escapeHtml(t('maxFacilities'))}<b>${stats.maxSecuredFacilities}</b></span><span>${escapeHtml(t('civilianLosses'))}<b>${stats.civilianLosses}</b></span><span>${escapeHtml(t('unitLosses'))}<b>${stats.unitLosses}</b></span><span>${escapeHtml(t('infectionLosses'))}<b>${stats.infectionLosses}</b></span><span>${escapeHtml(t('shortageLosses'))}<b>${stats.resourceShortageLosses}</b></span><span>${escapeHtml(t('hordeInterceptions'))}<b>${stats.hordeInterceptions}</b></span><span>${escapeHtml(t('defeatReason'))}<b>${escapeHtml(gameOverReasonLabel(result.reason, this.locale))}</b></span></div><div class="modal-actions"><button class="primary-button" data-action="title">${escapeHtml(t('reset'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
+  }
+
+  private renderBranchFlow(): string {
+    if (!this.state) return '';
+    const t = this.translator();
+    const branches = [...this.state.map.roadBranches].sort((left, right) => left.id.localeCompare(right.id));
+    const supply = deriveSupplySnapshot(this.state);
+    const cards = branches.map((branch) => {
+      const branchState = this.state!.roadBranches.find((candidate) => candidate.branchId === branch.id);
+      const checkpoint = this.state!.checkpoints.find((candidate) =>
+        candidate.status === 'operational' && (candidate.branchId ?? candidate.direction) === branch.id,
+      );
+      const policy = checkpoint
+        ? this.state!.config.refugees.policies[checkpoint.currentPolicy]
+        : this.state!.config.refugees.policies.passThrough;
+      const remaining = branchState ? Math.max(0, branchState.nextArrivalTurn - this.state!.turn) : 0;
+      const range = String(this.state!.config.refugees.arrivalPeopleMin) + '–' + String(this.state!.config.refugees.arrivalPeopleMax);
+      const destination = checkpoint ? t('checkpoint') + ' · ' + checkpoint.id : t('noCheckpoint');
+      const policyText = formatPercent(policy.workerRate, this.locale) + ' / ' + formatPercent(policy.infectionRate, this.locale);
+      const radius = supply.branchRadii.find((entry) => entry.branchId === branch.id)?.radius ?? this.state!.config.checkpoint.initialSupplyRadius;
+      return '<article class="branch-flow-card"><div class="branch-flow-heading"><strong>' +
+        escapeHtml(formatDirection(branch.direction, this.locale)) + ' · ' + escapeHtml(branch.id) +
+        '</strong><span class="status-chip">' + escapeHtml(destination) + '</span></div><dl class="branch-flow-grid"><div><dt>' +
+        escapeHtml(t('nextArrival')) + '</dt><dd>' + escapeHtml(t('arrivalIn')) + ' ' + String(remaining) +
+        '</dd></div><div><dt>' + escapeHtml(t('arrivalRange')) + '</dt><dd>' + escapeHtml(range) +
+        '</dd></div><div><dt>' + escapeHtml(t('screeningProbability')) + '</dt><dd>' + escapeHtml(policyText) +
+        '</dd></div><div><dt>' + escapeHtml(t('supplyRadius')) + '</dt><dd>' + String(radius) +
+        '</dd></div></dl>' + (!checkpoint ? '<p class="muted">' + escapeHtml(t('unmanagedPassThrough')) + '</p>' : '') + '</article>';
+    }).join('');
+    return '<section class="branch-flow-section" aria-labelledby="branch-flow-heading"><h3 id="branch-flow-heading">' +
+      escapeHtml(t('arrivalSchedule')) + '</h3>' + cards + '</section>';
+  }
+
+  private renderCheckpointPlacement(): string {
+    if (!this.state || !this.checkpointPlacement) return '';
+    const t = this.translator();
+    const branchIds = this.checkpointPlacement.branchId
+      ? [this.checkpointPlacement.branchId]
+      : this.state.map.roadBranches.map((branch) => branch.id);
+    const actions = branchIds.flatMap((branchId) => {
+      const branch = getRoadBranch(this.state!.map, branchId);
+      if (!branch) return [];
+      return branch.roadTiles.map((position): Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }> =>
+        this.checkpointPlacement?.mode === 'relocate' && this.checkpointPlacement.checkpointId
+          ? { type: 'RelocateCheckpoint', checkpointId: this.checkpointPlacement.checkpointId, branchId, position: { ...position } }
+          : { type: 'BuildCheckpoint', branchId, position: { ...position } },
+      );
+    });
+    const actionName = this.checkpointPlacement.mode === 'build' ? t('buildPreview') : t('relocatePreview');
+    const hint = this.checkpointPlacement.mode === 'build' ? t('buildCheckpointHint') : t('relocateCheckpointHint');
+    const buttons = actions.map((action) => {
+      const branchId = action.branchId ?? '';
+      const direction = this.state!.map.roadBranches.find((branch) => branch.id === branchId)?.direction ?? 'north';
+      const invalidReason = actionReasonFor(this.state!, action, this.locale);
+      return '<button class="checkpoint-candidate' + (invalidReason ? ' invalid' : '') + '" data-action="' +
+        (this.checkpointPlacement?.mode === 'build' ? 'checkpoint-build-at' : 'checkpoint-relocate-at') +
+        '" data-branch-id="' + escapeHtml(branchId) + '" data-q="' + String(action.position.q) +
+        '" data-r="' + String(action.position.r) + '" aria-invalid="' + String(Boolean(invalidReason)) + '"' +
+        (invalidReason ? ' title="' + escapeHtml(invalidReason) + '"' : '') + '>' +
+        escapeHtml(formatDirection(direction, this.locale)) + ' · ' + String(action.position.q) + ',' +
+        String(action.position.r) + (invalidReason ? ' ×' : '') + '</button>';
+    }).join('');
+    return '<section class="checkpoint-placement" aria-labelledby="checkpoint-placement-heading"><div class="section-heading"><h3 id="checkpoint-placement-heading">' +
+      escapeHtml(actionName) + '</h3><button class="ghost-button compact-button" data-action="checkpoint-place-cancel">' +
+      escapeHtml(t('cancelPlacement')) + '</button></div><p class="muted">' + escapeHtml(hint) +
+      '</p><div class="checkpoint-candidates">' + (buttons || '<p class="warning-text">' + escapeHtml(t('invalidAction')) + '</p>') +
+      '</div><p class="muted">' + escapeHtml(t('blockedZombie')) + '</p></section>';
   }
 
   private renderSheetBody(): void {
@@ -1194,7 +1541,9 @@ export class GameUiController {
       const riskText = typeof risk === 'number' ? risk <= 0.2 ? t('low') : risk <= 0.5 ? t('medium') : t('high') : String(risk ?? t('none'));
       const canWait = actions.some((action) => action.type === 'Wait');
       const canSuppress = actions.some((action) => action.type === 'SuppressInfection');
-      body.innerHTML = `${this.pendingMove ? `<div class="preview-card"><strong>${escapeHtml(t('preview'))}</strong><p>${escapeHtml(t('path'))}: ${this.pendingMove.path.length} <span>→ ${this.pendingMove.destination.q},${this.pendingMove.destination.r}</span></p><p>${escapeHtml(t('interceptionRisk'))}: <b class="risk-${riskText.toLowerCase()}">${escapeHtml(riskText)}</b></p><div class="action-row"><button class="primary-button" data-action="confirm-move">${escapeHtml(t('confirm'))}</button><button class="ghost-button" data-action="cancel-move">${escapeHtml(t('cancel'))}</button></div></div>` : ''}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}${canSuppress ? `<button class="secondary-button" data-action="suppress">${escapeHtml(t('infected'))}</button>` : ''}</div><p class="muted">${escapeHtml(t('selectDestination'))}</p>`;
+      const supplied = isHexSupplied(this.state, unit.position);
+      const supplyReason = supplied ? '' : localizeActionError('recovery_out_of_supply', this.locale);
+      body.innerHTML = `<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${this.pendingMove ? `<div class="preview-card"><strong>${escapeHtml(t('preview'))}</strong><p>${escapeHtml(t('path'))}: ${this.pendingMove.path.length} <span>→ ${this.pendingMove.destination.q},${this.pendingMove.destination.r}</span></p><p>${escapeHtml(t('interceptionRisk'))}: <b class="risk-${riskText.toLowerCase()}">${escapeHtml(riskText)}</b></p><div class="action-row"><button class="primary-button" data-action="confirm-move">${escapeHtml(t('confirm'))}</button><button class="ghost-button" data-action="cancel-move">${escapeHtml(t('cancel'))}</button></div></div>` : ''}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}${canSuppress ? `<button class="secondary-button" data-action="suppress">${escapeHtml(t('infected'))}</button>` : ''}</div><p class="muted">${escapeHtml(t('selectDestination'))}</p>`;
       return;
     }
     if (this.selection.kind === 'checkpoint') {
@@ -1214,6 +1563,8 @@ export class GameUiController {
     const bounds = workerAssignmentBounds(this.state, facility);
     const canOperatePopulation = owned && facility.infected === 0 && facility.populationOperationalTurn <= this.state.turn;
     const workerAction = actionForWorkerAssignment(this.legalActions(), facility.id, facility.workers);
+    const workerProbe = facility.workers < bounds.maximum ? facility.workers + 1 : facility.workers > 0 ? facility.workers - 1 : 0;
+    const workerProbeAction: Extract<GameAction, { type: 'AssignWorkers' }> = { type: 'AssignWorkers', facilityId: facility.id, workers: workerProbe };
     const workerReason = !owned
       ? t('invalidAction')
       : facility.infected > 0
@@ -1221,7 +1572,7 @@ export class GameUiController {
         : facility.populationOperationalTurn > this.state.turn
           ? t('facilityNotReady')
           : !workerAction
-            ? t('noChangeAction')
+            ? actionReasonFor(this.state, workerProbeAction, this.locale) ?? t('noChangeAction')
             : null;
     const eligibleCities = city ? this.eligibleCities().filter((candidate) => candidate.id !== facility.id) : [];
     const fromEligible = city && canOperatePopulation && this.eligibleCities().some((candidate) => candidate.id === facility.id);
@@ -1243,13 +1594,47 @@ export class GameUiController {
 
   private renderCheckpointSheet(checkpoint: CheckpointState, body: HTMLElement, title: HTMLElement, summary: HTMLElement): void {
     const t = this.translator();
-    title.textContent = `${t('checkpoint')} · ${checkpoint.id}`;
-    summary.textContent = `${checkpoint.status === 'operational' ? t('operational') : t('ruined')} · ${formatDirection(checkpoint.direction, this.locale)}`;
-    const policies: CheckpointPolicy[] = ['passThrough', 'normal', 'strict'];
-    const policyOptions = policies.map((policy) => `<option value="${policy}" ${checkpoint.currentPolicy === policy ? 'selected' : ''}>${escapeHtml(t(policy))}</option>`).join('');
-    const policyActionAvailable = this.legalActions().some((action) => action.type === 'SetCheckpointPolicy' && action.checkpointId === checkpoint.id);
-    const policyReason = checkpoint.status !== 'operational' ? t('invalidAction') : policyActionAvailable ? null : t('invalidAction');
-    body.innerHTML = `<section class="checkpoint-card"><dl class="location-grid"><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${checkpoint.waiting}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${checkpoint.screening}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${checkpoint.approved}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${checkpoint.infected}</dd></div></dl><p class="muted">${escapeHtml(t('tipCheckpoint'))}</p><label>${escapeHtml(t('checkpointPolicy'))}<select data-policy="${escapeHtml(checkpoint.id)}" ${checkpoint.status === 'operational' ? '' : 'disabled'}>${policyOptions}</select></label>${policyReason ? `<p class="warning-text">${escapeHtml(policyReason)}</p>` : ''}</section>`;
+    const statusLabel = t(checkpoint.status);
+    const branchId = checkpoint.branchId ?? checkpoint.direction;
+    const branch = this.state?.map.roadBranches.find((candidate) => candidate.id === branchId);
+    const branchState = this.state?.roadBranches.find((candidate) => candidate.branchId === branchId);
+    const supplied = this.state ? getSuppliedTileKeys(this.state).includes(String(checkpoint.position.q) + ',' + String(checkpoint.position.r)) : false;
+    const policyEditable = checkpoint.status === 'operational' || checkpoint.status === 'remnant';
+    const newPolicyActionAvailable = this.legalActions().some((action) => action.type === 'SetCheckpointPolicy' && action.checkpointId === checkpoint.id);
+    const requestedPolicy: Extract<GameAction, { type: 'SetCheckpointPolicy' }> = {
+      type: 'SetCheckpointPolicy',
+      checkpointId: checkpoint.id,
+      policy: checkpoint.currentPolicy === 'normal' ? 'strict' : 'normal',
+    };
+    const newPolicyReason = !policyEditable
+      ? t('invalidAction')
+      : newPolicyActionAvailable
+        ? null
+        : actionReasonFor(this.state!, requestedPolicy, this.locale) ?? t('invalidAction');
+    const newRelocationAvailable = checkpoint.status === 'operational' && this.legalActions().some((action) =>
+      action.type === 'RelocateCheckpoint' && action.checkpointId === checkpoint.id,
+    );
+    const statusSummary = statusLabel + ' · ' + formatDirection(checkpoint.direction, this.locale);
+    title.textContent = t('checkpoint') + ' · ' + checkpoint.id;
+    summary.textContent = statusSummary;
+    const branchText = branch ? formatDirection(branch.direction, this.locale) + ' · ' + branch.id : branchId;
+    const arrivalText = branchState ? t('arrivalIn') + ' ' + String(Math.max(0, branchState.nextArrivalTurn - this.state!.turn)) : t('unavailable');
+    const newPolicies: CheckpointPolicy[] = ['passThrough', 'normal', 'strict'];
+    const newPolicyOptions = newPolicies.map((policy) => '<option value="' + policy + '" ' + (checkpoint.currentPolicy === policy ? 'selected' : '') + '>' + escapeHtml(t(policy)) + '</option>').join('');
+    body.innerHTML = '<section class="checkpoint-card checkpoint-status-' + escapeHtml(checkpoint.status) + '"><div class="checkpoint-heading"><strong>' +
+      escapeHtml(t('checkpointStatus')) + ': ' + escapeHtml(statusLabel) + '</strong><span class="status-chip ' + (supplied ? 'is-supplied' : 'is-out-of-supply') +
+      '">' + escapeHtml(supplied ? t('supplied') : t('outOfSupply')) + '</span></div><dl class="location-grid"><div><dt>' +
+      escapeHtml(t('branch')) + '</dt><dd>' + escapeHtml(branchText) + '</dd></div><div><dt>' + escapeHtml(t('nextArrival')) +
+      '</dt><dd>' + escapeHtml(arrivalText) + '</dd></div><div><dt>' + escapeHtml(t('waiting')) + '</dt><dd>' + String(checkpoint.waiting) +
+      '</dd></div><div><dt>' + escapeHtml(t('screening')) + '</dt><dd>' + String(checkpoint.screening) + '</dd></div><div><dt>' +
+      escapeHtml(t('approved')) + '</dt><dd>' + String(checkpoint.approved) + '</dd></div><div><dt>' + escapeHtml(t('infected')) +
+      '</dt><dd>' + String(checkpoint.infected) + '</dd></div></dl><p class="muted">' + escapeHtml(t('tipCheckpoint')) +
+      '</p><label>' + escapeHtml(t('checkpointPolicy')) + '<select data-policy="' + escapeHtml(checkpoint.id) + '" ' +
+      (policyEditable ? '' : 'disabled') + '>' + newPolicyOptions + '</select></label>' +
+      (newPolicyReason ? '<p class="warning-text">' + escapeHtml(newPolicyReason) + '</p>' : '') +
+      (newRelocationAvailable ? '<div class="action-row"><button class="secondary-button" data-action="relocate-checkpoint">' +
+        escapeHtml(t('relocateCheckpoint')) + '</button></div>' : '') + '</section>';
+    return;
   }
 
   private showToast(message: string): void {

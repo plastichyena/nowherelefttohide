@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createAgentGame } from '../agent/game';
+import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, BRIDGE_API_VERSION, OBSERVATION_API_VERSION } from '../agent/types';
 import { createBrowserBridge, installBrowserBridge, type BrowserBridgeApi } from './bridge';
 
 const PUBLIC_METHODS = [
@@ -43,8 +44,10 @@ describe('Developer / Browser Bridge', () => {
 
     const info = api.getApiInfo();
     expect(info.methods).toEqual(PUBLIC_METHODS);
-    expect(info.bridgeApiVersion).toBe('1.0.0');
-    expect(info.observationApiVersion).toBe('1.0.0');
+    expect(info.appVersion).toBe(APP_VERSION);
+    expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
+    expect(info.bridgeApiVersion).toBe(BRIDGE_API_VERSION);
+    expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
     expect(info.recommendedCallOrder[0]).toBe('getApiInfo');
     expect(info.methodSchemas.step.returns).toBe('AgentStepResult');
     expect(info.prohibited.join(' ')).toContain('localStorage');
@@ -91,6 +94,10 @@ describe('Developer / Browser Bridge', () => {
     expect(JSON.stringify(api.getLegalActions()[0])).toBe(originalFirst);
 
     const artifact = api.getRunArtifact();
+    expect(artifact.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
+    expect(artifact.initialRoadArrivalSchedule).toHaveLength(4);
+    expect(artifact.observationTrace).toHaveLength(1);
+    expect(artifact.metrics).toBeDefined();
     artifact.config.maxTurns = 1;
     artifact.acceptedActions.push({ type: 'EndTurn' });
     expect(api.getRunArtifact().config.maxTurns).not.toBe(1);
@@ -127,6 +134,15 @@ describe('Developer / Browser Bridge', () => {
     expect(artifact.invalidAttempts).toHaveLength(2);
     expect(artifact.invalidAttempts.map((attempt) => attempt.decision)).toEqual([1, 2]);
     expect(artifact.invalidAttempts[0].error.code).toBe('invalid_action_input');
+
+    const malformedRelocate = api.step({
+      type: 'RelocateCheckpoint',
+      checkpointId: 'checkpoint-north-1',
+      position: { q: 0, r: 7 },
+      extra: true,
+    } as never);
+    expect(malformedRelocate.error?.code).toBe('invalid_action_input');
+    expect(api.getObservation()).toEqual(before);
   });
 
   it('returns a reason and preserves state for a well-formed but illegal action', () => {
@@ -140,5 +156,34 @@ describe('Developer / Browser Bridge', () => {
     expect(api.getRunArtifact().invalidAttempts).toHaveLength(1);
     expect(api.getRunArtifact().invalidAttempts[0].action).toEqual({ type: 'Wait', unitId: 'missing-unit' });
   });
-});
 
+  it('rejects a checkpoint action whose branch does not match its position', () => {
+    const api = bridge();
+    api.reset({ seed: 23, configOverrides: { economy: { initialZombieCount: 0 } } });
+    const before = api.getObservation();
+    const legalBuild = api.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
+    expect(legalBuild).toBeDefined();
+    const wrongBranch = before.roadBranches.find((branch) => branch.branchId !== legalBuild!.branchId)!.branchId;
+    const result = api.step({ ...legalBuild!, branchId: wrongBranch });
+    expect(result.error?.code).toBe('action_not_legal');
+    expect(api.getObservation()).toEqual(before);
+    expect(api.getRunArtifact().acceptedActions).toHaveLength(0);
+  });
+
+  it('exposes distinct legal BuildCheckpoint and RelocateCheckpoint actions', () => {
+    const api = bridge();
+    api.reset({ seed: 23, configOverrides: { economy: { initialZombieCount: 0 } } });
+    const build = api.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
+    expect(build).toBeDefined();
+    const built = api.step(build!);
+    expect(built.error).toBeNull();
+    const endTurn = api.getLegalActions().find((action) => action.type === 'EndTurn');
+    expect(endTurn).toBeDefined();
+    const ended = api.step(endTurn!);
+    expect(ended.error).toBeNull();
+    const relocate = api.getLegalActions().find((action) => action.type === 'RelocateCheckpoint');
+    expect(relocate).toBeDefined();
+    expect(relocate).toMatchObject({ type: 'RelocateCheckpoint' });
+    expect(relocate).not.toHaveProperty('state');
+  });
+});

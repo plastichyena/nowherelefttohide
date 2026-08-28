@@ -2,6 +2,7 @@ import { assertValidGameConfig, cloneConfig } from './config';
 import { hexKey } from './hex';
 import { createFixedMap } from './map';
 import { SeededRng } from './rng';
+import { getBranchSupplyRadius, isHexSupplied } from './supply';
 import type {
   CardinalDirection,
   CheckpointState,
@@ -15,7 +16,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '1.1.0';
+export const GAME_VERSION = '1.2.0';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -132,6 +133,20 @@ export function synchronizePopulation(state: GameState): void {
     state.statistics.maxSecuredFacilities,
     state.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length,
   );
+  state.statistics.maxSuppliedFacilities = Math.max(
+    state.statistics.maxSuppliedFacilities,
+    state.facilities.filter((facility) => isHexSupplied(state, facility.position)).length,
+  );
+  state.statistics.maxSupplyRadius = Math.max(
+    state.statistics.maxSupplyRadius,
+    ...state.roadBranches.map((branch) => getBranchSupplyRadius(state, branch.branchId)),
+  );
+  for (const checkpoint of state.checkpoints) {
+    const branch = state.roadBranches.find(
+      (candidate) => candidate.branchId === (checkpoint.branchId ?? checkpoint.direction),
+    );
+    checkpoint.nextArrivalTurn = branch?.nextArrivalTurn ?? null;
+  }
 }
 
 export function civilianWorkerCount(state: GameState): number {
@@ -284,6 +299,15 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   );
 
   const resources = stateConfig.economy.initialResources;
+  const roadBranches = [...map.roadBranches]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((branch) => ({
+      branchId: branch.id,
+      nextArrivalTurn:
+        1 + rng.nextInt(stateConfig.refugees.arrivalIntervalMin, stateConfig.refugees.arrivalIntervalMax),
+      checkpointActionsThisTurn: 0,
+      activeCheckpointId: null,
+    }));
   const state: GameState = {
     gameVersion: GAME_VERSION,
     config: stateConfig,
@@ -333,7 +357,9 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       ),
     ],
     checkpoints: [],
+    roadBranches,
     pendingUnitProductions: [],
+    nextCheckpointNumber: 1,
     nextUnitNumber: 2,
     nextEventNumber: 1,
     nextAssignmentOrder: securedOrder + 1,
@@ -354,6 +380,23 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       infectionLosses: 0,
       resourceShortageLosses: 0,
       hordeInterceptions: 0,
+      refugeeArrivalsByBranch: Object.fromEntries(roadBranches.map((branch) => [branch.branchId, 0])),
+      unmanagedPassThrough: 0,
+      refugeesScreenedByPolicy: { passThrough: 0, normal: 0, strict: 0 },
+      refugeesAccepted: 0,
+      refugeesDeparted: 0,
+      checkpointsBuilt: 0,
+      checkpointsRelocated: 0,
+      checkpointRetreats: 0,
+      checkpointsRuined: 0,
+      checkpointsRecovered: 0,
+      checkpointsAbandoned: 0,
+      checkpointsRemoved: 0,
+      unmanagedBranchTurns: 0,
+      maxSuppliedFacilities: 0,
+      maxSupplyRadius: stateConfig.checkpoint.initialSupplyRadius,
+      supplyLosses: 0,
+      supplyRejections: 0,
     },
     gameOver: false,
     result: null,

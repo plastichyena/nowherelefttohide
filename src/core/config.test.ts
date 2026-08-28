@@ -8,7 +8,7 @@ import {
 describe('GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('1.1.0');
+    expect(DEFAULT_CONFIG.version).toBe('1.2.0');
     expect(DEFAULT_CONFIG.maxTurns).toBe(30);
     expect(DEFAULT_CONFIG.horde).toMatchObject({ cycle: 5, initialCount: 2, increment: 2 });
     expect(DEFAULT_CONFIG.refugees).toMatchObject({
@@ -17,6 +17,11 @@ describe('GameConfig', () => {
       arrivalPeopleMin: 5,
       arrivalPeopleMax: 10,
       screeningCapacity: 10,
+    });
+    expect(DEFAULT_CONFIG.checkpoint).toMatchObject({
+      constructionCivilianGoods: 5,
+      requiresPolice: false,
+      initialSupplyRadius: 5,
     });
     expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, attack: 5, movement: 5, range: 1, population: 5 });
     expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, attack: 10, movement: 5, range: 2, population: 10 });

@@ -1,9 +1,19 @@
 import { createDefaultConfig, HUMAN_UNIT_TYPES } from './config';
 import { hexDistance, hexKey, hexNeighbors, hexWithinBounds } from './hex';
 import { assertInvariants, validateInvariants } from './invariants';
-import { getHordeEntrance, getTile, isRoad } from './map';
+import { getHordeEntrance, getTile } from './map';
 import { findNearestOpenTiles, findShortestPath } from './path';
 import { SeededRng } from './rng';
+import {
+  getBlockingZombiesForCheckpoint,
+  getBranchIdAt,
+  getBranchSupplyRadius,
+  getCapitalPosition,
+  getRoadBranch,
+  getRoadBranchState,
+  getSuppliedTileKeys,
+  isHexSupplied,
+} from './supply';
 import {
   civilianWorkerCount,
   cloneState,
@@ -435,7 +445,7 @@ function establishLatentInfectionInState(
 
 function placeApprovedRefugees(state: GameState): void {
   for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
-    if (checkpoint.status !== 'operational' || checkpoint.approved <= 0) continue;
+    if (!['operational', 'remnant'].includes(checkpoint.status) || checkpoint.approved <= 0) continue;
     const people = checkpoint.approved;
     const placements = distributeToReceptionCities(state, people);
     if (!placements) continue;
@@ -461,6 +471,9 @@ function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rn
   checkpoint.remainingTurns = 0;
   const acceptedWorkers = Math.floor(screened * policy.workerRate);
   state.population.cumulativeDepartures += screened - acceptedWorkers;
+  state.statistics.refugeesDeparted += screened - acceptedWorkers;
+  state.statistics.refugeesScreenedByPolicy[checkpoint.screeningPolicy] += screened;
+  state.statistics.refugeesAccepted += acceptedWorkers;
   let latentInfected = 0;
   if (acceptedWorkers > 0 && policy.infectionRate > 0 && rng.chance(policy.infectionRate)) {
     latentInfected = Math.ceil(acceptedWorkers * policy.infectionPopulationRate);
@@ -499,21 +512,99 @@ function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rn
   }
 }
 
+function removeEmptyCheckpointRemnants(state: GameState): void {
+  const removed = state.checkpoints.filter(
+    (checkpoint) =>
+      checkpoint.status === 'remnant' &&
+      totalCheckpointPeople(checkpoint) === 0 &&
+      checkpoint.infected === 0,
+  );
+  for (const checkpoint of removed) {
+    state.checkpoints.splice(state.checkpoints.findIndex((candidate) => candidate.id === checkpoint.id), 1);
+    state.statistics.checkpointsRemoved += 1;
+    emit(state, 'checkpoint_removed', {
+      checkpointId: checkpoint.id,
+      branchId: checkpoint.branchId ?? checkpoint.direction,
+      reason: 'remnant_empty',
+    });
+  }
+}
+
+function processUnmanagedArrival(
+  state: GameState,
+  branchId: string,
+  people: number,
+  rng: SeededRng,
+): void {
+  const policy = state.config.refugees.policies.passThrough;
+  const accepted = Math.floor(people * policy.workerRate);
+  state.statistics.unmanagedPassThrough += people;
+  state.statistics.refugeesScreenedByPolicy.passThrough += people;
+  const placements = distributeToReceptionCities(state, accepted);
+  emit(state, 'refugees_screened', {
+    branchId,
+    screened: people,
+    acceptedWorkers: placements ? accepted : 0,
+    policy: 'passThrough',
+    unmanaged: true,
+  });
+  if (!placements) {
+    state.population.cumulativeDepartures += people;
+    state.statistics.refugeesDeparted += people;
+    return;
+  }
+  state.statistics.refugeesAccepted += accepted;
+  for (const placement of placements) {
+    emit(state, 'population_transferred', {
+      from: `road-${branchId}`,
+      to: placement.facilityId,
+      people: placement.people,
+      reason: 'unmanaged_pass_through',
+    });
+  }
+  if (accepted > 0 && policy.infectionRate > 0 && rng.chance(policy.infectionRate)) {
+    establishLatentInfectionInState(
+      state,
+      rng,
+      `road-${branchId}`,
+      Math.ceil(accepted * policy.infectionPopulationRate),
+    );
+  }
+}
+
 function processRefugees(state: GameState, rng: SeededRng): void {
-  for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
-    if (checkpoint.status !== 'operational') {
-      continue;
-    }
-    if (checkpoint.nextArrivalTurn !== null && checkpoint.nextArrivalTurn === state.turn) {
+  for (const branch of [...state.roadBranches].sort((a, b) => a.branchId.localeCompare(b.branchId))) {
+    const checkpoint = branch.activeCheckpointId
+      ? state.checkpoints.find(
+        (candidate) => candidate.id === branch.activeCheckpointId && candidate.status === 'operational',
+      )
+      : state.checkpoints.find(
+        (candidate) =>
+          candidate.status === 'operational' &&
+          (candidate.branchId ?? candidate.direction) === branch.branchId,
+      );
+    if (!checkpoint) state.statistics.unmanagedBranchTurns += 1;
+    if (branch.nextArrivalTurn === state.turn) {
       const people = rng.nextInt(state.config.refugees.arrivalPeopleMin, state.config.refugees.arrivalPeopleMax);
-      checkpoint.waiting += people;
       state.population.cumulativeArrivals += people;
-      checkpoint.nextArrivalTurn = state.turn + rng.nextInt(
+      state.statistics.refugeeArrivalsByBranch[branch.branchId] =
+        (state.statistics.refugeeArrivalsByBranch[branch.branchId] ?? 0) + people;
+      branch.nextArrivalTurn = state.turn + rng.nextInt(
         state.config.refugees.arrivalIntervalMin,
         state.config.refugees.arrivalIntervalMax,
       );
-      emit(state, 'refugees_arrived', { checkpointId: checkpoint.id, people });
+      if (checkpoint) checkpoint.waiting += people;
+      emit(state, 'refugees_arrived', {
+        branchId: branch.branchId,
+        checkpointId: checkpoint?.id ?? null,
+        people,
+        unmanaged: !checkpoint,
+      });
+      if (!checkpoint) processUnmanagedArrival(state, branch.branchId, people, rng);
     }
+  }
+  for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (!['operational', 'remnant'].includes(checkpoint.status)) continue;
     if (checkpoint.screening > 0 && checkpoint.remainingTurns > 0) {
       checkpoint.remainingTurns -= 1;
       if (checkpoint.remainingTurns === 0) {
@@ -531,6 +622,7 @@ function processRefugees(state: GameState, rng: SeededRng): void {
       }
     }
   }
+  removeEmptyCheckpointRemnants(state);
 }
 
 function powerAndProduction(state: GameState): void {
@@ -903,10 +995,18 @@ function overrunFacility(state: GameState, facility: FacilityState, rng: SeededR
 }
 
 function overrunCheckpoint(state: GameState, checkpoint: CheckpointState, rng: SeededRng): void {
-  if (checkpoint.status === 'ruined') {
+  if (checkpoint.overrunProcessed || checkpoint.status === 'abandoned') {
     return;
   }
-  checkpoint.status = 'ruined';
+  const wasOperational = checkpoint.status === 'operational';
+  const beforeSupply = wasOperational ? getSuppliedTileKeys(state) : [];
+  checkpoint.overrunProcessed = true;
+  if (wasOperational) {
+    checkpoint.status = 'ruined';
+    const branch = getRoadBranchState(state, checkpoint.branchId ?? checkpoint.direction);
+    if (branch?.activeCheckpointId === checkpoint.id) branch.activeCheckpointId = null;
+    state.statistics.checkpointsRuined += 1;
+  }
   const previousInfected = checkpoint.infected;
   checkpoint.infected = Math.max(
     checkpoint.infected,
@@ -918,8 +1018,16 @@ function overrunCheckpoint(state: GameState, checkpoint: CheckpointState, rng: S
   checkpoint.screening = 0;
   checkpoint.approved = 0;
   checkpoint.remainingTurns = 0;
-  emit(state, 'facility_overrun', { checkpointId: checkpoint.id, discoveredInfected });
+  emit(state, 'facility_overrun', {
+    checkpointId: checkpoint.id,
+    branchId: checkpoint.branchId ?? checkpoint.direction,
+    discoveredInfected,
+    previousStatus: wasOperational ? 'operational' : checkpoint.status,
+  });
   spawnZombies(state, checkpoint.position, state.config.facilities.capital.overrunSpawnCount, rng, 'checkpoint_overrun');
+  if (wasOperational) {
+    emitSupplyChanged(state, checkpoint.branchId ?? checkpoint.direction, beforeSupply, 'checkpoint_ruined');
+  }
 }
 
 function suppressFacility(state: GameState, facility: FacilityState, unit: UnitState): boolean {
@@ -959,10 +1067,11 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
   return true;
 }
 
-function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit: UnitState, rng: SeededRng): boolean {
+function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit: UnitState, _rng: SeededRng): boolean {
   if (!unit.canAttack || unit.activity.attacked || unit.activity.intercepted || checkpoint.infected <= 0) {
     return false;
   }
+  const beforeSupply = checkpoint.status === 'ruined' ? getSuppliedTileKeys(state) : [];
   const amount = unit.type === 'police' ? state.config.infection.policeSuppression : state.config.infection.nationalGuardSuppression;
   const suppressed = Math.min(checkpoint.infected, amount);
   checkpoint.infected -= suppressed;
@@ -981,12 +1090,30 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
   unit.activity.suppressed = true;
   emit(state, 'infection_suppressed', { checkpointId: checkpoint.id, unitId: unit.id, remaining: checkpoint.infected });
   if (checkpoint.infected === 0 && checkpoint.status === 'ruined') {
+    const branch = getRoadBranchState(state, checkpoint.branchId ?? checkpoint.direction);
     checkpoint.status = 'operational';
-    checkpoint.nextArrivalTurn = state.turn + rng.nextInt(
-      state.config.refugees.arrivalIntervalMin,
-      state.config.refugees.arrivalIntervalMax,
-    );
-    emit(state, 'facility_recovered', { checkpointId: checkpoint.id, unitId: unit.id });
+    checkpoint.overrunProcessed = false;
+    if (branch) branch.activeCheckpointId = checkpoint.id;
+    state.statistics.checkpointsRecovered += 1;
+    emit(state, 'checkpoint_recovered', {
+      checkpointId: checkpoint.id,
+      branchId: checkpoint.branchId ?? checkpoint.direction,
+      unitId: unit.id,
+    });
+    emitSupplyChanged(state, checkpoint.branchId ?? checkpoint.direction, beforeSupply, 'checkpoint_recovered');
+  } else if (
+    checkpoint.infected === 0 &&
+    (checkpoint.status === 'abandoned' ||
+      (checkpoint.status === 'remnant' && totalCheckpointPeople(checkpoint) === 0))
+  ) {
+    state.checkpoints.splice(state.checkpoints.findIndex((candidate) => candidate.id === checkpoint.id), 1);
+    state.statistics.checkpointsRemoved += 1;
+    emit(state, 'checkpoint_removed', {
+      checkpointId: checkpoint.id,
+      branchId: checkpoint.branchId ?? checkpoint.direction,
+      reason: checkpoint.status === 'abandoned' ? 'abandoned_suppressed' : 'remnant_empty',
+      unitId: unit.id,
+    });
   }
   return true;
 }
@@ -1154,7 +1281,7 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
       }
     }
     const checkpoint = getCheckpointAt(state, zombie.position);
-    if (checkpoint?.status === 'operational' && totalCheckpointPeople(checkpoint) > 0) {
+    if (checkpoint && ['operational', 'remnant'].includes(checkpoint.status)) {
       const converted = removeCheckpointPeople(checkpoint, zombie.attack);
       checkpoint.infected += converted;
       if (converted > 0) {
@@ -1162,7 +1289,8 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
         state.statistics.infectionLosses += converted;
         emit(state, 'infection_spread', { checkpointId: checkpoint.id, amount: converted, source: zombie.id });
       }
-      if (totalCheckpointPeople(checkpoint) === 0) {
+      // An empty operational checkpoint is still destroyed by zombie occupation.
+      if (totalCheckpointPeople(checkpoint) === 0 && (checkpoint.status === 'operational' || checkpoint.infected > 0)) {
         overrunCheckpoint(state, checkpoint, rng);
       }
     }
@@ -1220,12 +1348,28 @@ function checkImmediateDefeat(state: GameState): boolean {
 }
 
 function startPlayerTurn(state: GameState, rng: SeededRng): void {
+  for (const branch of state.roadBranches) branch.checkpointActionsThisTurn = 0;
   for (const unit of state.units.filter((candidate) => candidate.isPlayerUnit)) {
     const activity = unit.activity;
-    if (!activity.moved && !activity.attacked && !activity.intercepted && !activity.suppressed) {
+    if (
+      !activity.moved &&
+      !activity.attacked &&
+      !activity.intercepted &&
+      !activity.suppressed &&
+      isHexSupplied(state, unit.position)
+    ) {
       const recovery = unit.maxHp * state.config.naturalRecovery.rate;
       const amount = state.config.naturalRecovery.rounding === 'ceil' ? Math.ceil(recovery) : Math.floor(recovery);
       unit.hp = Math.min(unit.maxHp, unit.hp + amount);
+    } else if (
+      unit.hp < unit.maxHp &&
+      !activity.moved &&
+      !activity.attacked &&
+      !activity.intercepted &&
+      !activity.suppressed &&
+      !isHexSupplied(state, unit.position)
+    ) {
+      emit(state, 'supply_action_rejected', { unitId: unit.id, reason: 'recovery_out_of_supply' });
     }
     unit.actionState = 'ready';
     unit.canMove = true;
@@ -1257,6 +1401,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
   }
   createCityPopulationSnapshot(state);
   placeApprovedRefugees(state);
+  removeEmptyCheckpointRemnants(state);
   synchronizePopulation(state);
   checkImmediateDefeat(state);
   saveRng(state, rng);
@@ -1291,7 +1436,7 @@ function endTurn(state: GameState, rng: SeededRng): void {
   startPlayerTurn(state, rng);
 }
 
-function playerActionBudgetError(state: GameState, action: GameAction): ActionError | null {
+function playerActionBudgetError(state: Readonly<GameState>, action: GameAction): ActionError | null {
   if (!isPlayerPhase(state)) return error(action, 'wrong_phase', 'Actions are only accepted during the player phase');
   if (state.actionsTakenThisTurn >= state.config.maxActionsPerTurn) {
     return error(action, 'action_limit', 'The action limit for this turn has been reached');
@@ -1318,6 +1463,9 @@ function assignWorkers(state: GameState, action: Extract<GameAction, { type: 'As
   if (difference === 0) return error(action, 'no_change', 'Worker assignment is unchanged');
   let movements: Array<{ facilityId: string; people: number }> | null;
   if (difference > 0) {
+    if (!isHexSupplied(state, facility.position)) {
+      return error(action, 'facility_out_of_supply', 'Workers cannot be added outside the supply network');
+    }
     if (availableSupplyPopulation(state) < difference) {
       return error(action, 'insufficient_city_population', 'Eligible cities cannot supply enough population');
     }
@@ -1376,43 +1524,173 @@ function transferPopulation(
   return null;
 }
 
-function checkpointDirection(state: GameState, position: HexCoord): CardinalDirection | null {
-  const north = state.map.hordeEntrances.find((entrance) => entrance.direction === 'north')?.tile;
-  const east = state.map.hordeEntrances.find((entrance) => entrance.direction === 'east')?.tile;
-  const south = state.map.hordeEntrances.find((entrance) => entrance.direction === 'south')?.tile;
-  const west = state.map.hordeEntrances.find((entrance) => entrance.direction === 'west')?.tile;
-  const centerQ = north?.q ?? south?.q;
-  const centerR = east?.r ?? west?.r;
-  if (north && centerQ !== undefined && centerR !== undefined && position.q === centerQ && position.r < centerR) return 'north';
-  if (south && centerQ !== undefined && centerR !== undefined && position.q === centerQ && position.r > centerR) return 'south';
-  if (east && centerQ !== undefined && centerR !== undefined && position.r === centerR && position.q > centerQ) return 'east';
-  if (west && centerQ !== undefined && centerR !== undefined && position.r === centerR && position.q < centerQ) return 'west';
+function checkpointBranchId(
+  state: Readonly<GameState>,
+  position: HexCoord,
+  requestedBranchId?: string,
+): string | null {
+  const branchId = getBranchIdAt(state.map, position);
+  if (!branchId || (requestedBranchId !== undefined && requestedBranchId !== branchId)) return null;
+  return branchId;
+}
+
+function checkpointDirection(state: Readonly<GameState>, branchId: string): CardinalDirection | null {
+  return getRoadBranch(state.map, branchId)?.direction ?? null;
+}
+
+function checkpointBranchInfectionBlocker(state: Readonly<GameState>, branchId: string): CheckpointState | undefined {
+  return state.checkpoints.find(
+    (checkpoint) =>
+      (checkpoint.branchId ?? checkpoint.direction) === branchId &&
+      ['operational', 'remnant'].includes(checkpoint.status) &&
+      checkpoint.infected > 0,
+  );
+}
+
+function checkpointForwardBlockers(state: Readonly<GameState>, branchId: string): CheckpointState[] {
+  return state.checkpoints.filter(
+    (checkpoint) =>
+      (checkpoint.branchId ?? checkpoint.direction) === branchId &&
+      ['ruined', 'abandoned'].includes(checkpoint.status) &&
+      checkpoint.infected > 0,
+  );
+}
+
+function validateCheckpointDestination(
+  state: Readonly<GameState>,
+  action: Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }>,
+  branchId: string,
+  ignoredCheckpointId?: string,
+): ActionError | null {
+  const tile = getTile(state.map, action.position);
+  if (
+    !tile?.road ||
+    tile.facilityId ||
+    state.checkpoints.some(
+      (checkpoint) => checkpoint.id !== ignoredCheckpointId && hexKey(checkpoint.position) === hexKey(action.position),
+    )
+  ) {
+    return error(action, 'invalid_checkpoint_tile', 'A checkpoint requires an empty branch road tile');
+  }
+  if (checkpointBranchId(state, action.position, action.branchId) !== branchId) {
+    return error(action, 'invalid_checkpoint_branch', 'Checkpoint destination must be on the selected road branch');
+  }
+  const branchState = getRoadBranchState(state, branchId);
+  if (!branchState) return error(action, 'unknown_road_branch', 'Unknown road branch');
+  if (branchState.checkpointActionsThisTurn >= 1) {
+    return error(action, 'checkpoint_branch_action_limit', 'This branch already built or relocated a checkpoint this turn');
+  }
+  const capital = getCapitalPosition(state.map);
+  const destinationDistance = hexDistance(capital, action.position);
+  const forwardBlocker = checkpointForwardBlockers(state, branchId).find(
+    (checkpoint) => destinationDistance >= hexDistance(capital, checkpoint.position),
+  );
+  if (forwardBlocker) {
+    return error(action, 'checkpoint_abandoned_forward_block', 'An infected ruined or abandoned site only permits a position closer to the capital');
+  }
+  const zombies = getBlockingZombiesForCheckpoint(state, branchId, action.position);
+  if (zombies.length > 0) {
+    return error(action, 'checkpoint_supply_zombie_blocked', `Checkpoint supply area contains zombie ${zombies[0]!.id}`);
+  }
+  if (state.resources.civilianGoods < state.config.checkpoint.constructionCivilianGoods) {
+    return error(action, 'insufficient_civilian_goods', 'Not enough civilian goods');
+  }
   return null;
 }
 
-function buildCheckpoint(state: GameState, action: Extract<GameAction, { type: 'BuildCheckpoint' }>, rng: SeededRng): ActionError | null {
+function validateBuildCheckpointAction(
+  state: Readonly<GameState>,
+  action: Extract<GameAction, { type: 'BuildCheckpoint' }>,
+): { branchId: string | null; error: ActionError | null } {
   const budget = playerActionBudgetError(state, action);
-  if (budget) return budget;
-  if (!isRoad(state.map, action.position) || getTile(state.map, action.position)?.facilityId || getCheckpointAt(state, action.position)) {
-    return error(action, 'invalid_checkpoint_tile', 'A checkpoint requires an empty road tile');
+  if (budget) return { branchId: null, error: budget };
+  const branchId = checkpointBranchId(state, action.position, action.branchId);
+  if (!branchId) {
+    return {
+      branchId: null,
+      error: error(action, 'invalid_checkpoint_branch', 'Checkpoint tile must belong to one road branch'),
+    };
   }
-  const direction = checkpointDirection(state, action.position);
-  if (!direction) return error(action, 'ambiguous_direction', 'Checkpoint tile must belong to exactly one cardinal approach');
-  const existingOnDirection = state.checkpoints.filter((checkpoint) => checkpoint.direction === direction);
-  if (existingOnDirection.length >= state.config.checkpoint.maxPerDirection) return error(action, 'checkpoint_limit', 'A checkpoint already exists on this approach');
-  const police = state.units.find(
-    (unit) => unit.type === 'police' && hexKey(unit.position) === hexKey(action.position) && unit.actionState !== 'acted',
+  const branch = getRoadBranchState(state, branchId);
+  const existingActive = state.checkpoints.find(
+    (checkpoint) =>
+      checkpoint.status === 'operational' &&
+      (checkpoint.branchId ?? checkpoint.direction) === branchId,
   );
-  if (!police) return error(action, 'police_required', 'A police unit with an available action is required');
-  if (state.resources.civilianGoods < state.config.checkpoint.constructionCivilianGoods) return error(action, 'insufficient_civilian_goods', 'Not enough civilian goods');
-  state.resources.civilianGoods -= state.config.checkpoint.constructionCivilianGoods;
-  police.canMove = false;
-  police.actionState = 'acted';
-  const interval = rng.nextInt(state.config.refugees.arrivalIntervalMin, state.config.refugees.arrivalIntervalMax);
+  if (branch?.activeCheckpointId || existingActive) {
+    return {
+      branchId,
+      error: error(action, 'checkpoint_requires_relocation', 'Use RelocateCheckpoint while this branch has an operational checkpoint'),
+    };
+  }
+  if (checkpointBranchInfectionBlocker(state, branchId)) {
+    return {
+      branchId,
+      error: error(action, 'checkpoint_infection_blocked', 'Operational checkpoints and remnants must be cleared before changing position'),
+    };
+  }
+  return {
+    branchId,
+    error: validateCheckpointDestination(state, action, branchId),
+  };
+}
+
+function validateRelocateCheckpointAction(
+  state: Readonly<GameState>,
+  action: Extract<GameAction, { type: 'RelocateCheckpoint' }>,
+): { source: CheckpointState | null; branchId: string | null; error: ActionError | null } {
+  const budget = playerActionBudgetError(state, action);
+  if (budget) return { source: null, branchId: null, error: budget };
+  const source = state.checkpoints.find((checkpoint) => checkpoint.id === action.checkpointId);
+  if (!source || source.status !== 'operational') {
+    return {
+      source: null,
+      branchId: null,
+      error: error(action, 'unknown_operational_checkpoint', 'Relocation requires an operational checkpoint'),
+    };
+  }
+  if (hexKey(source.position) === hexKey(action.position)) {
+    return {
+      source,
+      branchId: source.branchId ?? source.direction,
+      error: error(action, 'checkpoint_same_position', 'Relocation requires a different road tile'),
+    };
+  }
+  const branchId = source.branchId ?? source.direction;
+  if (checkpointBranchId(state, action.position, action.branchId) !== branchId) {
+    return {
+      source,
+      branchId,
+      error: error(action, 'checkpoint_wrong_branch', 'A checkpoint can only relocate on its current branch'),
+    };
+  }
+  if (checkpointBranchInfectionBlocker(state, branchId)) {
+    return {
+      source,
+      branchId,
+      error: error(action, 'checkpoint_infection_blocked', 'Operational checkpoints and remnants must be cleared before relocation'),
+    };
+  }
+  return {
+    source,
+    branchId,
+    error: validateCheckpointDestination(state, action, branchId, source.id),
+  };
+}
+
+function createOperationalCheckpoint(
+  state: GameState,
+  branchId: string,
+  position: HexCoord,
+): CheckpointState {
+  const direction = checkpointDirection(state, branchId);
+  if (!direction) throw new Error(`Unknown checkpoint branch: ${branchId}`);
+  const branch = getRoadBranchState(state, branchId);
   const checkpoint: CheckpointState = {
-    id: `checkpoint-${direction}-${existingOnDirection.length + 1}`,
-    position: { ...action.position },
+    id: `checkpoint-${branchId}-${state.nextCheckpointNumber++}`,
+    position: { ...position },
     direction,
+    branchId,
     status: 'operational',
     waiting: 0,
     screening: 0,
@@ -1420,12 +1698,95 @@ function buildCheckpoint(state: GameState, action: Extract<GameAction, { type: '
     remainingTurns: 0,
     screeningPolicy: 'normal',
     currentPolicy: 'normal',
-    nextArrivalTurn: state.turn + interval,
+    nextArrivalTurn: branch?.nextArrivalTurn ?? null,
     infected: 0,
+    overrunProcessed: false,
   };
   state.checkpoints.push(checkpoint);
+  if (branch) branch.activeCheckpointId = checkpoint.id;
+  return checkpoint;
+}
+
+function emitSupplyChanged(
+  state: GameState,
+  branchId: string,
+  beforeKeys: readonly string[],
+  reason: string,
+): void {
+  const afterKeys = getSuppliedTileKeys(state);
+  if (beforeKeys.length === afterKeys.length && beforeKeys.every((key, index) => key === afterKeys[index])) return;
+  if (afterKeys.length < beforeKeys.length) state.statistics.supplyLosses += 1;
+  emit(state, 'supply_changed', {
+    branchId,
+    reason,
+    beforeTileCount: beforeKeys.length,
+    afterTileCount: afterKeys.length,
+    radius: getBranchSupplyRadius(state, branchId),
+  });
+}
+
+function buildCheckpoint(state: GameState, action: Extract<GameAction, { type: 'BuildCheckpoint' }>): ActionError | null {
+  const validation = validateBuildCheckpointAction(state, action);
+  if (validation.error) return validation.error;
+  const branchId = validation.branchId!;
+  const branch = getRoadBranchState(state, branchId);
+  const beforeSupply = getSuppliedTileKeys(state);
+  state.resources.civilianGoods -= state.config.checkpoint.constructionCivilianGoods;
+  const ruined = state.checkpoints.filter(
+    (checkpoint) =>
+      checkpoint.status === 'ruined' &&
+      (checkpoint.branchId ?? checkpoint.direction) === branchId,
+  );
+  const checkpoint = createOperationalCheckpoint(state, branchId, action.position);
+  for (const old of ruined) {
+    old.status = 'abandoned';
+    state.statistics.checkpointsAbandoned += 1;
+    emit(state, 'checkpoint_abandoned', { checkpointId: old.id, branchId, replacementId: checkpoint.id });
+  }
+  if (branch) branch.checkpointActionsThisTurn += 1;
   state.actionsTakenThisTurn += 1;
-  emit(state, 'checkpoint_built', { checkpointId: checkpoint.id, direction });
+  state.statistics.checkpointsBuilt += 1;
+  if (ruined.length > 0) {
+    state.statistics.checkpointRetreats += 1;
+  }
+  emit(state, 'checkpoint_built', {
+    checkpointId: checkpoint.id,
+    branchId,
+    direction: checkpoint.direction,
+    retreat: ruined.length > 0,
+  });
+  emitSupplyChanged(state, branchId, beforeSupply, ruined.length > 0 ? 'checkpoint_retreat' : 'checkpoint_built');
+  return null;
+}
+
+function relocateCheckpoint(
+  state: GameState,
+  action: Extract<GameAction, { type: 'RelocateCheckpoint' }>,
+): ActionError | null {
+  const validation = validateRelocateCheckpointAction(state, action);
+  if (validation.error) return validation.error;
+  const source = validation.source!;
+  const branchId = validation.branchId!;
+  const beforeSupply = getSuppliedTileKeys(state);
+  state.resources.civilianGoods -= state.config.checkpoint.constructionCivilianGoods;
+  source.status = 'remnant';
+  const replacement = createOperationalCheckpoint(state, branchId, action.position);
+  const branch = getRoadBranchState(state, branchId);
+  if (branch) branch.checkpointActionsThisTurn += 1;
+  state.actionsTakenThisTurn += 1;
+  state.statistics.checkpointsRelocated += 1;
+  emit(state, 'checkpoint_remnant_created', {
+    checkpointId: source.id,
+    branchId,
+    replacementId: replacement.id,
+  });
+  emit(state, 'checkpoint_relocated', {
+    checkpointId: replacement.id,
+    sourceCheckpointId: source.id,
+    branchId,
+  });
+  removeEmptyCheckpointRemnants(state);
+  emitSupplyChanged(state, branchId, beforeSupply, 'checkpoint_relocated');
   return null;
 }
 
@@ -1433,7 +1794,7 @@ function setCheckpointPolicy(state: GameState, action: Extract<GameAction, { typ
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   const checkpoint = state.checkpoints.find((candidate) => candidate.id === action.checkpointId);
-  if (!checkpoint || checkpoint.status !== 'operational') return error(action, 'unknown_checkpoint', 'Checkpoint is not operational');
+  if (!checkpoint || !['operational', 'remnant'].includes(checkpoint.status)) return error(action, 'unknown_checkpoint', 'Checkpoint does not accept policy changes');
   if (!['passThrough', 'normal', 'strict'].includes(action.policy)) return error(action, 'invalid_policy', 'Unknown checkpoint policy');
   checkpoint.currentPolicy = action.policy;
   state.actionsTakenThisTurn += 1;
@@ -1458,9 +1819,17 @@ function produceUnit(state: GameState, action: Extract<GameAction, { type: 'Prod
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   if (!HUMAN_UNIT_TYPES.includes(action.unitType)) return error(action, 'invalid_unit_type', 'Only police and national guard can be produced');
-  const possibleCities = eligibleSnapshotCities(state, 'supply').filter(
+  const eligibleCities = eligibleSnapshotCities(state, 'supply').filter(
     (facility) => action.unitType === 'police' || facility.type === 'capital',
   );
+  if (
+    action.destination &&
+    eligibleCities.some((facility) => hexKey(facility.position) === hexKey(action.destination!)) &&
+    !isHexSupplied(state, action.destination)
+  ) {
+    return error(action, 'recruitment_out_of_supply', 'Units cannot be recruited outside the supply network');
+  }
+  const possibleCities = eligibleCities.filter((facility) => isHexSupplied(state, facility.position));
   const city = action.destination
     ? possibleCities.find((facility) => hexKey(facility.position) === hexKey(action.destination!))
     : possibleCities[0];
@@ -1583,8 +1952,9 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   }
   if (state.phase !== 'player') return error(action, 'wrong_phase', 'Actions are only accepted during the player phase');
   if (state.actionsTakenThisTurn >= state.config.maxActionsPerTurn) return error(action, 'action_limit', 'The action limit for this turn has been reached');
+  if (action.type === 'BuildCheckpoint') return validateBuildCheckpointAction(state, action).error;
+  if (action.type === 'RelocateCheckpoint') return validateRelocateCheckpointAction(state, action).error;
   const candidate = cloneState(state as GameState);
-  const rng = SeededRng.fromState(candidate.rngState);
   if (action.type === 'Move') return move(candidate, action);
   if (action.type === 'Attack') return attack(candidate, action);
   if (action.type === 'Wait') return wait(candidate, action);
@@ -1592,7 +1962,6 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   if (action.type === 'AssignWorkers') return assignWorkers(candidate, action);
   if (action.type === 'TransferPopulation') return transferPopulation(candidate, action);
   if (action.type === 'SetCheckpointPolicy') return setCheckpointPolicy(candidate, action);
-  if (action.type === 'BuildCheckpoint') return buildCheckpoint(candidate, action, rng);
   if (action.type === 'ProduceUnit') return produceUnit(candidate, action);
   return error(action, 'unknown_action', 'Unknown action');
 }
@@ -1654,7 +2023,8 @@ export class GameEngine implements HeadlessGame {
       for (let workers = 0; workers <= maximum; workers += 1) {
         if (
           workers !== facility.workers &&
-          (workers > facility.workers || eligibleSnapshotCities(this.state, 'reception').length > 0)
+          (workers > facility.workers || eligibleSnapshotCities(this.state, 'reception').length > 0) &&
+          (workers < facility.workers || isHexSupplied(this.state, facility.position))
         ) actions.push({ type: 'AssignWorkers', facilityId: facility.id, workers });
       }
     }
@@ -1674,20 +2044,23 @@ export class GameEngine implements HeadlessGame {
         }
       }
     }
-    for (const checkpoint of this.state.checkpoints.filter((candidate) => candidate.status === 'operational').sort((a, b) => a.id.localeCompare(b.id))) {
+    for (const checkpoint of this.state.checkpoints.filter((candidate) => ['operational', 'remnant'].includes(candidate.status)).sort((a, b) => a.id.localeCompare(b.id))) {
       for (const policy of ['passThrough', 'normal', 'strict'] as const) {
         if (policy !== checkpoint.currentPolicy) actions.push({ type: 'SetCheckpointPolicy', checkpointId: checkpoint.id, policy });
       }
     }
-    for (const unit of this.state.units.filter((candidate) => candidate.type === 'police' && candidate.actionState !== 'acted')) {
-      if (isRoad(this.state.map, unit.position) && !getTile(this.state.map, unit.position)?.facilityId && !getCheckpointAt(this.state, unit.position)) {
-        const direction = checkpointDirection(this.state, unit.position);
-        if (direction && this.state.checkpoints.filter((checkpoint) => checkpoint.direction === direction).length < this.state.config.checkpoint.maxPerDirection && this.state.resources.civilianGoods >= this.state.config.checkpoint.constructionCivilianGoods) {
-          actions.push({ type: 'BuildCheckpoint', position: { ...unit.position } });
-        }
+    for (const branch of [...this.state.map.roadBranches].sort((a, b) => a.id.localeCompare(b.id))) {
+      const active = this.state.checkpoints.find(
+        (checkpoint) => checkpoint.status === 'operational' && (checkpoint.branchId ?? checkpoint.direction) === branch.id,
+      );
+      for (const position of branch.roadTiles) {
+        const action: GameAction = active
+          ? { type: 'RelocateCheckpoint', checkpointId: active.id, branchId: branch.id, position: { ...position } }
+          : { type: 'BuildCheckpoint', branchId: branch.id, position: { ...position } };
+        if (!validateAction(this.state, action)) actions.push(action);
       }
     }
-    for (const city of cities) {
+    for (const city of cities.filter((candidate) => isHexSupplied(this.state, candidate.position))) {
       if (!this.state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) {
         for (const unitType of HUMAN_UNIT_TYPES) {
           if (unitType === 'nationalGuard' && city.type !== 'capital') continue;
@@ -1748,7 +2121,8 @@ export class GameEngine implements HeadlessGame {
     else if (action.type === 'AssignWorkers') actionError = assignWorkers(candidate, action);
     else if (action.type === 'TransferPopulation') actionError = transferPopulation(candidate, action);
     else if (action.type === 'SetCheckpointPolicy') actionError = setCheckpointPolicy(candidate, action);
-    else if (action.type === 'BuildCheckpoint') actionError = buildCheckpoint(candidate, action, rng);
+    else if (action.type === 'BuildCheckpoint') actionError = buildCheckpoint(candidate, action);
+    else if (action.type === 'RelocateCheckpoint') actionError = relocateCheckpoint(candidate, action);
     else if (action.type === 'ProduceUnit') actionError = produceUnit(candidate, action);
     else if (action.type === 'SuppressInfection') actionError = manualSuppress(candidate, action);
 

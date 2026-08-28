@@ -14,13 +14,15 @@
 - 食料・民需品・軍需品・燃料・電力Capacityの生産と不足処理
 - 所在地を持つ都市住民・生産施設労働者、都市間移住、都市過密
 - 検問所、避難民の到着・審査、waiting / screening / approved、潜伏感染
+- 道路方面ごとの独立到着予定、検問所の建設・移設、remnant / ruined / abandoned状態
+- 州都と稼働中検問所を起点にした供給範囲、セクター境界、供給外Actionの理由表示
 - Seed付き乱数によるゾンビAI、避難民、感染、Hordeの再現
 - 自動保存、セーブコード、JSON保存・復元
 - 日本語（デフォルト）/英語切り替え、初回ガイド、常設ヘルプ、終了統計
 - ブラウザJavaScriptから利用できる、通常UI・保存領域と分離したDeveloper / Browser Bridge
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。現在のアップデート要件は [`Doc/Nowhere Left to Hide PoC v1.2アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.2アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.2.5の実装要件は [`Doc/Nowhere Left to Hide PoC v1.2.5アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.2.5アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
 
 ## ローカルで起動する
 
@@ -67,13 +69,13 @@ npm run sim -- --agent=random,balanced --seeds=1,2,3 --out=output/simulations/co
 
 盤面をタップして施設またはユニットを選択します。ユニットを選択すると合法な移動先が表示され、移動先を選ぶと経路・到達地点・最初の迎撃リスクを確認できます。確認後に移動を実行し、攻撃対象を選ぶか待機して行動を確定します。攻撃後の移動や、行動済みユニットの再行動はできません。
 
-画面下部の情報パネルは次の3状態です。
+画面下部の情報パネルは次の3状態です。上部の供給範囲ボタンは常時利用でき、施設・検問所・建設/移設の確認時には自動表示されます。
 
 - 折りたたみ: 選択対象と最重要情報だけを表示
 - 標準: 要約、資源収支、主要Actionを表示
 - 展開: 労働者、駐留部隊、感染推移、詳細Actionを表示
 
-パネルのハンドルまたはヘッダーをタップ/ドラッグして切り替えます。本文スクロールと盤面パンを分離し、タッチ対象は原則44 CSS px以上を確保します。ターン終了前には、スライダーと数値入力による生産施設の労働者配置、都市間移住、検問所方針、都市での編成予約を調整できます。人口は所在地のないプールへ退避できず、施設から撤収した労働者は安全な都市へ原子的に帰還します。
+パネルのハンドルまたはヘッダーをタップ/ドラッグして切り替えます。本文スクロールと盤面パンを分離し、タッチ対象は原則44 CSS px以上を確保します。ターン終了前には、スライダーと数値入力による生産施設の労働者配置、都市間移住、検問所方針、都市での編成予約を調整できます。人口は所在地のないプールへ退避できず、施設から撤収した労働者は安全な都市へ原子的に帰還します。道路方面ごとの到着予定は検問所がない場合も表示され、到着人数の将来実値は表示せず範囲だけを示します。
 
 ## 目的と敗北条件
 
@@ -96,7 +98,7 @@ npm run sim -- --agent=random,balanced --seeds=1,2,3 --out=output/simulations/co
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。 App/Release Versionは `1.2.5`、Game Rules / GameState / Configは `1.2.0`です。
 
 ## CoreとHeadless API
 
@@ -119,7 +121,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App v1.2はGame Rules / State / Save Format `1.1.0`を維持するためv1.1セーブを読み込めます。v1.0以前の保存データは非互換で、自動変換・削除・上書きせず、理由を表示して「最初から」を案内します。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.2.5`、Game Rules / State / Config `1.2.0`、Save Format `2`を使用します。v1.2以前の保存データは非互換で、自動変換・削除・上書きせず、理由を表示して「最初から」を案内します。旧autosaveキーは読み取り専用で保持されます。
 
 ## テスト
 

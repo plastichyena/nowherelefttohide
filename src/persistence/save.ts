@@ -26,9 +26,11 @@ export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 
 /** Stable envelope identifier shared by autosaves, codes, and JSON exports. */
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 1;
-/** Keep the key stable so a v1.0 autosave is found and rejected with an explanation. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v1';
+export const SAVE_FORMAT_VERSION = 2;
+/** v1.2.5 writes a new key so a pre-v1.2.5 autosave remains untouched. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v2';
+/** Read-only fallback for pre-v1.2.5 data. It is never overwritten or deleted. */
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v1';
 
 export interface SaveEnvelope {
   format: typeof SAVE_FORMAT;
@@ -95,6 +97,13 @@ const GAME_EVENT_TYPES: readonly GameEventType[] = [
   'facility_overrun',
   'facility_recovered',
   'checkpoint_built',
+  'checkpoint_relocated',
+  'checkpoint_remnant_created',
+  'checkpoint_removed',
+  'checkpoint_abandoned',
+  'checkpoint_recovered',
+  'supply_changed',
+  'supply_action_rejected',
   'horde_spawned',
   'game_over',
 ];
@@ -304,7 +313,7 @@ function parseVersion(value: string): [number, number, number] | null {
 function versionError(value: unknown): string | null {
   if (typeof value !== 'string' || value.length === 0 || value === CURRENT_GAME_VERSION) return null;
   const parsed = parseVersion(value);
-  const old = parsed !== null && (parsed[0] < 1 || (parsed[0] === 1 && parsed[1] < 1));
+  const old = parsed !== null && (parsed[0] < 1 || (parsed[0] === 1 && parsed[1] < 2));
   if (old) return `保存データは旧バージョン (old version ${value}) のため読み込めません。現在のVersionは${CURRENT_GAME_VERSION}です。最初から開始してください。`;
   return `unsupported game version: ${value}; current game version is ${CURRENT_GAME_VERSION}`;
 }
@@ -335,9 +344,11 @@ function validateMap(errors: string[], value: unknown, expectedMapId: unknown): 
   if (!facilitiesValid) errors.push('state.map.facilities must be an array');
   const entrancesValid = Array.isArray(map.hordeEntrances);
   if (!entrancesValid) errors.push('state.map.hordeEntrances must be an array');
+  const branchesValid = Array.isArray(map.roadBranches);
+  if (!branchesValid) errors.push('state.map.roadBranches must be an array');
   const zombiesValid = Array.isArray(map.initialZombiePositions);
   if (!zombiesValid) errors.push('state.map.initialZombiePositions must be an array');
-  let traversable = tilesValid && facilitiesValid && entrancesValid && zombiesValid;
+  let traversable = tilesValid && facilitiesValid && entrancesValid && branchesValid && zombiesValid;
 
   if (tilesValid) {
     const tiles = map.tiles as unknown[];
@@ -416,6 +427,33 @@ function validateMap(errors: string[], value: unknown, expectedMapId: unknown): 
       validateCoordinate(errors, rawEntrance.tile, `${path}.tile`);
       if (!Array.isArray(rawEntrance.roadTiles)) errors.push(`${path}.roadTiles must be an array`);
       else for (const [roadIndex, position] of rawEntrance.roadTiles.entries()) validateCoordinate(errors, position, `${path}.roadTiles[${roadIndex}]`);
+    }
+  }
+  if (branchesValid) {
+    const branches = map.roadBranches as unknown[];
+    if (branches.length !== 4) errors.push('state.map.roadBranches must contain four branches');
+    const ids = new Set<string>();
+    const directions = new Set<string>();
+    for (const [index, rawBranch] of branches.entries()) {
+      const path = `state.map.roadBranches[${index}]`;
+      if (!isRecord(rawBranch)) {
+        errors.push(`${path} must be an object`);
+        traversable = false;
+        continue;
+      }
+      const idValid = requireString(errors, rawBranch.id, `${path}.id`);
+      if (idValid && typeof rawBranch.id === 'string') {
+        if (ids.has(rawBranch.id)) errors.push(`duplicate road branch: ${rawBranch.id}`);
+        ids.add(rawBranch.id);
+      }
+      if (requireEnum(errors, rawBranch.direction, `${path}.direction`, CARDINAL_DIRECTIONS)) {
+        if (directions.has(rawBranch.direction)) errors.push(`duplicate road branch direction: ${rawBranch.direction}`);
+        directions.add(rawBranch.direction);
+      }
+      validateCoordinate(errors, rawBranch.capitalConnection, `${path}.capitalConnection`);
+      if (!Array.isArray(rawBranch.roadTiles)) errors.push(`${path}.roadTiles must be an array`);
+      else for (const [roadIndex, position] of rawBranch.roadTiles.entries()) validateCoordinate(errors, position, `${path}.roadTiles[${roadIndex}]`);
+      validateCoordinate(errors, rawBranch.entrance, `${path}.entrance`);
     }
   }
   if (zombiesValid) {
@@ -529,6 +567,7 @@ function validateCheckpoint(
   index: number,
   tileKeys: Set<string>,
   roadTiles: Set<string>,
+  roadBranchIds: Set<string>,
   maxPerDirection: number | null,
   directionsSeen: Map<string, number>,
 ): checkpoint is CheckpointState {
@@ -545,13 +584,15 @@ function validateCheckpoint(
     if (!roadTiles.has(key)) errors.push(`${path}.position must be on a road`);
   }
   const directionValid = requireEnum(errors, checkpoint.direction, `${path}.direction`, CARDINAL_DIRECTIONS);
-  if (directionValid) {
+  if (directionValid && checkpoint.status === 'operational') {
     const direction = checkpoint.direction as CardinalDirection;
     const count = (directionsSeen.get(direction) ?? 0) + 1;
     directionsSeen.set(direction, count);
     if (maxPerDirection !== null && count > maxPerDirection) errors.push(`${path} exceeds checkpoint limit for ${checkpoint.direction}`);
   }
-  requireEnum(errors, checkpoint.status, `${path}.status`, ['operational', 'ruined'] as const);
+  const branchValid = requireString(errors, checkpoint.branchId, `${path}.branchId`);
+  if (branchValid && typeof checkpoint.branchId === 'string' && !roadBranchIds.has(checkpoint.branchId)) errors.push(`${path}.branchId does not refer to state.map.roadBranches`);
+  requireEnum(errors, checkpoint.status, `${path}.status`, ['operational', 'remnant', 'ruined', 'abandoned'] as const);
   for (const key of ['waiting', 'screening', 'approved', 'remainingTurns', 'infected'] as const) nonNegativeInteger(errors, checkpoint[key], `${path}.${key}`);
   requireEnum(errors, checkpoint.screeningPolicy, `${path}.screeningPolicy`, CHECKPOINT_POLICIES);
   requireEnum(errors, checkpoint.currentPolicy, `${path}.currentPolicy`, CHECKPOINT_POLICIES);
@@ -620,10 +661,10 @@ function isJsonValue(value: unknown): boolean {
 function validateGameState(value: Record<string, unknown>, errors: string[]): boolean {
   const requiredFields = [
     'gameVersion', 'config', 'seed', 'rngState', 'turn', 'maxTurns', 'actionsTakenThisTurn', 'phase', 'mapId', 'map', 'facilities',
-    'population', 'cityPopulationSnapshot', 'resources', 'units', 'checkpoints', 'pendingUnitProductions', 'nextUnitNumber', 'nextEventNumber',
+    'population', 'cityPopulationSnapshot', 'resources', 'units', 'checkpoints', 'roadBranches', 'pendingUnitProductions', 'nextCheckpointNumber', 'nextUnitNumber', 'nextEventNumber',
     'nextAssignmentOrder', 'horde', 'events', 'statistics', 'gameOver', 'result',
   ];
-  for (const field of requiredFields) if (!hasOwn(value, field)) errors.push(`state.${field} is required for a v1.1 save`);
+  for (const field of requiredFields) if (!hasOwn(value, field)) errors.push(`state.${field} is required for a v1.2.5 save`);
   addVersionValidation(errors, value.gameVersion, 'state.gameVersion');
   if (hasOwn(value, 'pendingAdmissions')) errors.push('state.pendingAdmissions is a legacy v1.0 field and is not supported');
   if (!isRecord(value.config)) {
@@ -761,7 +802,11 @@ function validateGameState(value: Record<string, unknown>, errors: string[]): bo
     const directionsSeen = new Map<string, number>();
     const maxPerDirection = isRecord(config.checkpoint) && isNonNegativeInteger(config.checkpoint.maxPerDirection) ? config.checkpoint.maxPerDirection : null;
     for (const [index, rawCheckpoint] of rawCheckpoints.entries()) {
-      if (validateCheckpoint(rawCheckpoint, errors, index, tileKeys, roadTiles, maxPerDirection, directionsSeen)) {
+      const roadBranchIds = new Set<string>();
+      if (mapRecord && Array.isArray(mapRecord.roadBranches)) {
+        for (const rawBranch of mapRecord.roadBranches as unknown[]) if (isRecord(rawBranch) && typeof rawBranch.id === 'string') roadBranchIds.add(rawBranch.id);
+      }
+      if (validateCheckpoint(rawCheckpoint, errors, index, tileKeys, roadTiles, roadBranchIds, maxPerDirection, directionsSeen)) {
         const checkpoint = rawCheckpoint as unknown as Record<string, unknown>;
         if (typeof checkpoint.id === 'string' && checkpointIds.has(checkpoint.id)) errors.push(`duplicate checkpoint id: ${checkpoint.id}`);
         if (typeof checkpoint.id === 'string') checkpointIds.add(checkpoint.id);
@@ -773,6 +818,56 @@ function validateGameState(value: Record<string, unknown>, errors: string[]): bo
       }
     }
   } else errors.push('state.checkpoints must be an array');
+
+  const rawRoadBranches = value.roadBranches;
+  const roadBranchIds = new Set<string>();
+  if (Array.isArray(rawRoadBranches)) {
+    const mapBranchIds = new Set<string>();
+    if (mapRecord && Array.isArray(mapRecord.roadBranches)) {
+      for (const rawBranch of mapRecord.roadBranches as unknown[]) {
+        if (isRecord(rawBranch) && typeof rawBranch.id === 'string') mapBranchIds.add(rawBranch.id);
+      }
+    }
+    if (mapBranchIds.size > 0 && rawRoadBranches.length !== mapBranchIds.size) errors.push('state.roadBranches count must match state.map.roadBranches');
+    const activeCheckpointIds = new Set<string>();
+    for (const [index, rawBranch] of rawRoadBranches.entries()) {
+      const path = `state.roadBranches[${index}]`;
+      if (!isRecord(rawBranch)) {
+        errors.push(`${path} must be an object`);
+        continue;
+      }
+      const idValid = requireString(errors, rawBranch.branchId, `${path}.branchId`);
+      const branchId = typeof rawBranch.branchId === 'string' ? rawBranch.branchId : '';
+      if (idValid) {
+        if (roadBranchIds.has(branchId)) errors.push(`${path}.branchId is duplicated`);
+        roadBranchIds.add(branchId);
+        if (!mapBranchIds.has(branchId)) errors.push(`${path}.branchId does not refer to state.map.roadBranches`);
+      }
+      requireInteger(errors, rawBranch.nextArrivalTurn, `${path}.nextArrivalTurn`, 1);
+      requireInteger(errors, rawBranch.checkpointActionsThisTurn, `${path}.checkpointActionsThisTurn`);
+      if (typeof rawBranch.checkpointActionsThisTurn === 'number' && rawBranch.checkpointActionsThisTurn > 1) errors.push(`${path}.checkpointActionsThisTurn cannot exceed 1`);
+      if (rawBranch.activeCheckpointId !== null) {
+        const activeIdValid = requireString(errors, rawBranch.activeCheckpointId, `${path}.activeCheckpointId`);
+        if (activeIdValid && typeof rawBranch.activeCheckpointId === 'string') {
+          if (activeCheckpointIds.has(rawBranch.activeCheckpointId)) errors.push(`${path}.activeCheckpointId is duplicated`);
+          activeCheckpointIds.add(rawBranch.activeCheckpointId);
+          const checkpoint = Array.isArray(rawCheckpoints)
+            ? rawCheckpoints.find((candidate) => isRecord(candidate) && candidate.id === rawBranch.activeCheckpointId)
+            : undefined;
+          if (!checkpoint || !isRecord(checkpoint) || checkpoint.status !== 'operational') errors.push(`${path}.activeCheckpointId must refer to an operational checkpoint`);
+          else if (checkpoint.branchId !== branchId) errors.push(`${path}.activeCheckpointId belongs to another road branch`);
+        }
+      }
+    }
+    for (const branchId of mapBranchIds) if (!roadBranchIds.has(branchId)) errors.push(`state.roadBranches is missing ${branchId}`);
+    if (Array.isArray(rawCheckpoints)) {
+      for (const rawCheckpoint of rawCheckpoints) {
+        if (!isRecord(rawCheckpoint) || rawCheckpoint.status !== 'operational' || typeof rawCheckpoint.branchId !== 'string') continue;
+        const branchState = rawRoadBranches.find((candidate) => isRecord(candidate) && candidate.branchId === rawCheckpoint.branchId);
+        if (!branchState || !isRecord(branchState) || branchState.activeCheckpointId !== rawCheckpoint.id) errors.push(`operational checkpoint ${String(rawCheckpoint.id)} must be active on its road branch`);
+      }
+    }
+  } else errors.push('state.roadBranches must be an array');
 
   validateCityPopulationSnapshot(value, errors, facilities);
 
@@ -801,7 +896,7 @@ function validateGameState(value: Record<string, unknown>, errors: string[]): bo
     }
   } else errors.push('state.pendingUnitProductions must be an array');
 
-  for (const field of ['nextUnitNumber', 'nextEventNumber', 'nextAssignmentOrder']) requireInteger(errors, value[field], `state.${field}`);
+  for (const field of ['nextCheckpointNumber', 'nextUnitNumber', 'nextEventNumber', 'nextAssignmentOrder']) requireInteger(errors, value[field], `state.${field}`);
 
   const horde = value.horde;
   if (isRecord(horde)) {
@@ -812,7 +907,19 @@ function validateGameState(value: Record<string, unknown>, errors: string[]): bo
   } else errors.push('state.horde must be an object');
 
   const statistics = value.statistics;
-  if (isRecord(statistics)) for (const field of ['maxPopulation', 'maxSecuredFacilities', 'civilianLosses', 'unitLosses', 'infectionLosses', 'resourceShortageLosses', 'hordeInterceptions']) nonNegativeInteger(errors, statistics[field], `state.statistics.${field}`);
+  const statisticFields = ['maxPopulation', 'maxSecuredFacilities', 'civilianLosses', 'unitLosses', 'infectionLosses', 'resourceShortageLosses', 'hordeInterceptions', 'unmanagedPassThrough', 'refugeesAccepted', 'refugeesDeparted', 'checkpointsBuilt', 'checkpointsRelocated', 'checkpointRetreats', 'checkpointsRuined', 'checkpointsRecovered', 'checkpointsAbandoned', 'checkpointsRemoved', 'unmanagedBranchTurns', 'maxSuppliedFacilities', 'maxSupplyRadius', 'supplyLosses', 'supplyRejections'];
+  if (isRecord(statistics)) {
+    for (const field of statisticFields) nonNegativeInteger(errors, statistics[field], `state.statistics.${field}`);
+    if (!requireRecord(errors, statistics.refugeeArrivalsByBranch, 'state.statistics.refugeeArrivalsByBranch')) {
+      // Error already recorded by requireRecord.
+    } else for (const [branchId, arrivals] of Object.entries(statistics.refugeeArrivalsByBranch)) {
+      if (!roadBranchIds.has(branchId)) errors.push(`state.statistics.refugeeArrivalsByBranch contains unknown branch ${branchId}`);
+      nonNegativeInteger(errors, arrivals, `state.statistics.refugeeArrivalsByBranch.${branchId}`);
+    }
+    if (!requireRecord(errors, statistics.refugeesScreenedByPolicy, 'state.statistics.refugeesScreenedByPolicy')) {
+      // Error already recorded by requireRecord.
+    } else for (const policy of CHECKPOINT_POLICIES) nonNegativeInteger(errors, statistics.refugeesScreenedByPolicy[policy], `state.statistics.refugeesScreenedByPolicy.${policy}`);
+  }
   else errors.push('state.statistics must be an object');
 
   const events = value.events;
@@ -848,7 +955,18 @@ function validateGameState(value: Record<string, unknown>, errors: string[]): bo
     if (typeof value.turn === 'number' && typeof value.result.turn === 'number' && value.result.turn !== value.turn) errors.push('state.result.turn must match state.turn');
     if (!requireRecord(errors, value.result.statistics, 'state.result.statistics')) {
       // Error already recorded by requireRecord.
-    } else for (const field of ['maxPopulation', 'maxSecuredFacilities', 'civilianLosses', 'unitLosses', 'infectionLosses', 'resourceShortageLosses', 'hordeInterceptions']) nonNegativeInteger(errors, value.result.statistics[field], `state.result.statistics.${field}`);
+    } else {
+      for (const field of statisticFields) nonNegativeInteger(errors, value.result.statistics[field], `state.result.statistics.${field}`);
+      if (!requireRecord(errors, value.result.statistics.refugeeArrivalsByBranch, 'state.result.statistics.refugeeArrivalsByBranch')) {
+        // Error already recorded by requireRecord.
+      } else for (const [branchId, arrivals] of Object.entries(value.result.statistics.refugeeArrivalsByBranch)) {
+        if (!roadBranchIds.has(branchId)) errors.push(`state.result.statistics.refugeeArrivalsByBranch contains unknown branch ${branchId}`);
+        nonNegativeInteger(errors, arrivals, `state.result.statistics.refugeeArrivalsByBranch.${branchId}`);
+      }
+      if (!requireRecord(errors, value.result.statistics.refugeesScreenedByPolicy, 'state.result.statistics.refugeesScreenedByPolicy')) {
+        // Error already recorded by requireRecord.
+      } else for (const policy of CHECKPOINT_POLICIES) nonNegativeInteger(errors, value.result.statistics.refugeesScreenedByPolicy[policy], `state.result.statistics.refugeesScreenedByPolicy.${policy}`);
+    }
   } else errors.push('state.result must be an object or null');
   if (gameOverValid && typeof value.gameOver === 'boolean' && value.gameOver !== (value.result !== null)) errors.push('state.gameOver and state.result must agree');
 
@@ -870,7 +988,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   if (typeof value.gameVersion !== 'string' && typeof value.version === 'string') addVersionValidation(errors, value.version, 'version');
   if (nestedState && typeof nestedState.gameVersion !== 'string' && typeof nestedState.version === 'string') addVersionValidation(errors, nestedState.version, 'state.version');
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
-  if (value.formatVersion !== SAVE_FORMAT_VERSION) errors.push('unsupported save format version');
+  if (value.formatVersion !== SAVE_FORMAT_VERSION) errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.2 and earlier saves are incompatible`);
   requireString(errors, value.mapId, 'mapId');
   if (typeof value.seed !== 'number' || !Number.isSafeInteger(value.seed)) errors.push('seed must be a safe integer');
   if (typeof value.checksum !== 'string' || !/^[0-9a-f]{8}$/u.test(value.checksum)) errors.push('checksum is invalid');
@@ -943,10 +1061,12 @@ function browserStorage(): StorageLike | null {
 export class AutoSaveStore {
   private readonly storage: StorageLike | null;
   private readonly key: string;
+  private readonly legacyKey: string | null;
   private readonly onError?: SaveErrorListener;
 
   constructor(options: { key?: string; storage?: StorageLike | null; onError?: SaveErrorListener } = {}) {
     this.key = options.key ?? DEFAULT_AUTOSAVE_KEY;
+    this.legacyKey = options.key === undefined ? LEGACY_AUTOSAVE_KEY : null;
     this.storage = options.storage === undefined ? browserStorage() : options.storage;
     this.onError = options.onError;
   }
@@ -976,9 +1096,13 @@ export class AutoSaveStore {
   load(): SaveValidationResult {
     if (!this.storage) return { valid: false, errors: ['ブラウザのローカル保存領域を利用できません'], state: null, envelope: null };
     try {
-      const code = this.storage.getItem(this.key);
-      if (!code) return { valid: false, errors: ['保存データがありません'], state: null, envelope: null };
-      return decodeSaveCode(code);
+      const currentCode = this.storage.getItem(this.key);
+      if (currentCode) return decodeSaveCode(currentCode);
+      // A legacy key is intentionally read-only. Loading it may show the
+      // incompatibility message, but it must never be migrated or removed.
+      const legacyCode = this.legacyKey ? this.storage.getItem(this.legacyKey) : null;
+      if (legacyCode) return decodeSaveCode(legacyCode);
+      return { valid: false, errors: ['保存データがありません'], state: null, envelope: null };
     } catch (error) {
       return { valid: false, errors: [`自動保存を読み込めません: ${error instanceof Error ? error.message : String(error)}`], state: null, envelope: null };
     }
@@ -987,7 +1111,7 @@ export class AutoSaveStore {
   hasSave(): boolean {
     if (!this.storage) return false;
     try {
-      return this.storage.getItem(this.key) !== null;
+      return this.storage.getItem(this.key) !== null || (this.legacyKey !== null && this.storage.getItem(this.legacyKey) !== null);
     } catch {
       return false;
     }

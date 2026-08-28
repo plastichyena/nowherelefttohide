@@ -21,7 +21,7 @@ import {
   type AgentRunnerLimits,
   type AgentRunnerGameOptions,
 } from './runner';
-import type { AgentStrategyId } from './types';
+import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, type AgentStrategyId } from './types';
 
 export const RUN_JSON_FILE = 'run.json';
 export const GAMES_CSV_FILE = 'games.csv';
@@ -57,7 +57,9 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '1.0.0';
+  schemaVersion: '1.1.0';
+  appVersion: string;
+  artifactSchemaVersion: string;
   execution: {
     agents: AgentStrategyId[];
     seeds: number[];
@@ -284,7 +286,9 @@ export function runSimulation(options: SimulationRunOptions = {}): SimulationRep
     message: run.failure.message,
   }] : []);
   const report: SimulationReport = {
-    schemaVersion: '1.0.0',
+    schemaVersion: '1.1.0',
+    appVersion: APP_VERSION,
+    artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
       agents: normalized.agents,
       seeds: normalized.seeds,
@@ -301,7 +305,7 @@ export function runSimulation(options: SimulationRunOptions = {}): SimulationRep
     },
     games,
     aggregate,
-    comparisons: compareMetricsBySeed(games),
+    comparisons: compareMetricsBySeed(games, normalized.agents),
     failures,
     technicalFailureCount: failures.length,
     exitCode: failures.length > 0 ? 1 : 0,
@@ -313,10 +317,17 @@ export function runSimulation(options: SimulationRunOptions = {}): SimulationRep
 export const runBatch = runSimulation;
 
 const CSV_COLUMNS: readonly string[] = [
-  'agentId', 'agentVersion', 'strategy', 'seed', 'outcome', 'gameOverReason', 'finalTurn',
+  'appVersion', 'gameRulesVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion',
+  'buildId', 'mapId', 'agentId', 'agentVersion', 'strategy', 'seed', 'outcome', 'gameOverReason', 'finalTurn',
   'totalAgentDecisions', 'acceptedActionCount', 'invalidAttemptCount', 'initialPopulation',
   'finalHealthyCivilianPopulation', 'maxPopulation', 'civilianLosses', 'infectionLosses',
-  'resourceShortageLosses', 'refugeesAccepted', 'maxOvercrowding', 'maxOvercrowdingAdditionalFood',
+  'resourceShortageLosses', 'refugeesAccepted', 'totalRefugeeArrivals', 'unmanagedPassThrough',
+  'refugeesDeparted', 'refugeesScreened.passThrough', 'refugeesScreened.normal', 'refugeesScreened.strict',
+  'checkpointsBuilt', 'checkpointsRelocated', 'checkpointRetreats', 'checkpointsRuined', 'checkpointsRecovered',
+  'checkpointsAbandoned', 'checkpointsRemoved', 'unmanagedBranchTurns', 'maxSuppliedFacilities',
+  'maxSupplyRadius', 'supplyLosses', 'supplyRejections',
+  'arrivals.north', 'arrivals.east', 'arrivals.south', 'arrivals.west',
+  'maxOvercrowding', 'maxOvercrowdingAdditionalFood',
   'maxOvercrowdingAdditionalCivilianGoods', 'facilitiesCaptured', 'facilitiesLost',
   'finalSecuredFacilities', 'policeProduced', 'nationalGuardProduced', 'unitLosses', 'zombiesKilled',
   'hordeInterceptions', 'finalFood', 'finalCivilianGoods', 'finalMilitaryGoods', 'finalFuel',
@@ -337,10 +348,18 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
   const rows = [CSV_COLUMNS.join(',')];
   for (const game of games) {
     const values: unknown[] = [
-      game.agentId, game.agentVersion, game.strategy, game.seed, game.outcome, game.gameOverReason, game.finalTurn,
+      game.appVersion, game.gameRulesVersion, game.agentApiVersion, game.observationApiVersion, game.bridgeApiVersion,
+      game.buildId, game.mapId, game.agentId, game.agentVersion, game.strategy, game.seed, game.outcome, game.gameOverReason, game.finalTurn,
       game.totalAgentDecisions, game.acceptedActionCount, game.invalidAttemptCount, game.initialPopulation,
       game.finalHealthyCivilianPopulation, game.maxPopulation, game.civilianLosses, game.infectionLosses,
-      game.resourceShortageLosses, game.refugeesAccepted, game.maxOvercrowding, game.maxOvercrowdingAdditionalFood,
+      game.resourceShortageLosses, game.refugeesAccepted, game.totalRefugeeArrivals, game.unmanagedPassThrough,
+      game.refugeesDeparted, game.refugeesScreenedByPolicy.passThrough ?? 0, game.refugeesScreenedByPolicy.normal ?? 0,
+      game.refugeesScreenedByPolicy.strict ?? 0, game.checkpointsBuilt, game.checkpointsRelocated, game.checkpointRetreats,
+      game.checkpointsRuined, game.checkpointsRecovered, game.checkpointsAbandoned, game.checkpointsRemoved,
+      game.unmanagedBranchTurns, game.maxSuppliedFacilities, game.maxSupplyRadius, game.supplyLosses, game.supplyRejections,
+      game.refugeeArrivalsByBranch.north ?? 0, game.refugeeArrivalsByBranch.east ?? 0,
+      game.refugeeArrivalsByBranch.south ?? 0, game.refugeeArrivalsByBranch.west ?? 0,
+      game.maxOvercrowding, game.maxOvercrowdingAdditionalFood,
       game.maxOvercrowdingAdditionalCivilianGoods, game.facilitiesCaptured, game.facilitiesLost,
       game.finalSecuredFacilities, game.policeProduced, game.nationalGuardProduced, game.unitLosses,
       game.zombiesKilled, game.hordeInterceptions, game.finalFood, game.finalCivilianGoods,
@@ -398,12 +417,12 @@ export function writeSimulationOutput(
   const artifactPaths: string[] = [];
   const fullRuns = report._runs;
   for (const [index, run] of report.games.entries()) {
-    // The report contains Metrics while artifact details live on the matching
-    // run in this process. The public writer accepts a report-only object too;
-    // in that case a compact Metrics artifact is still valid JSON.
+    if (!fullRuns?.[index]?.artifact) {
+      throw new Error('Full replay/failure artifacts are required; pass the report returned by runSimulation');
+    }
     const path = join(artifactDirectory, artifactFileName(index, run));
     if (!options.overwrite && existsSync(path)) throw new Error(`Refusing to overwrite existing artifact: ${path}`);
-    const artifact = fullRuns?.[index]?.artifact ?? run;
+    const artifact = fullRuns[index]!.artifact;
     writeFileSync(path, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
     artifactPaths.push(path);
   }

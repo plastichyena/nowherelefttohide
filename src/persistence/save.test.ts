@@ -7,6 +7,8 @@ import {
   AutoSaveStore,
   CURRENT_GAME_VERSION,
   DEFAULT_AUTOSAVE_KEY,
+  LEGACY_AUTOSAVE_KEY,
+  SAVE_FORMAT_VERSION,
   decodeSaveCode,
   encodeSaveCode,
   exportSaveJson,
@@ -62,6 +64,15 @@ describe('save format', () => {
     const validEnvelope = JSON.parse(exportSaveJson(initialState())) as { state: GameState };
     validEnvelope.state.facilities[0]!.workers = validEnvelope.state.facilities[0]!.workerCapacity + 1;
     expect(importSaveJson(JSON.stringify(validEnvelope)).valid).toBe(false);
+  });
+
+  it('rejects pre-v1.2.5 format data without applying it', () => {
+    const envelope = JSON.parse(exportSaveJson(initialState())) as Record<string, unknown>;
+    envelope.formatVersion = SAVE_FORMAT_VERSION - 1;
+    const result = importSaveJson(JSON.stringify(envelope));
+    expect(result.valid).toBe(false);
+    expect(result.state).toBeNull();
+    expect(result.errors.join(' ')).toMatch(/incompatible|format version/i);
   });
 
   it('rejects v1.0 JSON and save codes with an explicit old-version message', () => {
@@ -154,6 +165,29 @@ describe('save format', () => {
     });
   });
 
+  it('round-trips an operational checkpoint together with its remnant', () => {
+    const engine = new GameEngine(125, createDefaultConfig({
+      economy: { initialZombieCount: 0 },
+    }));
+    const build = engine.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
+    expect(build).toBeDefined();
+    expect(engine.step(build!).error).toBeNull();
+    expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+    const occupied = engine.getState() as GameState;
+    occupied.checkpoints[0]!.waiting = 3;
+    occupied.population.waitingRefugees = 3;
+    occupied.population.cumulativeArrivals += 3;
+    expect(engine.step({ type: 'LoadSnapshot', snapshot: occupied }).error).toBeNull();
+    const relocate = engine.getLegalActions().find((action) => action.type === 'RelocateCheckpoint');
+    expect(relocate).toBeDefined();
+    expect(engine.step(relocate!).error).toBeNull();
+    expect(engine.getState().checkpoints.map((checkpoint) => checkpoint.status).sort()).toEqual(['operational', 'remnant']);
+    expect(importSaveJson(exportSaveJson(engine.getState()))).toMatchObject({
+      valid: true,
+      state: engine.getState(),
+    });
+  });
+
   it('uses local storage for autosave and reports storage failures', () => {
     const storage = new MemoryStorage();
     const store = new AutoSaveStore({ storage });
@@ -169,6 +203,13 @@ describe('save format', () => {
     expect(oldLoad.state).toBeNull();
     expect(oldLoad.errors.join(' ')).toMatch(/旧バージョン|old version/i);
     expect(storage.getItem(DEFAULT_AUTOSAVE_KEY)).toBe(oldCode);
+
+    storage.setItem(LEGACY_AUTOSAVE_KEY, oldCode);
+    const legacyStore = new AutoSaveStore({ storage });
+    expect(legacyStore.load().valid).toBe(false);
+    expect(storage.getItem(LEGACY_AUTOSAVE_KEY)).toBe(oldCode);
+    expect(legacyStore.save(initialState(11)).ok).toBe(true);
+    expect(storage.getItem(LEGACY_AUTOSAVE_KEY)).toBe(oldCode);
 
     const messages: string[] = [];
     const unavailable = new AutoSaveStore({ storage: null, onError: (message) => messages.push(message) });

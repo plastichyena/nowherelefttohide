@@ -25,6 +25,10 @@
       <h1>Nowhere Left to Hide — Agent API</h1>
       <p class="note">The game page exposes <code>window.NLTH</code> for a browser JavaScript agent. This is an in-memory developer bridge, not an HTTP API.</p>
 
+      <h2>v1.2.5 contract</h2>
+      <p><code>App/Release 1.2.5</code> uses <code>Game Rules / GameState / Config 1.2.0</code>, <code>Save Format 2</code>, and <code>Agent / Observation / Bridge 1.1.0</code>. Observations include independent road branches and arrival schedules, checkpoint status and pools, supplied tiles, sector/radius information, and action availability. Future random draws are never exposed.</p>
+      <p>Legal actions may include <code>BuildCheckpoint</code> and <code>RelocateCheckpoint</code>. A branch without a checkpoint processes arrivals as unmanaged pass-through; operational checkpoints extend supply, while remnant, ruined, and abandoned sites do not. v1.2 or earlier saves, JSON, replays, and artifacts are rejected without conversion or overwrite.</p>
+
       <h2>Available methods</h2>
       <p><code>getApiInfo()</code>, <code>reset(options?)</code>, <code>getObservation()</code>, <code>getLegalActions()</code>, <code>step(action)</code>, <code>isGameOver()</code>, <code>getResult()</code>, and <code>getRunArtifact()</code>.</p>
       <p>Call <code>getApiInfo()</code> for machine-readable versions, schemas, the recommended order, and the complete minimal example. Every returned value is a JSON-compatible copy. The bridge never reads or writes <code>localStorage</code>, save codes, or the normal UI session.</p>

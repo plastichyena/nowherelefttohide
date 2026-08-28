@@ -12,6 +12,19 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBe(1);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
+    expect(run.metrics.bridgeApiVersion).toBe('1.1.0');
+    expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
+    expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
+    expect(run.metrics.maxSupplyRadius).toBeGreaterThan(0);
+  });
+
+  it('keeps branch, policy, checkpoint, and supply metrics in the public result', () => {
+    const config = createDefaultConfig({ maxTurns: 1, maxActionsPerTurn: 1 });
+    const run = runAgentGame(4, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 3 } });
+    expect(Object.keys(run.metrics.refugeesScreenedByPolicy).sort()).toEqual(['normal', 'passThrough', 'strict']);
+    expect(run.metrics.checkpointsBuilt).toBeGreaterThanOrEqual(0);
+    expect(run.metrics.checkpointsRelocated).toBeGreaterThanOrEqual(0);
+    expect(run.metrics.supplyRejections).toBeGreaterThanOrEqual(0);
   });
 
   it('aggregates averages, percentiles, outcomes, and action totals', () => {
@@ -38,4 +51,3 @@ describe('Agent Metrics', () => {
     expect(run.metrics.gameOverReason).toBeNull();
   });
 });
-
