@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
 import { GameEngine } from '../core/engine';
+import type { GameState } from '../core/types';
 import {
   actionForPopulationTransfer,
   actionForWorkerAssignment,
@@ -45,7 +46,7 @@ describe('UI action projection', () => {
     const engine = new GameEngine(3, createDefaultConfig());
     const state = engine.getState();
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
-    expect(workerAssignmentBounds(state, farm)).toEqual({ minimum: 0, maximum: 25, current: 23 });
+    expect(workerAssignmentBounds(state, farm)).toEqual({ minimum: 0, maximum: 30, current: 23 });
   });
 
   it('projects location-based population totals without legacy pools', () => {

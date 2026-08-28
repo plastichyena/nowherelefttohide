@@ -10,7 +10,8 @@ vi.mock('phaser', () => ({
 }));
 
 import type { FacilityState, GameState, UnitState } from '../core/types';
-import { loadValidationError, localizeActionError, phaseIndicatorViewModel, resolveTileSelection } from './controller';
+import { loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, resolveTileSelection, shouldAutosaveAfterLoad } from './controller';
+import { createTranslator } from './i18n';
 
 function testState(units: Partial<UnitState>[], facilities: Partial<FacilityState>[] = []): GameState {
   return { units, facilities } as unknown as GameState;
@@ -69,6 +70,18 @@ describe('controller view models', () => {
     expect(resolveTileSelection(state, { q: 2, r: 3 }, 'map')).toEqual({ kind: 'facility', id: 'farm-1' });
   });
 
+  it('does not autosave a migrated snapshot until a later accepted action', () => {
+    expect(shouldAutosaveAfterLoad(false)).toBe(true);
+    expect(shouldAutosaveAfterLoad(true)).toBe(false);
+  });
+
+  it('reports v1.2.5 migration rejection in both UI languages', () => {
+    const detail = 'checksum mismatch in v1.2.5 save';
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('移行できません');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('could not be migrated');
+    expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
+  });
+
   it('selects a checkpoint so its three population pools are inspectable', () => {
     const state = testState([], [],);
     state.checkpoints = [{ id: 'checkpoint-north-1', position: { q: 7, r: 5 } }] as GameState['checkpoints'];
@@ -76,10 +89,23 @@ describe('controller view models', () => {
     expect(resolveTileSelection(state, { q: 7, r: 5 }, 'domestic')).toEqual({ kind: 'checkpoint', id: 'checkpoint-north-1' });
   });
 
-  it('localizes v1.2.5 supply and checkpoint action errors', () => {
+  it('localizes v1.2.6 supply and checkpoint action errors', () => {
     expect(localizeActionError('facility_out_of_supply', 'ja')).toContain('供給外');
     expect(localizeActionError('recruitment_out_of_supply', 'en')).toContain('outside the supply');
     expect(localizeActionError('checkpoint_supply_zombie_blocked', 'ja')).toContain('ゾンビ');
     expect(localizeActionError('checkpoint_branch_action_limit', 'en')).toContain('branch');
+    expect(localizeActionError('invalid_action_input', 'ja')).toContain('合法');
+    expect(localizeActionError('invalid_action_input', 'en')).toContain('legal action');
+  });
+
+  it('has bilingual v1.2.6 recovery, infection, range, production, and policy help', () => {
+    const keys = [
+      'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPolicy',
+      'recoveryTiming', 'effectiveRange', 'projectedSuppression', 'powerRequirement', 'policyTradeoff', 'migratedSaveNotice', 'migrationSaveError',
+    ];
+    for (const key of keys) {
+      expect(createTranslator('ja')(key)).not.toBe(key);
+      expect(createTranslator('en')(key)).not.toBe(key);
+    }
   });
 });

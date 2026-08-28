@@ -109,6 +109,22 @@ jobs:
           echo "package_name=${PACKAGE_NAME}" >> "${GITHUB_OUTPUT}"
           echo "package_root=${PACKAGE_ROOT}" >> "${GITHUB_OUTPUT}"
 
+      - name: Verify portable package contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="${{ steps.package.outputs.package_root }}"
+          test -f "${ROOT}/PLAY_WITH_AI.md"
+          test -f "${ROOT}/BUILD_INFO.txt"
+          test -f "${ROOT}/game/package.json"
+          test -f "${ROOT}/game/package-lock.json"
+          test -d "${ROOT}/game/node_modules"
+          test -f "${ROOT}/game/src/agent/game.ts"
+          test -x "${ROOT}/runtime/node/bin/node"
+          VERSION="$(node -p "require('${ROOT}/game/package.json').version")"
+          grep -F "App version: ${VERSION}" "${ROOT}/BUILD_INFO.txt"
+          grep -F "Platform: linux-x64" "${ROOT}/BUILD_INFO.txt"
+
       - name: Smoke test bundled Node runtime
         shell: bash
         run: |

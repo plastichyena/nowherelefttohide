@@ -7,6 +7,7 @@ import {
   AutoSaveStore,
   CURRENT_GAME_VERSION,
   DEFAULT_AUTOSAVE_KEY,
+  LEGACY_GAME_VERSION,
   LEGACY_AUTOSAVE_KEY,
   SAVE_FORMAT_VERSION,
   decodeSaveCode,
@@ -21,9 +22,28 @@ function initialState(seed = 42): GameState {
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
+  readonly writes: string[] = [];
+  readonly removals: string[] = [];
   getItem(key: string): string | null { return this.values.get(key) ?? null; }
-  setItem(key: string, value: string): void { this.values.set(key, value); }
-  removeItem(key: string): void { this.values.delete(key); }
+  setItem(key: string, value: string): void { this.writes.push(key); this.values.set(key, value); }
+  removeItem(key: string): void { this.removals.push(key); this.values.delete(key); }
+}
+
+function legacyState(seed = 42): GameState {
+  const state = initialState(seed);
+  state.gameVersion = LEGACY_GAME_VERSION;
+  state.config.version = LEGACY_GAME_VERSION;
+  state.config.naturalRecovery = { rate: 0.1, rounding: 'ceil' } as unknown as GameState['config']['naturalRecovery'];
+  for (const type of ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant'] as const) {
+    state.config.facilities[type].workerCapacity -= 5;
+    state.map.facilities
+      .filter((facility) => facility.type === type)
+      .forEach((facility) => { facility.workerCapacity -= 5; });
+    state.facilities
+      .filter((facility) => facility.type === type)
+      .forEach((facility) => { facility.workerCapacity -= 5; });
+  }
+  return state;
 }
 
 describe('save format', () => {
@@ -44,6 +64,92 @@ describe('save format', () => {
     expect(state.population).toHaveProperty('cumulativeDiscoveredInfected');
     expect(state.cityPopulationSnapshot).toEqual(expect.objectContaining({ turn: state.turn, supply: expect.any(Array), reception: expect.any(Array) }));
     expect(state.facilities.every((facility) => Number.isSafeInteger(facility.populationOperationalTurn))).toBe(true);
+  });
+
+  it('migrates a v1.2.5 Save Code without changing gameplay data', () => {
+    const source = legacyState(43);
+    const farm = source.facilities.find((facility) => facility.id === 'farm-1')!;
+    farm.status = 'ruined';
+    farm.owner = 'none';
+    farm.operationalStatus = 'ruined';
+    farm.workers = 0;
+    farm.infected = 13;
+    source.population.cumulativeDeaths += 10;
+    synchronizePopulation(source);
+    const sourceBefore = JSON.stringify(source);
+    const legacyCode = encodeSaveCode(source);
+
+    const decoded = decodeSaveCode(legacyCode);
+    expect(decoded).toMatchObject({ valid: true, migrated: true });
+    expect(decoded.state?.gameVersion).toBe(CURRENT_GAME_VERSION);
+    expect(decoded.state?.config.version).toBe(CURRENT_GAME_VERSION);
+    expect(decoded.state?.config.naturalRecovery).toEqual({ combatRate: 0.1, restRate: 0.2, rounding: 'ceil' });
+    expect(decoded.state?.facilities.find((facility) => facility.id === 'farm-1')).toMatchObject({
+      workerCapacity: 30,
+      workers: 0,
+      infected: 13,
+      status: 'ruined',
+      owner: 'none',
+    });
+    expect(decoded.state?.map.facilities.find((facility) => facility.id === 'farm-1')?.workerCapacity).toBe(30);
+    expect(decoded.state?.population.cumulativeDeaths).toBe(source.population.cumulativeDeaths);
+    expect(JSON.stringify(source)).toBe(sourceBefore);
+
+    const jsonResult = importSaveJson(exportSaveJson(source));
+    expect(jsonResult).toMatchObject({ valid: true, migrated: true, state: decoded.state });
+  });
+
+  it('adds five to custom production capacities and doubles custom recovery up to one', () => {
+    const source = legacyState(44);
+    source.config.facilities.farm.workerCapacity = 40;
+    source.map.facilities.filter((facility) => facility.type === 'farm').forEach((facility) => { facility.workerCapacity = 40; });
+    source.facilities.filter((facility) => facility.type === 'farm').forEach((facility) => { facility.workerCapacity = 40; });
+    source.config.naturalRecovery = { rate: 0.6, rounding: 'floor' } as unknown as GameState['config']['naturalRecovery'];
+
+    const result = importSaveJson(exportSaveJson(source));
+    expect(result).toMatchObject({ valid: true, migrated: true });
+    expect(result.state?.config.facilities.farm.workerCapacity).toBe(45);
+    expect(result.state?.map.facilities.filter((facility) => facility.type === 'farm').every((facility) => facility.workerCapacity === 45)).toBe(true);
+    expect(result.state?.facilities.filter((facility) => facility.type === 'farm').every((facility) => facility.workerCapacity === 45)).toBe(true);
+    expect(result.state?.config.naturalRecovery).toEqual({ combatRate: 0.6, restRate: 1, rounding: 'floor' });
+  });
+
+  it('rejects legacy Map or GameState capacity mismatches before migration', () => {
+    for (const location of ['map', 'state'] as const) {
+      const source = legacyState(location === 'map' ? 46 : 47);
+      const facilities = location === 'map' ? source.map.facilities : source.facilities;
+      facilities.find((facility) => facility.type === 'farm')!.workerCapacity += 1;
+      const result = importSaveJson(exportSaveJson(source));
+      expect(result.valid).toBe(false);
+      expect(result.state).toBeNull();
+      expect(result.errors.join(' ')).toMatch(/workerCapacity.*match|capacity.*match/i);
+    }
+  });
+
+  it('rejects invalid legacy data before migration and preserves the source storage value', () => {
+    const source = legacyState(45);
+    const validCode = encodeSaveCode(source);
+    const envelope = JSON.parse(exportSaveJson(source)) as Record<string, unknown>;
+    envelope.checksum = '00000000';
+    const checksumFailure = importSaveJson(JSON.stringify(envelope));
+    expect(checksumFailure.valid).toBe(false);
+    expect(checksumFailure.state).toBeNull();
+    expect(checksumFailure.errors.join(' ')).toMatch(/checksum/i);
+
+    source.config.naturalRecovery = { rate: 2, rounding: 'ceil' } as unknown as GameState['config']['naturalRecovery'];
+    const invalidConfig = importSaveJson(exportSaveJson(source));
+    expect(invalidConfig.valid).toBe(false);
+    expect(invalidConfig.state).toBeNull();
+    expect(invalidConfig.errors.join(' ')).toMatch(/rate/i);
+
+    const storage = new MemoryStorage();
+    storage.setItem(DEFAULT_AUTOSAVE_KEY, validCode);
+    const writesBeforeLoad = storage.writes.length;
+    const loaded = new AutoSaveStore({ storage }).load();
+    expect(loaded).toMatchObject({ valid: true, migrated: true });
+    expect(storage.getItem(DEFAULT_AUTOSAVE_KEY)).toBe(validCode);
+    expect(storage.writes.length).toBe(writesBeforeLoad);
+    expect(storage.removals).toEqual([]);
   });
 
   it('rejects a tampered code before returning a snapshot', () => {

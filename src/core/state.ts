@@ -16,7 +16,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '1.2.0';
+export const GAME_VERSION = '1.2.1';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -286,7 +286,11 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   }
 
   const stateConfig = cloneConfig(config);
-  const map = createFixedMap();
+  const map = createFixedMap(
+    Object.fromEntries(
+      Object.entries(config.facilities).map(([type, facility]) => [type, facility.workerCapacity]),
+    ) as Record<keyof GameConfig['facilities'], number>,
+  );
   const rng = new SeededRng(seed);
   let securedOrder = 0;
   const facilities = map.facilities.map((definition) =>

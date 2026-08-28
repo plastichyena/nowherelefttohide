@@ -1,4 +1,4 @@
-import { hexDistance } from '../core/hex';
+import { hexDistance, hexKey } from '../core/hex';
 import type { FacilityType, GameAction, HexCoord } from '../core/types';
 import { actionKey, cloneAction, sortActions } from './action';
 import { BALANCED_AGENT_VERSION, type AgentCandidateScore, type AgentDecision, type AgentObservation, type AgentPriorityGoal, type GameAgent } from './types';
@@ -201,10 +201,11 @@ function scoreAction(
     if (attacker?.type === 'nationalGuard' && target && attacker.attack >= target.hp) {
       score += weights.safeGuardShot;
       reasonCodes.push('STATE_GUARD_CONTACT_DENIAL');
-      if (hexDistance(attacker.position, target.position) > target.range) {
+      if (hexDistance(attacker.position, target.position) > target.effectiveRange) {
         score += weights.safeGuardShot * 0.5;
         reasonCodes.push('SAFE_RANGE_ATTACK');
       }
+      if (attacker.rangeModifierReason === 'military_supply_shortage') reasonCodes.push('MILITARY_SUPPLY_RANGE_REDUCED');
     }
     if (attacker?.type === 'police' && !threat?.threatensCapital) {
       score -= weights.policePreservation;
@@ -214,7 +215,7 @@ function scoreAction(
       const targetWillDie = attacker.attack >= target.hp;
       const followUpThreats = observation.zombies.filter((zombie) =>
         (!targetWillDie || zombie.id !== target.id) &&
-        hexDistance(attacker.position, zombie.position) <= zombie.movement + zombie.range,
+        hexDistance(attacker.position, zombie.position) <= zombie.movement + zombie.effectiveRange,
       ).length;
       if (followUpThreats > 0) {
         const exposureWeight = attacker.type === 'police'
@@ -227,18 +228,6 @@ function scoreAction(
     if (attacker && attacker.hp / attacker.maxHp < BALANCED_THRESHOLDS.lowHpRatio && target && target.hp >= attacker.hp) {
       score -= 120;
       reasonCodes.push('AVOID_LOW_HP_RISK');
-    }
-  } else if (action.type === 'SuppressInfection') {
-    const facility = facilities.get(action.facilityId);
-    const unit = units.get(action.unitId);
-    score += weights.suppression + (facility?.infectedPopulation ?? 0) * 3;
-    reasonCodes.push('SUPPRESS_INFECTION');
-    if (unit?.type === 'police') {
-      score += 45;
-      reasonCodes.push('PREFER_POLICE_SUPPRESSION');
-    } else if (facility && facility.healthyPopulation <= 5) {
-      score -= 90;
-      reasonCodes.push('GUARD_CIVILIAN_DAMAGE');
     }
   } else if (action.type === 'AssignWorkers') {
     const facility = facilities.get(action.facilityId);
@@ -259,7 +248,8 @@ function scoreAction(
       } else if (facility.type === 'refinery') {
         targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation === 0 ? 5 : facility.healthyPopulation, facility.healthyPopulation + Math.ceil(observation.endTurnForecast.fuel.shortage / 4)));
       } else if (facility.type === 'powerPlant') {
-        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation, facility.healthyPopulation + Math.ceil(observation.endTurnForecast.electricity.shortage / 5)));
+        const generationPerWorker = Math.max(1, facility.production.powerGenerationPerWorker);
+        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation, facility.healthyPopulation + Math.ceil(observation.endTurnForecast.electricity.shortage / generationPerWorker)));
       } else if (facility.type === 'militaryFactory' && reserveDeficit > 0) {
         const immediateCivilianShortage = observation.endTurnForecast.food.shortage + observation.endTurnForecast.civilianGoods.shortage;
         if (immediateCivilianShortage === 0 || !observation.resources.militarySupplyAvailable) {
@@ -320,8 +310,14 @@ function scoreAction(
         reasonCodes.push('REDUCE_INPUT_DEMAND');
       }
       if (facility.type === 'powerPlant' && observation.endTurnForecast.electricity.shortage > 0 && delta > 0) {
-        score += 180;
+        const affectedFacilities = observation.facilities.filter((candidate) =>
+          candidate.owner === 'player' &&
+          candidate.healthyPopulation > 0 &&
+          candidate.production.requiresPower,
+        ).length;
+        score += 180 + affectedFacilities * 20;
         reasonCodes.push('RESTORE_POWER');
+        if (affectedFacilities > 0) reasonCodes.push('PREVENT_POWER_CASCADE');
       }
     }
   } else if (action.type === 'TransferPopulation') {
@@ -362,12 +358,12 @@ function scoreAction(
       const zombiePositions = observation.zombies.map((zombie) => zombie.position);
       const beforeZombie = nearestDistance(unit.position, zombiePositions);
       const afterZombie = nearestDistance(action.destination, zombiePositions);
-      const effectiveRange = unit.type === 'nationalGuard' && !observation.resources.militarySupplyAvailable ? 1 : unit.range;
+      const effectiveRange = unit.effectiveRange;
       const lethalShotsFromDestination = observation.zombies.filter((zombie) =>
         hexDistance(action.destination, zombie.position) <= effectiveRange && unit.attack >= zombie.hp,
       ).length;
       const zombiesReachingDestination = observation.zombies.filter((zombie) =>
-        hexDistance(action.destination, zombie.position) <= zombie.movement + zombie.range,
+        hexDistance(action.destination, zombie.position) <= zombie.movement + zombie.effectiveRange,
       ).length;
       const followUpExposure = Math.max(0, zombiesReachingDestination - Math.min(1, lethalShotsFromDestination));
       if (unit.type === 'nationalGuard' && urgentThreats.length > 0) {
@@ -381,7 +377,7 @@ function scoreAction(
           let denial = firingProgress * weights.contactDenial;
           if (after <= effectiveRange && unit.attack >= zombie.hp) {
             denial += threat.score + weights.safeGuardShot;
-            if (after > zombie.range) denial += weights.safeGuardShot;
+            if (after > zombie.effectiveRange) denial += weights.safeGuardShot;
           }
           bestDenial = Math.max(bestDenial, denial);
         }
@@ -435,7 +431,7 @@ function scoreAction(
             .map(({ facility }) => facility.position);
           const progress = nearestDistance(unit.position, defendedFacilities) - nearestDistance(action.destination, defendedFacilities);
           score += progress * weights.hordeDefense;
-          if (nearestDistance(action.destination, defendedFacilities) <= unit.range) score += weights.hordeDefense;
+          if (nearestDistance(action.destination, defendedFacilities) <= unit.effectiveRange) score += weights.hordeDefense;
           reasonCodes.push('DEFEND_FRONTLINE_FACILITY');
         } else {
           score -= weights.policePreservation * 0.5;
@@ -457,13 +453,38 @@ function scoreAction(
         score -= 2_000;
         reasonCodes.push('AVOID_LOW_HP_RISK');
       }
+      if (unit.hp < unit.maxHp && !unit.inSupply) {
+        const destinationSupplied = observation.supply.suppliedTileKeys.includes(hexKey(action.destination));
+        if (destinationSupplied) {
+          score += weights.recoveryWait * 8 * (1 - unit.hp / unit.maxHp);
+          reasonCodes.push('RETREAT_TO_SUPPLY_FOR_RECOVERY');
+        } else {
+          score -= weights.recoveryWait * 2;
+          reasonCodes.push('REMAIN_OUT_OF_SUPPLY');
+        }
+      }
     }
   } else if (action.type === 'Wait') {
     const unit = units.get(action.unitId);
-    if (unit && unit.hp < unit.maxHp && unit.recoveryAvailable) {
-      score += weights.recoveryWait * (1 - unit.hp / unit.maxHp);
-      reasonCodes.push('RECOVER_DAMAGED_UNIT_IN_SUPPLY');
-    } else if (unit && unit.hp < unit.maxHp && !unit.inSupply) {
+    if (unit?.suppressionAvailableIfTurnEndsNow) {
+      const facility = unit.suppressionTargetId ? facilities.get(unit.suppressionTargetId) : undefined;
+      score += weights.suppression + (facility?.infectedPopulation ?? 0) * 3;
+      reasonCodes.push('AUTOMATIC_SUPPRESSION_READY');
+      if (unit.type === 'police') {
+        score += 45;
+        reasonCodes.push('PREFER_POLICE_SUPPRESSION');
+      } else if (unit.suppressionCivilianDamage > 0) {
+        score -= unit.suppressionCivilianDamage * 30;
+        reasonCodes.push('AVOID_SUPPRESSION_CIVILIAN_DAMAGE');
+      }
+    }
+    if (unit && unit.hp < unit.maxHp && unit.recoveryClassIfTurnEndsNow === 'rest') {
+      score += weights.recoveryWait * unit.recoveryRateIfTurnEndsNow * 15 * (1 - unit.hp / unit.maxHp);
+      reasonCodes.push('REST_RECOVERY_20_PERCENT');
+    } else if (unit && unit.hp < unit.maxHp && unit.recoveryClassIfTurnEndsNow === 'combat') {
+      score += weights.recoveryWait * unit.recoveryRateIfTurnEndsNow * 2 * (1 - unit.hp / unit.maxHp);
+      reasonCodes.push('COMBAT_RECOVERY_10_PERCENT');
+    } else if (unit && unit.hp < unit.maxHp && unit.recoveryClassIfTurnEndsNow === 'outOfSupply') {
       score -= weights.recoveryWait;
       reasonCodes.push('RECOVERY_OUT_OF_SUPPLY');
     }
@@ -575,6 +596,15 @@ function scoreAction(
     if (action.policy === 'strict' && observation.population.healthyCivilians > 30) score += 55;
     if (action.policy === 'passThrough' && observation.population.healthyCivilians < 25) score += 50;
     if (action.policy === 'normal') score += 25;
+    if (observation.population.infected > 0) {
+      if (action.policy === 'strict') score += 110;
+      if (action.policy === 'passThrough') score -= 110;
+      reasonCodes.push('POLICY_REDUCE_INFECTION_RISK');
+    } else if (observation.population.healthyCivilians < 25) {
+      if (action.policy === 'passThrough') score += 75;
+      if (action.policy === 'strict') score -= 45;
+      reasonCodes.push('POLICY_GROW_POPULATION');
+    }
     if (checkpoint && checkpoint.currentPolicy === action.policy) score -= 100;
     if (branch?.activeCheckpointId === null) score -= 100;
     if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_POLICY_BEFORE_ARRIVAL');
@@ -621,7 +651,9 @@ export class BalancedAgent implements GameAgent {
       return unit?.type === 'nationalGuard' || threats.some((threat) => threat.contactNextTurn && threat.threatensCapital);
     });
     const canRespondToInfection = legalActions.some((action) => {
-      if (action.type === 'SuppressInfection') return true;
+      if (action.type === 'Wait') {
+        return observation.units.find((unit) => unit.id === action.unitId)?.suppressionAvailableIfTurnEndsNow === true;
+      }
       if (action.type !== 'Move') return false;
       return observation.units.find((unit) => unit.id === action.unitId)?.type === 'police';
     });

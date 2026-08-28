@@ -20,7 +20,7 @@ function engineWithoutZombies(): GameEngine {
   return engine;
 }
 
-describe('v1.2.5 road branches and supply network', () => {
+describe('road branches and supply network', () => {
   it('defines four capital-outward branches and supplies radius five without checkpoints', () => {
     const state = new GameEngine(1).getState();
     expect(state.map.roadBranches.map((branch) => branch.id).sort()).toEqual([

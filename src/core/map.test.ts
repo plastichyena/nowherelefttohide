@@ -26,6 +26,27 @@ describe('fixed map', () => {
     expect(FIXED_MAP.facilities.reduce((sum, facility) => sum + facility.startingWorkers, 0)).toBe(100);
   });
 
+  it('uses the v1.2.6 production capacities and accepts per-type overrides', () => {
+    const productionTypes = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant'] as const;
+    for (const type of productionTypes) {
+      expect(FIXED_MAP.facilities.filter((facility) => facility.type === type).every((facility) => facility.workerCapacity === 30)).toBe(true);
+    }
+    expect(FIXED_MAP.facilities.find((facility) => facility.type === 'city')?.workerCapacity).toBe(50);
+    expect(FIXED_MAP.facilities.find((facility) => facility.type === 'capital')?.workerCapacity).toBe(100);
+
+    const override = createFixedMap({
+      capital: 100,
+      city: 50,
+      farm: 42,
+      civilianFactory: 30,
+      militaryFactory: 30,
+      refinery: 30,
+      powerPlant: 30,
+    });
+    expect(override.facilities.filter((facility) => facility.type === 'farm').every((facility) => facility.workerCapacity === 42)).toBe(true);
+    expect(validateFixedMap(override)).toEqual({ valid: true, errors: [] });
+  });
+
   it('has a four-way road cross and one Horde entrance per cardinal direction', () => {
     expect(FIXED_MAP.roadTiles).toHaveLength(29);
     expect(FIXED_MAP.hordeEntrances.map((entrance) => entrance.direction).sort()).toEqual([

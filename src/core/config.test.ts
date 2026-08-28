@@ -8,7 +8,7 @@ import {
 describe('GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('1.2.0');
+    expect(DEFAULT_CONFIG.version).toBe('1.2.1');
     expect(DEFAULT_CONFIG.maxTurns).toBe(30);
     expect(DEFAULT_CONFIG.horde).toMatchObject({ cycle: 5, initialCount: 2, increment: 2 });
     expect(DEFAULT_CONFIG.refugees).toMatchObject({
@@ -25,6 +25,14 @@ describe('GameConfig', () => {
     });
     expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, attack: 5, movement: 5, range: 1, population: 5 });
     expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, attack: 10, movement: 5, range: 2, population: 10 });
+    expect(DEFAULT_CONFIG.naturalRecovery).toEqual({ combatRate: 0.1, restRate: 0.2, rounding: 'ceil' });
+    expect(DEFAULT_CONFIG.facilities).toMatchObject({
+      farm: { workerCapacity: 30 },
+      civilianFactory: { workerCapacity: 30 },
+      militaryFactory: { workerCapacity: 30 },
+      refinery: { workerCapacity: 30 },
+      powerPlant: { workerCapacity: 30 },
+    });
     expect(DEFAULT_CONFIG.economy.initialWorkersByFacility).toMatchObject({
       capital: 41,
       'farm-1': 23,
@@ -68,7 +76,7 @@ describe('GameConfig', () => {
   it('validates initial disconnected population ranges against their facility capacity', () => {
     const config = createDefaultConfig({
       initialFacilityPopulation: {
-        'farm-2': { survivorRange: { min: 20, max: 25 }, infected: 1 },
+        'farm-2': { survivorRange: { min: 20, max: 30 }, infected: 1 },
       },
     });
     const result = validateGameConfig(config);

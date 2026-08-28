@@ -16,20 +16,22 @@ import type {
   HumanUnitType,
   JsonObject,
   ResourceState,
+  ResourceType,
   UnitActionState,
   UnitType,
 } from '../core/types';
+import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.2.5';
-export const GAME_RULES_VERSION = '1.2.0';
+export const APP_VERSION = '1.2.6';
+export const GAME_RULES_VERSION = '1.2.1';
 export const SAVE_FORMAT_VERSION = '2';
-export const AGENT_API_VERSION = '1.1.0';
-export const OBSERVATION_API_VERSION = '1.1.0';
-export const BRIDGE_API_VERSION = '1.1.0';
-export const BALANCED_AGENT_VERSION = '2.1.0';
+export const AGENT_API_VERSION = '1.2.0';
+export const OBSERVATION_API_VERSION = '1.2.0';
+export const BRIDGE_API_VERSION = '1.2.0';
+export const BALANCED_AGENT_VERSION = '2.2.0';
 export const RANDOM_AGENT_VERSION = '1.1.0';
-export const ARTIFACT_SCHEMA_VERSION = '1.1.0';
+export const ARTIFACT_SCHEMA_VERSION = '1.2.0';
 
 export interface AgentMapTileObservation {
   q: number;
@@ -86,6 +88,24 @@ export interface AgentFacilityObservation {
   populationDecreaseAvailable: boolean;
   recruitmentAvailable: boolean;
   recruitmentUnavailableReason: string | null;
+  production: {
+    inputsPerWorker: Partial<Record<ResourceType, number>>;
+    outputsPerWorker: Partial<Record<ResourceType, number>>;
+    requiresPower: boolean;
+    requiredPowerCapacity: number;
+    powerGenerationPerWorker: number;
+    estimatedInputConsumption: Partial<Record<ResourceType, number>>;
+    estimatedOutput: Partial<Record<ResourceType, number>>;
+    estimatedPowerGeneration: number;
+    stoppedReason: string | null;
+    projectedInputLossIfInfectedOrOverrun: Partial<Record<ResourceType, number>>;
+    projectedOutputLossIfInfectedOrOverrun: Partial<Record<ResourceType, number>>;
+    projectedPowerLossIfInfectedOrOverrun: number;
+  };
+  infectionContained: boolean;
+  containingUnitId: string | null;
+  projectedSuppression: number;
+  projectedCivilianDamage: number;
 }
 
 export interface AgentUnitObservation {
@@ -96,14 +116,29 @@ export interface AgentUnitObservation {
   maxHp: number;
   attack: number;
   movement: number;
+  /** Deprecated base range alias retained for simple v1.1 consumers. */
   range: number;
+  baseRange: number;
+  effectiveRange: number;
+  rangeModifierReason: 'military_supply_shortage' | null;
   population: number;
   actionState: UnitActionState;
   canAttack: boolean;
   canMove: boolean;
   inSupply: boolean;
-  recoveryAvailable: boolean;
-  recoveryUnavailableReason: string | null;
+  recoveryClassIfTurnEndsNow: UnitRecoveryClass | null;
+  recoveryRateIfTurnEndsNow: number;
+  recoveryBaseAmountIfTurnEndsNow: number;
+  recoveryTiming: 'nextPlayerTurnStart' | null;
+  recoveryConditions: {
+    requiresSurvival: boolean;
+    requiresSupplyAtRecovery: boolean;
+  };
+  infectionContainmentCapable: boolean;
+  suppressionPower: number;
+  suppressionCivilianDamage: number;
+  suppressionAvailableIfTurnEndsNow: boolean;
+  suppressionTargetId: string | null;
 }
 
 export interface AgentCheckpointObservation {
@@ -120,6 +155,60 @@ export interface AgentCheckpointObservation {
   currentPolicy: CheckpointPolicy;
   nextPolicy: CheckpointPolicy;
   nextArrivalTurn: number | null;
+  providesSupply: boolean;
+  infectionContained: boolean;
+  containingUnitId: string | null;
+  projectedSuppression: number;
+  projectedCivilianDamage: number;
+}
+
+export interface AgentApiInfo {
+  appVersion: string;
+  gameRulesVersion: string;
+  saveFormatVersion: string;
+  artifactSchemaVersion: string;
+  agentApiVersion: string;
+  observationApiVersion: string;
+  bridgeApiVersion: string;
+  buildId: string;
+  methods: string[];
+  methodSchemas: Record<string, { arguments: string; returns: string; description: string }>;
+  recommendedCallOrder: string[];
+  publicInformation: string[];
+  prohibited: string[];
+  rules: {
+    recovery: {
+      combatRate: number;
+      restRate: number;
+      rounding: 'ceil' | 'floor';
+      timing: 'nextPlayerTurnStart';
+      supplyRequiredAtRecovery: true;
+      combatActivities: string[];
+      restActivities: string[];
+    };
+    infection: {
+      stationedUnitsContainSpread: true;
+      automaticSuppressionTiming: 'infectionPhaseAfterEndTurn';
+      policeSuppression: number;
+      nationalGuardSuppression: number;
+      nationalGuardCivilianDamageFormula: string;
+    };
+    ranges: Record<'police' | 'nationalGuard' | 'zombie', { baseRange: number }> & {
+      nationalGuardMilitarySupplyShortageRange: number;
+    };
+    checkpointPolicies: Record<CheckpointPolicy, {
+      turns: number;
+      acceptanceRate: number;
+      infectionBatchRate: number;
+      infectedPopulationRate: number;
+    }>;
+    production: {
+      workerCapacityByFacilityType: Record<FacilityType, number>;
+      powerPlantsGenerateCapacityPerWorker: number;
+      poweredFacilitiesConsumeFixedCapacityWhenOperating: true;
+    };
+  };
+  minimalExample: string;
 }
 
 export interface AgentGameResult {
@@ -289,6 +378,7 @@ export interface AgentRunArtifact {
 }
 
 export interface AgentGame {
+  getApiInfo(): AgentApiInfo;
   reset(options?: AgentResetOptions): AgentObservation;
   getObservation(): AgentObservation;
   getLegalActions(): GameAction[];

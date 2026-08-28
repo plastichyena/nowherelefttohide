@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -25,9 +25,18 @@
       <h1>Nowhere Left to Hide — Agent API</h1>
       <p class="note">The game page exposes <code>window.NLTH</code> for a browser JavaScript agent. This is an in-memory developer bridge, not an HTTP API.</p>
 
-      <h2>v1.2.5 contract</h2>
-      <p><code>App/Release 1.2.5</code> uses <code>Game Rules / GameState / Config 1.2.0</code>, <code>Save Format 2</code>, and <code>Agent / Observation / Bridge 1.1.0</code>. Observations include independent road branches and arrival schedules, checkpoint status and pools, supplied tiles, sector/radius information, and action availability. Future random draws are never exposed.</p>
-      <p>Legal actions may include <code>BuildCheckpoint</code> and <code>RelocateCheckpoint</code>. A branch without a checkpoint processes arrivals as unmanaged pass-through; operational checkpoints extend supply, while remnant, ruined, and abandoned sites do not. v1.2 or earlier saves, JSON, replays, and artifacts are rejected without conversion or overwrite.</p>
+      <h2>v1.2.6 contract</h2>
+      <p><code>App/Release 1.2.6</code> uses <code>Game Rules / GameState / Config 1.2.1</code>, <code>Save Format 2</code>, and <code>Agent / Observation / Bridge 1.2.0</code>. Observations include independent road branches and arrival schedules, checkpoint status and pools, supplied tiles, sector/radius information, action availability, and current recovery, suppression, production, and power forecasts. Future random draws are never exposed.</p>
+      <p>Legal actions may include <code>BuildCheckpoint</code> and <code>RelocateCheckpoint</code>. Infection suppression is an engine-owned End Turn consequence; <code>SuppressInfection</code> is not a public action and is rejected by the bridge. A branch without a checkpoint processes arrivals as unmanaged pass-through; operational checkpoints extend supply, while remnant, ruined, and abandoned sites do not. v1.2.5 saves are migrated in memory only; older saves, JSON, replays, and artifacts are rejected without conversion or overwrite.</p>
+
+      <h2>v1.2.6 rules visible to agents</h2>
+      <ul>
+        <li>At the next player-turn start, supplied surviving units recover 10% of max HP after attack, counterattack, interception, or suppression, and 20% after only moving, waiting, or taking no action. Out-of-supply units recover 0%; configured rounding is applied.</li>
+        <li>A human unit stationed at an infected location contains internal spread. With an unused attack, the engine may automatically suppress at the infection phase after End Turn. Police suppress without civilian damage; National Guard suppresses more but has civilian damage.</li>
+        <li>Unit observations expose <code>baseRange</code>, <code>effectiveRange</code>, and a shortage reason. National Guard range is 2 normally and 1 when military supply is short.</li>
+        <li>Facility observations expose worker capacity (30 for production facilities), input/output estimates, power requirements or generation, stop reasons, and projected infection/overrun losses. Checkpoint observations expose containment and suppression forecasts.</li>
+        <li>Checkpoint policy details describe screening time, acceptance, infection chance, and infected share. Strict is a trade-off, not an unconditional best choice.</li>
+      </ul>
 
       <h2>Available methods</h2>
       <p><code>getApiInfo()</code>, <code>reset(options?)</code>, <code>getObservation()</code>, <code>getLegalActions()</code>, <code>step(action)</code>, <code>isGameOver()</code>, <code>getResult()</code>, and <code>getRunArtifact()</code>.</p>
@@ -35,6 +44,8 @@
 
       <h2>Minimal browser example</h2>
       <pre><code>const api = window.NLTH;
+const info = api.getApiInfo();
+console.log(info.appVersion, info.rules);
 api.reset({ seed: 1, agent: { id: 'browser-agent' } });
 while (!api.isGameOver()) {
   const legal = api.getLegalActions();

@@ -53,21 +53,30 @@ describe('Balanced Agent scenario intentions', () => {
       (value) => { value.endTurnForecast.electricity.shortage = 5; },
     );
     expect(result.trace?.reasonCodes).toContain('RESTORE_POWER');
+    expect(result.trace?.reasonCodes).toContain('PREVENT_POWER_CASCADE');
   });
 
-  it('prefers Police infection suppression over National Guard civilian damage', () => {
+  it('prefers Police automatic suppression over National Guard civilian damage', () => {
     const facility = observation.facilities[0]!;
     const police = observation.units.find((unit) => unit.type === 'police')!;
     const guard = observation.units.find((unit) => unit.type === 'nationalGuard')!;
     const result = decide([
-      { type: 'SuppressInfection', unitId: guard.id, facilityId: facility.id },
-      { type: 'SuppressInfection', unitId: police.id, facilityId: facility.id },
+      { type: 'Wait', unitId: guard.id },
+      { type: 'Wait', unitId: police.id },
       { type: 'EndTurn' },
     ], (value) => {
       value.population.infected = 5;
       value.facilities[0]!.infectedPopulation = 5;
+      for (const unit of value.units) {
+        unit.suppressionAvailableIfTurnEndsNow = true;
+        unit.suppressionTargetId = facility.id;
+        unit.suppressionCivilianDamage = unit.type === 'nationalGuard' ? 5 : 0;
+        unit.recoveryClassIfTurnEndsNow = 'combat';
+        unit.recoveryRateIfTurnEndsNow = 0.1;
+      }
     });
-    expect(result.action).toMatchObject({ type: 'SuppressInfection', unitId: police.id });
+    expect(result.action).toMatchObject({ type: 'Wait', unitId: police.id });
+    expect(result.trace?.reasonCodes).toContain('PREFER_POLICE_SUPPRESSION');
   });
 
   it('positions National Guard at a frontline facility when Horde arrival is imminent', () => {
@@ -173,6 +182,11 @@ describe('Balanced Agent scenario intentions', () => {
       currentPolicy: 'normal' as const,
       nextPolicy: 'normal' as const,
       nextArrivalTurn: branch.nextArrivalTurn,
+      providesSupply: true,
+      infectionContained: false,
+      containingUnitId: null,
+      projectedSuppression: 0,
+      projectedCivilianDamage: 0,
     };
     const relocate = decide([
       { type: 'RelocateCheckpoint', checkpointId: checkpoint.id, branchId: branch.branchId, position: { ...branch.roadTiles[1]! } },
@@ -203,9 +217,96 @@ describe('Balanced Agent scenario intentions', () => {
       const target = value.units.find((candidate) => candidate.id === unit.id)!;
       target.hp = Math.max(1, target.maxHp - 1);
       target.inSupply = false;
-      target.recoveryAvailable = false;
+      target.recoveryClassIfTurnEndsNow = 'outOfSupply';
+      target.recoveryRateIfTurnEndsNow = 0;
+      target.recoveryBaseAmountIfTurnEndsNow = 0;
     });
     expect(wait.action.type).toBe('EndTurn');
+  });
+
+  it('retreats a damaged out-of-supply unit into the public supply network', () => {
+    const unit = observation.units.find((candidate) => candidate.type === 'police')!;
+    const suppliedKey = observation.supply.suppliedTileKeys[0]!;
+    const [q, r] = suppliedKey.split(',').map(Number);
+    const supplied = { q: q!, r: r! };
+    const exposed = { q: 0, r: 0 };
+    const result = decide([
+      { type: 'Move', unitId: unit.id, destination: supplied },
+      { type: 'Move', unitId: unit.id, destination: exposed },
+      { type: 'EndTurn' },
+    ], (value) => {
+      value.zombies = [];
+      value.population.infected = 0;
+      const target = value.units.find((candidate) => candidate.id === unit.id)!;
+      target.hp = Math.floor(target.maxHp / 2);
+      target.inSupply = false;
+      target.recoveryClassIfTurnEndsNow = 'outOfSupply';
+      target.recoveryRateIfTurnEndsNow = 0;
+    });
+    expect(result.action).toEqual({ type: 'Move', unitId: unit.id, destination: supplied });
+    expect(result.trace?.reasonCodes).toContain('RETREAT_TO_SUPPLY_FOR_RECOVERY');
+  });
+
+  it('uses rest recovery for a safely damaged unit', () => {
+    const unit = observation.units.find((candidate) => candidate.type === 'nationalGuard')!;
+    const result = decide([{ type: 'Wait', unitId: unit.id }, { type: 'EndTurn' }], (value) => {
+      value.zombies = [];
+      value.population.infected = 0;
+      const target = value.units.find((candidate) => candidate.id === unit.id)!;
+      target.hp = Math.floor(target.maxHp / 2);
+      target.recoveryClassIfTurnEndsNow = 'rest';
+      target.recoveryRateIfTurnEndsNow = 0.2;
+      target.recoveryBaseAmountIfTurnEndsNow = 10;
+    });
+    expect(['Wait', 'EndTurn']).toContain(result.action.type);
+    const waitCandidate = result.trace?.topCandidates.find((candidate) => candidate.action.type === 'Wait');
+    expect(waitCandidate?.reasonCodes).toContain('REST_RECOVERY_20_PERCENT');
+  });
+
+  it('changes checkpoint policy intent between population need and infection crisis', () => {
+    const branch = observation.roadBranches[0]!;
+    const checkpoint = {
+      id: 'checkpoint-policy-test',
+      branchId: branch.branchId,
+      position: { ...branch.roadTiles[0]! },
+      direction: branch.direction,
+      status: 'operational' as const,
+      waiting: 5,
+      screening: 0,
+      approved: 0,
+      infected: 0,
+      remainingTurns: 0,
+      currentPolicy: 'normal' as const,
+      nextPolicy: 'normal' as const,
+      nextArrivalTurn: branch.nextArrivalTurn,
+      providesSupply: true,
+      infectionContained: false,
+      containingUnitId: null,
+      projectedSuppression: 0,
+      projectedCivilianDamage: 0,
+    };
+    const actions: GameAction[] = [
+      { type: 'SetCheckpointPolicy', checkpointId: checkpoint.id, policy: 'passThrough' },
+      { type: 'SetCheckpointPolicy', checkpointId: checkpoint.id, policy: 'strict' },
+      { type: 'EndTurn' },
+    ];
+    const population = decide(actions, (value) => {
+      value.checkpoints = [checkpoint];
+      value.roadBranches[0]!.activeCheckpointId = checkpoint.id;
+      value.population.healthyCivilians = 15;
+      value.population.infected = 0;
+    });
+    expect(population.action).toMatchObject({ type: 'SetCheckpointPolicy', policy: 'passThrough' });
+    expect(population.trace?.reasonCodes).toContain('POLICY_GROW_POPULATION');
+
+    const infection = decide(actions, (value) => {
+      value.checkpoints = [checkpoint];
+      value.roadBranches[0]!.activeCheckpointId = checkpoint.id;
+      value.population.healthyCivilians = 50;
+      value.population.infected = 5;
+    });
+    expect(infection.action).toMatchObject({ type: 'SetCheckpointPolicy', policy: 'strict' });
+    expect(infection.trace?.reasonCodes).toContain('POLICY_REDUCE_INFECTION_RISK');
   });
 
   it('chooses EndTurn when there is no useful action', () => {

@@ -324,11 +324,11 @@ describe('GameEngine', () => {
     expect(killed.state.units.find((unit) => unit.id === police.id)?.hp).toBe(25);
   });
 
-  it('uses Config natural-recovery rounding after an inactive turn', () => {
+  it('uses Config rest-recovery rounding after a non-combat turn', () => {
     const config = createDefaultConfig({
       maxTurns: 3,
       economy: { initialZombieCount: 0, initialResources: { food: 2000, civilianGoods: 2000, militaryGoods: 2000, fuel: 2000 } },
-      naturalRecovery: { rate: 0.1, rounding: 'floor' },
+      naturalRecovery: { combatRate: 0.1, restRate: 0.2, rounding: 'floor' },
     });
     const engine = new GameEngine(105, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
@@ -337,7 +337,7 @@ describe('GameEngine', () => {
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().units.find((unit) => unit.id === 'police-1')?.hp).toBe(12);
+    expect(engine.getState().units.find((unit) => unit.id === 'police-1')?.hp).toBe(15);
   });
 
   it('rejects both worker assignment directions at an infected facility', () => {
@@ -600,8 +600,8 @@ describe('GameEngine', () => {
     const engine = new GameEngine(202, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const before = engine.getState();
     const ledgerBefore = populationLedgerTotal(before as ReturnType<typeof createInitialState>);
-    expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-1', workers: 25 }).error).toBeNull();
-    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')?.workers).toBe(39);
+    expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-1', workers: 30 }).error).toBeNull();
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')?.workers).toBe(34);
     expect(engine.getState().population.healthyCivilians).toBe(before.population.healthyCivilians);
     expect(populationLedgerTotal(engine.getState() as ReturnType<typeof createInitialState>)).toBe(ledgerBefore);
     expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-1', workers: 20 }).error).toBeNull();

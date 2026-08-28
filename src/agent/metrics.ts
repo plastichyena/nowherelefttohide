@@ -1,4 +1,4 @@
-import type { CheckpointPolicy, GameAction, GameConfig } from '../core/types';
+import type { CheckpointPolicy, GameAction, GameConfig, HumanUnitType } from '../core/types';
 import {
   APP_VERSION,
   AGENT_API_VERSION,
@@ -16,7 +16,6 @@ export const ACTION_TYPES = [
   'Move',
   'Attack',
   'Wait',
-  'SuppressInfection',
   'AssignWorkers',
   'TransferPopulation',
   'SetCheckpointPolicy',
@@ -102,6 +101,39 @@ export interface GameMetrics {
   finalSecuredFacilities: number;
   policeProduced: number;
   nationalGuardProduced: number;
+  policeInitial: number;
+  nationalGuardInitial: number;
+  policeLosses: number;
+  nationalGuardLosses: number;
+  policeFinal: number;
+  nationalGuardFinal: number;
+  policeSurvivalRate: number;
+  nationalGuardSurvivalRate: number;
+  outOfSupplyUnitLosses: number;
+  policeCombatRecoveryHp: number;
+  policeCombatRecoveryCount: number;
+  policeRestRecoveryHp: number;
+  policeRestRecoveryCount: number;
+  nationalGuardCombatRecoveryHp: number;
+  nationalGuardCombatRecoveryCount: number;
+  nationalGuardRestRecoveryHp: number;
+  nationalGuardRestRecoveryCount: number;
+  combatRecoverySelections: number;
+  restRecoverySelections: number;
+  maxWorkersInSingleFacility: number;
+  maxTotalProductionWorkers: number;
+  highCapacityFacilityTurns: number;
+  powerPlantStoppedTurns: number;
+  powerShortageTurns: number;
+  checkpointPassThroughBranchTurns: number;
+  checkpointNormalBranchTurns: number;
+  checkpointStrictBranchTurns: number;
+  checkpointPassThroughBranchTurnRate: number;
+  checkpointNormalBranchTurnRate: number;
+  checkpointStrictBranchTurnRate: number;
+  checkpointPassThroughScreenedRate: number;
+  checkpointNormalScreenedRate: number;
+  checkpointStrictScreenedRate: number;
   unitLosses: number;
   zombiesKilled: number;
   hordeInterceptions: number;
@@ -284,12 +316,6 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const supplyRejections = statisticNumber(statistics, 'supplyRejections') ?? events.filter(
     (event) => event.type === 'supply_action_rejected',
   ).length + (input.invalidAttempts ?? []).filter((attempt) => /supply|out_of_supply/i.test(attempt.error.code)).length;
-  const actionProducedPolice = input.actions.filter(
-    (action) => action.type === 'ProduceUnit' && action.unitType === 'police',
-  ).length;
-  const actionProducedGuard = input.actions.filter(
-    (action) => action.type === 'ProduceUnit' && action.unitType === 'nationalGuard',
-  ).length;
   const destroyedZombieEvents = events.filter(
     (event) => event.type === 'unit_destroyed' && typeof event.payload.unitId === 'string' && event.payload.unitId.startsWith('zombie-'),
   ).length;
@@ -298,6 +324,78 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const maxAdditionalFood = Math.max(...observations.map((observation) => numberOrZero(observation.endTurnForecast.overcrowding.additionalFood)), 0);
   const maxAdditionalCivilianGoods = Math.max(...observations.map((observation) => numberOrZero(observation.endTurnForecast.overcrowding.additionalCivilianGoods)), 0);
   const maxPopulation = Math.max(numberOrZero(statistics?.maxPopulation), maxPopulationObservation);
+  const turnObservations = [...new Map(observations.map((observation) => [observation.turn, observation])).values()]
+    .sort((left, right) => left.turn - right.turn);
+  const productionFacilities = observations.flatMap((observation) => observation.facilities.filter(
+    (facility) => facility.type !== 'capital' && facility.type !== 'city',
+  ));
+  const maxWorkersInSingleFacility = Math.max(...productionFacilities.map((facility) => facility.healthyPopulation), 0);
+  const maxTotalProductionWorkers = Math.max(...turnObservations.map((observation) => observation.facilities
+    .filter((facility) => facility.type !== 'capital' && facility.type !== 'city')
+    .reduce((total, facility) => total + facility.healthyPopulation, 0)), 0);
+  const highCapacityFacilityTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
+    (facility) => facility.type !== 'capital' && facility.type !== 'city' && facility.healthyPopulation >= 26 && facility.healthyPopulation <= 30,
+  ).length, 0);
+  const powerPlantStoppedTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
+    (facility) => facility.type === 'powerPlant' && facility.owner === 'player' && facility.healthyPopulation > 0 && facility.production.stoppedReason !== null,
+  ).length, 0);
+  const powerShortageTurns = turnObservations.filter((observation) => observation.endTurnForecast.electricity.shortage > 0).length;
+
+  const initialIds = new Set(input.initialObservation.units.map((unit) => unit.id));
+  const allUnits = new Map<string, HumanUnitType>();
+  for (const observation of observations) {
+    for (const unit of observation.units) {
+      if (unit.type === 'police' || unit.type === 'nationalGuard') allUnits.set(unit.id, unit.type);
+    }
+  }
+  const finalIds = new Set(finalObservation.units.map((unit) => unit.id));
+  const countUnits = (type: HumanUnitType, predicate: (id: string) => boolean): number =>
+    [...allUnits].filter(([id, unitType]) => unitType === type && predicate(id)).length;
+  const policeInitial = countUnits('police', (id) => initialIds.has(id));
+  const nationalGuardInitial = countUnits('nationalGuard', (id) => initialIds.has(id));
+  const policeProduced = countUnits('police', (id) => !initialIds.has(id));
+  const nationalGuardProduced = countUnits('nationalGuard', (id) => !initialIds.has(id));
+  const policeFinal = countUnits('police', (id) => finalIds.has(id));
+  const nationalGuardFinal = countUnits('nationalGuard', (id) => finalIds.has(id));
+  const policeLosses = countUnits('police', (id) => !finalIds.has(id));
+  const nationalGuardLosses = countUnits('nationalGuard', (id) => !finalIds.has(id));
+  const survivalRate = (finalCount: number, initialCount: number, producedCount: number): number => {
+    const denominator = initialCount + producedCount;
+    return denominator > 0 ? finalCount / denominator : 0;
+  };
+  const recovery = (unitType: HumanUnitType, recoveryClass: 'combat' | 'rest') => {
+    const matching = events.filter((event) =>
+      event.type === 'unit_recovered' &&
+      event.payload.unitType === unitType &&
+      event.payload.recoveryClass === recoveryClass,
+    );
+    return {
+      hp: matching.reduce((total, event) => total + eventPayloadNumber(event, 'actualAmount'), 0),
+      count: matching.length,
+    };
+  };
+  const policeCombatRecovery = recovery('police', 'combat');
+  const policeRestRecovery = recovery('police', 'rest');
+  const nationalGuardCombatRecovery = recovery('nationalGuard', 'combat');
+  const nationalGuardRestRecovery = recovery('nationalGuard', 'rest');
+  const combatRecoverySelections = turnObservations.reduce((total, observation) => total + observation.units.filter(
+    (unit) => unit.hp < unit.maxHp && unit.recoveryClassIfTurnEndsNow === 'combat',
+  ).length, 0);
+  const restRecoverySelections = turnObservations.reduce((total, observation) => total + observation.units.filter(
+    (unit) => unit.hp < unit.maxHp && unit.recoveryClassIfTurnEndsNow === 'rest',
+  ).length, 0);
+  const outOfSupplyUnitLosses = events.filter((event) =>
+    event.type === 'unit_destroyed' && event.payload.isPlayerUnit === true && event.payload.inSupply === false,
+  ).length;
+  const branchTurns: Record<CheckpointPolicy, number> = { passThrough: 0, normal: 0, strict: 0 };
+  for (const observation of turnObservations) {
+    for (const checkpoint of observation.checkpoints.filter((candidate) => candidate.status === 'operational')) {
+      branchTurns[checkpoint.currentPolicy] += 1;
+    }
+  }
+  const totalBranchTurns = Object.values(branchTurns).reduce((total, value) => total + value, 0);
+  const totalScreened = Object.values(refugeesScreenedByPolicy).reduce((total, value) => total + value, 0);
+  const rate = (value: number, denominator: number): number => denominator > 0 ? value / denominator : 0;
   const finalSecuredFacilities = finalObservation.facilities.filter(
     (facility) => facility.owner === 'player' && facility.status === 'owned',
   ).length;
@@ -357,8 +455,41 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     facilitiesCaptured: events.filter((event) => event.type === 'facility_captured').length,
     facilitiesLost: events.filter((event) => event.type === 'facility_overrun' && typeof event.payload.facilityId === 'string').length,
     finalSecuredFacilities,
-    policeProduced: actionProducedPolice,
-    nationalGuardProduced: actionProducedGuard,
+    policeProduced,
+    nationalGuardProduced,
+    policeInitial,
+    nationalGuardInitial,
+    policeLosses,
+    nationalGuardLosses,
+    policeFinal,
+    nationalGuardFinal,
+    policeSurvivalRate: survivalRate(policeFinal, policeInitial, policeProduced),
+    nationalGuardSurvivalRate: survivalRate(nationalGuardFinal, nationalGuardInitial, nationalGuardProduced),
+    outOfSupplyUnitLosses,
+    policeCombatRecoveryHp: policeCombatRecovery.hp,
+    policeCombatRecoveryCount: policeCombatRecovery.count,
+    policeRestRecoveryHp: policeRestRecovery.hp,
+    policeRestRecoveryCount: policeRestRecovery.count,
+    nationalGuardCombatRecoveryHp: nationalGuardCombatRecovery.hp,
+    nationalGuardCombatRecoveryCount: nationalGuardCombatRecovery.count,
+    nationalGuardRestRecoveryHp: nationalGuardRestRecovery.hp,
+    nationalGuardRestRecoveryCount: nationalGuardRestRecovery.count,
+    combatRecoverySelections,
+    restRecoverySelections,
+    maxWorkersInSingleFacility,
+    maxTotalProductionWorkers,
+    highCapacityFacilityTurns,
+    powerPlantStoppedTurns,
+    powerShortageTurns,
+    checkpointPassThroughBranchTurns: branchTurns.passThrough,
+    checkpointNormalBranchTurns: branchTurns.normal,
+    checkpointStrictBranchTurns: branchTurns.strict,
+    checkpointPassThroughBranchTurnRate: rate(branchTurns.passThrough, totalBranchTurns),
+    checkpointNormalBranchTurnRate: rate(branchTurns.normal, totalBranchTurns),
+    checkpointStrictBranchTurnRate: rate(branchTurns.strict, totalBranchTurns),
+    checkpointPassThroughScreenedRate: rate(refugeesScreenedByPolicy.passThrough, totalScreened),
+    checkpointNormalScreenedRate: rate(refugeesScreenedByPolicy.normal, totalScreened),
+    checkpointStrictScreenedRate: rate(refugeesScreenedByPolicy.strict, totalScreened),
     unitLosses: numberOrZero(statistics?.unitLosses),
     zombiesKilled: destroyedZombieEvents,
     hordeInterceptions: numberOrZero(statistics?.hordeInterceptions),
@@ -453,6 +584,39 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'finalSecuredFacilities',
   'policeProduced',
   'nationalGuardProduced',
+  'policeInitial',
+  'nationalGuardInitial',
+  'policeLosses',
+  'nationalGuardLosses',
+  'policeFinal',
+  'nationalGuardFinal',
+  'policeSurvivalRate',
+  'nationalGuardSurvivalRate',
+  'outOfSupplyUnitLosses',
+  'policeCombatRecoveryHp',
+  'policeCombatRecoveryCount',
+  'policeRestRecoveryHp',
+  'policeRestRecoveryCount',
+  'nationalGuardCombatRecoveryHp',
+  'nationalGuardCombatRecoveryCount',
+  'nationalGuardRestRecoveryHp',
+  'nationalGuardRestRecoveryCount',
+  'combatRecoverySelections',
+  'restRecoverySelections',
+  'maxWorkersInSingleFacility',
+  'maxTotalProductionWorkers',
+  'highCapacityFacilityTurns',
+  'powerPlantStoppedTurns',
+  'powerShortageTurns',
+  'checkpointPassThroughBranchTurns',
+  'checkpointNormalBranchTurns',
+  'checkpointStrictBranchTurns',
+  'checkpointPassThroughBranchTurnRate',
+  'checkpointNormalBranchTurnRate',
+  'checkpointStrictBranchTurnRate',
+  'checkpointPassThroughScreenedRate',
+  'checkpointNormalScreenedRate',
+  'checkpointStrictScreenedRate',
   'unitLosses',
   'zombiesKilled',
   'hordeInterceptions',

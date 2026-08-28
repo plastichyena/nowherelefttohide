@@ -57,7 +57,7 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '1.1.0';
+  schemaVersion: '1.2.0';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -286,7 +286,7 @@ export function runSimulation(options: SimulationRunOptions = {}): SimulationRep
     message: run.failure.message,
   }] : []);
   const report: SimulationReport = {
-    schemaVersion: '1.1.0',
+    schemaVersion: '1.2.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -330,6 +330,15 @@ const CSV_COLUMNS: readonly string[] = [
   'maxOvercrowding', 'maxOvercrowdingAdditionalFood',
   'maxOvercrowdingAdditionalCivilianGoods', 'facilitiesCaptured', 'facilitiesLost',
   'finalSecuredFacilities', 'policeProduced', 'nationalGuardProduced', 'unitLosses', 'zombiesKilled',
+  'policeInitial', 'nationalGuardInitial', 'policeLosses', 'nationalGuardLosses', 'policeFinal', 'nationalGuardFinal',
+  'policeSurvivalRate', 'nationalGuardSurvivalRate', 'outOfSupplyUnitLosses',
+  'policeCombatRecoveryHp', 'policeCombatRecoveryCount', 'policeRestRecoveryHp', 'policeRestRecoveryCount',
+  'nationalGuardCombatRecoveryHp', 'nationalGuardCombatRecoveryCount', 'nationalGuardRestRecoveryHp', 'nationalGuardRestRecoveryCount',
+  'combatRecoverySelections', 'restRecoverySelections', 'maxWorkersInSingleFacility', 'maxTotalProductionWorkers',
+  'highCapacityFacilityTurns', 'powerPlantStoppedTurns', 'powerShortageTurns',
+  'checkpointPassThroughBranchTurns', 'checkpointNormalBranchTurns', 'checkpointStrictBranchTurns',
+  'checkpointPassThroughBranchTurnRate', 'checkpointNormalBranchTurnRate', 'checkpointStrictBranchTurnRate',
+  'checkpointPassThroughScreenedRate', 'checkpointNormalScreenedRate', 'checkpointStrictScreenedRate',
   'hordeInterceptions', 'finalFood', 'finalCivilianGoods', 'finalMilitaryGoods', 'finalFuel',
   ...ACTION_TYPES.map((type) => `action.${type}`),
   ...PRIORITY_GOALS.map((goal) => `goal.${goal}`),
@@ -362,7 +371,17 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.maxOvercrowding, game.maxOvercrowdingAdditionalFood,
       game.maxOvercrowdingAdditionalCivilianGoods, game.facilitiesCaptured, game.facilitiesLost,
       game.finalSecuredFacilities, game.policeProduced, game.nationalGuardProduced, game.unitLosses,
-      game.zombiesKilled, game.hordeInterceptions, game.finalFood, game.finalCivilianGoods,
+      game.zombiesKilled,
+      game.policeInitial, game.nationalGuardInitial, game.policeLosses, game.nationalGuardLosses, game.policeFinal, game.nationalGuardFinal,
+      game.policeSurvivalRate, game.nationalGuardSurvivalRate, game.outOfSupplyUnitLosses,
+      game.policeCombatRecoveryHp, game.policeCombatRecoveryCount, game.policeRestRecoveryHp, game.policeRestRecoveryCount,
+      game.nationalGuardCombatRecoveryHp, game.nationalGuardCombatRecoveryCount, game.nationalGuardRestRecoveryHp, game.nationalGuardRestRecoveryCount,
+      game.combatRecoverySelections, game.restRecoverySelections, game.maxWorkersInSingleFacility, game.maxTotalProductionWorkers,
+      game.highCapacityFacilityTurns, game.powerPlantStoppedTurns, game.powerShortageTurns,
+      game.checkpointPassThroughBranchTurns, game.checkpointNormalBranchTurns, game.checkpointStrictBranchTurns,
+      game.checkpointPassThroughBranchTurnRate, game.checkpointNormalBranchTurnRate, game.checkpointStrictBranchTurnRate,
+      game.checkpointPassThroughScreenedRate, game.checkpointNormalScreenedRate, game.checkpointStrictScreenedRate,
+      game.hordeInterceptions, game.finalFood, game.finalCivilianGoods,
       game.finalMilitaryGoods, game.finalFuel,
       ...ACTION_TYPES.map((type) => game.actionCounts[type] ?? 0),
       ...PRIORITY_GOALS.map((goal) => game.priorityGoalCounts[goal] ?? 0),

@@ -12,9 +12,15 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBe(1);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('1.1.0');
+    expect(run.metrics.bridgeApiVersion).toBe('1.2.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
+    expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
+    expect(run.metrics.maxTotalProductionWorkers).toBeGreaterThanOrEqual(run.metrics.maxWorkersInSingleFacility);
+    expect(run.metrics.policeSurvivalRate).toBeGreaterThanOrEqual(0);
+    expect(run.metrics.nationalGuardSurvivalRate).toBeGreaterThanOrEqual(0);
+    expect(run.metrics.combatRecoverySelections).toBeGreaterThanOrEqual(0);
+    expect(run.metrics.restRecoverySelections).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxSupplyRadius).toBeGreaterThan(0);
   });
 

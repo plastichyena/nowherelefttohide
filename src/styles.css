@@ -173,7 +173,7 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
   .bottom-sheet[data-sheet="expanded"] { height: min(54dvh, 520px, calc(100dvh - var(--sheet-chrome))); max-height: min(54dvh, 520px, calc(100dvh - var(--sheet-chrome))); }
 }
 
-/* v1.2.5 supply and checkpoint planning states */
+/* v1.2.6 supply, forecast, and checkpoint planning states */
 .top-hud { grid-template-columns: minmax(82px, 1fr) max-content max-content 44px 44px; }
 .supply-toggle { color: var(--primary); }
 .supply-toggle[aria-pressed="true"] { background: #215c5e; border-color: var(--primary); box-shadow: inset 0 0 0 1px #7ee8df66; }
@@ -204,6 +204,22 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .checkpoint-status-remnant { border-color: #806f43; }
 .checkpoint-status-ruined { border-color: #8c4f4b; }
 .checkpoint-status-abandoned { border-color: #67405f; }
+.unit-forecast, .range-forecast, .infection-forecast, .production-forecast { margin: 9px 0; padding: 9px 10px; border: 1px solid #2c5962; border-radius: 9px; background: #102a31; }
+.unit-forecast h3, .range-forecast h3, .infection-forecast h3, .production-forecast h3 { margin: 0 0 6px; }
+.forecast-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 7px 0; }
+.forecast-detail-grid > div { min-width: 0; padding: 6px 7px; border: 1px solid #23414c; border-radius: 7px; background: #112832; }
+.forecast-detail-grid dt { color: var(--muted); font-size: 0.65rem; }
+.forecast-detail-grid dd { margin: 2px 0 0; color: #edf9fa; font-size: 0.8rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.recovery-status { margin: 0 0 6px; color: #e8f0f3; font-size: 0.84rem; }
+.recovery-combat { color: #f3d682; }
+.recovery-rest { color: #9ee0ae; }
+.recovery-outOfSupply { color: var(--danger); }
+.range-forecast p, .infection-forecast p, .production-forecast p { margin-bottom: 4px; }
+.is-contained { margin: 0; color: #8fe0be; font-size: 0.8rem; font-weight: 700; }
+.policy-details { margin-top: 9px; padding-top: 8px; border-top: 1px solid #23414c; }
+.policy-details h3 { margin-top: 0; }
+.policy-list { display: grid; gap: 6px; margin: 7px 0 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.74rem; line-height: 1.45; }
+.policy-list strong { color: #edf9fa; }
 
 @media (max-width: 560px) {
   .branch-flow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

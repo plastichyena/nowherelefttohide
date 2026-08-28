@@ -1,10 +1,17 @@
-import { forecastEndTurn } from '../core/engine';
+import {
+  effectiveRange,
+  forecastEndTurn,
+  forecastFacilityProduction,
+  forecastUnitSuppression,
+} from '../core/engine';
+import { deriveUnitRecovery } from '../core/recovery';
+import { hexKey } from '../core/hex';
 import { isCityFacility, isProductionFacility } from '../core/state';
 import {
   deriveSupplySnapshot,
   isHexSupplied,
 } from '../core/supply';
-import type { GameResult, GameState, JsonValue, UnitState } from '../core/types';
+import type { GameResult, GameState, JsonValue, ResourceType, UnitState } from '../core/types';
 import {
   OBSERVATION_API_VERSION,
   type AgentGameResult,
@@ -22,7 +29,11 @@ function publicResult(result: GameResult | null): AgentGameResult | null {
 
 function publicUnit(unit: UnitState, state: Readonly<GameState>): AgentUnitObservation {
   const inSupply = isHexSupplied(state, unit.position);
-  const recoveryAvailable = inSupply && unit.hp < unit.maxHp && unit.actionState === 'ready';
+  const suppression = forecastUnitSuppression(state, unit);
+  const recovery = unit.isPlayerUnit
+    ? deriveUnitRecovery(state, unit, { projectedSuppression: suppression !== null })
+    : null;
+  const currentRange = effectiveRange(state, unit);
   return {
     id: unit.id,
     type: unit.type,
@@ -32,23 +43,60 @@ function publicUnit(unit: UnitState, state: Readonly<GameState>): AgentUnitObser
     attack: unit.attack,
     movement: unit.movement,
     range: unit.range,
+    baseRange: unit.range,
+    effectiveRange: currentRange,
+    rangeModifierReason: unit.type === 'nationalGuard' && currentRange < unit.range
+      ? 'military_supply_shortage'
+      : null,
     population: unit.population,
     actionState: unit.actionState,
     canAttack: unit.canAttack,
     canMove: unit.canMove,
     inSupply,
-    recoveryAvailable,
-    recoveryUnavailableReason: unit.hp >= unit.maxHp
-      ? null
-      : inSupply
-        ? unit.actionState === 'ready' ? null : 'unit_already_acted'
-        : 'unit_out_of_supply',
+    recoveryClassIfTurnEndsNow: recovery?.recoveryClass ?? null,
+    recoveryRateIfTurnEndsNow: recovery?.rate ?? 0,
+    recoveryBaseAmountIfTurnEndsNow: recovery?.baseAmount ?? 0,
+    recoveryTiming: recovery?.timing ?? null,
+    recoveryConditions: {
+      requiresSurvival: recovery?.requiresSurvival ?? false,
+      requiresSupplyAtRecovery: recovery?.requiresSupplyAtRecovery ?? false,
+    },
+    infectionContainmentCapable: unit.isPlayerUnit,
+    suppressionPower: suppression?.suppressionPower ?? (
+      unit.type === 'police'
+        ? state.config.infection.policeSuppression
+        : unit.type === 'nationalGuard'
+          ? state.config.infection.nationalGuardSuppression
+          : 0
+    ),
+    suppressionCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
+    suppressionAvailableIfTurnEndsNow: suppression !== null,
+    suppressionTargetId: suppression?.targetId ?? null,
   };
+}
+
+function multiplyResources(
+  values: Partial<Record<ResourceType, number>>,
+  workers: number,
+): Partial<Record<ResourceType, number>> {
+  return Object.fromEntries(
+    Object.entries(values).map(([resource, amount]) => [resource, amount * workers]),
+  ) as Partial<Record<ResourceType, number>>;
+}
+
+function containingUnitAt(state: Readonly<GameState>, q: number, r: number): UnitState | undefined {
+  const key = `${q},${r}`;
+  return [...state.units]
+    .filter((unit) => unit.isPlayerUnit && hexKey(unit.position) === key)
+    .sort((left, right) => left.id.localeCompare(right.id))[0];
 }
 
 /** Build the stable public-information view used by every v1.2 Agent. */
 export function createAgentObservation(state: Readonly<GameState>): AgentObservation {
   const supply = deriveSupplySnapshot(state);
+  const productionByFacility = new Map(
+    forecastFacilityProduction(state).map((projection) => [projection.facilityId, projection]),
+  );
   const roadBranches = [...state.map.roadBranches]
     .sort((left, right) => left.id.localeCompare(right.id))
     .map((definition) => {
@@ -102,6 +150,16 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
         facility.infected === 0 &&
         facility.populationOperationalTurn <= state.turn &&
         inSupply;
+      const rule = state.config.facilities[facility.type].production;
+      const containingUnit = facility.infected > 0
+        ? containingUnitAt(state, facility.position.q, facility.position.r)
+        : undefined;
+      const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
+      const productionProjection = productionByFacility.get(facility.id);
+      const currentWorkers = productionProjection?.operatingWorkers ?? 0;
+      const estimatedInputs = multiplyResources(rule.inputs, currentWorkers);
+      const estimatedOutputs = multiplyResources(rule.outputs, currentWorkers);
+      const stoppedReason = productionProjection ? productionProjection.stoppedReason : 'stopped';
       return {
         id: facility.id,
         type: facility.type,
@@ -128,6 +186,24 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
                 ? 'available_next_turn'
                 : 'city_out_of_supply'
         ) : 'not_recruitment_hub',
+        production: {
+          inputsPerWorker: cloneJson(rule.inputs),
+          outputsPerWorker: cloneJson(rule.outputs),
+          requiresPower: rule.requiresPower,
+          requiredPowerCapacity: rule.powerCapacity,
+          powerGenerationPerWorker: rule.powerGeneration,
+          estimatedInputConsumption: estimatedInputs,
+          estimatedOutput: estimatedOutputs,
+          estimatedPowerGeneration: productionProjection?.powerGeneration ?? 0,
+          stoppedReason,
+          projectedInputLossIfInfectedOrOverrun: cloneJson(estimatedInputs),
+          projectedOutputLossIfInfectedOrOverrun: cloneJson(estimatedOutputs),
+          projectedPowerLossIfInfectedOrOverrun: productionProjection?.powerGeneration ?? 0,
+        },
+        infectionContained: facility.infected > 0 && containingUnit !== undefined,
+        containingUnitId: containingUnit?.id ?? null,
+        projectedSuppression: suppression?.projectedSuppression ?? 0,
+        projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
       };
     });
   const orderedUnits = [...state.units].sort((left, right) => left.id.localeCompare(right.id));
@@ -169,21 +245,32 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
     zombies: orderedUnits.filter((unit) => !unit.isPlayerUnit).map((unit) => publicUnit(unit, state)),
     checkpoints: [...state.checkpoints]
       .sort((left, right) => left.id.localeCompare(right.id))
-      .map((checkpoint) => ({
-        id: checkpoint.id,
-        branchId: checkpoint.branchId ?? checkpoint.direction,
-        position: { ...checkpoint.position },
-        direction: checkpoint.direction,
-        status: checkpoint.status,
-        waiting: checkpoint.waiting,
-        screening: checkpoint.screening,
-        approved: checkpoint.approved,
-        infected: checkpoint.infected,
-        remainingTurns: checkpoint.remainingTurns,
-        currentPolicy: checkpoint.currentPolicy,
-        nextPolicy: checkpoint.screeningPolicy,
-        nextArrivalTurn: checkpoint.nextArrivalTurn,
-      })),
+      .map((checkpoint) => {
+        const containingUnit = checkpoint.infected > 0
+          ? containingUnitAt(state, checkpoint.position.q, checkpoint.position.r)
+          : undefined;
+        const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
+        return {
+          id: checkpoint.id,
+          branchId: checkpoint.branchId ?? checkpoint.direction,
+          position: { ...checkpoint.position },
+          direction: checkpoint.direction,
+          status: checkpoint.status,
+          waiting: checkpoint.waiting,
+          screening: checkpoint.screening,
+          approved: checkpoint.approved,
+          infected: checkpoint.infected,
+          remainingTurns: checkpoint.remainingTurns,
+          currentPolicy: checkpoint.currentPolicy,
+          nextPolicy: checkpoint.screeningPolicy,
+          nextArrivalTurn: checkpoint.nextArrivalTurn,
+          providesSupply: checkpoint.status === 'operational',
+          infectionContained: checkpoint.infected > 0 && containingUnit !== undefined,
+          containingUnitId: containingUnit?.id ?? null,
+          projectedSuppression: suppression?.projectedSuppression ?? 0,
+          projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
+        };
+      }),
     roadBranches,
     supply: {
       initialRadius: supply.initialRadius,

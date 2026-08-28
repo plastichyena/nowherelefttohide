@@ -34,8 +34,7 @@ export function legalActionsForUnit(state: Readonly<GameState>, actions: readonl
   return actions.filter((action) =>
     (action.type === 'Move' && action.unitId === unitId) ||
     (action.type === 'Attack' && action.attackerId === unitId) ||
-    (action.type === 'Wait' && action.unitId === unitId) ||
-    (action.type === 'SuppressInfection' && action.unitId === unitId),
+    (action.type === 'Wait' && action.unitId === unitId),
   );
 }
 

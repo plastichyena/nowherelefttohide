@@ -92,11 +92,11 @@ export const FIXED_FACILITY_IDS = facilitySpecs.map((facility) => facility.id) a
 const capacityByType: Record<FacilityType, number> = {
   capital: 100,
   city: 50,
-  farm: 25,
-  civilianFactory: 25,
-  militaryFactory: 25,
-  refinery: 25,
-  powerPlant: 25,
+  farm: 30,
+  civilianFactory: 30,
+  militaryFactory: 30,
+  refinery: 30,
+  powerPlant: 30,
 };
 
 const cardinalDirections: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
@@ -138,13 +138,13 @@ function createTiles(roads: Set<string>): HexTile[] {
   return tiles;
 }
 
-function createFacilities(): FacilityDefinition[] {
+function createFacilities(capacities: Readonly<Record<FacilityType, number>> = capacityByType): FacilityDefinition[] {
   return facilitySpecs.map((spec) => ({
     id: spec.id,
     type: spec.type,
     nameKey: `facility.${spec.type}`,
     position: { ...spec.position },
-    workerCapacity: capacityByType[spec.type],
+    workerCapacity: capacities[spec.type],
     startingOwned: spec.startingOwned,
     startingWorkers: spec.startingWorkers,
     startingInfected: 0,
@@ -214,10 +214,10 @@ function createRoadBranches(): RoadBranchDefinition[] {
   ];
 }
 
-function buildFixedMap(): FixedMap {
+function buildFixedMap(capacities: Readonly<Record<FacilityType, number>> = capacityByType): FixedMap {
   const roads = roadKeySet();
   const tiles = createTiles(roads);
-  const facilities = createFacilities();
+  const facilities = createFacilities(capacities);
   const hordeEntrances = createEntrances();
   const roadBranches = createRoadBranches();
 
@@ -285,8 +285,8 @@ function canonicalMapJson(value: unknown): string {
 const FIXED_MAP_CANONICAL_JSON = canonicalMapJson(baseFixedMap);
 
 /** Return a fresh JSON-compatible copy for a new GameState. */
-export function createFixedMap(): FixedMap {
-  return cloneMap(baseFixedMap);
+export function createFixedMap(capacities: Readonly<Record<FacilityType, number>> = capacityByType): FixedMap {
+  return cloneMap(buildFixedMap(capacities));
 }
 
 export function getTile(map: FixedMap, position: HexCoord): HexTile | undefined {
@@ -357,6 +357,9 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     if (!hexWithinBounds(facility.position, FIXED_MAP_WIDTH, FIXED_MAP_HEIGHT)) {
       errors.push(`facility outside bounds: ${facility.id}`);
     }
+    if (!Number.isSafeInteger(facility.workerCapacity) || facility.workerCapacity < 1) {
+      errors.push(`facility worker capacity must be a positive integer: ${facility.id}`);
+    }
   }
   if (!Array.isArray(map?.hordeEntrances) || map.hordeEntrances.length !== 4) {
     errors.push('map must contain north/east/south/west Horde entrances');
@@ -395,7 +398,11 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
   if (!Array.isArray(map?.initialZombiePositions) || map.initialZombiePositions.length !== 4) {
     errors.push('map must contain four initial zombie positions');
   }
-  if (map && canonicalMapJson(map) !== FIXED_MAP_CANONICAL_JSON) {
+  const canonicalCandidate = map ? cloneMap(map) : null;
+  if (canonicalCandidate) {
+    for (const facility of canonicalCandidate.facilities) facility.workerCapacity = capacityByType[facility.type];
+  }
+  if (canonicalCandidate && canonicalMapJson(canonicalCandidate) !== FIXED_MAP_CANONICAL_JSON) {
     errors.push('map must match the fixed map template');
   }
   return { valid: errors.length === 0, errors };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAgentGame } from './game';
-import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, OBSERVATION_API_VERSION } from './types';
+import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, GAME_RULES_VERSION, OBSERVATION_API_VERSION } from './types';
 
 describe('AgentGame public boundary', () => {
   it('returns a deterministic JSON observation without private random state', () => {
@@ -18,6 +18,24 @@ describe('AgentGame public boundary', () => {
     expect(first.roadBranches.every((branch) => branch.turnsUntilArrival >= 0)).toBe(true);
     expect(first.supply.initialRadius).toBeGreaterThan(0);
     expect(first.units.every((unit) => typeof unit.inSupply === 'boolean')).toBe(true);
+    expect(first.units.every((unit) => unit.baseRange >= unit.effectiveRange)).toBe(true);
+    expect(first.units.every((unit) => ['combat', 'rest', 'outOfSupply'].includes(unit.recoveryClassIfTurnEndsNow!))).toBe(true);
+    expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
+  });
+
+  it('describes the v1.2.6 API and current Config from the same adapter boundary', () => {
+    const game = createAgentGame({ buildId: 'api-info-test' });
+    game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
+    const info = game.getApiInfo();
+    expect(info.appVersion).toBe(APP_VERSION);
+    expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
+    expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
+    expect(info.buildId).toBe('api-info-test');
+    expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
+    expect(info.rules.production.workerCapacityByFacilityType.farm).toBe(30);
+    expect(info.prohibited.join(' ')).toContain('SuppressInfection');
+    info.methods.pop();
+    expect(game.getApiInfo().methods).toContain('getRunArtifact');
   });
 
   it('does not share returned references with the private engine state', () => {

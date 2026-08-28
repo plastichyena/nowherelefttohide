@@ -3,9 +3,9 @@
 ## PoC 現行仕様
 
 - ステータス: 現行正本
-- 現行Version: v1.2.5
+- 現行Version: v1.2.6
 - 基準日: 2026-08-28
-- 直近の変更要件: `Nowhere Left to Hide PoC v1.2.5アップデート要件 確定版.md`
+- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.2.6アップデート要件 確定版.md`
 
 本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。過去の要件定義・仕様書・反映済みアップデート文書は`Doc/archive/`へ保管し、現行判断には使用しない。
 
@@ -145,6 +145,9 @@ UI / Phaser / Test Agent
 - 道路別の次回到着、未管理時の素通りリスク、都市のソフトキャップ超過受入を表示する。
 - 補給オーバーレイは常設切替を持ち、新設・移設、検問所選択、労働者配置で自動表示する。補給範囲、セクター境界、検問所半径、候補の将来範囲、建設を妨げるZombieを盤面上で識別できる。
 - 資源不足予測は警告するが、人口0敗北が確定しない限り無視してEndTurnできる。
+- ユニットBottom Sheetは補給状態、次のプレイヤーターン開始時の回復区分・率・基礎量・成立条件、基本射程と実効射程、駐留による感染封じ込めと自動鎮圧見込みを表示する。
+- 施設Bottom Sheetは上限、1人あたりと現在見込みの入出力、要求電力・発電量、停止理由、感染・陥落時の生産損失を表示する。検問所は現在／審査中方針、残り時間と3方針の交換関係を表示する。
+- ヘルプは回復10%／20%／0%、駐留封じ込めと自動鎮圧、警察と州兵の民間被害差、州兵の軍需不足時射程、発電停止の波及、厳格方針の合格率50%を日本語・英語で説明する。
 
 ---
 
@@ -219,10 +222,10 @@ interface HeadlessGame {
 
 ## 6.5 Version境界
 
-- App / Release Versionは`1.2.5`とする。
-- Game Rules / GameState / Config Versionは`1.2.0`とする。
-- Save Format Versionは`2`とする。v1.2以前の保存とReplayは読み込まない。
-- Agent API / Observation API / Browser Bridge APIは`1.1.0`、Balanced Agentは`2.1.0`、Random Agentは`1.1.0`とする。
+- App / Release Versionは`1.2.6`とする。
+- Game Rules / GameState / Config Versionは`1.2.1`とする。
+- Save Format Versionは`2`、Artifact Schemaは`1.2.0`とする。v1.2.5以前のReplay／Artifactは読み込まない。
+- Agent API / Observation API / Browser Bridge APIは`1.2.0`、Balanced Agentは`2.2.0`、Random Agentは`1.1.0`とする。
 - Agent、Observation、Browser Bridgeは個別のSemVerを持ち、Build IDはCIではGit commit SHA、ローカルではSHAとdirty状態または`local-unknown`を記録する。
 - Build IDは乱数とゲーム結果へ影響させない。
 
@@ -230,6 +233,9 @@ interface HeadlessGame {
 
 Agent向け正式入力はGameStateではなく、JSON互換の`AgentObservation`とする。API／Game Rules Version、Turn、Phase、静的マップ、公開中の資源・人口・施設・部隊・ゾンビ・検問所、Horde、EndTurn Forecast、勝敗に加え、初期補給半径、道路支線と次回到着、検問所Lifecycle、決定的な補給圏タイル、施設・都市・ユニットの補給状態、支線ごとのターン内操作済み状態を含む。
 
+- 人間ユニットは基本／実効射程と軍需不足理由、EndTurn時点の回復区分・率・基礎量・時点・生存／補給条件、感染封じ込め能力、自動鎮圧力・民間被害・対象を返す。予測は攻撃後10%、待機・移動後20%、補給外0%とCore判定に一致させる。
+- 施設は所有・状態・補給・人口・上限に加え、1人あたり入出力、電力条件、現在資源と確保順を反映した部分稼働見込み、停止理由、感染・陥落時に失う現在生産、封じ込め・鎮圧予測を返す。
+- 検問所はLifecycle、方針、3人口プール、感染、残り時間、補給提供、封じ込め・鎮圧予測を返す。方針の静的な率と時間は`getApiInfo()`へ置く。
 - PRNG内部状態、将来乱数、出現前Horde規模、デバッグ専用値を含めない。
 - 配列順を決定的にし、取得によってStateを変更せず、返却値と内部参照を共有しない。
 - Game Over後の合法手は空配列とする。
@@ -238,6 +244,7 @@ Agent向け正式入力はGameStateではなく、JSON互換の`AgentObservation
 
 ```ts
 interface AgentGame {
+  getApiInfo(): AgentApiInfo;
   reset(options?: AgentResetOptions): AgentObservation;
   getObservation(): AgentObservation;
   getLegalActions(): GameAction[];
@@ -252,7 +259,7 @@ interface AgentGame {
 
 - `random`と`balanced`は同じAgentGame、Runner、安全上限、Metrics、Artifact形式を使用する。
 - Random Agentの選択乱数はGameEngineから独立したSeed付き乱数とする。
-- Balanced Agent Versionは`2.1.0`とする。独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
+- Balanced Agent Versionは`2.2.0`とする。独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
 - Balancedは即時敗北回避、施設接触拒否、感染鎮圧、Horde防衛、軍需備蓄、食料・民需品・燃料・電力、州都人口バッファ、過密、生産冗長性を含む施設確保、部隊編成と損傷、検問所建設・方針、有益なActionがない場合のEndTurnを評価する。
 - 所有中かつ健全民間人口がいる施設に対し、各Zombieが現在接触中か、次のZombie Turnに移動力内から接触可能かを公開Observationだけで予測する。州都、単一供給源、軍需工場、健全民間人口の多い施設を高脅威として扱う。
 - National Guardは射程2と対Zombie確殺を利用する接触拒否火力として扱い、接触脅威への攻撃、安全な射撃位置、Horde方向側の所有施設防衛を優先する。Horde入口へ直接進出すること自体は目的にしない。
@@ -264,6 +271,7 @@ interface AgentGame {
 - Farm、Civilian Factory、Refinery、Power Plant、Military Factoryの単一依存を検出し、黒字時でも代替施設の確保と適量稼働を評価する。労働者は最大投入ではなく、不足解消、冗長性、入力資源、州都人口を考慮した目標人数へ近づける。
 - 同一ターン内で同じ施設の労働者数や検問所方針を繰り返し変更しないようAction Family単位の反復抑制を行う。接触脅威や感染が残っていても、対応可能なUnit Actionがなければ不要な内政Actionを挟まずEndTurnできる。
 - 評価重みと閾値をデータとして分離し、Decisionごとに優先目標、選択Actionと点数、上位候補、理由コードを機械可読Traceとして残す。文章上の思考過程は保存しない。
+- `effectiveRange`、軍需不足、負傷部隊の補給圏への後退、戦闘回復と休養回復の比較、駐留封じ込めと自動鎮圧、州兵の鎮圧時民間被害、電力・生産波及、人口・感染・防衛に応じた検問所方針を評価する。Traceは回復、後退、鎮圧、射程、電力、方針の理由コードを持つ。
 - Runnerは1ターン、1ゲーム、最大ターンの安全上限をGameConfigと別管理し、上限、例外、不変条件違反、不正Action、Agent停止を技術的失敗として扱う。ゲーム内敗北は正常完遂である。
 - 既定では失敗Artifactを残して次のゲームを続け、`fail-fast`指定時だけ停止する。
 
@@ -277,7 +285,7 @@ interface AgentGame {
 - Failure Artifactは直前Observation、エラー、Decision番号と、ローカル／CIデバッグ用途の直前・直後GameStateを追加できる。
 - ReplayはAction列を再実行し、最終Result、Action数、Observationの不一致理由を報告する。
 
-ゲームページでは追加設定なしに`window.NLTH`を公開する。Bridgeは通常UIとは別のインメモリAgentGameを1つだけ保持し、ページ再読み込みで破棄する。自動保存、localStorage、セーブコード、通常UI状態、ネットワーク、ファイル、Batchへアクセスしない。
+ゲームページでは追加設定なしに`window.NLTH`を公開する。Bridgeは通常UIとは別のインメモリAgentGameを1つだけ保持し、ページ再読み込みで破棄する。自動保存、localStorage、セーブコード、通常UI状態、ネットワーク、ファイル、Batchへアクセスしない。AgentGameとBridgeの`getApiInfo()`は同じ生成元からVersion、Build ID、公開メソッド、Schema、推奨順序、Fair Play境界、回復・感染・射程・検問所方針・生産電力の静的ルールを返す。
 
 公開メソッドは`getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact`だけとし、`getState`、`LoadSnapshot`、`StartNewGame`を公開しない。入力を境界で検証し、1回の`step`で1Actionだけを処理する。API説明ページ、最小プロンプト、Smoke手順、外部AI E2Eチェックリストを公開する。
 
@@ -302,7 +310,7 @@ interface AgentGame {
 
 - 州都: ソフトキャップ100
 - 地方都市: ソフトキャップ50
-- 生産施設: ハード上限25
+- 生産施設: ハード上限30
 
 都市はソフトキャップを超過できる。各値はConfig化する。
 
@@ -366,7 +374,7 @@ interface AgentGame {
 
 ## 8.4 自然回復
 
-警察・州兵は、前回の自ターンから次回自ターン開始まで移動、通常攻撃、迎撃、感染鎮圧をしておらず、回復判定時に補給圏内にいる場合だけ最大HPの10%を回復する。初期端数処理は切り上げ。ゾンビは回復しない。
+警察・州兵は次のプレイヤーターン開始時、判定時に補給圏内で生存していれば1回だけ自然回復する。通常攻撃・反撃・迎撃・自動鎮圧を行った場合は最大HPの10%、移動のみ・待機・移動後待機・未行動の場合は20%、補給圏外は0%とする。標準端数処理は各ユニット個別の切り上げで、Configの`combatRate`、`restRate`、`rounding`に従う。HP上限を超えず、ゾンビは回復しない。移動済みでも休養回復を妨げず、補給判定は回復時点で再評価する。
 
 ## 8.5 追加編成
 
@@ -509,15 +517,17 @@ infected += spread
 ## 11.2 鎮圧
 
 - 警察または州兵が感染施設へ駐留すると内部感染の加算を停止する。
-- 通常攻撃・迎撃をしていなければターン終了時に自動鎮圧し、攻撃権を消費する。
+- 通常攻撃・反撃・迎撃で攻撃権を消費していなければターン終了時に自動鎮圧し、攻撃権を消費する。待機または移動だけなら攻撃権が残るため自動鎮圧できる。
 - 警察はAttack相当を減らす。
 - 州兵はAttack相当を減らす一方、`ceil(Attack × 0.5)`の民間人被害を出す。
+- 即時`SuppressInfection`は公開Action、合法手、Human UI、Agent API、Bridgeから除去する。直接入力も状態とRNGを変えず拒否する。
 
 ## 11.3 陥落
 
 - 感染処理で健常人口0になった場合だけ陥落する。
 - 通常施設は荒廃感染施設、検問所は荒廃検問所となる。
 - 陥落時感染者は現在値とCapacityの50%の大きい方を基準とする。
+- 標準生産施設のCapacity 30では新規陥落時の感染者下限を15とする。移行時点ですでに荒廃しているv1.2.5施設の感染者数は増やさない。
 - 陥落時にゾンビ2体を生成し、隣接空き、距離2、距離3の順で最寄りへ置く。同距離はSeed付き乱数。
 - 州都陥落時はイベント処理後に即敗北する。
 
@@ -676,15 +686,16 @@ WIN CHECK / NEXT TURN
 - 同内容をJSONファイルで入出力できる。
 - Version不一致、破損、不正Config、不変条件違反を検出し、現在状態へ適用しない。
 - ロード後は保存時Configを使う。
-- v1.2.5はGame Rules / GameState / Config `1.2.0`、Save Format `2`を使う。v1.2以前の自動保存、セーブコード、JSONは読み込まない。
-- 旧データ検出時は「旧バージョンのため読み込めない」と表示し、「最初から」を促す。
-- 旧データを自動変換、自動削除、自動上書きしない。
+- v1.2.6はGame Rules / GameState / Config `1.2.1`、Save Format `2`を使う。v1.2.5のGame Rules `1.2.0`／Format 2の自動保存、セーブコード、JSONだけを移行対象とし、v1.2以前は読み込まない。
+- v1.2.5移行では旧Format、Checksum、Version、Config、State、不変条件を共有しないコピー上で先に検証する。生産5タイプのCapacityへ5を加え、旧`naturalRecovery.rate`を`combatRate`、`min(1, rate × 2)`を`restRate`へ引き継ぎ、端数設定を維持する。既存荒廃施設の感染者数、HP、人口、資源、RNG、Turn、道路、検問所、Action履歴は変更しない。
+- 移行後に現行Config、Map、不変条件を通った場合だけメモリ上で読み込む。移行元を自動削除、変換保存、上書きせず、次の受理ActionまたはEndTurn後に初めて現行形式で自動保存する。成功と拒否を日本語・英語で表示する。
+- v1.2以前の旧データ検出時は「旧バージョンのため読み込めない」と表示し、「最初から」を促す。Replay／Artifactは移行しない。
 
 ---
 
 # 16. Event・統計
 
-移動、戦闘、施設確保、人口配置・移住・徴用、資源生産・消費・不足、道路別避難民到着・未管理素通り、感染、鎮圧、陥落、復旧、検問所新設・移設・跡化・消滅・荒廃・後退・放棄、補給範囲拡張・縮小・補給理由の拒否、Horde、Game Overを理由付きEventとして保持する。
+移動、戦闘、施設確保、人口配置・移住・徴用、資源生産・消費・不足、道路別避難民到着・未管理素通り、感染、鎮圧、陥落、復旧、ユニット自然回復、検問所新設・移設・跡化・消滅・荒廃・後退・放棄、補給範囲拡張・縮小・補給理由の拒否、Horde、Game Overを理由付きEventとして保持する。自然回復EventはUnit ID／Type、回復前後HP、基礎量、実回復量、区分、率、補給状態を持つ。ユニット撃破Eventは撃破直前位置と補給状態を持つ。
 
 終了統計:
 
@@ -704,7 +715,10 @@ Agentゲーム単位Metricsは、各Version、Build ID、Map、Seed、Config、A
 - 検問所新設、移設、後退、荒廃、復旧、放棄、消滅、検問所なし道路ターン
 - 補給圏内施設数、最大補給半径、補給喪失、補給理由の拒否Action
 - 確保・喪失・最終所有施設数
-- 警察・州兵編成、ユニット損失、Zombie撃破、Horde迎撃
+- Unit Type別の初期・完成・損失・最終生存隊数と生存率、補給圏外損失、Type／回復区分別の実回復HP・回数、10%／20%選択回数
+- 単一／全生産施設の最大労働者数、26～30人施設Turn、発電所停止Turn、電力不足Turn
+- 稼働検問所の方針別branch-turn比率と、方針別の実審査人数比率
+- Zombie撃破、Horde迎撃
 - 最終食料、民需品、軍需品、燃料
 
 Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値の平均・中央値・最小・最大・p10・p90、Game Over理由、Action／優先目標件数、同一Seed差分を持つ。
@@ -715,7 +729,7 @@ Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値
 
 ## 17.1 必須ルールテスト
 
-- 移動、経路迎撃、攻撃、反撃、自然回復
+- 移動、経路迎撃、攻撃、反撃、10%／20%／0%自然回復、回復Eventと予測一致
 - 施設確保、操作解禁ターン、感染、鎮圧、陥落、復旧
 - 人口供給・受入順位、配置、撤収、都市間移住、編成
 - ソフトキャップ、都市生産上限、過密追加消費
@@ -725,7 +739,7 @@ Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値
 - 初期半径5、同距離共有セクター、検問所の拡張・喪失、補給制約、候補別Zombie阻害
 - 検問所新設・移設、支線別回数、跡、空検問所の荒廃、後退、放棄、復旧、消滅
 - ゾンビAI、初期配置、Horde予告・増加・最終ターンスキップ
-- 勝利・即時敗北、保存・復元、旧Version拒否
+- 勝利・即時敗北、保存・復元、v1.2.5保存移行、旧Version／Replay／Artifact拒否
 - UI数値入力とスライダー同期
 
 ## 17.2 不変条件
@@ -769,12 +783,14 @@ Resources >= 0
 ## 17.4 Agent／Batch／Bridge
 
 - ObservationがJSON互換、非共有、決定的で、取得時にStateを変更せず、非公開情報を含まないことを試験する。
+- 回復・鎮圧・実効射程・部分稼働生産・電力予測がCoreの合法手と実処理に一致し、`getApiInfo()`がAgentGameとBridgeで同じ静的契約を返すことを試験する。
 - Legal Actionsがすべて受理され、一覧外ActionでStateとRNGが変わらず、AgentStepResultにGameStateを含まないことを試験する。
-- Balancedの即時敗北、施設接触拒否、National Guardの射撃位置、Police温存、資源、電力、軍需備蓄、州都人口、感染、Horde、過密、冗長化、拡張、編成、損傷、道路流入、補給、検問所新設・移設・防衛・後退、EndTurnの固定シナリオを意図ベースで試験する。
+- Balancedの即時敗北、施設接触拒否、National Guardの実効射程、Police温存、戦闘／休養回復、補給圏への後退、自動鎮圧、民間被害、資源、電力波及、軍需備蓄、州都人口、感染、Horde、過密、冗長化、拡張、編成、道路流入、補給、検問所方針・新設・移設・防衛・後退、EndTurnの固定シナリオを意図ベースで試験する。
 - 標準Configの固定Seed 1～100でRandomとBalancedが技術的失敗なく完遂する。特定の勝率や生存ターンは合否条件にしない。
 - Random／Balancedの同一Seed比較、決定性、JSON／CSV／ゲーム単位Artifact、失敗継続、fail-fast、Replay一致を試験する。
 - Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
 - 公開Pagesではブラウザ操作可能な外部Agentを使い、API発見、不正Action訂正、Game Over、Result／Artifact取得とReplayを手動E2E確認する。勝利は合格条件にしない。
+- リリース前に標準ConfigのBalancedを固定Seed 1～300で完遂し、v1.2.5基準と主要Metricsを比較して重大なバランス異常がないことを確認する。Pages成功後に独立したPortable Package Workflowを成功させ、Commit SHA・App・Node Version入りZIPをBundled NodeだけでSmoke Testする。
 
 ---
 
@@ -789,12 +805,14 @@ Resources >= 0
 7. 道路別自然流入、検問所3プール、3方針、配置待ち、潜伏感染が機能する。
 8. 増加型Hordeと方向予告が機能する。
 9. 日本語・英語ヘルプ、Tips、無効理由、終了統計を表示する。
-10. 自動保存、セーブコード、JSON保存・復元と旧Version拒否が機能する。
+10. 自動保存、セーブコード、JSON保存・復元、v1.2.5の安全なメモリ内移行と旧Version拒否が機能する。
 11. Headless、主要Unit Test、不変条件試験、最低100ゲームのRandom Testが成功する。
 12. 許諾的ライセンスだけを使用し、GitHub Actionsでテスト・ビルド・Pages公開が可能である。
 13. AgentObservationとAgentGameが非公開GameStateを渡さず、合法手とstepだけで進行できる。
-14. Balanced v2.1が公開情報だけを使って決定的に動作し、施設接触拒否、補給、流入、検問所Lifecycleを含む固定シナリオと、RandomとともにSeed 1～100の技術的失敗なし完遂を満たす。
+14. Balanced v2.2が公開情報だけを使って決定的に動作し、回復、鎮圧、実効射程、電力、施設接触拒否、補給、流入、検問所Lifecycleを含む固定シナリオと、RandomとともにSeed 1～100の技術的失敗なし完遂を満たす。
 15. 統一RunnerとBatch CLIが同一Seed比較、Metrics、JSON／CSV、Replay／Failure Artifactを生成し再生できる。
 16. Production Buildで通常UI・保存と分離した`window.NLTH`とAPI説明を利用できる。
-17. App `1.2.5`、Game Rules / GameState / Config `1.2.0`、Save Format `2`、Agent / Observation / Browser Bridge `1.1.0`のVersion境界が整合し、v1.2以前の保存・Replayを状態変更なしで拒否する。
+17. App `1.2.6`、Game Rules / GameState / Config `1.2.1`、Save Format `2`、Agent / Observation / Browser Bridge / Artifact Schema `1.2.0`のVersion境界が整合し、v1.2.5保存だけを安全に移行し、旧Replay／Artifactを状態変更なしで拒否する。
 18. 補給オーバーレイ、新設・移設の将来範囲、阻害Zombie、補給理由の無効状態をHuman UIで確認できる。
+19. 生産施設上限30、10%／20%自然回復、感染封じ込めと自動鎮圧がHuman UIとAgent Observationで同じCore予測を表示する。
+20. Balanced Seed 1～300、Portable Package Smoke、外部AIによるGame Over・Artifact・Replay E2Eを完遂する。

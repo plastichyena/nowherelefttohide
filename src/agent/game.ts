@@ -18,6 +18,7 @@ import {
   type AgentStepResult,
 } from './types';
 import { collectGameMetrics } from './metrics';
+import { createAgentApiInfo } from './apiInfo';
 
 const DEFAULT_AGENT_SEED = 1;
 const MAX_AGENT_ID_LENGTH = 64;
@@ -111,6 +112,10 @@ export class AgentGameAdapter implements AgentGame {
     const observation = this.getObservation();
     this.initialObservation = cloneJson(observation);
     this.observations = [cloneJson(observation)];
+  }
+
+  public getApiInfo() {
+    return createAgentApiInfo(this.config, this.buildId, this.bridgeApiVersion);
   }
 
   public reset(options?: AgentResetOptions): AgentObservation {

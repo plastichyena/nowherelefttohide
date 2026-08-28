@@ -14,7 +14,7 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '1.2.0';
+export const CONFIG_VERSION = '1.2.1';
 export const DEFAULT_MAP_ID = 'fixed-15x15-v1';
 
 const facilityIds: FacilityId[] = [
@@ -67,27 +67,27 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
     overrunSpawnCount: 2,
   },
   farm: {
-    workerCapacity: 25,
+    workerCapacity: 30,
     production: { ...production({ fuel: 1 }, { food: 5 }, true, 5) },
     overrunSpawnCount: 2,
   },
   civilianFactory: {
-    workerCapacity: 25,
+    workerCapacity: 30,
     production: production({ fuel: 1 }, { civilianGoods: 5 }, true, 5),
     overrunSpawnCount: 2,
   },
   militaryFactory: {
-    workerCapacity: 25,
+    workerCapacity: 30,
     production: production({ fuel: 1, civilianGoods: 1 }, { militaryGoods: 2 }, true, 5),
     overrunSpawnCount: 2,
   },
   refinery: {
-    workerCapacity: 25,
+    workerCapacity: 30,
     production: production(emptyInputs(), { fuel: 5 }, false),
     overrunSpawnCount: 2,
   },
   powerPlant: {
-    workerCapacity: 25,
+    workerCapacity: 30,
     production: production(emptyInputs(), emptyOutputs(), false, 0, 5),
     overrunSpawnCount: 2,
   },
@@ -158,7 +158,8 @@ export const DEFAULT_CONFIG: GameConfig = {
   economy: defaultEconomy,
   initialFacilityPopulation: defaultInitialFacilityPopulation,
   naturalRecovery: {
-    rate: 0.1,
+    combatRate: 0.1,
+    restRate: 0.2,
     rounding: 'ceil',
   },
   horde: {
@@ -392,8 +393,10 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (!naturalRecovery || typeof naturalRecovery !== 'object') {
     errors.push('naturalRecovery is required');
   } else {
-    if (!Number.isFinite(naturalRecovery.rate) || naturalRecovery.rate < 0 || naturalRecovery.rate > 1) {
-      errors.push('naturalRecovery.rate must be between 0 and 1');
+    for (const field of ['combatRate', 'restRate'] as const) {
+      if (!Number.isFinite(naturalRecovery[field]) || naturalRecovery[field] < 0 || naturalRecovery[field] > 1) {
+        errors.push(`naturalRecovery.${field} must be between 0 and 1`);
+      }
     }
     if (naturalRecovery.rounding !== 'ceil' && naturalRecovery.rounding !== 'floor') {
       errors.push('naturalRecovery.rounding must be ceil or floor');

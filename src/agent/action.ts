@@ -8,7 +8,6 @@ export function actionKey(action: GameAction): string {
   if (action.type === 'Move') return `Move|${action.unitId}|${action.destination.q},${action.destination.r}`;
   if (action.type === 'Attack') return `Attack|${action.attackerId}|${action.targetId}`;
   if (action.type === 'Wait') return `Wait|${action.unitId}`;
-  if (action.type === 'SuppressInfection') return `SuppressInfection|${action.unitId}|${action.facilityId}`;
   if (action.type === 'AssignWorkers') return `AssignWorkers|${action.facilityId}|${action.workers}`;
   if (action.type === 'TransferPopulation') return `TransferPopulation|${action.fromFacilityId}|${action.toFacilityId}|${action.people}`;
   if (action.type === 'SetCheckpointPolicy') return `SetCheckpointPolicy|${action.checkpointId}|${action.policy}`;

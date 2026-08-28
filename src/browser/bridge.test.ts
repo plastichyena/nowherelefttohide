@@ -52,6 +52,11 @@ describe('Developer / Browser Bridge', () => {
     expect(info.methodSchemas.step.returns).toBe('AgentStepResult');
     expect(info.prohibited.join(' ')).toContain('localStorage');
     expect(info.minimalExample).toContain('window.NLTH');
+    expect(info.rules.recovery).toMatchObject({ combatRate: 0.1, restRate: 0.2 });
+    expect(info.rules.infection.stationedUnitsContainSpread).toBe(true);
+
+    const adapterInfo = createAgentGame({ buildId: 'test-build', bridgeApiVersion: BRIDGE_API_VERSION }).getApiInfo();
+    expect(info).toEqual(adapterInfo);
 
     // Self-description is also returned as a copy.
     info.methods.pop();
@@ -130,9 +135,13 @@ describe('Developer / Browser Bridge', () => {
     expect(unsupported.error?.code).toBe('invalid_action_input');
     expect(api.getObservation()).toEqual(before);
 
+    const retired = api.step({ type: 'SuppressInfection', unitId: 'police-1', facilityId: 'capital' } as never);
+    expect(retired.error?.code).toBe('invalid_action_input');
+    expect(api.getObservation()).toEqual(before);
+
     const artifact = api.getRunArtifact();
-    expect(artifact.invalidAttempts).toHaveLength(2);
-    expect(artifact.invalidAttempts.map((attempt) => attempt.decision)).toEqual([1, 2]);
+    expect(artifact.invalidAttempts).toHaveLength(3);
+    expect(artifact.invalidAttempts.map((attempt) => attempt.decision)).toEqual([1, 2, 3]);
     expect(artifact.invalidAttempts[0].error.code).toBe('invalid_action_input');
 
     const malformedRelocate = api.step({

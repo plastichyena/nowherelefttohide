@@ -272,6 +272,7 @@ export interface HordeState {
 
 export type GameEventType =
   | 'unit_moved'
+  | 'unit_recovered'
   | 'interception'
   | 'attack'
   | 'damage'
@@ -430,12 +431,6 @@ export interface WaitAction {
   unitId: string;
 }
 
-export interface SuppressInfectionAction {
-  type: 'SuppressInfection';
-  unitId: string;
-  facilityId: FacilityId;
-}
-
 export interface AssignWorkersAction {
   type: 'AssignWorkers';
   facilityId: FacilityId;
@@ -494,7 +489,6 @@ export type GameAction =
   | MoveAction
   | AttackAction
   | WaitAction
-  | SuppressInfectionAction
   | AssignWorkersAction
   | TransferPopulationAction
   | SetCheckpointPolicyAction
@@ -625,8 +619,10 @@ export interface InitialFacilityPopulationConfig {
 }
 
 export interface NaturalRecoveryConfig {
-  /** Fraction of maximum HP restored after a fully inactive turn. */
-  rate: number;
+  /** Fraction of maximum HP restored after combat or infection suppression. */
+  combatRate: number;
+  /** Fraction of maximum HP restored when no combat or suppression occurred. */
+  restRate: number;
   rounding: 'ceil' | 'floor';
 }
 

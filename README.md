@@ -22,7 +22,7 @@
 - ブラウザJavaScriptから利用できる、通常UI・保存領域と分離したDeveloper / Browser Bridge
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.2.5の実装要件は [`Doc/Nowhere Left to Hide PoC v1.2.5アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.2.5アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.2.6の実装要件は [`Doc/Nowhere Left to Hide PoC v1.2.6アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.2.6アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
 
 ## ローカルで起動する
 
@@ -52,7 +52,9 @@ npm run preview
 Open https://plastichyena.github.io/nowherelefttohide/ and use the documented window.NLTH browser bridge. Read getApiInfo(), reset with seed 1, then repeatedly inspect getObservation() and getLegalActions(), submit exactly one legal action per step(), and continue until Game Over. Finally report getResult() and getRunArtifact().
 ```
 
-公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
+公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・生産/電力の静的ルールを返します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
+
+v1.2.6では、Observationに現在局面の条件付き予測を追加しています。ユニットは次のプレイヤーターン開始時の自然回復区分（戦闘・鎮圧10%、移動/待機/未行動20%、補給外0%）、基礎回復量、基本射程・実効射程、感染拡大阻止と自動鎮圧見込みを返します。軍需品不足時の州兵は基本射程2から実効射程1へ下がります。施設は労働者上限30、入力・出力、電力要求・発電、停止理由、感染・陥落時の損失見込みを返し、検問所は3方針の交換関係を表示します。`SuppressInfection`は公開Actionではなく、感染フェーズの自動処理です。
 
 ## Agent Simulation CLI
 
@@ -64,6 +66,18 @@ npm run sim -- --agent=random,balanced --seeds=1,2,3 --out=output/simulations/co
 ```
 
 出力先には正本`run.json`、固定列UTF-8の`games.csv`、成功・敗北・技術的失敗を含むゲーム単位Artifactを生成します。既存の非空出力先は既定で上書きしません。上書きする場合だけ`--overwrite`を明示してください。ゲーム内敗北は正常完遂であり、技術的失敗が1件でもある場合だけExit Codeが非0になります。
+
+## AI Portable Package
+
+`CI and GitHub Pages`が`main`で成功すると、独立した`AI Portable Package` Workflowが同じCommitからLinux x64 ZIPを生成します。ZIPにはソース、lockfile固定済み依存、Linux x64 Node.js、`PLAY_WITH_AI.md`、Commit SHA・App Version・Node Version入り`BUILD_INFO.txt`を同梱します。展開先にNode.jsを別途インストールする必要はありません。
+
+GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロードし、展開後は次でBundled Nodeによる1ゲームSmokeを実行できます。
+
+```bash
+./run-npm.sh run sim -- --agent=random --games=1 --seed=1 --out=output/portable-smoke --overwrite
+```
+
+外部AIへ渡す主要入口と公開APIだけを使うプレイ手順は[`PLAY_WITH_AI.md`](PLAY_WITH_AI.md)を参照してください。
 
 ## 操作
 
@@ -98,7 +112,7 @@ npm run sim -- --agent=random,balanced --seeds=1,2,3 --out=output/simulations/co
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。 App/Release Versionは `1.2.5`、Game Rules / GameState / Configは `1.2.0`です。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。 App/Release Versionは `1.2.6`、Game Rules / GameState / Configは `1.2.1`、Agent / Observation / Browser Bridgeは `1.2.0`です。
 
 ## CoreとHeadless API
 
@@ -121,7 +135,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.2.5`、Game Rules / State / Config `1.2.0`、Save Format `2`を使用します。v1.2以前の保存データは非互換で、自動変換・削除・上書きせず、理由を表示して「最初から」を案内します。旧autosaveキーは読み取り専用で保持されます。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.2.6`、Game Rules / State / Config `1.2.1`、Save Format `2`を使用します。v1.2.5のSave Format 2は決定的にメモリ上へ移行できますが、移行元を上書きしません。v1.2以前の保存データは非互換で、自動変換・削除・上書きせず、理由を表示して「最初から」を案内します。旧autosaveキーは読み取り専用で保持されます。
 
 ## テスト
 
@@ -130,11 +144,16 @@ npm run typecheck
 npm test
 npm run test:random -- --games=100
 npm run test:balanced -- --games=100
+npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.2.6-balanced-300-part-1
+npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.2.6-balanced-300-part-2
+npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.2.6-balanced-300-part-3
 npm run build
 npm run test:browser-bridge -- --dist=dist
 ```
 
 Coreテストでは、移動・戦闘、資源・電力、不足被害、感染・鎮圧・陥落・復旧、避難民、Horde、勝敗、保存往復、不変条件、Seed再現性を確認します。Random／Balancedは公開Observationと合法手だけを使う統一Runnerで実行し、失敗時にはVersion、Config、Map ID、Seed、Action列、直前Observationとデバッグ用Stateを出力します。
+
+リリース前300 Seedは完全なReplay／Failure Artifactを保持するため、Node.jsの既定ヒープ内で安定して実行できる100ゲーム単位に分割します。3実行は連続した固定Seed 1～300を網羅します。
 
 `test:random`と`test:balanced`は標準ConfigのSeed群を共通Batch CLIで実行します。CIでは各100ゲームに加え、Observation境界、Replay、Production Bridge smokeを検証します。
 

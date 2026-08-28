@@ -23,6 +23,8 @@ import type {
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 /** Alias useful to callers that want to label a generated save explicitly. */
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
+/** Game Rules / Config version written by v1.2.5 and accepted for migration. */
+export const LEGACY_GAME_VERSION = '1.2.0';
 
 /** Stable envelope identifier shared by autosaves, codes, and JSON exports. */
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
@@ -47,6 +49,8 @@ export interface SaveValidationResult {
   errors: string[];
   state: GameState | null;
   envelope: SaveEnvelope | null;
+  /** True only when a valid v1.2.5 snapshot was migrated in memory. */
+  migrated?: boolean;
 }
 
 export interface SaveOperationResult {
@@ -78,6 +82,7 @@ const GAME_OVER_REASONS: readonly GameOverReason[] = [
 ];
 const GAME_EVENT_TYPES: readonly GameEventType[] = [
   'unit_moved',
+  'unit_recovered',
   'interception',
   'attack',
   'damage',
@@ -110,6 +115,13 @@ const GAME_EVENT_TYPES: readonly GameEventType[] = [
 const FACILITY_TYPES = [
   'capital',
   'city',
+  'farm',
+  'civilianFactory',
+  'militaryFactory',
+  'refinery',
+  'powerPlant',
+] as const;
+const PRODUCTION_FACILITY_TYPES = [
   'farm',
   'civilianFactory',
   'militaryFactory',
@@ -664,7 +676,7 @@ function validateGameState(value: Record<string, unknown>, errors: string[]): bo
     'population', 'cityPopulationSnapshot', 'resources', 'units', 'checkpoints', 'roadBranches', 'pendingUnitProductions', 'nextCheckpointNumber', 'nextUnitNumber', 'nextEventNumber',
     'nextAssignmentOrder', 'horde', 'events', 'statistics', 'gameOver', 'result',
   ];
-  for (const field of requiredFields) if (!hasOwn(value, field)) errors.push(`state.${field} is required for a v1.2.5 save`);
+  for (const field of requiredFields) if (!hasOwn(value, field)) errors.push(`state.${field} is required for a valid save`);
   addVersionValidation(errors, value.gameVersion, 'state.gameVersion');
   if (hasOwn(value, 'pendingAdmissions')) errors.push('state.pendingAdmissions is a legacy v1.0 field and is not supported');
   if (!isRecord(value.config)) {
@@ -973,10 +985,233 @@ function validateGameState(value: Record<string, unknown>, errors: string[]): bo
   return true;
 }
 
+function legacyValidationError(errors: string[]): SaveValidationResult {
+  return { valid: false, errors: [...new Set(errors)], state: null, envelope: null };
+}
+
+/**
+ * Validate the parts of the v1.2.5 schema which differ from the current one.
+ * The complete state validation is performed below on a non-shared copy with
+ * only the known schema differences normalized.
+ */
+function validateLegacySchema(value: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const state = isRecord(value.state) ? value.state : null;
+  if (value.gameVersion !== LEGACY_GAME_VERSION) {
+    errors.push(`gameVersion must be ${LEGACY_GAME_VERSION} for migration`);
+  }
+  if (!state) {
+    errors.push('state is required for migration');
+    return errors;
+  }
+  if (state.gameVersion !== LEGACY_GAME_VERSION) {
+    errors.push(`state.gameVersion must be ${LEGACY_GAME_VERSION} for migration`);
+  }
+  if (!isRecord(state.config)) {
+    errors.push('state.config must be an object for migration');
+    return errors;
+  }
+  const config = state.config;
+  if (config.version !== LEGACY_GAME_VERSION) {
+    errors.push(`state.config.version must be ${LEGACY_GAME_VERSION} for migration`);
+  }
+  const recovery = config.naturalRecovery;
+  if (!isRecord(recovery)) {
+    errors.push('state.config.naturalRecovery must be an object for migration');
+  } else {
+    if (typeof recovery.rate !== 'number' || !Number.isFinite(recovery.rate) || recovery.rate < 0 || recovery.rate > 1) {
+      errors.push('state.config.naturalRecovery.rate must be between 0 and 1 for migration');
+    }
+    if (recovery.rounding !== 'ceil' && recovery.rounding !== 'floor') {
+      errors.push('state.config.naturalRecovery.rounding must be ceil or floor for migration');
+    }
+  }
+
+  const facilities = isRecord(config.facilities) ? config.facilities : null;
+  if (!facilities) {
+    errors.push('state.config.facilities must be an object for migration');
+  } else {
+    for (const type of FACILITY_TYPES) {
+      const facility = facilities[type];
+      if (!isRecord(facility)) {
+        errors.push(`state.config.facilities.${type} must be an object for migration`);
+        continue;
+      }
+      if (!requireInteger(errors, facility.workerCapacity, `state.config.facilities.${type}.workerCapacity`, 1)) continue;
+      if ((PRODUCTION_FACILITY_TYPES as readonly string[]).includes(type) && (facility.workerCapacity as number) > Number.MAX_SAFE_INTEGER - 5) {
+        errors.push(`state.config.facilities.${type}.workerCapacity is too large to migrate`);
+      }
+    }
+  }
+
+  const map = isRecord(state.map) ? state.map : null;
+  if (map && Array.isArray(map.facilities)) {
+    for (const [index, facility] of map.facilities.entries()) {
+      if (!isRecord(facility)) continue;
+      const path = `state.map.facilities[${index}]`;
+      const capacityValid = requireInteger(errors, facility.workerCapacity, `${path}.workerCapacity`, 1);
+      const type = facility.type;
+      const configFacility = typeof type === 'string' && isRecord(facilities) ? facilities[type] : undefined;
+      if (capacityValid && isRecord(configFacility) && typeof configFacility.workerCapacity === 'number' && facility.workerCapacity !== configFacility.workerCapacity) {
+        errors.push(`${path}.workerCapacity must match state.config.facilities.${type}.workerCapacity for migration`);
+      }
+    }
+  }
+  if (Array.isArray(state.facilities)) {
+    for (const [index, facility] of state.facilities.entries()) {
+      if (!isRecord(facility)) continue;
+      const path = `state.facilities[${index}]`;
+      const capacityValid = requireInteger(errors, facility.workerCapacity, `${path}.workerCapacity`, 1);
+      const type = facility.type;
+      const configFacility = typeof type === 'string' && isRecord(facilities) ? facilities[type] : undefined;
+      if (capacityValid && isRecord(configFacility) && typeof configFacility.workerCapacity === 'number' && facility.workerCapacity !== configFacility.workerCapacity) {
+        errors.push(`${path}.workerCapacity must match state.config.facilities.${type}.workerCapacity for migration`);
+      }
+    }
+  }
+  return errors;
+}
+
+/** Normalize only schema differences in a private copy for legacy validation. */
+function normalizeLegacyForValidation(value: Record<string, unknown>): Record<string, unknown> {
+  const candidate = clone(value);
+  const state = candidate.state as Record<string, unknown>;
+  const config = state.config as Record<string, unknown>;
+  const recovery = config.naturalRecovery as Record<string, unknown>;
+  const rate = recovery.rate as number;
+  config.version = CURRENT_GAME_VERSION;
+  config.naturalRecovery = {
+    combatRate: rate,
+    restRate: Math.min(1, rate * 2),
+    rounding: recovery.rounding,
+  };
+  state.gameVersion = CURRENT_GAME_VERSION;
+  candidate.gameVersion = CURRENT_GAME_VERSION;
+
+  // v1.2.5 kept a fixed-map capacity copy beside Config. Align that copy for
+  // validation without changing the source snapshot or applying the +5 yet.
+  synchronizeMapFacilityCapacities(candidate, config);
+  const payload = {
+    format: candidate.format,
+    formatVersion: candidate.formatVersion,
+    gameVersion: candidate.gameVersion,
+    mapId: candidate.mapId,
+    seed: candidate.seed,
+    state: candidate.state,
+  } as unknown as Omit<SaveEnvelope, 'checksum'>;
+  candidate.checksum = checksum(envelopePayload(payload));
+  return candidate;
+}
+
+/** Set map/state definition capacities from a copied Config snapshot. */
+function synchronizeMapFacilityCapacities(
+  candidate: Record<string, unknown>,
+  config: Record<string, unknown>,
+): void {
+  const configFacilities = isRecord(config.facilities) ? config.facilities : null;
+  const state = isRecord(candidate.state) ? candidate.state : null;
+  const map = state && isRecord(state.map) ? state.map : null;
+  if (!configFacilities || !state) return;
+  const apply = (entries: unknown): void => {
+    if (!Array.isArray(entries)) return;
+    for (const rawFacility of entries) {
+      if (!isRecord(rawFacility) || typeof rawFacility.type !== 'string') continue;
+      const configFacility = configFacilities[rawFacility.type];
+      if (isRecord(configFacility) && typeof configFacility.workerCapacity === 'number') {
+        rawFacility.workerCapacity = configFacility.workerCapacity;
+      }
+    }
+  };
+  apply(map?.facilities);
+  apply(state.facilities);
+}
+
+/** Apply the deterministic v1.2.5 -> v1.2.6 conversion to a private copy. */
+function migrateLegacySnapshot(value: Record<string, unknown>): SaveValidationResult {
+  const errors: string[] = [];
+  if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
+  if (value.formatVersion !== SAVE_FORMAT_VERSION) {
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.2.5 migration requires format ${SAVE_FORMAT_VERSION}`);
+  }
+  requireString(errors, value.mapId, 'mapId');
+  if (typeof value.seed !== 'number' || !Number.isSafeInteger(value.seed)) errors.push('seed must be a safe integer');
+  if (typeof value.checksum !== 'string' || !/^[0-9a-f]{8}$/u.test(value.checksum)) errors.push('checksum is invalid');
+  const state = isRecord(value.state) ? value.state : null;
+  if (!state) errors.push('state is required');
+  if (state && state.gameVersion !== value.gameVersion) errors.push('state/gameVersion does not match envelope');
+  if (state && state.mapId !== value.mapId) errors.push('state/mapId does not match envelope');
+  if (state && state.seed !== value.seed) errors.push('state/seed does not match envelope');
+  if (errors.length > 0) return legacyValidationError(errors);
+
+  const payload = {
+    format: value.format,
+    formatVersion: value.formatVersion,
+    gameVersion: value.gameVersion,
+    mapId: value.mapId,
+    seed: value.seed,
+    state: value.state,
+  } as unknown as Omit<SaveEnvelope, 'checksum'>;
+  if (checksum(envelopePayload(payload)) !== value.checksum) errors.push('checksum mismatch in v1.2.5 save');
+  errors.push(...validateLegacySchema(value));
+  if (errors.length > 0) return legacyValidationError(errors);
+
+  let validationCopy: Record<string, unknown>;
+  try {
+    validationCopy = normalizeLegacyForValidation(value);
+  } catch (error) {
+    return legacyValidationError([`v1.2.5 save could not be prepared for validation: ${error instanceof Error ? error.message : String(error)}`]);
+  }
+  const legacyValidation = validateSnapshot(validationCopy);
+  if (!legacyValidation.valid) {
+    return legacyValidationError(legacyValidation.errors.map((error) => `invalid v1.2.5 save: ${error}`));
+  }
+
+  let migrated: Record<string, unknown>;
+  try {
+    migrated = clone(value);
+    const migratedState = migrated.state as Record<string, unknown>;
+    const config = migratedState.config as Record<string, unknown>;
+    const recovery = config.naturalRecovery as Record<string, unknown>;
+    const rate = recovery.rate as number;
+    const configFacilities = config.facilities as Record<string, unknown>;
+    for (const type of PRODUCTION_FACILITY_TYPES) {
+      const facility = configFacilities[type] as Record<string, unknown>;
+      facility.workerCapacity = (facility.workerCapacity as number) + 5;
+    }
+    config.version = CURRENT_GAME_VERSION;
+    config.naturalRecovery = {
+      combatRate: rate,
+      restRate: Math.min(1, rate * 2),
+      rounding: recovery.rounding,
+    };
+    migratedState.gameVersion = CURRENT_GAME_VERSION;
+    migrated.gameVersion = CURRENT_GAME_VERSION;
+    synchronizeMapFacilityCapacities(migrated, config);
+    const migratedPayload = {
+      format: migrated.format,
+      formatVersion: migrated.formatVersion,
+      gameVersion: migrated.gameVersion,
+      mapId: migrated.mapId,
+      seed: migrated.seed,
+      state: migrated.state,
+    } as unknown as Omit<SaveEnvelope, 'checksum'>;
+    migrated.checksum = checksum(envelopePayload(migratedPayload));
+  } catch (error) {
+    return legacyValidationError([`v1.2.5 save migration failed: ${error instanceof Error ? error.message : String(error)}`]);
+  }
+
+  const result = validateSnapshot(migrated);
+  if (!result.valid) {
+    return legacyValidationError(result.errors.map((error) => `migrated save is invalid: ${error}`));
+  }
+  return { ...result, migrated: true };
+}
+
 /** Validate a decoded snapshot before it can reach GameEngine.LoadSnapshot. */
 export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (!isRecord(value)) return { valid: false, errors: ['Save envelope must be an object'], state: null, envelope: null };
+  if (value.gameVersion === LEGACY_GAME_VERSION) return migrateLegacySnapshot(value);
   // Inspect versions before returning on envelope errors so old saves always get
   // the actionable incompatibility message rather than a generic parse error.
   addVersionValidation(errors, value.gameVersion, 'gameVersion');

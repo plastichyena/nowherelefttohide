@@ -145,6 +145,10 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (hexKey(definition.position) !== hexKey(facility.position)) {
       errors.push(`Facility ${facility.id} position differs from map`);
     }
+    const configuredCapacity = state.config.facilities[facility.type]?.workerCapacity;
+    if (definition.workerCapacity !== configuredCapacity || facility.workerCapacity !== configuredCapacity) {
+      errors.push(`Facility ${facility.id} worker capacity must match config and map`);
+    }
     if (!isNonNegativeInteger(facility.workers) || !isNonNegativeInteger(facility.infected)) {
       errors.push(`Facility ${facility.id} population must be non-negative integers`);
     }

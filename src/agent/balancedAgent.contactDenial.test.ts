@@ -156,6 +156,11 @@ describe('Balanced Agent facility-contact denial', () => {
     observation.population.infected = 1;
 
     const police = unitByType(observation, 'police');
+    police.suppressionAvailableIfTurnEndsNow = true;
+    police.suppressionTargetId = infectedFacility.id;
+    police.suppressionCivilianDamage = 0;
+    police.recoveryClassIfTurnEndsNow = 'combat';
+    police.recoveryRateIfTurnEndsNow = 0.1;
     const guard = unitByType(observation, 'nationalGuard');
     guard.position = { q: 9, r: 7 };
     guard.movement = 5;
@@ -165,15 +170,11 @@ describe('Balanced Agent facility-contact denial', () => {
 
     const actions: GameAction[] = [
       { type: 'Move', unitId: guard.id, destination: eastEntrance },
-      { type: 'SuppressInfection', unitId: police.id, facilityId: infectedFacility.id },
+      { type: 'Wait', unitId: police.id },
     ];
     const result = new BalancedAgent().decide(observation, actions);
 
-    expect(result.action).toEqual({
-      type: 'SuppressInfection',
-      unitId: police.id,
-      facilityId: infectedFacility.id,
-    });
+    expect(result.action).toEqual({ type: 'Wait', unitId: police.id });
   });
 
   it('secures an unowned military factory when the military reserve is already below projected demand', () => {

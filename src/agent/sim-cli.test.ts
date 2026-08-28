@@ -31,13 +31,14 @@ describe('Batch Simulation CLI', () => {
     expect(report.comparisons).toHaveLength(2);
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.exitCode).toBe(0);
-    expect(report.schemaVersion).toBe('1.1.0');
-    expect(report.appVersion).toBe('1.2.5');
+    expect(report.schemaVersion).toBe('1.2.0');
+    expect(report.appVersion).toBe('1.2.6');
   });
 
   it('continues after a technical failure by default and stops only with fail-fast', () => {
     const initial = createAgentGame().reset({ seed: 1 });
     const failingFactory = (): AgentGame => ({
+      getApiInfo: () => createAgentGame().getApiInfo(),
       reset: () => initial,
       getObservation: () => initial,
       getLegalActions: () => { throw new Error('legal actions unavailable'); },

@@ -4,6 +4,7 @@ import { assertInvariants, validateInvariants } from './invariants';
 import { getHordeEntrance, getTile } from './map';
 import { findNearestOpenTiles, findShortestPath } from './path';
 import { SeededRng } from './rng';
+import { deriveUnitRecovery } from './recovery';
 import {
   getBlockingZombiesForCheckpoint,
   getBranchIdAt,
@@ -67,6 +68,15 @@ export interface MovePreview {
   interception: { interceptorId: string; position: HexCoord } | null;
 }
 
+export interface FacilityProductionProjection {
+  facilityId: string;
+  operatingWorkers: number;
+  inputs: Partial<Record<ResourceType, number>>;
+  outputs: Partial<Record<ResourceType, number>>;
+  powerGeneration: number;
+  stoppedReason: 'ruined' | 'infection' | 'not_owned' | 'no_workers' | 'power_unavailable' | 'input_shortage' | null;
+}
+
 const RESOURCE_TYPES: readonly ResourceType[] = ['food', 'civilianGoods', 'militaryGoods', 'fuel'];
 
 function error(action: GameAction | null, code: string, message: string): ActionError {
@@ -115,11 +125,54 @@ function stableFacilities(state: GameState, descending = false): FacilityState[]
   });
 }
 
-function effectiveRange(state: GameState, unit: UnitState): number {
+export function effectiveRange(state: Readonly<GameState>, unit: Readonly<UnitState>): number {
   if (unit.type === 'nationalGuard' && !state.resources.militarySupplyAvailable) {
     return Math.min(1, unit.range);
   }
   return unit.range;
+}
+
+export interface SuppressionProjection {
+  targetId: string;
+  targetKind: 'facility' | 'checkpoint';
+  suppressionPower: number;
+  projectedSuppression: number;
+  projectedCivilianDamage: number;
+}
+
+/** Conditional EndTurn suppression derived only from the current public state. */
+export function forecastUnitSuppression(
+  state: Readonly<GameState>,
+  unit: Readonly<UnitState>,
+): SuppressionProjection | null {
+  if (
+    !unit.isPlayerUnit ||
+    !unit.canAttack ||
+    unit.activity.attacked ||
+    unit.activity.intercepted
+  ) return null;
+  const key = hexKey(unit.position);
+  const facility = state.facilities.find((candidate) => hexKey(candidate.position) === key && candidate.infected > 0);
+  const checkpoint = state.checkpoints.find((candidate) => hexKey(candidate.position) === key && candidate.infected > 0);
+  const target = facility ?? checkpoint;
+  if (!target) return null;
+  const suppressionPower = unit.type === 'police'
+    ? state.config.infection.policeSuppression
+    : state.config.infection.nationalGuardSuppression;
+  const healthyPopulation = facility
+    ? facility.workers
+    : checkpoint
+      ? checkpoint.waiting + checkpoint.screening + checkpoint.approved
+      : 0;
+  return {
+    targetId: target.id,
+    targetKind: facility ? 'facility' : 'checkpoint',
+    suppressionPower,
+    projectedSuppression: Math.min(target.infected, suppressionPower),
+    projectedCivilianDamage: unit.type === 'nationalGuard'
+      ? Math.min(healthyPopulation, Math.ceil(suppressionPower * state.config.infection.nationalGuardCivilianDamageRate))
+      : 0,
+  };
 }
 
 function isAttackable(attacker: UnitState, target: UnitState): boolean {
@@ -147,7 +200,15 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string): void {
     state.statistics.unitLosses += 1;
     state.population.cumulativeDeaths += unit.population;
   }
-  emit(state, 'unit_destroyed', { unitId: unit.id, cause });
+  emit(state, 'unit_destroyed', {
+    unitId: unit.id,
+    unitType: unit.type,
+    isPlayerUnit: unit.isPlayerUnit,
+    cause,
+    q: unit.position.q,
+    r: unit.position.r,
+    inSupply: unit.isPlayerUnit ? isHexSupplied(state, unit.position) : false,
+  });
 }
 
 function dealDamage(state: GameState, target: UnitState, amount: number, sourceId: string, cause: string): void {
@@ -625,8 +686,32 @@ function processRefugees(state: GameState, rng: SeededRng): void {
   removeEmptyCheckpointRemnants(state);
 }
 
-function powerAndProduction(state: GameState): void {
+function emptyFacilityProjection(
+  facility: Readonly<FacilityState>,
+  stoppedReason: FacilityProductionProjection['stoppedReason'],
+): FacilityProductionProjection {
+  return {
+    facilityId: facility.id,
+    operatingWorkers: 0,
+    inputs: {},
+    outputs: {},
+    powerGeneration: 0,
+    stoppedReason,
+  };
+}
+
+function facilityStoppedReason(facility: Readonly<FacilityState>): FacilityProductionProjection['stoppedReason'] {
+  if (facility.status === 'ruined') return 'ruined';
+  if (facility.infected > 0) return 'infection';
+  if (facility.owner !== 'player' || facility.status !== 'owned') return 'not_owned';
+  if (facility.workers <= 0) return 'no_workers';
+  if (facility.operationalStatus !== 'operational') return 'power_unavailable';
+  return null;
+}
+
+function powerAndProduction(state: GameState): FacilityProductionProjection[] {
   const outputs: Record<ResourceType, number> = { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0 };
+  const projections = new Map<string, FacilityProductionProjection>();
   const activeFacilities = stableFacilities(state).filter(
     (facility) =>
       facility.owner === 'player' &&
@@ -673,12 +758,14 @@ function powerAndProduction(state: GameState): void {
 
   for (const facility of stableFacilities(state)) {
     if (facility.operationalStatus !== 'operational' || facility.workers <= 0) {
+      projections.set(facility.id, emptyFacilityProjection(facility, facilityStoppedReason(facility)));
       continue;
     }
     const rule = state.config.facilities[facility.type].production;
-    let working = isCityFacility(facility)
+    const staffedWorkers = isCityFacility(facility)
       ? Math.min(facility.workers, state.config.facilities[facility.type].workerCapacity)
       : facility.workers;
+    let working = staffedWorkers;
     for (const [resource, perWorker] of Object.entries(rule.inputs) as Array<[ResourceType, number]>) {
       if (perWorker > 0) {
         working = Math.min(working, Math.floor(state.resources[resource] / perWorker));
@@ -694,6 +781,18 @@ function powerAndProduction(state: GameState): void {
     for (const [resource, perWorker] of Object.entries(rule.outputs) as Array<[ResourceType, number]>) {
       outputs[resource] += perWorker * working;
     }
+    projections.set(facility.id, {
+      facilityId: facility.id,
+      operatingWorkers: working,
+      inputs: Object.fromEntries(
+        Object.entries(rule.inputs).map(([resource, perWorker]) => [resource, perWorker * working]),
+      ) as Partial<Record<ResourceType, number>>,
+      outputs: Object.fromEntries(
+        Object.entries(rule.outputs).map(([resource, perWorker]) => [resource, perWorker * working]),
+      ) as Partial<Record<ResourceType, number>>,
+      powerGeneration: rule.powerGeneration * staffedWorkers,
+      stoppedReason: working < staffedWorkers ? 'input_shortage' : null,
+    });
   }
   for (const resource of RESOURCE_TYPES) {
     if (outputs[resource] > 0) {
@@ -701,6 +800,9 @@ function powerAndProduction(state: GameState): void {
       emit(state, 'resource_produced', { resource, amount: outputs[resource] });
     }
   }
+  return stableFacilities(state).map(
+    (facility) => projections.get(facility.id) ?? emptyFacilityProjection(facility, facilityStoppedReason(facility)),
+  );
 }
 
 function removeWorkersForShortage(state: GameState, amount: number, resource: 'food' | 'civilianGoods'): number {
@@ -884,7 +986,7 @@ export function forecastEndTurn(state: Readonly<GameState>): EndTurnForecast {
   };
 }
 
-function processEconomy(state: GameState): void {
+function processEconomy(state: GameState): FacilityProductionProjection[] {
   synchronizePopulation(state);
   const consumers = resourceConsumerPopulation(state);
   const overcrowding = overcrowdingTerms(state);
@@ -917,11 +1019,13 @@ function processEconomy(state: GameState): void {
     removeWorkersForShortage(state, foodShortage, 'food');
     synchronizePopulation(state);
     if (checkImmediateDefeat(state)) {
-      return;
+      return stableFacilities(state).map((facility) => emptyFacilityProjection(facility, facilityStoppedReason(facility)));
     }
     removeWorkersForShortage(state, civilianShortage, 'civilianGoods');
     synchronizePopulation(state);
-    if (checkImmediateDefeat(state)) return;
+    if (checkImmediateDefeat(state)) {
+      return stableFacilities(state).map((facility) => emptyFacilityProjection(facility, facilityStoppedReason(facility)));
+    }
   }
 
   const militaryNeed = state.population.unitPopulation * state.config.economy.militaryGoodsPerUnitPopulation;
@@ -929,8 +1033,46 @@ function processEconomy(state: GameState): void {
   const militarySpent = Math.min(state.resources.militaryGoods, militaryNeed);
   state.resources.militaryGoods -= militarySpent;
   emit(state, 'resource_consumed', { resource: 'militaryGoods', amount: militarySpent, population: state.population.unitPopulation });
-  powerAndProduction(state);
+  const production = powerAndProduction(state);
   synchronizePopulation(state);
+  return production;
+}
+
+/**
+ * Project the deterministic facility production that would be resolved by
+ * ending the current turn. The private copy includes maintenance losses,
+ * secured-order power allocation, and partial input-resource operation.
+ */
+export function forecastFacilityProduction(
+  state: Readonly<GameState>,
+): FacilityProductionProjection[] {
+  const cloneStatistics = (statistics: Readonly<GameState['statistics']>): GameState['statistics'] => ({
+    ...statistics,
+    refugeeArrivalsByBranch: { ...statistics.refugeeArrivalsByBranch },
+    refugeesScreenedByPolicy: { ...statistics.refugeesScreenedByPolicy },
+  });
+  // Avoid copying the growing Event log for every Agent/UI observation. The
+  // economy projection mutates only these private economy-facing structures.
+  const snapshot: GameState = {
+    ...(state as GameState),
+    facilities: state.facilities.map((facility) => ({ ...facility, position: { ...facility.position } })),
+    population: {
+      ...state.population,
+      facilityWorkers: state.population.facilityWorkers.map((entry) => ({ ...entry })),
+    },
+    cityPopulationSnapshot: {
+      turn: state.cityPopulationSnapshot.turn,
+      supply: state.cityPopulationSnapshot.supply.map((entry) => ({ ...entry })),
+      reception: state.cityPopulationSnapshot.reception.map((entry) => ({ ...entry })),
+    },
+    resources: { ...state.resources },
+    events: [],
+    statistics: cloneStatistics(state.statistics),
+    result: state.result
+      ? { ...state.result, statistics: cloneStatistics(state.result.statistics) }
+      : null,
+  };
+  return processEconomy(snapshot);
 }
 
 function nearestSpawnPosition(state: GameState, origin: HexCoord, rng: SeededRng): HexCoord | null {
@@ -1350,25 +1492,25 @@ function checkImmediateDefeat(state: GameState): boolean {
 function startPlayerTurn(state: GameState, rng: SeededRng): void {
   for (const branch of state.roadBranches) branch.checkpointActionsThisTurn = 0;
   for (const unit of state.units.filter((candidate) => candidate.isPlayerUnit)) {
-    const activity = unit.activity;
-    if (
-      !activity.moved &&
-      !activity.attacked &&
-      !activity.intercepted &&
-      !activity.suppressed &&
-      isHexSupplied(state, unit.position)
-    ) {
-      const recovery = unit.maxHp * state.config.naturalRecovery.rate;
-      const amount = state.config.naturalRecovery.rounding === 'ceil' ? Math.ceil(recovery) : Math.floor(recovery);
-      unit.hp = Math.min(unit.maxHp, unit.hp + amount);
-    } else if (
-      unit.hp < unit.maxHp &&
-      !activity.moved &&
-      !activity.attacked &&
-      !activity.intercepted &&
-      !activity.suppressed &&
-      !isHexSupplied(state, unit.position)
-    ) {
+    const recovery = deriveUnitRecovery(state, unit);
+    if (recovery.recoveryClass !== 'outOfSupply' && unit.hp < unit.maxHp) {
+      const beforeHp = unit.hp;
+      unit.hp = Math.min(unit.maxHp, unit.hp + recovery.baseAmount);
+      const actualAmount = unit.hp - beforeHp;
+      if (actualAmount > 0) {
+        emit(state, 'unit_recovered', {
+          unitId: unit.id,
+          unitType: unit.type,
+          beforeHp,
+          baseAmount: recovery.baseAmount,
+          actualAmount,
+          afterHp: unit.hp,
+          recoveryClass: recovery.recoveryClass,
+          rate: recovery.rate,
+          inSupply: true,
+        });
+      }
+    } else if (unit.hp < unit.maxHp && recovery.recoveryClass === 'outOfSupply') {
       emit(state, 'supply_action_rejected', { unitId: unit.id, reason: 'recovery_out_of_supply' });
     }
     unit.actionState = 'ready';
@@ -1914,21 +2056,6 @@ function wait(state: GameState, action: Extract<GameAction, { type: 'Wait' }>): 
   return null;
 }
 
-function manualSuppress(state: GameState, action: Extract<GameAction, { type: 'SuppressInfection' }>): ActionError | null {
-  const budget = playerActionBudgetError(state, action);
-  if (budget) return budget;
-  const unit = getUnit(state, action.unitId);
-  const facility = getFacilityState(state, action.facilityId);
-  if (!unit?.isPlayerUnit || !facility || hexKey(unit.position) !== hexKey(facility.position) || facility.infected <= 0) {
-    return error(action, 'suppression_not_legal', 'A human unit must be stationed at an infected facility');
-  }
-  suppressFacility(state, facility, unit);
-  state.actionsTakenThisTurn += 1;
-  synchronizePopulation(state);
-  checkImmediateDefeat(state);
-  return null;
-}
-
 /** Lightweight, non-mutating validation for callers that need an error reason. */
 export function validateAction(state: Readonly<GameState>, action: GameAction): ActionError | null {
   if (state.gameOver) return error(action, 'game_over', 'The game is over');
@@ -1958,7 +2085,6 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   if (action.type === 'Move') return move(candidate, action);
   if (action.type === 'Attack') return attack(candidate, action);
   if (action.type === 'Wait') return wait(candidate, action);
-  if (action.type === 'SuppressInfection') return manualSuppress(candidate, action);
   if (action.type === 'AssignWorkers') return assignWorkers(candidate, action);
   if (action.type === 'TransferPopulation') return transferPopulation(candidate, action);
   if (action.type === 'SetCheckpointPolicy') return setCheckpointPolicy(candidate, action);
@@ -2124,7 +2250,7 @@ export class GameEngine implements HeadlessGame {
     else if (action.type === 'BuildCheckpoint') actionError = buildCheckpoint(candidate, action);
     else if (action.type === 'RelocateCheckpoint') actionError = relocateCheckpoint(candidate, action);
     else if (action.type === 'ProduceUnit') actionError = produceUnit(candidate, action);
-    else if (action.type === 'SuppressInfection') actionError = manualSuppress(candidate, action);
+    else actionError = error(action, 'unknown_action', 'Unknown or retired action');
 
     if (actionError) {
       return { state: this.getState(), events: [], error: actionError, gameOver: this.isGameOver(), result: this.getResult() };

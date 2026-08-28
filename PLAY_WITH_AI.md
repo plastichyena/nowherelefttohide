@@ -1,6 +1,6 @@
 # Play Nowhere Left to Hide with an AI
 
-This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals.
+This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.2.6.
 
 The portable AI package produced by GitHub Actions contains this repository, installed dependencies, and a Linux x64 Node.js runtime. No separate Node.js installation or `npm install` is required after extracting the package.
 
@@ -30,6 +30,7 @@ For custom TypeScript driver scripts, use the bundled `vite-node` launcher inste
 
 A custom LLM player should import `createAgentGame` from `game/src/agent/game.ts` and interact only through the public AgentGame methods:
 
+- `getApiInfo()`
 - `reset(options?)`
 - `getObservation()`
 - `getLegalActions()`
@@ -40,14 +41,27 @@ A custom LLM player should import `createAgentGame` from `game/src/agent/game.ts
 
 Recommended loop:
 
-1. `reset`
-2. inspect `getObservation`
-3. inspect `getLegalActions`
-4. choose exactly one listed legal action
-5. explain the reason for the choice
-6. call `step`
-7. repeat until `isGameOver()` is true
-8. report `getResult()` and keep `getRunArtifact()` for replay/debugging
+1. `getApiInfo()` to read the versioned contract and static rules
+2. `reset`
+3. inspect `getObservation`
+4. inspect `getLegalActions`
+5. choose exactly one listed legal action
+6. explain the reason for the choice
+7. call `step`
+8. repeat until `isGameOver()` is true
+9. report `getResult()` and keep `getRunArtifact()` for replay/debugging
+
+## v1.2.6 tactical context
+
+Use the current `AgentObservation` as the source of truth for conditional forecasts. It does not reveal future random draws or private state.
+
+- A surviving supplied unit recovers at the next player-turn start. Combat, counterattack, interception, or automatic infection suppression uses the configured 10% combat rate; only moving, waiting, or taking no action uses the configured 20% rest rate; out of supply is 0%. The observation reports the class, rate, base amount, timing, and survival/supply conditions.
+- A police or National Guard unit stationed at an infected location contains internal spread. If it still has an attack available and did not spend it on normal combat, the engine can automatically suppress during the infection phase after End Turn. Police suppression has no civilian damage; National Guard suppression is stronger but can cause civilian damage.
+- Use `baseRange` and `effectiveRange` rather than assuming a unit's range. National Guard is base range 2, falling to effective range 1 while military supply is short.
+- Production-facility worker capacity is 30. Facility observations expose per-worker inputs/outputs, current estimates, power requirements or generation, stop reasons, and losses if infection or overrun removes the current operation. A power-plant stoppage can affect other powered facilities.
+- Checkpoint observations show screening pools and current policy. `getApiInfo().rules.checkpointPolicies` gives the static screening time, acceptance, infection chance, and infected-population rate for Pass through, Normal, and Strict. These are trade-offs; no policy is always correct.
+
+There is no public `SuppressInfection` action. Infection response is resolved by the engine at End Turn, so select a listed movement, attack, wait, domestic, checkpoint, or End Turn action instead.
 
 ## Fair-play boundary
 

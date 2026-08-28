@@ -26,10 +26,18 @@ describe('unified Agent Runner', () => {
     expect(replay.actionsReplayed).toBe(first.actions.length);
   });
 
-  it('rejects pre-v1.2.5 artifacts before creating a replay session', () => {
+  it('rejects v1.2.5 artifacts before creating a v1.2.6 replay session', () => {
     const config = createDefaultConfig({ maxTurns: 1 });
     const run = runAgentGame(2, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 3 } });
-    const oldArtifact = { ...run.artifact, appVersion: '1.2.0' };
+    const oldArtifact = {
+      ...run.artifact,
+      appVersion: '1.2.5',
+      gameRulesVersion: '1.2.0',
+      artifactSchemaVersion: '1.1.0',
+      agentApiVersion: '1.1.0',
+      observationApiVersion: '1.1.0',
+      bridgeApiVersion: '1.1.0',
+    };
     const replay = replayArtifact(oldArtifact);
     expect(replay.reproduced).toBe(false);
     expect(replay.error?.code).toBe('artifact_version_unsupported');
@@ -59,6 +67,7 @@ describe('unified Agent Runner', () => {
     let state = { value: 0 };
     const initialObservation = createAgentGame().reset({ seed: 1 });
     const game: AgentGame = {
+      getApiInfo: () => createAgentGame().getApiInfo(),
       reset: () => initialObservation,
       getObservation: () => initialObservation,
       getLegalActions: () => [{ type: 'EndTurn' }],
