@@ -173,7 +173,7 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
   .bottom-sheet[data-sheet="expanded"] { height: min(54dvh, 520px, calc(100dvh - var(--sheet-chrome))); max-height: min(54dvh, 520px, calc(100dvh - var(--sheet-chrome))); }
 }
 
-/* v1.2.6 supply, forecast, and checkpoint planning states */
+/* v1.2.7 supply, forecast, power, and checkpoint planning states */
 .top-hud { grid-template-columns: minmax(82px, 1fr) max-content max-content 44px 44px; }
 .supply-toggle { color: var(--primary); }
 .supply-toggle[aria-pressed="true"] { background: #215c5e; border-color: var(--primary); box-shadow: inset 0 0 0 1px #7ee8df66; }

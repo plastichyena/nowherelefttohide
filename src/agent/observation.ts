@@ -157,8 +157,8 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
       const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
       const productionProjection = productionByFacility.get(facility.id);
       const currentWorkers = productionProjection?.operatingWorkers ?? 0;
-      const estimatedInputs = multiplyResources(rule.inputs, currentWorkers);
-      const estimatedOutputs = multiplyResources(rule.outputs, currentWorkers);
+      const estimatedInputs = productionProjection?.inputs ?? multiplyResources(rule.inputs, currentWorkers);
+      const estimatedOutputs = productionProjection?.outputs ?? multiplyResources(rule.outputs, currentWorkers);
       const stoppedReason = productionProjection ? productionProjection.stoppedReason : 'stopped';
       return {
         id: facility.id,
@@ -192,6 +192,16 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
           requiresPower: rule.requiresPower,
           requiredPowerCapacity: rule.powerCapacity,
           powerGenerationPerWorker: rule.powerGeneration,
+          powerMode: rule.powerMode,
+          powerDemand: rule.powerCapacity,
+          powerSupplyEnabled: facility.powerSupplyEnabled,
+          projectedPowerRequested: productionProjection?.projectedPowerRequested ?? false,
+          projectedPowerSupplied: productionProjection?.projectedPowerSupplied ?? false,
+          projectedPowerReason: productionProjection?.projectedPowerReason ?? 'not_applicable',
+          lastPowerSupplied: facility.lastPowerSupplied,
+          projectedProductionMultiplier: productionProjection?.productionMultiplier ?? 1,
+          baseProduction: cloneJson(productionProjection?.baseOutputs ?? {}),
+          projectedProduction: cloneJson(estimatedOutputs),
           estimatedInputConsumption: estimatedInputs,
           estimatedOutput: estimatedOutputs,
           estimatedPowerGeneration: productionProjection?.powerGeneration ?? 0,

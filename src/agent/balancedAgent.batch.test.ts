@@ -4,7 +4,9 @@ import { createAgentGame } from './game';
 
 describe('Balanced Agent 30-seed regression', () => {
   const finalTurns = new Map<number, number>();
-  const seedBatches = Array.from({ length: 3 }, (_, index) => ({ start: index * 10 + 1, end: index * 10 + 10 }));
+  // Keep each CI case comfortably below the per-test timeout while preserving
+  // the same deterministic 30-seed coverage.
+  const seedBatches = Array.from({ length: 6 }, (_, index) => ({ start: index * 5 + 1, end: index * 5 + 5 }));
 
   it.each(seedBatches)('completes standard-config seeds $start through $end without technical failure', async ({ start, end }) => {
     for (let seed = start; seed <= end; seed += 1) {

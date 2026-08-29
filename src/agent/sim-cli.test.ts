@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
 import { createAgentGame } from './game';
-import { csvColumns, parseSimulationArgs, runSimulation, writeSimulationOutput } from './sim-cli';
+import { csvColumns, metricsToCsv, parseSimulationArgs, runSimulation, writeSimulationOutput } from './sim-cli';
 import type { AgentGame } from './types';
 
 describe('Batch Simulation CLI', () => {
@@ -31,8 +31,8 @@ describe('Batch Simulation CLI', () => {
     expect(report.comparisons).toHaveLength(2);
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.exitCode).toBe(0);
-    expect(report.schemaVersion).toBe('1.2.0');
-    expect(report.appVersion).toBe('1.2.6');
+    expect(report.schemaVersion).toBe('1.3.0');
+    expect(report.appVersion).toBe('1.2.7');
   });
 
   it('continues after a technical failure by default and stops only with fail-fast', () => {
@@ -67,6 +67,22 @@ describe('Batch Simulation CLI', () => {
     expect(paths.gamesCsv.endsWith('games.csv')).toBe(true);
     expect(csvColumns()).toContain('arrivals.north');
     expect(csvColumns()).toContain('checkpointsRelocated');
+    expect(csvColumns()).toEqual(expect.arrayContaining([
+      'poweredIndustrialFacilityTurns',
+      'unpoweredCityTurns',
+      'refineryFacilitiesCaptured',
+      'powerPlantFacilitiesCaptured',
+    ]));
+    const [header, row] = metricsToCsv(report.games).trim().split('\n').map((line) => line.split(','));
+    expect(row).toHaveLength(header!.length);
+    for (const key of [
+      'poweredIndustrialFacilityTurns',
+      'unpoweredCityTurns',
+      'refineryFacilitiesCaptured',
+      'powerPlantFacilitiesCaptured',
+    ] as const) {
+      expect(row![header!.indexOf(key)]).toBe(String(report.games[0]![key]));
+    }
     expect(() => writeSimulationOutput(report, output)).toThrow(/overwrite|empty/i);
   });
 });

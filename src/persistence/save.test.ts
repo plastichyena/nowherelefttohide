@@ -10,6 +10,7 @@ import {
   LEGACY_GAME_VERSION,
   LEGACY_AUTOSAVE_KEY,
   SAVE_FORMAT_VERSION,
+  V126_GAME_VERSION,
   decodeSaveCode,
   encodeSaveCode,
   exportSaveJson,
@@ -29,8 +30,29 @@ class MemoryStorage {
   removeItem(key: string): void { this.removals.push(key); this.values.delete(key); }
 }
 
-function legacyState(seed = 42): GameState {
+function legacyV126State(seed = 42): GameState {
   const state = initialState(seed);
+  state.gameVersion = V126_GAME_VERSION;
+  state.config.version = V126_GAME_VERSION;
+  for (const type of ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant'] as const) {
+    const production = state.config.facilities[type].production as unknown as Record<string, unknown>;
+    delete production.powerMode;
+    production.requiresPower = type !== 'refinery' && type !== 'powerPlant';
+    if (['farm', 'civilianFactory', 'militaryFactory'].includes(type)) {
+      (production.inputs as Record<string, unknown>).fuel = 1;
+    }
+    if (type === 'powerPlant') production.powerGeneration = 5;
+  }
+  for (const facility of state.facilities) {
+    const rawFacility = facility as unknown as Record<string, unknown>;
+    delete rawFacility.powerSupplyEnabled;
+    delete rawFacility.lastPowerSupplied;
+  }
+  return state;
+}
+
+function legacyState(seed = 42): GameState {
+  const state = legacyV126State(seed);
   state.gameVersion = LEGACY_GAME_VERSION;
   state.config.version = LEGACY_GAME_VERSION;
   state.config.naturalRecovery = { rate: 0.1, rounding: 'ceil' } as unknown as GameState['config']['naturalRecovery'];
@@ -91,12 +113,70 @@ describe('save format', () => {
       status: 'ruined',
       owner: 'none',
     });
+    expect(decoded.state?.config.facilities.farm.production).toMatchObject({ powerMode: 'boost', requiresPower: false });
+    expect(decoded.state?.config.facilities.farm.production.inputs).not.toHaveProperty('fuel');
+    expect(decoded.state?.config.facilities.militaryFactory.production.inputs).toEqual({ civilianGoods: 1 });
+    expect(decoded.state?.config.facilities.powerPlant.production).toMatchObject({ powerMode: 'none', powerGeneration: 10 });
+    expect(decoded.state?.facilities.find((facility) => facility.type === 'farm')).toMatchObject({ powerSupplyEnabled: true, lastPowerSupplied: null });
+    expect(decoded.state?.facilities.find((facility) => facility.type === 'powerPlant')).toMatchObject({ powerSupplyEnabled: false, lastPowerSupplied: null });
     expect(decoded.state?.map.facilities.find((facility) => facility.id === 'farm-1')?.workerCapacity).toBe(30);
     expect(decoded.state?.population.cumulativeDeaths).toBe(source.population.cumulativeDeaths);
     expect(JSON.stringify(source)).toBe(sourceBefore);
 
     const jsonResult = importSaveJson(exportSaveJson(source));
     expect(jsonResult).toMatchObject({ valid: true, migrated: true, state: decoded.state });
+  });
+
+  it('migrates a v1.2.6 Save Code directly to v1.3.0 without changing gameplay data', () => {
+    const source = legacyV126State(48);
+    const sourceBefore = JSON.stringify(source);
+    const preserved = {
+      population: source.population,
+      resources: source.resources,
+      turn: source.turn,
+      maxTurns: source.maxTurns,
+      actionsTakenThisTurn: source.actionsTakenThisTurn,
+      rngState: source.rngState,
+      map: source.map,
+      checkpoints: source.checkpoints,
+      roadBranches: source.roadBranches,
+      events: source.events,
+      units: source.units,
+    };
+    const result = decodeSaveCode(encodeSaveCode(source));
+    expect(result).toMatchObject({ valid: true, migrated: true });
+    expect(result.state?.gameVersion).toBe(CURRENT_GAME_VERSION);
+    expect(result.state?.config.version).toBe(CURRENT_GAME_VERSION);
+    expect(result.state?.population).toEqual(preserved.population);
+    expect(result.state?.resources).toEqual(preserved.resources);
+    expect(result.state?.turn).toBe(preserved.turn);
+    expect(result.state?.maxTurns).toBe(preserved.maxTurns);
+    expect(result.state?.actionsTakenThisTurn).toBe(preserved.actionsTakenThisTurn);
+    expect(result.state?.rngState).toEqual(preserved.rngState);
+    expect(result.state?.map).toEqual(preserved.map);
+    expect(result.state?.checkpoints).toEqual(preserved.checkpoints);
+    expect(result.state?.roadBranches).toEqual(preserved.roadBranches);
+    expect(result.state?.events).toEqual(preserved.events);
+    expect(result.state?.units).toEqual(preserved.units);
+    expect(result.state?.config.facilities.powerPlant.production.powerGeneration).toBe(10);
+    for (const type of ['farm', 'civilianFactory', 'militaryFactory'] as const) {
+      const production = result.state?.config.facilities[type].production;
+      expect(production?.powerMode).toBe('boost');
+      expect(production?.requiresPower).toBe(false);
+      expect(production?.inputs).not.toHaveProperty('fuel');
+    }
+    expect(result.state?.config.facilities.militaryFactory.production.inputs).toEqual({ civilianGoods: 1 });
+    expect(result.state?.facilities.filter((facility) => ['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type)).every((facility) => facility.powerSupplyEnabled && facility.lastPowerSupplied === null)).toBe(true);
+    expect(result.state?.facilities.filter((facility) => !['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type)).every((facility) => !facility.powerSupplyEnabled && facility.lastPowerSupplied === null)).toBe(true);
+    expect(JSON.stringify(source)).toBe(sourceBefore);
+  });
+
+  it('rejects current saves whose facility power capacity breaks the fixed v1.2.7 contract', () => {
+    const state = initialState(481);
+    state.config.facilities.capital.production.powerCapacity = 3;
+    const result = decodeSaveCode(encodeSaveCode(state));
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('config.facilities.capital.production.powerCapacity must be 5');
   });
 
   it('adds five to custom production capacities and doubles custom recovery up to one', () => {
@@ -141,6 +221,26 @@ describe('save format', () => {
     expect(invalidConfig.valid).toBe(false);
     expect(invalidConfig.state).toBeNull();
     expect(invalidConfig.errors.join(' ')).toMatch(/rate/i);
+
+    const storage = new MemoryStorage();
+    storage.setItem(DEFAULT_AUTOSAVE_KEY, validCode);
+    const writesBeforeLoad = storage.writes.length;
+    const loaded = new AutoSaveStore({ storage }).load();
+    expect(loaded).toMatchObject({ valid: true, migrated: true });
+    expect(storage.getItem(DEFAULT_AUTOSAVE_KEY)).toBe(validCode);
+    expect(storage.writes.length).toBe(writesBeforeLoad);
+    expect(storage.removals).toEqual([]);
+  });
+
+  it('rejects invalid v1.2.6 data before migration and never rewrites the source', () => {
+    const source = legacyV126State(49);
+    const validCode = encodeSaveCode(source);
+    const envelope = JSON.parse(exportSaveJson(source)) as Record<string, unknown>;
+    envelope.checksum = '00000000';
+    const checksumFailure = importSaveJson(JSON.stringify(envelope));
+    expect(checksumFailure.valid).toBe(false);
+    expect(checksumFailure.state).toBeNull();
+    expect(checksumFailure.errors.join(' ')).toMatch(/checksum/i);
 
     const storage = new MemoryStorage();
     storage.setItem(DEFAULT_AUTOSAVE_KEY, validCode);
@@ -223,6 +323,14 @@ describe('save format', () => {
     });
     expect(missingOperationalTurn.valid).toBe(false);
     expect(missingOperationalTurn.errors.join(' ')).toContain('populationOperationalTurn');
+
+    const missingPowerState = mutate((state) => {
+      const facilities = state.facilities as Array<Record<string, unknown>>;
+      delete facilities[0]!.powerSupplyEnabled;
+      delete facilities[0]!.lastPowerSupplied;
+    });
+    expect(missingPowerState.valid).toBe(false);
+    expect(missingPowerState.errors.join(' ')).toMatch(/powerSupplyEnabled|lastPowerSupplied/);
 
     const source = initialState();
     const checkpoint = {

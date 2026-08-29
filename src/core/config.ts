@@ -14,7 +14,7 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '1.2.1';
+export const CONFIG_VERSION = '1.3.0';
 export const DEFAULT_MAP_ID = 'fixed-15x15-v1';
 
 const facilityIds: FacilityId[] = [
@@ -42,11 +42,11 @@ const emptyOutputs = (): ProductionRule['outputs'] => ({});
 function production(
   inputs: ProductionRule['inputs'],
   outputs: ProductionRule['outputs'],
-  requiresPower: boolean,
+  powerMode: ProductionRule['powerMode'],
   powerCapacity = 0,
   powerGeneration = 0,
 ): ProductionRule {
-  return { inputs, outputs, requiresPower, powerCapacity, powerGeneration };
+  return { inputs, outputs, powerMode, requiresPower: powerMode === 'required', powerCapacity, powerGeneration };
 }
 
 const defaultUnitConfig: Record<UnitType, UnitConfig> = {
@@ -58,37 +58,37 @@ const defaultUnitConfig: Record<UnitType, UnitConfig> = {
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
   capital: {
     workerCapacity: 100,
-    production: production(emptyInputs(), { civilianGoods: 1 }, true, 5),
+    production: production(emptyInputs(), { civilianGoods: 1 }, 'required', 5),
     overrunSpawnCount: 2,
   },
   city: {
     workerCapacity: 50,
-    production: production(emptyInputs(), { civilianGoods: 1 }, true, 5),
+    production: production(emptyInputs(), { civilianGoods: 1 }, 'required', 5),
     overrunSpawnCount: 2,
   },
   farm: {
     workerCapacity: 30,
-    production: { ...production({ fuel: 1 }, { food: 5 }, true, 5) },
+    production: production(emptyInputs(), { food: 5 }, 'boost', 5),
     overrunSpawnCount: 2,
   },
   civilianFactory: {
     workerCapacity: 30,
-    production: production({ fuel: 1 }, { civilianGoods: 5 }, true, 5),
+    production: production(emptyInputs(), { civilianGoods: 5 }, 'boost', 5),
     overrunSpawnCount: 2,
   },
   militaryFactory: {
     workerCapacity: 30,
-    production: production({ fuel: 1, civilianGoods: 1 }, { militaryGoods: 2 }, true, 5),
+    production: production({ civilianGoods: 1 }, { militaryGoods: 2 }, 'boost', 5),
     overrunSpawnCount: 2,
   },
   refinery: {
     workerCapacity: 30,
-    production: production(emptyInputs(), { fuel: 5 }, false),
+    production: production(emptyInputs(), { fuel: 5 }, 'none'),
     overrunSpawnCount: 2,
   },
   powerPlant: {
     workerCapacity: 30,
-    production: production(emptyInputs(), emptyOutputs(), false, 0, 5),
+    production: production(emptyInputs(), emptyOutputs(), 'none', 0, 10),
     overrunSpawnCount: 2,
   },
 };
@@ -327,6 +327,24 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     }
     requireInteger(errors, facility.production.powerCapacity, `facilities.${type}.production.powerCapacity`, 0);
     requireInteger(errors, facility.production.powerGeneration, `facilities.${type}.production.powerGeneration`, 0);
+    if (!['required', 'boost', 'none'].includes(facility.production.powerMode)) {
+      errors.push(`facilities.${type}.production.powerMode must be required, boost, or none`);
+    }
+    const expectedPowerMode = type === 'capital' || type === 'city'
+      ? 'required'
+      : ['farm', 'civilianFactory', 'militaryFactory'].includes(type)
+        ? 'boost'
+        : 'none';
+    if (facility.production.powerMode !== expectedPowerMode) {
+      errors.push(`facilities.${type}.production.powerMode must be ${expectedPowerMode}`);
+    }
+    const expectedPowerCapacity = expectedPowerMode === 'none' ? 0 : 5;
+    if (facility.production.powerCapacity !== expectedPowerCapacity) {
+      errors.push(`facilities.${type}.production.powerCapacity must be ${expectedPowerCapacity}`);
+    }
+    if (facility.production.requiresPower !== (expectedPowerMode === 'required')) {
+      errors.push(`facilities.${type}.production.requiresPower is inconsistent with powerMode`);
+    }
     if (!facility.production.inputs || typeof facility.production.inputs !== 'object') {
       errors.push(`facilities.${type}.production.inputs is required`);
     } else {

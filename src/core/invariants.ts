@@ -158,6 +158,15 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (!Number.isSafeInteger(facility.populationOperationalTurn) || facility.populationOperationalTurn < 1) {
       errors.push(`Facility ${facility.id} has an invalid population operational turn`);
     }
+    if (typeof facility.powerSupplyEnabled !== 'boolean') {
+      errors.push(`Facility ${facility.id} has an invalid Power Supply setting`);
+    }
+    if (facility.lastPowerSupplied !== null && typeof facility.lastPowerSupplied !== 'boolean') {
+      errors.push(`Facility ${facility.id} has an invalid last Power Supply result`);
+    }
+    if (!['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type) && facility.powerSupplyEnabled) {
+      errors.push(`Facility ${facility.id} cannot request industrial boost power`);
+    }
     if (facility.status === 'unowned' && facility.owner !== 'none') {
       errors.push(`Unowned facility ${facility.id} must not have a player owner`);
     }

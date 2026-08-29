@@ -54,6 +54,7 @@ import type {
   HumanUnitType,
   JsonObject,
   MoveAction,
+  PowerSupplyReason,
   ResourceType,
   StepResult,
   UnitProductionOrder,
@@ -74,6 +75,14 @@ export interface FacilityProductionProjection {
   inputs: Partial<Record<ResourceType, number>>;
   outputs: Partial<Record<ResourceType, number>>;
   powerGeneration: number;
+  powerMode: 'required' | 'boost' | 'none';
+  powerSupplyEnabled: boolean;
+  projectedPowerRequested: boolean;
+  projectedPowerSupplied: boolean;
+  projectedPowerReason: PowerSupplyReason;
+  lastPowerSupplied: boolean | null;
+  productionMultiplier: number;
+  baseOutputs: Partial<Record<ResourceType, number>>;
   stoppedReason: 'ruined' | 'infection' | 'not_owned' | 'no_workers' | 'power_unavailable' | 'input_shortage' | null;
 }
 
@@ -696,6 +705,14 @@ function emptyFacilityProjection(
     inputs: {},
     outputs: {},
     powerGeneration: 0,
+    powerMode: 'none',
+    powerSupplyEnabled: false,
+    projectedPowerRequested: false,
+    projectedPowerSupplied: false,
+    projectedPowerReason: 'not_applicable',
+    lastPowerSupplied: facility.lastPowerSupplied,
+    productionMultiplier: 1,
+    baseOutputs: {},
     stoppedReason,
   };
 }
@@ -709,100 +726,267 @@ function facilityStoppedReason(facility: Readonly<FacilityState>): FacilityProdu
   return null;
 }
 
-function powerAndProduction(state: GameState): FacilityProductionProjection[] {
-  const outputs: Record<ResourceType, number> = { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0 };
-  const projections = new Map<string, FacilityProductionProjection>();
-  const activeFacilities = stableFacilities(state).filter(
-    (facility) =>
-      facility.owner === 'player' &&
-      facility.status === 'owned' &&
-      facility.infected === 0 &&
-      facility.workers > 0,
+interface EconomyPlan {
+  forecast: EndTurnForecast;
+  facilities: FacilityProductionProjection[];
+}
+
+function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
+  const facilities = stableFacilities(state as GameState);
+  const isOwned = (facility: Readonly<FacilityState>) => facility.owner === 'player' && facility.status === 'owned';
+  const canProduce = (facility: Readonly<FacilityState>) => isOwned(facility) && facility.infected === 0 && facility.workers > 0;
+  const consumers = state.facilities.reduce(
+    (total, facility) => total + (facility.owner === 'player' ? facility.workers : 0),
+    state.population.unitPopulation,
   );
-  const capacity = activeFacilities
-    .filter((facility) => facility.type === 'powerPlant')
-    .reduce(
-      (sum, facility) => sum + facility.workers * state.config.facilities[facility.type].production.powerGeneration,
-      0,
-    );
-  const powered = activeFacilities.filter(
-    (facility) => state.config.facilities[facility.type].production.requiresPower,
+  const overcrowding = overcrowdingTerms(state);
+  const normalFood = consumers * state.config.economy.populationConsumption.food;
+  const normalCivilian = consumers * state.config.economy.populationConsumption.civilianGoods;
+  const maintenance = {
+    food: normalFood + overcrowdingAdditionalConsumption(normalFood, overcrowding),
+    civilianGoods: normalCivilian + overcrowdingAdditionalConsumption(normalCivilian, overcrowding),
+    militaryGoods: state.population.unitPopulation * state.config.economy.militaryGoodsPerUnitPopulation,
+  };
+
+  const physicalGenerationCapacity = facilities
+    .filter((facility) => facility.type === 'powerPlant' && canProduce(facility))
+    .reduce((total, facility) => total + facility.workers * state.config.facilities.powerPlant.production.powerGeneration, 0);
+  const fuelLimitedGenerationCapacity = state.resources.fuel * 5;
+  const availableGenerationCapacity = Math.floor(
+    Math.min(physicalGenerationCapacity, fuelLimitedGenerationCapacity) / 5,
+  ) * 5;
+  let remainingPower = availableGenerationCapacity;
+  const supplied = new Set<string>();
+  const requested = new Set<string>();
+  const reasons = new Map<string, PowerSupplyReason>();
+  const allocate = (targets: FacilityState[]): number => {
+    let allocated = 0;
+    let lostInTier = false;
+    for (const facility of targets) {
+      const demand = state.config.facilities[facility.type].production.powerCapacity;
+      requested.add(facility.id);
+      if (remainingPower >= demand) {
+        remainingPower -= demand;
+        allocated += demand;
+        supplied.add(facility.id);
+        reasons.set(facility.id, 'supplied');
+      } else {
+        const underlying: PowerSupplyReason = physicalGenerationCapacity <= fuelLimitedGenerationCapacity
+          ? 'physical_capacity_shortage'
+          : 'fuel_shortage';
+        reasons.set(facility.id, lostInTier ? 'allocation_priority' : underlying);
+        lostInTier = true;
+      }
+    }
+    return allocated;
+  };
+
+  const requiredTargets = facilities.filter(
+    (facility) => isOwned(facility) && isCityFacility(facility) && facility.workers > 0,
   );
-  state.resources.electricityCapacity = capacity;
-  state.resources.electricityRequired = powered.reduce(
-    (sum, facility) => sum + state.config.facilities[facility.type].production.powerCapacity,
+  const requiredPowerDemand = requiredTargets.reduce(
+    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
     0,
   );
-  let remainingCapacity = capacity;
-  for (const facility of stableFacilities(state)) {
-    if (
-      facility.owner !== 'player' ||
-      facility.status !== 'owned' ||
-      facility.workers <= 0 ||
-      facility.infected > 0
-    ) {
-      facility.operationalStatus =
-        facility.status === 'ruined' ? 'ruined' : facility.infected > 0 ? 'infected' : 'stopped';
-      continue;
-    }
-    const rule = state.config.facilities[facility.type].production;
-    if (!rule.requiresPower || remainingCapacity >= rule.powerCapacity) {
-      facility.operationalStatus = 'operational';
-      if (rule.requiresPower) {
-        remainingCapacity -= rule.powerCapacity;
-      }
-    } else {
-      facility.operationalStatus = 'stopped';
-    }
-  }
+  const requiredPowerAllocated = allocate(requiredTargets);
 
-  for (const facility of stableFacilities(state)) {
-    if (facility.operationalStatus !== 'operational' || facility.workers <= 0) {
-      projections.set(facility.id, emptyFacilityProjection(facility, facilityStoppedReason(facility)));
-      continue;
-    }
-    const rule = state.config.facilities[facility.type].production;
-    const staffedWorkers = isCityFacility(facility)
-      ? Math.min(facility.workers, state.config.facilities[facility.type].workerCapacity)
-      : facility.workers;
-    let working = staffedWorkers;
-    for (const [resource, perWorker] of Object.entries(rule.inputs) as Array<[ResourceType, number]>) {
-      if (perWorker > 0) {
-        working = Math.min(working, Math.floor(state.resources[resource] / perWorker));
-      }
-    }
-    for (const [resource, perWorker] of Object.entries(rule.inputs) as Array<[ResourceType, number]>) {
-      const spent = perWorker * working;
-      state.resources[resource] -= spent;
-      if (spent > 0) {
-        emit(state, 'resource_consumed', { facilityId: facility.id, resource, amount: spent });
-      }
-    }
-    for (const [resource, perWorker] of Object.entries(rule.outputs) as Array<[ResourceType, number]>) {
-      outputs[resource] += perWorker * working;
-    }
-    projections.set(facility.id, {
-      facilityId: facility.id,
-      operatingWorkers: working,
-      inputs: Object.fromEntries(
-        Object.entries(rule.inputs).map(([resource, perWorker]) => [resource, perWorker * working]),
-      ) as Partial<Record<ResourceType, number>>,
-      outputs: Object.fromEntries(
-        Object.entries(rule.outputs).map(([resource, perWorker]) => [resource, perWorker * working]),
-      ) as Partial<Record<ResourceType, number>>,
-      powerGeneration: rule.powerGeneration * staffedWorkers,
-      stoppedReason: working < staffedWorkers ? 'input_shortage' : null,
-    });
-  }
-  for (const resource of RESOURCE_TYPES) {
-    if (outputs[resource] > 0) {
-      state.resources[resource] += outputs[resource];
-      emit(state, 'resource_produced', { resource, amount: outputs[resource] });
-    }
-  }
-  return stableFacilities(state).map(
-    (facility) => projections.get(facility.id) ?? emptyFacilityProjection(facility, facilityStoppedReason(facility)),
+  const maintenanceTargets = facilities.filter(
+    (facility) =>
+      isOwned(facility) &&
+      facility.workers > 0 &&
+      ['farm', 'civilianFactory'].includes(facility.type) &&
+      facility.powerSupplyEnabled,
   );
+  const maintenancePowerAllocated = allocate(maintenanceTargets);
+
+  const staffed = (facility: FacilityState) => isCityFacility(facility)
+    ? Math.min(facility.workers, state.config.facilities[facility.type].workerCapacity)
+    : facility.workers;
+  const preliminaryCivilianProduction = facilities.reduce((total, facility) => {
+    if (!canProduce(facility)) return total;
+    const rule = state.config.facilities[facility.type].production;
+    const perWorker = rule.outputs.civilianGoods ?? 0;
+    if (perWorker <= 0 || facility.type === 'militaryFactory') return total;
+    if (rule.powerMode === 'required' && !supplied.has(facility.id)) return total;
+    const multiplier = rule.powerMode === 'boost' && supplied.has(facility.id) ? 2 : 1;
+    return total + staffed(facility) * perWorker * multiplier;
+  }, 0);
+  const maintenanceReservation = Math.max(0, maintenance.civilianGoods - preliminaryCivilianProduction);
+  let civilianInputAvailable = Math.max(0, state.resources.civilianGoods - maintenanceReservation);
+  const militaryInputWorkers = new Map<string, number>();
+  const militaryFacilities = facilities.filter(
+    (facility) => facility.type === 'militaryFactory' && canProduce(facility),
+  );
+  for (const facility of militaryFacilities) {
+    const perWorker = state.config.facilities.militaryFactory.production.inputs.civilianGoods ?? 0;
+    const workers = perWorker > 0
+      ? Math.min(facility.workers, Math.floor(civilianInputAvailable / perWorker))
+      : facility.workers;
+    militaryInputWorkers.set(facility.id, workers);
+    civilianInputAvailable -= workers * perWorker;
+  }
+  const militaryTargets = militaryFacilities.filter(
+    (facility) => facility.powerSupplyEnabled && (militaryInputWorkers.get(facility.id) ?? 0) > 0,
+  );
+  const militaryPowerAllocated = allocate(militaryTargets);
+
+  const projections = facilities.map((facility): FacilityProductionProjection => {
+    const rule = state.config.facilities[facility.type].production;
+    const eligible = isOwned(facility) && facility.workers > 0;
+    let projectedPowerReason: PowerSupplyReason = reasons.get(facility.id) ?? 'not_applicable';
+    let projectedPowerRequested = requested.has(facility.id);
+    if (rule.powerMode === 'boost' && !facility.powerSupplyEnabled) projectedPowerReason = 'power_supply_off';
+    else if (!eligible && rule.powerMode !== 'none') projectedPowerReason = facility.workers <= 0 ? 'no_population' : 'not_eligible';
+    else if (facility.type === 'militaryFactory' && canProduce(facility) && (militaryInputWorkers.get(facility.id) ?? 0) === 0) {
+      projectedPowerReason = 'production_input_unavailable';
+      projectedPowerRequested = false;
+    }
+    const projectedPowerSupplied = supplied.has(facility.id);
+    const productionMultiplier = rule.powerMode === 'boost' && projectedPowerSupplied ? 2 : 1;
+    const operatingWorkers = !canProduce(facility)
+      ? 0
+      : facility.type === 'militaryFactory'
+        ? militaryInputWorkers.get(facility.id) ?? 0
+        : staffed(facility);
+    const baseOutputs = Object.fromEntries(
+      Object.entries(rule.outputs).map(([resource, amount]) => [resource, amount * operatingWorkers]),
+    ) as Partial<Record<ResourceType, number>>;
+    const outputs = rule.powerMode === 'required' && !projectedPowerSupplied
+      ? {}
+      : Object.fromEntries(
+        Object.entries(baseOutputs).map(([resource, amount]) => [resource, (amount ?? 0) * productionMultiplier]),
+      ) as Partial<Record<ResourceType, number>>;
+    const inputs = facility.type === 'militaryFactory'
+      ? { civilianGoods: (rule.inputs.civilianGoods ?? 0) * operatingWorkers }
+      : {};
+    const stoppedReason = !canProduce(facility)
+      ? facilityStoppedReason(facility)
+      : rule.powerMode === 'required' && !projectedPowerSupplied
+        ? 'power_unavailable'
+        : facility.type === 'militaryFactory' && operatingWorkers < facility.workers
+          ? 'input_shortage'
+          : null;
+    return {
+      facilityId: facility.id,
+      operatingWorkers,
+      inputs,
+      outputs,
+      powerGeneration: facility.type === 'powerPlant' && canProduce(facility)
+        ? rule.powerGeneration * facility.workers
+        : 0,
+      powerMode: rule.powerMode,
+      powerSupplyEnabled: facility.powerSupplyEnabled,
+      projectedPowerRequested,
+      projectedPowerSupplied,
+      projectedPowerReason,
+      lastPowerSupplied: facility.lastPowerSupplied,
+      productionMultiplier,
+      baseOutputs,
+      stoppedReason,
+    };
+  });
+  const production = (resource: ResourceType) => projections.reduce(
+    (total, projection) => total + (projection.outputs[resource] ?? 0),
+    0,
+  );
+  const militaryInputDemand = militaryFacilities.reduce(
+    (total, facility) => total + facility.workers * (state.config.facilities.militaryFactory.production.inputs.civilianGoods ?? 0),
+    0,
+  );
+  const militaryInputAllocated = projections.reduce(
+    (total, projection) => total + (projection.inputs.civilianGoods ?? 0),
+    0,
+  );
+  const industrialBoostDemand = [...maintenanceTargets, ...militaryTargets].reduce(
+    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
+    0,
+  );
+  const industrialBoostAllocated = maintenancePowerAllocated + militaryPowerAllocated;
+  const generationFuelDemand = (requiredPowerDemand + industrialBoostDemand) / 5;
+  const projectedFuelUsed = (requiredPowerAllocated + industrialBoostAllocated) / 5;
+  const resourceForecast = (
+    resource: 'food' | 'militaryGoods',
+    maintenanceRequired: number,
+  ): EndTurnForecast['food'] => {
+    const startingStock = state.resources[resource];
+    const projectedProduction = production(resource);
+    const shortage = Math.max(0, maintenanceRequired - startingStock - projectedProduction);
+    return {
+      startingStock,
+      projectedProduction,
+      maintenanceRequired,
+      endingStock: Math.max(0, startingStock + projectedProduction - maintenanceRequired),
+      available: startingStock,
+      productionInputRequired: 0,
+      required: maintenanceRequired,
+      shortage,
+    };
+  };
+  const civilianStarting = state.resources.civilianGoods;
+  const civilianProduction = production('civilianGoods');
+  const civilianShortage = Math.max(
+    0,
+    maintenance.civilianGoods - (civilianStarting - militaryInputAllocated + civilianProduction),
+  );
+  const fuelProduction = production('fuel');
+  const fuelEnding = Math.max(0, state.resources.fuel - projectedFuelUsed + fuelProduction);
+  const unpoweredFacilities = projections
+    .filter((projection) => projection.powerMode !== 'none' && !projection.projectedPowerSupplied)
+    .map((projection) => ({ facilityId: projection.facilityId, reason: projection.projectedPowerReason }));
+  const totalPowerDemand = requiredPowerDemand + industrialBoostDemand;
+  return {
+    facilities: projections,
+    forecast: {
+      populationConsumers: consumers,
+      overcrowding: {
+        cities: overcrowding,
+        additionalFood: maintenance.food - normalFood,
+        additionalCivilianGoods: maintenance.civilianGoods - normalCivilian,
+      },
+      food: resourceForecast('food', maintenance.food),
+      civilianGoods: {
+        startingStock: civilianStarting,
+        projectedProduction: civilianProduction,
+        maintenanceRequired: maintenance.civilianGoods,
+        productionInputDemand: militaryInputDemand,
+        productionInputAllocated: militaryInputAllocated,
+        productionInputShortage: Math.max(0, militaryInputDemand - militaryInputAllocated),
+        endingStock: Math.max(0, civilianStarting - militaryInputAllocated + civilianProduction - maintenance.civilianGoods),
+        maintenanceShortage: civilianShortage,
+        available: civilianStarting,
+        productionInputRequired: militaryInputDemand,
+        required: maintenance.civilianGoods + militaryInputDemand,
+        shortage: civilianShortage,
+      },
+      militaryGoods: resourceForecast('militaryGoods', maintenance.militaryGoods),
+      fuel: {
+        startingStock: state.resources.fuel,
+        projectedProduction: fuelProduction,
+        maintenanceRequired: 0,
+        generationFuelDemand,
+        projectedFuelUsed,
+        generationFuelShortage: Math.max(0, generationFuelDemand - state.resources.fuel),
+        endingStock: fuelEnding,
+        available: state.resources.fuel,
+        productionInputRequired: generationFuelDemand,
+        required: generationFuelDemand,
+        shortage: Math.max(0, generationFuelDemand - state.resources.fuel),
+      },
+      electricity: {
+        physicalGenerationCapacity,
+        fuelLimitedGenerationCapacity,
+        availableGenerationCapacity,
+        requiredPowerDemand,
+        industrialBoostDemand,
+        requiredPowerAllocated,
+        industrialBoostAllocated,
+        unpoweredFacilities,
+        capacity: physicalGenerationCapacity,
+        required: totalPowerDemand,
+        shortage: Math.max(0, totalPowerDemand - requiredPowerAllocated - industrialBoostAllocated),
+      },
+    },
+  };
 }
 
 function removeWorkersForShortage(state: GameState, amount: number, resource: 'food' | 'civilianGoods'): number {
@@ -895,147 +1079,95 @@ function overcrowdingAdditionalConsumption(normal: number, terms: ReturnType<typ
  * demand so the UI can warn before partial fuel operation is resolved.
  */
 export function forecastEndTurn(state: Readonly<GameState>): EndTurnForecast {
-  const snapshot = state as GameState;
-  const healthyFacilityPopulation = snapshot.facilities.reduce(
-    (total, facility) => total + (facility.owner === 'player' ? facility.workers : 0),
-    0,
-  );
-  const unitPopulation = snapshot.population.unitPopulation;
-  const populationConsumers = healthyFacilityPopulation + unitPopulation;
-  const overcrowding = overcrowdingTerms(snapshot);
-  const normalFood = populationConsumers * snapshot.config.economy.populationConsumption.food;
-  const normalCivilianGoods = populationConsumers * snapshot.config.economy.populationConsumption.civilianGoods;
-  const additionalFood = overcrowdingAdditionalConsumption(normalFood, overcrowding);
-  const additionalCivilianGoods = overcrowdingAdditionalConsumption(normalCivilianGoods, overcrowding);
-  const maintenance: Record<ResourceType, number> = {
-    food: normalFood + additionalFood,
-    civilianGoods: normalCivilianGoods + additionalCivilianGoods,
-    militaryGoods: unitPopulation * snapshot.config.economy.militaryGoodsPerUnitPopulation,
-    fuel: 0,
-  };
-  const productionInput: Record<ResourceType, number> = {
-    food: 0,
-    civilianGoods: 0,
-    militaryGoods: 0,
-    fuel: 0,
-  };
-
-  const activeFacilities = stableFacilities(snapshot).filter(
-    (facility) =>
-      facility.owner === 'player' &&
-      facility.status === 'owned' &&
-      facility.infected === 0 &&
-      facility.workers > 0,
-  );
-  const electricityCapacity = activeFacilities
-    .filter((facility) => facility.type === 'powerPlant')
-    .reduce(
-      (total, facility) => total + facility.workers * snapshot.config.facilities[facility.type].production.powerGeneration,
-      0,
-    );
-  const electricityRequired = activeFacilities
-    .filter((facility) => snapshot.config.facilities[facility.type].production.requiresPower)
-    .reduce(
-      (total, facility) => total + snapshot.config.facilities[facility.type].production.powerCapacity,
-      0,
-    );
-
-  let remainingCapacity = electricityCapacity;
-  for (const facility of activeFacilities) {
-    const rule = snapshot.config.facilities[facility.type].production;
-    if (rule.requiresPower && remainingCapacity < rule.powerCapacity) continue;
-    if (rule.requiresPower) remainingCapacity -= rule.powerCapacity;
-    for (const [resource, amount] of Object.entries(rule.inputs) as Array<[ResourceType, number]>) {
-      const workers = isCityFacility(facility)
-        ? Math.min(facility.workers, snapshot.config.facilities[facility.type].workerCapacity)
-        : facility.workers;
-      productionInput[resource] += amount * workers;
-    }
-  }
-
-  const resourceForecast = (resource: ResourceType): EndTurnForecast['food'] => {
-    const available = snapshot.resources[resource];
-    const maintenanceRequired = maintenance[resource];
-    const productionInputRequired = productionInput[resource];
-    const required = maintenanceRequired + productionInputRequired;
-    return {
-      available,
-      maintenanceRequired,
-      productionInputRequired,
-      required,
-      shortage: Math.max(0, required - available),
-    };
-  };
-
-  return {
-    populationConsumers,
-    overcrowding: {
-      cities: overcrowding,
-      additionalFood,
-      additionalCivilianGoods,
-    },
-    food: resourceForecast('food'),
-    civilianGoods: resourceForecast('civilianGoods'),
-    militaryGoods: resourceForecast('militaryGoods'),
-    fuel: resourceForecast('fuel'),
-    electricity: {
-      capacity: electricityCapacity,
-      required: electricityRequired,
-      shortage: Math.max(0, electricityRequired - electricityCapacity),
-    },
-  };
+  return calculateEconomyPlan(state).forecast;
 }
 
 function processEconomy(state: GameState): FacilityProductionProjection[] {
   synchronizePopulation(state);
-  const consumers = resourceConsumerPopulation(state);
-  const overcrowding = overcrowdingTerms(state);
-  const normalFoodNeed = consumers * state.config.economy.populationConsumption.food;
-  const normalCivilianNeed = consumers * state.config.economy.populationConsumption.civilianGoods;
-  const foodNeed = normalFoodNeed + overcrowdingAdditionalConsumption(normalFoodNeed, overcrowding);
-  const civilianNeed = normalCivilianNeed + overcrowdingAdditionalConsumption(normalCivilianNeed, overcrowding);
-  const foodShortage = Math.max(0, foodNeed - state.resources.food);
-  const civilianShortage = Math.max(0, civilianNeed - state.resources.civilianGoods);
-  const foodSpent = Math.min(foodNeed, state.resources.food);
-  const civilianSpent = Math.min(civilianNeed, state.resources.civilianGoods);
-  state.resources.food -= foodSpent;
-  state.resources.civilianGoods -= civilianSpent;
+  const plan = calculateEconomyPlan(state);
+  const forecast = plan.forecast;
+  state.resources.food = forecast.food.endingStock;
+  state.resources.civilianGoods = forecast.civilianGoods.endingStock;
+  state.resources.militaryGoods = forecast.militaryGoods.endingStock;
+  state.resources.fuel = forecast.fuel.endingStock;
+  state.resources.electricityCapacity = forecast.electricity.physicalGenerationCapacity;
+  state.resources.electricityRequired = forecast.electricity.required;
+  state.resources.militarySupplyAvailable = forecast.militaryGoods.shortage === 0;
+
+  for (const projection of plan.facilities) {
+    const facility = getFacilityState(state, projection.facilityId)!;
+    if (projection.powerMode === 'required' || projection.powerMode === 'boost') {
+      facility.lastPowerSupplied = projection.projectedPowerSupplied;
+    }
+    facility.operationalStatus = facility.status === 'ruined'
+      ? 'ruined'
+      : facility.infected > 0
+        ? 'infected'
+        : facility.workers > 0
+          ? 'operational'
+          : 'stopped';
+    if (projection.powerMode !== 'none') {
+      emit(state, 'power_allocated', {
+        facilityId: facility.id,
+        supplied: projection.projectedPowerSupplied,
+        reason: projection.projectedPowerReason,
+        amount: projection.projectedPowerSupplied ? state.config.facilities[facility.type].production.powerCapacity : 0,
+      });
+    }
+    for (const [resource, amount] of Object.entries(projection.inputs) as Array<[ResourceType, number]>) {
+      if (amount > 0) emit(state, 'resource_consumed', { facilityId: facility.id, resource, amount });
+    }
+  }
+  if (forecast.fuel.projectedFuelUsed > 0) {
+    emit(state, 'resource_consumed', { resource: 'fuel', amount: forecast.fuel.projectedFuelUsed, reason: 'power_generation' });
+  }
+  for (const resource of RESOURCE_TYPES) {
+    const amount = resource === 'food'
+      ? forecast.food.projectedProduction
+      : resource === 'civilianGoods'
+        ? forecast.civilianGoods.projectedProduction
+        : resource === 'militaryGoods'
+          ? forecast.militaryGoods.projectedProduction
+          : forecast.fuel.projectedProduction;
+    if (amount > 0) emit(state, 'resource_produced', { resource, amount });
+  }
   emit(state, 'resource_consumed', {
     resource: 'food',
-    amount: foodSpent,
-    population: consumers,
-    normal: normalFoodNeed,
-    overcrowding: foodNeed - normalFoodNeed,
+    amount: forecast.food.maintenanceRequired - forecast.food.shortage,
+    population: forecast.populationConsumers,
+    overcrowding: forecast.overcrowding.additionalFood,
   });
   emit(state, 'resource_consumed', {
     resource: 'civilianGoods',
-    amount: civilianSpent,
-    population: consumers,
-    normal: normalCivilianNeed,
-    overcrowding: civilianNeed - normalCivilianNeed,
+    amount: forecast.civilianGoods.maintenanceRequired - forecast.civilianGoods.maintenanceShortage,
+    population: forecast.populationConsumers,
+    overcrowding: forecast.overcrowding.additionalCivilianGoods,
   });
-  if (foodShortage + civilianShortage > 0) {
-    emit(state, 'resource_shortage', { food: foodShortage, civilianGoods: civilianShortage });
-    removeWorkersForShortage(state, foodShortage, 'food');
-    synchronizePopulation(state);
-    if (checkImmediateDefeat(state)) {
-      return stableFacilities(state).map((facility) => emptyFacilityProjection(facility, facilityStoppedReason(facility)));
-    }
-    removeWorkersForShortage(state, civilianShortage, 'civilianGoods');
-    synchronizePopulation(state);
-    if (checkImmediateDefeat(state)) {
-      return stableFacilities(state).map((facility) => emptyFacilityProjection(facility, facilityStoppedReason(facility)));
-    }
+  emit(state, 'resource_consumed', {
+    resource: 'militaryGoods',
+    amount: forecast.militaryGoods.maintenanceRequired - forecast.militaryGoods.shortage,
+    population: state.population.unitPopulation,
+  });
+  if (forecast.militaryGoods.shortage > 0) {
+    emit(state, 'resource_shortage', { resource: 'militaryGoods', amount: forecast.militaryGoods.shortage });
   }
-
-  const militaryNeed = state.population.unitPopulation * state.config.economy.militaryGoodsPerUnitPopulation;
-  state.resources.militarySupplyAvailable = state.resources.militaryGoods >= militaryNeed;
-  const militarySpent = Math.min(state.resources.militaryGoods, militaryNeed);
-  state.resources.militaryGoods -= militarySpent;
-  emit(state, 'resource_consumed', { resource: 'militaryGoods', amount: militarySpent, population: state.population.unitPopulation });
-  const production = powerAndProduction(state);
+  if (forecast.fuel.generationFuelShortage > 0) {
+    emit(state, 'resource_shortage', { resource: 'fuel', amount: forecast.fuel.generationFuelShortage, reason: 'power_generation' });
+  }
+  if (forecast.food.shortage + forecast.civilianGoods.maintenanceShortage > 0) {
+    emit(state, 'resource_shortage', {
+      food: forecast.food.shortage,
+      civilianGoods: forecast.civilianGoods.maintenanceShortage,
+    });
+    removeWorkersForShortage(state, forecast.food.shortage, 'food');
+    synchronizePopulation(state);
+    if (checkImmediateDefeat(state)) return plan.facilities;
+    removeWorkersForShortage(state, forecast.civilianGoods.maintenanceShortage, 'civilianGoods');
+    synchronizePopulation(state);
+    if (checkImmediateDefeat(state)) return plan.facilities;
+  }
   synchronizePopulation(state);
-  return production;
+  return plan.facilities;
 }
 
 /**
@@ -1046,33 +1178,7 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
 export function forecastFacilityProduction(
   state: Readonly<GameState>,
 ): FacilityProductionProjection[] {
-  const cloneStatistics = (statistics: Readonly<GameState['statistics']>): GameState['statistics'] => ({
-    ...statistics,
-    refugeeArrivalsByBranch: { ...statistics.refugeeArrivalsByBranch },
-    refugeesScreenedByPolicy: { ...statistics.refugeesScreenedByPolicy },
-  });
-  // Avoid copying the growing Event log for every Agent/UI observation. The
-  // economy projection mutates only these private economy-facing structures.
-  const snapshot: GameState = {
-    ...(state as GameState),
-    facilities: state.facilities.map((facility) => ({ ...facility, position: { ...facility.position } })),
-    population: {
-      ...state.population,
-      facilityWorkers: state.population.facilityWorkers.map((entry) => ({ ...entry })),
-    },
-    cityPopulationSnapshot: {
-      turn: state.cityPopulationSnapshot.turn,
-      supply: state.cityPopulationSnapshot.supply.map((entry) => ({ ...entry })),
-      reception: state.cityPopulationSnapshot.reception.map((entry) => ({ ...entry })),
-    },
-    resources: { ...state.resources },
-    events: [],
-    statistics: cloneStatistics(state.statistics),
-    result: state.result
-      ? { ...state.result, statistics: cloneStatistics(state.result.statistics) }
-      : null,
-  };
-  return processEconomy(snapshot);
+  return calculateEconomyPlan(state).facilities;
 }
 
 function nearestSpawnPosition(state: GameState, origin: HexCoord, rng: SeededRng): HexCoord | null {
@@ -1943,6 +2049,27 @@ function setCheckpointPolicy(state: GameState, action: Extract<GameAction, { typ
   return null;
 }
 
+function setPowerSupply(state: GameState, action: Extract<GameAction, { type: 'SetPowerSupply' }>): ActionError | null {
+  if (!isPlayerPhase(state)) return error(action, 'wrong_phase', 'Actions are only accepted during the player phase');
+  const facility = getFacilityState(state, action.facilityId);
+  if (!facility || !['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type)) {
+    return error(action, 'power_supply_not_applicable', 'Power Supply can only be changed for an industrial boost facility');
+  }
+  if (
+    facility.owner !== 'player' ||
+    facility.status !== 'owned' ||
+    facility.infected > 0 ||
+    facility.populationOperationalTurn > state.turn
+  ) {
+    return error(action, 'power_supply_unavailable', 'The facility must be owned, safe, and operational for population actions');
+  }
+  if (typeof action.enabled !== 'boolean') return error(action, 'invalid_power_supply', 'Power Supply must be ON or OFF');
+  if (facility.powerSupplyEnabled === action.enabled) return error(action, 'no_change', 'Power Supply is already set to this value');
+  facility.powerSupplyEnabled = action.enabled;
+  emit(state, 'power_supply_changed', { facilityId: facility.id, enabled: action.enabled });
+  return null;
+}
+
 function unitProductionCosts(state: Readonly<GameState>, unitType: HumanUnitType): {
   population: number;
   civilianGoods: number;
@@ -2078,6 +2205,7 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
     return state.phase === 'player' ? null : error(action, 'wrong_phase', 'Turn can only end during the player phase');
   }
   if (state.phase !== 'player') return error(action, 'wrong_phase', 'Actions are only accepted during the player phase');
+  if (action.type === 'SetPowerSupply') return setPowerSupply(cloneState(state as GameState), action);
   if (state.actionsTakenThisTurn >= state.config.maxActionsPerTurn) return error(action, 'action_limit', 'The action limit for this turn has been reached');
   if (action.type === 'BuildCheckpoint') return validateBuildCheckpointAction(state, action).error;
   if (action.type === 'RelocateCheckpoint') return validateRelocateCheckpointAction(state, action).error;
@@ -2119,7 +2247,21 @@ export class GameEngine implements HeadlessGame {
   public getLegalActions(): GameAction[] {
     if (!isPlayerPhase(this.state)) return [];
     const actions: GameAction[] = [];
-    if (this.state.actionsTakenThisTurn >= this.state.config.maxActionsPerTurn) return [{ type: 'EndTurn' }];
+    if (this.state.actionsTakenThisTurn >= this.state.config.maxActionsPerTurn) {
+      for (const facility of stableFacilities(this.state)) {
+        if (
+          facility.owner === 'player' &&
+          facility.status === 'owned' &&
+          facility.infected === 0 &&
+          facility.populationOperationalTurn <= this.state.turn &&
+          ['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type)
+        ) {
+          actions.push({ type: 'SetPowerSupply', facilityId: facility.id, enabled: !facility.powerSupplyEnabled });
+        }
+      }
+      actions.push({ type: 'EndTurn' });
+      return actions;
+    }
     for (const unit of this.state.units.filter((candidate) => candidate.isPlayerUnit).sort((a, b) => a.id.localeCompare(b.id))) {
       if (unit.actionState !== 'acted') {
         actions.push({ type: 'Wait', unitId: unit.id });
@@ -2152,6 +2294,9 @@ export class GameEngine implements HeadlessGame {
           (workers > facility.workers || eligibleSnapshotCities(this.state, 'reception').length > 0) &&
           (workers < facility.workers || isHexSupplied(this.state, facility.position))
         ) actions.push({ type: 'AssignWorkers', facilityId: facility.id, workers });
+      }
+      if (['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type)) {
+        actions.push({ type: 'SetPowerSupply', facilityId: facility.id, enabled: !facility.powerSupplyEnabled });
       }
     }
     const cities = eligibleSnapshotCities(this.state, 'supply');
@@ -2247,6 +2392,7 @@ export class GameEngine implements HeadlessGame {
     else if (action.type === 'AssignWorkers') actionError = assignWorkers(candidate, action);
     else if (action.type === 'TransferPopulation') actionError = transferPopulation(candidate, action);
     else if (action.type === 'SetCheckpointPolicy') actionError = setCheckpointPolicy(candidate, action);
+    else if (action.type === 'SetPowerSupply') actionError = setPowerSupply(candidate, action);
     else if (action.type === 'BuildCheckpoint') actionError = buildCheckpoint(candidate, action);
     else if (action.type === 'RelocateCheckpoint') actionError = relocateCheckpoint(candidate, action);
     else if (action.type === 'ProduceUnit') actionError = produceUnit(candidate, action);

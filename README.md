@@ -22,7 +22,7 @@
 - ブラウザJavaScriptから利用できる、通常UI・保存領域と分離したDeveloper / Browser Bridge
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.2.6の実装要件は [`Doc/Nowhere Left to Hide PoC v1.2.6アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.2.6アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.2.7の変更要件は [`Doc/Nowhere Left to Hide PoC v1.2.7アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.2.7アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
 
 ## ローカルで起動する
 
@@ -54,7 +54,7 @@ Open https://plastichyena.github.io/nowherelefttohide/ and use the documented wi
 
 公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・生産/電力の静的ルールを返します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
 
-v1.2.6では、Observationに現在局面の条件付き予測を追加しています。ユニットは次のプレイヤーターン開始時の自然回復区分（戦闘・鎮圧10%、移動/待機/未行動20%、補給外0%）、基礎回復量、基本射程・実効射程、感染拡大阻止と自動鎮圧見込みを返します。軍需品不足時の州兵は基本射程2から実効射程1へ下がります。施設は労働者上限30、入力・出力、電力要求・発電、停止理由、感染・陥落時の損失見込みを返し、検問所は3方針の交換関係を表示します。`SuppressInfection`は公開Actionではなく、感染フェーズの自動処理です。
+v1.2.7では、Observationが同じCore Forecastから当ターン生産、維持必要量、終了備蓄、維持不足、軍需工場入力不足、発電Fuel不足を分離して返します。都市はRequired Powerがなければ人口由来の民需品生産だけが0になり、Farm / Civilian Factory / Military Factoryは無給電でも基本生産、給電5で2倍生産します。発電はTurn-start Fuelだけを`Fuel 1 → Electricity 5`として使い、`SetPowerSupply`で産業ブーストのON/OFFを変更できます。当ターン生産したFood / Civilian Goods / Military Goodsは維持へ使えますが、別工程の入力には連鎖利用できません。
 
 ## Agent Simulation CLI
 
@@ -112,7 +112,7 @@ GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロード�
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。 App/Release Versionは `1.2.6`、Game Rules / GameState / Configは `1.2.1`、Agent / Observation / Browser Bridgeは `1.2.0`です。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.2.7`、Game Rules / GameState / Configは `1.3.0`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.3.0`です。
 
 ## CoreとHeadless API
 
@@ -135,7 +135,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.2.6`、Game Rules / State / Config `1.2.1`、Save Format `2`を使用します。v1.2.5のSave Format 2は決定的にメモリ上へ移行できますが、移行元を上書きしません。v1.2以前の保存データは非互換で、自動変換・削除・上書きせず、理由を表示して「最初から」を案内します。旧autosaveキーは読み取り専用で保持されます。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.2.7`、Game Rules / State / Config `1.3.0`、Save Format `2`を使用します。v1.2.5 / v1.2.6のSave Format 2は決定的にメモリ上へ移行できますが、移行元を変換・削除・上書きしません。v1.2以前の保存データは非互換です。旧Replay / Artifactは経済ルールが異なるため移行しません。
 
 ## テスト
 
@@ -144,9 +144,9 @@ npm run typecheck
 npm test
 npm run test:random -- --games=100
 npm run test:balanced -- --games=100
-npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.2.6-balanced-300-part-1
-npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.2.6-balanced-300-part-2
-npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.2.6-balanced-300-part-3
+npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.2.7-balanced-300-part-1
+npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.2.7-balanced-300-part-2
+npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.2.7-balanced-300-part-3
 npm run build
 npm run test:browser-bridge -- --dist=dist
 ```

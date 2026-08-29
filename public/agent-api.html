@@ -25,16 +25,18 @@
       <h1>Nowhere Left to Hide — Agent API</h1>
       <p class="note">The game page exposes <code>window.NLTH</code> for a browser JavaScript agent. This is an in-memory developer bridge, not an HTTP API.</p>
 
-      <h2>v1.2.6 contract</h2>
-      <p><code>App/Release 1.2.6</code> uses <code>Game Rules / GameState / Config 1.2.1</code>, <code>Save Format 2</code>, and <code>Agent / Observation / Bridge 1.2.0</code>. Observations include independent road branches and arrival schedules, checkpoint status and pools, supplied tiles, sector/radius information, action availability, and current recovery, suppression, production, and power forecasts. Future random draws are never exposed.</p>
-      <p>Legal actions may include <code>BuildCheckpoint</code> and <code>RelocateCheckpoint</code>. Infection suppression is an engine-owned End Turn consequence; <code>SuppressInfection</code> is not a public action and is rejected by the bridge. A branch without a checkpoint processes arrivals as unmanaged pass-through; operational checkpoints extend supply, while remnant, ruined, and abandoned sites do not. v1.2.5 saves are migrated in memory only; older saves, JSON, replays, and artifacts are rejected without conversion or overwrite.</p>
+      <h2>v1.2.7 contract</h2>
+      <p><code>App/Release 1.2.7</code> uses <code>Game Rules / GameState / Config 1.3.0</code>, <code>Save Format 2</code>, and <code>Agent / Observation / Bridge / Artifact Schema 1.3.0</code>. Observations expose the common Core economy forecast, projected and last actual power, deterministic allocation reasons, road/checkpoint/supply facts, recovery, and suppression. Future random draws are never exposed.</p>
+      <p>Legal actions may include <code>SetPowerSupply</code>, <code>BuildCheckpoint</code>, and <code>RelocateCheckpoint</code>. Infection suppression is an engine-owned End Turn consequence; <code>SuppressInfection</code> is not public. v1.2.5 and v1.2.6 saves migrate in memory only; earlier saves and old replays/artifacts are rejected without conversion or overwrite.</p>
 
-      <h2>v1.2.6 rules visible to agents</h2>
+      <h2>v1.2.7 rules visible to agents</h2>
       <ul>
         <li>At the next player-turn start, supplied surviving units recover 10% of max HP after attack, counterattack, interception, or suppression, and 20% after only moving, waiting, or taking no action. Out-of-supply units recover 0%; configured rounding is applied.</li>
         <li>A human unit stationed at an infected location contains internal spread. With an unused attack, the engine may automatically suppress at the infection phase after End Turn. Police suppress without civilian damage; National Guard suppresses more but has civilian damage.</li>
         <li>Unit observations expose <code>baseRange</code>, <code>effectiveRange</code>, and a shortage reason. National Guard range is 2 normally and 1 when military supply is short.</li>
-        <li>Facility observations expose worker capacity (30 for production facilities), input/output estimates, power requirements or generation, stop reasons, and projected infection/overrun losses. Checkpoint observations expose containment and suppression forecasts.</li>
+        <li>Cities need 5 power for population Civilian Goods but retain administration during outage. Farm/Civilian/Military factories run at ×1 unpowered and ×2 powered; Refinery and Power Plant are not boost targets.</li>
+        <li>Power uses turn-start Fuel only at <code>Fuel 1 → Electricity 5</code>, with no partial facility allocation. Required cities are first, Farm/Civilian Factory boosts second, and input-ready Military Factory boosts third.</li>
+        <li>Same-turn Food/Civilian/Military Goods production pays maintenance but cannot chain into production inputs. Forecasts separate maintenance shortage, Military Factory input shortage, generation Fuel demand/usage, and physical power capacity.</li>
         <li>Checkpoint policy details describe screening time, acceptance, infection chance, and infected share. Strict is a trade-off, not an unconditional best choice.</li>
       </ul>
 

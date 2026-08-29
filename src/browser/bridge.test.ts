@@ -195,4 +195,16 @@ describe('Developer / Browser Bridge', () => {
     expect(relocate).toMatchObject({ type: 'RelocateCheckpoint' });
     expect(relocate).not.toHaveProperty('state');
   });
+
+  it('accepts a well-formed legal SetPowerSupply action through the public boundary', () => {
+    const api = bridge();
+    api.reset({ seed: 127, configOverrides: { economy: { initialZombieCount: 0 } } });
+    const action = api.getLegalActions().find(
+      (candidate) => candidate.type === 'SetPowerSupply' && candidate.facilityId === 'farm-1',
+    );
+    expect(action).toEqual({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false });
+    const result = api.step(action!);
+    expect(result.error).toBeNull();
+    expect(result.observation.facilities.find((facility) => facility.id === 'farm-1')?.production.powerSupplyEnabled).toBe(false);
+  });
 });

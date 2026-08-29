@@ -19,6 +19,7 @@ import type {
   CardinalDirection,
   CheckpointPolicy,
   CheckpointState,
+  EndTurnForecast,
   FacilityState,
   GameAction,
   GameConfig,
@@ -28,6 +29,7 @@ import type {
   HeadlessGame,
   HexCoord,
   ResourceType,
+  PowerSupplyReason,
   RoadBranchId,
   UnitState,
 } from '../core/types';
@@ -35,6 +37,7 @@ import {
   actionForCheckpointPolicy,
   actionForPopulationTransfer,
   actionForUnitProduction,
+  actionForPowerSupply,
   actionForWorkerAssignment,
   clampInteger,
   findCheckpointAt,
@@ -239,6 +242,10 @@ function isCity(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
 }
 
+function isPowerSupplyFacility(facility: Pick<FacilityState, 'type'>): boolean {
+  return facility.type === 'farm' || facility.type === 'civilianFactory' || facility.type === 'militaryFactory';
+}
+
 function formatPercent(value: number, locale: Locale): string {
   return new Intl.NumberFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
     style: 'percent',
@@ -253,14 +260,94 @@ function samePosition(left: HexCoord, right: HexCoord): boolean {
 function formatResourceAmounts(
   values: Partial<Record<ResourceType, number>> | undefined,
   locale: Locale,
+  includeZero = false,
 ): string {
   const t = createTranslator(locale);
   const entries = Object.entries(values ?? {})
-    .filter(([, amount]) => typeof amount === 'number' && amount > 0)
+    .filter(([, amount]) => typeof amount === 'number' && (includeZero ? amount >= 0 : amount > 0))
     .sort(([left], [right]) => left.localeCompare(right));
   return entries.length > 0
     ? entries.map(([resource, amount]) => `${t(resource)} ${amount}`).join(' / ')
     : t('none');
+}
+
+function powerModeLabel(mode: AgentFacilityObservation['production']['powerMode'], locale: Locale): string {
+  const t = createTranslator(locale);
+  if (mode === 'required') return t('powerModeRequired');
+  if (mode === 'boost') return t('powerModeBoost');
+  return t('powerModeNone');
+}
+
+function powerReasonLabel(reason: PowerSupplyReason | string | null | undefined, locale: Locale): string {
+  const t = createTranslator(locale);
+  const labels: Record<string, string> = {
+    supplied: t('powerReasonSupplied'),
+    physical_capacity_shortage: t('powerReasonPhysical'),
+    fuel_shortage: t('powerReasonFuel'),
+    allocation_priority: t('powerReasonPriority'),
+    power_supply_off: t('powerReasonOff'),
+    no_population: t('powerReasonNoPopulation'),
+    not_eligible: t('powerReasonNotEligible'),
+    production_input_unavailable: t('powerReasonInput'),
+    not_applicable: t('powerReasonNone'),
+  };
+  return reason ? labels[reason] ?? reason : '';
+}
+
+function formatForecastAmount(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function forecastResourceCard(
+  resource: 'food' | 'civilianGoods' | 'militaryGoods' | 'fuel',
+  detail: EndTurnForecast['food'] | EndTurnForecast['civilianGoods'] | EndTurnForecast['militaryGoods'] | EndTurnForecast['fuel'],
+  locale: Locale,
+): string {
+  const t = createTranslator(locale);
+  let rows: Array<[string, string]>;
+  if (resource === 'civilianGoods') {
+    const civilian = detail as EndTurnForecast['civilianGoods'];
+    rows = [
+      [t('startingStock'), String(civilian.startingStock)],
+      [t('projectedProduction'), formatForecastAmount(civilian.projectedProduction)],
+      [t('maintenanceRequired'), `-${civilian.maintenanceRequired}`],
+      [t('productionInputDemand'), String(civilian.productionInputDemand)],
+      [t('productionInputAllocated'), String(civilian.productionInputAllocated)],
+      [t('productionInputShortage'), String(civilian.productionInputShortage)],
+      [t('endingStock'), String(civilian.endingStock)],
+      [t('maintenanceShortage'), String(civilian.maintenanceShortage)],
+    ];
+  } else if (resource === 'fuel') {
+    const fuel = detail as EndTurnForecast['fuel'];
+    rows = [
+      [t('startingStock'), String(fuel.startingStock)],
+      [t('generationFuelDemand'), String(fuel.generationFuelDemand)],
+      [t('projectedFuelUsed'), String(fuel.projectedFuelUsed)],
+      [t('generationFuelShortage'), String(fuel.generationFuelShortage)],
+      [t('projectedProduction'), formatForecastAmount(fuel.projectedProduction)],
+      [t('endingStock'), String(fuel.endingStock)],
+    ];
+  } else {
+    rows = [
+      [t('startingStock'), String(detail.startingStock)],
+      [t('projectedProduction'), formatForecastAmount(detail.projectedProduction)],
+      [t('maintenanceRequired'), `-${detail.maintenanceRequired}`],
+      [t('endingStock'), String(detail.endingStock)],
+      [t('shortage'), String(detail.shortage)],
+    ];
+  }
+  return `<section class="forecast-card resource-forecast-card"><h4>${escapeHtml(t(resource))}</h4><dl class="forecast-detail-grid">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl></section>`;
+}
+
+/** Render the complete public EndTurn forecast for the human-facing sheet. */
+export function renderEndTurnForecast(forecast: EndTurnForecast, locale: Locale): string {
+  const t = createTranslator(locale);
+  const electricity = forecast.electricity;
+  const totalDemand = electricity.requiredPowerDemand + electricity.industrialBoostDemand;
+  const unpowered = electricity.unpoweredFacilities.length > 0
+    ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredFacilities'))}</strong>: ${electricity.unpoweredFacilities.map((entry) => `${escapeHtml(entry.facilityId)} · ${escapeHtml(powerReasonLabel(entry.reason, locale))}`).join(' / ')}</p>`
+    : `<p class="muted">${escapeHtml(t('unpoweredFacilities'))}: ${escapeHtml(t('none'))}</p>`;
+  return `<section class="forecast-card end-turn-forecast"><h3>${escapeHtml(t('endTurnForecast'))}</h3><p class="muted">${escapeHtml(t('overcrowding'))}: ${escapeHtml(formatPercent(forecast.overcrowding.cities.reduce((total, city) => total + city.excess / Math.max(1, city.softCap), 0), locale))} · ${escapeHtml(t('additionalFood'))} ${forecast.overcrowding.additionalFood} · ${escapeHtml(t('additionalCivilianGoods'))} ${forecast.overcrowding.additionalCivilianGoods}</p>${forecastResourceCard('food', forecast.food, locale)}${forecastResourceCard('civilianGoods', forecast.civilianGoods, locale)}${forecastResourceCard('militaryGoods', forecast.militaryGoods, locale)}${forecastResourceCard('fuel', forecast.fuel, locale)}<section class="forecast-card power-forecast"><h4>${escapeHtml(t('electricity'))}</h4><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('physicalGenerationCapacity'))}</dt><dd>${electricity.physicalGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('fuelLimitedGenerationCapacity'))}</dt><dd>${electricity.fuelLimitedGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('availableGenerationCapacity'))}</dt><dd>${electricity.availableGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('requiredPowerDemand'))}</dt><dd>${electricity.requiredPowerDemand}</dd></div><div><dt>${escapeHtml(t('industrialBoostDemand'))}</dt><dd>${electricity.industrialBoostDemand}</dd></div><div><dt>${escapeHtml(t('requiredPowerAllocated'))}</dt><dd>${electricity.requiredPowerAllocated}</dd></div><div><dt>${escapeHtml(t('industrialBoostAllocated'))}</dt><dd>${electricity.industrialBoostAllocated}</dd></div><div><dt>${escapeHtml(t('shortage'))}</dt><dd>${electricity.shortage}</dd></div></dl><p class="muted">${escapeHtml(t('availableGenerationCapacity'))} ${electricity.availableGenerationCapacity} / ${totalDemand}</p>${unpowered}</section></section>`;
 }
 
 function recoveryClassLabel(recoveryClass: AgentUnitObservation['recoveryClassIfTurnEndsNow'], locale: Locale): string {
@@ -281,6 +368,15 @@ function stoppedReasonLabel(reason: string | null | undefined, locale: Locale): 
     input_shortage: t('stopReasonInput'),
     not_owned: t('stopReasonNotOwned'),
     stopped: t('stopReasonStopped'),
+    supplied: t('powerReasonSupplied'),
+    physical_capacity_shortage: t('powerReasonPhysical'),
+    fuel_shortage: t('powerReasonFuel'),
+    allocation_priority: t('powerReasonPriority'),
+    power_supply_off: t('powerReasonOff'),
+    no_population: t('powerReasonNoPopulation'),
+    not_eligible: t('powerReasonNotEligible'),
+    production_input_unavailable: t('powerReasonInput'),
+    not_applicable: t('powerReasonNone'),
   };
   return reason ? labels[reason] ?? reason : '';
 }
@@ -349,6 +445,9 @@ export function localizeActionError(code: string | undefined, locale: Locale): s
     checkpoint_same_position: locale === 'ja' ? '別の道路タイルを選択してください。' : 'Choose a different road tile.',
     unknown_operational_checkpoint: locale === 'ja' ? '移設できる稼働中の検問所を選択してください。' : 'Select an operational checkpoint to relocate.',
     checkpoint_abandoned_forward_block: t('abandonedForwardBlock'),
+    power_supply_not_applicable: locale === 'ja' ? '電力供給を変更できるのはFarm・民需工場・軍需工場だけです。' : 'Power Supply can only be changed for Farms, Civilian Factories, and Military Factories.',
+    power_supply_unavailable: locale === 'ja' ? '所有中で安全かつ操作可能な産業施設だけ変更できます。' : 'Only an owned, safe, and available industrial facility can change Power Supply.',
+    invalid_power_supply: locale === 'ja' ? 'Power SupplyはONまたはOFFで指定してください。' : 'Power Supply must be ON or OFF.',
   };
   return messages[code ?? ''] ?? t('invalidAction');
 }
@@ -696,6 +795,7 @@ export class GameUiController {
       case 'guide-close': this.markGuideSeen(); this.dismissModal(); break;
       case 'assign-workers': this.assignWorkers(); break;
       case 'transfer-population': this.transferPopulation(); break;
+      case 'toggle-power-supply': this.setPowerSupply(element); break;
       case 'produce-police': this.produce('police'); break;
       case 'produce-guard': this.produce('nationalGuard'); break;
       case 'build-checkpoint': this.buildCheckpoint(); break;
@@ -770,6 +870,9 @@ export class GameUiController {
   private updateHud(): void {
     if (!this.state) return;
     const population = populationLocationTotals(this.state);
+    const forecast = forecastEndTurn(this.state);
+    const forecastPower = forecast.electricity;
+    const forecastPowerDemand = forecastPower.requiredPowerDemand + forecastPower.industrialBoostDemand;
     const hordeVisible = this.state.turn >= this.state.config.horde.warningStartTurn;
     const phaseIndicator = phaseIndicatorViewModel(this.state.phase, this.locale);
     const phaseDot = this.root.querySelector<HTMLElement>('[data-bind="phase"]');
@@ -789,7 +892,7 @@ export class GameUiController {
       civilianGoods: String(this.state.resources.civilianGoods),
       militaryGoods: String(this.state.resources.militaryGoods),
       fuel: String(this.state.resources.fuel),
-      power: `${this.state.resources.electricityCapacity}/${this.state.resources.electricityRequired}`,
+      power: `${forecastPower.availableGenerationCapacity}/${forecastPowerDemand}`,
       'horde-direction': hordeVisible ? formatDirection(this.state.horde.nextDirection, this.locale) : this.translator()('warningPending'),
       'horde-remaining': hordeVisible ? String(this.state.horde.turnsRemaining) : '—',
       'healthy-civilians': String(population.healthyCivilians),
@@ -798,6 +901,10 @@ export class GameUiController {
     for (const [key, value] of Object.entries(bindings)) {
       const element = this.root.querySelector<HTMLElement>(`[data-bind="${key}"]`);
       if (element) element.textContent = value;
+    }
+    const powerElement = this.root.querySelector<HTMLElement>('[data-bind="power"]');
+    if (powerElement) {
+      powerElement.title = `${this.translator()('projectedPower')}: ${forecastPower.availableGenerationCapacity}/${forecastPowerDemand} · ${this.translator()('requiredPowerAllocated')} ${forecastPower.requiredPowerAllocated} · ${this.translator()('industrialBoostAllocated')} ${forecastPower.industrialBoostAllocated}`;
     }
   }
 
@@ -975,18 +1082,23 @@ export class GameUiController {
   private endTurn(): void {
     if (!this.state) return;
     const forecast = forecastEndTurn(this.state);
-    const shortages = [
-      ['food', forecast.food.shortage],
-      ['civilianGoods', forecast.civilianGoods.shortage],
-      ['militaryGoods', forecast.militaryGoods.shortage],
-      ['fuel', forecast.fuel.shortage],
-      ['electricity', forecast.electricity.shortage],
-    ] as const;
-    const projected = shortages.filter(([, amount]) => amount > 0);
+    const t = this.translator();
+    const projected: Array<[string, number]> = [];
+    if (forecast.food.shortage > 0) projected.push([t('food'), forecast.food.shortage]);
+    if (forecast.civilianGoods.maintenanceShortage > 0) {
+      projected.push([`${t('civilianGoods')} · ${t('maintenanceShortage')}`, forecast.civilianGoods.maintenanceShortage]);
+    }
+    if (forecast.civilianGoods.productionInputShortage > 0) {
+      projected.push([t('productionInputWarning'), forecast.civilianGoods.productionInputShortage]);
+    }
+    if (forecast.militaryGoods.shortage > 0) projected.push([t('militaryGoods'), forecast.militaryGoods.shortage]);
+    if (forecast.fuel.generationFuelShortage > 0) {
+      projected.push([t('generationFuelWarning'), forecast.fuel.generationFuelShortage]);
+    }
+    if (forecast.electricity.shortage > 0) projected.push([t('powerShortageWarning'), forecast.electricity.shortage]);
     if (projected.length > 0) {
-      const t = this.translator();
       const details = projected
-        .map(([resource, amount]) => `<li>${escapeHtml(t(resource))}: <b>${amount}</b></li>`)
+        .map(([resource, amount]) => `<li>${escapeHtml(resource)}: <b>${amount}</b></li>`)
         .join('');
       const overcrowding = forecast.overcrowding;
       const crowdDetails = overcrowding.cities.length > 0
@@ -1001,6 +1113,26 @@ export class GameUiController {
   private commitEndTurn(): void {
     const result = this.apply({ type: 'EndTurn' });
     if (result && this.state?.gameOver) this.showStatistics(this.state.result);
+  }
+
+  private setPowerSupply(element: HTMLElement): void {
+    if (!this.state) return;
+    const facilityId = element.dataset.facilityId ?? (this.selection?.kind === 'facility' ? this.selection.id : '');
+    if (!facilityId) return;
+    const enabled = element.dataset.enabled === 'true';
+    const requested: Extract<GameAction, { type: 'SetPowerSupply' }> = {
+      type: 'SetPowerSupply',
+      facilityId,
+      enabled,
+    };
+    const action = actionForPowerSupply(this.legalActions(), facilityId, enabled) ?? requested;
+    const reason = actionReasonFor(this.state, action, this.locale);
+    if (reason) {
+      this.showToast(reason);
+      this.updateFacilitySupplementalControls();
+      return;
+    }
+    this.apply(action);
   }
 
   private assignWorkers(): void {
@@ -1113,7 +1245,8 @@ export class GameUiController {
       output.innerHTML = `<p class="warning-text">${escapeHtml(t('invalidAction'))}</p>`;
       return;
     }
-    output.innerHTML = `<dl class="transfer-preview-grid"><div><dt>${escapeHtml(t('fromCity'))}</dt><dd>${projection.fromPopulation} → <b>${projection.fromAfter}</b></dd></div><div><dt>${escapeHtml(t('toCity'))}</dt><dd>${projection.toPopulation} → <b>${projection.toAfter}</b></dd></div><div><dt>${escapeHtml(t('projectedOvercrowding'))}</dt><dd>${escapeHtml(formatPercent(projection.overcrowdingRate, this.locale))}</dd></div><div><dt>${escapeHtml(t('additionalFood'))}</dt><dd>${projection.additionalFood}</dd></div><div><dt>${escapeHtml(t('additionalCivilianGoods'))}</dt><dd>${projection.additionalCivilianGoods}</dd></div></dl>`;
+    const projectedForecast = projection.forecast;
+    output.innerHTML = `<dl class="transfer-preview-grid"><div><dt>${escapeHtml(t('fromCity'))}</dt><dd>${projection.fromPopulation} → <b>${projection.fromAfter}</b></dd></div><div><dt>${escapeHtml(t('toCity'))}</dt><dd>${projection.toPopulation} → <b>${projection.toAfter}</b></dd></div><div><dt>${escapeHtml(t('projectedOvercrowding'))}</dt><dd>${escapeHtml(formatPercent(projection.overcrowdingRate, this.locale))}</dd></div><div><dt>${escapeHtml(t('additionalFood'))}</dt><dd>${projection.additionalFood}</dd></div><div><dt>${escapeHtml(t('additionalCivilianGoods'))}</dt><dd>${projection.additionalCivilianGoods}</dd></div></dl><section class="forecast-card transfer-forecast"><h4>${escapeHtml(t('endTurnForecast'))}</h4><p class="muted">${escapeHtml(t('food'))}: ${projectedForecast.food.startingStock} → ${projectedForecast.food.endingStock} · ${escapeHtml(t('shortage'))} ${projectedForecast.food.shortage}</p><p class="muted">${escapeHtml(t('civilianGoods'))}: ${projectedForecast.civilianGoods.startingStock} → ${projectedForecast.civilianGoods.endingStock} · ${escapeHtml(t('maintenanceShortage'))} ${projectedForecast.civilianGoods.maintenanceShortage} · ${escapeHtml(t('productionInputShortage'))} ${projectedForecast.civilianGoods.productionInputShortage}</p><p class="muted">${escapeHtml(t('electricity'))}: ${projectedForecast.electricity.availableGenerationCapacity} / ${projectedForecast.electricity.requiredPowerDemand + projectedForecast.electricity.industrialBoostDemand}</p></section>`;
     const action: Extract<GameAction, { type: 'TransferPopulation' }> = { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: toId, people };
     const reason = people <= 0 ? t('noPopulationToTransfer') : actionReasonFor(this.state, action, this.locale);
     const button = this.root.querySelector<HTMLButtonElement>('[data-action="transfer-population"]');
@@ -1479,7 +1612,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPolicy', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipPolicy', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card" aria-labelledby="help-heading"><button class="icon-button modal-close" data-action="dismiss-modal">×</button><h2 id="help-heading">${escapeHtml(t('help'))}</h2><p>${escapeHtml(t('helpBody'))}</p><h3>${escapeHtml(t('move'))}</h3><p>${escapeHtml(t('guideSteps'))}</p><h3>${escapeHtml(t('tipsTitle'))}</h3><ul class="tips-list">${tips}</ul><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></section></div>`);
@@ -1494,8 +1627,35 @@ export class GameUiController {
     const supplied = getSuppliedTileKeys(this.state).includes(String(facility.position.q) + ',' + String(facility.position.r));
     const locationCard = body.querySelector<HTMLElement>('.location-card');
     if (locationCard) {
+      locationCard.querySelector('[data-facility-supply-status="true"]')?.remove();
       locationCard.insertAdjacentHTML('afterbegin', '<p class="supply-status ' + (supplied ? 'is-supplied' : 'is-out-of-supply') + '">' +
         escapeHtml(supplied ? t('supplied') : t('outOfSupply')) + '</p>');
+      locationCard.querySelector<HTMLElement>('.supply-status')?.setAttribute('data-facility-supply-status', 'true');
+    }
+    const powerEditor = body.querySelector<HTMLElement>('[data-power-supply-editor="true"]');
+    if (powerEditor && isPowerSupplyFacility(facility)) {
+      const targetEnabled = !facility.powerSupplyEnabled;
+      const requested: Extract<GameAction, { type: 'SetPowerSupply' }> = {
+        type: 'SetPowerSupply',
+        facilityId: facility.id,
+        enabled: targetEnabled,
+      };
+      const actionAvailable = Boolean(actionForPowerSupply(this.legalActions(), facility.id, targetEnabled));
+      const reason = actionAvailable ? null : actionReasonFor(this.state, requested, this.locale) ?? t('invalidAction');
+      const stateElement = powerEditor.querySelector<HTMLElement>('[data-power-supply-state="true"]');
+      if (stateElement) stateElement.textContent = facility.powerSupplyEnabled ? t('powerOn') : t('powerOff');
+      const button = powerEditor.querySelector<HTMLButtonElement>('[data-action="toggle-power-supply"]');
+      if (button) {
+        button.dataset.enabled = String(targetEnabled);
+        button.disabled = !actionAvailable;
+        button.textContent = t('powerSupply') + ': ' + (targetEnabled ? t('powerOn') : t('powerOff'));
+        button.title = reason ?? '';
+      }
+      const reasonElement = powerEditor.querySelector<HTMLElement>('[data-power-supply-reason="true"]');
+      if (reasonElement) {
+        reasonElement.hidden = !reason;
+        reasonElement.textContent = reason ?? '';
+      }
     }
     const buildButton = body.querySelector<HTMLButtonElement>('[data-action="build-checkpoint"]');
     const buildCandidates = this.legalActions().some((action) => action.type === 'BuildCheckpoint');
@@ -1593,10 +1753,9 @@ export class GameUiController {
       const prompt = unselectedPrompt(this.navMode, this.locale);
       const population = populationLocationTotals(this.state);
       const forecast = forecastEndTurn(this.state);
-      const overcrowdingRate = forecast.overcrowding.cities.reduce((total, city) => total + city.excess / Math.max(1, city.softCap), 0);
       title.textContent = prompt;
       summary.textContent = stateSummary(this.state, this.locale);
-      body.innerHTML = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl><section class="forecast-card"><h3>${escapeHtml(t('endTurnForecast'))}</h3><p class="muted">${escapeHtml(t('overcrowding'))}: ${escapeHtml(formatPercent(overcrowdingRate, this.locale))} · ${escapeHtml(t('additionalFood'))} ${forecast.overcrowding.additionalFood} · ${escapeHtml(t('additionalCivilianGoods'))} ${forecast.overcrowding.additionalCivilianGoods}</p><p class="muted">${escapeHtml(t('food'))}: ${forecast.food.required}/${forecast.food.available} · ${escapeHtml(t('civilianGoods'))}: ${forecast.civilianGoods.required}/${forecast.civilianGoods.available}</p></section><p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>`;
+      body.innerHTML = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl>${renderEndTurnForecast(forecast, this.locale)}<p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>`;
       return;
     }
     if (this.selection.kind === 'unit') {
@@ -1627,9 +1786,34 @@ export class GameUiController {
     title.textContent = facilityLabel(facility.type, this.locale);
     const owned = facility.owner === 'player' && facility.status === 'owned';
     const statusText = facility.status === 'ruined' ? t('ruined') : facility.owner === 'player' ? t('owned') : t('unowned');
-    const operationText = facility.infected > 0 ? t('infected') : facility.operationalStatus === 'operational' ? t('operational') : facility.operationalStatus === 'stopped' ? t('stopped') : t('ruined');
+    const projectedProduction = publicFacility?.production;
+    const projectedPowerUnavailable = projectedProduction?.powerMode === 'required' && !projectedProduction.projectedPowerSupplied;
+    const operationText = facility.infected > 0
+      ? t('infected')
+      : facility.status === 'ruined'
+        ? t('ruined')
+        : facility.workers <= 0
+          ? t('stopped')
+          : projectedPowerUnavailable
+            ? t('powerNotSupplied')
+            : facility.operationalStatus === 'operational' ? t('operational') : t('stopped');
     summary.textContent = `${statusText} · ${operationText} · ${t('location')} ${facility.position.q},${facility.position.r}`;
     const city = isCity(facility);
+    const powerSupplyEditor = isPowerSupplyFacility(facility)
+      ? (() => {
+        const targetEnabled = !facility.powerSupplyEnabled;
+        const requested: Extract<GameAction, { type: 'SetPowerSupply' }> = {
+          type: 'SetPowerSupply',
+          facilityId: facility.id,
+          enabled: targetEnabled,
+        };
+        const availableAction = actionForPowerSupply(this.legalActions(), facility.id, targetEnabled);
+        const unavailableReason = availableAction ? null : actionReasonFor(this.state!, requested, this.locale) ?? t('invalidAction');
+        const currentPower = facility.powerSupplyEnabled ? t('powerOn') : t('powerOff');
+        const projectedPower = projectedProduction?.projectedPowerSupplied ? t('powerSupplied') : t('powerNotSupplied');
+        return `<section class="population-editor power-supply-editor" data-power-supply-editor="true"><h3>${escapeHtml(t('powerSupply'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('powerSupply'))}</dt><dd data-power-supply-state="true">${escapeHtml(currentPower)}</dd></div><div><dt>${escapeHtml(t('powerMode'))}</dt><dd>${escapeHtml(powerModeLabel(projectedProduction?.powerMode ?? 'boost', this.locale))}</dd></div><div><dt>${escapeHtml(t('projectedPower'))}</dt><dd data-projected-power="true">${escapeHtml(projectedPower)}</dd></div></dl><button class="secondary-button" data-action="toggle-power-supply" data-facility-id="${escapeHtml(facility.id)}" data-enabled="${String(targetEnabled)}" ${availableAction ? '' : 'disabled'}>${escapeHtml(t('powerSupply'))}: ${escapeHtml(targetEnabled ? t('powerOn') : t('powerOff'))}</button>${unavailableReason ? `<p class="warning-text" data-power-supply-reason="true">${escapeHtml(unavailableReason)}</p>` : '<p class="muted" data-power-supply-reason="true"></p>'}</section>`;
+      })()
+      : '';
     const bounds = workerAssignmentBounds(this.state, facility);
     const canOperatePopulation = owned && facility.infected === 0 && facility.populationOperationalTurn <= this.state.turn;
     const workerAction = actionForWorkerAssignment(this.legalActions(), facility.id, facility.workers);
@@ -1657,7 +1841,7 @@ export class GameUiController {
       : '';
     const recruitment = `<section class="recruitment-editor"><h3>${escapeHtml(t('population'))}</h3><p class="muted">${escapeHtml(city ? t('tipRecruitment') : t('recruitmentDisabled'))}</p><div class="action-row"><button class="secondary-button" data-action="produce-police">${escapeHtml(t('producePolice'))}</button><button class="secondary-button" data-action="produce-guard">${escapeHtml(t('produceGuard'))}</button></div><p class="warning-text" data-recruitment-reason="police" hidden></p><p class="warning-text" data-recruitment-reason="nationalGuard" hidden></p></section>`;
     const checkpoint = this.state.checkpoints.find((candidate) => candidate.position.q === facility.position.q && candidate.position.r === facility.position.r);
-    body.innerHTML = `<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${workerEditor}${cityTransfer}${recruitment}${checkpoint ? `<section class="checkpoint-editor"><h3>${escapeHtml(t('checkpoint'))}</h3><p class="muted">${escapeHtml(t('waiting'))}: ${checkpoint.waiting} · ${escapeHtml(t('screening'))}: ${checkpoint.screening} · ${escapeHtml(t('approved'))}: ${checkpoint.approved} · ${escapeHtml(t('infected'))}: ${checkpoint.infected}</p></section>` : ''}<div class="action-row"><button class="secondary-button" data-action="build-checkpoint">${escapeHtml(t('buildCheckpoint'))}</button></div>`;
+    body.innerHTML = `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text">${escapeHtml(t('powerNotSupplied'))}: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${workerEditor}${cityTransfer}${recruitment}${checkpoint ? `<section class="checkpoint-editor"><h3>${escapeHtml(t('checkpoint'))}</h3><p class="muted">${escapeHtml(t('waiting'))}: ${checkpoint.waiting} · ${escapeHtml(t('screening'))}: ${checkpoint.screening} · ${escapeHtml(t('approved'))}: ${checkpoint.approved} · ${escapeHtml(t('infected'))}: ${checkpoint.infected}</p></section>` : ''}<div class="action-row"><button class="secondary-button" data-action="build-checkpoint">${escapeHtml(t('buildCheckpoint'))}</button></div>`;
     body.insertAdjacentHTML('afterbegin', this.renderFacilityForecast(publicFacility));
     this.updateTransferPreview();
     this.updateRecruitmentReasons();
@@ -1708,19 +1892,40 @@ export class GameUiController {
     if (!publicFacility) return '';
     const t = this.translator();
     const production = publicFacility.production;
-    const powerRequirement = production.requiresPower
+    const powerMode = production.powerMode ?? (production.requiresPower ? 'required' : 'none');
+    const powerRequirement = powerMode !== 'none' && production.requiredPowerCapacity > 0
       ? String(production.requiredPowerCapacity)
       : t('none');
     const powerGeneration = production.estimatedPowerGeneration > 0
       ? `${production.estimatedPowerGeneration} (${production.powerGenerationPerWorker} / ${t('perWorker')})`
       : t('none');
+    const baseProduction = production.baseProduction ?? production.estimatedOutput;
+    const projectedProduction = production.projectedProduction ?? production.estimatedOutput;
+    const projectedInput = production.estimatedInputConsumption;
+    const projectedPower = powerMode === 'none'
+      ? t('none')
+      : production.projectedPowerSupplied ? t('powerSupplied') : t('powerNotSupplied');
+    const powerSupply = isPowerSupplyFacility(publicFacility)
+      ? production.powerSupplyEnabled ? t('powerOn') : t('powerOff')
+      : t('none');
+    const powerReason = powerMode === 'none'
+      ? ''
+      : powerReasonLabel(production.projectedPowerReason, this.locale);
+    const lastPower = powerMode === 'none'
+      ? t('none')
+      : production.lastPowerSupplied === null
+        ? t('unavailable')
+        : production.lastPowerSupplied ? t('powerSupplied') : t('powerNotSupplied');
     const stopped = production.stoppedReason
       ? `<p class="warning-text"><strong>${escapeHtml(t('stoppedReason'))}</strong>: ${escapeHtml(stoppedReasonLabel(production.stoppedReason, this.locale))}</p>`
+      : '';
+    const powerWarning = powerMode !== 'none' && !production.projectedPowerSupplied
+      ? `<p class="warning-text"><strong>${escapeHtml(t('powerNotSupplied'))}</strong>: ${escapeHtml(powerReason || t('powerReason'))}</p>`
       : '';
     const infection = publicFacility.infectedPopulation > 0
       ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicFacility.infectionContained ? 'is-contained' : 'warning-text'}">${escapeHtml(publicFacility.infectionContained ? t('infectionContained') : t('infectionNotContained'))}</p><p class="muted">${escapeHtml(t('automaticSuppression'))}: ${publicFacility.projectedSuppression > 0 ? publicFacility.projectedSuppression : t('automaticSuppressionUnavailable')}</p>${publicFacility.projectedCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicFacility.projectedCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}</section>`
       : '';
-    return `<section class="production-forecast"><h3>${escapeHtml(t('productionForecast'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(production.estimatedOutput, this.locale))}</dd></div><div><dt>${escapeHtml(t('inputConsumption'))}</dt><dd>${escapeHtml(formatResourceAmounts(production.estimatedInputConsumption, this.locale))}</dd></div><div><dt>${escapeHtml(t('powerRequirement'))}</dt><dd>${escapeHtml(powerRequirement)}</dd></div><div><dt>${escapeHtml(t('powerGeneration'))}</dt><dd>${escapeHtml(powerGeneration)}</dd></div></dl><p class="muted">${escapeHtml(t('perWorker'))}: ${escapeHtml(t('currentProduction'))} ${escapeHtml(formatResourceAmounts(production.outputsPerWorker, this.locale))} · ${escapeHtml(t('inputConsumption'))} ${escapeHtml(formatResourceAmounts(production.inputsPerWorker, this.locale))}</p>${stopped}<p class="muted">${escapeHtml(t('projectedLoss'))}: ${escapeHtml(formatResourceAmounts(production.projectedOutputLossIfInfectedOrOverrun, this.locale))} · ${escapeHtml(t('powerGeneration'))} ${production.projectedPowerLossIfInfectedOrOverrun}</p></section>${infection}`;
+    return `<section class="production-forecast"><h3>${escapeHtml(t('productionForecast'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('powerMode'))}</dt><dd>${escapeHtml(powerModeLabel(powerMode, this.locale))}</dd></div><div><dt>${escapeHtml(t('powerSupply'))}</dt><dd>${escapeHtml(powerSupply)}</dd></div><div><dt>${escapeHtml(t('projectedPower'))}</dt><dd>${escapeHtml(projectedPower)}</dd></div><div><dt>${escapeHtml(t('powerReason'))}</dt><dd>${escapeHtml(powerReason || t('none'))}</dd></div><div><dt>${escapeHtml(t('lastPowerSupplied'))}</dt><dd>${escapeHtml(lastPower)}</dd></div><div><dt>${escapeHtml(t('productionMultiplier'))}</dt><dd>×${production.projectedProductionMultiplier ?? 1}</dd></div><div><dt>${escapeHtml(t('baseProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(baseProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedInput'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedInput, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('powerRequirement'))}</dt><dd>${escapeHtml(powerRequirement)}</dd></div><div><dt>${escapeHtml(t('powerGeneration'))}</dt><dd>${escapeHtml(powerGeneration)}</dd></div></dl><p class="muted">${escapeHtml(t('perWorker'))}: ${escapeHtml(t('currentProduction'))} ${escapeHtml(formatResourceAmounts(production.outputsPerWorker, this.locale))} · ${escapeHtml(t('inputConsumption'))} ${escapeHtml(formatResourceAmounts(production.inputsPerWorker, this.locale))}</p>${powerWarning}${stopped}<p class="muted">${escapeHtml(t('projectedLoss'))}: ${escapeHtml(formatResourceAmounts(production.projectedOutputLossIfInfectedOrOverrun, this.locale))} · ${escapeHtml(t('powerGeneration'))} ${production.projectedPowerLossIfInfectedOrOverrun}</p></section>${infection}`;
   }
 
   private renderCheckpointSheet(

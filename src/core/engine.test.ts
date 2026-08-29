@@ -200,7 +200,7 @@ describe('GameEngine', () => {
     expect(engine.getState().population.cityResidents).toBeGreaterThanOrEqual(residents + 2);
   });
 
-  it('applies combined food and civilian shortages before production', () => {
+  it('uses same-turn food and civilian production before maintenance shortages', () => {
     const engine = new GameEngine(3, createDefaultConfig());
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.resources.food = 0;
@@ -208,8 +208,8 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
-    expect(result.result?.reason).toBe('healthyCiviliansLost');
-    expect(result.events.some((event) => event.type === 'resource_shortage')).toBe(true);
+    expect(result.result).toBeNull();
+    expect(result.events.some((event) => event.type === 'resource_shortage')).toBe(false);
   });
 
   it('previews Horde spawning deterministically and never spawns on the final turn', () => {
@@ -352,7 +352,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'AssignWorkers', facilityId: farm.id, workers: 21 }).error?.code).toBe('infected_facility');
   });
 
-  it('forecasts and resolves electricity, prior-stock fuel input, and partial fuel operation without mutation', () => {
+  it('forecasts and resolves fuel-backed power allocation without mutation', () => {
     const config = createDefaultConfig({ maxTurns: 3, economy: { initialZombieCount: 0 } });
     const engine = new GameEngine(107, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
@@ -362,13 +362,13 @@ describe('GameEngine', () => {
     const before = JSON.stringify(snapshot);
     const forecast = forecastEndTurn(snapshot);
     expect(JSON.stringify(snapshot)).toBe(before);
-    expect(forecast.fuel).toMatchObject({ available: 5, productionInputRequired: 46, shortage: 41 });
-    expect(forecast.electricity).toMatchObject({ capacity: 15, required: 15, shortage: 0 });
+    expect(forecast.fuel).toMatchObject({ available: 5, generationFuelDemand: 3, projectedFuelUsed: 3 });
+    expect(forecast.electricity).toMatchObject({ physicalGenerationCapacity: 30, required: 15, shortage: 0 });
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
-    expect(result.state.resources.fuel).toBe(50);
-    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'food' && event.payload.amount === 25)).toBe(true);
-    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'civilianGoods' && event.payload.amount === 41)).toBe(true);
+    expect(result.state.resources.fuel).toBe(52);
+    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'food' && event.payload.amount === 230)).toBe(true);
+    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'civilianGoods' && event.payload.amount === 271)).toBe(true);
 
     const noPower = engine.getState() as ReturnType<typeof createInitialState>;
     noPower.turn = 1;
@@ -382,7 +382,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot: noPower }).error).toBeNull();
     const unpowered = forecastEndTurn(engine.getState());
     expect(unpowered.electricity).toMatchObject({ capacity: 0, required: 15, shortage: 15 });
-    expect(unpowered.fuel.productionInputRequired).toBe(0);
+    expect(unpowered.fuel.projectedFuelUsed).toBe(0);
   });
 
   it('lowers every national-guard effective range when military goods are short', () => {
@@ -768,7 +768,7 @@ describe('GameEngine', () => {
     expect(engine.getState().checkpoints[0]!.infected).toBeGreaterThan(0);
   });
 
-  it('spreads checkpoint internal infection waiting-first and applies shortage losses to cities first', () => {
+  it('spreads checkpoint internal infection waiting-first while same-turn food production prevents losses', () => {
     const config = createDefaultConfig({
       maxTurns: 1,
       economy: { initialZombieCount: 0, initialResources: { food: 100, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
@@ -783,7 +783,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.getState().checkpoints[0]).toMatchObject({ waiting: 0, screening: 1, approved: 3, infected: 4 });
-    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(26);
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(41);
     expect(engine.getState().facilities.find((facility) => facility.id === 'farm-1')!.workers).toBe(23);
   });
 });

@@ -19,6 +19,7 @@ export const ACTION_TYPES = [
   'AssignWorkers',
   'TransferPopulation',
   'SetCheckpointPolicy',
+  'SetPowerSupply',
   'BuildCheckpoint',
   'RelocateCheckpoint',
   'ProduceUnit',
@@ -125,6 +126,10 @@ export interface GameMetrics {
   highCapacityFacilityTurns: number;
   powerPlantStoppedTurns: number;
   powerShortageTurns: number;
+  poweredIndustrialFacilityTurns: number;
+  unpoweredCityTurns: number;
+  refineryFacilitiesCaptured: number;
+  powerPlantFacilitiesCaptured: number;
   checkpointPassThroughBranchTurns: number;
   checkpointNormalBranchTurns: number;
   checkpointStrictBranchTurns: number;
@@ -340,6 +345,19 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     (facility) => facility.type === 'powerPlant' && facility.owner === 'player' && facility.healthyPopulation > 0 && facility.production.stoppedReason !== null,
   ).length, 0);
   const powerShortageTurns = turnObservations.filter((observation) => observation.endTurnForecast.electricity.shortage > 0).length;
+  const poweredIndustrialFacilityTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
+    (facility) => ['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type) && facility.production.projectedPowerSupplied,
+  ).length, 0);
+  const unpoweredCityTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
+    (facility) => ['capital', 'city'].includes(facility.type) && facility.owner === 'player' && facility.healthyPopulation > 0 && !facility.production.projectedPowerSupplied,
+  ).length, 0);
+  const capturedFacilityTypes = new Map(input.initialObservation.facilities.map((facility) => [facility.id, facility.type]));
+  const refineryFacilitiesCaptured = events.filter(
+    (event) => event.type === 'facility_captured' && capturedFacilityTypes.get(String(event.payload.facilityId)) === 'refinery',
+  ).length;
+  const powerPlantFacilitiesCaptured = events.filter(
+    (event) => event.type === 'facility_captured' && capturedFacilityTypes.get(String(event.payload.facilityId)) === 'powerPlant',
+  ).length;
 
   const initialIds = new Set(input.initialObservation.units.map((unit) => unit.id));
   const allUnits = new Map<string, HumanUnitType>();
@@ -481,6 +499,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     highCapacityFacilityTurns,
     powerPlantStoppedTurns,
     powerShortageTurns,
+    poweredIndustrialFacilityTurns,
+    unpoweredCityTurns,
+    refineryFacilitiesCaptured,
+    powerPlantFacilitiesCaptured,
     checkpointPassThroughBranchTurns: branchTurns.passThrough,
     checkpointNormalBranchTurns: branchTurns.normal,
     checkpointStrictBranchTurns: branchTurns.strict,
@@ -608,6 +630,10 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'highCapacityFacilityTurns',
   'powerPlantStoppedTurns',
   'powerShortageTurns',
+  'poweredIndustrialFacilityTurns',
+  'unpoweredCityTurns',
+  'refineryFacilitiesCaptured',
+  'powerPlantFacilitiesCaptured',
   'checkpointPassThroughBranchTurns',
   'checkpointNormalBranchTurns',
   'checkpointStrictBranchTurns',

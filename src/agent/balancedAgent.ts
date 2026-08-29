@@ -11,9 +11,9 @@ function nearestDistance(position: HexCoord, targets: readonly HexCoord[]): numb
 
 function shortage(observation: AgentObservation): number {
   return observation.endTurnForecast.food.shortage +
-    observation.endTurnForecast.civilianGoods.shortage +
-    observation.endTurnForecast.fuel.shortage +
-    observation.endTurnForecast.electricity.shortage;
+    observation.endTurnForecast.civilianGoods.maintenanceShortage +
+    observation.endTurnForecast.militaryGoods.shortage +
+    Math.max(0, observation.endTurnForecast.electricity.requiredPowerDemand - observation.endTurnForecast.electricity.requiredPowerAllocated);
 }
 
 interface ZombieThreat {
@@ -117,8 +117,8 @@ function primaryGoal(
 function facilityResourceValue(type: FacilityType, observation: AgentObservation): number {
   if (type === 'farm') return observation.endTurnForecast.food.shortage > 0 ? 5 : 2;
   if (type === 'civilianFactory') return observation.endTurnForecast.civilianGoods.shortage > 0 ? 5 : 2;
-  if (type === 'refinery') return observation.endTurnForecast.fuel.shortage > 0 ? 5 : 2;
-  if (type === 'powerPlant') return observation.endTurnForecast.electricity.shortage > 0 ? 5 : 2;
+  if (type === 'refinery') return observation.endTurnForecast.fuel.endingStock < observation.endTurnForecast.fuel.generationFuelDemand ? 5 : 2;
+  if (type === 'powerPlant') return observation.endTurnForecast.electricity.physicalGenerationCapacity < observation.endTurnForecast.electricity.required ? 5 : 2;
   if (type === 'militaryFactory') return observation.resources.militarySupplyAvailable ? 1 : 4;
   if (type === 'city') return 3;
   return 4;
@@ -137,6 +137,7 @@ function repeatSensitiveActionFamily(action: GameAction, observation: AgentObser
   }
   if (action.type === 'TransferPopulation') return 'TransferPopulation';
   if (action.type === 'SetCheckpointPolicy') return `SetCheckpointPolicy|${action.checkpointId}`;
+  if (action.type === 'SetPowerSupply') return `SetPowerSupply|${action.facilityId}`;
   if (action.type === 'BuildCheckpoint') return `BuildCheckpoint|${action.branchId ?? 'unknown'}`;
   if (action.type === 'RelocateCheckpoint') return `RelocateCheckpoint|${action.checkpointId}`;
   return null;
@@ -246,10 +247,12 @@ function scoreAction(
       } else if (facility.type === 'civilianFactory') {
         targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation === 0 ? 8 : facility.healthyPopulation, facility.healthyPopulation + Math.ceil(observation.endTurnForecast.civilianGoods.shortage / 4)));
       } else if (facility.type === 'refinery') {
-        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation === 0 ? 5 : facility.healthyPopulation, facility.healthyPopulation + Math.ceil(observation.endTurnForecast.fuel.shortage / 4)));
+        const nextTurnFuelDeficit = Math.max(0, observation.endTurnForecast.fuel.generationFuelDemand - observation.endTurnForecast.fuel.endingStock);
+        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation === 0 ? 5 : facility.healthyPopulation, facility.healthyPopulation + Math.ceil(nextTurnFuelDeficit / 5)));
       } else if (facility.type === 'powerPlant') {
         const generationPerWorker = Math.max(1, facility.production.powerGenerationPerWorker);
-        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation, facility.healthyPopulation + Math.ceil(observation.endTurnForecast.electricity.shortage / generationPerWorker)));
+        const physicalDeficit = Math.max(0, observation.endTurnForecast.electricity.required - observation.endTurnForecast.electricity.physicalGenerationCapacity);
+        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation, facility.healthyPopulation + Math.ceil(physicalDeficit / generationPerWorker)));
       } else if (facility.type === 'militaryFactory' && reserveDeficit > 0) {
         const immediateCivilianShortage = observation.endTurnForecast.food.shortage + observation.endTurnForecast.civilianGoods.shortage;
         if (immediateCivilianShortage === 0 || !observation.resources.militarySupplyAvailable) {
@@ -305,19 +308,35 @@ function scoreAction(
         score += usefulWorkers * weights.militaryReserve * Math.min(12, reserveDeficit) * urgencyMultiplier;
         reasonCodes.push('BUILD_MILITARY_RESERVE');
       }
-      if (delta < 0 && observation.endTurnForecast.fuel.shortage > 0 && ['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type)) {
-        score += Math.abs(delta) * 25;
-        reasonCodes.push('REDUCE_INPUT_DEMAND');
-      }
       if (facility.type === 'powerPlant' && observation.endTurnForecast.electricity.shortage > 0 && delta > 0) {
         const affectedFacilities = observation.facilities.filter((candidate) =>
           candidate.owner === 'player' &&
           candidate.healthyPopulation > 0 &&
-          candidate.production.requiresPower,
+          candidate.production.powerMode !== 'none',
         ).length;
         score += 180 + affectedFacilities * 20;
         reasonCodes.push('RESTORE_POWER');
         if (affectedFacilities > 0) reasonCodes.push('PREVENT_POWER_CASCADE');
+      }
+    }
+  } else if (action.type === 'SetPowerSupply') {
+    const facility = facilities.get(action.facilityId);
+    if (facility) {
+      const maintenanceEmergency = facility.type === 'farm'
+        ? observation.endTurnForecast.food.shortage
+        : facility.type === 'civilianFactory'
+          ? observation.endTurnForecast.civilianGoods.maintenanceShortage
+          : observation.endTurnForecast.militaryGoods.shortage;
+      if (action.enabled) {
+        score += maintenanceEmergency > 0 ? 320 : 20;
+        if (maintenanceEmergency > 0) reasonCodes.push('ENABLE_POWER_FOR_EMERGENCY_PRODUCTION');
+        else reasonCodes.push('ENABLE_INDUSTRIAL_POWER_BOOST');
+      } else if (!facility.production.projectedPowerSupplied && observation.endTurnForecast.electricity.shortage > 0) {
+        score += 15;
+        reasonCodes.push('REDIRECT_SCARCE_POWER');
+      } else {
+        score -= 180;
+        reasonCodes.push('KEEP_PRODUCTIVE_POWER_ON');
       }
     }
   } else if (action.type === 'TransferPopulation') {

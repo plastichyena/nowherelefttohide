@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
-import { GameEngine } from '../core/engine';
+import { forecastEndTurn, GameEngine } from '../core/engine';
 import type { GameState } from '../core/types';
 import {
   actionForPopulationTransfer,
+  actionForPowerSupply,
   actionForWorkerAssignment,
   clampInteger,
   findUnitAt,
   isLegalAction,
   legalMoveDestinations,
   populationLocationTotals,
+  projectCityTransfer,
   workerAssignmentBounds,
 } from './actions';
 
@@ -66,5 +68,34 @@ describe('UI action projection', () => {
     ];
     expect(actionForPopulationTransfer(actions, 'capital', 'city-1', 41)).toEqual(actions[1]);
     expect(actionForPopulationTransfer(actions, 'capital', 'city-2', 1)).toBeUndefined();
+  });
+
+  it('recalculates the Core forecast for a hypothetical city transfer without mutating state', () => {
+    const engine = new GameEngine(14, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = JSON.parse(JSON.stringify(engine.getState())) as GameState;
+    const destination = state.facilities.find((facility) => facility.id === 'city-1')!;
+    destination.owner = 'player';
+    destination.status = 'owned';
+    destination.operationalStatus = 'operational';
+    destination.populationOperationalTurn = state.turn;
+    destination.workers = 0;
+    const before = JSON.stringify(state);
+    const currentForecast = forecastEndTurn(state);
+    const projection = projectCityTransfer(state, 'capital', destination.id, 1, currentForecast);
+
+    expect(projection).not.toBeNull();
+    expect(projection!.fromAfter).toBe(40);
+    expect(projection!.toAfter).toBe(1);
+    expect(projection!.forecast.populationConsumers).toBe(currentForecast.populationConsumers);
+    expect(projection!.forecast.electricity.requiredPowerDemand).toBe(currentForecast.electricity.requiredPowerDemand + 5);
+    expect(JSON.stringify(state)).toBe(before);
+  });
+
+  it('finds the requested industrial Power Supply toggle', () => {
+    const action = actionForPowerSupply([
+      { type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false },
+    ], 'farm-1', false);
+    expect(action).toEqual({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false });
+    expect(actionForPowerSupply([], 'farm-1', true)).toBeUndefined();
   });
 });

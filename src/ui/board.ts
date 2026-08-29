@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { forecastFacilityProduction } from '../core/engine';
 import { getHordeEntrance } from '../core/map';
 import { getSectorBranchIds } from '../core/supply';
 import type { CardinalDirection, GameState, HexCoord } from '../core/types';
@@ -251,6 +252,9 @@ export class HexBoardScene extends Phaser.Scene {
     const hordeDirection = render.hordeDirection ?? null;
     const entrance = hordeDirection ? getHordeEntrance(state.map, hordeDirection) : undefined;
     const entranceKeys = new Set(entrance?.roadTiles.map((position) => `${position.q},${position.r}`) ?? []);
+    const productionByFacility = new Map(
+      forecastFacilityProduction(state).map((projection) => [projection.facilityId, projection]),
+    );
 
     for (const tile of state.map.tiles) {
       const center = this.hexToWorld(state, tile);
@@ -295,12 +299,16 @@ export class HexBoardScene extends Phaser.Scene {
 
       const facility = state.facilities.find((candidate) => sameHex(candidate.position, tile));
       if (facility) {
+        const production = productionByFacility.get(facility.id);
+        const boostWithoutPower = production?.powerMode === 'boost' && production.stoppedReason === null && !production.projectedPowerSupplied;
+        const projectedPowerUnavailable = production?.powerMode === 'required' && !production.projectedPowerSupplied;
+        const displayStopped = !boostWithoutPower && (facility.operationalStatus === 'stopped' || Boolean(production?.stoppedReason));
         const icon = facility.type === 'capital' ? '◆' : facility.type === 'city' ? '●' : facility.type === 'powerPlant' ? '⚡' : facility.type === 'farm' ? 'F' : '▣';
         const color = facility.status === 'ruined'
           ? '#ff8585'
           : facility.infected > 0
             ? '#ffb06b'
-            : facility.operationalStatus === 'stopped'
+            : displayStopped || projectedPowerUnavailable
               ? '#8b9aa2'
               : facility.owner === 'player'
                 ? '#c9f0d1'
@@ -318,7 +326,7 @@ export class HexBoardScene extends Phaser.Scene {
             8,
             true,
           );
-        } else if (facility.operationalStatus === 'stopped' && facility.owner === 'player') {
+        } else if ((displayStopped || projectedPowerUnavailable) && facility.owner === 'player') {
           this.addLabel(`facility:${facility.id}:status`, '×', center.x + 12, center.y - 14, '#a8b3b9', 9, true);
         } else if (render.supplyOverlay && facility.owner === 'player' && !suppliedTiles.has(tile.key) && !suppliedTiles.has(key)) {
           this.addLabel(`facility:${facility.id}:status`, '⊘', center.x + 12, center.y - 14, '#ef8c7a', 9, true);

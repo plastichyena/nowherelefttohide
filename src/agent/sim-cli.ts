@@ -57,7 +57,7 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '1.2.0';
+  schemaVersion: '1.3.0';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -286,7 +286,7 @@ export function runSimulation(options: SimulationRunOptions = {}): SimulationRep
     message: run.failure.message,
   }] : []);
   const report: SimulationReport = {
-    schemaVersion: '1.2.0',
+    schemaVersion: '1.3.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -336,6 +336,7 @@ const CSV_COLUMNS: readonly string[] = [
   'nationalGuardCombatRecoveryHp', 'nationalGuardCombatRecoveryCount', 'nationalGuardRestRecoveryHp', 'nationalGuardRestRecoveryCount',
   'combatRecoverySelections', 'restRecoverySelections', 'maxWorkersInSingleFacility', 'maxTotalProductionWorkers',
   'highCapacityFacilityTurns', 'powerPlantStoppedTurns', 'powerShortageTurns',
+  'poweredIndustrialFacilityTurns', 'unpoweredCityTurns', 'refineryFacilitiesCaptured', 'powerPlantFacilitiesCaptured',
   'checkpointPassThroughBranchTurns', 'checkpointNormalBranchTurns', 'checkpointStrictBranchTurns',
   'checkpointPassThroughBranchTurnRate', 'checkpointNormalBranchTurnRate', 'checkpointStrictBranchTurnRate',
   'checkpointPassThroughScreenedRate', 'checkpointNormalScreenedRate', 'checkpointStrictScreenedRate',
@@ -378,6 +379,8 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.nationalGuardCombatRecoveryHp, game.nationalGuardCombatRecoveryCount, game.nationalGuardRestRecoveryHp, game.nationalGuardRestRecoveryCount,
       game.combatRecoverySelections, game.restRecoverySelections, game.maxWorkersInSingleFacility, game.maxTotalProductionWorkers,
       game.highCapacityFacilityTurns, game.powerPlantStoppedTurns, game.powerShortageTurns,
+      game.poweredIndustrialFacilityTurns, game.unpoweredCityTurns,
+      game.refineryFacilitiesCaptured, game.powerPlantFacilitiesCaptured,
       game.checkpointPassThroughBranchTurns, game.checkpointNormalBranchTurns, game.checkpointStrictBranchTurns,
       game.checkpointPassThroughBranchTurnRate, game.checkpointNormalBranchTurnRate, game.checkpointStrictBranchTurnRate,
       game.checkpointPassThroughScreenedRate, game.checkpointNormalScreenedRate, game.checkpointStrictScreenedRate,

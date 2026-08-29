@@ -8,7 +8,9 @@ import {
 describe('GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('1.2.1');
+    expect(DEFAULT_CONFIG.version).toBe('1.3.0');
+    expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(10);
+    expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, powerMode: 'boost' });
     expect(DEFAULT_CONFIG.maxTurns).toBe(30);
     expect(DEFAULT_CONFIG.horde).toMatchObject({ cycle: 5, initialCount: 2, increment: 2 });
     expect(DEFAULT_CONFIG.refugees).toMatchObject({
@@ -39,6 +41,19 @@ describe('GameConfig', () => {
       'civilian-factory-1': 23,
       'refinery-1': 10,
       'power-plant-1': 3,
+    });
+  });
+
+  it('enforces fixed five-capacity consumers and zero-capacity non-consumers', () => {
+    const requiredThree = createDefaultConfig({ facilities: { capital: { production: { powerCapacity: 3 } } } });
+    expect(validateGameConfig(requiredThree)).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining(['facilities.capital.production.powerCapacity must be 5']),
+    });
+    const nonConsumerFive = createDefaultConfig({ facilities: { refinery: { production: { powerCapacity: 5 } } } });
+    expect(validateGameConfig(nonConsumerFive)).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining(['facilities.refinery.production.powerCapacity must be 0']),
     });
   });
 

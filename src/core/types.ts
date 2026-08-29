@@ -82,6 +82,19 @@ export type GameOverReason =
 
 export type ResourceType = 'food' | 'civilianGoods' | 'militaryGoods' | 'fuel';
 
+export type PowerMode = 'required' | 'boost' | 'none';
+
+export type PowerSupplyReason =
+  | 'supplied'
+  | 'physical_capacity_shortage'
+  | 'fuel_shortage'
+  | 'allocation_priority'
+  | 'power_supply_off'
+  | 'no_population'
+  | 'not_eligible'
+  | 'production_input_unavailable'
+  | 'not_applicable';
+
 export interface ResourceStock {
   food: number;
   civilianGoods: number;
@@ -159,6 +172,10 @@ export interface FacilityState extends FacilityDefinition {
   lastAssignedOrder: number;
   /** First player turn on which population actions and recruitment are legal. */
   populationOperationalTurn: number;
+  /** Player-controlled boost request for Farm/Civilian/Military factories. */
+  powerSupplyEnabled: boolean;
+  /** Actual result of the most recently completed economy phase. */
+  lastPowerSupplied: boolean | null;
 }
 
 export interface PopulationState {
@@ -299,6 +316,8 @@ export type GameEventType =
   | 'checkpoint_recovered'
   | 'supply_changed'
   | 'supply_action_rejected'
+  | 'power_supply_changed'
+  | 'power_allocated'
   | 'horde_spawned'
   | 'game_over';
 
@@ -346,15 +365,33 @@ export interface GameResult {
 }
 
 export interface ForecastResourceRequirement {
-  /** Stock available at the start of the economy phase. */
-  available: number;
-  /** Population/military maintenance that is paid before production input. */
+  startingStock: number;
+  projectedProduction: number;
   maintenanceRequired: number;
-  /** Full staffing input for facilities that receive electricity. */
+  endingStock: number;
+  /** Compatibility alias for startingStock. */
+  available: number;
   productionInputRequired: number;
-  /** Combined maintenance and full-production demand. */
   required: number;
   shortage: number;
+}
+
+export interface CivilianGoodsForecast extends ForecastResourceRequirement {
+  productionInputDemand: number;
+  productionInputAllocated: number;
+  productionInputShortage: number;
+  maintenanceShortage: number;
+}
+
+export interface FuelForecast extends ForecastResourceRequirement {
+  generationFuelDemand: number;
+  projectedFuelUsed: number;
+  generationFuelShortage: number;
+}
+
+export interface UnpoweredFacilityForecast {
+  facilityId: FacilityId;
+  reason: PowerSupplyReason;
 }
 
 export interface EndTurnForecast {
@@ -366,10 +403,19 @@ export interface EndTurnForecast {
     additionalCivilianGoods: number;
   };
   food: ForecastResourceRequirement;
-  civilianGoods: ForecastResourceRequirement;
+  civilianGoods: CivilianGoodsForecast;
   militaryGoods: ForecastResourceRequirement;
-  fuel: ForecastResourceRequirement;
+  fuel: FuelForecast;
   electricity: {
+    physicalGenerationCapacity: number;
+    fuelLimitedGenerationCapacity: number;
+    availableGenerationCapacity: number;
+    requiredPowerDemand: number;
+    industrialBoostDemand: number;
+    requiredPowerAllocated: number;
+    industrialBoostAllocated: number;
+    unpoweredFacilities: UnpoweredFacilityForecast[];
+    /** Compatibility aliases used by the existing compact HUD. */
     capacity: number;
     required: number;
     shortage: number;
@@ -450,6 +496,12 @@ export interface SetCheckpointPolicyAction {
   policy: CheckpointPolicy;
 }
 
+export interface SetPowerSupplyAction {
+  type: 'SetPowerSupply';
+  facilityId: FacilityId;
+  enabled: boolean;
+}
+
 export interface BuildCheckpointAction {
   type: 'BuildCheckpoint';
   branchId?: RoadBranchId;
@@ -492,6 +544,7 @@ export type GameAction =
   | AssignWorkersAction
   | TransferPopulationAction
   | SetCheckpointPolicyAction
+  | SetPowerSupplyAction
   | BuildCheckpointAction
   | RelocateCheckpointAction
   | ProduceUnitAction
@@ -533,6 +586,8 @@ export interface UnitConfig {
 export interface ProductionRule {
   inputs: Partial<Record<ResourceType, number>>;
   outputs: Partial<Record<ResourceType, number>>;
+  powerMode: PowerMode;
+  /** Compatibility alias; true only for required-power facilities. */
   requiresPower: boolean;
   powerCapacity: number;
   /** Electricity capacity generated per worker (used by power plants). */

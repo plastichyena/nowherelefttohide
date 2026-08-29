@@ -155,6 +155,12 @@ function isBridgeAction(value: unknown): value is GameAction {
           isSafeId(value.checkpointId) &&
           (value.policy === 'passThrough' || value.policy === 'normal' || value.policy === 'strict')
         );
+      case 'SetPowerSupply':
+        return (
+          hasOnlyKeys(value, ['type', 'facilityId', 'enabled']) &&
+          isSafeId(value.facilityId) &&
+          typeof value.enabled === 'boolean'
+        );
       case 'BuildCheckpoint':
         return hasOnlyKeys(value, ['type', 'position'], ['branchId']) &&
           isCoordinate(value.position) &&

@@ -1,4 +1,5 @@
 import { hexKey } from '../core/hex';
+import { forecastEndTurn } from '../core/engine';
 import type {
   EndTurnForecast,
   FacilityId,
@@ -63,6 +64,18 @@ export function actionForWorkerAssignment(
   return actions.find(
     (action): action is Extract<GameAction, { type: 'AssignWorkers' }> =>
       action.type === 'AssignWorkers' && action.facilityId === facilityId && action.workers === workers,
+  );
+}
+
+/** Find an industrial Power Supply toggle in the engine's legal action list. */
+export function actionForPowerSupply(
+  actions: readonly GameAction[],
+  facilityId: FacilityId,
+  enabled: boolean,
+): Extract<GameAction, { type: 'SetPowerSupply' }> | undefined {
+  return actions.find(
+    (action): action is Extract<GameAction, { type: 'SetPowerSupply' }> =>
+      action.type === 'SetPowerSupply' && action.facilityId === facilityId && action.enabled === enabled,
   );
 }
 
@@ -192,29 +205,11 @@ export interface CityTransferProjection {
   forecast: EndTurnForecast;
 }
 
-function ceilRationalProduct(value: number, numerator: bigint, denominator: bigint): number {
-  if (!Number.isFinite(value) || value <= 0 || numerator <= 0n || denominator <= 0n) return 0;
-  const wholeValue = BigInt(Math.max(0, Math.trunc(value)));
-  const amount = (wholeValue * numerator + denominator - 1n) / denominator;
-  return Math.max(1, Number(amount));
-}
-
-function gcdBigInt(left: bigint, right: bigint): bigint {
-  let a = left < 0n ? -left : left;
-  let b = right < 0n ? -right : right;
-  while (b !== 0n) {
-    const next = a % b;
-    a = b;
-    b = next;
-  }
-  return a;
-}
-
 /**
  * Project the visible consequences of a city transfer without changing the
- * GameState. The returned forecast retains the engine forecast for all
- * non-overcrowding fields and replaces only the values affected by the two
- * city populations.
+ * GameState. Forecasting must go through the same pure Core calculation as
+ * EndTurn so city power demand, same-turn production, maintenance reservation,
+ * and production-input allocation all reflect the hypothetical populations.
  */
 export function projectCityTransfer(
   state: Readonly<GameState>,
@@ -230,49 +225,44 @@ export function projectCityTransfer(
   const safePeople = Math.max(0, Math.min(requestedPeople, Math.max(0, from.workers)));
   const fromAfter = from.workers - safePeople;
   const toAfter = to.workers + safePeople;
-  const terms = state.facilities
-    .filter((facility) => facility.owner === 'player' && facility.status === 'owned' && (facility.type === 'capital' || facility.type === 'city'))
-    .map((facility) => {
-      const workers = facility.id === from.id ? fromAfter : facility.id === to.id ? toAfter : facility.workers;
-      const softCap = state.config.facilities[facility.type].workerCapacity;
-      return { excess: Math.max(0, workers - softCap), softCap };
-    })
-    .filter((term) => term.excess > 0);
-  // Configured city capacities are integers. A small rational accumulator
-  // keeps the common 50/100 caps exact while avoiding visible FP drift.
-  let numerator = 0n;
-  let denominator = 1n;
-  for (const term of terms) {
-    numerator = numerator * BigInt(term.softCap) + BigInt(term.excess) * denominator;
-    denominator *= BigInt(term.softCap);
-    const divisor = gcdBigInt(numerator, denominator);
-    numerator /= divisor;
-    denominator /= divisor;
-  }
-  const rate = denominator > 0n ? Number(numerator) / Number(denominator) : 0;
-  const additionalFood = ceilRationalProduct(forecast.food.maintenanceRequired - forecast.overcrowding.additionalFood, numerator, denominator);
-  const additionalCivilianGoods = ceilRationalProduct(
-    forecast.civilianGoods.maintenanceRequired - forecast.overcrowding.additionalCivilianGoods,
-    numerator,
-    denominator,
-  );
+  const projectedState: GameState = {
+    ...(state as GameState),
+    facilities: state.facilities.map((facility) => ({
+      ...facility,
+      position: { ...facility.position },
+      workers: facility.id === from.id
+        ? fromAfter
+        : facility.id === to.id
+          ? toAfter
+          : facility.workers,
+    })),
+    population: {
+      ...state.population,
+      facilityWorkers: state.population.facilityWorkers.map((entry) => ({ ...entry })),
+    },
+    cityPopulationSnapshot: {
+      turn: state.cityPopulationSnapshot.turn,
+      supply: state.cityPopulationSnapshot.supply.map((entry) => ({ ...entry })),
+      reception: state.cityPopulationSnapshot.reception.map((entry) => ({ ...entry })),
+    },
+    resources: { ...state.resources },
+  };
+  const projectedForecast = forecastEndTurn(projectedState);
+  const additionalFood = projectedForecast.overcrowding.additionalFood;
+  const additionalCivilianGoods = projectedForecast.overcrowding.additionalCivilianGoods;
   return {
     fromPopulation: from.workers,
     toPopulation: to.workers,
     fromAfter,
     toAfter,
     people: safePeople,
-    overcrowdingRate: rate,
+    overcrowdingRate: projectedForecast.overcrowding.cities.reduce(
+      (total, city) => total + city.excess / Math.max(1, city.softCap),
+      0,
+    ),
     additionalFood,
     additionalCivilianGoods,
-    forecast: {
-      ...forecast,
-      overcrowding: {
-        ...forecast.overcrowding,
-        additionalFood,
-        additionalCivilianGoods,
-      },
-    },
+    forecast: projectedForecast,
   };
 }
 

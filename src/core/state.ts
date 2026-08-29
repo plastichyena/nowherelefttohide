@@ -16,7 +16,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '1.2.1';
+export const GAME_VERSION = '1.3.0';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -231,6 +231,8 @@ function facilityStateFromDefinition(
     securedOrder,
     lastAssignedOrder: securedOrder ?? 0,
     populationOperationalTurn: owned ? 1 : Number.MAX_SAFE_INTEGER,
+    powerSupplyEnabled: ['farm', 'civilianFactory', 'militaryFactory'].includes(definition.type),
+    lastPowerSupplied: null,
   };
 }
 

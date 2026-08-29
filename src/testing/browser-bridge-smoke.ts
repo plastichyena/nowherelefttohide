@@ -88,8 +88,8 @@ function run(): void {
     if (!bundle.includes(method)) fail(`production bundle does not contain bridge method marker: ${method}`);
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
-  for (const marker of ['1.2.6', '1.2.0', 'RelocateCheckpoint', 'roadBranches', 'suppliedTileKeys', 'artifactSchemaVersion', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression']) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.2.6 schema marker: ${marker}`);
+  for (const marker of ['1.2.7', '1.3.0', 'SetPowerSupply', 'RelocateCheckpoint', 'roadBranches', 'suppliedTileKeys', 'artifactSchemaVersion', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression']) {
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.2.7 schema marker: ${marker}`);
   }
   // This is deliberately a static smoke: the project has no browser-driver
   // dependency. The companion page documents the real-browser E2E sequence.

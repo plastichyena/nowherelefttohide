@@ -15,6 +15,8 @@ import type {
   HexCoord,
   HumanUnitType,
   JsonObject,
+  PowerMode,
+  PowerSupplyReason,
   ResourceState,
   ResourceType,
   UnitActionState,
@@ -23,15 +25,15 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.2.6';
-export const GAME_RULES_VERSION = '1.2.1';
+export const APP_VERSION = '1.2.7';
+export const GAME_RULES_VERSION = '1.3.0';
 export const SAVE_FORMAT_VERSION = '2';
-export const AGENT_API_VERSION = '1.2.0';
-export const OBSERVATION_API_VERSION = '1.2.0';
-export const BRIDGE_API_VERSION = '1.2.0';
-export const BALANCED_AGENT_VERSION = '2.2.0';
+export const AGENT_API_VERSION = '1.3.0';
+export const OBSERVATION_API_VERSION = '1.3.0';
+export const BRIDGE_API_VERSION = '1.3.0';
+export const BALANCED_AGENT_VERSION = '2.3.0';
 export const RANDOM_AGENT_VERSION = '1.1.0';
-export const ARTIFACT_SCHEMA_VERSION = '1.2.0';
+export const ARTIFACT_SCHEMA_VERSION = '1.3.0';
 
 export interface AgentMapTileObservation {
   q: number;
@@ -94,6 +96,16 @@ export interface AgentFacilityObservation {
     requiresPower: boolean;
     requiredPowerCapacity: number;
     powerGenerationPerWorker: number;
+    powerMode: PowerMode;
+    powerDemand: number;
+    powerSupplyEnabled: boolean;
+    projectedPowerRequested: boolean;
+    projectedPowerSupplied: boolean;
+    projectedPowerReason: PowerSupplyReason;
+    lastPowerSupplied: boolean | null;
+    projectedProductionMultiplier: number;
+    baseProduction: Partial<Record<ResourceType, number>>;
+    projectedProduction: Partial<Record<ResourceType, number>>;
     estimatedInputConsumption: Partial<Record<ResourceType, number>>;
     estimatedOutput: Partial<Record<ResourceType, number>>;
     estimatedPowerGeneration: number;
@@ -206,6 +218,16 @@ export interface AgentApiInfo {
       workerCapacityByFacilityType: Record<FacilityType, number>;
       powerPlantsGenerateCapacityPerWorker: number;
       poweredFacilitiesConsumeFixedCapacityWhenOperating: true;
+      fuelPerFiveElectricity: number;
+      facilityPowerUnit: number;
+      industrialPoweredMultiplier: number;
+      industrialUnpoweredMultiplier: number;
+      unpoweredCityCivilianGoodsOutputIsZero: true;
+      sameTurnProductionCanCoverMaintenance: true;
+      sameTurnProductionCanCoverProductionInputs: false;
+      sameTurnCivilianGoodsCannotDirectlyFeedMilitaryFactories: true;
+      civilianProductionCanReleaseTurnStartStockFromMaintenanceReservation: true;
+      powerAllocationOrder: string[];
     };
   };
   minimalExample: string;

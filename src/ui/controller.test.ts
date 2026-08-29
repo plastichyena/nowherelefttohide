@@ -10,7 +10,8 @@ vi.mock('phaser', () => ({
 }));
 
 import type { FacilityState, GameState, UnitState } from '../core/types';
-import { loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, resolveTileSelection, shouldAutosaveAfterLoad } from './controller';
+import { forecastEndTurn, GameEngine } from '../core/engine';
+import { loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, renderEndTurnForecast, resolveTileSelection, shouldAutosaveAfterLoad } from './controller';
 import { createTranslator } from './i18n';
 
 function testState(units: Partial<UnitState>[], facilities: Partial<FacilityState>[] = []): GameState {
@@ -98,10 +99,30 @@ describe('controller view models', () => {
     expect(localizeActionError('invalid_action_input', 'en')).toContain('legal action');
   });
 
-  it('has bilingual v1.2.6 recovery, infection, range, production, and policy help', () => {
+  it('localizes Power Supply action errors', () => {
+    expect(localizeActionError('power_supply_not_applicable', 'ja')).toContain('Farm');
+    expect(localizeActionError('power_supply_unavailable', 'en')).toContain('owned');
+    expect(localizeActionError('invalid_power_supply', 'en')).toContain('ON or OFF');
+  });
+
+  it('renders the detailed End Turn forecast in both UI languages', () => {
+    const forecast = forecastEndTurn(new GameEngine(127).getState());
+    const japanese = renderEndTurnForecast(forecast, 'ja');
+    const english = renderEndTurnForecast(forecast, 'en');
+    for (const [html, locale] of [[japanese, 'ja'], [english, 'en']] as const) {
+      expect(html).toContain('forecast-detail-grid');
+      expect(html).toContain(createTranslator(locale)('productionInputShortage'));
+      expect(html).toContain(createTranslator(locale)('generationFuelShortage'));
+      expect(html).toContain(createTranslator(locale)('requiredPowerAllocated'));
+    }
+    expect(japanese).toContain('開始時備蓄');
+    expect(english).toContain('Starting stock');
+  });
+
+  it('has bilingual v1.2.7 recovery, infection, range, production, power, and policy help', () => {
     const keys = [
       'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPolicy',
-      'recoveryTiming', 'effectiveRange', 'projectedSuppression', 'powerRequirement', 'policyTradeoff', 'migratedSaveNotice', 'migrationSaveError',
+      'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'recoveryTiming', 'effectiveRange', 'projectedSuppression', 'powerRequirement', 'projectedPower', 'lastPowerSupplied', 'productionMultiplier', 'policyTradeoff', 'migratedSaveNotice', 'migrationSaveError',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);

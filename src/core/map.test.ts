@@ -26,7 +26,7 @@ describe('fixed map', () => {
     expect(FIXED_MAP.facilities.reduce((sum, facility) => sum + facility.startingWorkers, 0)).toBe(100);
   });
 
-  it('uses the v1.2.6 production capacities and accepts per-type overrides', () => {
+  it('uses the v1.2.7 production capacities and accepts per-type overrides', () => {
     const productionTypes = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant'] as const;
     for (const type of productionTypes) {
       expect(FIXED_MAP.facilities.filter((facility) => facility.type === type).every((facility) => facility.workerCapacity === 30)).toBe(true);

@@ -24,7 +24,11 @@ export const CURRENT_GAME_VERSION = GAME_VERSION;
 /** Alias useful to callers that want to label a generated save explicitly. */
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 /** Game Rules / Config version written by v1.2.5 and accepted for migration. */
-export const LEGACY_GAME_VERSION = '1.2.0';
+export const V125_GAME_VERSION = '1.2.0';
+/** Game Rules / Config version written by v1.2.6 and accepted for migration. */
+export const V126_GAME_VERSION = '1.2.1';
+/** Backwards-compatible name retained for callers that identify v1.2.5 saves. */
+export const LEGACY_GAME_VERSION = V125_GAME_VERSION;
 
 /** Stable envelope identifier shared by autosaves, codes, and JSON exports. */
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
@@ -49,7 +53,7 @@ export interface SaveValidationResult {
   errors: string[];
   state: GameState | null;
   envelope: SaveEnvelope | null;
-  /** True only when a valid v1.2.5 snapshot was migrated in memory. */
+  /** True only when a valid v1.2.5 or v1.2.6 snapshot was migrated in memory. */
   migrated?: boolean;
 }
 
@@ -109,6 +113,8 @@ const GAME_EVENT_TYPES: readonly GameEventType[] = [
   'checkpoint_recovered',
   'supply_changed',
   'supply_action_rejected',
+  'power_supply_changed',
+  'power_allocated',
   'horde_spawned',
   'game_over',
 ];
@@ -128,6 +134,7 @@ const PRODUCTION_FACILITY_TYPES = [
   'refinery',
   'powerPlant',
 ] as const;
+const POWER_BOOST_FACILITY_TYPES = ['farm', 'civilianFactory', 'militaryFactory'] as const;
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -515,6 +522,9 @@ function validateFacility(
   if (facility.securedOrder !== null) nonNegativeInteger(errors, facility.securedOrder, `${path}.securedOrder`);
   nonNegativeInteger(errors, facility.lastAssignedOrder, `${path}.lastAssignedOrder`);
   requireInteger(errors, facility.populationOperationalTurn, `${path}.populationOperationalTurn`, 1);
+  requireBoolean(errors, facility.powerSupplyEnabled, `${path}.powerSupplyEnabled`);
+  if (!hasOwn(facility, 'lastPowerSupplied')) errors.push(`${path}.lastPowerSupplied is required for a valid save`);
+  else if (facility.lastPowerSupplied !== null) requireBoolean(errors, facility.lastPowerSupplied, `${path}.lastPowerSupplied`);
 
   const definition = idValid ? mapFacilityById.get(id) : undefined;
   if (idValid && !definition) errors.push(`${path}.id does not exist in state.map.facilities`);
@@ -532,6 +542,9 @@ function validateFacility(
   if (facility.status === 'ruined' && facility.owner !== 'none') errors.push(`${path} ruined facility must not have a player owner`);
   if (facility.status === 'ruined' && facility.workers !== 0) errors.push(`${path} ruined facility cannot retain workers`);
   if (facility.status === 'ruined' && facility.operationalStatus !== 'ruined') errors.push(`${path} ruined facility must use ruined operational status`);
+  if (typeof facility.powerSupplyEnabled === 'boolean' && type && (POWER_BOOST_FACILITY_TYPES as readonly string[]).includes(type) === false && facility.powerSupplyEnabled) {
+    errors.push(`${path}.powerSupplyEnabled is only valid for boost facilities`);
+  }
   return true;
 }
 
@@ -662,6 +675,39 @@ function validateCityPopulationSnapshot(state: Record<string, unknown>, errors: 
   if (JSON.stringify(receptionExpected) !== JSON.stringify([...reception.values()])) errors.push('cityPopulationSnapshot.reception is not in deterministic order');
 }
 
+function expectedPowerMode(type: string): 'required' | 'boost' | 'none' {
+  if (type === 'capital' || type === 'city') return 'required';
+  if ((POWER_BOOST_FACILITY_TYPES as readonly string[]).includes(type)) return 'boost';
+  return 'none';
+}
+
+/** Validate the v1.2.7 power-role contract stored inside a current Config. */
+function validateCurrentProductionConfig(config: Record<string, unknown>, errors: string[]): void {
+  if (!isRecord(config.facilities)) return;
+  for (const type of FACILITY_TYPES) {
+    const facility = config.facilities[type];
+    if (!isRecord(facility) || !isRecord(facility.production)) continue;
+    const production = facility.production;
+    const mode = expectedPowerMode(type);
+    if (production.powerMode !== mode) errors.push(`config.facilities.${type}.production.powerMode must be ${mode}`);
+    const expectedPowerCapacity = mode === 'none' ? 0 : 5;
+    if (production.powerCapacity !== expectedPowerCapacity) {
+      errors.push(`config.facilities.${type}.production.powerCapacity must be ${expectedPowerCapacity}`);
+    }
+    const requiresPower = production.requiresPower;
+    requireBoolean(errors, requiresPower, `config.facilities.${type}.production.requiresPower`);
+    if (typeof requiresPower === 'boolean' && requiresPower !== (mode === 'required')) {
+      errors.push(`config.facilities.${type}.production.requiresPower must match powerMode`);
+    }
+    if (mode === 'boost' && isRecord(production.inputs) && hasOwn(production.inputs, 'fuel')) {
+      errors.push(`config.facilities.${type}.production.inputs.fuel is not supported in v1.2.7`);
+    }
+    if (type === 'powerPlant' && production.powerGeneration !== 10) {
+      errors.push('config.facilities.powerPlant.production.powerGeneration must be 10 in v1.2.7');
+    }
+  }
+}
+
 function isJsonValue(value: unknown): boolean {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);
@@ -694,6 +740,7 @@ function validateGameState(value: Record<string, unknown>, errors: string[]): bo
   } catch (error) {
     errors.push(`config: could not validate configuration (${error instanceof Error ? error.message : String(error)})`);
   }
+  validateCurrentProductionConfig(config, errors);
   if (isRecord(config.economy) && hasOwn(config.economy, 'initialUnemployed')) errors.push('config.economy.initialUnemployed is a legacy v1.0 field and is not supported');
 
   requireInteger(errors, value.seed, 'state.seed', -Number.MAX_SAFE_INTEGER);
@@ -989,6 +1036,41 @@ function legacyValidationError(errors: string[]): SaveValidationResult {
   return { valid: false, errors: [...new Set(errors)], state: null, envelope: null };
 }
 
+/** Validate the shared envelope fields before attempting a version migration. */
+function migrationEnvelopeErrors(
+  value: Record<string, unknown>,
+  expectedVersion: string,
+  label: string,
+): string[] {
+  const errors: string[] = [];
+  if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
+  if (value.formatVersion !== SAVE_FORMAT_VERSION) {
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; ${label} migration requires format ${SAVE_FORMAT_VERSION}`);
+  }
+  if (value.gameVersion !== expectedVersion) errors.push(`gameVersion must be ${expectedVersion} for migration`);
+  requireString(errors, value.mapId, 'mapId');
+  if (typeof value.seed !== 'number' || !Number.isSafeInteger(value.seed)) errors.push('seed must be a safe integer');
+  if (typeof value.checksum !== 'string' || !/^[0-9a-f]{8}$/u.test(value.checksum)) errors.push('checksum is invalid');
+  const state = isRecord(value.state) ? value.state : null;
+  if (!state) errors.push('state is required');
+  if (state && state.gameVersion !== value.gameVersion) errors.push('state/gameVersion does not match envelope');
+  if (state && state.mapId !== value.mapId) errors.push('state/mapId does not match envelope');
+  if (state && state.seed !== value.seed) errors.push('state/seed does not match envelope');
+  return errors;
+}
+
+function migrationChecksumMatches(value: Record<string, unknown>): boolean {
+  const payload = {
+    format: value.format,
+    formatVersion: value.formatVersion,
+    gameVersion: value.gameVersion,
+    mapId: value.mapId,
+    seed: value.seed,
+    state: value.state,
+  } as unknown as Omit<SaveEnvelope, 'checksum'>;
+  return checksum(envelopePayload(payload)) === value.checksum;
+}
+
 /**
  * Validate the parts of the v1.2.5 schema which differ from the current one.
  * The complete state validation is performed below on a non-shared copy with
@@ -1041,6 +1123,24 @@ function validateLegacySchema(value: Record<string, unknown>): string[] {
       if ((PRODUCTION_FACILITY_TYPES as readonly string[]).includes(type) && (facility.workerCapacity as number) > Number.MAX_SAFE_INTEGER - 5) {
         errors.push(`state.config.facilities.${type}.workerCapacity is too large to migrate`);
       }
+      if (!isRecord(facility.production)) {
+        errors.push(`state.config.facilities.${type}.production must be an object for migration`);
+        continue;
+      }
+      const production = facility.production;
+      requireBoolean(errors, production.requiresPower, `state.config.facilities.${type}.production.requiresPower`);
+      requireInteger(errors, production.powerCapacity, `state.config.facilities.${type}.production.powerCapacity`, 0);
+      requireInteger(errors, production.powerGeneration, `state.config.facilities.${type}.production.powerGeneration`, 0);
+      if (!requireRecord(errors, production.inputs, `state.config.facilities.${type}.production.inputs`)) {
+        // Error already recorded by requireRecord.
+      } else for (const [resource, amount] of Object.entries(production.inputs)) {
+        requireInteger(errors, amount, `state.config.facilities.${type}.production.inputs.${resource}`, 0);
+      }
+      if (!requireRecord(errors, production.outputs, `state.config.facilities.${type}.production.outputs`)) {
+        // Error already recorded by requireRecord.
+      } else for (const [resource, amount] of Object.entries(production.outputs)) {
+        requireInteger(errors, amount, `state.config.facilities.${type}.production.outputs.${resource}`, 0);
+      }
     }
   }
 
@@ -1072,25 +1172,125 @@ function validateLegacySchema(value: Record<string, unknown>): string[] {
   return errors;
 }
 
-/** Normalize only schema differences in a private copy for legacy validation. */
-function normalizeLegacyForValidation(value: Record<string, unknown>): Record<string, unknown> {
-  const candidate = clone(value);
-  const state = candidate.state as Record<string, unknown>;
-  const config = state.config as Record<string, unknown>;
-  const recovery = config.naturalRecovery as Record<string, unknown>;
-  const rate = recovery.rate as number;
-  config.version = CURRENT_GAME_VERSION;
-  config.naturalRecovery = {
-    combatRate: rate,
-    restRate: Math.min(1, rate * 2),
-    rounding: recovery.rounding,
-  };
-  state.gameVersion = CURRENT_GAME_VERSION;
-  candidate.gameVersion = CURRENT_GAME_VERSION;
+/**
+ * Validate the v1.2.6 (Rules/Config 1.2.1) schema before adding the v1.2.7
+ * power-role fields. This deliberately does not call the current config
+ * validator because v1.2.6 has no `powerMode` field yet.
+ */
+function validateV126Schema(value: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const state = isRecord(value.state) ? value.state : null;
+  if (value.gameVersion !== V126_GAME_VERSION) errors.push(`gameVersion must be ${V126_GAME_VERSION} for migration`);
+  if (!state) {
+    errors.push('state is required for migration');
+    return errors;
+  }
+  if (state.gameVersion !== V126_GAME_VERSION) errors.push(`state.gameVersion must be ${V126_GAME_VERSION} for migration`);
+  if (!isRecord(state.config)) {
+    errors.push('state.config must be an object for migration');
+    return errors;
+  }
+  const config = state.config;
+  if (config.version !== V126_GAME_VERSION) errors.push(`state.config.version must be ${V126_GAME_VERSION} for migration`);
+  const recovery = config.naturalRecovery;
+  if (!isRecord(recovery)) {
+    errors.push('state.config.naturalRecovery must be an object for migration');
+  } else {
+    for (const key of ['combatRate', 'restRate'] as const) {
+      if (typeof recovery[key] !== 'number' || !Number.isFinite(recovery[key]) || recovery[key] < 0 || recovery[key] > 1) {
+        errors.push(`state.config.naturalRecovery.${key} must be between 0 and 1 for migration`);
+      }
+    }
+    if (recovery.rounding !== 'ceil' && recovery.rounding !== 'floor') {
+      errors.push('state.config.naturalRecovery.rounding must be ceil or floor for migration');
+    }
+  }
 
-  // v1.2.5 kept a fixed-map capacity copy beside Config. Align that copy for
-  // validation without changing the source snapshot or applying the +5 yet.
-  synchronizeMapFacilityCapacities(candidate, config);
+  const facilities = isRecord(config.facilities) ? config.facilities : null;
+  if (!facilities) {
+    errors.push('state.config.facilities must be an object for migration');
+  } else {
+    for (const type of FACILITY_TYPES) {
+      const facility = facilities[type];
+      const path = `state.config.facilities.${type}`;
+      if (!isRecord(facility)) {
+        errors.push(`${path} must be an object for migration`);
+        continue;
+      }
+      requireInteger(errors, facility.workerCapacity, `${path}.workerCapacity`, 1);
+      if (!isRecord(facility.production)) {
+        errors.push(`${path}.production must be an object for migration`);
+        continue;
+      }
+      const production = facility.production;
+      const requiresPower = requireBoolean(errors, production.requiresPower, `${path}.production.requiresPower`);
+      const expectedRequiresPower = type !== 'refinery' && type !== 'powerPlant';
+      if (requiresPower && production.requiresPower !== expectedRequiresPower) {
+        errors.push(`${path}.production.requiresPower must match the v1.2.6 facility role`);
+      }
+      requireInteger(errors, production.powerCapacity, `${path}.production.powerCapacity`, 0);
+      requireInteger(errors, production.powerGeneration, `${path}.production.powerGeneration`, 0);
+      if (!requireRecord(errors, production.inputs, `${path}.production.inputs`)) {
+        // Error already recorded by requireRecord.
+      } else for (const [resource, amount] of Object.entries(production.inputs)) {
+        requireInteger(errors, amount, `${path}.production.inputs.${resource}`, 0);
+      }
+      if (!requireRecord(errors, production.outputs, `${path}.production.outputs`)) {
+        // Error already recorded by requireRecord.
+      } else for (const [resource, amount] of Object.entries(production.outputs)) {
+        requireInteger(errors, amount, `${path}.production.outputs.${resource}`, 0);
+      }
+    }
+  }
+
+  const checkCapacityCopies = (entries: unknown, path: string): void => {
+    if (!Array.isArray(entries)) return;
+    for (const [index, rawFacility] of entries.entries()) {
+      if (!isRecord(rawFacility)) continue;
+      const facilityPath = `${path}[${index}]`;
+      const capacityValid = requireInteger(errors, rawFacility.workerCapacity, `${facilityPath}.workerCapacity`, 1);
+      const type = rawFacility.type;
+      const configFacility = typeof type === 'string' && facilities ? facilities[type] : undefined;
+      if (capacityValid && isRecord(configFacility) && typeof configFacility.workerCapacity === 'number' && rawFacility.workerCapacity !== configFacility.workerCapacity) {
+        errors.push(`${facilityPath}.workerCapacity must match state.config.facilities.${type}.workerCapacity for migration`);
+      }
+    }
+  };
+  if (isRecord(state.map)) checkCapacityCopies(state.map.facilities, 'state.map.facilities');
+  checkCapacityCopies(state.facilities, 'state.facilities');
+  return errors;
+}
+
+/** Set the deterministic v1.2.7 Config fields on a private copy. */
+function normalizeV126Config(config: Record<string, unknown>): void {
+  const facilities = isRecord(config.facilities) ? config.facilities : null;
+  if (!facilities) return;
+  for (const type of FACILITY_TYPES) {
+    const facility = facilities[type];
+    if (!isRecord(facility) || !isRecord(facility.production)) continue;
+    const production = facility.production;
+    const mode = expectedPowerMode(type);
+    production.powerMode = mode;
+    production.requiresPower = mode === 'required';
+    if (mode === 'boost' && isRecord(production.inputs)) delete production.inputs.fuel;
+    if (type === 'powerPlant') production.powerGeneration = 10;
+  }
+  config.version = CURRENT_GAME_VERSION;
+}
+
+/** Add v1.2.7 facility power state without changing any other state fields. */
+function addV127FacilityFields(candidate: Record<string, unknown>): void {
+  const state = isRecord(candidate.state) ? candidate.state : null;
+  if (!state || !Array.isArray(state.facilities)) return;
+  for (const rawFacility of state.facilities) {
+    if (!isRecord(rawFacility)) continue;
+    rawFacility.powerSupplyEnabled = typeof rawFacility.type === 'string'
+      && (POWER_BOOST_FACILITY_TYPES as readonly string[]).includes(rawFacility.type);
+    rawFacility.lastPowerSupplied = null;
+  }
+}
+
+function refreshEnvelopeChecksum(candidate: Record<string, unknown>): void {
   const payload = {
     format: candidate.format,
     formatVersion: candidate.formatVersion,
@@ -1100,7 +1300,39 @@ function normalizeLegacyForValidation(value: Record<string, unknown>): Record<st
     state: candidate.state,
   } as unknown as Omit<SaveEnvelope, 'checksum'>;
   candidate.checksum = checksum(envelopePayload(payload));
+}
+
+/** Normalize a v1.2.6 snapshot to the current schema on a private copy. */
+function normalizeV126ForValidation(value: Record<string, unknown>): Record<string, unknown> {
+  const candidate = clone(value);
+  const state = candidate.state as Record<string, unknown>;
+  const config = state.config as Record<string, unknown>;
+  normalizeV126Config(config);
+  addV127FacilityFields(candidate);
+  state.gameVersion = CURRENT_GAME_VERSION;
+  candidate.gameVersion = CURRENT_GAME_VERSION;
+  synchronizeMapFacilityCapacities(candidate, config);
+  refreshEnvelopeChecksum(candidate);
   return candidate;
+}
+
+/** Normalize v1.2.5 through the v1.2.6 shape, then to the current schema. */
+function normalizeLegacyForValidation(value: Record<string, unknown>): Record<string, unknown> {
+  const candidate = clone(value);
+  const state = candidate.state as Record<string, unknown>;
+  const config = state.config as Record<string, unknown>;
+  const recovery = config.naturalRecovery as Record<string, unknown>;
+  const rate = recovery.rate as number;
+  config.version = V126_GAME_VERSION;
+  config.naturalRecovery = {
+    combatRate: rate,
+    restRate: Math.min(1, rate * 2),
+    rounding: recovery.rounding,
+  };
+  // v1.2.5 kept a fixed-map capacity copy beside Config. Align that copy for
+  // validation without changing the source snapshot or applying the +5 yet.
+  synchronizeMapFacilityCapacities(candidate, config);
+  return normalizeV126ForValidation(candidate);
 }
 
 /** Set map/state definition capacities from a copied Config snapshot. */
@@ -1126,32 +1358,11 @@ function synchronizeMapFacilityCapacities(
   apply(state.facilities);
 }
 
-/** Apply the deterministic v1.2.5 -> v1.2.6 conversion to a private copy. */
+/** Apply the deterministic v1.2.5 -> v1.2.6 -> v1.2.7 conversion. */
 function migrateLegacySnapshot(value: Record<string, unknown>): SaveValidationResult {
-  const errors: string[] = [];
-  if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
-  if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.2.5 migration requires format ${SAVE_FORMAT_VERSION}`);
-  }
-  requireString(errors, value.mapId, 'mapId');
-  if (typeof value.seed !== 'number' || !Number.isSafeInteger(value.seed)) errors.push('seed must be a safe integer');
-  if (typeof value.checksum !== 'string' || !/^[0-9a-f]{8}$/u.test(value.checksum)) errors.push('checksum is invalid');
-  const state = isRecord(value.state) ? value.state : null;
-  if (!state) errors.push('state is required');
-  if (state && state.gameVersion !== value.gameVersion) errors.push('state/gameVersion does not match envelope');
-  if (state && state.mapId !== value.mapId) errors.push('state/mapId does not match envelope');
-  if (state && state.seed !== value.seed) errors.push('state/seed does not match envelope');
+  const errors = migrationEnvelopeErrors(value, V125_GAME_VERSION, 'v1.2.5');
   if (errors.length > 0) return legacyValidationError(errors);
-
-  const payload = {
-    format: value.format,
-    formatVersion: value.formatVersion,
-    gameVersion: value.gameVersion,
-    mapId: value.mapId,
-    seed: value.seed,
-    state: value.state,
-  } as unknown as Omit<SaveEnvelope, 'checksum'>;
-  if (checksum(envelopePayload(payload)) !== value.checksum) errors.push('checksum mismatch in v1.2.5 save');
+  if (!migrationChecksumMatches(value)) errors.push('checksum mismatch in v1.2.5 save');
   errors.push(...validateLegacySchema(value));
   if (errors.length > 0) return legacyValidationError(errors);
 
@@ -1178,24 +1389,16 @@ function migrateLegacySnapshot(value: Record<string, unknown>): SaveValidationRe
       const facility = configFacilities[type] as Record<string, unknown>;
       facility.workerCapacity = (facility.workerCapacity as number) + 5;
     }
-    config.version = CURRENT_GAME_VERSION;
+    config.version = V126_GAME_VERSION;
     config.naturalRecovery = {
       combatRate: rate,
       restRate: Math.min(1, rate * 2),
       rounding: recovery.rounding,
     };
-    migratedState.gameVersion = CURRENT_GAME_VERSION;
-    migrated.gameVersion = CURRENT_GAME_VERSION;
+    migratedState.gameVersion = V126_GAME_VERSION;
+    migrated.gameVersion = V126_GAME_VERSION;
     synchronizeMapFacilityCapacities(migrated, config);
-    const migratedPayload = {
-      format: migrated.format,
-      formatVersion: migrated.formatVersion,
-      gameVersion: migrated.gameVersion,
-      mapId: migrated.mapId,
-      seed: migrated.seed,
-      state: migrated.state,
-    } as unknown as Omit<SaveEnvelope, 'checksum'>;
-    migrated.checksum = checksum(envelopePayload(migratedPayload));
+    migrated = normalizeV126ForValidation(migrated);
   } catch (error) {
     return legacyValidationError([`v1.2.5 save migration failed: ${error instanceof Error ? error.message : String(error)}`]);
   }
@@ -1207,11 +1410,34 @@ function migrateLegacySnapshot(value: Record<string, unknown>): SaveValidationRe
   return { ...result, migrated: true };
 }
 
+/** Apply the deterministic v1.2.6 -> v1.2.7 conversion to a private copy. */
+function migrateV126Snapshot(value: Record<string, unknown>): SaveValidationResult {
+  const errors = migrationEnvelopeErrors(value, V126_GAME_VERSION, 'v1.2.6');
+  if (errors.length > 0) return legacyValidationError(errors);
+  if (!migrationChecksumMatches(value)) errors.push('checksum mismatch in v1.2.6 save');
+  errors.push(...validateV126Schema(value));
+  if (errors.length > 0) return legacyValidationError(errors);
+
+  let validationCopy: Record<string, unknown>;
+  try {
+    validationCopy = normalizeV126ForValidation(value);
+  } catch (error) {
+    return legacyValidationError([`v1.2.6 save could not be prepared for validation: ${error instanceof Error ? error.message : String(error)}`]);
+  }
+  const legacyValidation = validateSnapshot(validationCopy);
+  if (!legacyValidation.valid) {
+    return legacyValidationError(legacyValidation.errors.map((error) => `invalid v1.2.6 save: ${error}`));
+  }
+
+  return { ...legacyValidation, migrated: true };
+}
+
 /** Validate a decoded snapshot before it can reach GameEngine.LoadSnapshot. */
 export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (!isRecord(value)) return { valid: false, errors: ['Save envelope must be an object'], state: null, envelope: null };
-  if (value.gameVersion === LEGACY_GAME_VERSION) return migrateLegacySnapshot(value);
+  if (value.gameVersion === V125_GAME_VERSION) return migrateLegacySnapshot(value);
+  if (value.gameVersion === V126_GAME_VERSION) return migrateV126Snapshot(value);
   // Inspect versions before returning on envelope errors so old saves always get
   // the actionable incompatibility message rather than a generic parse error.
   addVersionValidation(errors, value.gameVersion, 'gameVersion');

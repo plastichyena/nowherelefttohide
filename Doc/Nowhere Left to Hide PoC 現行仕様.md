@@ -3,9 +3,9 @@
 ## PoC 現行仕様
 
 - ステータス: 現行正本
-- 現行Version: v1.2.6
-- 基準日: 2026-08-28
-- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.2.6アップデート要件 確定版.md`
+- 現行Version: v1.2.7
+- 基準日: 2026-08-29
+- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.2.7アップデート要件 確定版.md`
 
 本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。過去の要件定義・仕様書・反映済みアップデート文書は`Doc/archive/`へ保管し、現行判断には使用しない。
 
@@ -144,9 +144,11 @@ UI / Phaser / Test Agent
 - 人口は盤面上の所在地から消せないこと、施設撤収時の帰還、都市過密、編成拠点制限、v1.2以前のセーブ非互換を説明する。
 - 道路別の次回到着、未管理時の素通りリスク、都市のソフトキャップ超過受入を表示する。
 - 補給オーバーレイは常設切替を持ち、新設・移設、検問所選択、労働者配置で自動表示する。補給範囲、セクター境界、検問所半径、候補の将来範囲、建設を妨げるZombieを盤面上で識別できる。
+- Farm、Civilian Factory、Military FactoryはBottom SheetからPower Supply ON/OFFを切り替え、現在配置とTurn-start Fuelに基づく次回EndTurnの予測給電、倍率、基本出力、予測出力、未給電理由、直前EndTurnの実績給電を区別して表示する。
+- 都市はRequired Powerの予測給電と人口由来Civilian Goods出力を表示する。停電時も人口保持、移住、編成、所有、補給、感染、防衛が利用可能であることを停止表示と混同しない。
 - 資源不足予測は警告するが、人口0敗北が確定しない限り無視してEndTurnできる。
 - ユニットBottom Sheetは補給状態、次のプレイヤーターン開始時の回復区分・率・基礎量・成立条件、基本射程と実効射程、駐留による感染封じ込めと自動鎮圧見込みを表示する。
-- 施設Bottom Sheetは上限、1人あたりと現在見込みの入出力、要求電力・発電量、停止理由、感染・陥落時の生産損失を表示する。検問所は現在／審査中方針、残り時間と3方針の交換関係を表示する。
+- 施設Bottom Sheetは上限、1人あたりと現在見込みの入出力、Power Mode、要求電力・発電量、予測／実績給電、停止理由、感染・陥落時の生産損失を表示する。検問所は現在／審査中方針、残り時間と3方針の交換関係を表示する。
 - ヘルプは回復10%／20%／0%、駐留封じ込めと自動鎮圧、警察と州兵の民間被害差、州兵の軍需不足時射程、発電停止の波及、厳格方針の合格率50%を日本語・英語で説明する。
 
 ---
@@ -162,6 +164,7 @@ UI / Phaser / Test Agent
 - マップID、タイル、道路、施設
 - 道路支線ID、道路ヘックス、州都への接続、支線ごとの次回到着ターンとターン内操作状態
 - 施設の所有、確保順、操作可能ターン、稼働、陥落、感染
+- 産業施設のPower Supply ON/OFFと直前EndTurnの実績給電
 - 都市別住民、生産施設別労働者、ユニット人口
 - ターン開始時の全所有都市の供給順位・受入順位と人口操作資格
 - 5資源、電力Capacity、軍需供給状態
@@ -182,6 +185,7 @@ UI / Phaser / Test Agent
 - AssignWorkers
 - TransferPopulation
 - SetCheckpointPolicy
+- SetPowerSupply
 - BuildCheckpoint
 - RelocateCheckpoint
 - ProduceUnit
@@ -222,10 +226,10 @@ interface HeadlessGame {
 
 ## 6.5 Version境界
 
-- App / Release Versionは`1.2.6`とする。
-- Game Rules / GameState / Config Versionは`1.2.1`とする。
-- Save Format Versionは`2`、Artifact Schemaは`1.2.0`とする。v1.2.5以前のReplay／Artifactは読み込まない。
-- Agent API / Observation API / Browser Bridge APIは`1.2.0`、Balanced Agentは`2.2.0`、Random Agentは`1.1.0`とする。
+- App / Release Versionは`1.2.7`とする。
+- Game Rules / GameState / Config Versionは`1.3.0`とする。
+- Save Format Versionは`2`、Artifact Schemaは`1.3.0`とする。v1.2.6以前のReplay／Artifactは読み込まない。
+- Agent API / Observation API / Browser Bridge APIは`1.3.0`、Balanced Agentは`2.3.0`、Random Agentは`1.1.0`とする。
 - Agent、Observation、Browser Bridgeは個別のSemVerを持ち、Build IDはCIではGit commit SHA、ローカルではSHAとdirty状態または`local-unknown`を記録する。
 - Build IDは乱数とゲーム結果へ影響させない。
 
@@ -234,7 +238,8 @@ interface HeadlessGame {
 Agent向け正式入力はGameStateではなく、JSON互換の`AgentObservation`とする。API／Game Rules Version、Turn、Phase、静的マップ、公開中の資源・人口・施設・部隊・ゾンビ・検問所、Horde、EndTurn Forecast、勝敗に加え、初期補給半径、道路支線と次回到着、検問所Lifecycle、決定的な補給圏タイル、施設・都市・ユニットの補給状態、支線ごとのターン内操作済み状態を含む。
 
 - 人間ユニットは基本／実効射程と軍需不足理由、EndTurn時点の回復区分・率・基礎量・時点・生存／補給条件、感染封じ込め能力、自動鎮圧力・民間被害・対象を返す。予測は攻撃後10%、待機・移動後20%、補給外0%とCore判定に一致させる。
-- 施設は所有・状態・補給・人口・上限に加え、1人あたり入出力、電力条件、現在資源と確保順を反映した部分稼働見込み、停止理由、感染・陥落時に失う現在生産、封じ込め・鎮圧予測を返す。
+- 施設は所有・状態・補給・人口・上限に加え、1人あたり入出力、Power Mode、需要、Power Supply ON/OFF、予測要求・給電・理由、直前実績、基本／予測生産と倍率、停止理由、感染・陥落時に失う現在生産、封じ込め・鎮圧予測を返す。
+- ForecastはFood／Military Goodsの開始備蓄、予測生産、維持必要量、終了備蓄、維持不足を返す。Civilian Goodsは市民維持とMilitary Factory入力を、Fuelは給電希望、実使用、Turn-start Fuel不足、当ターンRefinery生産を、電力は物理Capacity、Fuel制限Capacity、3段階の需要と実割当、未給電施設と理由を分離する。
 - 検問所はLifecycle、方針、3人口プール、感染、残り時間、補給提供、封じ込め・鎮圧予測を返す。方針の静的な率と時間は`getApiInfo()`へ置く。
 - PRNG内部状態、将来乱数、出現前Horde規模、デバッグ専用値を含めない。
 - 配列順を決定的にし、取得によってStateを変更せず、返却値と内部参照を共有しない。
@@ -259,7 +264,7 @@ interface AgentGame {
 
 - `random`と`balanced`は同じAgentGame、Runner、安全上限、Metrics、Artifact形式を使用する。
 - Random Agentの選択乱数はGameEngineから独立したSeed付き乱数とする。
-- Balanced Agent Versionは`2.2.0`とする。独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
+- Balanced Agent Versionは`2.3.0`とする。独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
 - Balancedは即時敗北回避、施設接触拒否、感染鎮圧、Horde防衛、軍需備蓄、食料・民需品・燃料・電力、州都人口バッファ、過密、生産冗長性を含む施設確保、部隊編成と損傷、検問所建設・方針、有益なActionがない場合のEndTurnを評価する。
 - 所有中かつ健全民間人口がいる施設に対し、各Zombieが現在接触中か、次のZombie Turnに移動力内から接触可能かを公開Observationだけで予測する。州都、単一供給源、軍需工場、健全民間人口の多い施設を高脅威として扱う。
 - National Guardは射程2と対Zombie確殺を利用する接触拒否火力として扱い、接触脅威への攻撃、安全な射撃位置、Horde方向側の所有施設防衛を優先する。Horde入口へ直接進出すること自体は目的にしない。
@@ -267,6 +272,7 @@ interface AgentGame {
 - 複数Zombieが次の敵行動で到達できる位置への移動・攻撃を露出として減点し、低HP Unitの危険接近を抑制する。
 - 未管理道路の流入リスク、検問所の新設・方針・前進・後退、補給圏を考慮した施設価値・労働者・編成・回復、検問所跡と荒廃地点の防衛・鎮圧・再前進を評価する。
 - 軍需品は現在のUnit人口から3ターン分の維持費と編成用バッファを評価し、供給停止前に軍需工場の確保・稼働を進める。National Guardが1隊だけで、軍需品・人口・生産基盤を維持できる場合は2隊目を編成する。
+- Food／Civilian Goods／Military Goodsは当ターン生産後の最終収支、Fuelは翌ターンの発電備蓄として評価する。Required都市、産業ブースト、物理発電CapacityとFuel不足、Civilian Goodsの市民維持不足とMilitary Factory入力不足を区別し、労働者再配置とSetPowerSupplyを評価する。
 - 州都の健全民間人口は平時15人、州都への接触脅威がある場合20人を目標バッファとする。これを下回る人口配置・編成を減点し、安全都市からの帰還を評価する。
 - Farm、Civilian Factory、Refinery、Power Plant、Military Factoryの単一依存を検出し、黒字時でも代替施設の確保と適量稼働を評価する。労働者は最大投入ではなく、不足解消、冗長性、入力資源、州都人口を考慮した目標人数へ近づける。
 - 同一ターン内で同じ施設の労働者数や検問所方針を繰り返し変更しないようAction Family単位の反復抑制を行う。接触脅威や感染が残っていても、対応可能なUnit Actionがなければ不要な内政Actionを挟まずEndTurnできる。
@@ -437,37 +443,62 @@ interface AgentGame {
 
 生産初期値:
 
-| 施設 | 労働者1人あたり入力 | 出力 |
-|---|---|---|
-| 農場 | 燃料1 | 食料5 |
-| 民需工場 | 燃料1 | 民需品5 |
-| 都市 | なし | 民需品1（SoftCapまで） |
-| 軍需工場 | 燃料1＋民需品1 | 軍需品2 |
-| 製油所 | なし | 燃料5 |
-| 発電所 | なし | 電力Capacity 5 |
+| 施設 | 労働者1人あたり入力 | 無給電出力 | 給電出力 |
+|---|---|---|---|
+| 農場 | なし | 食料5 | 食料10 |
+| 民需工場 | なし | 民需品5 | 民需品10 |
+| 都市 | なし | 0 | 民需品1（SoftCapまで） |
+| 軍需工場 | 民需品1 | 軍需品2 | 軍需品4 |
+| 製油所 | なし | 燃料5 | 同左 |
+| 発電所 | 燃料1で電力5 | 電力Capacity 10 / worker | 同左 |
 
-## 10.2 ターン開始時備蓄原則
+## 10.2 同ターン生産と備蓄原則
 
-- 消費と生産入力にはターン開始時点の備蓄だけを使う。
-- 同じターンに生産した資源を同じターンの入力・維持へ使わない。
-- 全消費と入力の後に今回の生産物を備蓄へ加える。
+- EndTurn開始時の人口・Unit人口・過密からFood、Civilian Goods、Military Goodsの維持必要量を先に固定する。Food不足死亡で同ターンのCivilian Goods必要量を減らさない。
+- 当ターン生産したFood、Civilian Goods、Military Goodsは同ターンの維持消費へ使用できる。
+- 当ターン生産した資源は別工程の生産入力へ使用できない。当ターンRefinery生産Fuelは次ターンから発電へ、当ターン生産Civilian Goodsは次ターンからMilitary Factory入力へ使用できる。
+- 同ターンCivilian Goods増産で市民維持用予約が減った場合は、余ったTurn-start Civilian GoodsをMilitary Factory入力へ回せる。Turn-start Civilian Goodsが0なら同ターン増産だけでMilitary Factoryを稼働できない。
 
-## 10.3 電力・燃料
+## 10.3 電力利用区分
 
-- 人口1人以上の稼働施設は施設単位で電力Capacity 5を要求する。
-- 発電所と検問所は電力不要。
-- Capacity不足時は確保時期が古い施設を優先し、満たせない施設を停止する。
-- 燃料不足時は確保時期が古い施設から労働者単位で配分し、部分稼働する。
+- `required`: CapitalとCity。健全民間人口1人以上なら施設単位で電力5を要求し、無給電では人口由来Civilian Goods生産だけが0になる。人口保持、避難民受入、移住、編成、所有、補給、感染、防衛は維持する。
+- `boost`: Farm、Civilian Factory、Military Factory。労働者1人以上でPower SupplyがONなら電力5の割当候補となり、給電時は稼働労働者分の生産を2倍、無給電またはOFFでは基本生産を行う。電力不足だけで停止しない。
+- `none`: Refinery、Power Plant、Checkpoint。電力供給の影響を受けない。
+- 未確保、陥落、人口／労働者0の施設は需要を持たない。5未満の部分給電は行わない。
+- Power Supply ON/OFFは所有中・安全・操作解禁済みのboost施設に対する`SetPowerSupply`でだけ変更し、既定、確保、復旧、旧Save移行時はONとする。Actionは資源・人口・Unit行動権も共通Player Action上限も消費せず、同一Player Phase中に何度でも変更でき、受理直後にForecastを更新する。
 
-## 10.4 通常消費
+## 10.4 発電と3段階割当
+
+- Power Plantの物理発電Capacityは全所有・非感染・非陥落発電所の`workers × 10`を州全体で合算する。
+- 発電にはTurn-start Fuelだけを使い、`Fuel 1 → Electricity 5`とする。実際に施設へ割り当てた5電力ごとにFuel 1を消費し、余剰CapacityへFuelを消費しない。
+- 利用可能電力は`min(物理発電Capacity, Turn-start Fuel × 5)`を5単位へ切り下げる。
+- 第1段階はRequired都市、第2段階はPower Supply ONのFarm／Civilian Factory、第3段階はTurn-start Civilian Goods入力を1人分以上確保したPower Supply ONのMilitary Factoryへ割り当てる。
+- 各段階内は確保時期が古い施設、同順位は`facilityId`昇順とする。未給電理由は物理Capacity不足、Turn-start Fuel不足、同段階の順位負け、Power Supply OFF、人口／労働者0または非対象、Military Factory入力なしを区別する。
+- 複数発電所のCapacityと電力は州全体で共有し、送電線、地域別停電、蓄電、発電所ごとのFuel在庫は扱わない。
+
+## 10.5 Civilian Goods予約と経済処理順
+
+Civilian Goodsの市民維持をMilitary Factory入力より優先する。
+
+```text
+maintenanceReservation
+= max(0, maintenanceRequired - projectedSameTurnCivilianProduction)
+
+productionInputAvailable
+= max(0, startingStock - maintenanceReservation)
+```
+
+経済処理は、維持必要量固定、発電上限計算、Required給電、Farm／Civilian Factory給電、生産見込み、維持予約、Military Factory入力割当、Military Factory給電、実割当Fuel消費、生産、生産物追加、Food／Civilian Goods／Military Goods維持消費、不足被害の順とする。ForecastとEndTurnは同じ純粋計算経路を使う。
+
+## 10.6 通常消費
 
 - 食料: 都市住民＋生産施設労働者＋警察人口＋州兵人口と同数
 - 民需品: 同上
 - 軍需品: 警察人口＋州兵人口と同数
 - 検問所の3健常者プールと感染者は消費しない。
-- 民需品は人口消費を軍需工場入力より優先する。
+- Civilian Goodsの`productionInputShortage`はMilitary Factory減産理由であり、市民死亡へ変換しない。`maintenanceShortage`だけを不足被害へ使う。
 
-## 10.5 過密
+## 10.7 過密
 
 ```text
 都市民需品生産 = min(都市人口, SoftCap)
@@ -482,7 +513,7 @@ interface AgentGame {
 - EndTurn時点で計算し、その直後の経済処理に課す。
 - UI予測と実消費を一致させる。
 
-## 10.6 不足被害
+## 10.8 不足被害
 
 - 食料不足1、民需品不足1につき民間人口1人を失い、両者を別々に処理する。
 - 食料不足を先、民需品不足を後にする。
@@ -647,17 +678,21 @@ PLAYER TURN START
 PLAYER / DOMESTIC ACTION
   移動・迎撃・攻撃・待機・施設確保
   労働者配置・撤収・都市間移住
+  Power Supply ON/OFF
   検問所方針・建設・ユニット編成予約
         ↓
 END TURN VALIDATION
   資源・電力・過密予測と警告
         ↓
 ECONOMY
-  通常人口消費＋過密追加消費
-  不足被害・敗北確認
-  電力Capacity決定
-  生産入力配分・部分稼働
-  生産物追加・軍需供給更新
+  EndTurn開始時の維持必要量＋過密追加消費を固定
+  Turn-start Fuelと物理発電Capacityを決定
+  Required都市 → Farm／Civilian Factory → 入力確保済みMilitary Factoryへ給電
+  Civilian Goods維持予約・Military Factory入力配分
+  実割当分のFuel消費
+  生産物追加
+  Food → Civilian Goods → Military Goods維持消費
+  不足被害・軍需供給更新・敗北確認
         ↓
 REFUGEES
   到着・審査・合格・自動配置または配置待ち
@@ -686,8 +721,10 @@ WIN CHECK / NEXT TURN
 - 同内容をJSONファイルで入出力できる。
 - Version不一致、破損、不正Config、不変条件違反を検出し、現在状態へ適用しない。
 - ロード後は保存時Configを使う。
-- v1.2.6はGame Rules / GameState / Config `1.2.1`、Save Format `2`を使う。v1.2.5のGame Rules `1.2.0`／Format 2の自動保存、セーブコード、JSONだけを移行対象とし、v1.2以前は読み込まない。
-- v1.2.5移行では旧Format、Checksum、Version、Config、State、不変条件を共有しないコピー上で先に検証する。生産5タイプのCapacityへ5を加え、旧`naturalRecovery.rate`を`combatRate`、`min(1, rate × 2)`を`restRate`へ引き継ぎ、端数設定を維持する。既存荒廃施設の感染者数、HP、人口、資源、RNG、Turn、道路、検問所、Action履歴は変更しない。
+- v1.2.7はGame Rules / GameState / Config `1.3.0`、Save Format `2`を使う。v1.2.6のGame Rules `1.2.1`とv1.2.5のGame Rules `1.2.0`／Format 2の自動保存、セーブコード、JSONだけを移行対象とし、v1.2以前は読み込まない。
+- v1.2.5移行では旧Format、Checksum、Version、Config、State、不変条件を共有しないコピー上で先に検証し、生産5タイプのCapacityへ5を加え、旧`naturalRecovery.rate`を`combatRate`、`min(1, rate × 2)`を`restRate`へ引き継いでv1.2.6相当にする。その後v1.2.7移行を適用する。
+- v1.2.6からの移行ではFarm／Civilian Factory／Military FactoryのFuel入力を除去してPower Modeを`boost`、Capital／Cityを`required`、Refinery／Power Plantを`none`とし、Power Plant発電を10、boost施設の`powerSupplyEnabled`をtrue、`lastPowerSupplied`をnullにする。
+- 既存荒廃施設の感染者数、HP、人口、労働者、資源、RNG、Turn、道路、検問所、Action履歴は変更せず、読み込んだ次のEndTurnからv1.2.7経済ルールを適用する。
 - 移行後に現行Config、Map、不変条件を通った場合だけメモリ上で読み込む。移行元を自動削除、変換保存、上書きせず、次の受理ActionまたはEndTurn後に初めて現行形式で自動保存する。成功と拒否を日本語・英語で表示する。
 - v1.2以前の旧データ検出時は「旧バージョンのため読み込めない」と表示し、「最初から」を促す。Replay／Artifactは移行しない。
 
@@ -717,6 +754,7 @@ Agentゲーム単位Metricsは、各Version、Build ID、Map、Seed、Config、A
 - 確保・喪失・最終所有施設数
 - Unit Type別の初期・完成・損失・最終生存隊数と生存率、補給圏外損失、Type／回復区分別の実回復HP・回数、10%／20%選択回数
 - 単一／全生産施設の最大労働者数、26～30人施設Turn、発電所停止Turn、電力不足Turn
+- 給電産業施設Turn、停電都市Turn、Refinery／Power Plant追加確保数
 - 稼働検問所の方針別branch-turn比率と、方針別の実審査人数比率
 - Zombie撃破、Horde迎撃
 - 最終食料、民需品、軍需品、燃料
@@ -733,13 +771,15 @@ Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値
 - 施設確保、操作解禁ターン、感染、鎮圧、陥落、復旧
 - 人口供給・受入順位、配置、撤収、都市間移住、編成
 - ソフトキャップ、都市生産上限、過密追加消費
-- 5資源、前ターン備蓄原則、電力、部分稼働、不足被害
+- 5資源、同ターン維持利用と生産入力への連鎖禁止、3段階給電、発電Fuel、産業ブースト、都市停電、不足被害
+- SetPowerSupplyの合法条件、行動上限非消費、同一Phase中の反復、即時Forecast更新、不正時State／RNG不変
+- Civilian Goods維持予約とMilitary Factory入力不足、Fuel希望／実使用／不足、物理Capacity不足の分離、ForecastとEndTurn実績一致
 - 検問所3プール、方針、合格、配置、2種類の感染順、陥落
 - 4支線の独立到着、未管理素通り、不可視プール不在、到着予定維持
 - 初期半径5、同距離共有セクター、検問所の拡張・喪失、補給制約、候補別Zombie阻害
 - 検問所新設・移設、支線別回数、跡、空検問所の荒廃、後退、放棄、復旧、消滅
 - ゾンビAI、初期配置、Horde予告・増加・最終ターンスキップ
-- 勝利・即時敗北、保存・復元、v1.2.5保存移行、旧Version／Replay／Artifact拒否
+- 勝利・即時敗北、保存・復元、v1.2.5／v1.2.6保存移行、旧Version／Replay／Artifact拒否
 - UI数値入力とスライダー同期
 
 ## 17.2 不変条件
@@ -785,12 +825,12 @@ Resources >= 0
 - ObservationがJSON互換、非共有、決定的で、取得時にStateを変更せず、非公開情報を含まないことを試験する。
 - 回復・鎮圧・実効射程・部分稼働生産・電力予測がCoreの合法手と実処理に一致し、`getApiInfo()`がAgentGameとBridgeで同じ静的契約を返すことを試験する。
 - Legal Actionsがすべて受理され、一覧外ActionでStateとRNGが変わらず、AgentStepResultにGameStateを含まないことを試験する。
-- Balancedの即時敗北、施設接触拒否、National Guardの実効射程、Police温存、戦闘／休養回復、補給圏への後退、自動鎮圧、民間被害、資源、電力波及、軍需備蓄、州都人口、感染、Horde、過密、冗長化、拡張、編成、道路流入、補給、検問所方針・新設・移設・防衛・後退、EndTurnの固定シナリオを意図ベースで試験する。
+- Balancedの即時敗北、施設接触拒否、National Guardの実効射程、Police温存、戦闘／休養回復、補給圏への後退、自動鎮圧、民間被害、同ターン最終収支、Fuel備蓄、Required Power、産業ブースト、Military Factory入力、州都人口、感染、Horde、過密、冗長化、拡張、編成、道路流入、補給、検問所方針・新設・移設・防衛・後退、EndTurnの固定シナリオを意図ベースで試験する。
 - 標準Configの固定Seed 1～100でRandomとBalancedが技術的失敗なく完遂する。特定の勝率や生存ターンは合否条件にしない。
 - Random／Balancedの同一Seed比較、決定性、JSON／CSV／ゲーム単位Artifact、失敗継続、fail-fast、Replay一致を試験する。
 - Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
 - 公開Pagesではブラウザ操作可能な外部Agentを使い、API発見、不正Action訂正、Game Over、Result／Artifact取得とReplayを手動E2E確認する。勝利は合格条件にしない。
-- リリース前に標準ConfigのBalancedを固定Seed 1～300で完遂し、v1.2.5基準と主要Metricsを比較して重大なバランス異常がないことを確認する。Pages成功後に独立したPortable Package Workflowを成功させ、Commit SHA・App・Node Version入りZIPをBundled NodeだけでSmoke Testする。
+- リリース前に標準ConfigのBalancedを固定Seed 1～300で完遂し、v1.2.6基準と主要Metricsを比較して重大なバランス異常がないことを確認する。Pages成功後に独立したPortable Package Workflowを成功させ、Commit SHA・App・Node Version入りZIPをBundled NodeだけでSmoke Testする。
 
 ---
 
@@ -801,18 +841,20 @@ Resources >= 0
 3. 15×15盤面のパン・ズーム、戦闘、ゾンビAI、施設確保・感染・復旧が機能する。
 4. 所在地を持つ人口の配置・撤収・都市間移住・編成が機能し、人口保存則を満たす。
 5. 都市ソフトキャップ、生産上限、過密追加消費と予測が機能する。
-6. 5資源、電力、部分稼働、不足被害が機能する。
+6. 5資源、3段階給電、産業ブースト、都市停電、Military Factory部分入力、不足被害が機能する。
 7. 道路別自然流入、検問所3プール、3方針、配置待ち、潜伏感染が機能する。
 8. 増加型Hordeと方向予告が機能する。
 9. 日本語・英語ヘルプ、Tips、無効理由、終了統計を表示する。
-10. 自動保存、セーブコード、JSON保存・復元、v1.2.5の安全なメモリ内移行と旧Version拒否が機能する。
+10. 自動保存、セーブコード、JSON保存・復元、v1.2.5／v1.2.6の安全なメモリ内移行と旧Version拒否が機能する。
 11. Headless、主要Unit Test、不変条件試験、最低100ゲームのRandom Testが成功する。
 12. 許諾的ライセンスだけを使用し、GitHub Actionsでテスト・ビルド・Pages公開が可能である。
 13. AgentObservationとAgentGameが非公開GameStateを渡さず、合法手とstepだけで進行できる。
-14. Balanced v2.2が公開情報だけを使って決定的に動作し、回復、鎮圧、実効射程、電力、施設接触拒否、補給、流入、検問所Lifecycleを含む固定シナリオと、RandomとともにSeed 1～100の技術的失敗なし完遂を満たす。
+14. Balanced v2.3が公開情報だけを使って決定的に動作し、回復、鎮圧、実効射程、Required Power、産業ブースト、Fuel備蓄、Military Factory入力、施設接触拒否、補給、流入、検問所Lifecycleを含む固定シナリオと、RandomとともにSeed 1～100の技術的失敗なし完遂を満たす。
 15. 統一RunnerとBatch CLIが同一Seed比較、Metrics、JSON／CSV、Replay／Failure Artifactを生成し再生できる。
 16. Production Buildで通常UI・保存と分離した`window.NLTH`とAPI説明を利用できる。
-17. App `1.2.6`、Game Rules / GameState / Config `1.2.1`、Save Format `2`、Agent / Observation / Browser Bridge / Artifact Schema `1.2.0`のVersion境界が整合し、v1.2.5保存だけを安全に移行し、旧Replay／Artifactを状態変更なしで拒否する。
+17. App `1.2.7`、Game Rules / GameState / Config `1.3.0`、Save Format `2`、Agent / Observation / Browser Bridge / Artifact Schema `1.3.0`のVersion境界が整合し、v1.2.5／v1.2.6保存だけを安全に移行し、旧Replay／Artifactを状態変更なしで拒否する。
 18. 補給オーバーレイ、新設・移設の将来範囲、阻害Zombie、補給理由の無効状態をHuman UIで確認できる。
 19. 生産施設上限30、10%／20%自然回復、感染封じ込めと自動鎮圧がHuman UIとAgent Observationで同じCore予測を表示する。
 20. Balanced Seed 1～300、Portable Package Smoke、外部AIによるGame Over・Artifact・Replay E2Eを完遂する。
+21. Farm／Civilian Factory／Military FactoryはFuel直接入力なしで無給電×1・給電×2、都市は無給電時に人口由来Civilian Goodsだけ0となり、Power Plantは10 Electricity / workerと実割当`Fuel 1 → Electricity 5`で動く。
+22. 当ターン生産Food／Civilian Goods／Military Goodsを維持へ使用し、別工程入力へ連鎖させず、Civilian Goods維持予約と各Forecast内訳が実EndTurn結果へ一致する。

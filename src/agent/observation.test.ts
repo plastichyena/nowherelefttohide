@@ -3,7 +3,7 @@ import { createDefaultConfig } from '../core/config';
 import { createInitialState } from '../core/state';
 import { createAgentObservation } from './observation';
 
-describe('Agent Observation 1.2.0 rule projections', () => {
+describe('Agent Observation 1.3.0 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -36,9 +36,11 @@ describe('Agent Observation 1.2.0 rule projections', () => {
       projectedCivilianDamage: 5,
     });
     expect(publicFarm.production).toMatchObject({
-      inputsPerWorker: { fuel: 1 },
+      inputsPerWorker: {},
       outputsPerWorker: { food: 5 },
-      requiresPower: true,
+      requiresPower: false,
+      powerMode: 'boost',
+      powerSupplyEnabled: true,
       requiredPowerCapacity: 5,
       stoppedReason: 'infection',
     });
@@ -57,7 +59,7 @@ describe('Agent Observation 1.2.0 rule projections', () => {
     expect(createAgentObservation(state)).toEqual(second);
   });
 
-  it('reports no current production loss for a stopped production facility', () => {
+  it('reports unpowered boost industry at base output instead of stopped', () => {
     const state = createInitialState(128, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
     const powerPlant = state.facilities.find((facility) => facility.id === 'power-plant-1')!;
@@ -66,28 +68,32 @@ describe('Agent Observation 1.2.0 rule projections', () => {
 
     const publicFarm = createAgentObservation(state).facilities.find((facility) => facility.id === farm.id)!;
     expect(publicFarm.production).toMatchObject({
-      estimatedInputConsumption: { fuel: 0 },
-      estimatedOutput: { food: 0 },
+      estimatedInputConsumption: {},
+      estimatedOutput: { food: 60 },
       estimatedPowerGeneration: 0,
-      projectedInputLossIfInfectedOrOverrun: { fuel: 0 },
-      projectedOutputLossIfInfectedOrOverrun: { food: 0 },
+      projectedInputLossIfInfectedOrOverrun: {},
+      projectedOutputLossIfInfectedOrOverrun: { food: 60 },
       projectedPowerLossIfInfectedOrOverrun: 0,
-      stoppedReason: 'power_unavailable',
+      projectedPowerSupplied: false,
+      projectedProductionMultiplier: 1,
+      stoppedReason: null,
     });
   });
 
-  it('uses the Core partial-input allocation for current production and loss estimates', () => {
+  it('keeps Farm production independent from Fuel while exposing the power-fuel shortage', () => {
     const state = createInitialState(129, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
     state.resources.fuel = 0;
 
     const publicFarm = createAgentObservation(state).facilities.find((facility) => facility.id === farm.id)!;
     expect(publicFarm.production).toMatchObject({
-      estimatedInputConsumption: { fuel: 0 },
-      estimatedOutput: { food: 0 },
-      stoppedReason: 'input_shortage',
-      projectedInputLossIfInfectedOrOverrun: { fuel: 0 },
-      projectedOutputLossIfInfectedOrOverrun: { food: 0 },
+      estimatedInputConsumption: {},
+      estimatedOutput: { food: 115 },
+      stoppedReason: null,
+      projectedPowerSupplied: false,
+      projectedPowerReason: 'fuel_shortage',
+      projectedInputLossIfInfectedOrOverrun: {},
+      projectedOutputLossIfInfectedOrOverrun: { food: 115 },
     });
   });
 

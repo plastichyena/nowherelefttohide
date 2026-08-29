@@ -23,7 +23,7 @@ describe('AgentGame public boundary', () => {
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.2.6 API and current Config from the same adapter boundary', () => {
+  it('describes the v1.2.7 API and current Config from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
@@ -33,6 +33,12 @@ describe('AgentGame public boundary', () => {
     expect(info.buildId).toBe('api-info-test');
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
     expect(info.rules.production.workerCapacityByFacilityType.farm).toBe(30);
+    expect(info.rules.production).toMatchObject({
+      powerPlantsGenerateCapacityPerWorker: 10,
+      fuelPerFiveElectricity: 1,
+      sameTurnProductionCanCoverMaintenance: true,
+      sameTurnProductionCanCoverProductionInputs: false,
+    });
     expect(info.prohibited.join(' ')).toContain('SuppressInfection');
     info.methods.pop();
     expect(game.getApiInfo().methods).toContain('getRunArtifact');
