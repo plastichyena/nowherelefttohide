@@ -90,6 +90,11 @@ export interface SimulationOutputPaths {
   artifacts: string[];
 }
 
+export interface StreamedSimulationOutput {
+  report: SimulationReport;
+  paths: SimulationOutputPaths;
+}
+
 const AGENTS: readonly AgentStrategyId[] = ['random', 'balanced'];
 
 function integer(value: string, name: string, minimum: number): number {
@@ -273,11 +278,6 @@ export function runSimulation(options: SimulationRunOptions = {}): SimulationRep
     if (normalized.failFast && runs.at(-1)?.technicalFailure) break;
   }
   const games = runs.map((run) => run.metrics);
-  const aggregate: Record<string, MetricsAggregation> = {};
-  for (const agent of normalized.agents) {
-    const rows = games.filter((game) => game.agentId === agent);
-    aggregate[agent] = aggregateMetrics(rows);
-  }
   const failures = runs.flatMap((run, index) => run.failure ? [{
     agent: run.agent.id,
     seed: run.seed,
@@ -285,7 +285,22 @@ export function runSimulation(options: SimulationRunOptions = {}): SimulationRep
     code: run.failure.code,
     message: run.failure.message,
   }] : []);
-  const report: SimulationReport = {
+  const report = createSimulationReport(normalized, games, failures);
+  Object.defineProperty(report, '_runs', { value: runs, enumerable: false, writable: false });
+  return report;
+}
+
+function createSimulationReport(
+  normalized: ReturnType<typeof normalizeRunOptions>,
+  games: GameMetrics[],
+  failures: SimulationReport['failures'],
+): SimulationReport {
+  const aggregate: Record<string, MetricsAggregation> = {};
+  for (const agent of normalized.agents) {
+    const rows = games.filter((game) => game.agentId === agent);
+    aggregate[agent] = aggregateMetrics(rows);
+  }
+  return {
     schemaVersion: '1.3.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
@@ -310,8 +325,6 @@ export function runSimulation(options: SimulationRunOptions = {}): SimulationRep
     technicalFailureCount: failures.length,
     exitCode: failures.length > 0 ? 1 : 0,
   };
-  Object.defineProperty(report, '_runs', { value: runs, enumerable: false, writable: false });
-  return report;
 }
 
 export const runBatch = runSimulation;
@@ -479,6 +492,67 @@ export function writeSimulationRuns(
   return { runJson, gamesCsv, artifacts: artifactPaths };
 }
 
+/**
+ * Execute a potentially large CLI batch while writing each replay artifact as
+ * soon as its game finishes. Only compact metrics remain resident, avoiding a
+ * heap-sized collection of full observation/action histories.
+ */
+export function runSimulationToDirectory(
+  options: SimulationRunOptions,
+  outDirectory: string,
+  writeOptions: { overwrite?: boolean } = {},
+): StreamedSimulationOutput {
+  const normalized = normalizeRunOptions(options);
+  const outputDirectory = isAbsolute(outDirectory) ? outDirectory : resolve(outDirectory);
+  const overwrite = writeOptions.overwrite ?? false;
+  ensureOutputDirectory(outputDirectory, overwrite);
+  const artifactDirectory = join(outputDirectory, ARTIFACT_DIRECTORY);
+  ensureOutputDirectory(artifactDirectory, overwrite);
+  const runJson = join(outputDirectory, RUN_JSON_FILE);
+  const gamesCsv = join(outputDirectory, GAMES_CSV_FILE);
+  if (!overwrite && (existsSync(runJson) || existsSync(gamesCsv))) {
+    throw new Error(`Refusing to overwrite existing output in ${outputDirectory}`);
+  }
+
+  const games: GameMetrics[] = [];
+  const failures: SimulationReport['failures'] = [];
+  const artifactPaths: string[] = [];
+  simulation: for (const agent of normalized.agents) {
+    for (const seed of normalized.seeds) {
+      const run = runAgentGame(seed, {
+        strategy: agent,
+        config: normalized.config,
+        limits: normalized.limits,
+        buildId: normalized.buildId,
+        gameFactory: options.gameFactory,
+        debugSnapshot: options.debugSnapshot,
+        assertInvariant: options.assertInvariant,
+      });
+      const artifactIndex = games.length;
+      games.push(run.metrics);
+      if (run.failure) {
+        failures.push({
+          agent: run.agent.id,
+          seed: run.seed,
+          artifactIndex,
+          code: run.failure.code,
+          message: run.failure.message,
+        });
+      }
+      const path = join(artifactDirectory, artifactFileName(artifactIndex, run.metrics));
+      if (!overwrite && existsSync(path)) throw new Error(`Refusing to overwrite existing artifact: ${path}`);
+      writeFileSync(path, `${JSON.stringify(run.artifact, null, 2)}\n`, 'utf8');
+      artifactPaths.push(path);
+      if (normalized.failFast && run.technicalFailure) break simulation;
+    }
+  }
+
+  const report = createSimulationReport(normalized, games, failures);
+  writeFileSync(runJson, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  writeFileSync(gamesCsv, metricsToCsv(report.games), 'utf8');
+  return { report, paths: { runJson, gamesCsv, artifacts: artifactPaths } };
+}
+
 export function usage(): string {
   return `Usage: npm run sim -- --agent=balanced --games=1000 --seed=1 --out=output/simulations/run-name
 
@@ -508,17 +582,14 @@ export function runCli(argv: readonly string[] = process.argv.slice(2)): number 
   }
   const config = readConfig(parsed);
   const seeds = parsed.seeds ?? createSeeds(parsed.games, parsed.seed);
-  const report = runSimulation({
+  const { report } = runSimulationToDirectory({
     agents: parsed.agents,
     seeds,
     config,
     limits: parsed.limits,
     failFast: parsed.failFast,
     buildId: parsed.buildId,
-  });
-  // Re-run is deliberately avoided: runSimulation is pure with respect to
-  // disk, and writeSimulationOutput only receives serializable report data.
-  writeSimulationOutput(report, parsed.out, { overwrite: parsed.overwrite });
+  }, parsed.out, { overwrite: parsed.overwrite });
   process.stdout.write(`${JSON.stringify({ output: resolve(parsed.out), games: report.games.length, technicalFailures: report.technicalFailureCount, exitCode: report.exitCode })}\n`);
   return report.exitCode;
 }

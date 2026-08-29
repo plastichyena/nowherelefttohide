@@ -4,7 +4,14 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
 import { createAgentGame } from './game';
-import { csvColumns, metricsToCsv, parseSimulationArgs, runSimulation, writeSimulationOutput } from './sim-cli';
+import {
+  csvColumns,
+  metricsToCsv,
+  parseSimulationArgs,
+  runSimulation,
+  runSimulationToDirectory,
+  writeSimulationOutput,
+} from './sim-cli';
 import type { AgentGame } from './types';
 
 describe('Batch Simulation CLI', () => {
@@ -84,5 +91,21 @@ describe('Batch Simulation CLI', () => {
       expect(row![header!.indexOf(key)]).toBe(String(report.games[0]![key]));
     }
     expect(() => writeSimulationOutput(report, output)).toThrow(/overwrite|empty/i);
+  });
+
+  it('streams CLI-scale artifacts to disk without retaining full runs in the report', () => {
+    const config = createDefaultConfig({ maxTurns: 1, maxActionsPerTurn: 1 });
+    const output = mkdtempSync(join(tmpdir(), 'nlth-sim-stream-'));
+    const { report, paths } = runSimulationToDirectory({
+      agents: ['random'],
+      seeds: [7, 8, 9],
+      config,
+      limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 4 },
+    }, output);
+    expect(report.games).toHaveLength(3);
+    expect(report._runs).toBeUndefined();
+    expect(paths.artifacts).toHaveLength(3);
+    expect(paths.runJson.endsWith('run.json')).toBe(true);
+    expect(paths.gamesCsv.endsWith('games.csv')).toBe(true);
   });
 });
