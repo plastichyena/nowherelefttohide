@@ -2,9 +2,11 @@ import { createDefaultConfig, HUMAN_UNIT_TYPES } from './config';
 import { hexDistance, hexKey, hexNeighbors, hexWithinBounds } from './hex';
 import { assertInvariants, validateInvariants } from './invariants';
 import { getHordeEntrance, getTile } from './map';
-import { findNearestOpenTiles, findShortestPath } from './path';
+import { findNearestOpenTiles, findReachableTiles, findShortestPath, pathMovementCost } from './path';
 import { SeededRng } from './rng';
 import { deriveUnitRecovery } from './recovery';
+import { effectiveMovementCost, terrainAdjustedDamage } from './terrain';
+import { canUnitSee, getPlayerVisibleTileKeys, getVisibleEnemyUnits, isVisibleToPlayer } from './visibility';
 import {
   getBlockingZombiesForCheckpoint,
   getBranchIdAt,
@@ -209,6 +211,11 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string): void {
     state.statistics.unitLosses += 1;
     state.population.cumulativeDeaths += unit.population;
   }
+  if (unit.type === 'zombie') state.statistics.normalZombiesKilled += 1;
+  if (unit.type === 'hordeZombie') {
+    state.statistics.hordeZombiesKilled += 1;
+    if (unit.hordeKind === 'final') state.statistics.finalHordeKilled += 1;
+  }
   emit(state, 'unit_destroyed', {
     unitId: unit.id,
     unitType: unit.type,
@@ -221,9 +228,35 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string): void {
 }
 
 function dealDamage(state: GameState, target: UnitState, amount: number, sourceId: string, cause: string): void {
-  const damage = Math.max(0, Math.min(target.hp, Math.floor(amount)));
+  const adjusted = terrainAdjustedDamage(state, target, amount);
+  const damage = Math.max(0, Math.min(target.hp, adjusted.finalDamage));
   target.hp -= damage;
-  emit(state, 'damage', { sourceId, targetId: target.id, amount: damage, cause });
+  if (adjusted.defense.source !== 'none') {
+    const prevented = Math.max(0, adjusted.baseDamage - adjusted.finalDamage);
+    if (adjusted.defense.source === 'urban') {
+      state.statistics.urbanDefenseApplications += 1;
+      state.statistics.urbanDefenseDamagePrevented += prevented;
+    } else {
+      state.statistics.forestDefenseApplications += 1;
+      state.statistics.forestDefenseDamagePrevented += prevented;
+    }
+    emit(state, 'terrain_defense_applied', {
+      targetId: target.id,
+      source: adjusted.defense.source,
+      multiplier: adjusted.defense.multiplier,
+      baseDamage: adjusted.baseDamage,
+      finalDamage: adjusted.finalDamage,
+    });
+  }
+  emit(state, 'damage', {
+    sourceId,
+    targetId: target.id,
+    amount: damage,
+    cause,
+    baseDamage: adjusted.baseDamage,
+    terrainDefenseSource: adjusted.defense.source,
+    terrainDamageMultiplier: adjusted.defense.multiplier,
+  });
   if (target.hp <= 0) {
     destroyUnit(state, target, cause);
   }
@@ -298,14 +331,23 @@ function applyMovement(
   state: GameState,
   mover: UnitState,
   path: HexCoord[],
-  maxSteps: number,
+  movementBudget: number,
 ): { reached: HexCoord; interception: UnitState | null } {
   let reached = { ...mover.position };
   let interception: UnitState | null = null;
-  const steps = path.slice(1, maxSteps + 1);
-  for (const position of steps) {
+  const traversed: HexCoord[] = [];
+  let spent = 0;
+  for (const position of path.slice(1)) {
+    const cost = effectiveMovementCost(state, position);
+    if (cost === null || spent + cost > movementBudget) break;
+    const occupant = getUnitAt(state, position);
+    if (occupant && occupant.id !== mover.id) break;
+    spent += cost;
     mover.position = { ...position };
     reached = { ...position };
+    traversed.push(position);
+    const enteredTile = getTile(state.map, position);
+    if (enteredTile) state.statistics.terrainEntriesByType[enteredTile.terrain] += 1;
     const candidates = interceptorsAt(state, mover, position);
     const interceptor = candidates[0];
     if (interceptor) {
@@ -316,7 +358,7 @@ function applyMovement(
   }
   if (state.units.some((unit) => unit.id === mover.id)) {
     if (isHumanUnit(mover)) {
-      mover.activity.moved = steps.length > 0;
+      mover.activity.moved = traversed.length > 0;
       mover.canMove = false;
       mover.actionState = 'moved';
     }
@@ -337,49 +379,60 @@ function getMovePath(state: GameState, action: MoveAction): { unit: UnitState; p
   if (!hexWithinBounds(action.destination, state.map.width, state.map.height)) {
     return error(action, 'outside_map', 'Destination is outside the map');
   }
-  if (getUnitAt(state, action.destination)) {
+  const visible = getPlayerVisibleTileKeys(state);
+  const destinationUnit = getUnitAt(state, action.destination);
+  if (destinationUnit && (destinationUnit.isPlayerUnit || visible.has(hexKey(destinationUnit.position)))) {
     return error(action, 'occupied_destination', 'Destination is occupied');
   }
-  const path = findShortestPath(state.map, unit.position, action.destination, occupiedKeys(state, unit.id));
+  const publicBlocked = new Set(
+    state.units
+      .filter((candidate) => candidate.id !== unit.id && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
+      .map((candidate) => hexKey(candidate.position)),
+  );
+  const path = findShortestPath(
+    state.map,
+    unit.position,
+    action.destination,
+    publicBlocked,
+    (position) => effectiveMovementCost(state, position),
+  );
   if (!path) {
     return error(action, 'no_path', 'No path is available');
   }
-  if (path.length <= 1 || path.length - 1 > unit.movement) {
+  if (path.length <= 1 || pathMovementCost(path, (position) => effectiveMovementCost(state, position)) > unit.movement) {
     return error(action, 'out_of_range', 'Destination exceeds movement range');
   }
   return { unit, path };
 }
 
 function reachableDestinations(state: GameState, unit: UnitState): HexCoord[] {
-  const blocked = occupiedKeys(state, unit.id);
-  const startKey = hexKey(unit.position);
-  const seen = new Set<string>([startKey]);
-  const pending: Array<{ position: HexCoord; steps: number }> = [{ position: { ...unit.position }, steps: 0 }];
-  const destinations: HexCoord[] = [];
-  for (let index = 0; index < pending.length; index += 1) {
-    const current = pending[index]!;
-    if (current.steps > 0) destinations.push(current.position);
-    if (current.steps === unit.movement) continue;
-    for (const neighbor of hexNeighbors(current.position)) {
-      const key = hexKey(neighbor);
-      if (!hexWithinBounds(neighbor, state.map.width, state.map.height) || seen.has(key) || blocked.has(key)) continue;
-      seen.add(key);
-      pending.push({ position: neighbor, steps: current.steps + 1 });
-    }
-  }
-  return destinations.sort((left, right) => left.q - right.q || left.r - right.r);
+  const visible = getPlayerVisibleTileKeys(state);
+  const blocked = new Set(
+    state.units
+      .filter((candidate) => candidate.id !== unit.id && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
+      .map((candidate) => hexKey(candidate.position)),
+  );
+  return findReachableTiles(
+    state.map,
+    unit.position,
+    unit.movement,
+    blocked,
+    (position) => effectiveMovementCost(state, position),
+  );
 }
 
 /** Pure movement preview shared by the UI and action validation. */
 export function previewMove(state: Readonly<GameState>, unitId: string, destination: HexCoord): MovePreview {
   const snapshot = cloneState(state as GameState);
+  const initiallyVisible = getPlayerVisibleTileKeys(snapshot);
   const candidate = getMovePath(snapshot, { type: 'Move', unitId, destination });
   if ('code' in candidate) {
     return { legal: false, reason: candidate.message, path: [], reached: null, interception: null };
   }
   const mover = candidate.unit;
   for (const position of candidate.path.slice(1)) {
-    const interceptors = interceptorsAt(snapshot, mover, position);
+    const interceptors = interceptorsAt(snapshot, mover, position)
+      .filter((interceptor) => initiallyVisible.has(hexKey(interceptor.position)));
     if (interceptors[0]) {
       return {
         legal: true,
@@ -1205,20 +1258,33 @@ function nearestSpawnPosition(state: GameState, origin: HexCoord, rng: SeededRng
   return null;
 }
 
-function spawnZombies(state: GameState, origin: HexCoord, count: number, rng: SeededRng, cause: string): void {
+function spawnZombies(
+  state: GameState,
+  origin: HexCoord,
+  count: number,
+  rng: SeededRng,
+  cause: string,
+  unitType: 'zombie' | 'hordeZombie' = 'zombie',
+  spawnGroupId: string | null = null,
+  hordeKind: UnitState['hordeKind'] = null,
+): void {
   for (let index = 0; index < count; index += 1) {
     const position = nearestSpawnPosition(state, origin, rng);
     if (!position) {
       return;
     }
-    let id = `zombie-${state.nextUnitNumber}`;
+    const prefix = unitType === 'hordeZombie' ? 'horde-zombie' : 'zombie';
+    let id = `${prefix}-${state.nextUnitNumber}`;
     while (state.units.some((unit) => unit.id === id)) {
       state.nextUnitNumber += 1;
-      id = `zombie-${state.nextUnitNumber}`;
+      id = `${prefix}-${state.nextUnitNumber}`;
     }
     state.nextUnitNumber += 1;
-    state.units.push(createUnit(state, id, 'zombie', position));
-    emit(state, 'horde_spawned', { zombieId: id, q: position.q, r: position.r, cause });
+    const unit = createUnit(state, id, unitType, position);
+    unit.spawnGroupId = spawnGroupId;
+    unit.hordeKind = hordeKind;
+    state.units.push(unit);
+    emit(state, 'horde_spawned', { zombieId: id, q: position.q, r: position.r, cause, unitType, spawnGroupId });
   }
 }
 
@@ -1428,6 +1494,13 @@ interface HumanTarget {
   population: number;
 }
 
+interface ZombieDecision {
+  target: HexCoord | null;
+  reason: 'visible_population' | 'inherited_horde' | 'capital' | 'idle';
+  inheritedTarget: HexCoord | null;
+  inheritedChanged: 'set' | 'cleared' | null;
+}
+
 function zombieTargets(state: GameState): HumanTarget[] {
   const byPosition = new Map<string, HumanTarget>();
   const add = (position: HexCoord, population: number): void => {
@@ -1447,13 +1520,47 @@ function zombieTargets(state: GameState): HumanTarget[] {
   return [...byPosition.values()].sort((left, right) => left.position.q - right.position.q || left.position.r - right.position.r);
 }
 
-function chooseZombieTarget(state: GameState, zombie: UnitState, rng: SeededRng): HumanTarget | null {
-  const targets = zombieTargets(state);
-  if (targets.length === 0) return null;
-  const minimumDistance = Math.min(...targets.map((target) => hexDistance(zombie.position, target.position)));
-  const nearest = targets.filter((target) => hexDistance(zombie.position, target.position) === minimumDistance);
-  const largestPopulation = Math.max(...nearest.map((target) => target.population));
-  return rng.pick(nearest.filter((target) => target.population === largestPopulation));
+function targetPath(
+  state: GameState,
+  zombie: UnitState,
+  target: HumanTarget,
+): { path: HexCoord[]; cost: number } | null {
+  const occupied = occupiedKeys(state, zombie.id);
+  const destinations = getUnitAt(state, target.position)
+    ? hexNeighbors(target.position)
+        .filter((position) => hexWithinBounds(position, state.map.width, state.map.height) && !occupied.has(hexKey(position)))
+    : [target.position];
+  const candidates = destinations
+    .map((destination) => {
+      const path = findShortestPath(
+        state.map,
+        zombie.position,
+        destination,
+        occupied,
+        (position) => effectiveMovementCost(state, position),
+      );
+      return path
+        ? { path, cost: pathMovementCost(path, (position) => effectiveMovementCost(state, position)) }
+        : null;
+    })
+    .filter((candidate): candidate is { path: HexCoord[]; cost: number } => candidate !== null)
+    .sort((left, right) => left.cost - right.cost || left.path.at(-1)!.q - right.path.at(-1)!.q || left.path.at(-1)!.r - right.path.at(-1)!.r);
+  return candidates[0] ?? null;
+}
+
+function chooseVisiblePopulationTarget(state: GameState, zombie: UnitState, rng: SeededRng): HumanTarget | null {
+  const candidates = zombieTargets(state)
+    .filter((target) => canUnitSee(zombie, target.position))
+    .map((target) => ({ target, path: targetPath(state, zombie, target) }))
+    .filter((candidate): candidate is { target: HumanTarget; path: { path: HexCoord[]; cost: number } } => candidate.path !== null);
+  if (candidates.length === 0) return null;
+  const minimumCost = Math.min(...candidates.map((candidate) => candidate.path.cost));
+  const nearest = candidates.filter((candidate) => candidate.path.cost === minimumCost);
+  const largestPopulation = Math.max(...nearest.map((candidate) => candidate.target.population));
+  const tied = nearest
+    .filter((candidate) => candidate.target.population === largestPopulation)
+    .sort((left, right) => left.target.position.q - right.target.position.q || left.target.position.r - right.target.position.r);
+  return (tied.length > 1 ? rng.pick(tied) : tied[0])?.target ?? null;
 }
 
 function nearestAttackableHuman(state: GameState, zombie: UnitState): UnitState | null {
@@ -1470,31 +1577,97 @@ function nearestAttackableHuman(state: GameState, zombie: UnitState): UnitState 
   return candidates[0] ?? null;
 }
 
-function destinationNearTarget(state: GameState, zombie: UnitState, target: HumanTarget): HexCoord | null {
-  if (!getUnitAt(state, target.position)) {
-    return target.position;
+function targetDecisionSnapshot(state: GameState, rng: SeededRng): Map<string, ZombieDecision> {
+  const snapshot = cloneState(state);
+  const decisions = new Map<string, ZombieDecision>();
+  const hordes = snapshot.units
+    .filter((unit) => unit.type === 'hordeZombie')
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const capital = getCapitalPosition(snapshot.map);
+  for (const horde of hordes) {
+    const visible = chooseVisiblePopulationTarget(snapshot, horde, rng);
+    decisions.set(horde.id, {
+      target: visible?.position ?? capital,
+      reason: visible ? 'visible_population' : 'capital',
+      inheritedTarget: null,
+      inheritedChanged: null,
+    });
   }
-  const candidates = hexNeighbors(target.position)
-    .filter((position) => hexWithinBounds(position, state.map.width, state.map.height) && !getUnitAt(state, position))
-    .sort((left, right) => hexDistance(zombie.position, left) - hexDistance(zombie.position, right) || left.q - right.q || left.r - right.r);
-  return candidates[0] ?? null;
+  for (const zombie of snapshot.units.filter((unit) => unit.type === 'zombie').sort((a, b) => a.id.localeCompare(b.id))) {
+    const visible = chooseVisiblePopulationTarget(snapshot, zombie, rng);
+    if (visible) {
+      decisions.set(zombie.id, {
+        target: visible.position,
+        reason: 'visible_population',
+        inheritedTarget: zombie.inheritedTarget,
+        inheritedChanged: null,
+      });
+      continue;
+    }
+    let memory = zombie.inheritedTarget;
+    let inheritedChanged: ZombieDecision['inheritedChanged'] = null;
+    if (memory && hexKey(memory) === hexKey(zombie.position)) {
+      memory = null;
+      inheritedChanged = 'cleared';
+    }
+    if (!memory) {
+      const source = hordes
+        .filter((horde) => {
+          const propagatedTarget = decisions.get(horde.id)?.target;
+          return canUnitSee(zombie, horde.position) && propagatedTarget !== null && propagatedTarget !== undefined && hexKey(propagatedTarget) !== hexKey(zombie.position);
+        })
+        .sort((left, right) => hexDistance(zombie.position, left.position) - hexDistance(zombie.position, right.position) || left.id.localeCompare(right.id))[0];
+      const inherited = source ? decisions.get(source.id)?.target ?? null : null;
+      if (inherited) {
+        memory = { ...inherited };
+        inheritedChanged = 'set';
+      }
+    }
+    decisions.set(zombie.id, {
+      target: memory,
+      reason: memory ? 'inherited_horde' : 'idle',
+      inheritedTarget: memory,
+      inheritedChanged,
+    });
+  }
+  return decisions;
 }
 
 function processZombieTurn(state: GameState, rng: SeededRng): void {
-  const zombieIds = state.units.filter((unit) => unit.type === 'zombie').map((unit) => unit.id).sort();
+  const decisions = targetDecisionSnapshot(state, rng);
+  const zombieIds = state.units
+    .filter((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')
+    .map((unit) => unit.id)
+    .sort();
   for (const zombieId of zombieIds) {
     const zombie = getUnit(state, zombieId);
     if (!zombie) continue;
+    const decision = decisions.get(zombieId) ?? { target: null, reason: 'idle' as const, inheritedTarget: null, inheritedChanged: null };
+    if (zombie.type === 'zombie') {
+      zombie.inheritedTarget = decision.inheritedTarget ? { ...decision.inheritedTarget } : null;
+      if (decision.inheritedChanged === 'set') {
+        state.statistics.hordeTargetInheritedCount += 1;
+        emit(state, 'horde_target_inherited', { zombieId, q: decision.target!.q, r: decision.target!.r });
+      } else if (decision.inheritedChanged === 'cleared') {
+        state.statistics.hordeTargetClearedCount += 1;
+        emit(state, 'horde_target_cleared', { zombieId });
+      }
+    }
     const immediateTarget = zombie.canAttack ? nearestAttackableHuman(state, zombie) : null;
     if (immediateTarget) {
       resolveCombat(state, zombie, immediateTarget, 'attack');
       continue;
     }
-    const target = chooseZombieTarget(state, zombie, rng);
-    if (!target) continue;
-    const destination = destinationNearTarget(state, zombie, target);
-    if (!destination) continue;
-    const path = findShortestPath(state.map, zombie.position, destination, occupiedKeys(state, zombie.id));
+    if (!decision.target) {
+      if (zombie.type === 'zombie') {
+        state.statistics.normalZombieIdleCount += 1;
+        emit(state, 'zombie_idle', { zombieId });
+      }
+      continue;
+    }
+    const target: HumanTarget = { position: decision.target, population: 0 };
+    const route = targetPath(state, zombie, target);
+    const path = route?.path ?? null;
     if (path && path.length > 1) {
       applyMovement(state, zombie, path, zombie.movement);
     }
@@ -1508,7 +1681,9 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
 }
 
 function processZombieInfection(state: GameState, rng: SeededRng): void {
-  const zombies = state.units.filter((unit) => unit.type === 'zombie').sort((a, b) => a.id.localeCompare(b.id));
+  const zombies = state.units
+    .filter((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')
+    .sort((a, b) => a.id.localeCompare(b.id));
   for (const zombie of zombies) {
     const tile = getTile(state.map, zombie.position);
     if (tile?.facilityId) {
@@ -1553,23 +1728,38 @@ function processHorde(state: GameState, rng: SeededRng): void {
     state.horde.turnsRemaining = Math.max(0, (state.horde.nextSpawnTurn ?? state.turn) - state.turn);
     return;
   }
-  if (state.config.horde.spawnOnlyBeforeFinalTurn && state.turn >= state.maxTurns) {
+  const entrance = getHordeEntrance(state.map, state.horde.nextDirection);
+  if (state.turn === state.finalHordeTurn) {
+    const groupId = `final-horde-${state.turn}`;
+    const count = state.config.horde.finalCount;
+    if (entrance) {
+      spawnZombies(state, entrance.tile, count, rng, 'final_horde', 'hordeZombie', groupId, 'final');
+    }
+    state.horde.finalSpawnGroupId = groupId;
+    state.horde.finalSpawnedCount = count;
+    state.horde.finalHordeStatus = 'active';
     state.horde.nextSpawnTurn = null;
     state.horde.turnsRemaining = 0;
+    state.horde.warningType = 'none';
+    state.horde.lastSpawnTurn = state.turn;
+    state.statistics.finalHordeSpawned = count;
+    state.horde.totalSpawned += count;
+    emit(state, 'horde_spawned', { hordeKind: 'final', direction: entrance?.direction ?? state.horde.nextDirection, spawnGroupId: groupId });
     return;
   }
+  if (state.turn > state.finalHordeTurn) return;
   const count = state.config.horde.initialCount + state.horde.spawnedCount * state.config.horde.increment;
-  const entrance = getHordeEntrance(state.map, state.horde.nextDirection);
-  if (entrance) {
-    spawnZombies(state, entrance.tile, count, rng, 'horde');
-  }
+  const groupId = `periodic-horde-${state.turn}`;
+  if (entrance) spawnZombies(state, entrance.tile, count, rng, 'periodic_horde', 'hordeZombie', groupId, 'periodic');
   state.horde.spawnedCount += 1;
   state.horde.totalSpawned += count;
   state.horde.lastSpawnTurn = state.turn;
   state.horde.nextDirection = rng.pick(['north', 'east', 'south', 'west'] as const);
-  state.horde.nextSpawnTurn = state.turn + state.config.horde.cycle;
-  state.horde.turnsRemaining = state.config.horde.cycle;
-  emit(state, 'horde_spawned', { count, direction: entrance?.direction ?? 'north' });
+  const nextPeriodic = state.turn + state.config.horde.cycle;
+  state.horde.nextSpawnTurn = nextPeriodic < state.finalHordeTurn ? nextPeriodic : state.finalHordeTurn;
+  state.horde.warningType = state.horde.nextSpawnTurn === state.finalHordeTurn ? 'final' : 'periodic';
+  state.horde.turnsRemaining = state.horde.nextSpawnTurn - state.turn;
+  emit(state, 'horde_spawned', { hordeKind: 'periodic', direction: entrance?.direction ?? 'north', spawnGroupId: groupId });
 }
 
 function finishGame(state: GameState, outcome: 'won' | 'lost', reason: GameOverReason): void {
@@ -1590,6 +1780,79 @@ function checkImmediateDefeat(state: GameState): boolean {
   synchronizePopulation(state);
   if (civilianWorkerCount(state) === 0) {
     finishGame(state, 'lost', 'healthyCiviliansLost');
+    return true;
+  }
+  return false;
+}
+
+export interface VictoryProgress {
+  finalHordeDefeated: boolean;
+  suppliedAreaZombieClear: boolean;
+  suppliedAreaInfectionClear: boolean;
+}
+
+export function deriveVictoryProgress(state: Readonly<GameState>): VictoryProgress {
+  const supplied = new Set(getSuppliedTileKeys(state));
+  const finalHordeDefeated =
+    state.horde.finalSpawnGroupId !== null &&
+    !state.units.some(
+      (unit) => unit.type === 'hordeZombie' && unit.spawnGroupId === state.horde.finalSpawnGroupId,
+    );
+  const suppliedAreaZombieClear = !state.units.some(
+    (unit) =>
+      (unit.type === 'zombie' || unit.type === 'hordeZombie') &&
+      supplied.has(hexKey(unit.position)),
+  );
+  const suppliedAreaInfectionClear =
+    !state.facilities.some((facility) => supplied.has(hexKey(facility.position)) && facility.infected > 0) &&
+    !state.checkpoints.some((checkpoint) => supplied.has(hexKey(checkpoint.position)) && checkpoint.infected > 0);
+  return { finalHordeDefeated, suppliedAreaZombieClear, suppliedAreaInfectionClear };
+}
+
+function emitPlayerKnowledgeChanges(before: Readonly<GameState>, after: GameState): void {
+  const beforeVisible = new Map(getVisibleEnemyUnits(before).map((unit) => [unit.id, unit] as const));
+  const afterVisible = new Map(getVisibleEnemyUnits(after).map((unit) => [unit.id, unit] as const));
+  for (const [id, unit] of afterVisible) {
+    if (!beforeVisible.has(id)) {
+      emit(after, 'enemy_spotted', { unitId: id, unitType: unit.type, q: unit.position.q, r: unit.position.r });
+    }
+  }
+  const survivingEnemyIds = new Set(
+    after.units.filter((unit) => !unit.isPlayerUnit).map((unit) => unit.id),
+  );
+  for (const [id, unit] of beforeVisible) {
+    if (!afterVisible.has(id) && survivingEnemyIds.has(id)) {
+      emit(after, 'enemy_lost', { unitId: id, unitType: unit.type, q: unit.position.q, r: unit.position.r });
+    }
+  }
+
+  const previousProgress = deriveVictoryProgress(before);
+  const currentProgress = deriveVictoryProgress(after);
+  if (
+    previousProgress.finalHordeDefeated !== currentProgress.finalHordeDefeated ||
+    previousProgress.suppliedAreaZombieClear !== currentProgress.suppliedAreaZombieClear ||
+    previousProgress.suppliedAreaInfectionClear !== currentProgress.suppliedAreaInfectionClear
+  ) {
+    emit(after, 'victory_progress_changed', { ...currentProgress });
+  }
+}
+
+function checkImmediateGameEnd(state: GameState): boolean {
+  if (checkImmediateDefeat(state)) return true;
+  const progress = deriveVictoryProgress(state);
+  if (progress.finalHordeDefeated && state.horde.finalHordeStatus !== 'defeated') {
+    state.horde.finalHordeStatus = 'defeated';
+    state.statistics.finalHordeDefeated = true;
+  }
+  if (progress.suppliedAreaZombieClear && state.statistics.suppliedAreaZombieClearTurn === null) {
+    state.statistics.suppliedAreaZombieClearTurn = state.turn;
+  }
+  if (progress.suppliedAreaInfectionClear && state.statistics.suppliedAreaInfectionClearTurn === null) {
+    state.statistics.suppliedAreaInfectionClearTurn = state.turn;
+  }
+  if (progress.finalHordeDefeated && progress.suppliedAreaZombieClear && progress.suppliedAreaInfectionClear) {
+    state.statistics.victoryTurn = state.turn;
+    finishGame(state, 'won', 'stateSecured');
     return true;
   }
   return false;
@@ -1624,7 +1887,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
     unit.canAttack = true;
     unit.activity = { moved: false, attacked: false, intercepted: false, suppressed: false };
   }
-  for (const zombie of state.units.filter((unit) => unit.type === 'zombie')) {
+  for (const zombie of state.units.filter((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')) {
     zombie.canAttack = true;
   }
   const orders = [...state.pendingUnitProductions].sort((left, right) => left.id.localeCompare(right.id));
@@ -1651,36 +1914,36 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
   placeApprovedRefugees(state);
   removeEmptyCheckpointRemnants(state);
   synchronizePopulation(state);
-  checkImmediateDefeat(state);
+  checkImmediateGameEnd(state);
   saveRng(state, rng);
 }
 
 function endTurn(state: GameState, rng: SeededRng): void {
   state.phase = 'economy';
   processEconomy(state);
-  if (state.gameOver) return;
+  if (checkImmediateGameEnd(state)) return;
   state.phase = 'refugees';
   processRefugees(state, rng);
   synchronizePopulation(state);
-  if (checkImmediateDefeat(state)) return;
+  if (checkImmediateGameEnd(state)) return;
   state.phase = 'infection';
   processInternalInfection(state, rng);
-  if (state.gameOver) return;
+  if (checkImmediateGameEnd(state)) return;
   state.phase = 'zombie';
   processZombieTurn(state, rng);
-  if (state.gameOver) return;
+  if (checkImmediateGameEnd(state)) return;
   processZombieInfection(state, rng);
-  if (state.gameOver) return;
+  if (checkImmediateGameEnd(state)) return;
   state.phase = 'horde';
   processHorde(state, rng);
-  if (state.turn >= state.maxTurns) {
-    finishGame(state, 'won', 'maxTurnsSurvived');
-    return;
-  }
+  if (checkImmediateGameEnd(state)) return;
   state.turn += 1;
+  if (state.turn > state.finalHordeTurn) state.statistics.turnsAfterFinalHorde += 1;
   state.actionsTakenThisTurn = 0;
   state.phase = 'player';
-  state.horde.turnsRemaining = Math.max(0, (state.horde.nextSpawnTurn ?? state.turn) - (state.turn - 1));
+  state.horde.turnsRemaining = state.horde.nextSpawnTurn === null
+    ? 0
+    : Math.max(0, state.horde.nextSpawnTurn - (state.turn - 1));
   startPlayerTurn(state, rng);
 }
 
@@ -1836,7 +2099,8 @@ function validateCheckpointDestination(
   if (forwardBlocker) {
     return error(action, 'checkpoint_abandoned_forward_block', 'An infected ruined or abandoned site only permits a position closer to the capital');
   }
-  const zombies = getBlockingZombiesForCheckpoint(state, branchId, action.position);
+  const zombies = getBlockingZombiesForCheckpoint(state, branchId, action.position)
+    .filter((zombie) => isVisibleToPlayer(state, zombie.position));
   if (zombies.length > 0) {
     return error(action, 'checkpoint_supply_zombie_blocked', `Checkpoint supply area contains zombie ${zombies[0]!.id}`);
   }
@@ -2160,7 +2424,9 @@ function attack(state: GameState, action: AttackAction): ActionError | null {
   if (budget) return budget;
   const attacker = getUnit(state, action.attackerId);
   const target = getUnit(state, action.targetId);
-  if (!attacker || !attacker.isPlayerUnit || !target || !isAttackable(attacker, target)) return error(action, 'invalid_target', 'An enemy target and player attacker are required');
+  if (!attacker || !attacker.isPlayerUnit || !target || !isAttackable(attacker, target) || !isVisibleToPlayer(state, target.position)) {
+    return error(action, 'invalid_target', 'A visible enemy target and player attacker are required');
+  }
   if (attacker.actionState === 'acted' || !attacker.canAttack || hexDistance(attacker.position, target.position) > effectiveRange(state, attacker)) {
     return error(action, 'attack_not_legal', 'Target is outside range or this unit cannot attack');
   }
@@ -2272,7 +2538,7 @@ export class GameEngine implements HeadlessGame {
         }
       }
       if (unit.canAttack && unit.actionState !== 'acted') {
-        for (const target of this.state.units.filter((candidate) => !candidate.isPlayerUnit).sort((a, b) => a.id.localeCompare(b.id))) {
+        for (const target of getVisibleEnemyUnits(this.state)) {
           if (hexDistance(unit.position, target.position) <= effectiveRange(this.state, unit)) {
             actions.push({ type: 'Attack', attackerId: unit.id, targetId: target.id });
           }
@@ -2403,6 +2669,7 @@ export class GameEngine implements HeadlessGame {
     }
     saveRng(candidate, rng);
     synchronizePopulation(candidate);
+    if (!candidate.gameOver) checkImmediateGameEnd(candidate);
     if (action.type !== 'EndTurn' && populationLedgerTotal(candidate) !== populationBeforeAction) {
       return {
         state: this.getState(),
@@ -2412,6 +2679,7 @@ export class GameEngine implements HeadlessGame {
         result: this.getResult(),
       };
     }
+    emitPlayerKnowledgeChanges(original, candidate);
     try {
       assertInvariants(candidate);
     } catch (reason) {

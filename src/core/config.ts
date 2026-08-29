@@ -14,8 +14,8 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '1.3.0';
-export const DEFAULT_MAP_ID = 'fixed-15x15-v1';
+export const CONFIG_VERSION = '1.4.0';
+export const DEFAULT_MAP_ID = 'fixed-15x15-v2';
 
 const facilityIds: FacilityId[] = [
   'capital',
@@ -50,9 +50,10 @@ function production(
 }
 
 const defaultUnitConfig: Record<UnitType, UnitConfig> = {
-  police: { hp: 25, attack: 5, movement: 5, range: 1, population: 5 },
-  nationalGuard: { hp: 50, attack: 10, movement: 5, range: 2, population: 10 },
-  zombie: { hp: 10, attack: 5, movement: 3, range: 1, population: 0 },
+  police: { hp: 25, attack: 5, movement: 5, range: 1, vision: 5, population: 5 },
+  nationalGuard: { hp: 50, attack: 10, movement: 5, range: 2, vision: 5, population: 10 },
+  zombie: { hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0 },
+  hordeZombie: { hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0 },
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
@@ -151,7 +152,7 @@ const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopula
 export const DEFAULT_CONFIG: GameConfig = {
   version: CONFIG_VERSION,
   mapId: DEFAULT_MAP_ID,
-  maxTurns: 30,
+  finalHordeTurn: 30,
   maxActionsPerTurn: 100,
   units: defaultUnitConfig,
   facilities: defaultFacilityConfig,
@@ -168,6 +169,7 @@ export const DEFAULT_CONFIG: GameConfig = {
     increment: 2,
     warningStartTurn: 1,
     spawnOnlyBeforeFinalTurn: true,
+    finalCount: 12,
   },
   refugees: {
     arrivalIntervalMin: 2,
@@ -211,6 +213,14 @@ export const DEFAULT_CONFIG: GameConfig = {
     requiresPolice: false,
     consumesPower: false,
     initialSupplyRadius: 5,
+  },
+  terrain: {
+    movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
+    damageMultiplier: { urban: 0.5, forestZombie: 0.5 },
+  },
+  vision: {
+    ownedFacility: 1,
+    operationalCheckpoint: 1,
   },
 };
 
@@ -289,17 +299,17 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (typeof config.mapId !== 'string' || config.mapId.length === 0) {
     errors.push('mapId must be a non-empty string');
   }
-  requireInteger(errors, config.maxTurns, 'maxTurns', 1);
+  requireInteger(errors, config.finalHordeTurn, 'finalHordeTurn', 1);
   requireInteger(errors, config.maxActionsPerTurn, 'maxActionsPerTurn', 1);
 
-  const unitTypes: UnitType[] = ['police', 'nationalGuard', 'zombie'];
+  const unitTypes: UnitType[] = ['police', 'nationalGuard', 'zombie', 'hordeZombie'];
   for (const type of unitTypes) {
     const unit = config.units?.[type];
     if (!unit) {
       errors.push(`units.${type} is required`);
       continue;
     }
-    for (const key of ['hp', 'attack', 'movement', 'range', 'population'] as const) {
+    for (const key of ['hp', 'attack', 'movement', 'range', 'vision', 'population'] as const) {
       requireInteger(errors, unit[key], `units.${type}.${key}`, 0);
     }
   }
@@ -450,6 +460,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     requireInteger(errors, horde.initialCount, 'horde.initialCount', 0);
     requireInteger(errors, horde.increment, 'horde.increment', 0);
     requireInteger(errors, horde.warningStartTurn, 'horde.warningStartTurn', 1);
+    requireInteger(errors, horde.finalCount, 'horde.finalCount', 1);
     if (typeof horde.spawnOnlyBeforeFinalTurn !== 'boolean') {
       errors.push('horde.spawnOnlyBeforeFinalTurn must be boolean');
     }
@@ -482,6 +493,30 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     if (typeof checkpoint.requiresPolice !== 'boolean' || typeof checkpoint.consumesPower !== 'boolean') {
       errors.push('checkpoint flags must be boolean');
     }
+  }
+
+  const terrain = config.terrain;
+  if (!terrain || typeof terrain !== 'object') {
+    errors.push('terrain is required');
+  } else {
+    for (const type of ['plain', 'forest', 'mountain'] as const) {
+      requireInteger(errors, terrain.movementCost?.[type] ?? Number.NaN, `terrain.movementCost.${type}`, 1);
+    }
+    if (terrain.movementCost?.water !== null) errors.push('terrain.movementCost.water must be null');
+    for (const key of ['urban', 'forestZombie'] as const) {
+      const value = terrain.damageMultiplier?.[key];
+      if (!Number.isFinite(value) || value <= 0 || value > 1) {
+        errors.push(`terrain.damageMultiplier.${key} must be greater than 0 and at most 1`);
+      }
+    }
+  }
+
+  const vision = config.vision;
+  if (!vision || typeof vision !== 'object') {
+    errors.push('vision is required');
+  } else {
+    requireInteger(errors, vision.ownedFacility, 'vision.ownedFacility', 0);
+    requireInteger(errors, vision.operationalCheckpoint, 'vision.operationalCheckpoint', 0);
   }
 
   const refugees = config.refugees;

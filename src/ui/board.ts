@@ -1,17 +1,25 @@
 import Phaser from 'phaser';
 import { forecastFacilityProduction } from '../core/engine';
+import { hexDistance, hexKey } from '../core/hex';
 import { getHordeEntrance } from '../core/map';
 import { getSectorBranchIds } from '../core/supply';
+import { effectiveMovementCost, isUrbanHex } from '../core/terrain';
+import { getPlayerVisibleTileKeys } from '../core/visibility';
 import type { CardinalDirection, GameState, HexCoord } from '../core/types';
+import { createTranslator, type Locale } from './i18n';
 
 export interface BoardRenderState {
   state: Readonly<GameState>;
+  locale?: Locale;
   selectedPosition?: HexCoord | null;
   selectedUnitId?: string | null;
   legalDestinations?: readonly HexCoord[];
   attackTargetIds?: readonly string[];
   pendingPath?: readonly HexCoord[];
   hordeDirection?: CardinalDirection | null;
+  hordeWarningType?: 'periodic' | 'final' | 'none';
+  visibilityOverlay?: boolean;
+  selectedVision?: { origin: HexCoord; radius: number } | null;
   supplyOverlay?: boolean;
   suppliedTileKeys?: readonly string[];
   branchRadii?: readonly { branchId: string; radius: number }[];
@@ -24,13 +32,27 @@ export interface BoardCallbacks {
   onTileTap(position: HexCoord): void;
 }
 
-type LabelEntity = 'facility' | 'checkpoint' | 'unit';
+type LabelEntity = 'facility' | 'checkpoint' | 'unit' | 'terrain';
 type LabelPurpose = 'icon' | 'infection' | 'status' | 'detail';
 
 const HEX_SIZE = 30;
 const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
 const HEX_HEIGHT = HEX_SIZE * 2;
 const WORLD_PADDING = 120;
+
+const TERRAIN_FILL: Record<'plain' | 'forest' | 'mountain' | 'water', number> = {
+  plain: 0x12222d,
+  forest: 0x1d3d34,
+  mountain: 0x3c3b49,
+  water: 0x112b48,
+};
+
+const TERRAIN_LINE: Record<'plain' | 'forest' | 'mountain' | 'water', number> = {
+  plain: 0x344b56,
+  forest: 0x477c64,
+  mountain: 0x777891,
+  water: 0x39749b,
+};
 
 function sameHex(a: HexCoord, b: HexCoord): boolean {
   return a.q === b.q && a.r === b.r;
@@ -237,6 +259,7 @@ export class HexBoardScene extends Phaser.Scene {
 
   private draw(render: BoardRenderState): void {
     const { state } = render;
+    const t = createTranslator(render.locale ?? 'ja');
     this.graphics.clear();
     this.activeLabelKeys.clear();
     const legal = new Set((render.legalDestinations ?? []).map((position) => `${position.q},${position.r}`));
@@ -250,6 +273,9 @@ export class HexBoardScene extends Phaser.Scene {
     const blockedZombies = new Set(render.blockedZombieIds ?? []);
     const selected = render.selectedPosition;
     const hordeDirection = render.hordeDirection ?? null;
+    const hordeWarningType = render.hordeWarningType ?? 'periodic';
+    const visibleTileKeys = getPlayerVisibleTileKeys(state);
+    const selectedVision = render.selectedVision ?? null;
     const entrance = hordeDirection ? getHordeEntrance(state.map, hordeDirection) : undefined;
     const entranceKeys = new Set(entrance?.roadTiles.map((position) => `${position.q},${position.r}`) ?? []);
     const productionByFacility = new Map(
@@ -262,22 +288,42 @@ export class HexBoardScene extends Phaser.Scene {
       const tileSelected = selected ? sameHex(selected, tile) : false;
       const isPath = path.has(key);
       const isLegal = legal.has(key);
-      const fill = tileSelected
+      const tileVisible = visibleTileKeys.has(tile.key);
+      const urban = isUrbanHex(state, tile);
+      const movementCost = effectiveMovementCost(state, tile);
+      const baseFill = TERRAIN_FILL[tile.terrain];
+      const baseLine = TERRAIN_LINE[tile.terrain];
+      this.graphics.fillStyle(baseFill, 1);
+      this.graphics.lineStyle(tileSelected || isLegal ? 2 : 1, baseLine, 1);
+      this.graphics.fillPoints(this.hexPoints(center), true);
+      this.graphics.strokePoints(this.hexPoints(center), true);
+      this.drawTerrainPattern(center, tile.terrain);
+      if (tile.road) this.drawRoadOverlay(center);
+      if (urban) this.drawUrbanOverlay(center);
+      if (render.visibilityOverlay !== false) {
+        this.graphics.lineStyle(tileVisible ? 1.5 : 1, tileVisible ? 0x6ee7e4 : 0x142b34, tileVisible ? 0.5 : 0.68);
+        this.graphics.strokePoints(this.hexPoints(center), true);
+      }
+      if (selectedVision && hexDistance(selectedVision.origin, tile) <= selectedVision.radius) {
+        this.graphics.lineStyle(2, 0x8be8ff, 0.64);
+        this.graphics.strokeCircle(center.x, center.y, HEX_SIZE * 0.74);
+      }
+      const overlayFill = tileSelected
         ? 0x366a92
         : isPath
           ? 0x8a6b2a
           : isLegal
             ? 0x154f67
             : entranceKeys.has(key)
-              ? 0x4c3a21
-              : tile.road
-                ? 0x253b47
-                : 0x12222d;
-      const line = tileSelected ? 0x81d4fa : isLegal ? 0x54d7ff : isPath ? 0xffcf66 : 0x344b56;
-      this.graphics.fillStyle(fill, 1);
-      this.graphics.lineStyle(tileSelected || isLegal ? 2 : 1, line, 1);
-      this.graphics.fillPoints(this.hexPoints(center), true);
-      this.graphics.strokePoints(this.hexPoints(center), true);
+              ? (hordeWarningType === 'final' ? 0x5b3024 : 0x4c3a21)
+              : null;
+      if (overlayFill !== null) {
+        this.graphics.fillStyle(overlayFill, tileSelected || isPath || isLegal ? 0.82 : 0.74);
+        this.graphics.fillPoints(this.hexPoints(center), true);
+        const line = tileSelected ? 0x81d4fa : isLegal ? 0x54d7ff : isPath ? 0xffcf66 : hordeWarningType === 'final' ? 0xff8b69 : 0xf0c867;
+        this.graphics.lineStyle(tileSelected || isLegal ? 2 : 1, line, 1);
+        this.graphics.strokePoints(this.hexPoints(center), true);
+      }
       if (render.supplyOverlay) {
         const supplied = suppliedTiles.has(tile.key) || suppliedTiles.has(key);
         this.graphics.fillStyle(supplied ? 0x38a9a4 : 0x02070b, supplied ? 0.18 : 0.52);
@@ -290,6 +336,7 @@ export class HexBoardScene extends Phaser.Scene {
       }
       if (isLegal) this.drawMarker(center, 0x54d7ff, 0.32);
       if (isPath) this.drawMarker(center, 0xffcf66, 0.18);
+      if (movementCost === null) this.drawMarker(center, 0x5299c0, 0.16);
       if (checkpointPreview.has(key)) {
         const previewSelected = selectedCheckpointPreview === key;
         this.graphics.lineStyle(previewSelected ? 4 : 2, previewSelected ? 0xffd36e : 0x72e0c2, 0.95);
@@ -376,18 +423,43 @@ export class HexBoardScene extends Phaser.Scene {
         }
       }
 
-      const unit = state.units.find((candidate) => candidate.actionState !== 'destroyed' && sameHex(candidate.position, tile));
+      const unit = state.units.find((candidate) =>
+        candidate.actionState !== 'destroyed' &&
+        sameHex(candidate.position, tile) &&
+        (candidate.isPlayerUnit || visibleTileKeys.has(hexKey(candidate.position))),
+      );
       if (unit) {
         const isTarget = attackTargets.has(unit.id);
         const isSelected = render.selectedUnitId === unit.id;
-        const isBlockedZombie = unit.type === 'zombie' && blockedZombies.has(unit.id);
-        this.graphics.fillStyle(unit.type === 'zombie' ? 0xa24c55 : unit.type === 'nationalGuard' ? 0xb6d8ff : 0x7fc7a0, 1);
-        this.graphics.lineStyle(isBlockedZombie ? 3 : isTarget ? 3 : isSelected ? 2 : 1, isBlockedZombie ? 0xff6b64 : isTarget ? 0xff8c69 : 0x071019, 1);
+        const isZombie = unit.type === 'zombie' || unit.type === 'hordeZombie';
+        const isHorde = unit.type === 'hordeZombie';
+        const isFinalHorde = isHorde && unit.hordeKind === 'final';
+        const isBlockedZombie = isZombie && blockedZombies.has(unit.id);
+        const unitFill = unit.type === 'zombie'
+          ? 0xa24c55
+          : isFinalHorde
+            ? 0xe07a45
+            : isHorde
+              ? 0xc8674d
+              : unit.type === 'nationalGuard'
+                ? 0xb6d8ff
+                : 0x7fc7a0;
+        const unitLine = isBlockedZombie
+          ? 0xff6b64
+          : isFinalHorde
+            ? 0xffcf66
+            : isTarget
+              ? 0xff8c69
+              : isSelected
+                ? 0x9ae9ff
+                : 0x071019;
+        this.graphics.fillStyle(unitFill, 1);
+        this.graphics.lineStyle(isBlockedZombie || isFinalHorde ? 3 : isTarget ? 3 : isSelected ? 2 : 1, unitLine, 1);
         this.graphics.fillCircle(center.x, center.y + 1, isSelected || isTarget ? 10 : 8);
         this.graphics.strokeCircle(center.x, center.y + 1, isSelected || isTarget ? 10 : 8);
         this.addLabel(
           `unit:${unit.id}:icon`,
-          unit.type === 'zombie' ? 'Z' : unit.type === 'nationalGuard' ? 'G' : 'P',
+          unit.type === 'zombie' ? 'Z' : isFinalHorde ? 'F' : isHorde ? 'H' : unit.type === 'nationalGuard' ? 'G' : 'P',
           center.x,
           center.y - 5,
           '#071019',
@@ -395,7 +467,7 @@ export class HexBoardScene extends Phaser.Scene {
           true,
         );
         if (unit.hp < unit.maxHp) this.drawHealth(center, unit.hp / Math.max(unit.maxHp, 1));
-        if (render.supplyOverlay && unit.type !== 'zombie' && !suppliedTiles.has(tile.key) && !suppliedTiles.has(key)) {
+        if (render.supplyOverlay && !isZombie && !suppliedTiles.has(tile.key) && !suppliedTiles.has(key)) {
           this.addLabel(`unit:${unit.id}:status`, '⊘', center.x - 13, center.y - 14, '#ef8c7a', 9, true);
         }
         if (isSelected) {
@@ -409,6 +481,31 @@ export class HexBoardScene extends Phaser.Scene {
             true,
           );
         }
+        if (isHorde) {
+          this.addLabel(
+            `unit:${unit.id}:status`,
+            isFinalHorde ? 'F' : 'H',
+            center.x + 13,
+            center.y - 14,
+            isFinalHorde ? '#ffd36e' : '#ffb06b',
+            8,
+            true,
+          );
+        }
+      }
+      if (tileSelected) {
+        const terrainName = t(`terrain${tile.terrain.charAt(0).toUpperCase()}${tile.terrain.slice(1)}`);
+        const overlays = [tile.road ? t('roadOverlay') : '', urban ? t('urbanOverlay') : ''].filter(Boolean).join('+');
+        const costText = movementCost === null ? t('blocked') : `${t('effectiveMovementCost')} ${movementCost}`;
+        this.addLabel(
+          `terrain:${key}:detail`,
+          `${terrainName}${overlays ? ` · ${overlays}` : ''} · ${costText}`,
+          center.x,
+          center.y - 25,
+          '#dff7f4',
+          7,
+          true,
+        );
       }
     }
     if (render.supplyOverlay) this.drawSupplyRadii(state, render.branchRadii ?? []);
@@ -439,6 +536,54 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.lineStyle(1, index % 2 === 0 ? 0x72e0c2 : 0xf0c867, 0.24);
       this.graphics.strokeCircle(center.x, center.y, radius * HEX_SIZE * 1.4);
     }
+  }
+
+  /** Give each base terrain a shape cue so the map is not color-only. */
+  private drawTerrainPattern(center: { x: number; y: number }, terrain: 'plain' | 'forest' | 'mountain' | 'water'): void {
+    this.graphics.lineStyle(1, TERRAIN_LINE[terrain], 0.5);
+    if (terrain === 'forest') {
+      for (const offset of [-7, 0, 7]) {
+        this.graphics.fillStyle(0x83bf86, 0.55);
+        this.graphics.fillCircle(center.x + offset * 0.45, center.y + (offset % 2 === 0 ? -3 : 4), 2.1);
+        this.graphics.lineBetween(center.x + offset * 0.45, center.y + 4, center.x + offset * 0.45, center.y + 8);
+      }
+      return;
+    }
+    if (terrain === 'mountain') {
+      const points = [
+        new Phaser.Math.Vector2(center.x - 9, center.y + 6),
+        new Phaser.Math.Vector2(center.x, center.y - 7),
+        new Phaser.Math.Vector2(center.x + 9, center.y + 6),
+      ];
+      this.graphics.strokePoints(points, false);
+      this.graphics.lineBetween(center.x - 4, center.y + 1, center.x + 1, center.y + 1);
+      this.graphics.lineBetween(center.x + 1, center.y + 1, center.x + 5, center.y + 6);
+      return;
+    }
+    if (terrain === 'water') {
+      for (const offset of [-7, 0, 7]) {
+        this.graphics.beginPath();
+        this.graphics.moveTo(center.x - 10, center.y + offset);
+        this.graphics.lineTo(center.x - 3, center.y + offset - 2);
+        this.graphics.lineTo(center.x + 4, center.y + offset);
+        this.graphics.lineTo(center.x + 10, center.y + offset - 2);
+        this.graphics.strokePath();
+      }
+    }
+  }
+
+  private drawRoadOverlay(center: { x: number; y: number }): void {
+    this.graphics.lineStyle(3, 0xd5b568, 0.72);
+    this.graphics.strokeCircle(center.x, center.y, HEX_SIZE * 0.58);
+    this.graphics.lineStyle(1, 0xffe09a, 0.62);
+    this.graphics.strokeCircle(center.x, center.y, HEX_SIZE * 0.42);
+  }
+
+  private drawUrbanOverlay(center: { x: number; y: number }): void {
+    this.graphics.lineStyle(2, 0xc7a8ff, 0.82);
+    this.graphics.strokeCircle(center.x, center.y, HEX_SIZE * 0.88);
+    this.graphics.fillStyle(0xc7a8ff, 0.3);
+    this.graphics.fillCircle(center.x, center.y, 3);
   }
 
   private drawMarker(center: { x: number; y: number }, color: number, alpha: number): void {

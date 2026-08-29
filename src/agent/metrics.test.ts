@@ -5,14 +5,15 @@ import { runAgentGame } from './runner';
 
 describe('Agent Metrics', () => {
   it('collects required game-level values and deterministic action counts', () => {
-    const config = createDefaultConfig({ maxTurns: 1, maxActionsPerTurn: 2 });
-    const run = runAgentGame(7, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 2, maxDecisionsPerGame: 5 } });
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 4 });
+    const run = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } });
+    expect(run.failure).toBeNull();
     expect(run.technicalFailure).toBe(false);
-    expect(run.metrics.seed).toBe(7);
-    expect(run.metrics.actionCounts.EndTurn).toBe(1);
+    expect(run.metrics.seed).toBe(11);
+    expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('1.3.0');
+    expect(run.metrics.bridgeApiVersion).toBe('1.4.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -22,11 +23,23 @@ describe('Agent Metrics', () => {
     expect(run.metrics.combatRecoverySelections).toBeGreaterThanOrEqual(0);
     expect(run.metrics.restRecoverySelections).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxSupplyRadius).toBeGreaterThan(0);
+    expect(run.metrics.terrainEntriesByType).toMatchObject({ plain: expect.any(Number), forest: expect.any(Number), mountain: expect.any(Number), water: 0 });
+    expect(run.metrics.finalHordeDefeated).toBeTypeOf('boolean');
+    expect(run.metrics.maxVisibleZombies).toBeGreaterThanOrEqual(0);
+    expect(run.metrics.normalZombieIdleCount).toBeGreaterThanOrEqual(0);
+    for (const key of [
+      'finalHordeSpawned', 'finalHordeKilled', 'finalHordeDefeated',
+      'normalZombiesKilled', 'hordeZombiesKilled', 'maxVisibleZombies', 'turnsAfterFinalHorde',
+      'suppliedAreaZombieClearTurn', 'suppliedAreaInfectionClearTurn', 'victoryTurn',
+      'terrainEntriesByType', 'urbanDefenseApplications', 'urbanDefenseDamagePrevented',
+      'forestDefenseApplications', 'forestDefenseDamagePrevented', 'normalZombieIdleCount',
+      'hordeTargetInheritedCount', 'hordeTargetClearedCount',
+    ]) expect(run.metrics).toHaveProperty(key);
   });
 
   it('keeps branch, policy, checkpoint, and supply metrics in the public result', () => {
-    const config = createDefaultConfig({ maxTurns: 1, maxActionsPerTurn: 1 });
-    const run = runAgentGame(4, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 3 } });
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
+    const run = runAgentGame(4, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 } });
     expect(Object.keys(run.metrics.refugeesScreenedByPolicy).sort()).toEqual(['normal', 'passThrough', 'strict']);
     expect(run.metrics.checkpointsBuilt).toBeGreaterThanOrEqual(0);
     expect(run.metrics.checkpointsRelocated).toBeGreaterThanOrEqual(0);
@@ -34,15 +47,15 @@ describe('Agent Metrics', () => {
   });
 
   it('aggregates averages, percentiles, outcomes, and action totals', () => {
-    const config = createDefaultConfig({ maxTurns: 1, maxActionsPerTurn: 1 });
-    const first = runAgentGame(1, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 3 } }).metrics;
-    const second = runAgentGame(2, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 3 } }).metrics;
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 4 });
+    const first = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } }).metrics;
+    const second = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } }).metrics;
     const aggregate = aggregateMetrics([first, second]);
     expect(aggregate.executions).toBe(2);
     expect(aggregate.completed).toBe(2);
     expect(aggregate.metrics.finalTurn.average).toBeGreaterThan(0);
     expect(aggregate.metrics.finalTurn.p10).toBeLessThanOrEqual(aggregate.metrics.finalTurn.p90);
-    expect(aggregate.actionCounts.EndTurn).toBe(2);
+    expect(aggregate.actionCounts.EndTurn).toBe(first.actionCounts.EndTurn + second.actionCounts.EndTurn);
   });
 
   it('can collect a technical-failure metric without pretending it is an in-game loss', () => {

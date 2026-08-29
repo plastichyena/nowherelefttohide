@@ -1,6 +1,6 @@
 # Play Nowhere Left to Hide with an AI
 
-This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.2.7.
+This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.3.0.
 
 The portable AI package produced by GitHub Actions contains this repository, installed dependencies, and a Linux x64 Node.js runtime. No separate Node.js installation or `npm install` is required after extracting the package.
 
@@ -51,9 +51,15 @@ Recommended loop:
 8. repeat until `isGameOver()` is true
 9. report `getResult()` and keep `getRunArtifact()` for replay/debugging
 
-## v1.2.7 tactical context
+## v1.3 tactical context
 
 Use the current `AgentObservation` as the source of truth for conditional forecasts. It does not reveal future random draws or private state.
+
+- Map tiles expose base terrain, road/urban overlays, effective movement cost, terrain defense, and `visibleToPlayer`. Human movement, zombies, replay, and agents share the same weighted pathfinding rules.
+- Enemy arrays contain only currently visible `zombie` and `hordeZombie` units. Never infer hidden enemies from missing movement or checkpoint actions: public planning treats hidden occupied hexes as empty, and execution can stop movement safely when one is encountered.
+- Police and National Guard have vision 5. The Capital, owned facilities, and operational checkpoints add shared visibility. Hidden enemy positions, IDs, target memory, spawn coordinates, and counts are not public.
+- Periodic Hordes spawn as `hordeZombie` units before the Final Horde. The observation always exposes warning type, direction, remaining turns, spawn turn, and Final Horde status—but not size or exact spawn positions.
+- There is no game-rule turn limit. After the Final Horde spawns on the configured turn, play continues until defeat or all three public victory flags are true: `finalHordeDefeated`, `suppliedAreaZombieClear`, and `suppliedAreaInfectionClear`.
 
 - A surviving supplied unit recovers at the next player-turn start. Combat, counterattack, interception, or automatic infection suppression uses the configured 10% combat rate; only moving, waiting, or taking no action uses the configured 20% rest rate; out of supply is 0%. The observation reports the class, rate, base amount, timing, and survival/supply conditions.
 - A police or National Guard unit stationed at an infected location contains internal spread. If it still has an attack available and did not spend it on normal combat, the engine can automatically suppress during the infection phase after End Turn. Police suppression has no civilian damage; National Guard suppression is stronger but can cause civilian damage.
@@ -70,7 +76,7 @@ There is no public `SuppressInfection` action. Infection response is resolved by
 
 The AI player should not use `GameEngine.getState()`, `AgentGameAdapter.getDebugState()`, save internals, hidden future random values, or other non-public implementation details to make decisions. Those exist for development and diagnostics, not as player-visible information.
 
-The intended information boundary is the same one used by the built-in Agent platform: public Observation plus currently legal actions.
+The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.3.0` uses Game Rules, Agent, Observation, Bridge, and Artifact contracts `1.4.0`, Save Format `3`, Balanced Agent `3.0.0`, and Random Agent `1.2.0`.
 
 ## Package layout
 

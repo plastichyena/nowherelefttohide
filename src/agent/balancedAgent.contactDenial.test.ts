@@ -102,7 +102,9 @@ describe('Balanced Agent facility-contact denial', () => {
     const threat = observation.zombies[0]!;
     const decoy = observation.zombies[1]!;
     threat.id = 'zombie-threat';
-    threat.position = { q: 5, r: 2 };
+    // One Forest step plus the Urban destination costs exactly the Zombie's
+    // three movement points, so this remains a next-phase contact threat in v1.3.
+    threat.position = { q: 5, r: 3 };
     decoy.id = 'zombie-decoy';
     decoy.position = { q: 10, r: 7 };
 

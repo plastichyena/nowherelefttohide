@@ -134,6 +134,56 @@ describe('Balanced Agent scenario intentions', () => {
     expect(result.action.type).toBe('ProduceUnit');
   });
 
+  it('prioritizes a visible Horde Zombie over an equivalent normal Zombie', () => {
+    const guard = observation.units.find((unit) => unit.type === 'nationalGuard')!;
+    const template = observation.zombies[0]!;
+    const normal = { ...clone(template), id: 'visible-normal', type: 'zombie' as const, unitType: 'zombie' as const };
+    const horde = { ...clone(template), id: 'visible-horde', type: 'hordeZombie' as const, unitType: 'hordeZombie' as const };
+    const result = decide([
+      { type: 'Attack', attackerId: guard.id, targetId: normal.id },
+      { type: 'Attack', attackerId: guard.id, targetId: horde.id },
+      { type: 'EndTurn' },
+    ], (value) => {
+      value.zombies = [normal, horde];
+      value.units.find((unit) => unit.id === guard.id)!.position = { ...normal.position };
+    });
+    expect(result.action).toEqual({ type: 'Attack', attackerId: guard.id, targetId: horde.id });
+    expect(result.trace?.reasonCodes).toContain('TARGET_HORDE_ZOMBIE');
+  });
+
+  it('uses the public terrain multiplier when evaluating a lethal attack', () => {
+    const guard = observation.units.find((unit) => unit.type === 'nationalGuard')!;
+    const template = observation.zombies[0]!;
+    const forest = { ...clone(template), id: 'forest-zombie', hp: 6, terrainDefenseSource: 'forest' as const, terrainDamageMultiplier: 0.5 };
+    const plain = { ...clone(template), id: 'plain-zombie', hp: 10, terrainDefenseSource: 'none' as const, terrainDamageMultiplier: 1 };
+    const result = decide([
+      { type: 'Attack', attackerId: guard.id, targetId: forest.id },
+      { type: 'Attack', attackerId: guard.id, targetId: plain.id },
+      { type: 'EndTurn' },
+    ], (value) => {
+      value.zombies = [forest, plain];
+      value.units.find((unit) => unit.id === guard.id)!.position = { ...plain.position };
+    });
+    expect(result.action).toEqual({ type: 'Attack', attackerId: guard.id, targetId: plain.id });
+    expect(result.trace?.reasonCodes).toContain('LETHAL_ATTACK');
+  });
+
+  it('patrols unseen terrain while the supplied area is not confirmed clear', () => {
+    const unit = observation.units.find((candidate) => candidate.type === 'nationalGuard')!;
+    const unseen = observation.map.tiles.find((tile) => !tile.visibleToPlayer)!;
+    const result = decide([
+      { type: 'Move', unitId: unit.id, destination: { q: unseen.q, r: unseen.r } },
+      { type: 'EndTurn' },
+    ], (value) => {
+      value.zombies = [];
+      value.suppliedAreaZombieClear = false;
+      value.victory.suppliedAreaZombieClear = false;
+      value.facilities.forEach((facility) => { facility.owner = 'player'; });
+    });
+    expect(result.action.type).toBe('Move');
+    expect(result.trace?.reasonCodes).toContain('PATROL_HIDDEN_SUPPLY_THREAT');
+  });
+
   it('does not send a badly damaged unit into nearby danger', () => {
     const unit = observation.units[0]!;
     const zombie = observation.zombies[0]!;

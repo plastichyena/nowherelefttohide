@@ -3,6 +3,7 @@ import { hexKey } from './hex';
 import { createFixedMap } from './map';
 import { SeededRng } from './rng';
 import { getBranchSupplyRadius, isHexSupplied } from './supply';
+import { getVisibleEnemyUnits } from './visibility';
 import type {
   CardinalDirection,
   CheckpointState,
@@ -16,7 +17,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '1.3.0';
+export const GAME_VERSION = '1.4.0';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -73,11 +74,15 @@ export function createUnit(
     attack: stats.attack,
     movement: stats.movement,
     range: stats.range,
+    vision: stats.vision,
     population: stats.population,
     actionState,
     canAttack: true,
-    canMove: type !== 'zombie',
-    isPlayerUnit: type !== 'zombie',
+    canMove: type !== 'zombie' && type !== 'hordeZombie',
+    isPlayerUnit: type !== 'zombie' && type !== 'hordeZombie',
+    inheritedTarget: null,
+    spawnGroupId: null,
+    hordeKind: null,
     activity: { moved: false, attacked: false, intercepted: false, suppressed: false },
   };
 }
@@ -140,6 +145,10 @@ export function synchronizePopulation(state: GameState): void {
   state.statistics.maxSupplyRadius = Math.max(
     state.statistics.maxSupplyRadius,
     ...state.roadBranches.map((branch) => getBranchSupplyRadius(state, branch.branchId)),
+  );
+  state.statistics.maxVisibleZombies = Math.max(
+    state.statistics.maxVisibleZombies,
+    getVisibleEnemyUnits(state).length,
   );
   for (const checkpoint of state.checkpoints) {
     const branch = state.roadBranches.find(
@@ -280,7 +289,7 @@ function directionFromRng(rng: SeededRng): CardinalDirection {
  */
 export function createInitialState(seed: number, config: GameConfig): GameState {
   assertValidGameConfig(config);
-  if (config.mapId !== 'fixed-15x15-v1') {
+  if (config.mapId !== 'fixed-15x15-v2') {
     throw new Error(`Unsupported map id: ${config.mapId}`);
   }
   if (!Number.isSafeInteger(seed)) {
@@ -320,7 +329,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     seed,
     rngState: rng.snapshot(),
     turn: 1,
-    maxTurns: stateConfig.maxTurns,
+    finalHordeTurn: stateConfig.finalHordeTurn,
     actionsTakenThisTurn: 0,
     phase: 'player',
     mapId: map.id,
@@ -373,9 +382,13 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       spawnedCount: 0,
       totalSpawned: 0,
       nextDirection: directionFromRng(rng),
-      turnsRemaining: stateConfig.horde.cycle,
-      nextSpawnTurn: stateConfig.horde.cycle,
+      turnsRemaining: Math.min(stateConfig.horde.cycle, stateConfig.finalHordeTurn),
+      nextSpawnTurn: Math.min(stateConfig.horde.cycle, stateConfig.finalHordeTurn),
       lastSpawnTurn: null,
+      warningType: stateConfig.finalHordeTurn <= stateConfig.horde.cycle ? 'final' : 'periodic',
+      finalHordeStatus: 'notStarted',
+      finalSpawnGroupId: null,
+      finalSpawnedCount: 0,
     },
     events: [],
     statistics: {
@@ -403,6 +416,24 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       maxSupplyRadius: stateConfig.checkpoint.initialSupplyRadius,
       supplyLosses: 0,
       supplyRejections: 0,
+      finalHordeSpawned: 0,
+      finalHordeKilled: 0,
+      finalHordeDefeated: false,
+      normalZombiesKilled: 0,
+      hordeZombiesKilled: 0,
+      maxVisibleZombies: 0,
+      turnsAfterFinalHorde: 0,
+      suppliedAreaZombieClearTurn: null,
+      suppliedAreaInfectionClearTurn: null,
+      victoryTurn: null,
+      terrainEntriesByType: { plain: 0, forest: 0, mountain: 0, water: 0 },
+      urbanDefenseApplications: 0,
+      urbanDefenseDamagePrevented: 0,
+      forestDefenseApplications: 0,
+      forestDefenseDamagePrevented: 0,
+      normalZombieIdleCount: 0,
+      hordeTargetInheritedCount: 0,
+      hordeTargetClearedCount: 0,
     },
     gameOver: false,
     result: null,

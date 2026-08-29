@@ -110,7 +110,7 @@ describe('road branches and supply network', () => {
 
   it('processes all unmanaged road arrivals immediately without hidden checkpoint pools', () => {
     const config = createDefaultConfig({
-      maxTurns: 3,
+      finalHordeTurn: 3,
       economy: { initialZombieCount: 0 },
       refugees: {
         arrivalIntervalMin: 1,
@@ -131,7 +131,7 @@ describe('road branches and supply network', () => {
   });
 
   it('allows existing out-of-supply production but rejects worker increases and natural recovery', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, maxTurns: 3 });
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, finalHordeTurn: 3 });
     const engine = new GameEngine(4, config);
     const snapshot = engine.getState();
     const power = snapshot.facilities.find((facility) => facility.id === 'power-plant-2')!;
@@ -153,7 +153,7 @@ describe('road branches and supply network', () => {
   });
 
   it('ruins an empty occupied checkpoint, permits only an inner retreat, and abandons the old site', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, maxTurns: 4 });
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, finalHordeTurn: 4 });
     const engine = new GameEngine(5, config);
     expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 7, r: 1 } }).error).toBeNull();
     const occupied = engine.getState();

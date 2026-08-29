@@ -103,9 +103,9 @@ describe('Developer / Browser Bridge', () => {
     expect(artifact.initialRoadArrivalSchedule).toHaveLength(4);
     expect(artifact.observationTrace).toHaveLength(1);
     expect(artifact.metrics).toBeDefined();
-    artifact.config.maxTurns = 1;
+    artifact.config.finalHordeTurn = 1;
     artifact.acceptedActions.push({ type: 'EndTurn' });
-    expect(api.getRunArtifact().config.maxTurns).not.toBe(1);
+    expect(api.getRunArtifact().config.finalHordeTurn).not.toBe(1);
     expect(api.getRunArtifact().acceptedActions.length).toBe(0);
   });
 

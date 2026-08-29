@@ -3,9 +3,9 @@
 ## PoC 現行仕様
 
 - ステータス: 現行正本
-- 現行Version: v1.2.7
+- 現行Version: v1.3.0
 - 基準日: 2026-08-29
-- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.2.7アップデート要件 確定版.md`
+- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.3アップデート要件 確定版.md`
 
 本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。過去の要件定義・仕様書・反映済みアップデート文書は`Doc/archive/`へ保管し、現行判断には使用しない。
 
@@ -34,6 +34,8 @@
 ## 2.1 必須
 
 - 15×15固定ヘックスマップ
+- 固定Terrain、重み付き移動、Urban／Forest防御
+- Human Unit・管理施設を合成したVisionとFog of War
 - PCおよびスマートフォン縦向き
 - 警察・州兵の移動、攻撃、反撃、迎撃、待機、自然回復
 - ゾンビAI、施設感染、鎮圧、陥落、復旧
@@ -55,7 +57,7 @@
 
 ## 2.2 対象外
 
-- Fog of War、ランダムマップ、地形別移動コスト・防御補正
+- ランダムマップ、Terrain自動生成、LOS／高低差／視界遮蔽、Waterを使う標準Map
 - Replay UI、外部LLM Agent、`balanced`以外の組み込みStrategy
 - AI観戦、AI思考表示、After Action Report、Browser BridgeからのBatch実行
 - 強化学習、Minimax、MCTS、人間より強いAIの保証
@@ -92,9 +94,9 @@ UI / Phaser / Test Agent
 - 全言語共通タイトル: Nowhere Left to Hide
 - 日本語UIでもタイトルは英語表記の`Nowhere Left to Hide`に統一する。
 - プレイヤー: 州知事
-- デフォルト最大ターン: 30（Config化）
-- 最終ターンの既存ゾンビ行動・感染処理まで生存すると勝利する。
-- 最終ターンには新しいHordeを生成しない。
+- デフォルトFinal Horde発生Turn: 30（Config化）。ゲームルール上のTurn上限はない。
+- Final Horde撃退、現在Supply内Zombie排除、同範囲の感染排除をすべて達成すると勝利する。
+- Periodic HordeはFinal Horde発生Turn以後生成しない。
 
 次のいずれかが成立した瞬間に敗北し、残りの状態遷移を停止する。
 
@@ -160,8 +162,8 @@ UI / Phaser / Test Agent
 最低限、次を保存する。
 
 - Game Version、使用Configの完全なコピー
-- Seed、疑似乱数状態、ターン、最大ターン、フェーズ
-- マップID、タイル、道路、施設
+- Seed、疑似乱数状態、ターン、Final Horde発生Turn、フェーズ
+- マップID、基礎Terrain、タイル、道路／Urban Overlay、施設
 - 道路支線ID、道路ヘックス、州都への接続、支線ごとの次回到着ターンとターン内操作状態
 - 施設の所有、確保順、操作可能ターン、稼働、陥落、感染
 - 産業施設のPower Supply ON/OFFと直前EndTurnの実績給電
@@ -170,7 +172,7 @@ UI / Phaser / Test Agent
 - 5資源、電力Capacity、軍需供給状態
 - ユニット、HP、位置、行動・攻撃権
 - 検問所の状態種別、支線、避難民、審査中、配置待ち合格者、感染者、方針、審査中方針、残り時間
-- Horde状態、直近イベント、累積統計、勝敗
+- Horde Warning、Final Spawn Group／状態、Zombie内部Target記憶、直近イベント、累積統計、Victory進捗、勝敗
 
 人口合計等の導出値は正データから再計算し、重複する可変の正データを持たない。
 補給圏内タイル、施設の補給可否、セクターは正データから共通の純粋関数で決定的に導出する。
@@ -226,10 +228,10 @@ interface HeadlessGame {
 
 ## 6.5 Version境界
 
-- App / Release Versionは`1.2.7`とする。
-- Game Rules / GameState / Config Versionは`1.3.0`とする。
-- Save Format Versionは`2`、Artifact Schemaは`1.3.0`とする。v1.2.6以前のReplay／Artifactは読み込まない。
-- Agent API / Observation API / Browser Bridge APIは`1.3.0`、Balanced Agentは`2.3.0`、Random Agentは`1.1.0`とする。
+- App / Release Versionは`1.3.0`とする。
+- Game Rules / GameState / Config Versionは`1.4.0`、Fixed Map IDは`fixed-15x15-v2`とする。
+- Save Format Versionは`3`、Artifact Schemaは`1.4.0`とする。v1.2.7以前のSave／Replay／Artifactは移行しない。
+- Agent API / Observation API / Browser Bridge APIは`1.4.0`、Balanced Agentは`3.0.0`、Random Agentは`1.2.0`とする。
 - Agent、Observation、Browser Bridgeは個別のSemVerを持ち、Build IDはCIではGit commit SHA、ローカルではSHAとdirty状態または`local-unknown`を記録する。
 - Build IDは乱数とゲーム結果へ影響させない。
 
@@ -242,6 +244,8 @@ Agent向け正式入力はGameStateではなく、JSON互換の`AgentObservation
 - ForecastはFood／Military Goodsの開始備蓄、予測生産、維持必要量、終了備蓄、維持不足を返す。Civilian Goodsは市民維持とMilitary Factory入力を、Fuelは給電希望、実使用、Turn-start Fuel不足、当ターンRefinery生産を、電力は物理Capacity、Fuel制限Capacity、3段階の需要と実割当、未給電施設と理由を分離する。
 - 検問所はLifecycle、方針、3人口プール、感染、残り時間、補給提供、封じ込め・鎮圧予測を返す。方針の静的な率と時間は`getApiInfo()`へ置く。
 - PRNG内部状態、将来乱数、出現前Horde規模、デバッグ専用値を含めない。
+- Map Terrain、Road／Urban属性、実効移動コスト、防御補正、各Hexの`visibleToPlayer`を返す。Enemy配列は現在Visibleな`zombie`／`hordeZombie`だけを含める。
+- HordeはWarning種別・方向・残りTurn・発生Turn・Final Horde状態、Victoryは3条件の真偽値を返す。Enemy内部Target、継承記憶、Spawn Group、Hidden位置・ID・個体数を返さない。
 - 配列順を決定的にし、取得によってStateを変更せず、返却値と内部参照を共有しない。
 - Game Over後の合法手は空配列とする。
 - Agent向けStepResultはObservation、公開Event、理由コード付きError、勝敗だけを返し、GameStateを含めない。
@@ -264,7 +268,8 @@ interface AgentGame {
 
 - `random`と`balanced`は同じAgentGame、Runner、安全上限、Metrics、Artifact形式を使用する。
 - Random Agentの選択乱数はGameEngineから独立したSeed付き乱数とする。
-- Balanced Agent Versionは`2.3.0`とする。独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
+- Balanced Agent Versionは`3.0.0`とする。独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
+- Visibleな通常Zombie／Horde Zombie、Terrain Movement Cost、Urban／Forest防御、Vision Coverage、Horde警告、Final Horde後の3条件を評価する。Supply内Zombie未排除かつVisible Enemyがいない場合はHidden脅威を前提に探索・巡回する。
 - Balancedは即時敗北回避、施設接触拒否、感染鎮圧、Horde防衛、軍需備蓄、食料・民需品・燃料・電力、州都人口バッファ、過密、生産冗長性を含む施設確保、部隊編成と損傷、検問所建設・方針、有益なActionがない場合のEndTurnを評価する。
 - 所有中かつ健全民間人口がいる施設に対し、各Zombieが現在接触中か、次のZombie Turnに移動力内から接触可能かを公開Observationだけで予測する。州都、単一供給源、軍需工場、健全民間人口の多い施設を高脅威として扱う。
 - National Guardは射程2と対Zombie確殺を利用する接触拒否火力として扱い、接触脅威への攻撃、安全な射撃位置、Horde方向側の所有施設防衛を優先する。Horde入口へ直接進出すること自体は目的にしない。
@@ -301,9 +306,41 @@ interface AgentGame {
 
 ## 7.1 マップ
 
-- 15×15ヘックス、全陸地移動コスト1
+- 15×15固定ヘックス。道路、16施設、4方向のHorde侵入口、道路支線、初期Unit座標は従来どおり固定し、TerrainをSeed生成しない。
 - 中央都市圏と東西南北へ延びる主要道路
-- 道路は移動ボーナスを持たず、検問所建設、Horde侵入口、視覚誘導に使う。
+- 基礎Terrainは`plain`、`forest`、`mountain`、`water`。Road、Facility、Capital、City、Checkpointは別Overlay／属性とし、Terrainと同じenumへ格納しない。
+- 以下にないHexはPlainとし、標準MapにWaterは置かない。
+
+Forest（49 Hex）:
+
+```text
+(3,4) (4,4) (4,5) (3,5) (4,6) (5,6) (5,4) (3,6)
+(9,2) (10,2) (9,3) (10,3) (11,4) (9,4) (10,4) (12,4)
+(2,9) (3,9) (3,10) (4,10) (4,11) (5,10) (5,11) (2,10)
+(9,9) (10,9) (11,9) (9,10) (10,10) (11,10) (10,11) (11,11) (12,10)
+(7,2) (12,7) (7,12) (2,7)
+(5,2) (6,2) (6,3) (12,5) (13,5) (12,6)
+(1,8) (2,8) (3,8) (6,12) (6,13) (5,12)
+```
+
+Mountain（32 Hex）:
+
+```text
+(1,1) (2,1) (1,2) (2,2) (3,2) (1,3) (2,3)
+(12,1) (13,1) (11,2) (12,2) (13,2) (12,3) (13,3)
+(1,11) (2,11) (1,12) (2,12) (3,12) (1,13) (2,13)
+(12,11) (13,11) (11,12) (12,12) (13,12) (12,13) (13,13)
+(7,1) (13,7) (7,13) (1,7)
+```
+
+- 進入先の実効Costを消費し、開始Hexは消費しない。Plain 1、Forest 2、Mountain 3、Waterは進入不能とする。
+- RoadまたはUrban Hexは基礎Terrainに関係なくCost 1とする。Human、通常Zombie、Horde Zombieは同じ決定的な重み付き最短経路を使い、同Cost経路は安定座標順で決める。
+- Urban Hex上のGround Unitは被通常Combat Damage×0.5、Forest上の通常／Horde Zombieは×0.5。Urbanを優先し、重複しない。RoadはForest防御を消さない。
+- Urbanは全施設と、稼働・非稼働・跡・荒廃・放棄を含む全Checkpoint Hexで、所有・状態に依存しない。Terrain防御は通常攻撃、反撃、迎撃に適用し、感染・不足・鎮圧等には適用しない。
+- Police／National GuardのVisionは5、通常／Horde Zombieは3。Visionは距離以内でTerrainに遮られない。Capitalは初期Supply Radius、所有・未陥落施設と稼働CheckpointはVision 1を提供する。
+- Player VisibilityはHuman Unit、Capital、Player所有施設、稼働Checkpointの和集合とし、UIとAgent Observationは同じ純粋関数を使う。Terrain、Road、施設・Checkpoint位置と公開済み状態、自軍、Supply、Horde Warning、Final Horde状態、Victory進捗はVisibility外でも既知とする。
+- Visibility外Enemyの位置・個体情報・Target・移動・正確なSpawn位置はUI、ログ、Observation、Legal Actions、StepResult、Bridge、公開Eventへ出さず、Last Known Positionも保持しない。
+- 公開移動計画ではHidden EnemyのHexを空きとして扱う。実移動で占有Hexへ進入しようとした場合は直前Hexで止まり、移動済みにしてVisibilityを再計算する。Checkpoint新設／移設の阻害判定にもVisible Enemyだけを使う。
 
 施設は合計16。
 
@@ -354,11 +391,12 @@ interface AgentGame {
 
 ## 8.1 初期性能
 
-| ユニット | HP | Attack | Move | Range | 人口 |
-|---|---:|---:|---:|---:|---:|
-| 警察 | 25 | 5 | 5 | 1 | 5 |
-| 州兵 | 50 | 10 | 5 | 2 | 10 |
-| ゾンビ | 10 | 5 | 3 | 1 | — |
+| ユニット | HP | Attack | Move | Range | Vision | 人口 |
+|---|---:|---:|---:|---:|---:|---:|
+| 警察 | 25 | 5 | 5 | 1 | 5 | 5 |
+| 州兵 | 50 | 10 | 5 | 2 | 5 | 10 |
+| 通常Zombie | 10 | 5 | 3 | 1 | 3 | — |
+| Horde Zombie | 10 | 5 | 3 | 1 | 3 | — |
 
 すべてConfig化する。
 
@@ -377,6 +415,7 @@ interface AgentGame {
 - 移動経路で初めて敵射程へ入った地点で迎撃し、その地点で移動を終了する。
 - 生存していれば攻撃または待機できる。
 - HPを0未満にせず、死亡ユニットを盤面と合法手から除外する。
+- 防御側HexのTerrain防御を攻撃、反撃、迎撃へ適用し、軽減前後Damageと防御源をEvent／Metricsへ残す。
 
 ## 8.4 自然回復
 
@@ -558,7 +597,7 @@ infected += spread
 - 感染処理で健常人口0になった場合だけ陥落する。
 - 通常施設は荒廃感染施設、検問所は荒廃検問所となる。
 - 陥落時感染者は現在値とCapacityの50%の大きい方を基準とする。
-- 標準生産施設のCapacity 30では新規陥落時の感染者下限を15とする。移行時点ですでに荒廃しているv1.2.5施設の感染者数は増やさない。
+- 標準生産施設のCapacity 30では新規陥落時の感染者下限を15とする。
 - 陥落時にゾンビ2体を生成し、隣接空き、距離2、距離3の順で最寄りへ置く。同距離はSeed付き乱数。
 - 州都陥落時はイベント処理後に即敗北する。
 
@@ -643,23 +682,35 @@ infected += spread
 
 ## 13.1 ゾンビAI
 
-目標優先順位:
+Zombie陣営を`zombie`と`hordeZombie`へ分ける。Combat、感染、占有、不変条件は共通だが、TargetingとHorde／Final Horde帰属は分離する。
 
-1. 最も近い人間タイル
-2. 同距離なら対象人口が多いタイル
-3. 同数ならSeed付き乱数
-
-人口評価には施設の健常人口、警察・州兵人口、検問所の3健常者プールを含む。移動コスト1、1タイル1駒、迎撃を考慮する。
+- Zombie自身のVision内にあり経路を持つ、施設健常人口、検問所の健常3プール、Police／National Guard人口をPopulation Target候補とする。感染者だけ、人口0、死亡Unitは候補外とする。
+- 候補は重み付き最短経路Cost、健常人口の多さ、Seed付き乱数の順で選ぶ。
+- Zombie Phase開始時のSnapshotで全Horde Zombie、次に全通常ZombieのTargetを確定してから、Unit ID安定順で移動・戦闘を解決する。
+- 通常ZombieはVisible Population Target、継承Horde Target、Idleの順とする。どちらのTargetもなければ移動しない。
+- 継承はHordeのSnapshot上のTarget Hex座標で、Hordeを見失っても保持する。Visible Populationを一時優先しても記憶を保持し、座標到達時に有効Targetがなければ解除する。
+- 通常Zombieに有効Target／記憶がなくVision内にHorde Zombieがいる場合だけ`hordeZombie -> zombie`へTargetを伝播する。通常Zombie間、通常からHordeへの伝播は禁止する。
+- 複数Horde候補はHex Distance、同距離ならUnit ID昇順で選ぶ。
+- Horde ZombieはVisible Population Target、Capitalの順とし、Visible TargetをVision外まで記憶しない。CapitalはHordeだけが常時知るStrategic Anchorとする。
 
 ## 13.2 Horde
 
-- デフォルト5ターンごと。
-- 初回2駒、以後2駒ずつ増加する。
-- 東西南北からSeed付き乱数で方向を決める。
-- 規模は非公開、方向と残りターンは公開する。
-- 予告方向の主要道路入口を中心に配置し、同順位はSeed付き乱数。
-- Turn 5 HordeはTurn 5終了時に生成され、次のゾンビ行動から活動する。
-- 最終ターンには生成しない。
+- Periodic HordeはTurn 5、10、15、20、25に2、4、6、8、10体を生成し、すべて`hordeZombie`とする。方向は東西南北からSeed付きで決め、予告入口を中心に決定的に配置し、次のZombie Phaseから行動する。
+- `finalHordeTurn`の標準値は30、Final Hordeは12体とする。該当TurnのZombie Phase後に予告された1方向へ専用Spawn Groupとして生成し、そのTurnは行動せず次Turnから行動する。
+- Periodic Hordeは`finalHordeTurn`以後生成しない。方向、残りTurn、発生Turn、Periodic／Final種別、Final Hordeの`notStarted | active | defeated`は常時公開し、規模と正確なSpawn位置は非公開とする。
+- ゲームルール上の最大Turnはない。Final Horde後も経済、避難民、感染、回復、編成、Supplyを通常処理し、VictoryまたはDefeatまで継続する。Runnerの標準Turn安全上限100は別の技術上限とする。
+
+## 13.3 Victory
+
+Final Horde生成後、次をすべて満たした瞬間に`stateSecured`で勝利する。
+
+1. Final Horde Spawn Groupの全個体がSupply内外を問わず死亡している。
+2. 現在のPlayer Supply Network内に通常／Horde Zombieがいない。
+3. 現在のSupply内にある全Facility／Checkpoint状態の感染者合計が0である。所有、連絡途絶、陥落、荒廃、放棄、Remnantを問わない。
+
+- 判定時点のSupply Networkを使い、範囲外の通常Zombie／感染地域は条件2・3から除外する。Final Horde個体だけは範囲外でも全滅が必要である。
+- 各受理Action後と各自動サブフェーズ後にDefeat、続いてVictoryを判定し、Defeatを優先する。
+- `finalHordeDefeated`、`suppliedAreaZombieClear`、`suppliedAreaInfectionClear`の真偽値を公開するが、Hidden個体数、ID、座標は公開しない。
 
 ---
 
@@ -705,9 +756,10 @@ ZOMBIE TURN / INFECTION
   AI・移動・迎撃・戦闘・施設感染
   陥落・敗北確認
         ↓
-HORDE SPAWN（最終ターン以外）
+  PERIODIC HORDE SPAWN（finalHordeTurnより前）
+  FINAL HORDE SPAWN（finalHordeTurnのみ、次Turnから行動）
         ↓
-WIN CHECK / NEXT TURN
+  DEFEAT CHECK → 3-CONDITION VICTORY CHECK / NEXT TURN
 ```
 
 各サブフェーズ内の順序は決定的にする。即時敗北成立後は残り処理を行わない。
@@ -721,18 +773,17 @@ WIN CHECK / NEXT TURN
 - 同内容をJSONファイルで入出力できる。
 - Version不一致、破損、不正Config、不変条件違反を検出し、現在状態へ適用しない。
 - ロード後は保存時Configを使う。
-- v1.2.7はGame Rules / GameState / Config `1.3.0`、Save Format `2`を使う。v1.2.6のGame Rules `1.2.1`とv1.2.5のGame Rules `1.2.0`／Format 2の自動保存、セーブコード、JSONだけを移行対象とし、v1.2以前は読み込まない。
-- v1.2.5移行では旧Format、Checksum、Version、Config、State、不変条件を共有しないコピー上で先に検証し、生産5タイプのCapacityへ5を加え、旧`naturalRecovery.rate`を`combatRate`、`min(1, rate × 2)`を`restRate`へ引き継いでv1.2.6相当にする。その後v1.2.7移行を適用する。
-- v1.2.6からの移行ではFarm／Civilian Factory／Military FactoryのFuel入力を除去してPower Modeを`boost`、Capital／Cityを`required`、Refinery／Power Plantを`none`とし、Power Plant発電を10、boost施設の`powerSupplyEnabled`をtrue、`lastPowerSupplied`をnullにする。
-- 既存荒廃施設の感染者数、HP、人口、労働者、資源、RNG、Turn、道路、検問所、Action履歴は変更せず、読み込んだ次のEndTurnからv1.2.7経済ルールを適用する。
-- 移行後に現行Config、Map、不変条件を通った場合だけメモリ上で読み込む。移行元を自動削除、変換保存、上書きせず、次の受理ActionまたはEndTurn後に初めて現行形式で自動保存する。成功と拒否を日本語・英語で表示する。
-- v1.2以前の旧データ検出時は「旧バージョンのため読み込めない」と表示し、「最初から」を促す。Replay／Artifactは移行しない。
+- v1.3はGame Rules / GameState / Config `1.4.0`、Fixed Map `fixed-15x15-v2`、Save Format `3`を使う。
+- v1.2.7以前の自動保存、セーブコード、JSON Saveを一律で移行しない。旧SaveはVersion不一致として現在Stateを変更せず、理由を日本語・英語で表示する。
+- 旧Saveを自動変換、削除、上書きしない。v1.3新規ゲームは新Saveキー／Version境界を使う。
+- v1.2.7以前のReplay／Artifactも移行せず、状態変更なしで理由付き拒否する。
+- v1.3 ArtifactはTerrain Map、Vision Config、Zombie Type、Horde Spawn Group、Target決定／伝播、Final Horde、Victoryを再現可能にする。Player-facing ReplayにはFoWを適用し、検証用完全Artifactだけが内部情報を保持できる。
 
 ---
 
 # 16. Event・統計
 
-移動、戦闘、施設確保、人口配置・移住・徴用、資源生産・消費・不足、道路別避難民到着・未管理素通り、感染、鎮圧、陥落、復旧、ユニット自然回復、検問所新設・移設・跡化・消滅・荒廃・後退・放棄、補給範囲拡張・縮小・補給理由の拒否、Horde、Game Overを理由付きEventとして保持する。自然回復EventはUnit ID／Type、回復前後HP、基礎量、実回復量、区分、率、補給状態を持つ。ユニット撃破Eventは撃破直前位置と補給状態を持つ。
+移動、戦闘、施設確保、人口配置・移住・徴用、資源生産・消費・不足、道路別避難民到着・未管理素通り、感染、鎮圧、陥落、復旧、ユニット自然回復、検問所新設・移設・跡化・消滅・荒廃・後退・放棄、補給範囲拡張・縮小・補給理由の拒否、Horde、Game Overを理由付きEventとして保持する。自然回復EventはUnit ID／Type、回復前後HP、基礎量、実回復量、区分、率、補給状態を持つ。ユニット撃破Eventは撃破直前位置と補給状態を持つ。Terrain防御の軽減前後Damage、Enemy発見／喪失、Zombie Idle、Horde Target継承／解除、Periodic／Final Spawn Group、Final Horde進捗、Victory条件変化を内部Eventへ追加し、公開EventはFoW境界を通す。
 
 終了統計:
 
@@ -757,6 +808,8 @@ Agentゲーム単位Metricsは、各Version、Build ID、Map、Seed、Config、A
 - 給電産業施設Turn、停電都市Turn、Refinery／Power Plant追加確保数
 - 稼働検問所の方針別branch-turn比率と、方針別の実審査人数比率
 - Zombie撃破、Horde迎撃
+- Final Horde生成／撃破／全滅、通常／Horde Zombie撃破、最大Visible Zombie、Final Horde後Turn数、Supply内Zombie／感染Clear Turn、Victory Turn
+- Terrain別進入、Urban／Forest防御適用回数と防止Damage、通常Zombie Idle、Horde Target継承／解除
 - 最終食料、民需品、軍需品、燃料
 
 Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値の平均・中央値・最小・最大・p10・p90、Game Over理由、Action／優先目標件数、同一Seed差分を持つ。
@@ -778,8 +831,13 @@ Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値
 - 4支線の独立到着、未管理素通り、不可視プール不在、到着予定維持
 - 初期半径5、同距離共有セクター、検問所の拡張・喪失、補給制約、候補別Zombie阻害
 - 検問所新設・移設、支線別回数、跡、空検問所の荒廃、後退、放棄、復旧、消滅
-- ゾンビAI、初期配置、Horde予告・増加・最終ターンスキップ
-- 勝利・即時敗北、保存・復元、v1.2.5／v1.2.6保存移行、旧Version／Replay／Artifact拒否
+- ゾンビAI、初期配置、Horde予告・増加・Final Hordeとの分離
+- 固定Terrain数・座標・Overlay、重み付き移動、Road／Urban Cost、Water不可、同Cost決定性
+- Urban／Forest防御の攻撃・反撃・迎撃と非Combat Damage非適用
+- Unit／施設Vision和集合、境界距離、Visibility更新、UI／Observation／Legal Actions／EventのFoW、Hidden移動停止とCheckpoint公平性
+- 通常Zombie Idle／記憶／解除、HordeのCapital指向、Target伝播方向、複数Horde決定性、Snapshot順序
+- Periodic／Final Hordeの規模・Timing・次Turn行動、Turn 31以降継続、3 Victory条件、Supply縮小、Defeat優先
+- 勝利・即時敗北、Save Format 3保存・復元、v1.2.7以前のSave／Replay／Artifact拒否
 - UI数値入力とスライダー同期
 
 ## 17.2 不変条件
@@ -830,31 +888,34 @@ Resources >= 0
 - Random／Balancedの同一Seed比較、決定性、JSON／CSV／ゲーム単位Artifact、失敗継続、fail-fast、Replay一致を試験する。
 - Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
 - 公開Pagesではブラウザ操作可能な外部Agentを使い、API発見、不正Action訂正、Game Over、Result／Artifact取得とReplayを手動E2E確認する。勝利は合格条件にしない。
-- リリース前に標準ConfigのBalancedを固定Seed 1～300で完遂し、v1.2.6基準と主要Metricsを比較して重大なバランス異常がないことを確認する。Pages成功後に独立したPortable Package Workflowを成功させ、Commit SHA・App・Node Version入りZIPをBundled NodeだけでSmoke Testする。
+- リリース前に標準ConfigのBalancedを固定Seed 1～300で完遂し、v1.2.7基準と主要Metricsを比較して重大なバランス異常がないことを確認する。Pages成功後に独立したPortable Package Workflowを成功させ、Commit SHA・App・Node Version入りZIPをBundled NodeだけでSmoke Testする。
 
 ---
 
 # 18. PoC完成条件
 
-1. PC Chromeで30ターンまたは敗北までプレイできる。
+1. PC ChromeでFinal Horde後の勝利または敗北までTurn上限なくプレイできる。
 2. iPhone Safari・Android Chrome相当の縦向きで主要操作と3状態パネルを利用できる。
 3. 15×15盤面のパン・ズーム、戦闘、ゾンビAI、施設確保・感染・復旧が機能する。
 4. 所在地を持つ人口の配置・撤収・都市間移住・編成が機能し、人口保存則を満たす。
 5. 都市ソフトキャップ、生産上限、過密追加消費と予測が機能する。
 6. 5資源、3段階給電、産業ブースト、都市停電、Military Factory部分入力、不足被害が機能する。
 7. 道路別自然流入、検問所3プール、3方針、配置待ち、潜伏感染が機能する。
-8. 増加型Hordeと方向予告が機能する。
+8. 増加型Periodic Horde、Final Horde、方向予告、Turn 31以降と3条件Victoryが機能する。
 9. 日本語・英語ヘルプ、Tips、無効理由、終了統計を表示する。
-10. 自動保存、セーブコード、JSON保存・復元、v1.2.5／v1.2.6の安全なメモリ内移行と旧Version拒否が機能する。
+10. Save Format 3の自動保存、セーブコード、JSON保存・復元と、v1.2.7以前の状態不変な拒否が機能する。
 11. Headless、主要Unit Test、不変条件試験、最低100ゲームのRandom Testが成功する。
 12. 許諾的ライセンスだけを使用し、GitHub Actionsでテスト・ビルド・Pages公開が可能である。
 13. AgentObservationとAgentGameが非公開GameStateを渡さず、合法手とstepだけで進行できる。
-14. Balanced v2.3が公開情報だけを使って決定的に動作し、回復、鎮圧、実効射程、Required Power、産業ブースト、Fuel備蓄、Military Factory入力、施設接触拒否、補給、流入、検問所Lifecycleを含む固定シナリオと、RandomとともにSeed 1～100の技術的失敗なし完遂を満たす。
+14. Balanced v3.0が公開情報だけを使って決定的に動作し、Terrain、Vision、FoW、Horde、Victoryと既存経済・感染・補給シナリオを扱い、RandomとともにSeed 1～100の技術的失敗なし完遂を満たす。
 15. 統一RunnerとBatch CLIが同一Seed比較、Metrics、JSON／CSV、Replay／Failure Artifactを生成し再生できる。
 16. Production Buildで通常UI・保存と分離した`window.NLTH`とAPI説明を利用できる。
-17. App `1.2.7`、Game Rules / GameState / Config `1.3.0`、Save Format `2`、Agent / Observation / Browser Bridge / Artifact Schema `1.3.0`のVersion境界が整合し、v1.2.5／v1.2.6保存だけを安全に移行し、旧Replay／Artifactを状態変更なしで拒否する。
+17. App `1.3.0`、Game Rules / GameState / Config `1.4.0`、Map `fixed-15x15-v2`、Save Format `3`、Agent / Observation / Browser Bridge / Artifact Schema `1.4.0`のVersion境界が整合し、v1.2.7以前のSave／Replay／Artifactを状態変更なしで拒否する。
 18. 補給オーバーレイ、新設・移設の将来範囲、阻害Zombie、補給理由の無効状態をHuman UIで確認できる。
 19. 生産施設上限30、10%／20%自然回復、感染封じ込めと自動鎮圧がHuman UIとAgent Observationで同じCore予測を表示する。
 20. Balanced Seed 1～300、Portable Package Smoke、外部AIによるGame Over・Artifact・Replay E2Eを完遂する。
 21. Farm／Civilian Factory／Military FactoryはFuel直接入力なしで無給電×1・給電×2、都市は無給電時に人口由来Civilian Goodsだけ0となり、Power Plantは10 Electricity / workerと実割当`Fuel 1 → Electricity 5`で動く。
 22. 当ターン生産Food／Civilian Goods／Military Goodsを維持へ使用し、別工程入力へ連鎖させず、Civilian Goods維持予約と各Forecast内訳が実EndTurn結果へ一致する。
+23. 固定Terrain、重み付きPathfinding、Urban／Forest防御、Vision／FoWがHuman UI、Core、Agent、Replayで同じ判定を使う。
+24. Hidden Enemyの位置・ID・Target・Spawn座標が公開経路から漏れず、公開移動候補とCheckpoint判定から推測できない。
+25. Final Horde全滅、現在Supply内Zombie 0、現在Supply内感染者0の進捗を公開し、条件成立時に即時勝利する。

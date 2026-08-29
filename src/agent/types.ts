@@ -19,28 +19,39 @@ import type {
   PowerSupplyReason,
   ResourceState,
   ResourceType,
+  BaseTerrain,
+  TerrainDefenseSource,
   UnitActionState,
   UnitType,
 } from '../core/types';
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.2.7';
-export const GAME_RULES_VERSION = '1.3.0';
-export const SAVE_FORMAT_VERSION = '2';
-export const AGENT_API_VERSION = '1.3.0';
-export const OBSERVATION_API_VERSION = '1.3.0';
-export const BRIDGE_API_VERSION = '1.3.0';
-export const BALANCED_AGENT_VERSION = '2.3.0';
-export const RANDOM_AGENT_VERSION = '1.1.0';
-export const ARTIFACT_SCHEMA_VERSION = '1.3.0';
+export const APP_VERSION = '1.3.0';
+export const GAME_RULES_VERSION = '1.4.0';
+export const SAVE_FORMAT_VERSION = '3';
+export const AGENT_API_VERSION = '1.4.0';
+export const OBSERVATION_API_VERSION = '1.4.0';
+export const BRIDGE_API_VERSION = '1.4.0';
+export const BALANCED_AGENT_VERSION = '3.0.0';
+export const RANDOM_AGENT_VERSION = '1.2.0';
+export const ARTIFACT_SCHEMA_VERSION = '1.4.0';
 
 export interface AgentMapTileObservation {
   q: number;
   r: number;
+  /** Base terrain is public even outside the current visibility union. */
+  terrain: BaseTerrain;
   passable: boolean;
   road: boolean;
+  /** True when a facility or checkpoint occupies this tile. */
+  urban: boolean;
   facilityId: string | null;
+  checkpointId: string | null;
+  effectiveMovementCost: number | null;
+  terrainDefenseSource: TerrainDefenseSource;
+  terrainDamageMultiplier: number;
+  visibleToPlayer: boolean;
   hordeEntranceDirections: CardinalDirection[];
 }
 
@@ -79,6 +90,8 @@ export interface AgentFacilityObservation {
   owner: 'player' | 'none';
   status: FacilityStatus;
   operationalStatus: FacilityOperationalStatus;
+  /** Vision radius contributed by this facility at the current state. */
+  vision: number;
   healthyPopulation: number;
   infectedPopulation: number;
   populationCapacity: number;
@@ -123,7 +136,14 @@ export interface AgentFacilityObservation {
 export interface AgentUnitObservation {
   id: string;
   type: UnitType;
+  /** Explicit v1.4 name; `type` remains as the established alias. */
+  unitType: UnitType;
   position: HexCoord;
+  vision: number;
+  positionTerrain: BaseTerrain;
+  effectiveMovementCostAtPosition: number | null;
+  terrainDefenseSource: TerrainDefenseSource;
+  terrainDamageMultiplier: number;
   hp: number;
   maxHp: number;
   attack: number;
@@ -158,6 +178,8 @@ export interface AgentCheckpointObservation {
   branchId: string;
   position: HexCoord;
   direction: CardinalDirection;
+  /** Vision radius contributed by an operational checkpoint. */
+  vision?: number;
   status: 'operational' | 'remnant' | 'ruined' | 'abandoned';
   waiting: number;
   screening: number;
@@ -205,8 +227,49 @@ export interface AgentApiInfo {
       nationalGuardSuppression: number;
       nationalGuardCivilianDamageFormula: string;
     };
-    ranges: Record<'police' | 'nationalGuard' | 'zombie', { baseRange: number }> & {
+    ranges: Record<'police' | 'nationalGuard' | 'zombie' | 'hordeZombie', { baseRange: number }> & {
       nationalGuardMilitarySupplyShortageRange: number;
+    };
+    terrain: {
+      movementCost: Record<BaseTerrain, number | null>;
+      damageMultiplier: {
+        urban: number;
+        forestZombie: number;
+      };
+      roadAndUrbanMovementCost: number;
+      defenseRounding: 'ceil';
+      minimumDamage: number;
+    };
+    vision: {
+      unitVision: Record<UnitType, number>;
+      capital: number;
+      ownedFacility: number;
+      operationalCheckpoint: number;
+      distance: 'hex';
+      terrainBlocks: false;
+      sources: string[];
+    };
+    fogOfWar: {
+      enemyVisibility: 'visible_only';
+      mapTerrainAlwaysKnown: true;
+      hiddenEnemyPositionPublic: false;
+      hiddenEnemyTargetPublic: false;
+      hiddenEnemySpawnCoordinatePublic: false;
+      hiddenEnemyCountPublic: false;
+    };
+    horde: {
+      cycle: number;
+      initialCount: number;
+      increment: number;
+      warningStartTurn: number;
+      spawnOnlyBeforeFinalTurn: boolean;
+      finalHordeTurn: number;
+      finalCount: number;
+    };
+    victory: {
+      requiresFinalHorde: true;
+      progressFields: string[];
+      defeatPrecedesVictory: true;
     };
     checkpointPolicies: Record<CheckpointPolicy, {
       turns: number;
@@ -262,6 +325,24 @@ export interface AgentGameResult {
     maxSupplyRadius: number;
     supplyLosses: number;
     supplyRejections: number;
+    finalHordeSpawned: number;
+    finalHordeKilled: number;
+    finalHordeDefeated: boolean;
+    normalZombiesKilled: number;
+    hordeZombiesKilled: number;
+    maxVisibleZombies: number;
+    turnsAfterFinalHorde: number;
+    suppliedAreaZombieClearTurn: number | null;
+    suppliedAreaInfectionClearTurn: number | null;
+    victoryTurn: number | null;
+    terrainEntriesByType: Record<BaseTerrain, number>;
+    urbanDefenseApplications: number;
+    urbanDefenseDamagePrevented: number;
+    forestDefenseApplications: number;
+    forestDefenseDamagePrevented: number;
+    normalZombieIdleCount: number;
+    hordeTargetInheritedCount: number;
+    hordeTargetClearedCount: number;
   };
 }
 
@@ -269,7 +350,7 @@ export interface AgentObservation {
   apiVersion: string;
   gameRulesVersion: string;
   turn: number;
-  maxTurns: number;
+  finalHordeTurn: number;
   phase: GamePhase;
   map: AgentMapObservation;
   resources: ResourceState;
@@ -290,10 +371,25 @@ export interface AgentObservation {
   roadBranches: AgentRoadBranchObservation[];
   supply: AgentSupplyObservation;
   horde: {
+    warningType: 'periodic' | 'final' | 'none';
+    warningDirection: CardinalDirection;
+    spawnTurn: number | null;
+    finalHordeStatus: 'notStarted' | 'active' | 'defeated';
+    /** Established aliases retained for clients that consumed v1.3 Horde data. */
     direction: CardinalDirection;
     turnsRemaining: number;
     nextSpawnTurn: number | null;
   };
+  /** Public Victory progress; no hidden enemy count or coordinate is included. */
+  victory: {
+    finalHordeDefeated: boolean;
+    suppliedAreaZombieClear: boolean;
+    suppliedAreaInfectionClear: boolean;
+  };
+  /** Top-level aliases make the three progress facts easy to consume. */
+  finalHordeDefeated: boolean;
+  suppliedAreaZombieClear: boolean;
+  suppliedAreaInfectionClear: boolean;
   endTurnForecast: EndTurnForecast;
   gameOver: boolean;
   result: AgentGameResult | null;

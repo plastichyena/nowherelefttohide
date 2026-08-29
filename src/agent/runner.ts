@@ -140,8 +140,13 @@ function errorFromUnknown(error: unknown, fallbackCode: string, fallbackMessage:
 function normalizeLimits(config: GameConfig, limits: Partial<AgentRunnerLimits> | undefined): AgentRunnerLimits {
   const values = {
     maxDecisionsPerTurn: limits?.maxDecisionsPerTurn ?? Math.max(1, config.maxActionsPerTurn),
-    maxDecisionsPerGame: limits?.maxDecisionsPerGame ?? Math.max(1, Math.max(config.maxTurns, 100) * (Math.max(1, config.maxActionsPerTurn) + 1) + 1),
-    maxTurns: limits?.maxTurns ?? Math.max(config.maxTurns, 100),
+    // This is a runner-owned technical safety budget.  In particular it must
+    // not grow when a scenario moves the in-game Final Horde later.
+    maxDecisionsPerGame: limits?.maxDecisionsPerGame ?? Math.max(
+      1,
+      DEFAULT_AGENT_RUNNER_LIMITS.maxTurns * (Math.max(1, config.maxActionsPerTurn) + 1) + 1,
+    ),
+    maxTurns: limits?.maxTurns ?? DEFAULT_AGENT_RUNNER_LIMITS.maxTurns,
   };
   for (const [key, value] of Object.entries(values)) {
     if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${key} must be a positive safe integer`);
@@ -540,7 +545,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       apiVersion: OBSERVATION_API_VERSION,
       gameRulesVersion: config.version,
       turn: 0,
-      maxTurns: config.maxTurns,
+      finalHordeTurn: config.finalHordeTurn,
       phase: 'gameOver',
       map: { id: config.mapId, width: 15, height: 15, coordinateSystem: 'axial-q-r', tiles: [] },
       roadBranches: [],
@@ -548,7 +553,23 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       resources: { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0, electricityCapacity: 0, electricityRequired: 0, militarySupplyAvailable: false },
       population: { healthyCivilians: 0, cityResidents: 0, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
       facilities: [], units: [], zombies: [], checkpoints: [],
-      horde: { direction: 'north', turnsRemaining: 0, nextSpawnTurn: null },
+      horde: {
+        warningType: 'none',
+        warningDirection: 'north',
+        spawnTurn: null,
+        finalHordeStatus: 'notStarted',
+        direction: 'north',
+        turnsRemaining: 0,
+        nextSpawnTurn: null,
+      },
+      victory: {
+        finalHordeDefeated: false,
+        suppliedAreaZombieClear: false,
+        suppliedAreaInfectionClear: false,
+      },
+      finalHordeDefeated: false,
+      suppliedAreaZombieClear: false,
+      suppliedAreaInfectionClear: false,
       endTurnForecast: {
         populationConsumers: 0,
         overcrowding: { cities: [], additionalFood: 0, additionalCivilianGoods: 0 },
@@ -698,6 +719,13 @@ function artifactValidationError(artifact: AgentRunArtifact): AgentActionError |
   if (mismatch) return publicActionError('artifact_version_unsupported', `${mismatch[0]} must be ${mismatch[2]}`);
   if (artifact.artifactType === 'failure') return publicActionError('artifact_not_replayable', 'Failure artifacts are diagnostics and cannot be replayed');
   if (!Number.isSafeInteger(artifact.seed)) return publicActionError('artifact_invalid', 'Replay artifact seed is invalid');
+  if (!isRecord(artifact.config)) return publicActionError('artifact_invalid', 'Replay artifact config is invalid');
+  if (artifact.config.version !== GAME_RULES_VERSION) {
+    return publicActionError('artifact_version_unsupported', `config.version must be ${GAME_RULES_VERSION}`);
+  }
+  if (typeof artifact.config.mapId !== 'string' || artifact.config.mapId !== artifact.mapId) {
+    return publicActionError('artifact_invalid', 'Replay artifact map metadata does not match its config');
+  }
   if (!Array.isArray(artifact.acceptedActions)) return publicActionError('artifact_invalid', 'Replay artifact acceptedActions is invalid');
   if (!Array.isArray(artifact.initialRoadArrivalSchedule)) return publicActionError('artifact_invalid', 'Replay artifact road schedule is missing');
   if (!artifact.result) return publicActionError('artifact_incomplete', 'Replay requires a completed Result');

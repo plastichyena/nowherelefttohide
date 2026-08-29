@@ -1,8 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { hexDistance } from './hex';
-import { FIXED_FACILITY_COUNT, FIXED_MAP, createFixedMap, validateFixedMap } from './map';
+import { FIXED_FACILITY_COUNT, FIXED_MAP, FIXED_MAP_ID, createFixedMap, validateFixedMap } from './map';
 
 describe('fixed map', () => {
+  it('uses the v1.3 map id and exact fixed terrain counts', () => {
+    expect(FIXED_MAP_ID).toBe('fixed-15x15-v2');
+    const counts = FIXED_MAP.tiles.reduce<Record<string, number>>((result, tile) => {
+      result[tile.terrain] = (result[tile.terrain] ?? 0) + 1;
+      return result;
+    }, {});
+    expect(counts.forest).toBe(49);
+    expect(counts.mountain).toBe(32);
+    expect(counts.water ?? 0).toBe(0);
+    expect(counts.plain).toBe(144);
+    expect(FIXED_MAP.tiles.find((tile) => tile.q === 4 && tile.r === 4)?.terrain).toBe('forest');
+    expect(FIXED_MAP.tiles.find((tile) => tile.q === 11 && tile.r === 3)?.terrain).toBe('plain');
+    expect(FIXED_MAP.tiles.find((tile) => tile.q === 7 && tile.r === 1)).toMatchObject({ terrain: 'mountain', road: true });
+    expect(FIXED_MAP.tiles.find((tile) => tile.q === 7 && tile.r === 2)).toMatchObject({ terrain: 'forest', road: true });
+  });
+
   it('is a valid 15x15 map with 16 non-overlapping facilities', () => {
     expect(validateFixedMap(FIXED_MAP)).toEqual({ valid: true, errors: [] });
     expect(FIXED_MAP.tiles).toHaveLength(225);
@@ -26,7 +42,7 @@ describe('fixed map', () => {
     expect(FIXED_MAP.facilities.reduce((sum, facility) => sum + facility.startingWorkers, 0)).toBe(100);
   });
 
-  it('uses the v1.2.7 production capacities and accepts per-type overrides', () => {
+  it('uses the production capacities and accepts per-type overrides', () => {
     const productionTypes = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant'] as const;
     for (const type of productionTypes) {
       expect(FIXED_MAP.facilities.filter((facility) => facility.type === type).every((facility) => facility.workerCapacity === 30)).toBe(true);

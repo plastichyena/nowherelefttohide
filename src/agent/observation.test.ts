@@ -3,7 +3,7 @@ import { createDefaultConfig } from '../core/config';
 import { createInitialState } from '../core/state';
 import { createAgentObservation } from './observation';
 
-describe('Agent Observation 1.3.0 rule projections', () => {
+describe('Agent Observation 1.4.0 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -104,5 +104,65 @@ describe('Agent Observation 1.3.0 rule projections', () => {
 
     expect(publicCapital.production.estimatedOutput.civilianGoods).toBe(41);
     expect(publicCapital.production.stoppedReason).toBeNull();
+  });
+
+  it('publishes the fixed terrain contract and filters enemies by current visibility', () => {
+    const state = createInitialState(131, createDefaultConfig({
+      checkpoint: { initialSupplyRadius: 1 },
+      units: {
+        police: { vision: 1 },
+        nationalGuard: { vision: 1 },
+      },
+    }));
+    state.units.find((unit) => unit.id === 'zombie-1')!.position = { q: 7, r: 6 };
+    const observation = createAgentObservation(state);
+    const hiddenEnemyIds = state.units
+      .filter((unit) => !unit.isPlayerUnit)
+      .map((unit) => unit.id)
+      .filter((id) => !observation.zombies.some((unit) => unit.id === id));
+
+    expect(observation.finalHordeTurn).toBe(30);
+    expect(observation.map.tiles).toHaveLength(225);
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'forest')).toHaveLength(49);
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'mountain')).toHaveLength(32);
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'water')).toHaveLength(0);
+    expect(observation.map.tiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        q: 7,
+        r: 2,
+        terrain: 'forest',
+        road: true,
+        effectiveMovementCost: 1,
+        terrainDefenseSource: 'forest',
+        terrainDamageMultiplier: 0.5,
+      }),
+    ]));
+    expect(observation.map.tiles.every((tile) =>
+      typeof tile.visibleToPlayer === 'boolean' &&
+      typeof tile.urban === 'boolean' &&
+      (tile.effectiveMovementCost === null || tile.effectiveMovementCost >= 1),
+    )).toBe(true);
+    expect(observation.units.every((unit) =>
+      unit.unitType === unit.type &&
+      unit.vision > 0 &&
+      typeof unit.positionTerrain === 'string' &&
+      (unit.effectiveMovementCostAtPosition === null || unit.effectiveMovementCostAtPosition >= 1),
+    )).toBe(true);
+    expect(observation.zombies.every((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')).toBe(true);
+    expect(hiddenEnemyIds.length).toBeGreaterThan(0);
+    expect(observation.zombies.map((unit) => unit.id)).not.toEqual(expect.arrayContaining(hiddenEnemyIds));
+    expect(observation.horde).toMatchObject({
+      warningType: 'periodic',
+      warningDirection: observation.horde.direction,
+      spawnTurn: 5,
+      finalHordeStatus: 'notStarted',
+    });
+    expect(observation.victory).toEqual({
+      finalHordeDefeated: observation.finalHordeDefeated,
+      suppliedAreaZombieClear: observation.suppliedAreaZombieClear,
+      suppliedAreaInfectionClear: observation.suppliedAreaInfectionClear,
+    });
+    expect(JSON.stringify(observation)).not.toContain('inheritedTarget');
+    expect(JSON.stringify(observation)).not.toContain('spawnGroupId');
   });
 });

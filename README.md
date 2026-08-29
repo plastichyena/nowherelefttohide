@@ -9,6 +9,7 @@
 ## PoCの範囲
 
 - 固定15×15ヘックス、16施設、東西南北の道路とHorde入口
+- Plain／Forest／Mountainの固定地形、重み付き移動、Urban／Forest防御、共通VisibilityとFog of War
 - 州都、地方都市、農場、工場、製油所、発電所の確保・稼働・感染・陥落・復旧
 - 警察・州兵の移動、迎撃、攻撃、反撃、待機、自然回復
 - 食料・民需品・軍需品・燃料・電力Capacityの生産と不足処理
@@ -22,7 +23,7 @@
 - ブラウザJavaScriptから利用できる、通常UI・保存領域と分離したDeveloper / Browser Bridge
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.2.7の変更要件は [`Doc/Nowhere Left to Hide PoC v1.2.7アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.2.7アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.3の変更要件は [`Doc/Nowhere Left to Hide PoC v1.3アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.3アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
 
 ## ローカルで起動する
 
@@ -54,7 +55,7 @@ Open https://plastichyena.github.io/nowherelefttohide/ and use the documented wi
 
 公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・生産/電力の静的ルールを返します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
 
-v1.2.7では、Observationが同じCore Forecastから当ターン生産、維持必要量、終了備蓄、維持不足、軍需工場入力不足、発電Fuel不足を分離して返します。都市はRequired Powerがなければ人口由来の民需品生産だけが0になり、Farm / Civilian Factory / Military Factoryは無給電でも基本生産、給電5で2倍生産します。発電はTurn-start Fuelだけを`Fuel 1 → Electricity 5`として使い、`SetPowerSupply`で産業ブーストのON/OFFを変更できます。当ターン生産したFood / Civilian Goods / Military Goodsは維持へ使えますが、別工程の入力には連鎖利用できません。
+v1.3ではHuman UIとAgentが同じVisibility関数を使います。Observationは固定Terrain、実効移動コスト、防御補正、各タイルの可視状態、自軍と現在可視なEnemy、Periodic／Final Horde警告、3つのVictory進捗を返します。Vision外のEnemy位置・個体ID・Target・Spawn座標は公開しません。経済Forecast、回復、鎮圧、補給、検問所の既存公開情報も維持します。
 
 ## Agent Simulation CLI
 
@@ -93,12 +94,12 @@ GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロード�
 
 ## 目的と敗北条件
 
-最大ターンは既定30ターンです。最終ターンのゾンビ行動・感染処理まで生存すると勝利します。次のいずれかが成立した時点で即敗北です。
+Turn 30に12体のFinal Hordeが発生し、ゲームはTurn 31以降も勝敗まで続きます。Final Horde全滅、現在のSupply Network内Zombie 0、同範囲内感染者0の3条件をすべて満たした瞬間に勝利します。次のいずれかが成立した時点で即敗北です。
 
 1. 州都が陥落する
 2. 所有中の州都・地方都市・生産施設にいる健全民間人口の合計が0になる
 
-検問所の3健常者プール、施設内感染者、ユニット人口は健全民間人口0の判定には数えません。都市はソフトキャップを超えて受け入れられますが、民需品生産はソフトキャップで止まり、食料・民需品の追加消費が発生します。Hordeは既定で5ターンごとに出現し、方向と残りターンは常時表示されます。
+検問所の3健常者プール、施設内感染者、ユニット人口は健全民間人口0の判定には数えません。都市はソフトキャップを超えて受け入れられますが、民需品生産はソフトキャップで止まり、食料・民需品の追加消費が発生します。Periodic HordeはTurn 5～25に5ターンごと、Final Hordeは既定Turn 30に出現し、種類・方向・残りターンは常時表示されます。
 
 ## ConfigとSeed
 
@@ -106,13 +107,14 @@ GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロード�
 
 基盤の既定値は `src/core/config.ts` の `DEFAULT_CONFIG` です。`createDefaultConfig()` はネストした設定を複製してから上書きするため、既定値を共有して変更しません。主な変更項目は次のとおりです。
 
-- `maxTurns`
+- `finalHordeTurn`
+- `terrain` / `vision`
 - `horde.cycle` / `initialCount` / `increment`
 - 避難民の到着間隔・人数・審査枠
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.2.7`、Game Rules / GameState / Configは `1.3.0`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.3.0`です。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.3.0`、Game Rules / GameState / Configは `1.4.0`、Fixed Mapは `fixed-15x15-v2`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.4.0`です。
 
 ## CoreとHeadless API
 
@@ -135,7 +137,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.2.7`、Game Rules / State / Config `1.3.0`、Save Format `2`を使用します。v1.2.5 / v1.2.6のSave Format 2は決定的にメモリ上へ移行できますが、移行元を変換・削除・上書きしません。v1.2以前の保存データは非互換です。旧Replay / Artifactは経済ルールが異なるため移行しません。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.3.0`、Game Rules / State / Config `1.4.0`、Save Format `3`を使用します。v1.2.7以前の保存データ、Replay、Artifactは移行せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
 
 ## テスト
 
@@ -144,9 +146,9 @@ npm run typecheck
 npm test
 npm run test:random -- --games=100
 npm run test:balanced -- --games=100
-npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.2.7-balanced-300-part-1
-npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.2.7-balanced-300-part-2
-npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.2.7-balanced-300-part-3
+npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.3-balanced-300-part-1
+npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.3-balanced-300-part-2
+npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.3-balanced-300-part-3
 npm run build
 npm run test:browser-bridge -- --dist=dist
 ```
@@ -177,7 +179,7 @@ Workflowは`actions/configure-pages`でPagesの有効化を要求し、相対ass
 
 完成判定では、少なくとも次の環境で手動確認します。
 
-- PC Chrome（安定版）: 新規ゲーム、30ターン/敗北、マウス操作、パン/ズーム、保存復元
+- PC Chrome（安定版）: 新規ゲーム、Final Horde後の勝利または敗北、マウス操作、パン/ズーム、保存復元
 - iPhone Safari（対応するiOSの安定版）: 縦向き、Safe Area、44pxタッチ対象、3状態パネル、スクロール競合、ページ再読込
 - Android Chrome（対応するAndroidの安定版）: 縦向き、タッチ操作、パン/ピンチズーム、3状態パネル、保存復元
 

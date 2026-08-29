@@ -32,7 +32,12 @@ export type HexDirection =
   | 'southWest'
   | 'southEast';
 
-export type TileTerrain = 'land' | 'road';
+export type BaseTerrain = 'plain' | 'forest' | 'mountain' | 'water';
+
+/** Compatibility name retained for callers that imported TileTerrain. */
+export type TileTerrain = BaseTerrain;
+
+export type TerrainDefenseSource = 'urban' | 'forest' | 'none';
 
 export type FacilityType =
   | 'capital'
@@ -49,12 +54,12 @@ export type FacilityStatus = 'unowned' | 'owned' | 'ruined';
 
 export type FacilityOperationalStatus = 'operational' | 'stopped' | 'infected' | 'ruined';
 
-export type UnitType = 'police' | 'nationalGuard' | 'zombie';
+export type UnitType = 'police' | 'nationalGuard' | 'zombie' | 'hordeZombie';
 
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
 
-export type HumanUnitType = Exclude<UnitType, 'zombie'>;
+export type HumanUnitType = Exclude<UnitType, 'zombie' | 'hordeZombie'>;
 
 export type UnitActionState = 'ready' | 'moved' | 'acted' | 'destroyed';
 
@@ -76,7 +81,7 @@ export type GamePhase =
 export type GameOverReason =
   | 'capitalLost'
   | 'healthyCiviliansLost'
-  | 'maxTurnsSurvived'
+  | 'stateSecured'
   | 'abandoned'
   | 'error';
 
@@ -115,7 +120,7 @@ export interface HexTile {
   r: number;
   terrain: TileTerrain;
   road: boolean;
-  movementCost: 1;
+  movementCost: number | null;
   facilityId: FacilityId | null;
   hordeEntranceDirections: CardinalDirection[];
 }
@@ -229,12 +234,18 @@ export interface UnitState {
   attack: number;
   movement: number;
   range: number;
+  vision: number;
   population: number;
   actionState: UnitActionState;
   canAttack: boolean;
   canMove: boolean;
   /** Set for human units; zombies are always false. */
   isPlayerUnit: boolean;
+  /** Internal-only remembered coordinate inherited from a visible Horde Zombie. */
+  inheritedTarget: HexCoord | null;
+  /** Identifies periodic/final Horde membership without exposing it through public APIs. */
+  spawnGroupId: string | null;
+  hordeKind: 'periodic' | 'final' | null;
   /** Activity since the previous Player Turn Start, used for natural healing. */
   activity: {
     moved: boolean;
@@ -285,6 +296,10 @@ export interface HordeState {
   turnsRemaining: number;
   nextSpawnTurn: number | null;
   lastSpawnTurn: number | null;
+  warningType: 'periodic' | 'final' | 'none';
+  finalHordeStatus: 'notStarted' | 'active' | 'defeated';
+  finalSpawnGroupId: string | null;
+  finalSpawnedCount: number;
 }
 
 export type GameEventType =
@@ -318,6 +333,13 @@ export type GameEventType =
   | 'supply_action_rejected'
   | 'power_supply_changed'
   | 'power_allocated'
+  | 'terrain_defense_applied'
+  | 'enemy_spotted'
+  | 'enemy_lost'
+  | 'zombie_idle'
+  | 'horde_target_inherited'
+  | 'horde_target_cleared'
+  | 'victory_progress_changed'
   | 'horde_spawned'
   | 'game_over';
 
@@ -355,6 +377,24 @@ export interface GameStatistics {
   maxSupplyRadius: number;
   supplyLosses: number;
   supplyRejections: number;
+  finalHordeSpawned: number;
+  finalHordeKilled: number;
+  finalHordeDefeated: boolean;
+  normalZombiesKilled: number;
+  hordeZombiesKilled: number;
+  maxVisibleZombies: number;
+  turnsAfterFinalHorde: number;
+  suppliedAreaZombieClearTurn: number | null;
+  suppliedAreaInfectionClearTurn: number | null;
+  victoryTurn: number | null;
+  terrainEntriesByType: Record<BaseTerrain, number>;
+  urbanDefenseApplications: number;
+  urbanDefenseDamagePrevented: number;
+  forestDefenseApplications: number;
+  forestDefenseDamagePrevented: number;
+  normalZombieIdleCount: number;
+  hordeTargetInheritedCount: number;
+  hordeTargetClearedCount: number;
 }
 
 export interface GameResult {
@@ -429,7 +469,7 @@ export interface GameState {
   /** Serializable state of the deterministic PRNG at this point in play. */
   rngState: RngState;
   turn: number;
-  maxTurns: number;
+  finalHordeTurn: number;
   actionsTakenThisTurn: number;
   phase: GamePhase;
   mapId: string;
@@ -580,6 +620,7 @@ export interface UnitConfig {
   attack: number;
   movement: number;
   range: number;
+  vision: number;
   population: number;
 }
 
@@ -607,6 +648,20 @@ export interface HordeConfig {
   increment: number;
   warningStartTurn: number;
   spawnOnlyBeforeFinalTurn: boolean;
+  finalCount: number;
+}
+
+export interface TerrainConfig {
+  movementCost: Record<BaseTerrain, number | null>;
+  damageMultiplier: {
+    urban: number;
+    forestZombie: number;
+  };
+}
+
+export interface VisionConfig {
+  ownedFacility: number;
+  operationalCheckpoint: number;
 }
 
 export interface RefugeePolicyConfig {
@@ -684,7 +739,7 @@ export interface NaturalRecoveryConfig {
 export interface GameConfig {
   version: string;
   mapId: string;
-  maxTurns: number;
+  finalHordeTurn: number;
   maxActionsPerTurn: number;
   units: Record<UnitType, UnitConfig>;
   facilities: Record<FacilityType, FacilityConfig>;
@@ -695,6 +750,8 @@ export interface GameConfig {
   refugees: RefugeeConfig;
   infection: InfectionConfig;
   checkpoint: CheckpointConfig;
+  terrain: TerrainConfig;
+  vision: VisionConfig;
 }
 
 /** A recursively partial configuration used by options screens and tests. */

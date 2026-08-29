@@ -7,7 +7,7 @@ import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, AGENT_API_VERSION, OBSERVATION_AP
 
 describe('unified Agent Runner', () => {
   it('runs a deterministic random game and records a replay artifact', () => {
-    const config = createDefaultConfig({ maxTurns: 3, maxActionsPerTurn: 4 });
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 4 });
     const first = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } });
     const second = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } });
     expect(first.technicalFailure).toBe(false);
@@ -18,6 +18,9 @@ describe('unified Agent Runner', () => {
     expect(first.artifact.agentApiVersion).toBe(AGENT_API_VERSION);
     expect(first.artifact.observationApiVersion).toBe(OBSERVATION_API_VERSION);
     expect(first.artifact.bridgeApiVersion).toBe(BRIDGE_API_VERSION);
+    expect(first.artifact.config.finalHordeTurn).toBe(3);
+    expect(first.artifact.observationTrace?.[0]?.map.tiles.some((tile) => tile.terrain === 'forest')).toBe(true);
+    expect(first.artifact.observationTrace?.some((observation) => observation.horde.finalHordeStatus !== 'notStarted')).toBe(true);
     expect(first.artifact.initialRoadArrivalSchedule).toHaveLength(4);
     expect(first.artifact.observationTrace).toHaveLength(first.actions.length + 1);
     const replay = replayArtifact(first.artifact);
@@ -26,8 +29,8 @@ describe('unified Agent Runner', () => {
     expect(replay.actionsReplayed).toBe(first.actions.length);
   });
 
-  it('rejects v1.2.5 and v1.2.6 artifacts before creating a v1.2.7 replay session', () => {
-    const config = createDefaultConfig({ maxTurns: 1 });
+  it('rejects v1.3 and earlier artifacts before creating a v1.4 replay session', () => {
+    const config = createDefaultConfig({ finalHordeTurn: 1 });
     const run = runAgentGame(2, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 3 } });
     const oldArtifact = {
       ...run.artifact,
@@ -53,17 +56,51 @@ describe('unified Agent Runner', () => {
       bridgeApiVersion: '1.2.0',
     });
     expect(v126Replay).toMatchObject({ reproduced: false, actionsReplayed: 0, error: { code: 'artifact_version_unsupported' } });
+    const v13Replay = replayArtifact({
+      ...run.artifact,
+      appVersion: '1.3.0',
+      gameRulesVersion: '1.3.0',
+      artifactSchemaVersion: '1.3.0',
+      agentApiVersion: '1.3.0',
+      observationApiVersion: '1.3.0',
+      bridgeApiVersion: '1.3.0',
+    });
+    expect(v13Replay).toMatchObject({ reproduced: false, actionsReplayed: 0, error: { code: 'artifact_version_unsupported' } });
   });
 
   it('forces EndTurn at the runner per-turn limit for agents without traces', () => {
-    const config = createDefaultConfig({ maxTurns: 2, maxActionsPerTurn: 100 });
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 100 });
     const run = runAgentGame(12, {
       config,
       agent: new RandomAgent(12),
-      limits: { maxTurns: 4, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 20 },
+      limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 },
     });
-    expect(run.technicalFailure).toBe(false);
+    expect(run.technicalFailure).toBe(true);
+    expect(run.failure?.code).toBe('TURN_SAFETY_LIMIT');
     expect(run.actions.filter((action) => action.type === 'EndTurn').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the default runner turn safety limit at 100 when the Final Horde is later', () => {
+    const initial = createAgentGame().reset({ seed: 1 });
+    const overRunnerLimit = { ...initial, turn: 101, finalHordeTurn: 250 };
+    const game: AgentGame = {
+      getApiInfo: () => createAgentGame().getApiInfo(),
+      reset: () => overRunnerLimit,
+      getObservation: () => overRunnerLimit,
+      getLegalActions: () => [{ type: 'EndTurn' }],
+      step: () => { throw new Error('must not step after the runner turn limit'); },
+      isGameOver: () => false,
+      getResult: () => null,
+      getRunArtifact: () => ({}) as never,
+    };
+    const run = runAgentGame(1, {
+      config: createDefaultConfig({ finalHordeTurn: 250 }),
+      agent: { id: 'fake', version: '1.0.0', decide: () => ({ action: { type: 'EndTurn' } }) },
+      gameFactory: () => game,
+    });
+    expect(run.technicalFailure).toBe(true);
+    expect(run.failure?.code).toBe('TURN_SAFETY_LIMIT');
+    expect(run.failure?.message).toContain('(100)');
   });
 
   it('uses Observation only in the Balanced Agent decision contract', () => {
@@ -89,7 +126,7 @@ describe('unified Agent Runner', () => {
     const run = runAgentGame(1, {
       gameFactory: () => game,
       agent: { id: 'fake', version: '1.0.0', decide: () => ({ action: { type: 'EndTurn' } }) },
-      config: createDefaultConfig({ maxTurns: 1 }),
+      config: createDefaultConfig({ finalHordeTurn: 1 }),
       debugSnapshot: () => ({ value: state.value }),
       limits: { maxTurns: 2, maxDecisionsPerTurn: 2, maxDecisionsPerGame: 2 },
     });

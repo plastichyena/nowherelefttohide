@@ -65,6 +65,12 @@ describe('controller view models', () => {
     expect(resolveTileSelection(state, { q: 4, r: 5 }, 'domestic')).toBeNull();
   });
 
+  it('never selects an enemy-only tile through the human selection resolver', () => {
+    const state = testState([testUnit('zombie-1', 4, 5, false)]);
+
+    expect(resolveTileSelection(state, { q: 4, r: 5 }, 'map')).toBeNull();
+  });
+
   it('selects a facility-only tile in map mode', () => {
     const state = testState([], [testFacility('farm-1', 2, 3)]);
 
@@ -76,10 +82,10 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports v1.2.5 migration rejection in both UI languages', () => {
+  it('reports unsupported pre-v1.3 saves in both UI languages', () => {
     const detail = 'checksum mismatch in v1.2.5 save';
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('移行できません');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('could not be migrated');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('サポートしていないため読み込めません');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('does not support migration');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
   });
 
@@ -128,5 +134,22 @@ describe('controller view models', () => {
       expect(createTranslator('ja')(key)).not.toBe(key);
       expect(createTranslator('en')(key)).not.toBe(key);
     }
+  });
+
+  it('has bilingual v1.3 terrain, visibility, Horde, and victory labels', () => {
+    const keys = [
+      'finalHordeTurn', 'finalHordeWarning', 'spawnTurn', 'hordeStatusNotStarted',
+      'terrain', 'baseTerrain', 'terrainPlain', 'terrainForest', 'terrainMountain', 'terrainWater',
+      'roadOverlay', 'urbanOverlay', 'effectiveMovementCost', 'defenseSource', 'damageMultiplier',
+      'vision', 'visible', 'hidden', 'victoryProgress', 'finalHordeDefeated',
+      'suppliedAreaZombieClear', 'suppliedAreaInfectionClear', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory',
+      'finalHordeSpawned', 'finalHordeKilled', 'normalZombiesKilled', 'hordeZombiesKilled', 'victoryTurn',
+    ];
+    for (const key of keys) {
+      expect(createTranslator('ja')(key)).not.toBe(key);
+      expect(createTranslator('en')(key)).not.toBe(key);
+    }
+    expect(createTranslator('ja')('finalHordeTurn')).toContain('Final Horde');
+    expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
   });
 });

@@ -11,7 +11,7 @@ function rebalance(state: ReturnType<typeof createInitialState>): void {
 
 function recoveryEngine(seed = 301): GameEngine {
   return new GameEngine(seed, createDefaultConfig({
-    maxTurns: 4,
+    finalHordeTurn: 4,
     economy: {
       initialZombieCount: 0,
       initialResources: { food: 10_000, civilianGoods: 10_000, militaryGoods: 10_000, fuel: 10_000 },

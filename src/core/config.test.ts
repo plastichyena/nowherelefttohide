@@ -8,11 +8,16 @@ import {
 describe('GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('1.3.0');
+    expect(DEFAULT_CONFIG.version).toBe('1.4.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('fixed-15x15-v2');
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(10);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, powerMode: 'boost' });
-    expect(DEFAULT_CONFIG.maxTurns).toBe(30);
-    expect(DEFAULT_CONFIG.horde).toMatchObject({ cycle: 5, initialCount: 2, increment: 2 });
+    expect(DEFAULT_CONFIG.finalHordeTurn).toBe(30);
+    expect(DEFAULT_CONFIG.horde).toMatchObject({ cycle: 5, initialCount: 2, increment: 2, finalCount: 12 });
+    expect(DEFAULT_CONFIG.terrain).toEqual({
+      movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
+      damageMultiplier: { urban: 0.5, forestZombie: 0.5 },
+    });
     expect(DEFAULT_CONFIG.refugees).toMatchObject({
       arrivalIntervalMin: 2,
       arrivalIntervalMax: 4,
@@ -25,7 +30,7 @@ describe('GameConfig', () => {
       requiresPolice: false,
       initialSupplyRadius: 5,
     });
-    expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, attack: 5, movement: 5, range: 1, population: 5 });
+    expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, attack: 5, movement: 5, range: 1, vision: 5, population: 5 });
     expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, attack: 10, movement: 5, range: 2, population: 10 });
     expect(DEFAULT_CONFIG.naturalRecovery).toEqual({ combatRate: 0.1, restRate: 0.2, rounding: 'ceil' });
     expect(DEFAULT_CONFIG.facilities).toMatchObject({
@@ -58,11 +63,11 @@ describe('GameConfig', () => {
   });
 
   it('deep-merges options without mutating the default snapshot', () => {
-    const config = createDefaultConfig({ maxTurns: 12, horde: { cycle: 3 } });
-    expect(config.maxTurns).toBe(12);
+    const config = createDefaultConfig({ finalHordeTurn: 12, horde: { cycle: 3 } });
+    expect(config.finalHordeTurn).toBe(12);
     expect(config.horde.cycle).toBe(3);
     expect(config.horde.initialCount).toBe(DEFAULT_CONFIG.horde.initialCount);
-    expect(DEFAULT_CONFIG.maxTurns).toBe(30);
+    expect(DEFAULT_CONFIG.finalHordeTurn).toBe(30);
 
     config.economy.initialResources.food = 0;
     expect(DEFAULT_CONFIG.economy.initialResources.food).toBe(230);

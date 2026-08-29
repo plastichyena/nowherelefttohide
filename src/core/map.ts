@@ -1,6 +1,7 @@
 import { DEFAULT_MAP_ID } from './config';
 import { hexKey, hexWithinBounds } from './hex';
 import type {
+  BaseTerrain,
   CardinalDirection,
   FacilityDefinition,
   FacilityType,
@@ -25,6 +26,27 @@ export const STARTING_FACILITY_IDS = [
 
 const ROAD_ROW = 7;
 const ROAD_COLUMN = 7;
+
+const FOREST_COORDINATES: readonly HexCoord[] = [
+  [3,4],[4,4],[4,5],[3,5],[4,6],[5,6],[5,4],[3,6],
+  [9,2],[10,2],[9,3],[10,3],[11,4],[9,4],[10,4],[12,4],
+  [2,9],[3,9],[3,10],[4,10],[4,11],[5,10],[5,11],[2,10],
+  [9,9],[10,9],[11,9],[9,10],[10,10],[11,10],[10,11],[11,11],[12,10],
+  [7,2],[12,7],[7,12],[2,7],
+  [5,2],[6,2],[6,3],[12,5],[13,5],[12,6],
+  [1,8],[2,8],[3,8],[6,12],[6,13],[5,12],
+].map(([q, r]) => ({ q, r }));
+
+const MOUNTAIN_COORDINATES: readonly HexCoord[] = [
+  [1,1],[2,1],[1,2],[2,2],[3,2],[1,3],[2,3],
+  [12,1],[13,1],[11,2],[12,2],[13,2],[12,3],[13,3],
+  [1,11],[2,11],[1,12],[2,12],[3,12],[1,13],[2,13],
+  [12,11],[13,11],[11,12],[12,12],[13,12],[12,13],[13,13],
+  [7,1],[13,7],[7,13],[1,7],
+].map(([q, r]) => ({ q, r }));
+
+export const FIXED_FOREST_COORDINATES = FOREST_COORDINATES;
+export const FIXED_MOUNTAIN_COORDINATES = MOUNTAIN_COORDINATES;
 
 const facilitySpecs: Array<{
   id: string;
@@ -117,19 +139,22 @@ function roadKeySet(): Set<string> {
 }
 
 function createTiles(roads: Set<string>): HexTile[] {
+  const forests = new Set(FOREST_COORDINATES.map(hexKey));
+  const mountains = new Set(MOUNTAIN_COORDINATES.map(hexKey));
   const tiles: HexTile[] = [];
   for (let r = 0; r < FIXED_MAP_HEIGHT; r += 1) {
     for (let q = 0; q < FIXED_MAP_WIDTH; q += 1) {
       const position = coord(q, r);
       const key = hexKey(position);
       const road = roads.has(key);
+      const terrain: BaseTerrain = forests.has(key) ? 'forest' : mountains.has(key) ? 'mountain' : 'plain';
       tiles.push({
         key,
         q,
         r,
-        terrain: road ? 'road' : 'land',
+        terrain,
         road,
-        movementCost: 1,
+        movementCost: terrain === 'forest' ? 2 : terrain === 'mountain' ? 3 : 1,
         facilityId: null,
         hordeEntranceDirections: [],
       });
@@ -343,9 +368,17 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
       errors.push(`duplicate tile: ${tile.key}`);
     }
     seenTiles.add(tile.key);
-    if (tile.movementCost !== 1) {
-      errors.push(`tile movement cost must be 1: ${tile.key}`);
+    const expectedCost = tile.terrain === 'plain' ? 1 : tile.terrain === 'forest' ? 2 : tile.terrain === 'mountain' ? 3 : null;
+    if (tile.movementCost !== expectedCost) {
+      errors.push(`tile movement cost does not match terrain: ${tile.key}`);
     }
+  }
+  const terrainCounts = map?.tiles.reduce<Record<BaseTerrain, number>>(
+    (counts, tile) => ({ ...counts, [tile.terrain]: counts[tile.terrain] + 1 }),
+    { plain: 0, forest: 0, mountain: 0, water: 0 },
+  );
+  if (terrainCounts && (terrainCounts.forest !== 49 || terrainCounts.mountain !== 32 || terrainCounts.water !== 0 || terrainCounts.plain !== 144)) {
+    errors.push('map terrain counts must be plain 144, forest 49, mountain 32, water 0');
   }
   const facilityPositions = new Set<string>();
   for (const facility of map?.facilities ?? []) {

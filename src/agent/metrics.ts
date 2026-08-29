@@ -1,4 +1,4 @@
-import type { CheckpointPolicy, GameAction, GameConfig, HumanUnitType } from '../core/types';
+import type { BaseTerrain, CheckpointPolicy, GameAction, GameConfig, HumanUnitType } from '../core/types';
 import {
   APP_VERSION,
   AGENT_API_VERSION,
@@ -142,6 +142,25 @@ export interface GameMetrics {
   unitLosses: number;
   zombiesKilled: number;
   hordeInterceptions: number;
+  /** v1.4 Final Horde, terrain, and target-propagation metrics. */
+  finalHordeSpawned: number;
+  finalHordeKilled: number;
+  finalHordeDefeated: boolean;
+  normalZombiesKilled: number;
+  hordeZombiesKilled: number;
+  maxVisibleZombies: number;
+  turnsAfterFinalHorde: number;
+  suppliedAreaZombieClearTurn: number | null;
+  suppliedAreaInfectionClearTurn: number | null;
+  victoryTurn: number | null;
+  terrainEntriesByType: Record<BaseTerrain, number>;
+  urbanDefenseApplications: number;
+  urbanDefenseDamagePrevented: number;
+  forestDefenseApplications: number;
+  forestDefenseDamagePrevented: number;
+  normalZombieIdleCount: number;
+  hordeTargetInheritedCount: number;
+  hordeTargetClearedCount: number;
   finalFood: number;
   finalCivilianGoods: number;
   finalMilitaryGoods: number;
@@ -222,6 +241,34 @@ function statisticNumber(statistics: unknown, key: string): number | null {
   if (!isRecord(statistics)) return null;
   const value = statistics[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function statisticBoolean(statistics: unknown, key: string): boolean | null {
+  if (!isRecord(statistics)) return null;
+  return typeof statistics[key] === 'boolean' ? statistics[key] as boolean : null;
+}
+
+function statisticTurn(statistics: unknown, key: string): number | null {
+  const value = statisticNumber(statistics, key);
+  return value !== null && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+const BASE_TERRAINS: readonly BaseTerrain[] = ['plain', 'forest', 'mountain', 'water'];
+
+function terrainEntriesByType(statistics: unknown): Record<BaseTerrain, number> {
+  const fromStatistics = numericRecord(isRecord(statistics) ? statistics.terrainEntriesByType : undefined);
+  return Object.fromEntries(BASE_TERRAINS.map((terrain) => {
+    const reported = fromStatistics[terrain];
+    return [terrain, reported ?? 0];
+  })) as Record<BaseTerrain, number>;
+}
+
+function firstTurnWhere(
+  observations: readonly AgentObservation[],
+  predicate: (observation: AgentObservation) => boolean,
+): number | null {
+  const match = observations.find(predicate);
+  return match ? match.turn : null;
 }
 
 function eventBranchId(event: AgentPublicEvent): string | null {
@@ -324,6 +371,16 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const destroyedZombieEvents = events.filter(
     (event) => event.type === 'unit_destroyed' && typeof event.payload.unitId === 'string' && event.payload.unitId.startsWith('zombie-'),
   ).length;
+  const normalZombiesKilled = statisticNumber(statistics, 'normalZombiesKilled') ?? events.filter(
+    (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'zombie',
+  ).length;
+  const hordeZombiesKilled = statisticNumber(statistics, 'hordeZombiesKilled') ?? events.filter(
+    (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'hordeZombie',
+  ).length;
+  const finalHordeSpawned = statisticNumber(statistics, 'finalHordeSpawned') ?? events
+    .filter((event) => event.type === 'horde_spawned' && event.payload.hordeKind === 'final')
+    .reduce((total, event) => total + eventPayloadNumber(event, 'count'), 0);
+  const finalHordeKilled = statisticNumber(statistics, 'finalHordeKilled') ?? 0;
   const maxPopulationObservation = Math.max(...observations.map(populationAtObservation), 0);
   const maxOvercrowdingObservation = Math.max(...observations.map(overcrowdingAtObservation), 0);
   const maxAdditionalFood = Math.max(...observations.map((observation) => numberOrZero(observation.endTurnForecast.overcrowding.additionalFood)), 0);
@@ -331,6 +388,38 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const maxPopulation = Math.max(numberOrZero(statistics?.maxPopulation), maxPopulationObservation);
   const turnObservations = [...new Map(observations.map((observation) => [observation.turn, observation])).values()]
     .sort((left, right) => left.turn - right.turn);
+  const finalHordeDefeated = statisticBoolean(statistics, 'finalHordeDefeated')
+    ?? finalObservation.victory.finalHordeDefeated;
+  const maxVisibleZombies = Math.max(
+    statisticNumber(statistics, 'maxVisibleZombies') ?? 0,
+    ...observations.map((observation) => observation.zombies.length),
+    0,
+  );
+  const finalHordeStarted = finalHordeSpawned > 0 || observations.some(
+    (observation) => observation.horde.finalHordeStatus !== 'notStarted',
+  );
+  const turnsAfterFinalHorde = statisticNumber(statistics, 'turnsAfterFinalHorde')
+    ?? (finalHordeStarted ? Math.max(0, finalObservation.turn - input.config.finalHordeTurn) : 0);
+  const suppliedAreaZombieClearTurn = statisticTurn(statistics, 'suppliedAreaZombieClearTurn')
+    ?? firstTurnWhere(turnObservations, (observation) => observation.victory.suppliedAreaZombieClear);
+  const suppliedAreaInfectionClearTurn = statisticTurn(statistics, 'suppliedAreaInfectionClearTurn')
+    ?? firstTurnWhere(turnObservations, (observation) => observation.victory.suppliedAreaInfectionClear);
+  const victoryTurn = statisticTurn(statistics, 'victoryTurn')
+    ?? firstTurnWhere(turnObservations, (observation) => observation.gameOver && observation.result?.outcome === 'won');
+  const terrainEntries = terrainEntriesByType(statistics);
+  const urbanDefenseApplications = statisticNumber(statistics, 'urbanDefenseApplications') ?? 0;
+  const urbanDefenseDamagePrevented = statisticNumber(statistics, 'urbanDefenseDamagePrevented') ?? 0;
+  const forestDefenseApplications = statisticNumber(statistics, 'forestDefenseApplications') ?? 0;
+  const forestDefenseDamagePrevented = statisticNumber(statistics, 'forestDefenseDamagePrevented') ?? 0;
+  const normalZombieIdleCount = statisticNumber(statistics, 'normalZombieIdleCount') ?? events.filter(
+    (event) => event.type === 'zombie_idle',
+  ).length;
+  const hordeTargetInheritedCount = statisticNumber(statistics, 'hordeTargetInheritedCount') ?? events.filter(
+    (event) => event.type === 'horde_target_inherited',
+  ).length;
+  const hordeTargetClearedCount = statisticNumber(statistics, 'hordeTargetClearedCount') ?? events.filter(
+    (event) => event.type === 'horde_target_cleared',
+  ).length;
   const productionFacilities = observations.flatMap((observation) => observation.facilities.filter(
     (facility) => facility.type !== 'capital' && facility.type !== 'city',
   ));
@@ -513,8 +602,28 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     checkpointNormalScreenedRate: rate(refugeesScreenedByPolicy.normal, totalScreened),
     checkpointStrictScreenedRate: rate(refugeesScreenedByPolicy.strict, totalScreened),
     unitLosses: numberOrZero(statistics?.unitLosses),
-    zombiesKilled: destroyedZombieEvents,
+    zombiesKilled: statisticNumber(statistics, 'normalZombiesKilled') === null && statisticNumber(statistics, 'hordeZombiesKilled') === null
+      ? destroyedZombieEvents
+      : normalZombiesKilled + hordeZombiesKilled,
     hordeInterceptions: numberOrZero(statistics?.hordeInterceptions),
+    finalHordeSpawned,
+    finalHordeKilled,
+    finalHordeDefeated,
+    normalZombiesKilled,
+    hordeZombiesKilled,
+    maxVisibleZombies,
+    turnsAfterFinalHorde,
+    suppliedAreaZombieClearTurn,
+    suppliedAreaInfectionClearTurn,
+    victoryTurn,
+    terrainEntriesByType: terrainEntries,
+    urbanDefenseApplications,
+    urbanDefenseDamagePrevented,
+    forestDefenseApplications,
+    forestDefenseDamagePrevented,
+    normalZombieIdleCount,
+    hordeTargetInheritedCount,
+    hordeTargetClearedCount,
     finalFood: numberOrZero(finalObservation.resources.food),
     finalCivilianGoods: numberOrZero(finalObservation.resources.civilianGoods),
     finalMilitaryGoods: numberOrZero(finalObservation.resources.militaryGoods),
@@ -646,6 +755,22 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'unitLosses',
   'zombiesKilled',
   'hordeInterceptions',
+  'finalHordeSpawned',
+  'finalHordeKilled',
+  'normalZombiesKilled',
+  'hordeZombiesKilled',
+  'maxVisibleZombies',
+  'turnsAfterFinalHorde',
+  'suppliedAreaZombieClearTurn',
+  'suppliedAreaInfectionClearTurn',
+  'victoryTurn',
+  'urbanDefenseApplications',
+  'urbanDefenseDamagePrevented',
+  'forestDefenseApplications',
+  'forestDefenseDamagePrevented',
+  'normalZombieIdleCount',
+  'hordeTargetInheritedCount',
+  'hordeTargetClearedCount',
   'finalFood',
   'finalCivilianGoods',
   'finalMilitaryGoods',

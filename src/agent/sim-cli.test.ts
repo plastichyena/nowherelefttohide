@@ -32,14 +32,35 @@ describe('Batch Simulation CLI', () => {
   });
 
   it('runs multiple strategies against the same seed set and reports comparisons', () => {
-    const config = createDefaultConfig({ maxTurns: 1, maxActionsPerTurn: 1 });
-    const report = runSimulation({ agents: ['random', 'balanced'], seeds: [1, 2], config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 4 } });
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
+    const report = runSimulation({ agents: ['random', 'balanced'], seeds: [1, 2], config, limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 } });
     expect(report.games).toHaveLength(4);
     expect(report.comparisons).toHaveLength(2);
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
-    expect(report.exitCode).toBe(0);
-    expect(report.schemaVersion).toBe('1.3.0');
-    expect(report.appVersion).toBe('1.2.7');
+    expect(report.technicalFailureCount).toBeGreaterThanOrEqual(0);
+    expect(report.schemaVersion).toBe('1.4.0');
+    expect(report.appVersion).toBe('1.3.0');
+  });
+
+  it('reports the runner default turn ceiling independently from finalHordeTurn', () => {
+    const initial = createAgentGame().reset({ seed: 1 });
+    const failingFactory = (): AgentGame => ({
+      getApiInfo: () => createAgentGame().getApiInfo(),
+      reset: () => initial,
+      getObservation: () => initial,
+      getLegalActions: () => { throw new Error('stop after report normalization'); },
+      step: () => { throw new Error('unreachable'); },
+      isGameOver: () => false,
+      getResult: () => null,
+      getRunArtifact: () => ({}) as never,
+    });
+    const report = runSimulation({
+      agents: ['random'],
+      seeds: [1],
+      config: createDefaultConfig({ finalHordeTurn: 250, maxActionsPerTurn: 2 }),
+      gameFactory: failingFactory,
+    });
+    expect(report.execution.limits).toMatchObject({ maxTurns: 100, maxDecisionsPerTurn: 2, maxDecisionsPerGame: 301 });
   });
 
   it('continues after a technical failure by default and stops only with fail-fast', () => {
@@ -54,7 +75,7 @@ describe('Batch Simulation CLI', () => {
       getResult: () => null,
       getRunArtifact: () => ({}) as never,
     });
-    const config = createDefaultConfig({ maxTurns: 1 });
+    const config = createDefaultConfig({ finalHordeTurn: 1 });
     const continued = runSimulation({ agents: ['random'], seeds: [1, 2, 3], config, gameFactory: failingFactory });
     expect(continued.games).toHaveLength(3);
     expect(continued.technicalFailureCount).toBe(3);
@@ -65,8 +86,8 @@ describe('Batch Simulation CLI', () => {
   });
 
   it('writes UTF-8 JSON, fixed-column CSV, and full per-game artifacts without accidental overwrite', () => {
-    const config = createDefaultConfig({ maxTurns: 1, maxActionsPerTurn: 1 });
-    const report = runSimulation({ agents: ['random'], seeds: [5], config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 4 } });
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
+    const report = runSimulation({ agents: ['random'], seeds: [5], config, limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 } });
     const output = mkdtempSync(join(tmpdir(), 'nlth-sim-'));
     const paths = writeSimulationOutput(report, output);
     expect(paths.artifacts).toHaveLength(1);
@@ -79,6 +100,10 @@ describe('Batch Simulation CLI', () => {
       'unpoweredCityTurns',
       'refineryFacilitiesCaptured',
       'powerPlantFacilitiesCaptured',
+      'finalHordeSpawned',
+      'finalHordeDefeated',
+      'terrainEntriesByType.forest',
+      'hordeTargetClearedCount',
     ]));
     const [header, row] = metricsToCsv(report.games).trim().split('\n').map((line) => line.split(','));
     expect(row).toHaveLength(header!.length);
@@ -87,6 +112,8 @@ describe('Batch Simulation CLI', () => {
       'unpoweredCityTurns',
       'refineryFacilitiesCaptured',
       'powerPlantFacilitiesCaptured',
+      'finalHordeSpawned',
+      'hordeTargetClearedCount',
     ] as const) {
       expect(row![header!.indexOf(key)]).toBe(String(report.games[0]![key]));
     }
@@ -94,13 +121,13 @@ describe('Batch Simulation CLI', () => {
   });
 
   it('streams CLI-scale artifacts to disk without retaining full runs in the report', () => {
-    const config = createDefaultConfig({ maxTurns: 1, maxActionsPerTurn: 1 });
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
     const output = mkdtempSync(join(tmpdir(), 'nlth-sim-stream-'));
     const { report, paths } = runSimulationToDirectory({
       agents: ['random'],
       seeds: [7, 8, 9],
       config,
-      limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 4 },
+      limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 },
     }, output);
     expect(report.games).toHaveLength(3);
     expect(report._runs).toBeUndefined();

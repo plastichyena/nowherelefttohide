@@ -1,4 +1,5 @@
 import {
+  deriveVictoryProgress,
   effectiveRange,
   forecastEndTurn,
   forecastFacilityProduction,
@@ -6,12 +7,23 @@ import {
 } from '../core/engine';
 import { deriveUnitRecovery } from '../core/recovery';
 import { hexKey } from '../core/hex';
+import { getTile } from '../core/map';
 import { isCityFacility, isProductionFacility } from '../core/state';
 import {
   deriveSupplySnapshot,
   isHexSupplied,
 } from '../core/supply';
-import type { GameResult, GameState, JsonValue, ResourceType, UnitState } from '../core/types';
+import { effectiveMovementCost, isUrbanHex, terrainDefenseAt } from '../core/terrain';
+import { getPlayerVisibleTileKeys } from '../core/visibility';
+import type {
+  GameResult,
+  GameState,
+  HexTile,
+  JsonValue,
+  ResourceType,
+  TerrainDefenseSource,
+  UnitState,
+} from '../core/types';
 import {
   OBSERVATION_API_VERSION,
   type AgentGameResult,
@@ -27,6 +39,34 @@ function publicResult(result: GameResult | null): AgentGameResult | null {
   return result ? cloneJson(result) : null;
 }
 
+interface PublicTerrainProjection {
+  source: TerrainDefenseSource;
+  multiplier: number;
+}
+
+function tileAt(state: Readonly<GameState>, position: { q: number; r: number }): HexTile | undefined {
+  return getTile(state.map, position);
+}
+
+function samePosition(left: { q: number; r: number }, right: { q: number; r: number }): boolean {
+  return left.q === right.q && left.r === right.r;
+}
+
+/**
+ * A map tile has no attacking unit type, so its defense projection describes
+ * the terrain/overlay rule itself. Unit observations below use terrainDefenseAt
+ * to expose the exact modifier for that unit type.
+ */
+function publicTileDefense(state: Readonly<GameState>, tile: HexTile): PublicTerrainProjection {
+  if (isUrbanHex(state, tile)) {
+    return { source: 'urban', multiplier: state.config.terrain.damageMultiplier.urban };
+  }
+  if (tile.terrain === 'forest') {
+    return { source: 'forest', multiplier: state.config.terrain.damageMultiplier.forestZombie };
+  }
+  return { source: 'none', multiplier: 1 };
+}
+
 function publicUnit(unit: UnitState, state: Readonly<GameState>): AgentUnitObservation {
   const inSupply = isHexSupplied(state, unit.position);
   const suppression = forecastUnitSuppression(state, unit);
@@ -34,10 +74,18 @@ function publicUnit(unit: UnitState, state: Readonly<GameState>): AgentUnitObser
     ? deriveUnitRecovery(state, unit, { projectedSuppression: suppression !== null })
     : null;
   const currentRange = effectiveRange(state, unit);
+  const positionTile = tileAt(state, unit.position);
+  const defense = terrainDefenseAt(state, unit);
   return {
     id: unit.id,
     type: unit.type,
+    unitType: unit.type,
     position: { ...unit.position },
+    vision: unit.vision,
+    positionTerrain: positionTile?.terrain ?? 'plain',
+    effectiveMovementCostAtPosition: effectiveMovementCost(state, unit.position),
+    terrainDefenseSource: defense.source,
+    terrainDamageMultiplier: defense.multiplier,
     hp: unit.hp,
     maxHp: unit.maxHp,
     attack: unit.attack,
@@ -91,9 +139,10 @@ function containingUnitAt(state: Readonly<GameState>, q: number, r: number): Uni
     .sort((left, right) => left.id.localeCompare(right.id))[0];
 }
 
-/** Build the stable public-information view used by every v1.2 Agent. */
+/** Build the stable public-information view used by every v1.4 Agent. */
 export function createAgentObservation(state: Readonly<GameState>): AgentObservation {
   const supply = deriveSupplySnapshot(state);
+  const visibleTileKeys = getPlayerVisibleTileKeys(state);
   const productionByFacility = new Map(
     forecastFacilityProduction(state).map((projection) => [projection.facilityId, projection]),
   );
@@ -167,6 +216,11 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
         owner: facility.owner,
         status: facility.status,
         operationalStatus: facility.operationalStatus,
+        vision: facility.owner === 'player' && facility.status !== 'ruined'
+          ? facility.type === 'capital'
+            ? state.config.checkpoint.initialSupplyRadius
+            : state.config.vision.ownedFacility
+          : 0,
         healthyPopulation: facility.workers,
         infectedPopulation: facility.infected,
         populationCapacity: facility.workerCapacity,
@@ -217,11 +271,23 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
       };
     });
   const orderedUnits = [...state.units].sort((left, right) => left.id.localeCompare(right.id));
+  const visibleEnemyUnits = orderedUnits.filter(
+    (unit) => !unit.isPlayerUnit && visibleTileKeys.has(hexKey(unit.position)),
+  );
+  const victory = deriveVictoryProgress(state);
+  const publicFinalHordeStatus = victory.finalHordeDefeated
+    ? 'defeated' as const
+    : state.horde.finalHordeStatus;
+  // Before a spawn this is the warned future turn. Once the Final Horde has
+  // spawned, nextSpawnTurn is null, so retain the actual public spawn turn.
+  const publicSpawnTurn = state.horde.warningType === 'none'
+    ? state.horde.lastSpawnTurn
+    : state.horde.nextSpawnTurn;
   return cloneJson({
     apiVersion: OBSERVATION_API_VERSION,
     gameRulesVersion: state.gameVersion,
     turn: state.turn,
-    maxTurns: state.maxTurns,
+    finalHordeTurn: state.finalHordeTurn,
     phase: state.phase,
     map: {
       id: state.mapId,
@@ -230,14 +296,26 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
       coordinateSystem: 'axial-q-r' as const,
       tiles: [...state.map.tiles]
         .sort((left, right) => left.q - right.q || left.r - right.r)
-        .map((tile) => ({
-          q: tile.q,
-          r: tile.r,
-          passable: tile.terrain === 'land' || tile.terrain === 'road',
-          road: tile.road,
-          facilityId: tile.facilityId,
-          hordeEntranceDirections: [...tile.hordeEntranceDirections].sort(),
-        })),
+        .map((tile) => {
+          const checkpoint = state.checkpoints.find((candidate) => samePosition(candidate.position, tile));
+          const defense = publicTileDefense(state, tile);
+          const movementCost = effectiveMovementCost(state, tile);
+          return {
+            q: tile.q,
+            r: tile.r,
+            terrain: tile.terrain,
+            passable: movementCost !== null,
+            road: tile.road,
+            urban: isUrbanHex(state, tile),
+            facilityId: tile.facilityId,
+            checkpointId: checkpoint?.id ?? null,
+            effectiveMovementCost: movementCost,
+            terrainDefenseSource: defense.source,
+            terrainDamageMultiplier: defense.multiplier,
+            visibleToPlayer: visibleTileKeys.has(tile.key),
+            hordeEntranceDirections: [...tile.hordeEntranceDirections].sort(),
+          };
+        }),
     },
     resources: cloneJson(state.resources),
     population: {
@@ -252,7 +330,7 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
     },
     facilities,
     units: orderedUnits.filter((unit) => unit.isPlayerUnit).map((unit) => publicUnit(unit, state)),
-    zombies: orderedUnits.filter((unit) => !unit.isPlayerUnit).map((unit) => publicUnit(unit, state)),
+    zombies: visibleEnemyUnits.map((unit) => publicUnit(unit, state)),
     checkpoints: [...state.checkpoints]
       .sort((left, right) => left.id.localeCompare(right.id))
       .map((checkpoint) => {
@@ -265,6 +343,7 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
           branchId: checkpoint.branchId ?? checkpoint.direction,
           position: { ...checkpoint.position },
           direction: checkpoint.direction,
+          vision: checkpoint.status === 'operational' ? state.config.vision.operationalCheckpoint : 0,
           status: checkpoint.status,
           waiting: checkpoint.waiting,
           screening: checkpoint.screening,
@@ -288,10 +367,18 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
       branchRadii: supply.branchRadii.map((branch) => ({ ...branch })),
     },
     horde: {
+      warningType: state.horde.warningType,
+      warningDirection: state.horde.nextDirection,
+      spawnTurn: publicSpawnTurn,
+      finalHordeStatus: publicFinalHordeStatus,
       direction: state.horde.nextDirection,
       turnsRemaining: state.horde.turnsRemaining,
       nextSpawnTurn: state.horde.nextSpawnTurn,
     },
+    victory,
+    finalHordeDefeated: victory.finalHordeDefeated,
+    suppliedAreaZombieClear: victory.suppliedAreaZombieClear,
+    suppliedAreaInfectionClear: victory.suppliedAreaInfectionClear,
     endTurnForecast: forecastEndTurn(state),
     gameOver: state.gameOver,
     result: publicResult(state.result),

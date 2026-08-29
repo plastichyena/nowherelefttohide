@@ -15,6 +15,7 @@ import {
 } from './metrics';
 import {
   createSeeds,
+  DEFAULT_AGENT_RUNNER_LIMITS,
   runAgentGame,
   type AgentGameFactory,
   type AgentRun,
@@ -57,7 +58,7 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '1.3.0';
+  schemaVersion: '1.4.0';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -301,19 +302,22 @@ function createSimulationReport(
     aggregate[agent] = aggregateMetrics(rows);
   }
   return {
-    schemaVersion: '1.3.0',
+    schemaVersion: '1.4.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
       agents: normalized.agents,
       seeds: normalized.seeds,
       config: normalized.config,
-      // Keep the report's limit values complete and deterministic by deriving
-      // defaults once from the first game configuration below.
+      // Runner safety budgets are independent of the in-game Final Horde
+      // schedule; this mirrors the normalization used by runAgentGame.
       limits: {
         maxDecisionsPerTurn: normalized.limits.maxDecisionsPerTurn ?? Math.max(1, normalized.config.maxActionsPerTurn),
-        maxDecisionsPerGame: normalized.limits.maxDecisionsPerGame ?? Math.max(1, Math.max(normalized.config.maxTurns, 100) * (Math.max(1, normalized.config.maxActionsPerTurn) + 1) + 1),
-        maxTurns: normalized.limits.maxTurns ?? Math.max(normalized.config.maxTurns, 100),
+        maxDecisionsPerGame: normalized.limits.maxDecisionsPerGame ?? Math.max(
+          1,
+          DEFAULT_AGENT_RUNNER_LIMITS.maxTurns * (Math.max(1, normalized.config.maxActionsPerTurn) + 1) + 1,
+        ),
+        maxTurns: normalized.limits.maxTurns ?? DEFAULT_AGENT_RUNNER_LIMITS.maxTurns,
       },
       failFast: normalized.failFast,
       buildId: normalized.buildId,
@@ -353,7 +357,13 @@ const CSV_COLUMNS: readonly string[] = [
   'checkpointPassThroughBranchTurns', 'checkpointNormalBranchTurns', 'checkpointStrictBranchTurns',
   'checkpointPassThroughBranchTurnRate', 'checkpointNormalBranchTurnRate', 'checkpointStrictBranchTurnRate',
   'checkpointPassThroughScreenedRate', 'checkpointNormalScreenedRate', 'checkpointStrictScreenedRate',
-  'hordeInterceptions', 'finalFood', 'finalCivilianGoods', 'finalMilitaryGoods', 'finalFuel',
+  'hordeInterceptions',
+  'finalHordeSpawned', 'finalHordeKilled', 'finalHordeDefeated', 'normalZombiesKilled', 'hordeZombiesKilled',
+  'maxVisibleZombies', 'turnsAfterFinalHorde', 'suppliedAreaZombieClearTurn', 'suppliedAreaInfectionClearTurn', 'victoryTurn',
+  'terrainEntriesByType.plain', 'terrainEntriesByType.forest', 'terrainEntriesByType.mountain', 'terrainEntriesByType.water',
+  'urbanDefenseApplications', 'urbanDefenseDamagePrevented', 'forestDefenseApplications', 'forestDefenseDamagePrevented',
+  'normalZombieIdleCount', 'hordeTargetInheritedCount', 'hordeTargetClearedCount',
+  'finalFood', 'finalCivilianGoods', 'finalMilitaryGoods', 'finalFuel',
   ...ACTION_TYPES.map((type) => `action.${type}`),
   ...PRIORITY_GOALS.map((goal) => `goal.${goal}`),
 ];
@@ -397,7 +407,16 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.checkpointPassThroughBranchTurns, game.checkpointNormalBranchTurns, game.checkpointStrictBranchTurns,
       game.checkpointPassThroughBranchTurnRate, game.checkpointNormalBranchTurnRate, game.checkpointStrictBranchTurnRate,
       game.checkpointPassThroughScreenedRate, game.checkpointNormalScreenedRate, game.checkpointStrictScreenedRate,
-      game.hordeInterceptions, game.finalFood, game.finalCivilianGoods,
+      game.hordeInterceptions,
+      game.finalHordeSpawned, game.finalHordeKilled, game.finalHordeDefeated,
+      game.normalZombiesKilled, game.hordeZombiesKilled, game.maxVisibleZombies, game.turnsAfterFinalHorde,
+      game.suppliedAreaZombieClearTurn, game.suppliedAreaInfectionClearTurn, game.victoryTurn,
+      game.terrainEntriesByType.plain, game.terrainEntriesByType.forest,
+      game.terrainEntriesByType.mountain, game.terrainEntriesByType.water,
+      game.urbanDefenseApplications, game.urbanDefenseDamagePrevented,
+      game.forestDefenseApplications, game.forestDefenseDamagePrevented,
+      game.normalZombieIdleCount, game.hordeTargetInheritedCount, game.hordeTargetClearedCount,
+      game.finalFood, game.finalCivilianGoods,
       game.finalMilitaryGoods, game.finalFuel,
       ...ACTION_TYPES.map((type) => game.actionCounts[type] ?? 0),
       ...PRIORITY_GOALS.map((goal) => game.priorityGoalCounts[goal] ?? 0),

@@ -9,6 +9,31 @@ function nearestDistance(position: HexCoord, targets: readonly HexCoord[]): numb
   return Math.min(...targets.map((target) => hexDistance(position, target)));
 }
 
+function weightedDistance(observation: AgentObservation, start: HexCoord, target: HexCoord): number {
+  const byKey = new Map(observation.map.tiles.map((tile) => [`${tile.q},${tile.r}`, tile]));
+  const best = new Map<string, number>([[`${start.q},${start.r}`, 0]]);
+  const pending: Array<{ position: HexCoord; cost: number }> = [{ position: start, cost: 0 }];
+  const directions = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]] as const;
+  while (pending.length > 0) {
+    pending.sort((left, right) => left.cost - right.cost || left.position.q - right.position.q || left.position.r - right.position.r);
+    const current = pending.shift()!;
+    const key = `${current.position.q},${current.position.r}`;
+    if (current.cost !== best.get(key)) continue;
+    if (current.position.q === target.q && current.position.r === target.r) return current.cost;
+    for (const [dq, dr] of directions) {
+      const next = { q: current.position.q + dq, r: current.position.r + dr };
+      const nextKey = `${next.q},${next.r}`;
+      const tile = byKey.get(nextKey);
+      if (!tile || tile.effectiveMovementCost === null) continue;
+      const cost = current.cost + tile.effectiveMovementCost;
+      if (cost >= (best.get(nextKey) ?? Number.POSITIVE_INFINITY)) continue;
+      best.set(nextKey, cost);
+      pending.push({ position: next, cost });
+    }
+  }
+  return 999;
+}
+
 function shortage(observation: AgentObservation): number {
   return observation.endTurnForecast.food.shortage +
     observation.endTurnForecast.civilianGoods.maintenanceShortage +
@@ -55,7 +80,7 @@ function zombieThreats(observation: AgentObservation): ZombieThreat[] {
   const facilities = ownedOperationalFacilities(observation);
   return observation.zombies.map((zombie) => {
     const candidates = facilities.map((facility) => {
-      const distance = hexDistance(zombie.position, facility.position);
+      const distance = weightedDistance(observation, zombie.position, facility.position);
       const contactNow = distance === 0;
       const contactNextTurn = distance <= zombie.movement;
       const threatensCapital = facility.type === 'capital';
@@ -103,7 +128,7 @@ function primaryGoal(
     return 'rescue_critical_infection';
   }
   if (observation.population.infected > 0) return 'suppress_infection';
-  if (observation.horde.turnsRemaining <= BALANCED_THRESHOLDS.hordeUrgentTurns) return 'defend_horde';
+  if (observation.horde.finalHordeStatus === 'active' || (observation.horde.warningType !== 'none' && observation.horde.turnsRemaining <= BALANCED_THRESHOLDS.hordeUrgentTurns)) return 'defend_horde';
   if (shortage(observation) > 0) return 'restore_economy';
   if (!observation.resources.militarySupplyAvailable || militaryReserveDeficit(observation) > 0) return 'restore_military_supply';
   if (observation.endTurnForecast.overcrowding.additionalFood > 0) return 'reduce_overcrowding';
@@ -126,7 +151,7 @@ function facilityResourceValue(type: FacilityType, observation: AgentObservation
 
 function hordeEntrancePositions(observation: AgentObservation): HexCoord[] {
   return observation.map.tiles
-    .filter((tile) => tile.hordeEntranceDirections.includes(observation.horde.direction))
+    .filter((tile) => tile.hordeEntranceDirections.includes(observation.horde.warningDirection))
     .map((tile) => ({ q: tile.q, r: tile.r }));
 }
 
@@ -176,7 +201,7 @@ function scoreAction(
   const units = new Map(observation.units.map((unit) => [unit.id, unit]));
   const zombies = new Map(observation.zombies.map((unit) => [unit.id, unit]));
   const threatByZombie = new Map(threats.map((threat) => [threat.zombieId, threat]));
-  const urgentHorde = observation.horde.turnsRemaining <= BALANCED_THRESHOLDS.hordeUrgentTurns;
+  const urgentHorde = observation.horde.finalHordeStatus === 'active' || (observation.horde.warningType !== 'none' && observation.horde.turnsRemaining <= BALANCED_THRESHOLDS.hordeUrgentTurns);
   const urgentThreats = threats.filter((threat) => threat.contactNextTurn);
   const reserveDeficit = militaryReserveDeficit(observation);
   const roadUrgency = unmanagedRoadUrgency(observation);
@@ -187,7 +212,8 @@ function scoreAction(
     const threat = threatByZombie.get(action.targetId);
     score += weights.attack;
     reasonCodes.push('ATTACK_THREAT');
-    if (attacker && target && attacker.attack >= target.hp) {
+    const projectedDamage = attacker && target ? Math.max(1, Math.ceil(attacker.attack * target.terrainDamageMultiplier)) : 0;
+    if (attacker && target && projectedDamage >= target.hp) {
       score += weights.lethalAttack;
       reasonCodes.push('LETHAL_ATTACK');
     }
@@ -199,7 +225,11 @@ function scoreAction(
       score += weights.criticalFacilityDefense;
       reasonCodes.push('DEFEND_CRITICAL_FACILITY');
     }
-    if (attacker?.type === 'nationalGuard' && target && attacker.attack >= target.hp) {
+    if (target?.type === 'hordeZombie') {
+      score += weights.hordeDefense * 2;
+      reasonCodes.push('TARGET_HORDE_ZOMBIE');
+    }
+    if (attacker?.type === 'nationalGuard' && target && projectedDamage >= target.hp) {
       score += weights.safeGuardShot;
       reasonCodes.push('STATE_GUARD_CONTACT_DENIAL');
       if (hexDistance(attacker.position, target.position) > target.effectiveRange) {
@@ -213,7 +243,7 @@ function scoreAction(
       reasonCodes.push('PRESERVE_POLICE_FOR_SUPPRESSION');
     }
     if (attacker && target) {
-      const targetWillDie = attacker.attack >= target.hp;
+      const targetWillDie = projectedDamage >= target.hp;
       const followUpThreats = observation.zombies.filter((zombie) =>
         (!targetWillDie || zombie.id !== target.id) &&
         hexDistance(attacker.position, zombie.position) <= zombie.movement + zombie.effectiveRange,
@@ -379,12 +409,29 @@ function scoreAction(
       const afterZombie = nearestDistance(action.destination, zombiePositions);
       const effectiveRange = unit.effectiveRange;
       const lethalShotsFromDestination = observation.zombies.filter((zombie) =>
-        hexDistance(action.destination, zombie.position) <= effectiveRange && unit.attack >= zombie.hp,
+        hexDistance(action.destination, zombie.position) <= effectiveRange && Math.max(1, Math.ceil(unit.attack * zombie.terrainDamageMultiplier)) >= zombie.hp,
       ).length;
       const zombiesReachingDestination = observation.zombies.filter((zombie) =>
         hexDistance(action.destination, zombie.position) <= zombie.movement + zombie.effectiveRange,
       ).length;
       const followUpExposure = Math.max(0, zombiesReachingDestination - Math.min(1, lethalShotsFromDestination));
+      const destinationTile = observation.map.tiles.find((tile) => tile.q === action.destination.q && tile.r === action.destination.r);
+      if (destinationTile) {
+        score -= Math.max(0, (destinationTile.effectiveMovementCost ?? 4) - 1) * 8;
+        if (destinationTile.terrainDefenseSource === 'urban') {
+          score += 18;
+          reasonCodes.push('USE_URBAN_DEFENSE');
+        }
+      }
+      if (observation.zombies.length === 0 && !observation.suppliedAreaZombieClear) {
+        const coverageGain = observation.map.tiles.filter((tile) =>
+          !tile.visibleToPlayer && hexDistance(action.destination, tile) <= unit.vision,
+        ).length;
+        if (coverageGain > 0) {
+          score += coverageGain * 9;
+          reasonCodes.push('PATROL_HIDDEN_SUPPLY_THREAT');
+        }
+      }
       if (unit.type === 'nationalGuard' && urgentThreats.length > 0) {
         let bestDenial = Number.NEGATIVE_INFINITY;
         for (const threat of urgentThreats) {
@@ -635,6 +682,10 @@ function scoreAction(
     if (goal === 'avoid_defeat') score -= 500;
     if (urgentThreats.length > 0 && readyUnits > 0 && canRespondToThreat) score -= 1_000;
     if (observation.population.infected > 0 && readyUnits > 0 && canRespondToInfection) score -= 500;
+    if (!observation.suppliedAreaZombieClear && observation.zombies.length === 0 && readyUnits > 0) {
+      score -= 350;
+      reasonCodes.push('CONTINUE_SUPPLY_PATROL');
+    }
     reasonCodes.push('END_TURN_WHEN_SETTLED');
   }
 

@@ -1,16 +1,24 @@
 import { HEX_DIRECTION_ORDER, hexKey, hexNeighbor, hexWithinBounds } from './hex';
+import { getTile } from './map';
 import type { FixedMap, HexCoord } from './types';
 
 export function compareHexCoordinates(a: HexCoord, b: HexCoord): number {
   return a.q - b.q || a.r - b.r;
 }
 
-/** Breadth-first path on the fixed all-cost-one map, including both endpoints. */
+export type MovementCostResolver = (position: HexCoord) => number | null;
+
+function coordinateSignature(position: HexCoord): string {
+  return `${position.q.toString().padStart(2, '0')},${position.r.toString().padStart(2, '0')}`;
+}
+
+/** Deterministic weighted shortest path, including both endpoints. */
 export function findShortestPath(
   map: FixedMap,
   start: HexCoord,
   destination: HexCoord,
   blocked: ReadonlySet<string> = new Set(),
+  resolveCost: MovementCostResolver = (position) => getTile(map, position)?.movementCost ?? null,
 ): HexCoord[] | null {
   const startKey = hexKey(start);
   const destinationKey = hexKey(destination);
@@ -20,12 +28,18 @@ export function findShortestPath(
   if (blocked.has(destinationKey) && destinationKey !== startKey) {
     return null;
   }
-  const pending: HexCoord[] = [{ ...start }];
+  type Pending = { position: HexCoord; cost: number; signature: string };
+  const pending: Pending[] = [{ position: { ...start }, cost: 0, signature: coordinateSignature(start) }];
+  const best = new Map<string, { cost: number; signature: string }>([[startKey, { cost: 0, signature: coordinateSignature(start) }]]);
   const previous = new Map<string, string | null>([[startKey, null]]);
   const positions = new Map<string, HexCoord>([[startKey, { ...start }]]);
-  for (let index = 0; index < pending.length; index += 1) {
-    const current = pending[index]!;
+  while (pending.length > 0) {
+    pending.sort((left, right) => left.cost - right.cost || left.signature.localeCompare(right.signature));
+    const currentEntry = pending.shift()!;
+    const current = currentEntry.position;
     const currentKey = hexKey(current);
+    const currentBest = best.get(currentKey);
+    if (!currentBest || currentBest.cost !== currentEntry.cost || currentBest.signature !== currentEntry.signature) continue;
     if (currentKey === destinationKey) {
       const result: HexCoord[] = [];
       let cursor: string | null = currentKey;
@@ -38,19 +52,64 @@ export function findShortestPath(
     for (const direction of HEX_DIRECTION_ORDER) {
       const next = hexNeighbor(current, direction);
       const nextKey = hexKey(next);
+      const stepCost = resolveCost(next);
       if (
         !hexWithinBounds(next, map.width, map.height) ||
-        previous.has(nextKey) ||
+        stepCost === null || stepCost < 1 ||
         (blocked.has(nextKey) && nextKey !== destinationKey)
       ) {
         continue;
       }
+      const nextCost = currentEntry.cost + stepCost;
+      const nextSignature = `${currentEntry.signature}|${coordinateSignature(next)}`;
+      const known = best.get(nextKey);
+      if (known && (known.cost < nextCost || (known.cost === nextCost && known.signature <= nextSignature))) continue;
+      best.set(nextKey, { cost: nextCost, signature: nextSignature });
       previous.set(nextKey, currentKey);
       positions.set(nextKey, next);
-      pending.push(next);
+      pending.push({ position: next, cost: nextCost, signature: nextSignature });
     }
   }
   return null;
+}
+
+export function pathMovementCost(path: readonly HexCoord[], resolveCost: MovementCostResolver): number {
+  return path.slice(1).reduce((total, position) => total + (resolveCost(position) ?? Number.POSITIVE_INFINITY), 0);
+}
+
+/** Every tile reachable within a movement-point budget, sorted by coordinate. */
+export function findReachableTiles(
+  map: FixedMap,
+  start: HexCoord,
+  budget: number,
+  blocked: ReadonlySet<string> = new Set(),
+  resolveCost: MovementCostResolver = (position) => getTile(map, position)?.movementCost ?? null,
+): HexCoord[] {
+  const startKey = hexKey(start);
+  const best = new Map<string, number>([[startKey, 0]]);
+  const pending: Array<{ position: HexCoord; cost: number }> = [{ position: { ...start }, cost: 0 }];
+  while (pending.length > 0) {
+    pending.sort((left, right) => left.cost - right.cost || compareHexCoordinates(left.position, right.position));
+    const current = pending.shift()!;
+    if (best.get(hexKey(current.position)) !== current.cost) continue;
+    for (const direction of HEX_DIRECTION_ORDER) {
+      const next = hexNeighbor(current.position, direction);
+      const key = hexKey(next);
+      const stepCost = resolveCost(next);
+      if (!hexWithinBounds(next, map.width, map.height) || blocked.has(key) || stepCost === null) continue;
+      const total = current.cost + stepCost;
+      if (total > budget || total >= (best.get(key) ?? Number.POSITIVE_INFINITY)) continue;
+      best.set(key, total);
+      pending.push({ position: next, cost: total });
+    }
+  }
+  return [...best.keys()]
+    .filter((key) => key !== startKey)
+    .map((key) => {
+      const [q, r] = key.split(',').map(Number);
+      return { q: q!, r: r! };
+    })
+    .sort(compareHexCoordinates);
 }
 
 /** Return every nearest empty tile in stable coordinate order. */

@@ -1,6 +1,8 @@
 import { assertValidGameConfig, cloneConfig, createDefaultConfig, DEFAULT_MAP_ID } from '../core/config';
 import { GameEngine } from '../core/engine';
-import type { DeepPartial, GameAction, GameConfig, GameState, JsonValue } from '../core/types';
+import { hexKey } from '../core/hex';
+import { getPlayerVisibleTileKeys } from '../core/visibility';
+import type { DeepPartial, GameAction, GameConfig, GameEvent, GameState, JsonObject, JsonValue } from '../core/types';
 import { actionKey, cloneAction, cloneJson, sortActions } from './action';
 import { createAgentObservation, createAgentResult } from './observation';
 import {
@@ -87,6 +89,54 @@ function safeUnknownClone(value: unknown): unknown {
   }
 }
 
+const INTERNAL_EVENT_TYPES = new Set([
+  'zombie_idle',
+  'horde_target_inherited',
+  'horde_target_cleared',
+]);
+
+function publicEvents(
+  before: Readonly<GameState>,
+  after: Readonly<GameState>,
+  events: readonly GameEvent[],
+): AgentPublicEvent[] {
+  const visibleTiles = new Set([...getPlayerVisibleTileKeys(before), ...getPlayerVisibleTileKeys(after)]);
+  const enemyById = new Map(
+    [...before.units, ...after.units]
+      .filter((unit) => !unit.isPlayerUnit)
+      .map((unit) => [unit.id, unit] as const),
+  );
+  const visibleEnemyIds = new Set(
+    [...enemyById.values()]
+      .filter((unit) => visibleTiles.has(hexKey(unit.position)))
+      .map((unit) => unit.id),
+  );
+  return events
+    .filter((event) => !INTERNAL_EVENT_TYPES.has(event.type))
+    .map((event) => {
+      const payload = cloneJson(event.payload) as JsonObject;
+      const spawnedEnemyId = event.type === 'horde_spawned' && typeof payload.zombieId === 'string'
+        ? payload.zombieId
+        : null;
+      if (spawnedEnemyId && !visibleEnemyIds.has(spawnedEnemyId)) return null;
+      for (const field of ['zombieId', 'unitId', 'sourceId', 'targetId', 'attackerId', 'defenderId'] as const) {
+        const id = payload[field];
+        if (typeof id === 'string' && enemyById.has(id) && !visibleEnemyIds.has(id)) delete payload[field];
+      }
+      if (typeof payload.source === 'string' && enemyById.has(payload.source) && !visibleEnemyIds.has(payload.source)) {
+        delete payload.source;
+      }
+      if (typeof payload.q === 'number' && typeof payload.r === 'number' && !visibleTiles.has(hexKey({ q: payload.q, r: payload.r }))) {
+        delete payload.q;
+        delete payload.r;
+      }
+      delete payload.spawnGroupId;
+      return { ...event, payload } as AgentPublicEvent;
+    })
+    .filter((event): event is AgentPublicEvent => event !== null)
+    .filter((event) => Object.keys(event.payload).length > 0 || event.type === 'game_over');
+}
+
 export interface AgentGameAdapterOptions {
   buildId?: string;
   bridgeApiVersion?: string;
@@ -163,6 +213,7 @@ export class AgentGameAdapter implements AgentGame {
         result: this.getResult(),
       };
     }
+    const before = this.engine.getState();
     const result = this.engine.step(matched);
     if (result.error) {
       const error = publicError(result.error.code, result.error.message);
@@ -172,7 +223,7 @@ export class AgentGameAdapter implements AgentGame {
     }
     this.acceptedActions.push(cloneAction(matched));
     const observation = this.getObservation();
-    const events = cloneJson(result.events);
+    const events = publicEvents(before, result.state, result.events);
     this.events.push(...events);
     this.observations.push(cloneJson(observation));
     return {

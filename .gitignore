@@ -12,6 +12,7 @@ node_modules/
 dist/
 coverage/
 output/
+/.playwright-cli/
 
 # Local configuration and logs
 .env

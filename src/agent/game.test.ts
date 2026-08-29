@@ -13,23 +13,45 @@ describe('AgentGame public boundary', () => {
     expect(encoded).not.toContain('rngState');
     expect(encoded).not.toContain('spawnedCount');
     expect(first.map.tiles).toHaveLength(225);
+    expect(first).not.toHaveProperty('maxTurns');
+    expect(first.finalHordeTurn).toBe(30);
     expect(first.apiVersion).toBe(OBSERVATION_API_VERSION);
     expect(first.roadBranches).toHaveLength(4);
     expect(first.roadBranches.every((branch) => branch.turnsUntilArrival >= 0)).toBe(true);
     expect(first.supply.initialRadius).toBeGreaterThan(0);
     expect(first.units.every((unit) => typeof unit.inSupply === 'boolean')).toBe(true);
     expect(first.units.every((unit) => unit.baseRange >= unit.effectiveRange)).toBe(true);
+    expect(first.units.every((unit) => unit.unitType === unit.type && unit.vision > 0)).toBe(true);
+    expect(first.map.tiles.every((tile) =>
+      typeof tile.terrain === 'string' &&
+      typeof tile.road === 'boolean' &&
+      typeof tile.visibleToPlayer === 'boolean',
+    )).toBe(true);
+    expect(first.zombies.every((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')).toBe(true);
+    expect(first.zombies.length).toBeGreaterThan(0);
+    expect(first.horde).toMatchObject({
+      warningType: 'periodic',
+      spawnTurn: 5,
+      finalHordeStatus: 'notStarted',
+    });
+    expect(first.victory).toEqual({
+      finalHordeDefeated: first.finalHordeDefeated,
+      suppliedAreaZombieClear: first.suppliedAreaZombieClear,
+      suppliedAreaInfectionClear: first.suppliedAreaInfectionClear,
+    });
     expect(first.units.every((unit) => ['combat', 'rest', 'outOfSupply'].includes(unit.recoveryClassIfTurnEndsNow!))).toBe(true);
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.2.7 API and current Config from the same adapter boundary', () => {
+  it('describes the v1.3.0 API and current Config from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
+    expect(info.saveFormatVersion).toBe('3');
+    expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
     expect(info.rules.production.workerCapacityByFacilityType.farm).toBe(30);
@@ -39,6 +61,20 @@ describe('AgentGame public boundary', () => {
       sameTurnProductionCanCoverMaintenance: true,
       sameTurnProductionCanCoverProductionInputs: false,
     });
+    expect(info.rules.ranges.hordeZombie.baseRange).toBe(1);
+    expect(info.rules.terrain).toMatchObject({
+      movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
+      roadAndUrbanMovementCost: 1,
+      defenseRounding: 'ceil',
+      minimumDamage: 1,
+    });
+    expect(info.rules.vision).toMatchObject({ capital: 5, ownedFacility: 1, operationalCheckpoint: 1, distance: 'hex' });
+    expect(info.rules.fogOfWar).toMatchObject({ enemyVisibility: 'visible_only', hiddenEnemyPositionPublic: false });
+    expect(info.rules.victory.progressFields).toEqual([
+      'finalHordeDefeated',
+      'suppliedAreaZombieClear',
+      'suppliedAreaInfectionClear',
+    ]);
     expect(info.prohibited.join(' ')).toContain('SuppressInfection');
     info.methods.pop();
     expect(game.getApiInfo().methods).toContain('getRunArtifact');
@@ -80,6 +116,28 @@ describe('AgentGame public boundary', () => {
       expect(result.error).toBeNull();
       expect(result).not.toHaveProperty('state');
       expect(result.observation).not.toHaveProperty('rngState');
+    }
+  });
+
+  it('publishes one direction-only Horde event instead of leaking hidden spawn count or identity', () => {
+    const game = createAgentGame();
+    game.reset({
+      seed: 21,
+      configOverrides: {
+        finalHordeTurn: 1,
+        economy: { initialZombieCount: 0 },
+        horde: { finalCount: 4 },
+        units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
+      },
+    });
+    const result = game.step({ type: 'EndTurn' });
+    expect(result.error).toBeNull();
+    expect(result.observation.zombies).toHaveLength(0);
+    const hordeEvents = result.events.filter((event) => event.type === 'horde_spawned');
+    expect(hordeEvents).toHaveLength(1);
+    expect(hordeEvents[0]!.payload).toMatchObject({ hordeKind: 'final', direction: expect.any(String) });
+    for (const hiddenField of ['zombieId', 'q', 'r', 'count', 'spawnGroupId']) {
+      expect(hordeEvents[0]!.payload).not.toHaveProperty(hiddenField);
     }
   });
 

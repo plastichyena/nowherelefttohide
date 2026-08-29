@@ -4,8 +4,10 @@ import { createAgentObservation } from '../agent/observation';
 import type {
   AgentCheckpointObservation,
   AgentFacilityObservation,
+  AgentMapTileObservation,
   AgentUnitObservation,
 } from '../agent/types';
+import { hexKey } from '../core/hex';
 import {
   deriveSupplySnapshot,
   getBlockingZombiesForCheckpoint,
@@ -14,6 +16,7 @@ import {
   getSuppliedTileKeys,
   isHexSupplied,
 } from '../core/supply';
+import { getPlayerVisibleTileKeys } from '../core/visibility';
 import Phaser from 'phaser';
 import type {
   CardinalDirection,
@@ -179,7 +182,7 @@ function isLegacySaveError(message: string): boolean {
   return /version|v1\.0|legacy|旧|互換/iu.test(message);
 }
 
-/** Localize version and v1.2.5 migration failures without hiding generic diagnostics. */
+/** Localize version failures without hiding generic diagnostics. */
 export function localizeSaveLoadError(message: string, locale: Locale): string {
   const t = createTranslator(locale);
   if (/v1\.2\.5|migrat/iu.test(message)) return t('migrationSaveError');
@@ -216,6 +219,38 @@ function formatDirection(direction: CardinalDirection, locale: Locale): string {
   return ({ north: '北', east: '東', south: '南', west: '西' } as Record<CardinalDirection, string>)[direction];
 }
 
+function hordeStatusLabel(status: 'notStarted' | 'active' | 'defeated', locale: Locale): string {
+  const t = createTranslator(locale);
+  if (status === 'active') return t('hordeStatusActive');
+  if (status === 'defeated') return t('hordeStatusDefeated');
+  return t('hordeStatusNotStarted');
+}
+
+function terrainLabel(terrain: AgentMapTileObservation['terrain'], locale: Locale): string {
+  const t = createTranslator(locale);
+  const labels: Record<AgentMapTileObservation['terrain'], string> = {
+    plain: t('terrainPlain'),
+    forest: t('terrainForest'),
+    mountain: t('terrainMountain'),
+    water: t('terrainWater'),
+  };
+  return labels[terrain];
+}
+
+function terrainDefenseLabel(source: AgentMapTileObservation['terrainDefenseSource'], locale: Locale): string {
+  const t = createTranslator(locale);
+  if (source === 'urban') return t('terrainDefenseUrban');
+  if (source === 'forest') return t('terrainDefenseForest');
+  return t('terrainDefenseNone');
+}
+
+function mapTileForPosition(
+  observation: { map: { tiles: AgentMapTileObservation[] } },
+  position: HexCoord,
+): AgentMapTileObservation | undefined {
+  return observation.map.tiles.find((tile) => tile.q === position.q && tile.r === position.r);
+}
+
 function facilityLabel(type: string, locale: Locale): string {
   const names: Record<string, [string, string]> = {
     capital: ['州都', 'Capital'],
@@ -234,6 +269,7 @@ function unitLabel(type: UnitState['type'], locale: Locale): string {
     police: ['警察', 'Police'],
     nationalGuard: ['州兵', 'National Guard'],
     zombie: ['ゾンビ', 'Zombie'],
+    hordeZombie: ['Hordeゾンビ', 'Horde Zombie'],
   };
   return names[type][locale === 'ja' ? 0 : 1];
 }
@@ -466,7 +502,7 @@ function gameOverReasonLabel(reason: GameResult['reason'], locale: Locale): stri
   const labels: Record<string, string> = {
     capitalLost: locale === 'ja' ? '州都が陥落しました' : 'The capital fell',
     healthyCiviliansLost: locale === 'ja' ? '健全民間人口がなくなりました' : 'No healthy civilian population remains',
-    maxTurnsSurvived: t('victory'),
+    stateSecured: t('victory'),
     abandoned: locale === 'ja' ? '放棄しました' : 'Abandoned',
     error: locale === 'ja' ? '内部エラー' : 'Internal error',
   };
@@ -576,7 +612,7 @@ export class GameUiController {
         <h2 id="new-game-heading">${escapeHtml(t('newGame'))}</h2>
         <form data-form="new-game" class="settings-form">
           <label>${escapeHtml(t('newSeed'))}<input name="seed" type="number" inputmode="numeric" value="${Date.now() % 2147483647}" /></label>
-          <label>${escapeHtml(t('maxTurns'))}<input name="maxTurns" type="number" min="1" max="999" value="30" /></label>
+          <label>${escapeHtml(t('finalHordeTurn'))}<input name="finalHordeTurn" type="number" min="1" max="999" value="30" /></label>
           <label>${escapeHtml(t('hordeCycle'))}<input name="hordeCycle" type="number" min="1" value="5" /></label>
           <label>${escapeHtml(t('hordeInitial'))}<input name="hordeInitial" type="number" min="0" value="2" /></label>
           <label>${escapeHtml(t('hordeIncrement'))}<input name="hordeIncrement" type="number" min="0" value="2" /></label>
@@ -601,7 +637,7 @@ export class GameUiController {
       const refugeePeopleMin = Math.max(1, Math.floor(numberValue(values.get('refugeePeopleMin')?.toString(), 5)));
       const refugeePeopleMax = Math.max(refugeePeopleMin, Math.floor(numberValue(values.get('refugeePeopleMax')?.toString(), 10)));
       const config = createDefaultConfig({
-        maxTurns: Math.max(1, Math.floor(numberValue(values.get('maxTurns')?.toString(), 30))),
+        finalHordeTurn: Math.max(1, Math.floor(numberValue(values.get('finalHordeTurn')?.toString(), 30))),
         horde: {
           cycle: Math.max(1, Math.floor(numberValue(values.get('hordeCycle')?.toString(), 5))),
           initialCount: Math.max(0, Math.floor(numberValue(values.get('hordeInitial')?.toString(), 2))),
@@ -684,7 +720,7 @@ export class GameUiController {
     this.root.innerHTML = `
       <header class="top-hud">
         <div class="hud-brand"><span class="hud-glyph">◇</span><span>${escapeHtml(t('title'))}</span></div>
-        <div class="hud-turn"><span data-bind="turn">—</span><small>${escapeHtml(t('turn'))}</small><span class="phase-dot" data-bind="phase" data-phase="${escapeHtml(phaseIndicator.phase)}" aria-hidden="true"></span><span class="phase-label" data-bind="phase-label" title="${escapeHtml(phaseIndicator.label)}">${escapeHtml(phaseIndicator.shortLabel)}</span></div>
+        <div class="hud-turn"><span data-bind="turn">—</span><small data-bind="turn-label">${escapeHtml(t('turn'))}</small><span class="phase-dot" data-bind="phase" data-phase="${escapeHtml(phaseIndicator.phase)}" aria-hidden="true"></span><span class="phase-label" data-bind="phase-label" title="${escapeHtml(phaseIndicator.label)}">${escapeHtml(phaseIndicator.shortLabel)}</span></div>
         <div class="hud-pop"><span data-bind="population">—</span><small>${escapeHtml(t('population'))}</small></div>
         <button class="icon-button supply-toggle" aria-label="${escapeHtml(t('supplyOverlay'))}" aria-pressed="${this.supplyOverlay}" data-action="toggle-supply" title="${escapeHtml(this.supplyOverlay ? t('supplyOn') : t('supplyOff'))}">◎</button>
         <button class="icon-button" aria-label="${escapeHtml(t('help'))}" data-action="help">?</button>
@@ -698,7 +734,8 @@ export class GameUiController {
         <span class="resource-pill civilian-pill">♙ <b data-bind="healthy-civilians">0</b><small>${escapeHtml(t('healthyCivilians'))}</small></span>
         <span class="resource-pill infected-pill">☣ <b data-bind="infected">0</b><small>${escapeHtml(t('infected'))}</small></span>
       </section>
-      <section class="horde-card" aria-live="polite"><div><strong>${escapeHtml(t('horde'))}</strong><span data-bind="horde-direction">—</span></div><b><span data-bind="horde-remaining">—</span> <small>${escapeHtml(t('remaining'))}</small></b></section>
+      <section class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><div class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></div><div class="horde-facts"><span><small>${escapeHtml(t('direction'))}</small><b data-bind="horde-direction">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span></div></section>
+      <section class="victory-progress" aria-live="polite" aria-label="${escapeHtml(t('victoryProgress'))}"><strong>${escapeHtml(t('victoryProgress'))}</strong><div data-bind="victory-progress"></div></section>
       <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
       <section class="bottom-sheet" data-sheet="standard" aria-label="${escapeHtml(t('selected'))}">
         <button class="sheet-handle" type="button" data-action="sheet-toggle"><span></span><span class="sr-only">${escapeHtml(t('selected'))}</span></button>
@@ -869,11 +906,15 @@ export class GameUiController {
 
   private updateHud(): void {
     if (!this.state) return;
+    const observation = createAgentObservation(this.state);
     const population = populationLocationTotals(this.state);
     const forecast = forecastEndTurn(this.state);
     const forecastPower = forecast.electricity;
     const forecastPowerDemand = forecastPower.requiredPowerDemand + forecastPower.industrialBoostDemand;
-    const hordeVisible = this.state.turn >= this.state.config.horde.warningStartTurn;
+    const horde = observation.horde;
+    const warningType = horde.warningType;
+    const finalHordeVisible = warningType === 'final' || horde.finalHordeStatus !== 'notStarted';
+    const warningLabel = finalHordeVisible ? this.translator()('finalHordeWarning') : this.translator()('horde');
     const phaseIndicator = phaseIndicatorViewModel(this.state.phase, this.locale);
     const phaseDot = this.root.querySelector<HTMLElement>('[data-bind="phase"]');
     if (phaseDot) {
@@ -886,21 +927,38 @@ export class GameUiController {
       phaseLabel.title = phaseIndicator.label;
     }
     const bindings: Record<string, string> = {
-      turn: `${this.state.turn}/${this.state.maxTurns}`,
+      turn: String(this.state.turn),
+      'turn-label': `${this.translator()('turn')} · ${this.translator()('finalHordeTurn')} ${observation.finalHordeTurn}`,
       population: String(population.total),
       food: String(this.state.resources.food),
       civilianGoods: String(this.state.resources.civilianGoods),
       militaryGoods: String(this.state.resources.militaryGoods),
       fuel: String(this.state.resources.fuel),
       power: `${forecastPower.availableGenerationCapacity}/${forecastPowerDemand}`,
-      'horde-direction': hordeVisible ? formatDirection(this.state.horde.nextDirection, this.locale) : this.translator()('warningPending'),
-      'horde-remaining': hordeVisible ? String(this.state.horde.turnsRemaining) : '—',
+      'horde-warning': warningLabel,
+      'horde-status': hordeStatusLabel(horde.finalHordeStatus, this.locale),
+      'horde-direction': warningType === 'none' && !finalHordeVisible ? '—' : formatDirection(horde.warningDirection, this.locale),
+      'horde-remaining': warningType === 'none' && !finalHordeVisible ? '—' : String(horde.turnsRemaining),
+      'horde-spawn-turn': horde.spawnTurn === null ? '—' : String(horde.spawnTurn),
       'healthy-civilians': String(population.healthyCivilians),
       infected: String(population.infected),
     };
     for (const [key, value] of Object.entries(bindings)) {
       const element = this.root.querySelector<HTMLElement>(`[data-bind="${key}"]`);
       if (element) element.textContent = value;
+    }
+    const hordeCard = this.root.querySelector<HTMLElement>('[data-bind="horde-card"]');
+    if (hordeCard) hordeCard.dataset.hordeState = finalHordeVisible ? 'final' : warningType;
+    const progress = this.root.querySelector<HTMLElement>('[data-bind="victory-progress"]');
+    if (progress) {
+      const progressItems = [
+        ['finalHordeDefeated', this.translator()('finalHordeDefeated'), observation.finalHordeDefeated],
+        ['suppliedAreaZombieClear', this.translator()('suppliedAreaZombieClear'), observation.suppliedAreaZombieClear],
+        ['suppliedAreaInfectionClear', this.translator()('suppliedAreaInfectionClear'), observation.suppliedAreaInfectionClear],
+      ] as const;
+      progress.innerHTML = progressItems.map(([key, label, complete]) =>
+        `<span class="victory-check ${complete ? 'is-complete' : 'is-pending'}" data-progress="${key}"><b aria-hidden="true">${complete ? '✓' : '○'}</b>${escapeHtml(label)}</span>`,
+      ).join('');
     }
     const powerElement = this.root.querySelector<HTMLElement>('[data-bind="power"]');
     if (powerElement) {
@@ -924,12 +982,16 @@ export class GameUiController {
       : supply.branchRadii;
     const render: BoardRenderState = {
       state: this.state,
+      locale: this.locale,
       selectedPosition: this.selectedPosition(),
       selectedUnitId: this.selection?.kind === 'unit' ? this.selection.id : null,
       legalDestinations: this.selectedUnitLegalMoves(),
       attackTargetIds: this.selectedUnitAttackTargets(),
       pendingPath: this.pendingMove?.path,
-      hordeDirection: this.state.turn >= this.state.config.horde.warningStartTurn ? this.state.horde.nextDirection : undefined,
+      hordeDirection: this.state.horde.warningType === 'none' ? null : this.state.horde.nextDirection,
+      hordeWarningType: this.state.horde.warningType,
+      visibilityOverlay: true,
+      selectedVision: this.selectedVision(),
       supplyOverlay: supplyContext,
       suppliedTileKeys,
       branchRadii,
@@ -953,14 +1015,39 @@ export class GameUiController {
         positions.push({ ...position });
       }
     }
+    const visible = getPlayerVisibleTileKeys(this.state);
     const blockedZombieIds = this.checkpointPreviewTarget
       ? getBlockingZombiesForCheckpoint(
         this.state,
         this.checkpointPreviewTarget.branchId,
         this.checkpointPreviewTarget.position,
-      ).map((zombie) => zombie.id)
+      )
+        .filter((zombie) => visible.has(hexKey(zombie.position)))
+        .map((zombie) => zombie.id)
       : [];
     return { positions, blockedZombieIds };
+  }
+
+  private selectedVision(): { origin: HexCoord; radius: number } | null {
+    if (!this.state || !this.selection) return null;
+    if (this.selection.kind === 'unit') {
+      const unit = findUnit(this.state, this.selection.id);
+      return unit && unit.isPlayerUnit ? { origin: { ...unit.position }, radius: unit.vision } : null;
+    }
+    if (this.selection.kind === 'facility') {
+      const facility = this.state.facilities.find((candidate) => candidate.id === this.selection?.id);
+      if (!facility || facility.owner !== 'player' || facility.status === 'ruined') return null;
+      return {
+        origin: { ...facility.position },
+        radius: facility.type === 'capital'
+          ? this.state.config.checkpoint.initialSupplyRadius
+          : this.state.config.vision.ownedFacility,
+      };
+    }
+    const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === this.selection?.id);
+    return checkpoint?.status === 'operational'
+      ? { origin: { ...checkpoint.position }, radius: this.state.config.vision.operationalCheckpoint }
+      : null;
   }
 
   private selectedPosition(): HexCoord | null {
@@ -1612,7 +1699,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipPolicy', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipPolicy', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card" aria-labelledby="help-heading"><button class="icon-button modal-close" data-action="dismiss-modal">×</button><h2 id="help-heading">${escapeHtml(t('help'))}</h2><p>${escapeHtml(t('helpBody'))}</p><h3>${escapeHtml(t('move'))}</h3><p>${escapeHtml(t('guideSteps'))}</p><h3>${escapeHtml(t('tipsTitle'))}</h3><ul class="tips-list">${tips}</ul><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></section></div>`);
@@ -1671,7 +1758,19 @@ export class GameUiController {
     const stats = result.statistics;
     const finalPopulation = this.state ? populationLocationTotals(this.state).total : 0;
     const finalFacilities = this.state?.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length ?? 0;
-    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="statistics"><section class="modal-card floating-card" aria-labelledby="statistics-heading"><p class="eyebrow">${escapeHtml(t('gameOver'))}</p><h2 id="statistics-heading">${escapeHtml(result.outcome === 'won' ? t('victory') : t('defeat'))}</h2><div class="stats-grid"><span>${escapeHtml(t('survivedTurns'))}<b>${result.turn}</b></span><span>${escapeHtml(t('finalPopulation'))}<b>${finalPopulation}</b></span><span>${escapeHtml(t('maxPopulation'))}<b>${stats.maxPopulation}</b></span><span>${escapeHtml(t('finalFacilities'))}<b>${finalFacilities}</b></span><span>${escapeHtml(t('maxFacilities'))}<b>${stats.maxSecuredFacilities}</b></span><span>${escapeHtml(t('civilianLosses'))}<b>${stats.civilianLosses}</b></span><span>${escapeHtml(t('unitLosses'))}<b>${stats.unitLosses}</b></span><span>${escapeHtml(t('infectionLosses'))}<b>${stats.infectionLosses}</b></span><span>${escapeHtml(t('shortageLosses'))}<b>${stats.resourceShortageLosses}</b></span><span>${escapeHtml(t('hordeInterceptions'))}<b>${stats.hordeInterceptions}</b></span><span>${escapeHtml(t('defeatReason'))}<b>${escapeHtml(gameOverReasonLabel(result.reason, this.locale))}</b></span></div><div class="modal-actions"><button class="primary-button" data-action="title">${escapeHtml(t('reset'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
+    const victory = this.state ? createAgentObservation(this.state) : null;
+    const progress = victory
+      ? [
+        ['finalHordeDefeated', t('finalHordeDefeated'), victory.finalHordeDefeated],
+        ['suppliedAreaZombieClear', t('suppliedAreaZombieClear'), victory.suppliedAreaZombieClear],
+        ['suppliedAreaInfectionClear', t('suppliedAreaInfectionClear'), victory.suppliedAreaInfectionClear],
+      ] as const
+      : [];
+    const progressHtml = progress.map(([, label, complete]) => `<span class="victory-check ${complete ? 'is-complete' : 'is-pending'}"><b aria-hidden="true">${complete ? '✓' : '○'}</b>${escapeHtml(label)}</span>`).join('');
+    const terrainEntries = Object.entries(stats.terrainEntriesByType)
+      .map(([terrain, count]) => `${escapeHtml(terrainLabel(terrain as AgentMapTileObservation['terrain'], this.locale))} ${count}`)
+      .join(' · ');
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="statistics"><section class="modal-card floating-card" aria-labelledby="statistics-heading"><p class="eyebrow">${escapeHtml(t('gameOver'))}</p><h2 id="statistics-heading">${escapeHtml(result.outcome === 'won' ? t('victory') : t('defeat'))}</h2><div class="stats-grid"><span>${escapeHtml(t('survivedTurns'))}<b>${result.turn}</b></span><span>${escapeHtml(t('finalPopulation'))}<b>${finalPopulation}</b></span><span>${escapeHtml(t('maxPopulation'))}<b>${stats.maxPopulation}</b></span><span>${escapeHtml(t('finalFacilities'))}<b>${finalFacilities}</b></span><span>${escapeHtml(t('maxFacilities'))}<b>${stats.maxSecuredFacilities}</b></span><span>${escapeHtml(t('civilianLosses'))}<b>${stats.civilianLosses}</b></span><span>${escapeHtml(t('unitLosses'))}<b>${stats.unitLosses}</b></span><span>${escapeHtml(t('infectionLosses'))}<b>${stats.infectionLosses}</b></span><span>${escapeHtml(t('shortageLosses'))}<b>${stats.resourceShortageLosses}</b></span><span>${escapeHtml(t('hordeInterceptions'))}<b>${stats.hordeInterceptions}</b></span><span>${escapeHtml(t('finalHordeSpawned'))}<b>${stats.finalHordeSpawned}</b></span><span>${escapeHtml(t('finalHordeKilled'))}<b>${stats.finalHordeKilled}</b></span><span>${escapeHtml(t('normalZombiesKilled'))}<b>${stats.normalZombiesKilled}</b></span><span>${escapeHtml(t('hordeZombiesKilled'))}<b>${stats.hordeZombiesKilled}</b></span><span>${escapeHtml(t('victoryTurn'))}<b>${stats.victoryTurn ?? '—'}</b></span><span>${escapeHtml(t('defeatReason'))}<b>${escapeHtml(gameOverReasonLabel(result.reason, this.locale))}</b></span></div><section class="victory-progress stats-victory"><h3>${escapeHtml(t('victoryProgress'))}</h3><div>${progressHtml || `<span class="muted">${escapeHtml(t('unavailable'))}</span>`}</div></section><p class="muted stats-terrain-summary">${escapeHtml(t('terrain'))}: ${terrainEntries}</p><div class="modal-actions"><button class="primary-button" data-action="title">${escapeHtml(t('reset'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
   }
 
   private renderBranchFlow(): string {
@@ -1763,26 +1862,29 @@ export class GameUiController {
       if (!unit) return;
       const actions = legalActionsForUnit(this.state, this.legalActions(), unit.id);
       const publicUnit = observation.units.find((candidate) => candidate.id === unit.id);
+      const publicTile = mapTileForPosition(observation, unit.position);
       title.textContent = `${unitLabel(unit.type, this.locale)} · ${unit.id}`;
-      summary.textContent = `HP ${unit.hp}/${unit.maxHp} · ${t('move')} ${unit.movement} · ${t('attack')} ${unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range}`;
+      summary.textContent = `HP ${unit.hp}/${unit.maxHp} · ${t('move')} ${unit.movement} · ${t('attack')} ${unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range} · ${t('vision')} ${publicUnit?.vision ?? unit.vision}`;
       const risk = this.pendingMove?.interceptionRisk;
       const riskText = typeof risk === 'number' ? risk <= 0.2 ? t('low') : risk <= 0.5 ? t('medium') : t('high') : String(risk ?? t('none'));
       const canWait = actions.some((action) => action.type === 'Wait');
       const supplied = isHexSupplied(this.state, unit.position);
       const supplyReason = supplied ? '' : localizeActionError('recovery_out_of_supply', this.locale);
-      body.innerHTML = this.renderUnitSheet(unit, publicUnit, actions, riskText, supplied, supplyReason);
+      body.innerHTML = this.renderUnitSheet(unit, publicUnit, publicTile, actions, riskText, supplied, supplyReason);
       return;
     }
     if (this.selection.kind === 'checkpoint') {
       const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === this.selection?.id);
       if (!checkpoint) return;
       const publicCheckpoint = observation.checkpoints.find((candidate) => candidate.id === checkpoint.id);
-      this.renderCheckpointSheet(checkpoint, body, title, summary, publicCheckpoint);
+      const publicTile = mapTileForPosition(observation, checkpoint.position);
+      this.renderCheckpointSheet(checkpoint, body, title, summary, publicCheckpoint, publicTile);
       return;
     }
     const facility = this.state.facilities.find((candidate) => candidate.id === this.selection?.id);
     if (!facility) return;
     const publicFacility = observation.facilities.find((candidate) => candidate.id === facility.id);
+    const publicTile = mapTileForPosition(observation, facility.position);
     title.textContent = facilityLabel(facility.type, this.locale);
     const owned = facility.owner === 'player' && facility.status === 'owned';
     const statusText = facility.status === 'ruined' ? t('ruined') : facility.owner === 'player' ? t('owned') : t('unowned');
@@ -1797,7 +1899,7 @@ export class GameUiController {
           : projectedPowerUnavailable
             ? t('powerNotSupplied')
             : facility.operationalStatus === 'operational' ? t('operational') : t('stopped');
-    summary.textContent = `${statusText} · ${operationText} · ${t('location')} ${facility.position.q},${facility.position.r}`;
+    summary.textContent = `${statusText} · ${operationText} · ${t('location')} ${facility.position.q},${facility.position.r} · ${t('vision')} ${publicFacility?.vision ?? 0}`;
     const city = isCity(facility);
     const powerSupplyEditor = isPowerSupplyFacility(facility)
       ? (() => {
@@ -1841,8 +1943,8 @@ export class GameUiController {
       : '';
     const recruitment = `<section class="recruitment-editor"><h3>${escapeHtml(t('population'))}</h3><p class="muted">${escapeHtml(city ? t('tipRecruitment') : t('recruitmentDisabled'))}</p><div class="action-row"><button class="secondary-button" data-action="produce-police">${escapeHtml(t('producePolice'))}</button><button class="secondary-button" data-action="produce-guard">${escapeHtml(t('produceGuard'))}</button></div><p class="warning-text" data-recruitment-reason="police" hidden></p><p class="warning-text" data-recruitment-reason="nationalGuard" hidden></p></section>`;
     const checkpoint = this.state.checkpoints.find((candidate) => candidate.position.q === facility.position.q && candidate.position.r === facility.position.r);
-    body.innerHTML = `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text">${escapeHtml(t('powerNotSupplied'))}: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${workerEditor}${cityTransfer}${recruitment}${checkpoint ? `<section class="checkpoint-editor"><h3>${escapeHtml(t('checkpoint'))}</h3><p class="muted">${escapeHtml(t('waiting'))}: ${checkpoint.waiting} · ${escapeHtml(t('screening'))}: ${checkpoint.screening} · ${escapeHtml(t('approved'))}: ${checkpoint.approved} · ${escapeHtml(t('infected'))}: ${checkpoint.infected}</p></section>` : ''}<div class="action-row"><button class="secondary-button" data-action="build-checkpoint">${escapeHtml(t('buildCheckpoint'))}</button></div>`;
-    body.insertAdjacentHTML('afterbegin', this.renderFacilityForecast(publicFacility));
+    body.innerHTML = `${this.renderTerrainDetails(publicTile, publicFacility?.vision ?? 0)}${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text">${escapeHtml(t('powerNotSupplied'))}: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${workerEditor}${cityTransfer}${recruitment}${checkpoint ? `<section class="checkpoint-editor"><h3>${escapeHtml(t('checkpoint'))}</h3><p class="muted">${escapeHtml(t('waiting'))}: ${checkpoint.waiting} · ${escapeHtml(t('screening'))}: ${checkpoint.screening} · ${escapeHtml(t('approved'))}: ${checkpoint.approved} · ${escapeHtml(t('infected'))}: ${checkpoint.infected}</p></section>` : ''}<div class="action-row"><button class="secondary-button" data-action="build-checkpoint">${escapeHtml(t('buildCheckpoint'))}</button></div>`;
+    body.insertAdjacentHTML('beforeend', this.renderFacilityForecast(publicFacility));
     this.updateTransferPreview();
     this.updateRecruitmentReasons();
   }
@@ -1850,6 +1952,7 @@ export class GameUiController {
   private renderUnitSheet(
     unit: UnitState,
     publicUnit: AgentUnitObservation | undefined,
+    publicTile: AgentMapTileObservation | undefined,
     actions: readonly GameAction[],
     riskText: string,
     supplied: boolean,
@@ -1885,7 +1988,30 @@ export class GameUiController {
     const preview = this.pendingMove
       ? `<div class="preview-card"><strong>${escapeHtml(t('preview'))}</strong><p>${escapeHtml(t('path'))}: ${this.pendingMove.path.length} <span>→ ${this.pendingMove.destination.q},${this.pendingMove.destination.r}</span></p><p>${escapeHtml(t('interceptionRisk'))}: <b class="risk-${riskText.toLowerCase()}">${escapeHtml(riskText)}</b></p><div class="action-row"><button class="primary-button" data-action="confirm-move">${escapeHtml(t('confirm'))}</button><button class="ghost-button" data-action="cancel-move">${escapeHtml(t('cancel'))}</button></div></div>`
       : '';
-    return `<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p><section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(t('selectDestination'))}</p>`;
+    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p><section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(t('selectDestination'))}</p>`;
+  }
+
+  /**
+   * Render the public terrain/overlay values for the selected hex. This uses
+   * AgentObservation rather than internal map state so the human UI and the
+   * public Agent surface stay on the same fair-information boundary.
+   */
+  private renderTerrainDetails(
+    tile: AgentMapTileObservation | undefined,
+    vision: number,
+    unit?: Pick<AgentUnitObservation, 'terrainDefenseSource' | 'terrainDamageMultiplier'>,
+  ): string {
+    if (!tile) return '';
+    const t = this.translator();
+    const overlays = [
+      tile.road ? t('roadOverlay') : null,
+      tile.urban ? t('urbanOverlay') : null,
+    ].filter((value): value is string => Boolean(value));
+    const defenseSource = unit?.terrainDefenseSource ?? tile.terrainDefenseSource;
+    const damageMultiplier = unit?.terrainDamageMultiplier ?? tile.terrainDamageMultiplier;
+    const movementCost = tile.effectiveMovementCost === null ? t('blocked') : String(tile.effectiveMovementCost);
+    const visibility = tile.visibleToPlayer ? t('visible') : t('hidden');
+    return `<section class="terrain-detail terrain-forecast" data-terrain="${escapeHtml(tile.terrain)}"><div class="section-heading"><h3>${escapeHtml(t('terrain'))}</h3><span class="status-chip">${escapeHtml(visibility)}</span></div><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('baseTerrain'))}</dt><dd>${escapeHtml(terrainLabel(tile.terrain, this.locale))}</dd></div><div><dt>${escapeHtml(t('roadOverlay'))} / ${escapeHtml(t('urbanOverlay'))}</dt><dd>${escapeHtml(overlays.join(' · ') || t('none'))}</dd></div><div><dt>${escapeHtml(t('effectiveMovementCost'))}</dt><dd>${escapeHtml(movementCost)}</dd></div><div><dt>${escapeHtml(t('defenseSource'))}</dt><dd>${escapeHtml(terrainDefenseLabel(defenseSource, this.locale))}</dd></div><div><dt>${escapeHtml(t('damageMultiplier'))}</dt><dd>×${escapeHtml(String(damageMultiplier))}</dd></div><div><dt>${escapeHtml(t('vision'))}</dt><dd>${escapeHtml(String(Math.max(0, vision)))}</dd></div></dl></section>`;
   }
 
   private renderFacilityForecast(publicFacility: AgentFacilityObservation | undefined): string {
@@ -1934,6 +2060,7 @@ export class GameUiController {
     title: HTMLElement,
     summary: HTMLElement,
     publicCheckpoint?: AgentCheckpointObservation,
+    publicTile?: AgentMapTileObservation,
   ): void {
     const t = this.translator();
     const statusLabel = t(checkpoint.status);
@@ -1958,7 +2085,7 @@ export class GameUiController {
     );
     const statusSummary = statusLabel + ' · ' + formatDirection(checkpoint.direction, this.locale);
     title.textContent = t('checkpoint') + ' · ' + checkpoint.id;
-    summary.textContent = statusSummary;
+    summary.textContent = `${statusSummary} · ${t('vision')} ${publicCheckpoint?.vision ?? 0}`;
     const branchText = branch ? formatDirection(branch.direction, this.locale) + ' · ' + branch.id : branchId;
     const arrivalText = branchState ? t('arrivalIn') + ' ' + String(Math.max(0, branchState.nextArrivalTurn - this.state!.turn)) : t('unavailable');
     const newPolicies: CheckpointPolicy[] = ['passThrough', 'normal', 'strict'];
@@ -1967,7 +2094,7 @@ export class GameUiController {
     const infectionSection = checkpoint.infected > 0
       ? '<section class="infection-forecast"><h3>' + escapeHtml(t('infectionForecast')) + '</h3><p class="' + (publicCheckpoint?.infectionContained ? 'is-contained' : 'warning-text') + '">' + escapeHtml(publicCheckpoint?.infectionContained ? t('infectionContained') : t('infectionNotContained')) + '</p><p class="muted">' + escapeHtml(t('automaticSuppression')) + ': ' + String(publicCheckpoint?.projectedSuppression ?? 0) + '</p>' + ((publicCheckpoint?.projectedCivilianDamage ?? 0) > 0 ? '<p class="warning-text">' + escapeHtml(t('projectedCivilianDamage')) + ': ' + String(publicCheckpoint?.projectedCivilianDamage) + '</p>' : '<p class="muted">' + escapeHtml(t('noCivilianDamage')) + '</p>') + '</section>'
       : '';
-    body.innerHTML = '<section class="checkpoint-card checkpoint-status-' + escapeHtml(checkpoint.status) + '"><div class="checkpoint-heading"><strong>' +
+    body.innerHTML = this.renderTerrainDetails(publicTile, publicCheckpoint?.vision ?? 0) + '<section class="checkpoint-card checkpoint-status-' + escapeHtml(checkpoint.status) + '"><div class="checkpoint-heading"><strong>' +
       escapeHtml(t('checkpointStatus')) + ': ' + escapeHtml(statusLabel) + '</strong><span class="status-chip ' + (supplied ? 'is-supplied' : 'is-out-of-supply') +
       '">' + escapeHtml(supplied ? t('supplied') : t('outOfSupply')) + '</span></div><dl class="location-grid"><div><dt>' +
       escapeHtml(t('branch')) + '</dt><dd>' + escapeHtml(branchText) + '</dd></div><div><dt>' + escapeHtml(t('nextArrival')) +
