@@ -11,7 +11,7 @@ vi.mock('phaser', () => ({
 
 import type { FacilityState, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
-import { boardLegendViewModel, loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, powerHudViewModel, renderBoardLegend, renderEndTurnForecast, resolveTileSelection, shouldAutosaveAfterLoad } from './controller';
+import { boardLegendViewModel, loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, powerHudViewModel, renderBoardLegend, renderEndTurnForecast, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 
@@ -76,6 +76,22 @@ describe('controller view models', () => {
     const state = testState([], [testFacility('farm-1', 2, 3)]);
 
     expect(resolveTileSelection(state, { q: 2, r: 3 }, 'map')).toEqual({ kind: 'facility', id: 'farm-1' });
+  });
+
+  it('does not auto-show Supply for the capital but keeps it for worker facilities', () => {
+    const state = new GameEngine(1).getState();
+    const capital = state.facilities.find((facility) => facility.type === 'capital')!;
+    const city = state.facilities.find((facility) => facility.type === 'city')!;
+    const farm = state.facilities.find((facility) => facility.type === 'farm')!;
+    const overlayState = {
+      facilities: state.facilities,
+      checkpoints: [{ id: 'checkpoint-test' }] as GameState['checkpoints'],
+    };
+
+    expect(selectionShowsSupplyOverlay(overlayState, { kind: 'facility', id: capital.id })).toBe(false);
+    expect(selectionShowsSupplyOverlay(overlayState, { kind: 'facility', id: city.id })).toBe(false);
+    expect(selectionShowsSupplyOverlay(overlayState, { kind: 'facility', id: farm.id })).toBe(true);
+    expect(selectionShowsSupplyOverlay(overlayState, { kind: 'checkpoint', id: 'checkpoint-test' })).toBe(true);
   });
 
   it('does not autosave a migrated snapshot until a later accepted action', () => {

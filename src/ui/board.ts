@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { forecastFacilityProduction } from '../core/engine';
-import { hexDistance, hexKey, hexNeighbor } from '../core/hex';
-import { getHordeEntrance } from '../core/map';
+import { HEX_DIRECTION_ORDER, hexDistance, hexKey, hexNeighbor } from '../core/hex';
 import { getSectorBranchIds } from '../core/supply';
 import { effectiveMovementCost, isUrbanHex } from '../core/terrain';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
@@ -9,6 +8,7 @@ import type {
   CardinalDirection,
   CheckpointState,
   FacilityState,
+  FixedMap,
   GameState,
   HexCoord,
   HexDirection,
@@ -47,7 +47,6 @@ export interface BoardRenderState {
   selectedVision?: { origin: HexCoord; radius: number } | null;
   supplyOverlay?: boolean;
   suppliedTileKeys?: readonly string[];
-  branchRadii?: readonly { branchId: string; radius: number }[];
   checkpointPreviewPositions?: readonly HexCoord[];
   checkpointPreviewSelected?: HexCoord | null;
   blockedZombieIds?: readonly string[];
@@ -147,6 +146,15 @@ const ROAD_DIRECTION_ANGLE: Record<HexDirection, number> = {
   southEast: Math.PI / 3,
 };
 
+const HEX_EDGE_POINT_INDEX: Record<HexDirection, readonly [number, number]> = {
+  east: [5, 0],
+  northEast: [4, 5],
+  northWest: [3, 4],
+  west: [2, 3],
+  southWest: [1, 2],
+  southEast: [0, 1],
+};
+
 const FALLBACK_FACILITY_SYMBOL: Record<string, string> = {
   capital: '◆',
   city: '●',
@@ -217,6 +225,36 @@ export function roadTextureRotations(directions: readonly HexDirection[]): reado
 }
 
 export const getRoadTextureRotations = roadTextureRotations;
+
+/** Limit a Horde warning to the warned capital-outward road branch. */
+export function hordeWarningTileKeys(map: Readonly<FixedMap>, direction: CardinalDirection): readonly string[] {
+  const branch = map.roadBranches.find((candidate) => candidate.direction === direction);
+  if (branch) return branch.roadTiles.map((position) => hexKey(position));
+  const entrance = map.hordeEntrances.find((candidate) => candidate.direction === direction);
+  return entrance ? [hexKey(entrance.tile)] : [];
+}
+
+export interface SupplyBoundaryEdge {
+  tileKey: string;
+  direction: HexDirection;
+}
+
+/** Return only edges that separate a supplied Hex from a non-supplied Hex. */
+export function supplyBoundaryEdges(
+  map: Readonly<FixedMap>,
+  suppliedTileKeys: ReadonlySet<string> | readonly string[],
+): readonly SupplyBoundaryEdge[] {
+  const supplied = suppliedTileKeys instanceof Set ? suppliedTileKeys : new Set(suppliedTileKeys);
+  const edges: SupplyBoundaryEdge[] = [];
+  for (const tile of map.tiles) {
+    const tileKey = hexKey(tile);
+    if (!supplied.has(tile.key) && !supplied.has(tileKey)) continue;
+    for (const direction of HEX_DIRECTION_ORDER) {
+      if (!supplied.has(hexKey(hexNeighbor(tile, direction)))) edges.push({ tileKey, direction });
+    }
+  }
+  return edges;
+}
 
 function safeString(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -698,8 +736,13 @@ export class HexBoardScene extends Phaser.Scene {
     const hordeWarningType = render.hordeWarningType ?? 'periodic';
     const visibleTileKeys = getPlayerVisibleTileKeys(state);
     const selectedVision = render.selectedVision ?? null;
-    const entrance = hordeDirection ? getHordeEntrance(state.map, hordeDirection) : undefined;
-    const entranceKeys = new Set(entrance?.roadTiles.map((position) => hexKey(position)) ?? []);
+    const hordeRouteKeys = new Set(hordeDirection ? hordeWarningTileKeys(state.map, hordeDirection) : []);
+    const hordeEntrance = hordeDirection
+      ? state.map.hordeEntrances.find((candidate) => candidate.direction === hordeDirection)
+      : undefined;
+    const hordeEntranceKey = hordeEntrance ? hexKey(hordeEntrance.tile) : null;
+    const capital = state.facilities.find((facility) => facility.type === 'capital');
+    const hordeTarget = capital ? this.hexToWorld(state, capital.position) : null;
     const productionByFacility = this.productionMap(state);
     const facilitiesByTile = new Map<string, FacilityState>();
     for (const facility of state.facilities) facilitiesByTile.set(hexKey(facility.position), facility);
@@ -755,13 +798,13 @@ export class HexBoardScene extends Phaser.Scene {
       const facility = facilitiesByTile.get(key);
       const checkpoint = checkpointsByTile.get(key);
       const tileSelected = selected ? sameHex(selected, tile) : false;
-      this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), entranceKeys.has(key), hordeWarningType, selectedVision, render, suppliedTiles, checkpointPreview, selectedCheckpointPreview);
+      this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKey === key, hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointPreview, selectedCheckpointPreview);
       if (facility) this.drawFacilityDynamic(facility, productionByFacility.get(facility.id), center, tileSelected, render, suppliedTiles, key, t);
       if (checkpoint) this.drawCheckpointDynamic(checkpoint, center);
       const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
       units.forEach((unit, index) => this.drawUnitDynamic(unit, center, getFacilityUnitOffset(Boolean(facility || checkpoint)), index, units.length, tileSelected, render, suppliedTiles, key, attackTargets, blockedZombies, t));
     }
-    if (render.supplyOverlay) this.drawSupplyRadii(state, render.branchRadii ?? []);
+    if (render.supplyOverlay) this.drawSupplyBoundary(state, suppliedTiles);
     if (render.pendingPath && render.pendingPath.length > 1) {
       this.graphics.lineStyle(3, 0xffcf66, 0.9);
       const points = render.pendingPath.map((position) => this.hexToWorld(state, position));
@@ -881,7 +924,9 @@ export class HexBoardScene extends Phaser.Scene {
     tileSelected: boolean,
     isLegal: boolean,
     isPath: boolean,
-    isEntrance: boolean,
+    isHordeRoute: boolean,
+    isHordeEntrance: boolean,
+    hordeTarget: { x: number; y: number } | null,
     hordeWarningType: 'periodic' | 'final' | 'none',
     selectedVision: { origin: HexCoord; radius: number } | null,
     render: BoardRenderState,
@@ -889,12 +934,11 @@ export class HexBoardScene extends Phaser.Scene {
     checkpointPreview: ReadonlySet<string>,
     selectedCheckpointPreview: string | null,
   ): void {
-    if (render.supplyOverlay) {
-      const supplied = suppliedTiles.has(tile.key) || suppliedTiles.has(key);
-      this.graphics.fillStyle(supplied ? 0x38a9a4 : 0x02070b, supplied ? 0.08 : 0.14);
+    if (render.supplyOverlay && (suppliedTiles.has(tile.key) || suppliedTiles.has(key))) {
+      this.graphics.fillStyle(0x38a9a4, 0.1);
       this.graphics.fillPoints(this.hexPoints(center), true);
       if (getSectorBranchIds(state.map, { q: tile.q, r: tile.r }).length > 1) {
-        this.graphics.lineStyle(2, 0xf0c867, 0.82);
+        this.graphics.lineStyle(1, 0xa990d6, 0.48);
         this.graphics.strokePoints(this.hexPoints(center), true);
       }
     }
@@ -908,12 +952,11 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.lineStyle(2, 0xffcf66, 0.95);
       this.graphics.strokePoints(this.hexPoints(center), true);
     }
-    if (isEntrance && hordeWarningType !== 'none') {
+    if (isHordeRoute && hordeWarningType !== 'none') {
       const warningColor = hordeWarningType === 'final' ? 0xff8b69 : 0xf0c867;
       this.graphics.lineStyle(3, warningColor, 0.9);
       this.graphics.strokePoints(this.hexPoints(center), true);
-      this.graphics.fillStyle(warningColor, 0.82);
-      this.graphics.fillTriangle(center.x, center.y - 12, center.x - 6, center.y - 2, center.x + 6, center.y - 2);
+      if (isHordeEntrance && hordeTarget) this.drawHordeEntranceArrow(center, hordeTarget, warningColor);
     }
     if (selectedVision && hexDistance(selectedVision.origin, tile) <= selectedVision.radius) {
       this.graphics.lineStyle(2, 0x8be8ff, 0.7);
@@ -1188,17 +1231,45 @@ export class HexBoardScene extends Phaser.Scene {
     this.activeLabelKeys.add(key);
   }
 
-  private drawSupplyRadii(state: Readonly<GameState>, branchRadii: readonly { branchId: string; radius: number }[]): void {
-    const capital = state.facilities.find((facility) => facility.type === 'capital');
-    if (!capital) return;
-    const center = this.hexToWorld(state, capital.position);
-    this.graphics.lineStyle(1, 0x67d0d4, 0.35);
-    this.graphics.strokeCircle(center.x, center.y, Math.max(1, state.config.checkpoint.initialSupplyRadius) * HEX_SIZE * 1.4);
-    for (const [index, branch] of [...branchRadii].sort((left, right) => left.branchId.localeCompare(right.branchId)).entries()) {
-      const radius = Math.max(state.config.checkpoint.initialSupplyRadius, branch.radius);
-      this.graphics.lineStyle(1, index % 2 === 0 ? 0x72e0c2 : 0xf0c867, 0.24);
-      this.graphics.strokeCircle(center.x, center.y, radius * HEX_SIZE * 1.4);
+  private drawSupplyBoundary(state: Readonly<GameState>, suppliedTiles: ReadonlySet<string>): void {
+    const tilesByKey = new Map(state.map.tiles.map((tile) => [hexKey(tile), tile]));
+    this.graphics.lineStyle(3, 0x72e0c2, 0.9);
+    this.graphics.beginPath();
+    for (const edge of supplyBoundaryEdges(state.map, suppliedTiles)) {
+      const tile = tilesByKey.get(edge.tileKey);
+      if (!tile) continue;
+      const points = this.hexPoints(this.hexToWorld(state, tile));
+      const [startIndex, endIndex] = HEX_EDGE_POINT_INDEX[edge.direction];
+      const start = points[startIndex]!;
+      const end = points[endIndex]!;
+      this.graphics.moveTo(start.x, start.y);
+      this.graphics.lineTo(end.x, end.y);
     }
+    this.graphics.strokePath();
+  }
+
+  private drawHordeEntranceArrow(
+    center: { x: number; y: number },
+    target: { x: number; y: number },
+    color: number,
+  ): void {
+    const length = Math.hypot(target.x - center.x, target.y - center.y);
+    if (length === 0) return;
+    const dx = (target.x - center.x) / length;
+    const dy = (target.y - center.y) / length;
+    const perpendicularX = -dy;
+    const perpendicularY = dx;
+    const tip = { x: center.x + dx * 11, y: center.y + dy * 11 };
+    const base = { x: center.x - dx * 5, y: center.y - dy * 5 };
+    this.graphics.fillStyle(color, 0.9);
+    this.graphics.fillTriangle(
+      tip.x,
+      tip.y,
+      base.x + perpendicularX * 7,
+      base.y + perpendicularY * 7,
+      base.x - perpendicularX * 7,
+      base.y - perpendicularY * 7,
+    );
   }
 
   private handleShutdown(): void {

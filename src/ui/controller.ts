@@ -627,6 +627,20 @@ function isCity(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
 }
 
+/** Auto-show Supply only where the current interaction actually depends on it. */
+export function selectionShowsSupplyOverlay(
+  state: Pick<GameState, 'facilities' | 'checkpoints'>,
+  selection: Selection | null,
+): boolean {
+  if (!selection) return false;
+  if (selection.kind === 'checkpoint') {
+    return state.checkpoints.some((checkpoint) => checkpoint.id === selection.id);
+  }
+  if (selection.kind !== 'facility') return false;
+  const facility = state.facilities.find((candidate) => candidate.id === selection.id);
+  return Boolean(facility && !isCity(facility));
+}
+
 function isPowerSupplyFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'farm' || facility.type === 'civilianFactory' || facility.type === 'militaryFactory';
 }
@@ -1357,17 +1371,12 @@ export class GameUiController {
   private updateBoard(): void {
     if (!this.state || !this.boardScene) return;
     const supply = deriveSupplySnapshot(this.state);
-    const supplyContext = this.supplyOverlay || Boolean(this.checkpointPlacement) || this.selection?.kind === 'facility' || this.selection?.kind === 'checkpoint';
+    const supplyContext = this.supplyOverlay || Boolean(this.checkpointPlacement) || selectionShowsSupplyOverlay(this.state, this.selection);
     const preview = this.checkpointPreview();
     const previewTarget = this.checkpointPlacement ? this.checkpointPreviewTarget : null;
     const suppliedTileKeys = previewTarget
       ? getSuppliedTileKeys(this.state, { branchId: previewTarget.branchId, checkpointPosition: previewTarget.position })
       : supply.suppliedTileKeys;
-    const branchRadii = previewTarget
-      ? supply.branchRadii.map((entry) => entry.branchId === previewTarget.branchId
-        ? { ...entry, radius: getBranchSupplyRadius(this.state!, entry.branchId, previewTarget.position) }
-        : entry)
-      : supply.branchRadii;
     const render: BoardRenderState = {
       state: this.state,
       locale: this.locale,
@@ -1382,7 +1391,6 @@ export class GameUiController {
       selectedVision: this.selectedVision(),
       supplyOverlay: supplyContext,
       suppliedTileKeys,
-      branchRadii,
       checkpointPreviewPositions: preview.positions,
       blockedZombieIds: preview.blockedZombieIds,
       checkpointPreviewSelected: previewTarget?.position,
