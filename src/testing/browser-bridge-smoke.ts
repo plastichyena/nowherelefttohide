@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve, relative, sep } from 'node:path';
+import { BOARD_ASSET_PATHS } from '../ui/boardAssets';
 
 const DEFAULT_DIST = 'dist';
 const MAX_BUNDLE_BYTES = 20 * 1024 * 1024;
@@ -51,6 +52,16 @@ function run(): void {
   const agentPagePath = resolve(dist, 'agent-api.html');
   if (!existsSync(indexPath)) fail('dist/index.html is missing');
   if (!existsSync(agentPagePath)) fail('dist/agent-api.html is missing');
+  const boardAssetRoot = resolve(dist, 'assets', 'board');
+  if (!existsSync(resolve(boardAssetRoot, 'ASSET_MANIFEST.md'))) fail('board Asset Manifest is missing');
+  let boardAssetBytes = 0;
+  for (const assetPath of BOARD_ASSET_PATHS) {
+    const runtimePath = resolve(boardAssetRoot, assetPath);
+    assertInside(boardAssetRoot, runtimePath);
+    if (!existsSync(runtimePath)) fail(`board runtime asset is missing: ${assetPath}`);
+    boardAssetBytes += statSync(runtimePath).size;
+  }
+  if (boardAssetBytes > 3 * 1024 * 1024) fail(`board runtime assets exceed 3 MiB: ${boardAssetBytes}`);
 
   const index = readFileSync(indexPath, 'utf8');
   const agentPage = readFileSync(agentPagePath, 'utf8');
@@ -88,7 +99,7 @@ function run(): void {
     if (!bundle.includes(method)) fail(`production bundle does not contain bridge method marker: ${method}`);
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
-  for (const marker of ['1.3.0', '1.4.0', 'fixed-15x15-v2', 'SetPowerSupply', 'RelocateCheckpoint', 'roadBranches', 'suppliedTileKeys', 'artifactSchemaVersion', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression', 'visibleToPlayer', 'finalHordeStatus']) {
+  for (const marker of ['1.3.1', '1.4.0', 'fixed-15x15-v2', 'SetPowerSupply', 'RelocateCheckpoint', 'roadBranches', 'suppliedTileKeys', 'artifactSchemaVersion', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression', 'visibleToPlayer', 'finalHordeStatus']) {
     if (!bundle.includes(marker)) fail(`production bundle does not contain v1.3 schema marker: ${marker}`);
   }
   // This is deliberately a static smoke: the project has no browser-driver

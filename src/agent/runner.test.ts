@@ -27,6 +27,9 @@ describe('unified Agent Runner', () => {
     expect(replay.reproduced).toBe(true);
     expect(replay.mismatch).toBeNull();
     expect(replay.actionsReplayed).toBe(first.actions.length);
+    const previousAppReplay = replayArtifact({ ...first.artifact, appVersion: '1.3.0' });
+    expect(previousAppReplay.reproduced).toBe(true);
+    expect(previousAppReplay.mismatch).toBeNull();
   });
 
   it('rejects v1.3 and earlier artifacts before creating a v1.4 replay session', () => {

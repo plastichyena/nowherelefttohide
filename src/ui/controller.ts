@@ -55,7 +55,7 @@ import {
   projectCityTransfer,
   workerAssignmentBounds,
 } from './actions';
-import { createBoardGame, type BoardRenderState, type HexBoardScene } from './board';
+import { createBoardGame, type BoardAssetWarning, type BoardRenderState, type HexBoardScene } from './board';
 import {
   createTranslator,
   getInitialLocale,
@@ -70,6 +70,7 @@ import {
   exportSaveJson,
   importSaveJson,
 } from '../persistence/save';
+import { BOARD_ASSET_REGISTRY, resolveBoardAssetUrl } from './boardAssets';
 
 export interface MovePreview {
   path: HexCoord[];
@@ -164,6 +165,354 @@ export function phaseIndicatorViewModel(phase: GamePhase, locale: Locale): Phase
     shortLabel,
     label: `${translator('phase')}: ${shortLabel}`,
   };
+}
+
+/**
+ * The compact power pill is deliberately derived from the public forecast in
+ * one place.  The numerator is demand (Required plus Industrial Boost), while
+ * the denominator is the generation that is actually available this turn.
+ * In particular, this helper does not infer shortage from those two numbers:
+ * `electricity.shortage` remains the Core's source of truth.
+ */
+export interface PowerHudViewModel {
+  demand: number;
+  available: number;
+  requiredAllocated: number;
+  industrialBoostAllocated: number;
+  shortage: number;
+  display: string;
+  label: string;
+  accessibleName: string;
+  tooltip: string;
+  isShortage: boolean;
+}
+
+export type PowerHudForecast = Readonly<Pick<
+  EndTurnForecast['electricity'],
+  | 'availableGenerationCapacity'
+  | 'requiredPowerDemand'
+  | 'industrialBoostDemand'
+  | 'requiredPowerAllocated'
+  | 'industrialBoostAllocated'
+  | 'shortage'
+>>;
+
+export function powerHudViewModel(
+  electricity: PowerHudForecast,
+  locale: Locale,
+): PowerHudViewModel {
+  const t = createTranslator(locale);
+  const demand = electricity.requiredPowerDemand + electricity.industrialBoostDemand;
+  const available = electricity.availableGenerationCapacity;
+  const isShortage = electricity.shortage > 0;
+  const shortage = electricity.shortage;
+  const label = t('powerHudLabel');
+  const accessibleName = locale === 'ja'
+    ? `${label}。${t('projectedPowerDemand')} ${demand}、${t('availablePowerSupply')} ${available}、${t('powerHudAccessibleShortage')} ${shortage}`
+    : `${label}: ${t('projectedPowerDemand')} ${demand}, ${t('availablePowerSupply')} ${available}, ${t('powerHudAccessibleShortage')} ${shortage}`;
+  const tooltip = locale === 'ja'
+    ? `${t('projectedPowerDemand')}: ${demand} · ${t('availablePowerSupply')}: ${available} · ${t('requiredPowerAllocated')}: ${electricity.requiredPowerAllocated} · ${t('industrialBoostAllocated')}: ${electricity.industrialBoostAllocated} · ${t('shortage')}: ${shortage}`
+    : `${t('projectedPowerDemand')}: ${demand} · ${t('availablePowerSupply')}: ${available} · ${t('requiredPowerAllocated')}: ${electricity.requiredPowerAllocated} · ${t('industrialBoostAllocated')}: ${electricity.industrialBoostAllocated} · ${t('shortage')}: ${shortage}`;
+  return {
+    demand,
+    available,
+    requiredAllocated: electricity.requiredPowerAllocated,
+    industrialBoostAllocated: electricity.industrialBoostAllocated,
+    shortage,
+    display: `${demand}/${available}`,
+    label,
+    accessibleName,
+    tooltip,
+    isShortage,
+  };
+}
+
+/**
+ * The Help legend accepts the UI registry without making the Core depend on
+ * asset paths.  Keeping the small structural interface here also lets the
+ * legend remain testable when Phaser and the runtime loader are unavailable.
+ * `boardAssets.ts` supplies the concrete registry at runtime; the symbolic
+ * fallback is used only while an asset registry is not available (for example
+ * in a headless view-model test).
+ */
+export interface BoardLegendAsset {
+  path?: string;
+  lodPath?: string;
+  label?: string;
+  symbol?: string;
+}
+
+export type BoardLegendRegistry = Readonly<Record<string, unknown>>;
+
+export interface BoardLegendEntry {
+  key: string;
+  label: string;
+  description: string;
+  path: string | null;
+  lodPath: string | null;
+  paths?: readonly string[];
+  symbol: string;
+}
+
+export interface BoardLegendSection {
+  key: string;
+  title: string;
+  entries: BoardLegendEntry[];
+}
+
+export interface BoardLegendViewModel {
+  config: Readonly<GameConfig>;
+  configSource: 'current' | 'standard';
+  sections: BoardLegendSection[];
+}
+
+const LEGEND_TERRAINS = ['plain', 'forest', 'mountain'] as const;
+const LEGEND_OVERLAYS = ['road', 'urban'] as const;
+const LEGEND_UNITS = ['police', 'nationalGuard', 'zombie', 'hordeZombie'] as const;
+const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'checkpoint'] as const;
+
+function legendAssetFromRegistry(
+  registry: BoardLegendRegistry | undefined,
+  category: string,
+  key: string,
+): BoardLegendAsset | undefined {
+  if (!registry || typeof registry !== 'object') return undefined;
+  const root = registry as Record<string, unknown>;
+  const categoryName = category === 'overlay' || category.endsWith('State') || category === 'horde'
+    ? 'overlays'
+    : category === 'facility'
+      ? 'facilities'
+      : category === 'unit'
+        ? 'units'
+        : category;
+  const categoryValue = root[categoryName];
+  const categoryEntries = categoryValue && typeof categoryValue === 'object'
+    ? categoryValue as Record<string, unknown>
+    : undefined;
+  const aliases: Record<string, string> = category === 'facilityState'
+    ? { unowned: 'unsecured', owned: 'secured' }
+    : category === 'checkpointState'
+      ? { operational: 'checkpointOperational', abandoned: 'checkpointAbandoned', remnant: 'checkpointRemnant' }
+      : category === 'horde'
+        ? { periodic: 'horde', final: 'final' }
+        : {};
+  const candidateKey = aliases[key] ?? key;
+  const candidate = categoryEntries?.[candidateKey];
+  const nested = candidate && typeof candidate === 'object' ? candidate as Record<string, unknown> : undefined;
+  if (typeof candidate === 'string') return { path: candidate };
+  if (!nested) return undefined;
+  return {
+    path: typeof nested.path === 'string' ? nested.path : typeof nested.src === 'string' ? nested.src : undefined,
+    lodPath: typeof nested.lodPath === 'string' ? nested.lodPath : typeof nested.lod === 'string' ? nested.lod : undefined,
+    label: typeof nested.label === 'string' ? nested.label : undefined,
+    symbol: typeof nested.symbol === 'string' ? nested.symbol : undefined,
+  };
+}
+
+function legendAssetEntry(
+  registry: BoardLegendRegistry | undefined,
+  category: string,
+  key: string,
+  label: string,
+  description: string,
+  symbol: string,
+): BoardLegendEntry {
+  const asset = legendAssetFromRegistry(registry, category, key);
+  return {
+    key,
+    label: asset?.label ?? label,
+    description,
+    path: asset?.path ?? null,
+    lodPath: asset?.lodPath ?? null,
+    symbol: asset?.symbol ?? symbol,
+  };
+}
+
+function legendCompositeEntry(
+  registry: BoardLegendRegistry | undefined,
+  key: string,
+  label: string,
+  description: string,
+  layers: ReadonlyArray<readonly [string, string]>,
+  symbol: string,
+): BoardLegendEntry {
+  const paths = layers
+    .map(([category, layer]) => legendAssetFromRegistry(registry, category, layer)?.path)
+    .filter((path): path is string => Boolean(path));
+  return {
+    key,
+    label,
+    description,
+    path: paths[0] ?? null,
+    lodPath: null,
+    paths: paths.length > 0 ? paths : undefined,
+    symbol,
+  };
+}
+
+function configLegendEntry(
+  key: string,
+  label: string,
+  value: string,
+): BoardLegendEntry {
+  return legendAssetEntry(undefined, 'config', key, label, value, '·');
+}
+
+function configLegendEntries(
+  config: Readonly<GameConfig>,
+  locale: Locale,
+): BoardLegendEntry[] {
+  const t = createTranslator(locale);
+  const entries: BoardLegendEntry[] = [];
+  const add = (key: string, label: string, value: string): void => {
+    entries.push(configLegendEntry(key, label, value));
+  };
+  const terrainCost = config.terrain.movementCost;
+  add('movementCostPlain', t('legendMovementCostPlain'), String(terrainCost.plain));
+  add('movementCostForest', t('legendMovementCostForest'), String(terrainCost.forest));
+  add('movementCostMountain', t('legendMovementCostMountain'), String(terrainCost.mountain));
+  add('urbanDefenseMultiplier', t('legendUrbanDefenseMultiplier'), `×${config.terrain.damageMultiplier.urban}`);
+  add('forestDefenseMultiplier', t('legendForestDefenseMultiplier'), `×${config.terrain.damageMultiplier.forestZombie}`);
+  add('ownedFacilityVision', t('legendOwnedFacilityVision'), String(config.vision.ownedFacility));
+  add('operationalCheckpointVision', t('legendOperationalCheckpointVision'), String(config.vision.operationalCheckpoint));
+
+  for (const key of LEGEND_UNITS) {
+    const unit = config.units[key];
+    add(`unit.${key}`, unitLabel(key, locale), `${t('legendHp')} ${unit.hp} · ${t('legendAttack')} ${unit.attack} · ${t('legendMovement')} ${unit.movement} · ${t('legendRange')} ${unit.range} · ${t('legendVision')} ${unit.vision} · ${t('legendPopulation')} ${unit.population}`);
+  }
+  for (const key of LEGEND_FACILITIES) {
+    if (key === 'checkpoint') continue;
+    const facility = config.facilities[key];
+    const production = facility.production;
+    add(`facility.${key}`, facilityLabel(key, locale), `${t('legendWorkers')} ${facility.workerCapacity} · ${t('legendMode')} ${powerModeLabel(production.powerMode, locale)} · ${t('legendPowerCapacity')} ${production.powerCapacity} · ${t('legendPowerGeneration')} ${production.powerGeneration} · ${t('legendInputs')} ${formatResourceAmounts(production.inputs, locale, true)} · ${t('legendOutputs')} ${formatResourceAmounts(production.outputs, locale, true)}`);
+  }
+  add('populationConsumption', t('legendPopulationConsumption'), `${t('food')} ${config.economy.populationConsumption.food} · ${t('civilianGoods')} ${config.economy.populationConsumption.civilianGoods}`);
+  add('militaryGoodsPerUnit', t('legendMilitaryGoodsPerUnit'), String(config.economy.militaryGoodsPerUnitPopulation));
+  add('maxActionsPerTurn', t('maxActionsPerTurn'), String(config.maxActionsPerTurn));
+  add('finalHordeTurn', t('finalHordeTurn'), String(config.finalHordeTurn));
+  add('hordeCycle', t('hordeCycle'), String(config.horde.cycle));
+  add('hordeWarningStart', t('hordeWarningStart'), String(config.horde.warningStartTurn));
+  add('hordeInitial', t('hordeInitial'), String(config.horde.initialCount));
+  add('hordeIncrement', t('hordeIncrement'), String(config.horde.increment));
+  add('finalHordeCount', t('finalHordeCount'), String(config.horde.finalCount));
+  add('initialSupplyRadius', t('initialSupplyRadius'), String(config.checkpoint.initialSupplyRadius));
+  add('checkpointMaxPerDirection', t('checkpointMaxPerDirection'), String(config.checkpoint.maxPerDirection));
+  add('checkpointConstructionCost', t('checkpointConstructionCost'), String(config.checkpoint.constructionCivilianGoods));
+  add('screeningCapacity', t('screeningCapacity'), String(config.refugees.screeningCapacity));
+  for (const policy of ['passThrough', 'normal', 'strict'] as const) {
+    const rule = config.refugees.policies[policy];
+    add(`policy.${policy}`, t(policy), `${t('policyTurns')} ${rule.turns} · ${t('policyAcceptance')} ${formatPercent(rule.workerRate, locale)} · ${t('policyInfection')} ${formatPercent(rule.infectionRate, locale)} · ${t('policyInfectedPopulation')} ${formatPercent(rule.infectionPopulationRate, locale)}`);
+  }
+  add('facilitySpread', t('legendFacilitySpread'), String(config.infection.facilitySpreadPerTurn));
+  add('policeSuppression', t('legendPoliceSuppression'), String(config.infection.policeSuppression));
+  add('guardSuppression', t('legendGuardSuppression'), String(config.infection.nationalGuardSuppression));
+  add('guardCivilianDamage', t('legendGuardCivilianDamage'), formatPercent(config.infection.nationalGuardCivilianDamageRate, locale));
+  add('combatRecovery', t('legendCombatRecovery'), formatPercent(config.naturalRecovery.combatRate, locale));
+  add('restRecovery', t('legendRestRecovery'), formatPercent(config.naturalRecovery.restRate, locale));
+  return entries;
+}
+
+function legendDescription(key: string, locale: Locale, t: (key: string, fallback?: string) => string): string {
+  const translated = t(`legendDescription.${key}`);
+  if (translated !== `legendDescription.${key}`) return translated;
+  const fallback: Record<string, [string, string]> = {
+    plain: ['Movement Costは下のConfig数値。特別な防御補正なし。', 'Movement Cost comes from the Config values below. No special defense modifier.'],
+    forest: ['Movement Costは下のConfig数値。Forest上のZombieにはForest防御が適用されます。', 'Movement Cost comes from the Config values below. Zombies receive Forest defense on Forest tiles.'],
+    mountain: ['Movement Costは下のConfig数値。', 'Movement Cost comes from the Config values below.'],
+    road: ['基礎TerrainではないOverlay。実効移動Costは1です。', 'An overlay, not base Terrain. Effective movement Cost is 1.'],
+    urban: ['基礎TerrainではないOverlay。実効移動Costは1で、Urban防御が適用されます。', 'An overlay, not base Terrain. Effective movement Cost is 1 and Urban defense applies.'],
+    police: ['感染鎮圧と治安活動を担います。自動鎮圧時の民間被害はありません。', 'Handles infection suppression and security. Automatic suppression causes no civilian damage.'],
+    nationalGuard: ['射程と火力に優れます。軍需不足時は実効射程が低下し、鎮圧時に民間被害があります（数値はConfig）。', 'Provides range and firepower. Military shortages reduce effective range; suppression can harm civilians (values come from Config).'],
+    zombie: ['通常の敵Unit。視界外では表示されません。', 'A normal enemy unit. Hidden outside player visibility.'],
+    hordeZombie: ['Periodic／Final Hordeの敵Unit。Horde Markerと併記します。', 'Enemy unit used by Periodic and Final Hordes, shown with a Horde marker.'],
+    periodic: ['周期的に到着するHorde。Final Horde発生Turn以後は生成されません。', 'A periodic Horde. It is not generated after the Final Horde turn.'],
+    final: ['Configで指定されたFinal Horde。撃退がVictory条件の一つです。', 'The Config-specified Final Horde. Defeating it is one Victory condition.'],
+    capital: ['州都。人口の基点、編成、初期Supplyを担います。', 'The capital anchors population, recruitment, and initial Supply.'],
+    city: ['地方都市。人口を受け入れ、警察編成と民需品生産を担います。', 'A regional city that receives population, produces Police, and supports civilian goods.'],
+    farm: ['食料を生産する産業施設。Power Supplyで出力がBoostされます。', 'Produces Food. Power Supply boosts its output.'],
+    civilianFactory: ['民需品を生産する産業施設。Power Supplyで出力がBoostされます。', 'Produces Civilian Goods. Power Supply boosts its output.'],
+    militaryFactory: ['軍需品を生産する産業施設。入力とPower Supplyで出力が決まります。', 'Produces Military Goods. Output depends on inputs and Power Supply.'],
+    refinery: ['Fuelを生産する施設。発電のFuel入力を支えます。', 'Produces Fuel for generation.'],
+    powerPlant: ['電力Capacityを発電する施設。Turn-start Fuelの制限を受けます。', 'Generates power Capacity and is limited by Turn-start Fuel.'],
+    checkpoint: ['道路上の避難民を待機・審査・合格の3プールで管理します。', 'Manages road refugees through waiting, screening, and approved pools.'],
+    unowned: ['未確保。人口操作や生産はできません。', 'Unsecured. Population actions and production are unavailable.'],
+    owned: ['確保済み。安全と操作可能Turnの条件を満たせば利用できます。', 'Secured. Available when safe and past its operational turn.'],
+    stopped: ['現在停止。状態Markerで停止理由を示します。', 'Currently stopped. The state marker identifies the reason.'],
+    infected: ['感染中。感染と生産停止を別々のMarkerで示します。', 'Infected. Infection and production shutdown are shown separately.'],
+    ruined: ['荒廃。復旧まで生産・供給の対象外です。', 'Ruined. Excluded from production and supply until recovered.'],
+    operational: ['稼働中。避難民方針とSupplyを利用できます。', 'Operational. Refugee policy and Supply are active.'],
+    abandoned: ['放棄。避難民管理は停止し、Supplyを延長しません。', 'Abandoned. Refugee management stops and Supply is not extended.'],
+    remnant: ['跡地／残存拠点。Lifecycleを保ちますがSupplyは延長しません。', 'Remnant. The lifecycle remains, but it does not extend Supply.'],
+  };
+  return fallback[key]?.[locale === 'ja' ? 0 : 1] ?? key;
+}
+
+function legendSections(
+  config: Readonly<GameConfig>,
+  locale: Locale,
+  registry: BoardLegendRegistry | undefined,
+): BoardLegendSection[] {
+  const t = createTranslator(locale);
+  const terrain = LEGEND_TERRAINS.map((key) => legendAssetEntry(registry, 'terrain', key, terrainLabel(key, locale), legendDescription(key, locale, t), key === 'plain' ? '◇' : key === 'forest' ? '♣' : '△'));
+  const overlays = LEGEND_OVERLAYS.map((key) => legendAssetEntry(registry, 'overlay', key, key === 'road' ? t('roadOverlay') : t('urbanOverlay'), legendDescription(key, locale, t), key === 'road' ? '═' : '▦'));
+  const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'zombie' ? 'Z' : 'H'));
+  const horde = (['periodic', 'final'] as const).map((key) => legendAssetEntry(registry, 'horde', key, key === 'periodic' ? t('periodicHorde') : t('finalHorde'), legendDescription(key, locale, t), key === 'periodic' ? '↝' : '✹'));
+  const facilities = LEGEND_FACILITIES.map((key) => legendAssetEntry(registry, 'facility', key, key === 'checkpoint' ? t('checkpoint') : facilityLabel(key, locale), legendDescription(key, locale, t), key === 'capital' ? '★' : key === 'city' ? '⌂' : key === 'checkpoint' ? '⊞' : '▣'));
+  const facilityStates = ['unowned', 'owned', 'stopped', 'infected', 'ruined'].map((key) => legendAssetEntry(registry, 'facilityState', key, t(key), legendDescription(key, locale, t), key === 'owned' ? '✓' : key === 'infected' ? '☣' : key === 'ruined' ? '×' : '•'));
+  facilityStates.push(
+    legendCompositeEntry(registry, 'securedStopped', locale === 'ja' ? '確保済み + 停止中' : 'Secured + stopped', locale === 'ja' ? '確保済みのBaseに停止中Overlayを重ねます。' : 'Composes the secured Base with the stopped overlay.', [['facilityState', 'owned'], ['facilityState', 'stopped']], '✓·'),
+    legendCompositeEntry(registry, 'unsecuredInfected', locale === 'ja' ? '未確保 + 感染' : 'Unsecured + infected', locale === 'ja' ? '未確保のBaseに感染Overlayを重ねます。' : 'Composes the unsecured Base with the infected overlay.', [['facilityState', 'unowned'], ['facilityState', 'infected']], '•☣'),
+    legendCompositeEntry(registry, 'ruinedInfected', locale === 'ja' ? '荒廃 + 感染' : 'Ruined + infected', locale === 'ja' ? '荒廃Overlayと感染Overlayを併記します。' : 'Shows ruined and infected overlays together.', [['facilityState', 'ruined'], ['facilityState', 'infected']], '×☣'),
+  );
+  const checkpointStates = ['operational', 'abandoned', 'remnant', 'ruined', 'infected'].map((key) => legendAssetEntry(registry, 'checkpointState', key, t(key), legendDescription(key, locale, t), key === 'operational' ? '●' : key === 'abandoned' ? '◌' : key === 'remnant' ? '◍' : key === 'infected' ? '☣' : '×'));
+  const dynamic = ['selected', 'legalDestination', 'path', 'attackTarget', 'hp', 'infected', 'stopped', 'projected', 'vision', 'fogOfWar', 'supply', 'hordeDirection'].map((key) => legendAssetEntry(registry, 'dynamicOverlay', key, t(`legendOverlay.${key}`), t(`legendOverlayDescription.${key}`), key === 'selected' ? '◎' : key === 'path' ? '→' : key === 'attackTarget' ? '✦' : key === 'hp' ? '▰' : key === 'infected' ? '☣' : key === 'vision' ? '◌' : key === 'fogOfWar' ? '░' : key === 'supply' ? '▧' : key === 'hordeDirection' ? '↝' : '·'));
+  const configRows = configLegendEntries(config, locale);
+  return [
+    { key: 'terrain', title: t('legendTerrain'), entries: terrain },
+    { key: 'overlays', title: t('legendOverlays'), entries: overlays },
+    { key: 'units', title: t('legendUnits'), entries: units },
+    { key: 'horde', title: t('legendHorde'), entries: horde },
+    { key: 'facilities', title: t('legendFacilities'), entries: facilities },
+    { key: 'facilityStates', title: t('legendFacilityStates'), entries: facilityStates },
+    { key: 'checkpointStates', title: t('legendCheckpointStates'), entries: checkpointStates },
+    { key: 'zoom', title: t('legendZoom'), entries: [
+      legendAssetEntry(registry, 'lod', 'normal', t('legendNormalZoom'), t('legendNormalZoomDescription'), '▣'),
+      legendAssetEntry(registry, 'lod', 'low', t('legendLowZoom'), t('legendLowZoomDescription'), '▪'),
+    ] },
+    { key: 'dynamic', title: t('legendDynamicOverlay'), entries: dynamic },
+    { key: 'config', title: t('legendConfigRules'), entries: configRows },
+  ];
+}
+
+export function boardLegendViewModel(
+  config: Readonly<GameConfig> | null | undefined,
+  locale: Locale,
+  registry?: BoardLegendRegistry,
+): BoardLegendViewModel {
+  const configSource = config ? 'current' : 'standard';
+  const resolvedConfig = config ?? createDefaultConfig();
+  return { config: resolvedConfig, configSource, sections: legendSections(resolvedConfig, locale, registry ?? BOARD_ASSET_REGISTRY) };
+}
+
+function legendImage(entry: BoardLegendEntry): string {
+  if (entry.path) {
+    const paths = entry.paths && entry.paths.length > 0 ? entry.paths : [entry.path];
+    const lod = entry.lodPath ? ` data-lod-src="${escapeHtml(resolveBoardAssetUrl(entry.lodPath))}"` : '';
+    return `<span class="board-legend-images">${paths.map((path, index) => `<img class="board-legend-icon" src="${escapeHtml(resolveBoardAssetUrl(path))}" alt="" loading="lazy"${index === 0 ? lod : ''} />`).join('')}</span>`;
+  }
+  return `<span class="board-legend-symbol" aria-hidden="true">${escapeHtml(entry.symbol)}</span>`;
+}
+
+export function renderBoardLegend(
+  config: Readonly<GameConfig> | null | undefined,
+  locale: Locale,
+  registry?: BoardLegendRegistry,
+): string {
+  const t = createTranslator(locale);
+  const view = boardLegendViewModel(config, locale, registry);
+  const source = view.configSource === 'current' ? t('legendConfigCurrent') : t('legendConfigStandard');
+  const sections = view.sections.map((section) => `<section class="board-legend-section" data-legend-section="${escapeHtml(section.key)}"><h4>${escapeHtml(section.title)}</h4><ul class="board-legend-list">${section.entries.map((entry) => `<li class="board-legend-entry" data-legend-key="${escapeHtml(entry.key)}">${legendImage(entry)}<span class="board-legend-copy"><strong>${escapeHtml(entry.label)}</strong><span>${escapeHtml(entry.description)}</span></span>${entry.key === 'config' ? `<b class="board-legend-value">${escapeHtml(entry.description)}</b>` : ''}</li>`).join('')}</ul></section>`).join('');
+  return `<div class="board-legend" data-board-legend="true"><h3 class="board-legend-heading">${escapeHtml(t('legendTitle'))}</h3><p class="board-legend-source"><strong>${escapeHtml(t('legendConfigSource'))}</strong>: ${escapeHtml(source)}</p><p class="muted">${escapeHtml(t('legendIntro'))}</p>${sections}<section class="board-legend-rules"><h4>${escapeHtml(t('legendRules'))}</h4><p>${escapeHtml(t('legendTerrainRule'))}</p><p>${escapeHtml(t('legendOverlayRule'))}</p><p>${escapeHtml(t('legendUnitRule'))}</p><p>${escapeHtml(t('legendHordeRule'))}</p><p>${escapeHtml(t('legendStateRule'))}</p><p>${escapeHtml(t('legendPowerRule'))}</p><p>${escapeHtml(t('legendFogRule'))}</p><p>${escapeHtml(t('legendDynamicRule'))}</p></section></div>`;
 }
 
 export function loadValidationError(
@@ -379,11 +728,11 @@ function forecastResourceCard(
 export function renderEndTurnForecast(forecast: EndTurnForecast, locale: Locale): string {
   const t = createTranslator(locale);
   const electricity = forecast.electricity;
-  const totalDemand = electricity.requiredPowerDemand + electricity.industrialBoostDemand;
+  const powerHud = powerHudViewModel(electricity, locale);
   const unpowered = electricity.unpoweredFacilities.length > 0
     ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredFacilities'))}</strong>: ${electricity.unpoweredFacilities.map((entry) => `${escapeHtml(entry.facilityId)} · ${escapeHtml(powerReasonLabel(entry.reason, locale))}`).join(' / ')}</p>`
     : `<p class="muted">${escapeHtml(t('unpoweredFacilities'))}: ${escapeHtml(t('none'))}</p>`;
-  return `<section class="forecast-card end-turn-forecast"><h3>${escapeHtml(t('endTurnForecast'))}</h3><p class="muted">${escapeHtml(t('overcrowding'))}: ${escapeHtml(formatPercent(forecast.overcrowding.cities.reduce((total, city) => total + city.excess / Math.max(1, city.softCap), 0), locale))} · ${escapeHtml(t('additionalFood'))} ${forecast.overcrowding.additionalFood} · ${escapeHtml(t('additionalCivilianGoods'))} ${forecast.overcrowding.additionalCivilianGoods}</p>${forecastResourceCard('food', forecast.food, locale)}${forecastResourceCard('civilianGoods', forecast.civilianGoods, locale)}${forecastResourceCard('militaryGoods', forecast.militaryGoods, locale)}${forecastResourceCard('fuel', forecast.fuel, locale)}<section class="forecast-card power-forecast"><h4>${escapeHtml(t('electricity'))}</h4><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('physicalGenerationCapacity'))}</dt><dd>${electricity.physicalGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('fuelLimitedGenerationCapacity'))}</dt><dd>${electricity.fuelLimitedGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('availableGenerationCapacity'))}</dt><dd>${electricity.availableGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('requiredPowerDemand'))}</dt><dd>${electricity.requiredPowerDemand}</dd></div><div><dt>${escapeHtml(t('industrialBoostDemand'))}</dt><dd>${electricity.industrialBoostDemand}</dd></div><div><dt>${escapeHtml(t('requiredPowerAllocated'))}</dt><dd>${electricity.requiredPowerAllocated}</dd></div><div><dt>${escapeHtml(t('industrialBoostAllocated'))}</dt><dd>${electricity.industrialBoostAllocated}</dd></div><div><dt>${escapeHtml(t('shortage'))}</dt><dd>${electricity.shortage}</dd></div></dl><p class="muted">${escapeHtml(t('availableGenerationCapacity'))} ${electricity.availableGenerationCapacity} / ${totalDemand}</p>${unpowered}</section></section>`;
+  return `<section class="forecast-card end-turn-forecast"><h3>${escapeHtml(t('endTurnForecast'))}</h3><p class="muted">${escapeHtml(t('overcrowding'))}: ${escapeHtml(formatPercent(forecast.overcrowding.cities.reduce((total, city) => total + city.excess / Math.max(1, city.softCap), 0), locale))} · ${escapeHtml(t('additionalFood'))} ${forecast.overcrowding.additionalFood} · ${escapeHtml(t('additionalCivilianGoods'))} ${forecast.overcrowding.additionalCivilianGoods}</p>${forecastResourceCard('food', forecast.food, locale)}${forecastResourceCard('civilianGoods', forecast.civilianGoods, locale)}${forecastResourceCard('militaryGoods', forecast.militaryGoods, locale)}${forecastResourceCard('fuel', forecast.fuel, locale)}<section class="forecast-card power-forecast"><h4>${escapeHtml(t('electricity'))}</h4><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('physicalGenerationCapacity'))}</dt><dd>${electricity.physicalGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('fuelLimitedGenerationCapacity'))}</dt><dd>${electricity.fuelLimitedGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('availableGenerationCapacity'))}</dt><dd>${electricity.availableGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('requiredPowerDemand'))}</dt><dd>${electricity.requiredPowerDemand}</dd></div><div><dt>${escapeHtml(t('industrialBoostDemand'))}</dt><dd>${electricity.industrialBoostDemand}</dd></div><div><dt>${escapeHtml(t('requiredPowerAllocated'))}</dt><dd>${electricity.requiredPowerAllocated}</dd></div><div><dt>${escapeHtml(t('industrialBoostAllocated'))}</dt><dd>${electricity.industrialBoostAllocated}</dd></div><div><dt>${escapeHtml(t('shortage'))}</dt><dd>${electricity.shortage}</dd></div></dl><p class="muted">${escapeHtml(t('powerHudLabel'))}: ${escapeHtml(powerHud.display)}</p>${unpowered}</section></section>`;
 }
 
 function recoveryClassLabel(recoveryClass: AgentUnitObservation['recoveryClassIfTurnEndsNow'], locale: Locale): string {
@@ -730,13 +1079,13 @@ export class GameUiController {
         <span class="resource-pill civ-pill">▣ <b data-bind="civilianGoods">0</b><small>${escapeHtml(t('civilianGoods'))}</small></span>
         <span class="resource-pill mil-pill">✦ <b data-bind="militaryGoods">0</b><small>${escapeHtml(t('militaryGoods'))}</small></span>
         <span class="resource-pill fuel-pill">◌ <b data-bind="fuel">0</b><small>${escapeHtml(t('fuel'))}</small></span>
-        <span class="resource-pill power-pill">⚡ <b data-bind="power">0/0</b><small>${escapeHtml(t('electricity'))}</small></span>
+        <span class="resource-pill power-pill" data-bind="power-pill" role="img" aria-label="${escapeHtml(t('powerHudLabel'))}">⚡ <b data-bind="power">0/0</b><small data-bind="power-label">${escapeHtml(t('powerHudLabel'))}</small></span>
         <span class="resource-pill civilian-pill">♙ <b data-bind="healthy-civilians">0</b><small>${escapeHtml(t('healthyCivilians'))}</small></span>
         <span class="resource-pill infected-pill">☣ <b data-bind="infected">0</b><small>${escapeHtml(t('infected'))}</small></span>
       </section>
       <section class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><div class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></div><div class="horde-facts"><span><small>${escapeHtml(t('direction'))}</small><b data-bind="horde-direction">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span></div></section>
       <section class="victory-progress" aria-live="polite" aria-label="${escapeHtml(t('victoryProgress'))}"><strong>${escapeHtml(t('victoryProgress'))}</strong><div data-bind="victory-progress"></div></section>
-      <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
+      <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
       <section class="bottom-sheet" data-sheet="standard" aria-label="${escapeHtml(t('selected'))}">
         <button class="sheet-handle" type="button" data-action="sheet-toggle"><span></span><span class="sr-only">${escapeHtml(t('selected'))}</span></button>
         <div class="sheet-header" data-action="sheet-toggle"><div><strong data-bind="selection-title">${escapeHtml(t('selectUnit'))}</strong><small data-bind="selection-summary">${escapeHtml(stateSummary(this.state, this.locale))}</small></div><span data-bind="sheet-state">${escapeHtml(sheetStateLabel(this.sheetState, this.locale))}</span></div>
@@ -752,7 +1101,18 @@ export class GameUiController {
     const parent = this.root.querySelector<HTMLElement>('#board-canvas');
     if (!parent) return;
     this.destroyBoard();
-    this.boardGame = createBoardGame(parent, { onTileTap: (position) => this.onTileTap(position) });
+    this.setBoardLoading(true);
+    const callbacks = {
+      onTileTap: (position: HexCoord) => this.onTileTap(position),
+      // board.ts may call this while its runtime registry is preloading.  The
+      // permissive input keeps the controller compatible with both boolean
+      // and message-style loading callbacks without coupling the Core to UI.
+      onLoading: (loading: unknown) => this.setBoardLoading(loading),
+      onWarning: (warning: BoardAssetWarning) => {
+        console.warn(`[board-assets] ${warning.kind}: ${warning.path} (${warning.message})`);
+      },
+    } as Parameters<typeof createBoardGame>[1];
+    this.boardGame = createBoardGame(parent, callbacks);
     const game = this.boardGame;
     const resolveScene = (): void => {
       const scene = game.scene.getScene('hex-board');
@@ -771,6 +1131,31 @@ export class GameUiController {
       this.boardGame.destroy(true);
       this.boardGame = null;
     }
+  }
+
+  private setBoardLoading(status: unknown): void {
+    let loading = true;
+    let message: string | undefined;
+    if (typeof status === 'boolean') {
+      loading = status;
+    } else if (typeof status === 'string') {
+      message = status;
+      loading = !/^(?:ready|loaded|complete|completed|done|success|error|failed|failure)$/iu.test(status.trim());
+    } else if (status && typeof status === 'object') {
+      const payload = status as { loading?: unknown; message?: unknown; status?: unknown; phase?: unknown };
+      if (typeof payload.loading === 'boolean') loading = payload.loading;
+      const label = payload.message ?? payload.status ?? payload.phase;
+      if (typeof label === 'string') {
+        message = label;
+        if (typeof payload.loading !== 'boolean') loading = !/^(?:ready|loaded|complete|completed|done|success|error|failed|failure)$/iu.test(label.trim());
+      }
+    }
+    const indicator = this.root.querySelector<HTMLElement>('[data-board-loading]');
+    if (!indicator) return;
+    if (message && message.length > 0) indicator.textContent = message;
+    else if (loading) indicator.textContent = this.translator()('boardLoading');
+    indicator.hidden = !loading;
+    indicator.setAttribute('aria-hidden', String(!loading));
   }
 
   private bindRootEvents(): void {
@@ -910,7 +1295,7 @@ export class GameUiController {
     const population = populationLocationTotals(this.state);
     const forecast = forecastEndTurn(this.state);
     const forecastPower = forecast.electricity;
-    const forecastPowerDemand = forecastPower.requiredPowerDemand + forecastPower.industrialBoostDemand;
+    const powerHud = powerHudViewModel(forecastPower, this.locale);
     const horde = observation.horde;
     const warningType = horde.warningType;
     const finalHordeVisible = warningType === 'final' || horde.finalHordeStatus !== 'notStarted';
@@ -934,7 +1319,7 @@ export class GameUiController {
       civilianGoods: String(this.state.resources.civilianGoods),
       militaryGoods: String(this.state.resources.militaryGoods),
       fuel: String(this.state.resources.fuel),
-      power: `${forecastPower.availableGenerationCapacity}/${forecastPowerDemand}`,
+      power: powerHud.display,
       'horde-warning': warningLabel,
       'horde-status': hordeStatusLabel(horde.finalHordeStatus, this.locale),
       'horde-direction': warningType === 'none' && !finalHordeVisible ? '—' : formatDirection(horde.warningDirection, this.locale),
@@ -960,9 +1345,12 @@ export class GameUiController {
         `<span class="victory-check ${complete ? 'is-complete' : 'is-pending'}" data-progress="${key}"><b aria-hidden="true">${complete ? '✓' : '○'}</b>${escapeHtml(label)}</span>`,
       ).join('');
     }
-    const powerElement = this.root.querySelector<HTMLElement>('[data-bind="power"]');
+    const powerElement = this.root.querySelector<HTMLElement>('[data-bind="power-pill"]');
     if (powerElement) {
-      powerElement.title = `${this.translator()('projectedPower')}: ${forecastPower.availableGenerationCapacity}/${forecastPowerDemand} · ${this.translator()('requiredPowerAllocated')} ${forecastPower.requiredPowerAllocated} · ${this.translator()('industrialBoostAllocated')} ${forecastPower.industrialBoostAllocated}`;
+      powerElement.title = powerHud.tooltip;
+      powerElement.setAttribute('aria-label', powerHud.accessibleName);
+      powerElement.classList.toggle('is-shortage', powerHud.isShortage);
+      powerElement.dataset.powerState = powerHud.isShortage ? 'shortage' : 'ok';
     }
   }
 
@@ -1333,7 +1721,8 @@ export class GameUiController {
       return;
     }
     const projectedForecast = projection.forecast;
-    output.innerHTML = `<dl class="transfer-preview-grid"><div><dt>${escapeHtml(t('fromCity'))}</dt><dd>${projection.fromPopulation} → <b>${projection.fromAfter}</b></dd></div><div><dt>${escapeHtml(t('toCity'))}</dt><dd>${projection.toPopulation} → <b>${projection.toAfter}</b></dd></div><div><dt>${escapeHtml(t('projectedOvercrowding'))}</dt><dd>${escapeHtml(formatPercent(projection.overcrowdingRate, this.locale))}</dd></div><div><dt>${escapeHtml(t('additionalFood'))}</dt><dd>${projection.additionalFood}</dd></div><div><dt>${escapeHtml(t('additionalCivilianGoods'))}</dt><dd>${projection.additionalCivilianGoods}</dd></div></dl><section class="forecast-card transfer-forecast"><h4>${escapeHtml(t('endTurnForecast'))}</h4><p class="muted">${escapeHtml(t('food'))}: ${projectedForecast.food.startingStock} → ${projectedForecast.food.endingStock} · ${escapeHtml(t('shortage'))} ${projectedForecast.food.shortage}</p><p class="muted">${escapeHtml(t('civilianGoods'))}: ${projectedForecast.civilianGoods.startingStock} → ${projectedForecast.civilianGoods.endingStock} · ${escapeHtml(t('maintenanceShortage'))} ${projectedForecast.civilianGoods.maintenanceShortage} · ${escapeHtml(t('productionInputShortage'))} ${projectedForecast.civilianGoods.productionInputShortage}</p><p class="muted">${escapeHtml(t('electricity'))}: ${projectedForecast.electricity.availableGenerationCapacity} / ${projectedForecast.electricity.requiredPowerDemand + projectedForecast.electricity.industrialBoostDemand}</p></section>`;
+    const projectedPower = powerHudViewModel(projectedForecast.electricity, this.locale);
+    output.innerHTML = `<dl class="transfer-preview-grid"><div><dt>${escapeHtml(t('fromCity'))}</dt><dd>${projection.fromPopulation} → <b>${projection.fromAfter}</b></dd></div><div><dt>${escapeHtml(t('toCity'))}</dt><dd>${projection.toPopulation} → <b>${projection.toAfter}</b></dd></div><div><dt>${escapeHtml(t('projectedOvercrowding'))}</dt><dd>${escapeHtml(formatPercent(projection.overcrowdingRate, this.locale))}</dd></div><div><dt>${escapeHtml(t('additionalFood'))}</dt><dd>${projection.additionalFood}</dd></div><div><dt>${escapeHtml(t('additionalCivilianGoods'))}</dt><dd>${projection.additionalCivilianGoods}</dd></div></dl><section class="forecast-card transfer-forecast"><h4>${escapeHtml(t('endTurnForecast'))}</h4><p class="muted">${escapeHtml(t('food'))}: ${projectedForecast.food.startingStock} → ${projectedForecast.food.endingStock} · ${escapeHtml(t('shortage'))} ${projectedForecast.food.shortage}</p><p class="muted">${escapeHtml(t('civilianGoods'))}: ${projectedForecast.civilianGoods.startingStock} → ${projectedForecast.civilianGoods.endingStock} · ${escapeHtml(t('maintenanceShortage'))} ${projectedForecast.civilianGoods.maintenanceShortage} · ${escapeHtml(t('productionInputShortage'))} ${projectedForecast.civilianGoods.productionInputShortage}</p><p class="muted">${escapeHtml(t('powerHudLabel'))}: ${escapeHtml(projectedPower.display)}</p></section>`;
     const action: Extract<GameAction, { type: 'TransferPopulation' }> = { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: toId, people };
     const reason = people <= 0 ? t('noPopulationToTransfer') : actionReasonFor(this.state, action, this.locale);
     const button = this.root.querySelector<HTMLButtonElement>('[data-action="transfer-population"]');
@@ -1702,7 +2091,8 @@ export class GameUiController {
     const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipPolicy', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
-    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card" aria-labelledby="help-heading"><button class="icon-button modal-close" data-action="dismiss-modal">×</button><h2 id="help-heading">${escapeHtml(t('help'))}</h2><p>${escapeHtml(t('helpBody'))}</p><h3>${escapeHtml(t('move'))}</h3><p>${escapeHtml(t('guideSteps'))}</p><h3>${escapeHtml(t('tipsTitle'))}</h3><ul class="tips-list">${tips}</ul><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></section></div>`);
+    const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${escapeHtml(t('close'))}" data-action="dismiss-modal">×</button><h2 id="help-heading">${escapeHtml(t('help'))}</h2><p>${escapeHtml(t('helpBody'))}</p><h3>${escapeHtml(t('move'))}</h3><p>${escapeHtml(t('guideSteps'))}</p><details class="board-legend-disclosure" data-board-legend-disclosure="true"><summary>${escapeHtml(t('legendTitle'))}</summary>${legend}</details><h3>${escapeHtml(t('tipsTitle'))}</h3><ul class="tips-list">${tips}</ul><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></section></div>`);
   }
 
   private updateFacilitySupplementalControls(): void {

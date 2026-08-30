@@ -1,6 +1,6 @@
 # Play Nowhere Left to Hide with an AI
 
-This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.3.0.
+This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.3.1.
 
 The portable AI package produced by GitHub Actions contains this repository, installed dependencies, and a Linux x64 Node.js runtime. No separate Node.js installation or `npm install` is required after extracting the package.
 
@@ -76,7 +76,7 @@ There is no public `SuppressInfection` action. Infection response is resolved by
 
 The AI player should not use `GameEngine.getState()`, `AgentGameAdapter.getDebugState()`, save internals, hidden future random values, or other non-public implementation details to make decisions. Those exist for development and diagnostics, not as player-visible information.
 
-The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.3.0` uses Game Rules, Agent, Observation, Bridge, and Artifact contracts `1.4.0`, Save Format `3`, Balanced Agent `3.0.0`, and Random Agent `1.2.0`.
+The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.3.1` uses Game Rules, Agent, Observation, Bridge, and Artifact contracts `1.4.0`, Save Format `3`, Balanced Agent `3.0.0`, and Random Agent `1.2.0`.
 
 ## Package layout
 

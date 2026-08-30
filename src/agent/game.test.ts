@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createAgentGame } from './game';
 import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, GAME_RULES_VERSION, OBSERVATION_API_VERSION } from './types';
+import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
+  it('keeps package and public App release metadata aligned', () => {
+    expect(APP_VERSION).toBe('1.3.1');
+    expect(packageMetadata.version).toBe(APP_VERSION);
+  });
   it('returns a deterministic JSON observation without private random state', () => {
     const game = createAgentGame();
     const first = game.reset({ seed: 42, agent: { id: 'boundary-test' } });
@@ -43,7 +48,7 @@ describe('AgentGame public boundary', () => {
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.3.0 API and current Config from the same adapter boundary', () => {
+  it('describes the v1.3.1 API and current Config from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();

@@ -114,7 +114,7 @@ Turn 30に12体のFinal Hordeが発生し、ゲームはTurn 31以降も勝敗�
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.3.0`、Game Rules / GameState / Configは `1.4.0`、Fixed Mapは `fixed-15x15-v2`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.4.0`です。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.3.1`、Game Rules / GameState / Configは `1.4.0`、Fixed Mapは `fixed-15x15-v2`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.4.0`です。
 
 ## CoreとHeadless API
 
@@ -137,7 +137,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.3.0`、Game Rules / State / Config `1.4.0`、Save Format `3`を使用します。v1.2.7以前の保存データ、Replay、Artifactは移行せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.3.1`、Game Rules / State / Config `1.4.0`、Save Format `3`を使用します。v1.2.7以前の保存データ、Replay、Artifactは移行せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
 
 ## テスト
 

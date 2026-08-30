@@ -27,7 +27,7 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.3.1';
 export const GAME_RULES_VERSION = '1.4.0';
 export const SAVE_FORMAT_VERSION = '3';
 export const AGENT_API_VERSION = '1.4.0';

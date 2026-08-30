@@ -707,9 +707,11 @@ export function createAgent(strategy: AgentStrategyId, seed: number): GameAgent 
 
 function artifactValidationError(artifact: AgentRunArtifact): AgentActionError | null {
   if (!isRecord(artifact)) return publicActionError('artifact_invalid', 'Replay artifact must be a JSON object');
+  if (typeof artifact.appVersion !== 'string' || artifact.appVersion.length === 0) {
+    return publicActionError('artifact_invalid', 'Replay artifact appVersion metadata is invalid');
+  }
   const versions: Array<[string, unknown, string]> = [
     ['artifactSchemaVersion', artifact.artifactSchemaVersion, ARTIFACT_SCHEMA_VERSION],
-    ['appVersion', artifact.appVersion, APP_VERSION],
     ['gameRulesVersion', artifact.gameRulesVersion, GAME_RULES_VERSION],
     ['agentApiVersion', artifact.agentApiVersion, AGENT_API_VERSION],
     ['observationApiVersion', artifact.observationApiVersion, OBSERVATION_API_VERSION],

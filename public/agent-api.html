@@ -26,7 +26,7 @@
       <p class="note">The game page exposes <code>window.NLTH</code> for a browser JavaScript agent. This is an in-memory developer bridge, not an HTTP API.</p>
 
       <h2>v1.3 contract</h2>
-      <p><code>App/Release 1.3.0</code> uses <code>Game Rules / GameState / Config 1.4.0</code>, <code>Fixed Map fixed-15x15-v2</code>, <code>Save Format 3</code>, and <code>Agent / Observation / Bridge / Artifact Schema 1.4.0</code>. Observations expose player-visible terrain, visibility, enemies, Horde warnings, victory progress, economy, supply, recovery, and suppression. Future random draws and hidden enemy state are never exposed.</p>
+      <p><code>App/Release 1.3.1</code> uses <code>Game Rules / GameState / Config 1.4.0</code>, <code>Fixed Map fixed-15x15-v2</code>, <code>Save Format 3</code>, and <code>Agent / Observation / Bridge / Artifact Schema 1.4.0</code>. Observations expose player-visible terrain, visibility, enemies, Horde warnings, victory progress, economy, supply, recovery, and suppression. Future random draws and hidden enemy state are never exposed.</p>
       <p>Legal actions may include <code>SetPowerSupply</code>, <code>BuildCheckpoint</code>, and <code>RelocateCheckpoint</code>. Infection suppression is an engine-owned End Turn consequence; <code>SuppressInfection</code> is not public. v1.2.7 and earlier saves, replays, and artifacts are rejected without conversion, deletion, overwrite, or state change.</p>
 
       <h2>v1.3 rules visible to agents</h2>

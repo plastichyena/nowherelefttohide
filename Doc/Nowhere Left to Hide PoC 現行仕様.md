@@ -3,9 +3,9 @@
 ## PoC 現行仕様
 
 - ステータス: 現行正本
-- 現行Version: v1.3.0
-- 基準日: 2026-08-29
-- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.3アップデート要件 確定版.md`
+- 現行Version: v1.3.1
+- 基準日: 2026-08-30
+- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.3.1アップデート要件 確定版.md`
 
 本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。過去の要件定義・仕様書・反映済みアップデート文書は`Doc/archive/`へ保管し、現行判断には使用しない。
 
@@ -47,6 +47,7 @@
 - ローカル自動保存、セーブコード、JSON保存・復元
 - 日本語・英語切り替え（デフォルト日本語）
 - 初回ガイド、常設ヘルプ、終了統計
+- UI専用Asset Registryを使う盤面用2D Asset、個別Fallback、低Zoom LOD、Board Legend
 - Phaserなしで進行できるHeadless Game Interface
 - 公開情報だけを返すAgent ObservationとAgentGame Adapter
 - 共通Runnerを使う決定的なRandom Test AgentとBalanced Agent
@@ -113,7 +114,7 @@ UI / Phaser / Test Agent
 
 - スマートフォン縦向きを基準に、盤面を上部、選択情報と操作を下部へ配置する。
 - マップはドラッグパンとピンチズームに対応し、PCではマウス操作にも対応する。
-- 上部にターン、フェーズ、総人口、5資源、電力Capacityを常時表示する。
+- 上部にターン、フェーズ、総人口、5資源、次回EndTurnの電力予測需要量／利用可能供給量を常時表示する。
 - Horde方向と残りターンは独立した警告カードとして常時確認可能にする。
 - ターン、Horde、致命的不足等を折りたたみ領域だけへ隠さない。
 
@@ -152,6 +153,19 @@ UI / Phaser / Test Agent
 - ユニットBottom Sheetは補給状態、次のプレイヤーターン開始時の回復区分・率・基礎量・成立条件、基本射程と実効射程、駐留による感染封じ込めと自動鎮圧見込みを表示する。
 - 施設Bottom Sheetは上限、1人あたりと現在見込みの入出力、Power Mode、要求電力・発電量、予測／実績給電、停止理由、感染・陥落時の生産損失を表示する。検問所は現在／審査中方針、残り時間と3方針の交換関係を表示する。
 - ヘルプは回復10%／20%／0%、駐留封じ込めと自動鎮圧、警察と州兵の民間被害差、州兵の軍需不足時射程、発電停止の波及、厳格方針の合格率50%を日本語・英語で説明する。
+
+## 5.5 盤面Asset・Layer・Board Legend
+
+- Runtime盤面画像は`public/assets/board/`配下の256×256 px透過PNGとし、Plain／Forest／Mountain、Road／Urban、Police／National Guard／Zombie／Horde Zombie、Capital／City／Farm／Civilian Factory／Military Factory／Refinery／Power Plant／Checkpoint、施設・Checkpoint・Horde状態Overlayを収録する。WaterはPNGを持たず既存描画へFallbackする。
+- 通常Zombieは承認済みの3体Group、Horde Zombieは同画風の12体密集Swarmとする。両AssetのComic-paintedな傷・血痕は許容するが、写実的またはこれ以上GraphicなGoreと死体表現は使用しない。
+- TypeScriptのUI専用Asset RegistryをPathとCore Typeの唯一の対応表とし、Game Core、GameState、Save、Observation、ReplayへAsset Path、読込状態、LOD、表示Marker、Help開閉状態を含めない。BoardとBoard Legendは同じRegistryと状態Mappingを使用する。
+- Runtime PNG合計は3 MiB以下とし、生成・後加工・出所・第三者Asset不使用・再生成方法を`public/assets/board/ASSET_MANIFEST.md`へ記録する。App VersionまたはBuild IDをURLへ付与してCache Bustingする。
+- ゲーム盤面を表示する前にRegistryの全Assetを一括Preloadし、Loading進捗を表示する。Missing、Load、Decode、Texture登録の失敗はAsset単位で記録し、成功済みAssetを維持したまま失敗対象だけ既存図形・文字描画へFallbackする。読込成否は操作、GameState、RNG、Save、Observationへ影響させない。
+- 描画順は`Terrain → Road → Urban → Facility Base → Facility State → Fog暗転 → Unit → 動的Overlay`とする。視界外でもTerrain、Road、Urban、施設、Checkpointを暗転して識別可能にし、Enemy Unitは描画しない。自軍Unitと選択・移動・攻撃・HP・感染・停止予測・Vision・Supply・Horde方向等の操作情報はFogより上に置く。
+- Roadは単一透過Assetを隣接する道路Hexの方向へ回転・合成して連続させ、形状別PNGを持たない。施設とUnitが同じHexにある場合は施設を中央、Unitを右下へOffsetし、双方を識別可能にする。
+- Camera Zoomが`0.75`未満ではPNGの細部を省いたLODへ切り替え、最小Zoom`0.55`でも陣営、通常Zombie／Horde／Final、主要施設状態を色とSilhouetteで区別する。LODは旧`P / G / Z / H / F`固定文字へ戻さず、閾値と表示状態をGameStateへ保存しない。
+- Help内に折りたたみ可能な`盤面アイコン / Board Legend`を設け、Terrain、Road／Urban、4 Unit、Periodic／Final Horde、8施設、一般施設とCheckpointの複合状態、通常Zoom／LOD、動的Overlay、Config由来のRule値を日本語・英語で説明する。進行中は現在GameState Config、GameStateがない場合は標準Configを表示する。Player向けLegendには強制Fallback表示を含めない。
+- 上部電力HUDは`requiredPowerDemand + industrialBoostDemand`を分子、`availableGenerationCapacity`を分母とする`予測需要量 / 利用可能供給量`で表示する。日本語Labelは`電力 需要/供給`、英語Labelは`Power Demand/Available`とし、TooltipとAccessible Nameで需要、供給、Core Forecastの不足量を名前付きで伝える。`electricity.shortage > 0`の場合だけ不足状態とし、`0/0`を安全に表示する。実消費量とは呼ばない。
 
 ---
 
@@ -228,12 +242,13 @@ interface HeadlessGame {
 
 ## 6.5 Version境界
 
-- App / Release Versionは`1.3.0`とする。
+- App / Release Versionは`1.3.1`とする。
 - Game Rules / GameState / Config Versionは`1.4.0`、Fixed Map IDは`fixed-15x15-v2`とする。
 - Save Format Versionは`3`、Artifact Schemaは`1.4.0`とする。v1.2.7以前のSave／Replay／Artifactは移行しない。
 - Agent API / Observation API / Browser Bridge APIは`1.4.0`、Balanced Agentは`3.0.0`、Random Agentは`1.2.0`とする。
 - Agent、Observation、Browser Bridgeは個別のSemVerを持ち、Build IDはCIではGit commit SHA、ローカルではSHAとdirty状態または`local-unknown`を記録する。
 - Build IDは乱数とゲーム結果へ影響させない。
+- App Versionは表示ReleaseのMetadataであり、Game Rules、Save Format、Artifact Schemaが一致するv1.3.0のSave／Replay ArtifactをApp Version差だけで拒否しない。
 
 ## 6.6 Agent ObservationとAgentGame
 
@@ -839,6 +854,11 @@ Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値
 - Periodic／Final Hordeの規模・Timing・次Turn行動、Turn 31以降継続、3 Victory条件、Supply縮小、Defeat優先
 - 勝利・即時敗北、Save Format 3保存・復元、v1.2.7以前のSave／Replay／Artifact拒否
 - UI数値入力とスライダー同期
+- 全Asset Registry Pathの実File、PNG Decode、256×256 px、透過、3 MiB上限、Water非収録、Type／状態Mapping、BoardとLegendのRegistry同一性
+- 一般施設とCheckpointの複合状態、現在停止と停止予測、Periodic／Final Horde Marker、Road接続方向、施設・Unit Offset
+- 全Asset成功と個別Missing／Decode／Texture登録失敗のFallback、成功Assetの維持、Loading完了、Fallback中の操作継続とState／RNG不変
+- Fog外の既知情報暗転とEnemy非表示、Layer順、Zoom`0.75`境界と最小`0.55`のLOD、日英Board Legend、現在／標準Config、電力HUDの需要／供給・Tooltip・Accessible Name・`0/0`
+- v1.3.0とv1.3.1の固定Seed 1～10についてApp Version等の表示Metadataを除外し、受理Action、公開Event、勝敗、終了Turn、PRNG最終状態、主要Metrics、Balanced Observation／選択Actionを正規化比較する。
 
 ## 17.2 不変条件
 
@@ -910,7 +930,7 @@ Resources >= 0
 14. Balanced v3.0が公開情報だけを使って決定的に動作し、Terrain、Vision、FoW、Horde、Victoryと既存経済・感染・補給シナリオを扱い、RandomとともにSeed 1～100の技術的失敗なし完遂を満たす。
 15. 統一RunnerとBatch CLIが同一Seed比較、Metrics、JSON／CSV、Replay／Failure Artifactを生成し再生できる。
 16. Production Buildで通常UI・保存と分離した`window.NLTH`とAPI説明を利用できる。
-17. App `1.3.0`、Game Rules / GameState / Config `1.4.0`、Map `fixed-15x15-v2`、Save Format `3`、Agent / Observation / Browser Bridge / Artifact Schema `1.4.0`のVersion境界が整合し、v1.2.7以前のSave／Replay／Artifactを状態変更なしで拒否する。
+17. App `1.3.1`、Game Rules / GameState / Config `1.4.0`、Map `fixed-15x15-v2`、Save Format `3`、Agent / Observation / Browser Bridge / Artifact Schema `1.4.0`のVersion境界が整合し、v1.2.7以前のSave／Replay／Artifactを状態変更なしで拒否する。
 18. 補給オーバーレイ、新設・移設の将来範囲、阻害Zombie、補給理由の無効状態をHuman UIで確認できる。
 19. 生産施設上限30、10%／20%自然回復、感染封じ込めと自動鎮圧がHuman UIとAgent Observationで同じCore予測を表示する。
 20. Balanced Seed 1～300、Portable Package Smoke、外部AIによるGame Over・Artifact・Replay E2Eを完遂する。
@@ -919,3 +939,7 @@ Resources >= 0
 23. 固定Terrain、重み付きPathfinding、Urban／Forest防御、Vision／FoWがHuman UI、Core、Agent、Replayで同じ判定を使う。
 24. Hidden Enemyの位置・ID・Target・Spawn座標が公開経路から漏れず、公開移動候補とCheckpoint判定から推測できない。
 25. Final Horde全滅、現在Supply内Zombie 0、現在Supply内感染者0の進捗を公開し、条件成立時に即時勝利する。
+26. Waterを除く256×256 px盤面PNG、UI専用Asset Registry、一括Preload、個別Fallback、Road接続、Fog Layer、施設・Unit Offset、Zoom`0.75`未満のLODが機能し、Runtime PNG合計が3 MiB以下である。
+27. Help内Board Legendが盤面と同じRegistryを使い、日英でAsset、複合状態、LOD、動的Overlay、現在または標準ConfigのRule値を説明する。
+28. 上部電力HUDが次回EndTurnの`予測需要量 / 利用可能供給量`を表示し、Core Forecastだけで不足を判定してTooltipとAccessible Nameへ同じ意味を伝える。
+29. 390×844と1280×720の通常Zoom、`0.75`未満、最小`0.55`、個別Asset失敗を実ブラウザで確認し、固定Seed 1～10のv1.3.0／v1.3.1正規化Core結果が一致する。

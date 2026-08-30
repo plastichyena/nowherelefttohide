@@ -11,7 +11,8 @@ vi.mock('phaser', () => ({
 
 import type { FacilityState, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
-import { loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, renderEndTurnForecast, resolveTileSelection, shouldAutosaveAfterLoad } from './controller';
+import { boardLegendViewModel, loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, powerHudViewModel, renderBoardLegend, renderEndTurnForecast, resolveTileSelection, shouldAutosaveAfterLoad } from './controller';
+import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 
 function testState(units: Partial<UnitState>[], facilities: Partial<FacilityState>[] = []): GameState {
@@ -151,5 +152,68 @@ describe('controller view models', () => {
     }
     expect(createTranslator('ja')('finalHordeTurn')).toContain('Final Horde');
     expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
+  });
+
+  it('formats the power HUD as projected demand over available supply', () => {
+    const electricity = {
+      physicalGenerationCapacity: 40,
+      fuelLimitedGenerationCapacity: 20,
+      availableGenerationCapacity: 20,
+      requiredPowerDemand: 10,
+      industrialBoostDemand: 5,
+      requiredPowerAllocated: 10,
+      industrialBoostAllocated: 2,
+      unpoweredFacilities: [],
+      capacity: 20,
+      required: 10,
+      shortage: 3,
+    } as const;
+    const japanese = powerHudViewModel(electricity, 'ja');
+    const english = powerHudViewModel(electricity, 'en');
+    expect(japanese.display).toBe('15/20');
+    expect(english.display).toBe('15/20');
+    expect(japanese.isShortage).toBe(true);
+    expect(japanese.tooltip).toContain('予測需要量: 15');
+    expect(japanese.tooltip).toContain('不足: 3');
+    expect(english.accessibleName).toContain('Projected demand 15');
+  });
+
+  it('keeps a zero-demand, zero-supply power HUD safe and uses Core shortage only', () => {
+    const electricity = {
+      physicalGenerationCapacity: 0,
+      fuelLimitedGenerationCapacity: 0,
+      availableGenerationCapacity: 0,
+      requiredPowerDemand: 0,
+      industrialBoostDemand: 0,
+      requiredPowerAllocated: 0,
+      industrialBoostAllocated: 0,
+      unpoweredFacilities: [],
+      capacity: 0,
+      required: 0,
+      shortage: 0,
+    } as const;
+    const view = powerHudViewModel(electricity, 'en');
+    expect(view.display).toBe('0/0');
+    expect(view.isShortage).toBe(false);
+    expect(view.accessibleName).toContain('Shortage 0');
+  });
+
+  it('renders a bilingual collapsible board legend with config provenance', () => {
+    const standard = boardLegendViewModel(null, 'ja');
+    const state = new GameEngine(9).getState();
+    const current = boardLegendViewModel(state.config, 'en');
+    expect(standard.configSource).toBe('standard');
+    expect(current.configSource).toBe('current');
+    const japanese = renderBoardLegend(null, 'ja');
+    const english = renderBoardLegend(current.config, 'en');
+    expect(japanese).toContain('標準Config（ゲーム開始前）');
+    expect(japanese).toContain('平地');
+    expect(japanese).toContain('盤面と同じAsset Registry');
+    expect(english).toContain('Current GameState Config');
+    expect(english).toContain('Periodic Horde');
+    expect(english).toContain('data-legend-section="dynamic"');
+    expect(english).toContain('Secured + stopped');
+    expect(english).toContain('Forest Movement Cost');
+    expect(renderBoardLegend(null, 'en', ASSET_REGISTRY)).toContain('/assets/board/terrain/terrain_plain.png');
   });
 });
