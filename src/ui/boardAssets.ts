@@ -48,9 +48,19 @@ interface ViteRuntimeEnv {
   VITE_BUILD_ID?: string;
 }
 
+/*
+ * Keep these as direct property reads. Vite statically replaces
+ * `import.meta.env.KEY`; reading `env` through a cast leaves the production
+ * bundle without BASE_URL/VITE_BUILD_ID and breaks project-scoped Pages URLs.
+ */
+const VITE_BASE_URL = import.meta.env.BASE_URL;
+const VITE_BUILD_ID = import.meta.env.VITE_BUILD_ID;
+
 function viteRuntimeEnv(): ViteRuntimeEnv {
-  const metadata = import.meta as ImportMeta & { env?: ViteRuntimeEnv };
-  return metadata.env ?? {};
+  return {
+    BASE_URL: VITE_BASE_URL,
+    VITE_BUILD_ID,
+  };
 }
 
 /** Build-time Vite BASE_URL, exported for UI adapters that need the same base. */
