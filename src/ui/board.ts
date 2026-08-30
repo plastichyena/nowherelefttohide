@@ -87,6 +87,10 @@ export interface BoardAssetWarning {
 
 export interface BoardCallbacks {
   onTileTap(position: HexCoord): void;
+  /** Invoked when a short tap lands outside the map's Hexes. */
+  onBlankTap?: () => void;
+  /** Invoked after camera or board state changes so DOM overlays can reproject. */
+  onViewChange?: () => void;
   /** The DOM controller consumes this compact loading object. */
   onLoading?: (status: boolean | string | BoardAssetProgress) => void;
   onProgress?: (progress: BoardAssetProgress) => void;
@@ -111,6 +115,46 @@ export const BOARD_RENDER_LAYER_ORDER = [
 
 export const BOARD_FALLBACK_LAYER_ORDER = BOARD_RENDER_LAYER_ORDER;
 export const BOARD_LOD_THRESHOLD = BOARD_LOD_ZOOM_THRESHOLD;
+
+export interface BoardCameraProjection {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  scrollX: number;
+  scrollY: number;
+  zoom: number;
+  /** Camera origin is normalized in Phaser (default: 0.5 / center). */
+  originX?: number;
+  originY?: number;
+  rotation?: number;
+}
+
+/**
+ * Project a world point into the camera viewport's local screen coordinates.
+ *
+ * This mirrors Phaser's camera view transform, including zoom around the
+ * camera origin.  Keeping it pure also lets DOM overlay tests avoid
+ * constructing a Phaser Scene.
+ */
+export function projectWorldToScreen(
+  world: { x: number; y: number },
+  camera: BoardCameraProjection,
+): { x: number; y: number } | null {
+  const values = [world.x, world.y, camera.x, camera.y, camera.width, camera.height, camera.scrollX, camera.scrollY, camera.zoom];
+  if (values.some((value) => !Number.isFinite(value)) || camera.zoom <= 0) return null;
+  const originX = camera.width * (camera.originX ?? 0.5);
+  const originY = camera.height * (camera.originY ?? 0.5);
+  const rotation = camera.rotation ?? 0;
+  if (!Number.isFinite(originX) || !Number.isFinite(originY) || !Number.isFinite(rotation)) return null;
+  const cosine = Math.cos(rotation);
+  const sine = Math.sin(rotation);
+  const relativeX = world.x - camera.scrollX - originX;
+  const relativeY = world.y - camera.scrollY - originY;
+  const x = camera.x + originX + (relativeX * cosine - relativeY * sine) * camera.zoom;
+  const y = camera.y + originY + (relativeX * sine + relativeY * cosine) * camera.zoom;
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
 
 const HEX_SIZE = 30;
 const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
@@ -384,6 +428,57 @@ export class HexBoardScene extends Phaser.Scene {
   updateState(next: BoardRenderState): void {
     this.current = next;
     if (this.graphics) this.draw(next);
+    this.invokeViewChange();
+  }
+
+  /**
+   * Return a Hex center in board-canvas-relative screen coordinates.
+   *
+   * DOM controls live above the canvas, while Phaser's world coordinates are
+   * affected by camera scroll and zoom.  Keep this conversion on the board so
+   * the controller does not need to duplicate camera math.
+   */
+  public projectHexToScreen(position: HexCoord): { x: number; y: number } | null {
+    if (!this.current || !position || !this.cameras?.main) return null;
+    const tile = this.current.state.map.tiles.find((candidate) => sameHex(candidate, position));
+    if (!tile) return null;
+    const camera = this.cameras.main;
+    return projectWorldToScreen(this.hexToWorld(this.current.state, tile), {
+      x: camera.x,
+      y: camera.y,
+      width: camera.width,
+      height: camera.height,
+      scrollX: camera.scrollX,
+      scrollY: camera.scrollY,
+      zoom: camera.zoom,
+      originX: camera.originX,
+      originY: camera.originY,
+    });
+  }
+
+  private invokeViewChange(): void {
+    try {
+      this.callbacks.onViewChange?.();
+    } catch {
+      // DOM overlay observers cannot stop camera input or rendering.
+    }
+  }
+
+  private invokeBlankTap(): void {
+    try {
+      this.callbacks.onBlankTap?.();
+    } catch {
+      // Optional DOM observers cannot stop Phaser pointer handling.
+    }
+  }
+
+  private invokeTileTap(position: HexCoord): void {
+    try {
+      this.callbacks.onTileTap(position);
+    } catch {
+      // Controller callbacks are observers of Phaser input; an exception must
+      // not leave the pointer gesture state active or break the Scene.
+    }
   }
 
   private initializeAssetTracking(): void {
@@ -606,6 +701,7 @@ export class HexBoardScene extends Phaser.Scene {
   private handleResize(size: { width: number; height: number }): void {
     if (!this.cameras.main) return;
     if (this.current) this.configureCamera(this.current.state, !this.cameraInitialized, size);
+    this.invokeViewChange();
   }
 
   private handlePointerDown(pointer: Phaser.Input.Pointer): void {
@@ -631,8 +727,12 @@ export class HexBoardScene extends Phaser.Scene {
     }
     if (!this.dragStart || !pointer.isDown) return;
     const zoom = this.cameras.main.zoom;
-    this.cameras.main.scrollX = this.dragStart.scrollX - (pointer.x - this.dragStart.x) / zoom;
-    this.cameras.main.scrollY = this.dragStart.scrollY - (pointer.y - this.dragStart.y) / zoom;
+    const nextScrollX = this.dragStart.scrollX - (pointer.x - this.dragStart.x) / zoom;
+    const nextScrollY = this.dragStart.scrollY - (pointer.y - this.dragStart.y) / zoom;
+    if (nextScrollX === this.cameras.main.scrollX && nextScrollY === this.cameras.main.scrollY) return;
+    this.cameras.main.scrollX = nextScrollX;
+    this.cameras.main.scrollY = nextScrollY;
+    this.invokeViewChange();
   }
 
   private handlePointerUp(pointer: Phaser.Input.Pointer): void {
@@ -650,7 +750,10 @@ export class HexBoardScene extends Phaser.Scene {
     const position = this.worldToHex(pointer.x, pointer.y);
     this.dragStart = null;
     this.pointerDown = null;
-    if (moved < 12 && position) this.callbacks.onTileTap(position);
+    if (moved < 12) {
+      if (position) this.invokeTileTap(position);
+      else this.invokeBlankTap();
+    }
   }
 
   private handleWheel(pointer: Phaser.Input.Pointer, _gameObjects: unknown, deltaX: number, deltaY: number): void {
@@ -669,6 +772,7 @@ export class HexBoardScene extends Phaser.Scene {
       this.configureCamera(this.current.state, false, this.scale.gameSize);
       if (this.graphics) this.draw(this.current);
     }
+    this.invokeViewChange();
   }
 
   private configureCamera(state: Readonly<GameState>, center: boolean, size: { width: number; height: number }): void {

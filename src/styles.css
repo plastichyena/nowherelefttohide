@@ -125,6 +125,23 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .board-region { position: relative; min-height: 180px; overflow: hidden; background: #071019; }
 .board-canvas { width: 100%; height: 100%; touch-action: none; }
 .board-canvas canvas { display: block; width: 100% !important; height: 100% !important; }
+.unit-context-layer { position: absolute; inset: 0; z-index: 8; overflow: hidden; pointer-events: none; }
+.unit-action-menu, .unit-target-confirm, .unit-mode-indicator { position: absolute; pointer-events: auto; }
+.unit-action-menu, .unit-target-confirm { display: flex; align-items: center; gap: 6px; max-width: calc(100% - 16px); padding: 6px; border: 1px solid #35606e; border-radius: 12px; background: #10232ded; box-shadow: 0 8px 22px #0008; transform: translate(-50%, -50%); }
+.unit-action-menu[hidden], .unit-target-confirm[hidden], .unit-mode-indicator[hidden] { display: none; }
+.unit-action-menu button, .unit-target-confirm button { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; gap: 5px; padding: 7px 10px; border: 1px solid #396878; border-radius: 9px; background: #18313c; color: #e8f0f3; font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
+.unit-action-menu button:hover, .unit-target-confirm button:hover { border-color: #66d5d8; background: #214b58; }
+.unit-action-menu button:focus-visible, .unit-target-confirm button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.unit-action-menu button:disabled, .unit-target-confirm button:disabled { border-color: #2b4b59; background: #11242e; color: #8ba4ae; filter: saturate(0.55); opacity: 0.58; }
+.unit-action-menu button[data-unit-action="move"] { color: #a9e8eb; }
+.unit-action-menu button[data-unit-action="attack"] { color: #ffb394; }
+.unit-action-menu button[data-unit-action="wait"] { color: #bcefd0; }
+.unit-target-confirm button[data-unit-action="confirm"], .unit-target-confirm button[data-action="confirm"] { background: #27584e; border-color: #5ab994; color: #bcefd0; }
+.unit-target-confirm button[data-unit-action="cancel"], .unit-target-confirm button[data-action="cancel"] { background: #302819; border-color: #89703d; color: #f7dfa0; }
+.unit-mode-indicator { top: 8px; left: 50%; max-width: calc(100% - 16px); padding: 6px 10px; border: 1px solid #35606e; border-radius: 9px; background: #0c1b24e8; color: #d8f8e8; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-align: center; transform: translateX(-50%); }
+.unit-mode-indicator button { min-width: 44px; min-height: 44px; margin-left: 6px; padding: 7px 10px; border: 1px solid #89703d; border-radius: 9px; background: #302819; color: #f7dfa0; font-size: 0.76rem; font-weight: 700; }
+.unit-mode-indicator button:hover { border-color: #d7b75f; background: #40331e; }
+.unit-mode-indicator button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .toast { position: absolute; right: 12px; bottom: 12px; left: 12px; z-index: 10; padding: 11px 14px; border: 1px solid #8d6a30; border-radius: 10px; background: #312717ee; color: #ffe1a0; font-size: 0.82rem; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 150ms ease, transform 150ms ease; }
 .toast.visible { opacity: 1; transform: translateY(0); }
 

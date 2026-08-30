@@ -132,7 +132,16 @@ UI / Phaser / Test Agent
 - タッチ対象は原則44 CSS px以上とする。
 - パネル状態はUI状態でありGameStateへ保存しない。
 
-## 5.3 人口操作UI
+## 5.3 Unit Action Mode
+
+- Player Unitを選択した時点では情報、Vision、HP、射程、補給状態だけを表示し、別Hexのタップから移動・攻撃へ暗黙移行しない。
+- 選択Unitの近傍に`Move / Attack / Wait`のAction Menuを表示する。各Actionの有効状態はCoreが列挙するLegal Actionsだけから導出し、UI独自の合法性判定を持たない。
+- Move Modeでは合法な移動先、Attack ModeではFoWを維持した合法な攻撃対象だけを強調する。対象選択後は対象Hex近傍へ左`×`／右`✓`の確認UIを表示し、既存`Move`／`Attack` Actionを実行する。
+- WaitはAction Menuから即時実行して選択を解除する。Target確認中のCancelは同じAction Mode、Action Mode中のCancelはUnit Selected、Unit Selected中の空白タップまたは同Unit再タップは未選択へ1段ずつ戻す。
+- Action Menuと確認UIは44 CSS px以上のタッチ対象とし、画面端では盤面内へ収め、パン・ズーム・リサイズへ追随する。これらの状態はController内だけのUI状態であり、GameState、Save、Replay、Agent APIへ含めない。
+- Bottom Sheetの既存Move確認とWaitは移行期間の補助操作として残せるが、盤面近傍UIを主要操作とし、主要Unit ActionはBottom Sheetまで指を移動せず完結できる。
+
+## 5.4 人口操作UI
 
 - 生産施設への割り当てはスライダーと数値入力を併用し、双方向に即時同期する。
 - 数値は整数へ正規化し、0から合法な最大値へクランプする。
@@ -140,7 +149,7 @@ UI / Phaser / Test Agent
 - 都市間移住は移動元、移動先、人数、実行後人口と過密予測を確認してから確定する。
 - 新規確保・感染復旧した施設は次ターンから操作可能であることを無効理由とヘルプ／Tipsへ表示する。
 
-## 5.4 ガイドとヘルプ
+## 5.5 ガイドとヘルプ
 
 - 初回ガイドで移動、攻撃、人口配置、ターン終了を説明する。
 - 日本語・英語の常設ヘルプを提供する。
@@ -154,7 +163,7 @@ UI / Phaser / Test Agent
 - 施設Bottom Sheetは上限、1人あたりと現在見込みの入出力、Power Mode、要求電力・発電量、予測／実績給電、停止理由、感染・陥落時の生産損失を表示する。検問所は現在／審査中方針、残り時間と3方針の交換関係を表示する。
 - ヘルプは回復10%／20%／0%、駐留封じ込めと自動鎮圧、警察と州兵の民間被害差、州兵の軍需不足時射程、発電停止の波及、厳格方針の合格率50%を日本語・英語で説明する。
 
-## 5.5 盤面Asset・Layer・Board Legend
+## 5.6 盤面Asset・Layer・Board Legend
 
 - Runtime盤面画像は`public/assets/board/`配下の256×256 px透過PNGとし、Plain／Forest／Mountain、Road／Urban、Police／National Guard／Zombie／Horde Zombie、Capital／City／Farm／Civilian Factory／Military Factory／Refinery／Power Plant／Checkpoint、施設・Checkpoint・Horde状態Overlayを収録する。WaterはPNGを持たず既存描画へFallbackする。
 - 通常Zombieは承認済みの3体Group、Horde Zombieは同画風の12体密集Swarmとする。両AssetのComic-paintedな傷・血痕は許容するが、写実的またはこれ以上GraphicなGoreと死体表現は使用しない。
@@ -943,3 +952,4 @@ Resources >= 0
 27. Help内Board Legendが盤面と同じRegistryを使い、日英でAsset、複合状態、LOD、動的Overlay、現在または標準ConfigのRule値を説明する。
 28. 上部電力HUDが次回EndTurnの`予測需要量 / 利用可能供給量`を表示し、Core Forecastだけで不足を判定してTooltipとAccessible Nameへ同じ意味を伝える。
 29. 390×844と1280×720の通常Zoom、`0.75`未満、最小`0.55`、個別Asset失敗を実ブラウザで確認し、固定Seed 1～10のv1.3.0／v1.3.1正規化Core結果が一致する。
+30. Unit選択、明示的Move／Attack Mode、対象近傍Confirm／Cancel、Unit近傍WaitがMobileで完結し、キャンセル階層、画面端配置、Desktop操作、Core／Replay／Agent API境界を維持する。

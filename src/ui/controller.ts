@@ -46,7 +46,6 @@ import {
   findCheckpointAt,
   findFacilityAt,
   findUnit,
-  findUnitAt,
   isLegalAction,
   legalActionsForUnit,
   legalAttackTargets,
@@ -101,6 +100,66 @@ export type Selection =
   | { kind: 'facility'; id: string }
   | { kind: 'checkpoint'; id: string }
   | null;
+
+export type UnitActionMode = 'move' | 'attack' | null;
+
+export interface UnitActionAvailability {
+  move: boolean;
+  attack: boolean;
+  wait: boolean;
+}
+
+export interface BoardContextPlacement {
+  left: number;
+  top: number;
+  vertical: 'above' | 'below';
+}
+
+export type UnitInteractionCancelStep = 'target' | 'mode' | 'selection' | 'none';
+
+export function unitInteractionCancelStep(
+  mode: UnitActionMode,
+  hasTarget: boolean,
+  hasSelection: boolean,
+): UnitInteractionCancelStep {
+  if (hasTarget) return 'target';
+  if (mode) return 'mode';
+  if (hasSelection) return 'selection';
+  return 'none';
+}
+
+/** Derive menu availability only from the Core-provided legal action list. */
+export function unitActionAvailability(actions: readonly GameAction[], unitId: string): UnitActionAvailability {
+  return {
+    move: actions.some((action) => action.type === 'Move' && action.unitId === unitId),
+    attack: actions.some((action) => action.type === 'Attack' && action.attackerId === unitId),
+    wait: actions.some((action) => action.type === 'Wait' && action.unitId === unitId),
+  };
+}
+
+/**
+ * Keep a board-side menu inside the visible board. Prefer above the anchor,
+ * then flip below when the top edge would be crossed.
+ */
+export function placeBoardContextUi(
+  anchor: Readonly<{ x: number; y: number }>,
+  board: Readonly<{ width: number; height: number }>,
+  menu: Readonly<{ width: number; height: number }>,
+  margin = 8,
+  gap = 34,
+): BoardContextPlacement {
+  const maxLeft = Math.max(margin, board.width - menu.width - margin);
+  const left = Math.min(maxLeft, Math.max(margin, anchor.x - menu.width / 2));
+  const above = anchor.y - gap - menu.height;
+  const vertical = above >= margin ? 'above' : 'below';
+  const preferredTop = vertical === 'above' ? above : anchor.y + gap;
+  const maxTop = Math.max(margin, board.height - menu.height - margin);
+  return {
+    left: Math.min(maxLeft, Math.max(margin, left)),
+    top: Math.min(maxTop, Math.max(margin, preferredTop)),
+    vertical,
+  };
+}
 
 /**
  * Resolve a tapped tile according to the active navigation mode.
@@ -908,7 +967,9 @@ export class GameUiController {
   private boardGame: Phaser.Game | null = null;
   private boardScene: HexBoardScene | null = null;
   private selection: Selection = null;
+  private unitActionMode: UnitActionMode = null;
   private pendingMove: MovePreview | null = null;
+  private pendingAttackTargetId: string | null = null;
   private checkpointPlacement: CheckpointPlacement | null = null;
   private checkpointPreviewTarget: CheckpointPreviewTarget | null = null;
   private supplyOverlay = false;
@@ -925,8 +986,15 @@ export class GameUiController {
   }
 
   mount(): void {
+    this.root.ownerDocument.addEventListener('keydown', this.handleGlobalKeyDown);
     this.showTitle();
   }
+
+  private readonly handleGlobalKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || this.screen !== 'game' || this.root.querySelector('[data-modal]')) return;
+    event.preventDefault();
+    this.cancelUnitInteractionLevel();
+  };
 
   private translator(): (key: string, fallback?: string) => string {
     return createTranslator(this.locale);
@@ -937,7 +1005,9 @@ export class GameUiController {
     this.state = null;
     this.engine = null;
     this.selection = null;
+    this.unitActionMode = null;
     this.pendingMove = null;
+    this.pendingAttackTargetId = null;
     this.checkpointPlacement = null;
     this.checkpointPreviewTarget = null;
     this.supplyOverlay = false;
@@ -1045,7 +1115,9 @@ export class GameUiController {
       this.sheetState = 'standard';
       this.navMode = 'map';
       this.selection = null;
+      this.unitActionMode = null;
       this.pendingMove = null;
+      this.pendingAttackTargetId = null;
       this.checkpointPlacement = null;
       this.checkpointPreviewTarget = null;
       this.supplyOverlay = false;
@@ -1099,7 +1171,7 @@ export class GameUiController {
       </section>
       <section class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><div class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></div><div class="horde-facts"><span><small>${escapeHtml(t('direction'))}</small><b data-bind="horde-direction">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span></div></section>
       <section class="victory-progress" aria-live="polite" aria-label="${escapeHtml(t('victoryProgress'))}"><strong>${escapeHtml(t('victoryProgress'))}</strong><div data-bind="victory-progress"></div></section>
-      <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
+      <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="unit-context-layer" data-unit-context-layer aria-live="polite"></div><div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
       <section class="bottom-sheet" data-sheet="standard" aria-label="${escapeHtml(t('selected'))}">
         <button class="sheet-handle" type="button" data-action="sheet-toggle"><span></span><span class="sr-only">${escapeHtml(t('selected'))}</span></button>
         <div class="sheet-header" data-action="sheet-toggle"><div><strong data-bind="selection-title">${escapeHtml(t('selectUnit'))}</strong><small data-bind="selection-summary">${escapeHtml(stateSummary(this.state, this.locale))}</small></div><span data-bind="sheet-state">${escapeHtml(sheetStateLabel(this.sheetState, this.locale))}</span></div>
@@ -1118,6 +1190,8 @@ export class GameUiController {
     this.setBoardLoading(true);
     const callbacks = {
       onTileTap: (position: HexCoord) => this.onTileTap(position),
+      onBlankTap: () => this.cancelUnitInteractionLevel(),
+      onViewChange: () => this.positionUnitContextUi(),
       // board.ts may call this while its runtime registry is preloading.  The
       // permissive input keeps the controller compatible with both boolean
       // and message-style loading callbacks without coupling the Core to UI.
@@ -1133,6 +1207,7 @@ export class GameUiController {
       if (scene instanceof Object && 'updateState' in scene) {
         this.boardScene = scene as HexBoardScene;
         this.updateBoard();
+        this.renderUnitContextUi();
       }
     };
     game.events.once('ready', resolveScene);
@@ -1218,9 +1293,16 @@ export class GameUiController {
       case 'help': this.showHelp(); break;
       case 'toggle-supply': this.supplyOverlay = !this.supplyOverlay; this.updateView(); break;
       case 'sheet-toggle': this.toggleSheet(); break;
+      case 'unit-mode-move': this.enterUnitActionMode('move'); break;
+      case 'unit-mode-attack': this.enterUnitActionMode('attack'); break;
+      case 'unit-clear-selection': this.clearUnitSelection(); break;
+      case 'unit-mode-cancel': this.leaveUnitActionMode(); break;
+      case 'unit-target-cancel': this.cancelUnitTarget(); break;
       case 'confirm-move': this.confirmMove(); break;
-      case 'cancel-move': this.pendingMove = null; this.updateView(); break;
-      case 'wait': this.waitSelected(); break;
+      case 'confirm-attack': this.confirmAttack(); break;
+      case 'cancel-move': this.cancelUnitTarget(); break;
+      case 'wait':
+      case 'unit-wait': this.waitSelected(); break;
       case 'end-turn': this.endTurn(); break;
       case 'end-turn-confirm': this.dismissModal(); this.commitEndTurn(); break;
       case 'save': this.showSaveModal(); break;
@@ -1248,7 +1330,9 @@ export class GameUiController {
     const mode = nav as NavigationMode;
     const selected = this.selectedPosition();
     this.navMode = mode;
+    this.unitActionMode = null;
     this.pendingMove = null;
+    this.pendingAttackTargetId = null;
     this.checkpointPlacement = null;
     this.checkpointPreviewTarget = null;
     if (this.state && selected) this.selection = resolveTileSelection(this.state, selected, mode);
@@ -1281,6 +1365,7 @@ export class GameUiController {
     if (sheetBody && !this.selection) sheetBody.insertAdjacentHTML('beforeend', this.renderBranchFlow());
     if (sheetBody && this.checkpointPlacement) sheetBody.insertAdjacentHTML('beforeend', this.renderCheckpointPlacement());
     this.updateBoard();
+    this.renderUnitContextUi();
     const sheet = this.root.querySelector<HTMLElement>('.bottom-sheet');
     sheet?.setAttribute('data-sheet', this.sheetState);
     const sheetState = this.root.querySelector<HTMLElement>('[data-bind="sheet-state"]');
@@ -1462,13 +1547,124 @@ export class GameUiController {
   }
 
   private selectedUnitLegalMoves(): HexCoord[] {
+    if (this.unitActionMode !== 'move' || !this.selection || this.selection.kind !== 'unit') return [];
+    return this.selectedUnitLegalMovesRaw();
+  }
+
+  private selectedUnitLegalMovesRaw(): HexCoord[] {
     if (!this.selection || this.selection.kind !== 'unit') return [];
     return legalMoveDestinations(this.legalActions(), this.selection.id);
   }
 
   private selectedUnitAttackTargets(): string[] {
+    if (this.unitActionMode !== 'attack' || !this.selection || this.selection.kind !== 'unit') return [];
+    return this.selectedUnitAttackTargetsRaw();
+  }
+
+  private selectedUnitAttackTargetsRaw(): string[] {
     if (!this.selection || this.selection.kind !== 'unit') return [];
     return legalAttackTargets(this.legalActions(), this.selection.id);
+  }
+
+  private enterUnitActionMode(mode: Exclude<UnitActionMode, null>): void {
+    if (this.selection?.kind !== 'unit') return;
+    const availability = unitActionAvailability(this.legalActions(), this.selection.id);
+    if (!availability[mode]) return;
+    this.unitActionMode = mode;
+    this.pendingMove = null;
+    this.pendingAttackTargetId = null;
+    this.updateView();
+  }
+
+  private clearUnitSelection(): void {
+    this.selection = null;
+    this.unitActionMode = null;
+    this.pendingMove = null;
+    this.pendingAttackTargetId = null;
+    this.updateView();
+  }
+
+  private leaveUnitActionMode(): void {
+    if (this.selection?.kind !== 'unit') return;
+    this.unitActionMode = null;
+    this.pendingMove = null;
+    this.pendingAttackTargetId = null;
+    this.updateView();
+  }
+
+  private cancelUnitTarget(): void {
+    if (this.selection?.kind !== 'unit') return;
+    this.pendingMove = null;
+    this.pendingAttackTargetId = null;
+    this.updateView();
+  }
+
+  private cancelUnitInteractionLevel(): void {
+    if (this.checkpointPlacement) return;
+    switch (unitInteractionCancelStep(this.unitActionMode, Boolean(this.pendingMove || this.pendingAttackTargetId), Boolean(this.selection))) {
+      case 'target': this.cancelUnitTarget(); break;
+      case 'mode': this.leaveUnitActionMode(); break;
+      case 'selection': this.selection = null; this.updateView(); break;
+      default: break;
+    }
+  }
+
+  private unitContextAnchorPosition(): HexCoord | null {
+    if (!this.state || this.selection?.kind !== 'unit') return null;
+    if (this.pendingMove) return this.pendingMove.destination;
+    if (this.pendingAttackTargetId) {
+      return this.state.units.find((unit) => unit.id === this.pendingAttackTargetId)?.position ?? null;
+    }
+    return findUnit(this.state, this.selection.id)?.position ?? null;
+  }
+
+  private renderUnitContextUi(): void {
+    const layer = this.root.querySelector<HTMLElement>('[data-unit-context-layer]');
+    if (!layer) return;
+    layer.innerHTML = '';
+    if (!this.state || this.navMode !== 'map' || this.selection?.kind !== 'unit') return;
+    const unit = findUnit(this.state, this.selection.id);
+    if (!unit?.isPlayerUnit) return;
+    const t = this.translator();
+
+    if (this.pendingMove || this.pendingAttackTargetId) {
+      const confirmAction = this.pendingMove ? 'confirm-move' : 'confirm-attack';
+      const confirmLabel = this.pendingMove ? t('confirmMove') : t('confirmAttack');
+      layer.innerHTML = `<div class="unit-target-confirm" data-unit-context-ui role="group" aria-label="${escapeHtml(confirmLabel)}"><button type="button" class="unit-context-button unit-context-cancel" data-action="unit-target-cancel" data-unit-action="cancel" aria-label="${escapeHtml(t('cancelTarget'))}"><span aria-hidden="true">×</span><small>${escapeHtml(t('cancel'))}</small></button><button type="button" class="unit-context-button unit-context-confirm" data-action="${confirmAction}" data-unit-action="confirm" aria-label="${escapeHtml(confirmLabel)}"><span aria-hidden="true">✓</span><small>${escapeHtml(confirmLabel)}</small></button></div>`;
+      this.positionUnitContextUi();
+      return;
+    }
+
+    if (this.unitActionMode) {
+      const label = this.unitActionMode === 'move' ? t('moveMode') : t('attackMode');
+      layer.innerHTML = `<div class="unit-mode-indicator" data-unit-context-ui role="status"><strong>${escapeHtml(label)}</strong><button type="button" class="unit-context-button unit-context-cancel" data-action="unit-mode-cancel" aria-label="${escapeHtml(t('cancelActionMode'))}">×</button></div>`;
+      this.positionUnitContextUi();
+      return;
+    }
+
+    const availability = unitActionAvailability(this.legalActions(), unit.id);
+    layer.innerHTML = `<div class="unit-action-menu" data-unit-context-ui role="toolbar" aria-label="${escapeHtml(t('unitActions'))}"><button type="button" class="unit-context-button" data-action="unit-mode-move" data-unit-action="move" ${availability.move ? '' : 'disabled'}><span aria-hidden="true">⇢</span><small>${escapeHtml(t('move'))}</small></button><button type="button" class="unit-context-button" data-action="unit-mode-attack" data-unit-action="attack" ${availability.attack ? '' : 'disabled'}><span aria-hidden="true">⌖</span><small>${escapeHtml(t('attack'))}</small></button><button type="button" class="unit-context-button" data-action="unit-wait" data-unit-action="wait" ${availability.wait ? '' : 'disabled'}><span aria-hidden="true">Ⅱ</span><small>${escapeHtml(t('wait'))}</small></button><button type="button" class="unit-context-button unit-context-close" data-action="unit-clear-selection" aria-label="${escapeHtml(t('clearSelection'))}">×</button></div>`;
+    this.positionUnitContextUi();
+  }
+
+  private positionUnitContextUi(): void {
+    const context = this.root.querySelector<HTMLElement>('[data-unit-context-ui]');
+    const region = this.root.querySelector<HTMLElement>('.board-region');
+    const position = this.unitContextAnchorPosition();
+    if (!context || !region || !position || !this.boardScene) return;
+    const anchor = this.boardScene.projectHexToScreen(position);
+    if (!anchor) return;
+    const size = { width: context.offsetWidth, height: context.offsetHeight };
+    const placement = placeBoardContextUi(
+      anchor,
+      { width: region.clientWidth, height: region.clientHeight },
+      size,
+    );
+    context.style.left = `${placement.left + size.width / 2}px`;
+    context.style.top = context.classList.contains('unit-mode-indicator')
+      ? `${placement.top}px`
+      : `${placement.top + size.height / 2}px`;
+    context.dataset.vertical = placement.vertical;
   }
 
   private onTileTap(position: HexCoord): void {
@@ -1502,38 +1698,63 @@ export class GameUiController {
       return;
     }
     if (this.navMode === 'domestic') {
+      this.unitActionMode = null;
       this.pendingMove = null;
+      this.pendingAttackTargetId = null;
       this.selection = resolveTileSelection(this.state, position, this.navMode);
       this.updateView();
       return;
     }
-    const unit = findUnitAt(this.state, position);
-    if (this.pendingMove && this.selection?.kind === 'unit' && this.pendingMove.destination.q === position.q && this.pendingMove.destination.r === position.r) {
-      this.updateView();
-      return;
-    }
+
     if (this.selection?.kind === 'unit') {
-      const targets = this.selectedUnitAttackTargets();
-      if (unit && targets.includes(unit.id)) {
-        this.apply({ type: 'Attack', attackerId: this.selection.id, targetId: unit.id });
+      const selected = findUnit(this.state, this.selection.id);
+      if (selected && samePosition(selected.position, position)) {
+        this.cancelUnitInteractionLevel();
         return;
       }
-      const move = this.selectedUnitLegalMoves().find((candidate) => candidate.q === position.q && candidate.r === position.r);
-      if (move) {
-        this.pendingMove = this.preview(this.selection.id, move);
-        this.sheetState = 'standard';
-        this.updateView();
+
+      if (this.unitActionMode === 'attack') {
+        const targetIds = this.selectedUnitAttackTargetsRaw();
+        const target = this.state.units.find((candidate) =>
+          targetIds.includes(candidate.id) && candidate.actionState !== 'destroyed' && samePosition(candidate.position, position));
+        if (target) {
+          this.pendingAttackTargetId = target.id;
+          this.pendingMove = null;
+          this.updateView();
+          return;
+        }
+        if (this.pendingAttackTargetId) this.cancelUnitTarget();
+        else this.leaveUnitActionMode();
+        return;
+      }
+
+      if (this.unitActionMode === 'move') {
+        const move = this.selectedUnitLegalMovesRaw().find((candidate) => samePosition(candidate, position));
+        if (move) {
+          this.pendingMove = this.preview(this.selection.id, move);
+          this.pendingAttackTargetId = null;
+          this.sheetState = 'standard';
+          this.updateView();
+          return;
+        }
+        if (this.pendingMove) this.cancelUnitTarget();
+        else this.leaveUnitActionMode();
         return;
       }
     }
+
     const resolved = resolveTileSelection(this.state, position, this.navMode);
     if (resolved) {
       this.selection = resolved;
+      this.unitActionMode = null;
       this.pendingMove = null;
+      this.pendingAttackTargetId = null;
       this.updateView();
     } else {
       this.selection = null;
+      this.unitActionMode = null;
       this.pendingMove = null;
+      this.pendingAttackTargetId = null;
       this.updateView();
     }
   }
@@ -1554,12 +1775,30 @@ export class GameUiController {
     if (!this.pendingMove || !this.selection || this.selection.kind !== 'unit') return;
     const action: GameAction = { type: 'Move', unitId: this.selection.id, destination: this.pendingMove.destination };
     this.pendingMove = null;
+    this.pendingAttackTargetId = null;
+    this.unitActionMode = null;
+    this.apply(action);
+  }
+
+  private confirmAttack(): void {
+    if (!this.pendingAttackTargetId || !this.selection || this.selection.kind !== 'unit') return;
+    const action: GameAction = { type: 'Attack', attackerId: this.selection.id, targetId: this.pendingAttackTargetId };
+    this.pendingAttackTargetId = null;
+    this.pendingMove = null;
+    this.unitActionMode = null;
     this.apply(action);
   }
 
   private waitSelected(): void {
     if (this.selection?.kind !== 'unit') return;
-    this.apply({ type: 'Wait', unitId: this.selection.id });
+    const unitId = this.selection.id;
+    if (this.apply({ type: 'Wait', unitId })) {
+      this.selection = null;
+      this.unitActionMode = null;
+      this.pendingMove = null;
+      this.pendingAttackTargetId = null;
+      this.updateView();
+    }
   }
 
   private endTurn(): void {
@@ -1595,7 +1834,14 @@ export class GameUiController {
 
   private commitEndTurn(): void {
     const result = this.apply({ type: 'EndTurn' });
-    if (result && this.state?.gameOver) this.showStatistics(this.state.result);
+    if (result) {
+      this.selection = null;
+      this.unitActionMode = null;
+      this.pendingMove = null;
+      this.pendingAttackTargetId = null;
+      this.updateView();
+      if (this.state?.gameOver) this.showStatistics(this.state.result);
+    }
   }
 
   private setPowerSupply(element: HTMLElement): void {
@@ -2003,7 +2249,9 @@ export class GameUiController {
       this.screen = 'game';
       this.navMode = 'map';
       this.selection = null;
+      this.unitActionMode = null;
       this.pendingMove = null;
+      this.pendingAttackTargetId = null;
       this.checkpointPlacement = null;
       this.checkpointPreviewTarget = null;
       this.lastSaveCode = null;
@@ -2091,7 +2339,7 @@ export class GameUiController {
 
   private showGuide(): void {
     const t = this.translator();
-    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="guide"><section class="modal-card floating-card guide-card" aria-labelledby="guide-heading"><div class="guide-icon">◇</div><h2 id="guide-heading">${escapeHtml(t('guideTitle'))}</h2><p>${escapeHtml(t('guideBody'))}</p><p>${escapeHtml(t('guideSteps'))}</p><button class="primary-button" data-action="guide-close">${escapeHtml(t('confirm'))}</button></section></div>`);
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="guide"><section class="modal-card floating-card guide-card" aria-labelledby="guide-heading"><div class="guide-icon">◇</div><h2 id="guide-heading">${escapeHtml(t('guideTitle'))}</h2><p>${escapeHtml(t('guideBody'))}</p><p>${escapeHtml(t('guideSteps'))}</p><button class="primary-button" data-action="guide-close">${escapeHtml(t('close'))}</button></section></div>`);
   }
 
   private showHelp(): void {
@@ -2386,7 +2634,14 @@ export class GameUiController {
     const preview = this.pendingMove
       ? `<div class="preview-card"><strong>${escapeHtml(t('preview'))}</strong><p>${escapeHtml(t('path'))}: ${this.pendingMove.path.length} <span>→ ${this.pendingMove.destination.q},${this.pendingMove.destination.r}</span></p><p>${escapeHtml(t('interceptionRisk'))}: <b class="risk-${riskText.toLowerCase()}">${escapeHtml(riskText)}</b></p><div class="action-row"><button class="primary-button" data-action="confirm-move">${escapeHtml(t('confirm'))}</button><button class="ghost-button" data-action="cancel-move">${escapeHtml(t('cancel'))}</button></div></div>`
       : '';
-    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p><section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(t('selectDestination'))}</p>`;
+    const actionHint = this.pendingMove || this.pendingAttackTargetId
+      ? t('confirmTargetNearby')
+      : this.unitActionMode === 'move'
+        ? t('selectDestination')
+        : this.unitActionMode === 'attack'
+          ? t('selectAttackTarget')
+          : t('selectUnitAction');
+    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p><section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
   }
 
   /**

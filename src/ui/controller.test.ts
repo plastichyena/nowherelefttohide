@@ -9,9 +9,9 @@ vi.mock('phaser', () => ({
   },
 }));
 
-import type { FacilityState, GameState, UnitState } from '../core/types';
+import type { FacilityState, GameAction, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
-import { boardLegendViewModel, loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, powerHudViewModel, renderBoardLegend, renderEndTurnForecast, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad } from './controller';
+import { boardLegendViewModel, loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, renderBoardLegend, renderEndTurnForecast, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 
@@ -28,6 +28,31 @@ function testFacility(id: string, q: number, r: number): Partial<FacilityState> 
 }
 
 describe('controller view models', () => {
+  it('derives action-menu availability only from legal actions for the selected unit', () => {
+    const actions = [
+      { type: 'Move', unitId: 'police-1', destination: { q: 2, r: 3 } },
+      { type: 'Attack', attackerId: 'guard-2', targetId: 'zombie-1' },
+      { type: 'Wait', unitId: 'police-1' },
+    ] as GameAction[];
+
+    expect(unitActionAvailability(actions, 'police-1')).toEqual({ move: true, attack: false, wait: true });
+    expect(unitActionAvailability(actions, 'guard-2')).toEqual({ move: false, attack: true, wait: false });
+  });
+
+  it('keeps board-side controls visible near every mobile edge', () => {
+    const board = { width: 320, height: 420 };
+    const menu = { width: 236, height: 64 };
+    expect(placeBoardContextUi({ x: 8, y: 16 }, board, menu)).toEqual({ left: 8, top: 50, vertical: 'below' });
+    expect(placeBoardContextUi({ x: 315, y: 410 }, board, menu)).toEqual({ left: 76, top: 312, vertical: 'above' });
+  });
+
+  it('cancels target, mode, and selection in that order', () => {
+    expect(unitInteractionCancelStep('move', true, true)).toBe('target');
+    expect(unitInteractionCancelStep('attack', false, true)).toBe('mode');
+    expect(unitInteractionCancelStep(null, false, true)).toBe('selection');
+    expect(unitInteractionCancelStep(null, false, false)).toBe('none');
+  });
+
   it('keeps the raw phase in metadata while exposing a localized label separately', () => {
     expect(phaseIndicatorViewModel('player', 'ja')).toEqual({
       phase: 'player',
@@ -168,6 +193,18 @@ describe('controller view models', () => {
     }
     expect(createTranslator('ja')('finalHordeTurn')).toContain('Final Horde');
     expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
+  });
+
+  it('has bilingual explicit action-mode labels', () => {
+    const keys = [
+      'unitActions', 'moveMode', 'attackMode', 'confirmMove', 'confirmAttack',
+      'cancelTarget', 'cancelActionMode', 'clearSelection', 'selectUnitAction',
+      'selectAttackTarget', 'confirmTargetNearby',
+    ];
+    for (const key of keys) {
+      expect(createTranslator('ja')(key)).not.toBe(key);
+      expect(createTranslator('en')(key)).not.toBe(key);
+    }
   });
 
   it('formats the power HUD as projected demand over available supply', () => {

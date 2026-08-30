@@ -18,6 +18,7 @@ import {
   boardTextureKey,
   classifyBoardAssetFailure,
   hordeWarningTileKeys,
+  projectWorldToScreen,
   roadTextureRotations,
   supplyBoundaryEdges,
 } from './board';
@@ -49,6 +50,24 @@ describe('Phaser board asset boundary helpers', () => {
     expect(boardTextureKey('units/unit_police.png')).not.toBe(boardTextureKey('units/unit_zombie.png'));
     expect(roadTextureRotations(['east', 'west'])).toHaveLength(1);
     expect(roadTextureRotations(['east', 'northEast', 'west', 'southWest'])).toHaveLength(2);
+  });
+
+  it('projects world coordinates using the current camera viewport, scroll, and zoom', () => {
+    expect(projectWorldToScreen(
+      { x: 240, y: 180 },
+      { x: 8, y: 12, width: 320, height: 240, scrollX: 100, scrollY: 60, zoom: 1.5 },
+    )).toEqual({ x: 138, y: 132 });
+  });
+
+  it('rejects unusable camera projection values', () => {
+    expect(projectWorldToScreen(
+      { x: 10, y: 20 },
+      { x: 0, y: 0, width: 320, height: 240, scrollX: 0, scrollY: 0, zoom: 0 },
+    )).toBeNull();
+    expect(projectWorldToScreen(
+      { x: Number.NaN, y: 20 },
+      { x: 0, y: 0, width: 320, height: 240, scrollX: 0, scrollY: 0, zoom: 1 },
+    )).toBeNull();
   });
 
   it.each([
