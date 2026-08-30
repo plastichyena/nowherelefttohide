@@ -58,7 +58,7 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '1.4.0';
+  schemaVersion: '1.4.1';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -302,7 +302,7 @@ function createSimulationReport(
     aggregate[agent] = aggregateMetrics(rows);
   }
   return {
-    schemaVersion: '1.4.0',
+    schemaVersion: '1.4.1',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -358,7 +358,10 @@ const CSV_COLUMNS: readonly string[] = [
   'checkpointPassThroughBranchTurnRate', 'checkpointNormalBranchTurnRate', 'checkpointStrictBranchTurnRate',
   'checkpointPassThroughScreenedRate', 'checkpointNormalScreenedRate', 'checkpointStrictScreenedRate',
   'hordeInterceptions',
-  'finalHordeSpawned', 'finalHordeKilled', 'finalHordeDefeated', 'normalZombiesKilled', 'hordeZombiesKilled',
+  'finalHordeSpawned', 'finalHordeKilled', 'finalHordeDefeated',
+  'periodicHordeZombiesSpawned', 'periodicNormalZombiesSpawned',
+  'finalHordeZombiesSpawned', 'finalNormalZombiesSpawned',
+  'normalZombiesKilled', 'hordeZombiesKilled',
   'maxVisibleZombies', 'turnsAfterFinalHorde', 'suppliedAreaZombieClearTurn', 'suppliedAreaInfectionClearTurn', 'victoryTurn',
   'terrainEntriesByType.plain', 'terrainEntriesByType.forest', 'terrainEntriesByType.mountain', 'terrainEntriesByType.water',
   'urbanDefenseApplications', 'urbanDefenseDamagePrevented', 'forestDefenseApplications', 'forestDefenseDamagePrevented',
@@ -409,6 +412,8 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.checkpointPassThroughScreenedRate, game.checkpointNormalScreenedRate, game.checkpointStrictScreenedRate,
       game.hordeInterceptions,
       game.finalHordeSpawned, game.finalHordeKilled, game.finalHordeDefeated,
+      game.periodicHordeZombiesSpawned, game.periodicNormalZombiesSpawned,
+      game.finalHordeZombiesSpawned, game.finalNormalZombiesSpawned,
       game.normalZombiesKilled, game.hordeZombiesKilled, game.maxVisibleZombies, game.turnsAfterFinalHorde,
       game.suppliedAreaZombieClearTurn, game.suppliedAreaInfectionClearTurn, game.victoryTurn,
       game.terrainEntriesByType.plain, game.terrainEntriesByType.forest,

@@ -1,6 +1,7 @@
 import type {
   CardinalDirection,
   CheckpointPolicy,
+  CheckpointPositionCandidate,
   CheckpointStatus,
   DeepPartial,
   EndTurnForecast,
@@ -9,10 +10,12 @@ import type {
   FacilityType,
   GameAction,
   GameConfig,
+  GameEvent,
   GameEventType,
   GameOverReason,
   GamePhase,
   HexCoord,
+  HordeComposition,
   HumanUnitType,
   JsonObject,
   PowerMode,
@@ -27,15 +30,15 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.3.1';
-export const GAME_RULES_VERSION = '1.4.0';
+export const APP_VERSION = '1.3.2';
+export const GAME_RULES_VERSION = '1.4.1';
 export const SAVE_FORMAT_VERSION = '3';
-export const AGENT_API_VERSION = '1.4.0';
-export const OBSERVATION_API_VERSION = '1.4.0';
-export const BRIDGE_API_VERSION = '1.4.0';
+export const AGENT_API_VERSION = '1.4.1';
+export const OBSERVATION_API_VERSION = '1.4.1';
+export const BRIDGE_API_VERSION = '1.4.1';
 export const BALANCED_AGENT_VERSION = '3.0.0';
 export const RANDOM_AGENT_VERSION = '1.2.0';
-export const ARTIFACT_SCHEMA_VERSION = '1.4.0';
+export const ARTIFACT_SCHEMA_VERSION = '1.4.1';
 
 export interface AgentMapTileObservation {
   q: number;
@@ -259,12 +262,12 @@ export interface AgentApiInfo {
     };
     horde: {
       cycle: number;
-      initialCount: number;
-      increment: number;
+      periodicInitial: HordeComposition;
+      periodicIncrement: HordeComposition;
       warningStartTurn: number;
       spawnOnlyBeforeFinalTurn: boolean;
       finalHordeTurn: number;
-      finalCount: number;
+      finalComposition: HordeComposition;
     };
     victory: {
       requiresFinalHorde: true;
@@ -277,6 +280,27 @@ export interface AgentApiInfo {
       infectionBatchRate: number;
       infectedPopulationRate: number;
     }>;
+    checkpointPositionCandidates: {
+      observationField: 'checkpointPositionCandidates';
+      schema: {
+        actionType: 'BuildCheckpoint | RelocateCheckpoint';
+        branchId: 'string';
+        checkpointId: 'string (RelocateCheckpoint only; omitted for BuildCheckpoint)';
+        position: '{ q: number; r: number }';
+        legal: 'boolean';
+        reasonCode: 'ActionError.code | null';
+      };
+      ordering: 'branch_id_then_branch_road_tile_order';
+      includesIllegalCandidates: true;
+      reasonCodes: Record<string, string>;
+      fairPlay: {
+        hiddenEnemiesBlock: false;
+        visibleEnemiesCanBlock: true;
+        blockerUnitIdsPublic: false;
+        prngStatePublic: false;
+        futureRandomOutcomesPublic: false;
+      };
+    };
     production: {
       workerCapacityByFacilityType: Record<FacilityType, number>;
       powerPlantsGenerateCapacityPerWorker: number;
@@ -328,6 +352,10 @@ export interface AgentGameResult {
     finalHordeSpawned: number;
     finalHordeKilled: number;
     finalHordeDefeated: boolean;
+    periodicHordeZombiesSpawned: number;
+    periodicNormalZombiesSpawned: number;
+    finalHordeZombiesSpawned: number;
+    finalNormalZombiesSpawned: number;
     normalZombiesKilled: number;
     hordeZombiesKilled: number;
     maxVisibleZombies: number;
@@ -368,6 +396,7 @@ export interface AgentObservation {
   units: AgentUnitObservation[];
   zombies: AgentUnitObservation[];
   checkpoints: AgentCheckpointObservation[];
+  checkpointPositionCandidates: CheckpointPositionCandidate[];
   roadBranches: AgentRoadBranchObservation[];
   supply: AgentSupplyObservation;
   horde: {
@@ -492,6 +521,8 @@ export interface AgentRunArtifact {
   observationTrace?: AgentObservation[];
   /** Present on complete Runner artifacts and optionally on a live AgentGame. */
   metrics?: GameMetrics;
+  /** Local/CI Runner-only Core events. Browser Bridge artifacts never include this field. */
+  verificationEvents?: GameEvent[];
   events?: AgentPublicEvent[];
 }
 

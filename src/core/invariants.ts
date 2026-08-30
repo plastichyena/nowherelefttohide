@@ -148,6 +148,10 @@ export function validateInvariants(state: GameState): InvariantResult {
     'supplyRejections',
     'finalHordeSpawned',
     'finalHordeKilled',
+    'periodicHordeZombiesSpawned',
+    'periodicNormalZombiesSpawned',
+    'finalHordeZombiesSpawned',
+    'finalNormalZombiesSpawned',
     'normalZombiesKilled',
     'hordeZombiesKilled',
     'maxVisibleZombies',
@@ -188,6 +192,9 @@ export function validateInvariants(state: GameState): InvariantResult {
   }
   if (state.statistics.finalHordeKilled > state.statistics.finalHordeSpawned) {
     errors.push('Final Horde killed count cannot exceed its spawned count');
+  }
+  if (state.statistics.finalHordeSpawned !== state.statistics.finalHordeZombiesSpawned + state.statistics.finalNormalZombiesSpawned) {
+    errors.push('Final Horde spawned count must equal its Unit Type counts');
   }
 
   const mapFacilityById = new Map(state.map.facilities.map((facility) => [facility.id, facility]));
@@ -282,7 +289,12 @@ export function validateInvariants(state: GameState): InvariantResult {
     }
     if (!['ready', 'moved', 'acted'].includes(unit.actionState)) errors.push(`Unit ${unit.id} has an invalid action state`);
     if (unit.type === 'zombie') {
-      if (unit.hordeKind !== null || unit.spawnGroupId !== null) errors.push(`Normal Zombie ${unit.id} cannot belong to a Horde spawn group`);
+      const hasKind = ['periodic', 'final'].includes(unit.hordeKind ?? '');
+      const hasGroup = typeof unit.spawnGroupId === 'string' && unit.spawnGroupId.length > 0;
+      if (hasKind !== hasGroup) errors.push(`Normal Zombie ${unit.id} must have both Horde kind and spawn group, or neither`);
+      if (unit.hordeKind === 'final' && unit.spawnGroupId !== state.horde.finalSpawnGroupId) {
+        errors.push(`Final Normal Zombie ${unit.id} must use the active Final Horde group`);
+      }
     } else if (unit.type === 'hordeZombie') {
       if (!['periodic', 'final'].includes(unit.hordeKind ?? '') || typeof unit.spawnGroupId !== 'string' || unit.spawnGroupId.length === 0) {
         errors.push(`Horde Zombie ${unit.id} requires Horde kind and spawn group`);
@@ -297,7 +309,7 @@ export function validateInvariants(state: GameState): InvariantResult {
   }
 
   const remainingFinalHorde = state.units.filter(
-    (unit) => unit.type === 'hordeZombie' && unit.spawnGroupId === state.horde.finalSpawnGroupId,
+    (unit) => unit.spawnGroupId === state.horde.finalSpawnGroupId,
   ).length;
   if (state.horde.finalHordeStatus === 'active' && remainingFinalHorde === 0) {
     errors.push('An active Final Horde must have at least one surviving member');

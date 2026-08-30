@@ -4,6 +4,7 @@ import {
   forecastEndTurn,
   forecastFacilityProduction,
   forecastUnitSuppression,
+  getCheckpointPositionCandidates,
 } from '../core/engine';
 import { deriveUnitRecovery } from '../core/recovery';
 import { hexKey } from '../core/hex';
@@ -360,6 +361,7 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
           projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
         };
       }),
+    checkpointPositionCandidates: getCheckpointPositionCandidates(state),
     roadBranches,
     supply: {
       initialRadius: supply.initialRadius,

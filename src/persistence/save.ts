@@ -172,7 +172,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.3 Save Format 3 (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。`;
+  return `${subject} is incompatible with v1.3.2 / Game Rules ${CURRENT_GAME_VERSION} / Save Format 3 (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -224,7 +224,16 @@ function validateV13Shape(state: Record<string, unknown>, errors: string[]): voi
       }
     }
     if (!isRecord(config.vision) || !isInteger(config.vision.ownedFacility) || !isInteger(config.vision.operationalCheckpoint)) errors.push('state.config.vision is invalid');
-    if (!isRecord(config.horde) || !isInteger(config.horde.finalCount, 1)) errors.push('state.config.horde.finalCount is required');
+    if (!isRecord(config.horde)) {
+      errors.push('state.config.horde must be an object');
+    } else {
+      for (const field of ['periodicInitial', 'periodicIncrement', 'finalComposition'] as const) {
+        const composition = config.horde[field];
+        if (!isRecord(composition) || !isInteger(composition.hordeZombie) || !isInteger(composition.zombie)) {
+          errors.push(`state.config.horde.${field} is invalid`);
+        }
+      }
+    }
     if (!isRecord(config.units)) {
       errors.push('state.config.units must be an object');
     } else {
@@ -277,6 +286,8 @@ function validateV13Shape(state: Record<string, unknown>, errors: string[]): voi
   const statistics = state.statistics;
   const statisticFields = [
     'finalHordeSpawned', 'finalHordeKilled', 'normalZombiesKilled', 'hordeZombiesKilled', 'maxVisibleZombies',
+    'periodicHordeZombiesSpawned', 'periodicNormalZombiesSpawned',
+    'finalHordeZombiesSpawned', 'finalNormalZombiesSpawned',
     'turnsAfterFinalHorde', 'urbanDefenseApplications', 'urbanDefenseDamagePrevented',
     'forestDefenseApplications', 'forestDefenseDamagePrevented', 'normalZombieIdleCount',
     'hordeTargetInheritedCount', 'hordeTargetClearedCount',
@@ -352,7 +363,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   if (!isRecord(value)) return reject(['Save envelope must be a JSON object']);
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
-  if (value.formatVersion !== SAVE_FORMAT_VERSION) errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.2.7 and earlier saves cannot be loaded`);
+  if (value.formatVersion !== SAVE_FORMAT_VERSION) errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.3.1 and earlier saves cannot be loaded`);
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (typeof value.mapId !== 'string' || value.mapId.length === 0) errors.push('mapId must be a non-empty string');
   if (!Number.isSafeInteger(value.seed)) errors.push('seed must be a safe integer');

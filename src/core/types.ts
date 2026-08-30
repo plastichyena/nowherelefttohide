@@ -274,6 +274,15 @@ export interface CheckpointState {
   overrunProcessed?: boolean;
 }
 
+export interface CheckpointPositionCandidate {
+  actionType: 'BuildCheckpoint' | 'RelocateCheckpoint';
+  branchId: string;
+  checkpointId?: string;
+  position: HexCoord;
+  legal: boolean;
+  reasonCode: string | null;
+}
+
 export interface RoadBranchState {
   branchId: RoadBranchId;
   nextArrivalTurn: number;
@@ -380,6 +389,10 @@ export interface GameStatistics {
   finalHordeSpawned: number;
   finalHordeKilled: number;
   finalHordeDefeated: boolean;
+  periodicHordeZombiesSpawned: number;
+  periodicNormalZombiesSpawned: number;
+  finalHordeZombiesSpawned: number;
+  finalNormalZombiesSpawned: number;
   normalZombiesKilled: number;
   hordeZombiesKilled: number;
   maxVisibleZombies: number;
@@ -610,6 +623,7 @@ export interface HeadlessGame {
   reset(seed: number, config: GameConfig): Readonly<GameState>;
   getState(): Readonly<GameState>;
   getLegalActions(): GameAction[];
+  getCheckpointPositionCandidates(): CheckpointPositionCandidate[];
   step(action: GameAction): StepResult;
   isGameOver(): boolean;
   getResult(): GameResult | null;
@@ -642,13 +656,18 @@ export interface FacilityConfig {
   overrunSpawnCount: number;
 }
 
+export interface HordeComposition {
+  hordeZombie: number;
+  zombie: number;
+}
+
 export interface HordeConfig {
   cycle: number;
-  initialCount: number;
-  increment: number;
+  periodicInitial: HordeComposition;
+  periodicIncrement: HordeComposition;
   warningStartTurn: number;
   spawnOnlyBeforeFinalTurn: boolean;
-  finalCount: number;
+  finalComposition: HordeComposition;
 }
 
 export interface TerrainConfig {

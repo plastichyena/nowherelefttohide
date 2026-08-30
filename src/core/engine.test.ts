@@ -554,7 +554,11 @@ describe('GameEngine', () => {
     const config = createDefaultConfig({
       finalHordeTurn: 3,
       economy: { initialZombieCount: 0, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
-      horde: { cycle: 1, initialCount: 2, increment: 2 },
+      horde: {
+        cycle: 1,
+        periodicInitial: { hordeZombie: 2, zombie: 0 },
+        periodicIncrement: { hordeZombie: 1, zombie: 1 },
+      },
       units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
     });
     const engine = new GameEngine(113, config);

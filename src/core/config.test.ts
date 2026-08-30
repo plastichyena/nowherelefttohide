@@ -8,12 +8,17 @@ import {
 describe('GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('1.4.0');
+    expect(DEFAULT_CONFIG.version).toBe('1.4.1');
     expect(DEFAULT_CONFIG.mapId).toBe('fixed-15x15-v2');
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(10);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, powerMode: 'boost' });
     expect(DEFAULT_CONFIG.finalHordeTurn).toBe(30);
-    expect(DEFAULT_CONFIG.horde).toMatchObject({ cycle: 5, initialCount: 2, increment: 2, finalCount: 12 });
+    expect(DEFAULT_CONFIG.horde).toMatchObject({
+      cycle: 5,
+      periodicInitial: { hordeZombie: 2, zombie: 0 },
+      periodicIncrement: { hordeZombie: 1, zombie: 1 },
+      finalComposition: { hordeZombie: 7, zombie: 5 },
+    });
     expect(DEFAULT_CONFIG.terrain).toEqual({
       movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
       damageMultiplier: { urban: 0.5, forestZombie: 0.5 },
@@ -66,11 +71,48 @@ describe('GameConfig', () => {
     const config = createDefaultConfig({ finalHordeTurn: 12, horde: { cycle: 3 } });
     expect(config.finalHordeTurn).toBe(12);
     expect(config.horde.cycle).toBe(3);
-    expect(config.horde.initialCount).toBe(DEFAULT_CONFIG.horde.initialCount);
+    expect(config.horde.periodicInitial).toEqual(DEFAULT_CONFIG.horde.periodicInitial);
     expect(DEFAULT_CONFIG.finalHordeTurn).toBe(30);
 
     config.economy.initialResources.food = 0;
     expect(DEFAULT_CONFIG.economy.initialResources.food).toBe(230);
+
+    config.horde.finalComposition.zombie = 99;
+    expect(DEFAULT_CONFIG.horde.finalComposition.zombie).toBe(5);
+  });
+
+  it('validates every Horde composition component and rejects unusable groups', () => {
+    const invalidConfigs = [
+      createDefaultConfig({ horde: { periodicInitial: { hordeZombie: -1 } } }),
+      createDefaultConfig({ horde: { periodicIncrement: { zombie: 0.5 } } }),
+      createDefaultConfig({ horde: { finalComposition: { zombie: -1 } } }),
+      createDefaultConfig({ horde: { periodicInitial: { hordeZombie: 0, zombie: 0 } } }),
+      createDefaultConfig({ horde: { finalComposition: { hordeZombie: 0, zombie: 0 } } }),
+      createDefaultConfig({ horde: { periodicInitial: { hordeZombie: 0, zombie: 1 } } }),
+      createDefaultConfig({ horde: { finalComposition: { hordeZombie: 0, zombie: 1 } } }),
+    ];
+
+    for (const config of invalidConfigs) {
+      expect(validateGameConfig(config).valid).toBe(false);
+    }
+  });
+
+  it('clones custom per-type Horde compositions without sharing nested state', () => {
+    const config = createDefaultConfig({
+      horde: {
+        periodicInitial: { hordeZombie: 4, zombie: 2 },
+        periodicIncrement: { hordeZombie: 2, zombie: 3 },
+        finalComposition: { hordeZombie: 9, zombie: 8 },
+      },
+    });
+
+    expect(validateGameConfig(config)).toEqual({ valid: true, errors: [] });
+    expect(config.horde).toMatchObject({
+      periodicInitial: { hordeZombie: 4, zombie: 2 },
+      periodicIncrement: { hordeZombie: 2, zombie: 3 },
+      finalComposition: { hordeZombie: 9, zombie: 8 },
+    });
+    expect(JSON.parse(JSON.stringify(config))).toEqual(config);
   });
 
   it('rejects inverted ranges and invalid rates', () => {

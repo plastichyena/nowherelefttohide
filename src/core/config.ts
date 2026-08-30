@@ -14,7 +14,7 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '1.4.0';
+export const CONFIG_VERSION = '1.4.1';
 export const DEFAULT_MAP_ID = 'fixed-15x15-v2';
 
 const facilityIds: FacilityId[] = [
@@ -53,7 +53,7 @@ const defaultUnitConfig: Record<UnitType, UnitConfig> = {
   police: { hp: 25, attack: 5, movement: 5, range: 1, vision: 5, population: 5 },
   nationalGuard: { hp: 50, attack: 10, movement: 5, range: 2, vision: 5, population: 10 },
   zombie: { hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0 },
-  hordeZombie: { hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0 },
+  hordeZombie: { hp: 20, attack: 5, movement: 3, range: 1, vision: 3, population: 0 },
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
@@ -165,11 +165,11 @@ export const DEFAULT_CONFIG: GameConfig = {
   },
   horde: {
     cycle: 5,
-    initialCount: 2,
-    increment: 2,
+    periodicInitial: { hordeZombie: 2, zombie: 0 },
+    periodicIncrement: { hordeZombie: 1, zombie: 1 },
     warningStartTurn: 1,
     spawnOnlyBeforeFinalTurn: true,
-    finalCount: 12,
+    finalComposition: { hordeZombie: 7, zombie: 5 },
   },
   refugees: {
     arrivalIntervalMin: 2,
@@ -457,10 +457,29 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('horde is required');
   } else {
     requireInteger(errors, horde.cycle, 'horde.cycle', 1);
-    requireInteger(errors, horde.initialCount, 'horde.initialCount', 0);
-    requireInteger(errors, horde.increment, 'horde.increment', 0);
     requireInteger(errors, horde.warningStartTurn, 'horde.warningStartTurn', 1);
-    requireInteger(errors, horde.finalCount, 'horde.finalCount', 1);
+    const validateComposition = (composition: typeof horde.periodicInitial, path: string): void => {
+      if (!composition || typeof composition !== 'object') {
+        errors.push(`${path} is required`);
+        return;
+      }
+      requireInteger(errors, composition.hordeZombie, `${path}.hordeZombie`, 0);
+      requireInteger(errors, composition.zombie, `${path}.zombie`, 0);
+      if (Number.isInteger(composition.hordeZombie) && Number.isInteger(composition.zombie)) {
+        if (composition.hordeZombie + composition.zombie < 1) errors.push(`${path} must contain at least one unit`);
+        if (composition.zombie > 0 && composition.hordeZombie === 0) {
+          errors.push(`${path} cannot contain Normal Zombies without a Horde Zombie`);
+        }
+      }
+    };
+    validateComposition(horde.periodicInitial, 'horde.periodicInitial');
+    if (!horde.periodicIncrement || typeof horde.periodicIncrement !== 'object') {
+      errors.push('horde.periodicIncrement is required');
+    } else {
+      requireInteger(errors, horde.periodicIncrement.hordeZombie, 'horde.periodicIncrement.hordeZombie', 0);
+      requireInteger(errors, horde.periodicIncrement.zombie, 'horde.periodicIncrement.zombie', 0);
+    }
+    validateComposition(horde.finalComposition, 'horde.finalComposition');
     if (typeof horde.spawnOnlyBeforeFinalTurn !== 'boolean') {
       errors.push('horde.spawnOnlyBeforeFinalTurn must be boolean');
     }

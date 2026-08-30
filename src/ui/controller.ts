@@ -12,7 +12,6 @@ import {
   deriveSupplySnapshot,
   getBlockingZombiesForCheckpoint,
   getBranchSupplyRadius,
-  getRoadBranch,
   getSuppliedTileKeys,
   isHexSupplied,
 } from '../core/supply';
@@ -21,6 +20,7 @@ import Phaser from 'phaser';
 import type {
   CardinalDirection,
   CheckpointPolicy,
+  CheckpointPositionCandidate,
   CheckpointState,
   EndTurnForecast,
   FacilityState,
@@ -107,6 +107,42 @@ export interface UnitActionAvailability {
   move: boolean;
   attack: boolean;
   wait: boolean;
+}
+
+export interface CheckpointCandidateViewModel {
+  candidate: CheckpointPositionCandidate;
+  reason: string | null;
+}
+
+/** Localize Core-owned candidate results without duplicating checkpoint rules in the UI. */
+export function checkpointCandidateViewModels(
+  candidates: readonly CheckpointPositionCandidate[],
+  locale: Locale,
+): CheckpointCandidateViewModel[] {
+  return candidates.map((candidate) => ({
+    candidate: {
+      ...candidate,
+      position: { ...candidate.position },
+    },
+    reason: candidate.reasonCode ? localizeActionError(candidate.reasonCode, locale) : null,
+  }));
+}
+
+export function actionForCheckpointCandidate(
+  candidate: CheckpointPositionCandidate,
+): Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }> {
+  return candidate.actionType === 'RelocateCheckpoint'
+    ? {
+      type: 'RelocateCheckpoint',
+      checkpointId: candidate.checkpointId ?? '',
+      branchId: candidate.branchId,
+      position: { ...candidate.position },
+    }
+    : {
+      type: 'BuildCheckpoint',
+      branchId: candidate.branchId,
+      position: { ...candidate.position },
+    };
 }
 
 export interface BoardContextPlacement {
@@ -451,9 +487,12 @@ function configLegendEntries(
   add('finalHordeTurn', t('finalHordeTurn'), String(config.finalHordeTurn));
   add('hordeCycle', t('hordeCycle'), String(config.horde.cycle));
   add('hordeWarningStart', t('hordeWarningStart'), String(config.horde.warningStartTurn));
-  add('hordeInitial', t('hordeInitial'), String(config.horde.initialCount));
-  add('hordeIncrement', t('hordeIncrement'), String(config.horde.increment));
-  add('finalHordeCount', t('finalHordeCount'), String(config.horde.finalCount));
+  add('periodicInitialHordeZombies', t('periodicInitialHordeZombies'), String(config.horde.periodicInitial.hordeZombie));
+  add('periodicInitialNormalZombies', t('periodicInitialNormalZombies'), String(config.horde.periodicInitial.zombie));
+  add('periodicIncrementHordeZombies', t('periodicIncrementHordeZombies'), String(config.horde.periodicIncrement.hordeZombie));
+  add('periodicIncrementNormalZombies', t('periodicIncrementNormalZombies'), String(config.horde.periodicIncrement.zombie));
+  add('finalHordeZombies', t('finalHordeZombies'), String(config.horde.finalComposition.hordeZombie));
+  add('finalNormalZombies', t('finalNormalZombies'), String(config.horde.finalComposition.zombie));
   add('initialSupplyRadius', t('initialSupplyRadius'), String(config.checkpoint.initialSupplyRadius));
   add('checkpointMaxPerDirection', t('checkpointMaxPerDirection'), String(config.checkpoint.maxPerDirection));
   add('checkpointConstructionCost', t('checkpointConstructionCost'), String(config.checkpoint.constructionCivilianGoods));
@@ -482,10 +521,10 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
     urban: ['基礎TerrainではないOverlay。実効移動Costは1で、Urban防御が適用されます。', 'An overlay, not base Terrain. Effective movement Cost is 1 and Urban defense applies.'],
     police: ['感染鎮圧と治安活動を担います。自動鎮圧時の民間被害はありません。', 'Handles infection suppression and security. Automatic suppression causes no civilian damage.'],
     nationalGuard: ['射程と火力に優れます。軍需不足時は実効射程が低下し、鎮圧時に民間被害があります（数値はConfig）。', 'Provides range and firepower. Military shortages reduce effective range; suppression can harm civilians (values come from Config).'],
-    zombie: ['通常の敵Unit。視界外では表示されません。', 'A normal enemy unit. Hidden outside player visibility.'],
-    hordeZombie: ['Periodic／Final Hordeの敵Unit。Horde Markerと併記します。', 'Enemy unit used by Periodic and Final Hordes, shown with a Horde marker.'],
-    periodic: ['周期的に到着するHorde。Final Horde発生Turn以後は生成されません。', 'A periodic Horde. It is not generated after the Final Horde turn.'],
-    final: ['Configで指定されたFinal Horde。撃退がVictory条件の一つです。', 'The Config-specified Final Horde. Defeating it is one Victory condition.'],
+    zombie: ['HPの低い通常敵Unit。Mixed Horde所属個体には所属Markerが付き、Horde ZombieからTargetを継承できます。', 'A lower-HP normal enemy. Mixed-Horde members carry a group marker and can inherit a Horde Zombie target.'],
+    hordeZombie: ['高HPでCapitalをStrategic TargetにするHorde中核。所属に応じたHorde Markerと併記します。', 'A high-HP Horde core that uses the Capital as a strategic target, shown with its Horde marker.'],
+    periodic: ['Horde ZombieとNormal Zombieが混在できる周期集団。MarkerはUnit Typeではなく所属を示します。', 'A periodic group that may mix Horde and Normal Zombies. Its marker shows membership, not Unit Type.'],
+    final: ['Final Spawn Group所属を示すMarker。Normal Zombieも含め、Group全滅がVictory条件の一つです。', 'Marks Final Spawn Group membership. Every member, including Normal Zombies, must be defeated for Victory.'],
     capital: ['州都。人口の基点、編成、初期Supplyを担います。', 'The capital anchors population, recruitment, and initial Supply.'],
     city: ['地方都市。人口を受け入れ、警察編成と民需品生産を担います。', 'A regional city that receives population, produces Police, and supports civilian goods.'],
     farm: ['食料を生産する産業施設。Power Supplyで出力がBoostされます。', 'Produces Food. Power Supply boosts its output.'],
@@ -972,6 +1011,7 @@ export class GameUiController {
   private pendingAttackTargetId: string | null = null;
   private checkpointPlacement: CheckpointPlacement | null = null;
   private checkpointPreviewTarget: CheckpointPreviewTarget | null = null;
+  private checkpointPlacementMessage: string | null = null;
   private supplyOverlay = false;
   private lastSaveCode: string | null = null;
   private toastMessage: string | null = null;
@@ -1010,6 +1050,7 @@ export class GameUiController {
     this.pendingAttackTargetId = null;
     this.checkpointPlacement = null;
     this.checkpointPreviewTarget = null;
+    this.checkpointPlacementMessage = null;
     this.supplyOverlay = false;
     this.destroyBoard();
     const t = this.translator();
@@ -1037,6 +1078,7 @@ export class GameUiController {
 
   private beginNewGame(): void {
     const t = this.translator();
+    const defaults = createDefaultConfig();
     this.root.className = 'app-shell modal-screen';
     this.root.innerHTML = `
       <section class="modal-card" aria-labelledby="new-game-heading">
@@ -1045,11 +1087,17 @@ export class GameUiController {
         <h2 id="new-game-heading">${escapeHtml(t('newGame'))}</h2>
         <form data-form="new-game" class="settings-form">
           <label>${escapeHtml(t('newSeed'))}<input name="seed" type="number" inputmode="numeric" value="${Date.now() % 2147483647}" /></label>
-          <label>${escapeHtml(t('finalHordeTurn'))}<input name="finalHordeTurn" type="number" min="1" max="999" value="30" /></label>
-          <label>${escapeHtml(t('hordeCycle'))}<input name="hordeCycle" type="number" min="1" value="5" /></label>
-          <label>${escapeHtml(t('hordeInitial'))}<input name="hordeInitial" type="number" min="0" value="2" /></label>
-          <label>${escapeHtml(t('hordeIncrement'))}<input name="hordeIncrement" type="number" min="0" value="2" /></label>
-          <label>${escapeHtml(t('hordeWarningStart'))}<input name="hordeWarningStart" type="number" min="1" value="1" /></label>
+          <label>${escapeHtml(t('finalHordeTurn'))}<input name="finalHordeTurn" type="number" inputmode="numeric" min="1" max="999" step="1" value="${defaults.finalHordeTurn}" /></label>
+          <label>${escapeHtml(t('hordeCycle'))}<input name="hordeCycle" type="number" inputmode="numeric" min="1" step="1" value="${defaults.horde.cycle}" /></label>
+          <label>${escapeHtml(t('hordeWarningStart'))}<input name="hordeWarningStart" type="number" inputmode="numeric" min="1" step="1" value="${defaults.horde.warningStartTurn}" /></label>
+          <fieldset class="composition-settings"><legend>${escapeHtml(t('hordeComposition'))}</legend><div class="composition-grid">
+            <label>${escapeHtml(t('periodicInitialHordeZombies'))}<input name="periodicInitialHordeZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.periodicInitial.hordeZombie}" /></label>
+            <label>${escapeHtml(t('periodicInitialNormalZombies'))}<input name="periodicInitialNormalZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.periodicInitial.zombie}" /></label>
+            <label>${escapeHtml(t('periodicIncrementHordeZombies'))}<input name="periodicIncrementHordeZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.periodicIncrement.hordeZombie}" /></label>
+            <label>${escapeHtml(t('periodicIncrementNormalZombies'))}<input name="periodicIncrementNormalZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.periodicIncrement.zombie}" /></label>
+            <label>${escapeHtml(t('finalHordeZombies'))}<input name="finalHordeZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.finalComposition.hordeZombie}" /></label>
+            <label>${escapeHtml(t('finalNormalZombies'))}<input name="finalNormalZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.finalComposition.zombie}" /></label>
+          </div><p class="muted composition-hint">${escapeHtml(t('hordeCompositionHint'))}</p></fieldset>
           <label>${escapeHtml(t('refugeeIntervalMin'))}<input name="refugeeIntervalMin" type="number" min="1" value="2" /></label>
           <label>${escapeHtml(t('refugeeIntervalMax'))}<input name="refugeeIntervalMax" type="number" min="1" value="4" /></label>
           <label>${escapeHtml(t('refugeePeopleMin'))}<input name="refugeePeopleMin" type="number" min="1" value="5" /></label>
@@ -1073,9 +1121,19 @@ export class GameUiController {
         finalHordeTurn: Math.max(1, Math.floor(numberValue(values.get('finalHordeTurn')?.toString(), 30))),
         horde: {
           cycle: Math.max(1, Math.floor(numberValue(values.get('hordeCycle')?.toString(), 5))),
-          initialCount: Math.max(0, Math.floor(numberValue(values.get('hordeInitial')?.toString(), 2))),
-          increment: Math.max(0, Math.floor(numberValue(values.get('hordeIncrement')?.toString(), 2))),
+          periodicInitial: {
+            hordeZombie: Math.max(0, Math.floor(numberValue(values.get('periodicInitialHordeZombies')?.toString(), 2))),
+            zombie: Math.max(0, Math.floor(numberValue(values.get('periodicInitialNormalZombies')?.toString(), 0))),
+          },
+          periodicIncrement: {
+            hordeZombie: Math.max(0, Math.floor(numberValue(values.get('periodicIncrementHordeZombies')?.toString(), 1))),
+            zombie: Math.max(0, Math.floor(numberValue(values.get('periodicIncrementNormalZombies')?.toString(), 1))),
+          },
           warningStartTurn: Math.max(1, Math.floor(numberValue(values.get('hordeWarningStart')?.toString(), 1))),
+          finalComposition: {
+            hordeZombie: Math.max(0, Math.floor(numberValue(values.get('finalHordeZombies')?.toString(), 7))),
+            zombie: Math.max(0, Math.floor(numberValue(values.get('finalNormalZombies')?.toString(), 5))),
+          },
         },
         refugees: {
           arrivalIntervalMin: refugeeIntervalMin,
@@ -1120,13 +1178,14 @@ export class GameUiController {
       this.pendingAttackTargetId = null;
       this.checkpointPlacement = null;
       this.checkpointPreviewTarget = null;
+      this.checkpointPlacementMessage = null;
       this.supplyOverlay = false;
       this.guideShown = !this.hasSeenGuide();
       this.renderGame();
       this.autosave();
       if (this.guideShown) this.showGuide();
     } catch (error) {
-      this.showToast(`ゲームを開始できません: ${error instanceof Error ? error.message : String(error)}`);
+      this.showToast(`${this.translator()('newGameError')}: ${error instanceof Error ? error.message : String(error)}`);
       this.showTitle();
     }
   }
@@ -1288,7 +1347,7 @@ export class GameUiController {
       case 'continue': this.loadAutosave(); break;
       case 'load': this.showLoadModal(); break;
       case 'options': this.beginNewGame(); break;
-      case 'toggle-language': this.locale = toggleLocale(this.locale); persistLocale(this.locale); this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
+      case 'toggle-language': this.locale = toggleLocale(this.locale); persistLocale(this.locale); this.checkpointPlacementMessage = null; this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
       case 'title': this.showTitle(); break;
       case 'help': this.showHelp(); break;
       case 'toggle-supply': this.supplyOverlay = !this.supplyOverlay; this.updateView(); break;
@@ -1318,7 +1377,7 @@ export class GameUiController {
       case 'produce-guard': this.produce('nationalGuard'); break;
       case 'build-checkpoint': this.buildCheckpoint(); break;
       case 'relocate-checkpoint': this.startRelocation(); break;
-      case 'checkpoint-place-cancel': this.checkpointPlacement = null; this.checkpointPreviewTarget = null; this.updateView(); break;
+      case 'checkpoint-place-cancel': this.checkpointPlacement = null; this.checkpointPreviewTarget = null; this.checkpointPlacementMessage = null; this.updateView(); break;
       case 'checkpoint-build-at': this.buildCheckpointAt(element); break;
       case 'checkpoint-relocate-at': this.relocateCheckpointAt(element); break;
       default: break;
@@ -1335,6 +1394,7 @@ export class GameUiController {
     this.pendingAttackTargetId = null;
     this.checkpointPlacement = null;
     this.checkpointPreviewTarget = null;
+    this.checkpointPlacementMessage = null;
     if (this.state && selected) this.selection = resolveTileSelection(this.state, selected, mode);
     else if (mode === 'domestic' && this.selection?.kind === 'unit') this.selection = null;
     this.sheetState = mode === 'domestic' ? 'expanded' : 'standard';
@@ -1476,26 +1536,19 @@ export class GameUiController {
       selectedVision: this.selectedVision(),
       supplyOverlay: supplyContext,
       suppliedTileKeys,
-      checkpointPreviewPositions: preview.positions,
+      checkpointLegalPreviewPositions: preview.legalPositions,
+      checkpointInvalidPreviewPositions: preview.invalidPositions,
       blockedZombieIds: preview.blockedZombieIds,
       checkpointPreviewSelected: previewTarget?.position,
     };
     this.boardScene.updateState(render);
   }
 
-  private checkpointPreview(): { positions: HexCoord[]; blockedZombieIds: string[] } {
-    if (!this.state || !this.checkpointPlacement) return { positions: [], blockedZombieIds: [] };
-    const branchIds = this.checkpointPlacement.branchId
-      ? [this.checkpointPlacement.branchId]
-      : this.state.map.roadBranches.map((branch) => branch.id);
-    const positions: HexCoord[] = [];
-    for (const branchId of branchIds) {
-      const branch = getRoadBranch(this.state.map, branchId);
-      if (!branch) continue;
-      for (const position of branch.roadTiles) {
-        positions.push({ ...position });
-      }
-    }
+  private checkpointPreview(): { legalPositions: HexCoord[]; invalidPositions: HexCoord[]; blockedZombieIds: string[] } {
+    if (!this.state || !this.checkpointPlacement) return { legalPositions: [], invalidPositions: [], blockedZombieIds: [] };
+    const candidates = this.checkpointCandidates();
+    const legalPositions = candidates.filter((candidate) => candidate.legal).map((candidate) => ({ ...candidate.position }));
+    const invalidPositions = candidates.filter((candidate) => !candidate.legal).map((candidate) => ({ ...candidate.position }));
     const visible = getPlayerVisibleTileKeys(this.state);
     const blockedZombieIds = this.checkpointPreviewTarget
       ? getBlockingZombiesForCheckpoint(
@@ -1506,7 +1559,7 @@ export class GameUiController {
         .filter((zombie) => visible.has(hexKey(zombie.position)))
         .map((zombie) => zombie.id)
       : [];
-    return { positions, blockedZombieIds };
+    return { legalPositions, invalidPositions, blockedZombieIds };
   }
 
   private selectedVision(): { origin: HexCoord; radius: number } | null {
@@ -1546,6 +1599,20 @@ export class GameUiController {
     }
   }
 
+  private checkpointCandidates(placement = this.checkpointPlacement): CheckpointPositionCandidate[] {
+    if (!this.engine || !placement) return [];
+    try {
+      const actionType = placement.mode === 'build' ? 'BuildCheckpoint' : 'RelocateCheckpoint';
+      return this.engine.getCheckpointPositionCandidates()
+        .filter((candidate) => candidate.actionType === actionType)
+        .filter((candidate) => !placement.branchId || candidate.branchId === placement.branchId)
+        .filter((candidate) => placement.mode !== 'relocate' || candidate.checkpointId === placement.checkpointId)
+        .map((candidate) => ({ ...candidate, position: { ...candidate.position } }));
+    } catch {
+      return [];
+    }
+  }
+
   private selectedUnitLegalMoves(): HexCoord[] {
     if (this.unitActionMode !== 'move' || !this.selection || this.selection.kind !== 'unit') return [];
     return this.selectedUnitLegalMovesRaw();
@@ -1578,6 +1645,7 @@ export class GameUiController {
 
   private clearUnitSelection(): void {
     this.selection = null;
+    this.checkpointPlacementMessage = null;
     this.unitActionMode = null;
     this.pendingMove = null;
     this.pendingAttackTargetId = null;
@@ -1604,7 +1672,7 @@ export class GameUiController {
     switch (unitInteractionCancelStep(this.unitActionMode, Boolean(this.pendingMove || this.pendingAttackTargetId), Boolean(this.selection))) {
       case 'target': this.cancelUnitTarget(); break;
       case 'mode': this.leaveUnitActionMode(); break;
-      case 'selection': this.selection = null; this.updateView(); break;
+      case 'selection': this.selection = null; this.checkpointPlacementMessage = null; this.updateView(); break;
       default: break;
     }
   }
@@ -1670,30 +1738,20 @@ export class GameUiController {
   private onTileTap(position: HexCoord): void {
     if (!this.state || !this.engine) return;
     if (this.checkpointPlacement) {
-      const branch = this.state.map.roadBranches.find((candidate) =>
-        candidate.roadTiles.some((tile) => tile.q === position.q && tile.r === position.r),
-      );
-      const action = this.legalActions().find((candidate) => {
-        if (this.checkpointPlacement?.mode === 'build' && candidate.type !== 'BuildCheckpoint') return false;
-        if (this.checkpointPlacement?.mode === 'relocate' && candidate.type !== 'RelocateCheckpoint') return false;
-        if (candidate.type === 'BuildCheckpoint') {
-          return candidate.branchId === branch?.id && candidate.position.q === position.q && candidate.position.r === position.r;
-        }
-        if (candidate.type === 'RelocateCheckpoint') {
-          return candidate.checkpointId === this.checkpointPlacement?.checkpointId &&
-            candidate.branchId === branch?.id &&
-            candidate.position.q === position.q &&
-            candidate.position.r === position.r;
-        }
-        return false;
-      });
-      if (action && this.apply(action)) {
+      const candidate = this.checkpointCandidates().find((entry) => samePosition(entry.position, position));
+      if (!candidate) return;
+      this.checkpointPreviewTarget = { branchId: candidate.branchId, position: { ...candidate.position } };
+      if (!candidate.legal) {
+        this.checkpointPlacementMessage = localizeActionError(candidate.reasonCode ?? undefined, this.locale);
+        this.updateView();
+        return;
+      }
+      if (this.apply(actionForCheckpointCandidate(candidate))) {
         this.checkpointPlacement = null;
         this.checkpointPreviewTarget = null;
+        this.checkpointPlacementMessage = null;
         this.supplyOverlay = true;
         this.updateView();
-      } else if (!action) {
-        this.showToast(this.checkpointActionReason(this.checkpointPlacement.mode, this.checkpointPlacement.checkpointId));
       }
       return;
     }
@@ -1702,6 +1760,7 @@ export class GameUiController {
       this.pendingMove = null;
       this.pendingAttackTargetId = null;
       this.selection = resolveTileSelection(this.state, position, this.navMode);
+      this.checkpointPlacementMessage = null;
       this.updateView();
       return;
     }
@@ -1746,12 +1805,14 @@ export class GameUiController {
     const resolved = resolveTileSelection(this.state, position, this.navMode);
     if (resolved) {
       this.selection = resolved;
+      this.checkpointPlacementMessage = null;
       this.unitActionMode = null;
       this.pendingMove = null;
       this.pendingAttackTargetId = null;
       this.updateView();
     } else {
       this.selection = null;
+      this.checkpointPlacementMessage = null;
       this.unitActionMode = null;
       this.pendingMove = null;
       this.pendingAttackTargetId = null;
@@ -2040,16 +2101,16 @@ export class GameUiController {
   }
 
   private buildCheckpoint(): void {
-    const candidates = this.legalActions().filter((action): action is Extract<GameAction, { type: 'BuildCheckpoint' }> => action.type === 'BuildCheckpoint');
+    const placement: CheckpointPlacement = { mode: 'build' };
+    const candidates = this.checkpointCandidates(placement);
     if (candidates.length === 0) {
       this.showToast(this.checkpointActionReason('build'));
       return;
     }
-    this.checkpointPlacement = { mode: 'build' };
-    const first = candidates[0]!;
-    this.checkpointPreviewTarget = first.branchId
-      ? { branchId: first.branchId, position: { ...first.position } }
-      : null;
+    this.checkpointPlacement = placement;
+    this.checkpointPlacementMessage = null;
+    const first = candidates.find((candidate) => candidate.legal) ?? candidates[0]!;
+    this.checkpointPreviewTarget = { branchId: first.branchId, position: { ...first.position } };
     this.supplyOverlay = true;
     this.sheetState = 'standard';
     this.updateView();
@@ -2065,41 +2126,36 @@ export class GameUiController {
       this.showToast(this.translator()('unknownOperationalCheckpoint'));
       return;
     }
-    const candidates = this.legalActions().filter((action): action is Extract<GameAction, { type: 'RelocateCheckpoint' }> => action.type === 'RelocateCheckpoint' && action.checkpointId === checkpoint.id);
-    if (candidates.length === 0) {
-      this.showToast(this.checkpointActionReason('relocate', checkpoint.id));
-      return;
-    }
-    this.checkpointPlacement = {
+    const placement: CheckpointPlacement = {
       mode: 'relocate',
       checkpointId: checkpoint.id,
       branchId: checkpoint.branchId ?? checkpoint.direction,
     };
-    const first = candidates[0]!;
-    this.checkpointPreviewTarget = first.branchId
-      ? { branchId: first.branchId, position: { ...first.position } }
-      : null;
+    const candidates = this.checkpointCandidates(placement);
+    if (candidates.length === 0) {
+      this.showToast(this.checkpointActionReason('relocate', checkpoint.id));
+      return;
+    }
+    this.checkpointPlacement = placement;
+    this.checkpointPlacementMessage = null;
+    const first = candidates.find((candidate) => candidate.legal) ?? candidates[0]!;
+    this.checkpointPreviewTarget = { branchId: first.branchId, position: { ...first.position } };
     this.supplyOverlay = true;
     this.sheetState = 'standard';
     this.updateView();
   }
 
   private checkpointActionReason(mode: 'build' | 'relocate', checkpointId?: string): string {
-    if (!this.state) return this.translator()('invalidAction');
-    const branchIds = this.state.map.roadBranches.map((branch) => branch.id);
-    for (const branchId of branchIds) {
-      const branch = getRoadBranch(this.state.map, branchId);
-      if (!branch) continue;
-      for (const position of branch.roadTiles) {
-        const action: GameAction = mode === 'build'
-          ? { type: 'BuildCheckpoint', branchId, position: { ...position } }
-          : checkpointId
-            ? { type: 'RelocateCheckpoint', checkpointId, branchId, position: { ...position } }
-            : { type: 'BuildCheckpoint', branchId, position: { ...position } };
-        const reason = actionReasonFor(this.state, action, this.locale);
-        if (reason) return reason;
-      }
-    }
+    const checkpoint = checkpointId && this.state
+      ? this.state.checkpoints.find((candidate) => candidate.id === checkpointId)
+      : undefined;
+    const candidates = this.checkpointCandidates({
+      mode,
+      checkpointId,
+      branchId: checkpoint ? checkpoint.branchId ?? checkpoint.direction : undefined,
+    });
+    const reasonCode = candidates.find((candidate) => !candidate.legal)?.reasonCode;
+    if (reasonCode) return localizeActionError(reasonCode, this.locale);
     return this.translator()('invalidAction');
   }
 
@@ -2109,25 +2165,20 @@ export class GameUiController {
     const q = numberValue(element.dataset.q, NaN);
     const r = numberValue(element.dataset.r, NaN);
     if (!branchId || !Number.isInteger(q) || !Number.isInteger(r)) return;
-    const action = this.legalActions().find(
-      (candidate): candidate is Extract<GameAction, { type: 'BuildCheckpoint' }> =>
-        candidate.type === 'BuildCheckpoint' &&
-        candidate.branchId === branchId &&
-        candidate.position.q === q &&
-        candidate.position.r === r,
+    const candidate = this.checkpointCandidates().find((entry) =>
+      entry.branchId === branchId && entry.position.q === q && entry.position.r === r,
     );
-    if (!action) {
-      const requested: Extract<GameAction, { type: 'BuildCheckpoint' }> = {
-        type: 'BuildCheckpoint',
-        branchId,
-        position: { q, r },
-      };
-      this.showToast(actionReasonFor(this.state, requested, this.locale) ?? this.checkpointActionReason('build'));
+    if (!candidate) return;
+    this.checkpointPreviewTarget = { branchId: candidate.branchId, position: { ...candidate.position } };
+    if (!candidate.legal) {
+      this.checkpointPlacementMessage = localizeActionError(candidate.reasonCode ?? undefined, this.locale);
+      this.updateView();
       return;
     }
-    if (this.apply(action)) {
+    if (this.apply(actionForCheckpointCandidate(candidate))) {
       this.checkpointPlacement = null;
       this.checkpointPreviewTarget = null;
+      this.checkpointPlacementMessage = null;
       this.supplyOverlay = true;
       this.updateView();
     }
@@ -2139,27 +2190,20 @@ export class GameUiController {
     const q = numberValue(element.dataset.q, NaN);
     const r = numberValue(element.dataset.r, NaN);
     if (!branchId || !Number.isInteger(q) || !Number.isInteger(r)) return;
-    const action = this.legalActions().find(
-      (candidate): candidate is Extract<GameAction, { type: 'RelocateCheckpoint' }> =>
-        candidate.type === 'RelocateCheckpoint' &&
-        candidate.checkpointId === this.checkpointPlacement?.checkpointId &&
-        candidate.branchId === branchId &&
-        candidate.position.q === q &&
-        candidate.position.r === r,
+    const candidate = this.checkpointCandidates().find((entry) =>
+      entry.branchId === branchId && entry.position.q === q && entry.position.r === r,
     );
-    if (!action) {
-      const requested: Extract<GameAction, { type: 'RelocateCheckpoint' }> = {
-        type: 'RelocateCheckpoint',
-        checkpointId: this.checkpointPlacement.checkpointId,
-        branchId,
-        position: { q, r },
-      };
-      this.showToast(actionReasonFor(this.state, requested, this.locale) ?? this.checkpointActionReason('relocate', requested.checkpointId));
+    if (!candidate) return;
+    this.checkpointPreviewTarget = { branchId: candidate.branchId, position: { ...candidate.position } };
+    if (!candidate.legal) {
+      this.checkpointPlacementMessage = localizeActionError(candidate.reasonCode ?? undefined, this.locale);
+      this.updateView();
       return;
     }
-    if (this.apply(action)) {
+    if (this.apply(actionForCheckpointCandidate(candidate))) {
       this.checkpointPlacement = null;
       this.checkpointPreviewTarget = null;
+      this.checkpointPlacementMessage = null;
       this.supplyOverlay = true;
       this.updateView();
     }
@@ -2175,6 +2219,7 @@ export class GameUiController {
     const current = this.checkpointPreviewTarget;
     if (current?.branchId === branchId && current.position.q === q && current.position.r === r) return;
     this.checkpointPreviewTarget = { branchId, position: { q, r } };
+    this.setCheckpointPlacementMessage(null);
     this.updateBoard();
   }
 
@@ -2217,6 +2262,7 @@ export class GameUiController {
       return false;
     }
     this.state = result.state;
+    this.checkpointPlacementMessage = null;
     this.autosave();
     this.updateView();
     if (result.gameOver && result.result) this.showStatistics(result.result);
@@ -2254,6 +2300,7 @@ export class GameUiController {
       this.pendingAttackTargetId = null;
       this.checkpointPlacement = null;
       this.checkpointPreviewTarget = null;
+      this.checkpointPlacementMessage = null;
       this.lastSaveCode = null;
       this.renderGame();
       if (shouldAutosaveAfterLoad(migrated)) this.autosave();
@@ -2391,7 +2438,7 @@ export class GameUiController {
       }
     }
     const buildButton = body.querySelector<HTMLButtonElement>('[data-action="build-checkpoint"]');
-    const buildCandidates = this.legalActions().some((action) => action.type === 'BuildCheckpoint');
+    const buildCandidates = this.checkpointCandidates({ mode: 'build' }).length > 0;
     if (buildButton) {
       buildButton.disabled = !buildCandidates;
       buildButton.title = buildCandidates ? '' : this.checkpointActionReason('build');
@@ -2453,37 +2500,29 @@ export class GameUiController {
   private renderCheckpointPlacement(): string {
     if (!this.state || !this.checkpointPlacement) return '';
     const t = this.translator();
-    const branchIds = this.checkpointPlacement.branchId
-      ? [this.checkpointPlacement.branchId]
-      : this.state.map.roadBranches.map((branch) => branch.id);
-    const actions = branchIds.flatMap((branchId) => {
-      const branch = getRoadBranch(this.state!.map, branchId);
-      if (!branch) return [];
-      return branch.roadTiles.map((position): Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }> =>
-        this.checkpointPlacement?.mode === 'relocate' && this.checkpointPlacement.checkpointId
-          ? { type: 'RelocateCheckpoint', checkpointId: this.checkpointPlacement.checkpointId, branchId, position: { ...position } }
-          : { type: 'BuildCheckpoint', branchId, position: { ...position } },
-      );
-    });
+    const candidates = checkpointCandidateViewModels(this.checkpointCandidates(), this.locale);
     const actionName = this.checkpointPlacement.mode === 'build' ? t('buildPreview') : t('relocatePreview');
     const hint = this.checkpointPlacement.mode === 'build' ? t('buildCheckpointHint') : t('relocateCheckpointHint');
-    const buttons = actions.map((action) => {
-      const branchId = action.branchId ?? '';
+    const buttons = candidates.map(({ candidate, reason }) => {
+      const branchId = candidate.branchId;
       const direction = this.state!.map.roadBranches.find((branch) => branch.id === branchId)?.direction ?? 'north';
-      const invalidReason = actionReasonFor(this.state!, action, this.locale);
-      return '<button class="checkpoint-candidate' + (invalidReason ? ' invalid' : '') + '" data-action="' +
+      const selected = this.checkpointPreviewTarget?.branchId === branchId && samePosition(this.checkpointPreviewTarget.position, candidate.position);
+      return '<button class="checkpoint-candidate ' + (candidate.legal ? 'legal' : 'invalid') + (selected ? ' selected' : '') + '" data-action="' +
         (this.checkpointPlacement?.mode === 'build' ? 'checkpoint-build-at' : 'checkpoint-relocate-at') +
-        '" data-branch-id="' + escapeHtml(branchId) + '" data-q="' + String(action.position.q) +
-        '" data-r="' + String(action.position.r) + '" aria-invalid="' + String(Boolean(invalidReason)) + '"' +
-        (invalidReason ? ' title="' + escapeHtml(invalidReason) + '"' : '') + '>' +
-        escapeHtml(formatDirection(direction, this.locale)) + ' · ' + String(action.position.q) + ',' +
-        String(action.position.r) + (invalidReason ? ' ×' : '') + '</button>';
+        '" data-branch-id="' + escapeHtml(branchId) + '" data-q="' + String(candidate.position.q) +
+        '" data-r="' + String(candidate.position.r) + '" aria-invalid="' + String(!candidate.legal) + '"' +
+        (reason ? ' title="' + escapeHtml(reason) + '"' : '') + '>' +
+        '<span aria-hidden="true">' + (candidate.legal ? '✓' : '×') + '</span> ' +
+        escapeHtml(formatDirection(direction, this.locale)) + ' · ' + String(candidate.position.q) + ',' +
+        String(candidate.position.r) + '</button>';
     }).join('');
+    const inlineMessage = this.checkpointPlacementMessage ?? '';
     return '<section class="checkpoint-placement" aria-labelledby="checkpoint-placement-heading"><div class="section-heading"><h3 id="checkpoint-placement-heading">' +
       escapeHtml(actionName) + '</h3><button class="ghost-button compact-button" data-action="checkpoint-place-cancel">' +
       escapeHtml(t('cancelPlacement')) + '</button></div><p class="muted">' + escapeHtml(hint) +
       '</p><div class="checkpoint-candidates">' + (buttons || '<p class="warning-text">' + escapeHtml(t('invalidAction')) + '</p>') +
-      '</div><p class="muted">' + escapeHtml(t('blockedZombie')) + '</p></section>';
+      '</div><p class="checkpoint-inline-message" data-checkpoint-inline-message role="status" aria-live="polite"' +
+      (inlineMessage ? '' : ' hidden') + '>' + escapeHtml(inlineMessage) + '</p><p class="muted">' + escapeHtml(t('checkpointCandidateHint')) + '</p></section>';
   }
 
   private renderSheetBody(): void {
@@ -2733,9 +2772,11 @@ export class GameUiController {
       : newPolicyActionAvailable
         ? null
         : actionReasonFor(this.state!, requestedPolicy, this.locale) ?? t('invalidAction');
-    const newRelocationAvailable = checkpoint.status === 'operational' && this.legalActions().some((action) =>
-      action.type === 'RelocateCheckpoint' && action.checkpointId === checkpoint.id,
-    );
+    const newRelocationAvailable = checkpoint.status === 'operational' && this.checkpointCandidates({
+      mode: 'relocate',
+      checkpointId: checkpoint.id,
+      branchId: checkpoint.branchId ?? checkpoint.direction,
+    }).length > 0;
     const statusSummary = statusLabel + ' · ' + formatDirection(checkpoint.direction, this.locale);
     title.textContent = t('checkpoint') + ' · ' + checkpoint.id;
     summary.textContent = `${statusSummary} · ${t('vision')} ${publicCheckpoint?.vision ?? 0}`;
@@ -2773,6 +2814,14 @@ export class GameUiController {
       this.renderToast();
     }, 4500);
     this.noticeTimer = timer;
+  }
+
+  private setCheckpointPlacementMessage(message: string | null): void {
+    this.checkpointPlacementMessage = message;
+    const element = this.root.querySelector<HTMLElement>('[data-checkpoint-inline-message]');
+    if (!element) return;
+    element.textContent = message ?? '';
+    element.hidden = !message;
   }
 
   private renderToast(): void {

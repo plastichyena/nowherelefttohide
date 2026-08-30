@@ -47,7 +47,8 @@ export interface BoardRenderState {
   selectedVision?: { origin: HexCoord; radius: number } | null;
   supplyOverlay?: boolean;
   suppliedTileKeys?: readonly string[];
-  checkpointPreviewPositions?: readonly HexCoord[];
+  checkpointLegalPreviewPositions?: readonly HexCoord[];
+  checkpointInvalidPreviewPositions?: readonly HexCoord[];
   checkpointPreviewSelected?: HexCoord | null;
   blockedZombieIds?: readonly string[];
 }
@@ -330,6 +331,26 @@ function unitLineColor(unit: UnitState, selected: boolean, target: boolean, bloc
   if (target) return 0xff8c69;
   if (selected) return 0x9ae9ff;
   return 0x071019;
+}
+
+export interface CheckpointCandidateMarkerStyle {
+  color: number;
+  symbol: '✓' | '×';
+  lineWidth: number;
+  alpha: number;
+}
+
+/** Keep legal/invalid checkpoint candidates distinguishable without relying on color alone. */
+export function checkpointCandidateMarkerStyle(
+  legal: boolean,
+  selected: boolean,
+): CheckpointCandidateMarkerStyle {
+  return {
+    color: legal ? (selected ? 0xffd36e : 0x72e0c2) : (selected ? 0xff9a8d : 0xc86f68),
+    symbol: legal ? '✓' : '×',
+    lineWidth: selected ? 4 : legal ? 2 : 3,
+    alpha: selected ? 0.38 : legal ? 0.2 : 0.26,
+  };
 }
 
 export class HexBoardScene extends Phaser.Scene {
@@ -832,7 +853,8 @@ export class HexBoardScene extends Phaser.Scene {
     const path = new Set((render.pendingPath ?? []).map((position) => hexKey(position)));
     const attackTargets = new Set(render.attackTargetIds ?? []);
     const suppliedTiles = new Set(render.suppliedTileKeys ?? []);
-    const checkpointPreview = new Set((render.checkpointPreviewPositions ?? []).map((position) => hexKey(position)));
+    const checkpointLegalPreview = new Set((render.checkpointLegalPreviewPositions ?? []).map((position) => hexKey(position)));
+    const checkpointInvalidPreview = new Set((render.checkpointInvalidPreviewPositions ?? []).map((position) => hexKey(position)));
     const selectedCheckpointPreview = render.checkpointPreviewSelected ? hexKey(render.checkpointPreviewSelected) : null;
     const blockedZombies = new Set(render.blockedZombieIds ?? []);
     const selected = render.selectedPosition;
@@ -902,7 +924,7 @@ export class HexBoardScene extends Phaser.Scene {
       const facility = facilitiesByTile.get(key);
       const checkpoint = checkpointsByTile.get(key);
       const tileSelected = selected ? sameHex(selected, tile) : false;
-      this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKey === key, hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointPreview, selectedCheckpointPreview);
+      this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKey === key, hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview);
       if (facility) this.drawFacilityDynamic(facility, productionByFacility.get(facility.id), center, tileSelected, render, suppliedTiles, key, t);
       if (checkpoint) this.drawCheckpointDynamic(checkpoint, center);
       const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
@@ -1035,7 +1057,8 @@ export class HexBoardScene extends Phaser.Scene {
     selectedVision: { origin: HexCoord; radius: number } | null,
     render: BoardRenderState,
     suppliedTiles: ReadonlySet<string>,
-    checkpointPreview: ReadonlySet<string>,
+    checkpointLegalPreview: ReadonlySet<string>,
+    checkpointInvalidPreview: ReadonlySet<string>,
     selectedCheckpointPreview: string | null,
   ): void {
     if (render.supplyOverlay && (suppliedTiles.has(tile.key) || suppliedTiles.has(key))) {
@@ -1069,11 +1092,15 @@ export class HexBoardScene extends Phaser.Scene {
     if (isLegal) this.drawMarker(this.graphics, center, 0x54d7ff, 0.26);
     if (isPath) this.drawMarker(this.graphics, center, 0xffcf66, 0.16);
     if (effectiveMovementCost(state, tile) === null) this.drawMarker(this.graphics, center, 0x5299c0, 0.16);
-    if (checkpointPreview.has(key)) {
+    const checkpointCandidateLegal = checkpointLegalPreview.has(key);
+    const checkpointCandidateInvalid = checkpointInvalidPreview.has(key);
+    if (checkpointCandidateLegal || checkpointCandidateInvalid) {
       const previewSelected = selectedCheckpointPreview === key;
-      this.graphics.lineStyle(previewSelected ? 4 : 2, previewSelected ? 0xffd36e : 0x72e0c2, 0.95);
+      const style = checkpointCandidateMarkerStyle(checkpointCandidateLegal, previewSelected);
+      this.graphics.lineStyle(style.lineWidth, style.color, 0.95);
       this.graphics.strokeCircle(center.x, center.y, HEX_SIZE * 0.78);
-      this.drawMarker(this.graphics, center, previewSelected ? 0xffd36e : 0x72e0c2, previewSelected ? 0.36 : 0.2);
+      this.drawMarker(this.graphics, center, style.color, style.alpha);
+      this.addLabel(`checkpoint-candidate:${key}`, style.symbol, center.x, center.y, checkpointCandidateLegal ? '#d8f8e8' : '#ffd0ca', 10, true);
     }
   }
 

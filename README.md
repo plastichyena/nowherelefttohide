@@ -18,12 +18,14 @@
 - 道路方面ごとの独立到着予定、検問所の建設・移設、remnant / ruined / abandoned状態
 - 州都と稼働中検問所を起点にした供給範囲、セクター境界、供給外Actionの理由表示
 - Seed付き乱数によるゾンビAI、避難民、感染、Hordeの再現
+- HP 20のHorde Zombieと通常Zombieを組み合わせたPeriodic／Final Horde
+- Core生成の全道路Checkpoint候補と、Human／Agent共通の利用不能理由
 - 自動保存、セーブコード、JSON保存・復元
 - 日本語（デフォルト）/英語切り替え、初回ガイド、常設ヘルプ、終了統計
 - ブラウザJavaScriptから利用できる、通常UI・保存領域と分離したDeveloper / Browser Bridge
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.3の変更要件は [`Doc/Nowhere Left to Hide PoC v1.3アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.3アップデート要件%20確定版.md) で確認できます。READMEや実装判断が正本と矛盾する場合は正本を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.3.2の変更記録は [`Doc/Nowhere Left to Hide PoC v1.3.2アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.3.2アップデート要件%20確定版.md) で確認できます。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## ローカルで起動する
 
@@ -53,9 +55,9 @@ npm run preview
 Open https://plastichyena.github.io/nowherelefttohide/ and use the documented window.NLTH browser bridge. Read getApiInfo(), reset with seed 1, then repeatedly inspect getObservation() and getLegalActions(), submit exactly one legal action per step(), and continue until Game Over. Finally report getResult() and getRunArtifact().
 ```
 
-公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・生産/電力の静的ルールを返します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
+公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・Checkpoint候補Schema／Reason Code・生産/電力の静的ルールを返します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
 
-v1.3ではHuman UIとAgentが同じVisibility関数を使います。Observationは固定Terrain、実効移動コスト、防御補正、各タイルの可視状態、自軍と現在可視なEnemy、Periodic／Final Horde警告、3つのVictory進捗を返します。Vision外のEnemy位置・個体ID・Target・Spawn座標は公開しません。経済Forecast、回復、鎮圧、補給、検問所の既存公開情報も維持します。
+v1.3.2ではHuman UIとAgentが同じVisibility関数とCheckpoint候補Queryを使います。Observationは固定Terrain、実効移動コスト、防御補正、各タイルの可視状態、自軍と現在可視なEnemy、全道路タイルの`checkpointPositionCandidates`とReason Code、Periodic／Final Horde警告、3つのVictory進捗を返します。Vision外のEnemy位置・個体ID・Target・Spawn座標は公開せず、Hidden Enemyだけを理由にCheckpoint候補を不合法化しません。経済Forecast、回復、鎮圧、補給、検問所の既存公開情報も維持します。
 
 ## Agent Simulation CLI
 
@@ -66,7 +68,7 @@ npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/ba
 npm run sim -- --agent=random,balanced --seeds=1,2,3 --out=output/simulations/comparison
 ```
 
-出力先には正本`run.json`、固定列UTF-8の`games.csv`、成功・敗北・技術的失敗を含むゲーム単位Artifactを生成します。既存の非空出力先は既定で上書きしません。上書きする場合だけ`--overwrite`を明示してください。ゲーム内敗北は正常完遂であり、技術的失敗が1件でもある場合だけExit Codeが非0になります。
+出力先には正本`run.json`、固定列UTF-8の`games.csv`、成功・敗北・技術的失敗を含むゲーム単位Artifactを生成します。ローカル／CIの完全Artifactだけは`verificationEvents`へMixed Hordeの内部Group・Type別生成数・Unit所属を保持し、Replayで内部Event列まで照合します。Browser Bridgeの`getRunArtifact()`にはこの内部情報を含めません。既存の非空出力先は既定で上書きしません。上書きする場合だけ`--overwrite`を明示してください。ゲーム内敗北は正常完遂であり、技術的失敗が1件でもある場合だけExit Codeが非0になります。
 
 ## AI Portable Package
 
@@ -94,12 +96,12 @@ GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロード�
 
 ## 目的と敗北条件
 
-Turn 30に12体のFinal Hordeが発生し、ゲームはTurn 31以降も勝敗まで続きます。Final Horde全滅、現在のSupply Network内Zombie 0、同範囲内感染者0の3条件をすべて満たした瞬間に勝利します。次のいずれかが成立した時点で即敗北です。
+Turn 30にHorde Zombie 7体とNormal Zombie 5体からなる12体のFinal Hordeが発生し、ゲームはTurn 31以降も勝敗まで続きます。Final Spawn Group全12体の全滅、現在のSupply Network内Zombie 0、同範囲内感染者0の3条件をすべて満たした瞬間に勝利します。次のいずれかが成立した時点で即敗北です。
 
 1. 州都が陥落する
 2. 所有中の州都・地方都市・生産施設にいる健全民間人口の合計が0になる
 
-検問所の3健常者プール、施設内感染者、ユニット人口は健全民間人口0の判定には数えません。都市はソフトキャップを超えて受け入れられますが、民需品生産はソフトキャップで止まり、食料・民需品の追加消費が発生します。Periodic HordeはTurn 5～25に5ターンごと、Final Hordeは既定Turn 30に出現し、種類・方向・残りターンは常時表示されます。
+検問所の3健常者プール、施設内感染者、ユニット人口は健全民間人口0の判定には数えません。都市はソフトキャップを超えて受け入れられますが、民需品生産はソフトキャップで止まり、食料・民需品の追加消費が発生します。Periodic HordeはTurn 5～25に5ターンごと、`2/0、3/1、4/2、5/3、6/4`（Horde／Normal）で出現します。Horde ZombieはHP 20、Normal ZombieはHP 10です。
 
 ## ConfigとSeed
 
@@ -109,12 +111,12 @@ Turn 30に12体のFinal Hordeが発生し、ゲームはTurn 31以降も勝敗�
 
 - `finalHordeTurn`
 - `terrain` / `vision`
-- `horde.cycle` / `initialCount` / `increment`
+- `horde.cycle` / `periodicInitial` / `periodicIncrement` / `finalComposition`
 - 避難民の到着間隔・人数・審査枠
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.3.1`、Game Rules / GameState / Configは `1.4.0`、Fixed Mapは `fixed-15x15-v2`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.4.0`です。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.3.2`、Game Rules / GameState / Configは `1.4.1`、Fixed Mapは `fixed-15x15-v2`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.4.1`です。
 
 ## CoreとHeadless API
 
@@ -127,6 +129,7 @@ interface HeadlessGame {
   reset(seed: number, config: GameConfig): Readonly<GameState>;
   getState(): Readonly<GameState>;
   getLegalActions(): GameAction[];
+  getCheckpointPositionCandidates(): CheckpointPositionCandidate[];
   step(action: GameAction): StepResult;
   isGameOver(): boolean;
   getResult(): GameResult | null;
@@ -137,7 +140,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不変条件違反のデータは現在状態へ適用しません。App/Release `1.3.1`、Game Rules / State / Config `1.4.0`、Save Format `3`を使用します。v1.2.7以前の保存データ、Replay、Artifactは移行せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不正Config、不変条件違反のデータは現在状態へ適用しません。App/Release `1.3.2`、Game Rules / State / Config `1.4.1`、Save Format `3`を使用します。v1.3.1以前の保存データ、Replay、Artifactは変換せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
 
 ## テスト
 
@@ -146,9 +149,9 @@ npm run typecheck
 npm test
 npm run test:random -- --games=100
 npm run test:balanced -- --games=100
-npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.3-balanced-300-part-1
-npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.3-balanced-300-part-2
-npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.3-balanced-300-part-3
+npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.3.2-balanced-300-part-1
+npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.3.2-balanced-300-part-2
+npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.3.2-balanced-300-part-3
 npm run build
 npm run test:browser-bridge -- --dist=dist
 ```

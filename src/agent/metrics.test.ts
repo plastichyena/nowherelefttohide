@@ -13,7 +13,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('1.4.0');
+    expect(run.metrics.bridgeApiVersion).toBe('1.4.1');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -29,12 +29,22 @@ describe('Agent Metrics', () => {
     expect(run.metrics.normalZombieIdleCount).toBeGreaterThanOrEqual(0);
     for (const key of [
       'finalHordeSpawned', 'finalHordeKilled', 'finalHordeDefeated',
+      'periodicHordeZombiesSpawned', 'periodicNormalZombiesSpawned',
+      'finalHordeZombiesSpawned', 'finalNormalZombiesSpawned',
       'normalZombiesKilled', 'hordeZombiesKilled', 'maxVisibleZombies', 'turnsAfterFinalHorde',
       'suppliedAreaZombieClearTurn', 'suppliedAreaInfectionClearTurn', 'victoryTurn',
       'terrainEntriesByType', 'urbanDefenseApplications', 'urbanDefenseDamagePrevented',
       'forestDefenseApplications', 'forestDefenseDamagePrevented', 'normalZombieIdleCount',
       'hordeTargetInheritedCount', 'hordeTargetClearedCount',
     ]) expect(run.metrics).toHaveProperty(key);
+    expect(run.result).not.toBeNull();
+    expect(run.metrics.periodicHordeZombiesSpawned).toBe(run.result!.statistics.periodicHordeZombiesSpawned);
+    expect(run.metrics.periodicNormalZombiesSpawned).toBe(run.result!.statistics.periodicNormalZombiesSpawned);
+    expect(run.metrics.finalHordeZombiesSpawned).toBe(run.result!.statistics.finalHordeZombiesSpawned);
+    expect(run.metrics.finalNormalZombiesSpawned).toBe(run.result!.statistics.finalNormalZombiesSpawned);
+    expect(run.metrics.finalHordeSpawned).toBe(
+      run.metrics.finalHordeZombiesSpawned + run.metrics.finalNormalZombiesSpawned,
+    );
   });
 
   it('keeps branch, policy, checkpoint, and supply metrics in the public result', () => {

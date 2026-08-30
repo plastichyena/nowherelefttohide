@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
-import { createInitialState } from '../core/state';
+import { getCheckpointPositionCandidates } from '../core/engine';
+import { createInitialState, createUnit } from '../core/state';
 import { createAgentObservation } from './observation';
 
-describe('Agent Observation 1.4.0 rule projections', () => {
+describe('Agent Observation 1.4.1 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -164,5 +165,30 @@ describe('Agent Observation 1.4.0 rule projections', () => {
     });
     expect(JSON.stringify(observation)).not.toContain('inheritedTarget');
     expect(JSON.stringify(observation)).not.toContain('spawnGroupId');
+  });
+
+  it('publishes the detached Core checkpoint candidates without leaking hidden blockers', () => {
+    const config = createDefaultConfig({
+      economy: { initialZombieCount: 0 },
+      units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
+    });
+    const clearState = createInitialState(132, config);
+    const clearCandidates = createAgentObservation(clearState).checkpointPositionCandidates;
+    expect(clearCandidates).toEqual(getCheckpointPositionCandidates(clearState));
+    expect(clearCandidates).toHaveLength(28);
+
+    const hiddenState = createInitialState(132, config);
+    hiddenState.units.push(createUnit(hiddenState, 'zombie-secret-blocker', 'zombie', { q: 7, r: 1 }));
+    const hiddenObservation = createAgentObservation(hiddenState);
+    expect(hiddenObservation.checkpointPositionCandidates).toEqual(clearCandidates);
+    expect(JSON.stringify(hiddenObservation)).not.toContain('zombie-secret-blocker');
+
+    const visibleState = createInitialState(132, config);
+    visibleState.units.find((unit) => unit.isPlayerUnit)!.position = { q: 7, r: 2 };
+    visibleState.units.find((unit) => unit.isPlayerUnit)!.vision = 1;
+    visibleState.units.push(createUnit(visibleState, 'zombie-visible-blocker', 'zombie', { q: 7, r: 1 }));
+    const visibleCandidates = createAgentObservation(visibleState).checkpointPositionCandidates;
+    expect(visibleCandidates.some((candidate) => candidate.reasonCode === 'checkpoint_supply_zombie_blocked')).toBe(true);
+    expect(JSON.stringify(visibleCandidates)).not.toContain('zombie-visible-blocker');
   });
 });

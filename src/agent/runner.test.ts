@@ -20,17 +20,40 @@ describe('unified Agent Runner', () => {
     expect(first.artifact.bridgeApiVersion).toBe(BRIDGE_API_VERSION);
     expect(first.artifact.config.finalHordeTurn).toBe(3);
     expect(first.artifact.observationTrace?.[0]?.map.tiles.some((tile) => tile.terrain === 'forest')).toBe(true);
+    expect(first.artifact.observationTrace?.[0]?.checkpointPositionCandidates).toHaveLength(28);
     expect(first.artifact.observationTrace?.some((observation) => observation.horde.finalHordeStatus !== 'notStarted')).toBe(true);
     expect(first.artifact.initialRoadArrivalSchedule).toHaveLength(4);
     expect(first.artifact.observationTrace).toHaveLength(first.actions.length + 1);
+    const fullHordeEvent = first.artifact.verificationEvents?.find((event) => (
+      event.type === 'horde_spawned' && Array.isArray(event.payload.units)
+    ));
+    expect(fullHordeEvent?.payload).toMatchObject({
+      spawnGroupId: expect.any(String),
+      hordeZombieCount: expect.any(Number),
+      normalZombieCount: expect.any(Number),
+      units: expect.arrayContaining([
+        expect.objectContaining({ unitId: expect.any(String), unitType: expect.any(String), spawnGroupId: expect.any(String) }),
+      ]),
+    });
     const replay = replayArtifact(first.artifact);
     expect(replay.reproduced).toBe(true);
     expect(replay.mismatch).toBeNull();
     expect(replay.actionsReplayed).toBe(first.actions.length);
-    const previousAppReplay = replayArtifact({ ...first.artifact, appVersion: '1.3.0' });
+    const corruptedVerificationEvents = first.artifact.verificationEvents?.map((event) => (
+      event === fullHordeEvent
+        ? { ...event, payload: { ...event.payload, hordeZombieCount: 999 } }
+        : event
+    ));
+    const corruptedReplay = replayArtifact({ ...first.artifact, verificationEvents: corruptedVerificationEvents });
+    expect(corruptedReplay.reproduced).toBe(false);
+    expect(corruptedReplay.mismatch).toBe('Replay internal verification events differ from the artifact');
+    const previousAppReplay = replayArtifact({ ...first.artifact, appVersion: '1.3.1' });
     expect(previousAppReplay.reproduced).toBe(true);
-    expect(previousAppReplay.mismatch).toBeNull();
-  });
+    expect(previousAppReplay.error).toBeNull();
+    const missingAppMetadataReplay = replayArtifact({ ...first.artifact, appVersion: '' });
+    expect(missingAppMetadataReplay.reproduced).toBe(false);
+    expect(missingAppMetadataReplay.error?.code).toBe('artifact_invalid');
+  }, 10_000);
 
   it('rejects v1.3 and earlier artifacts before creating a v1.4 replay session', () => {
     const config = createDefaultConfig({ finalHordeTurn: 1 });
@@ -72,11 +95,11 @@ describe('unified Agent Runner', () => {
   });
 
   it('forces EndTurn at the runner per-turn limit for agents without traces', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 100 });
+    const config = createDefaultConfig({ finalHordeTurn: 30, maxActionsPerTurn: 100, economy: { initialZombieCount: 0 } });
     const run = runAgentGame(12, {
       config,
       agent: new RandomAgent(12),
-      limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 },
+      limits: { maxTurns: 1, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 },
     });
     expect(run.technicalFailure).toBe(true);
     expect(run.failure?.code).toBe('TURN_SAFETY_LIMIT');

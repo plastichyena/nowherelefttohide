@@ -99,8 +99,8 @@ function run(): void {
     if (!bundle.includes(method)) fail(`production bundle does not contain bridge method marker: ${method}`);
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
-  for (const marker of ['1.3.1', '1.4.0', 'fixed-15x15-v2', 'SetPowerSupply', 'RelocateCheckpoint', 'roadBranches', 'suppliedTileKeys', 'artifactSchemaVersion', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression', 'visibleToPlayer', 'finalHordeStatus']) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.3 schema marker: ${marker}`);
+  for (const marker of ['1.3.2', '1.4.1', 'fixed-15x15-v2', 'SetPowerSupply', 'RelocateCheckpoint', 'roadBranches', 'suppliedTileKeys', 'checkpointPositionCandidates', 'periodicInitial', 'finalComposition', 'periodicHordeZombiesSpawned', 'artifactSchemaVersion', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression', 'visibleToPlayer', 'finalHordeStatus']) {
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.3.2 schema marker: ${marker}`);
   }
   // This is deliberately a static smoke: the project has no browser-driver
   // dependency. The companion page documents the real-browser E2E sequence.

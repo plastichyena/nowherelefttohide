@@ -1,5 +1,5 @@
 import { assertValidGameConfig, cloneConfig, createDefaultConfig, DEFAULT_MAP_ID } from '../core/config';
-import { GameEngine } from '../core/engine';
+import { GameEngine, validateAction } from '../core/engine';
 import { hexKey } from '../core/hex';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
 import type { DeepPartial, GameAction, GameConfig, GameEvent, GameState, JsonObject, JsonValue } from '../core/types';
@@ -115,6 +115,12 @@ function publicEvents(
     .filter((event) => !INTERNAL_EVENT_TYPES.has(event.type))
     .map((event) => {
       const payload = cloneJson(event.payload) as JsonObject;
+      if (event.type === 'horde_spawned') {
+        for (const field of [
+          'units', 'unit', 'spawnedUnits', 'position', 'positions', 'spawnGroupId', 'groupId',
+          'count', 'hordeZombieCount', 'normalZombieCount', 'hordeZombies', 'normalZombies',
+        ] as const) delete payload[field];
+      }
       const spawnedEnemyId = event.type === 'horde_spawned' && typeof payload.zombieId === 'string'
         ? payload.zombieId
         : null;
@@ -203,7 +209,17 @@ export class AgentGameAdapter implements AgentGame {
       matched = undefined;
     }
     if (!matched) {
-      const error = publicError('action_not_legal', 'Action is not in the current legal action list');
+      let error = publicError('action_not_legal', 'Action is not in the current legal action list');
+      if (action.type === 'BuildCheckpoint' || action.type === 'RelocateCheckpoint') {
+        try {
+          const coreError = validateAction(this.engine.getState(), action);
+          if (coreError) error = publicError(coreError.code, coreError.message);
+        } catch {
+          // Direct TypeScript callers can still bypass the declared GameAction
+          // shape at runtime. Keep malformed values at the generic boundary;
+          // the Browser Bridge performs stricter shape validation first.
+        }
+      }
       this.invalidAttempts.push({ decision: this.acceptedActions.length + this.invalidAttempts.length + 1, action: safeUnknownClone(action), error });
       return {
         observation: this.getObservation(),

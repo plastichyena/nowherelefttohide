@@ -17,7 +17,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '1.4.0';
+export const GAME_VERSION = '1.4.1';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -419,6 +419,10 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       finalHordeSpawned: 0,
       finalHordeKilled: 0,
       finalHordeDefeated: false,
+      periodicHordeZombiesSpawned: 0,
+      periodicNormalZombiesSpawned: 0,
+      finalHordeZombiesSpawned: 0,
+      finalNormalZombiesSpawned: 0,
       normalZombiesKilled: 0,
       hordeZombiesKilled: 0,
       maxVisibleZombies: 0,

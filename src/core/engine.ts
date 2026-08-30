@@ -41,6 +41,7 @@ import type {
   AttackAction,
   CardinalDirection,
   CheckpointPolicy,
+  CheckpointPositionCandidate,
   CheckpointState,
   EndTurnForecast,
   FacilityState,
@@ -211,7 +212,10 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string): void {
     state.statistics.unitLosses += 1;
     state.population.cumulativeDeaths += unit.population;
   }
-  if (unit.type === 'zombie') state.statistics.normalZombiesKilled += 1;
+  if (unit.type === 'zombie') {
+    state.statistics.normalZombiesKilled += 1;
+    if (unit.hordeKind === 'final') state.statistics.finalHordeKilled += 1;
+  }
   if (unit.type === 'hordeZombie') {
     state.statistics.hordeZombiesKilled += 1;
     if (unit.hordeKind === 'final') state.statistics.finalHordeKilled += 1;
@@ -1258,6 +1262,25 @@ function nearestSpawnPosition(state: GameState, origin: HexCoord, rng: SeededRng
   return null;
 }
 
+function nearestSpawnPositionMatching(
+  state: GameState,
+  origin: HexCoord,
+  rng: SeededRng,
+  allowed: (position: HexCoord) => boolean,
+): HexCoord | null {
+  const occupied = occupiedKeys(state);
+  const available = state.map.tiles
+    .map((tile) => ({ q: tile.q, r: tile.r }))
+    .filter((position) => !occupied.has(hexKey(position)) && allowed(position));
+  if (available.length === 0) return null;
+  const minimumDistance = Math.min(...available.map((position) => hexDistance(origin, position)));
+  return rng.pick(
+    available
+      .filter((position) => hexDistance(origin, position) === minimumDistance)
+      .sort((left, right) => left.q - right.q || left.r - right.r),
+  );
+}
+
 function spawnZombies(
   state: GameState,
   origin: HexCoord,
@@ -1267,11 +1290,15 @@ function spawnZombies(
   unitType: 'zombie' | 'hordeZombie' = 'zombie',
   spawnGroupId: string | null = null,
   hordeKind: UnitState['hordeKind'] = null,
-): void {
+  positionAllowed: ((position: HexCoord) => boolean) | null = null,
+): UnitState[] {
+  const spawned: UnitState[] = [];
   for (let index = 0; index < count; index += 1) {
-    const position = nearestSpawnPosition(state, origin, rng);
+    const position = positionAllowed
+      ? nearestSpawnPositionMatching(state, origin, rng, positionAllowed)
+      : nearestSpawnPosition(state, origin, rng);
     if (!position) {
-      return;
+      return spawned;
     }
     const prefix = unitType === 'hordeZombie' ? 'horde-zombie' : 'zombie';
     let id = `${prefix}-${state.nextUnitNumber}`;
@@ -1284,8 +1311,36 @@ function spawnZombies(
     unit.spawnGroupId = spawnGroupId;
     unit.hordeKind = hordeKind;
     state.units.push(unit);
+    spawned.push(unit);
     emit(state, 'horde_spawned', { zombieId: id, q: position.q, r: position.r, cause, unitType, spawnGroupId });
   }
+  return spawned;
+}
+
+function spawnHordeComposition(
+  state: GameState,
+  origin: HexCoord,
+  composition: { hordeZombie: number; zombie: number },
+  rng: SeededRng,
+  cause: string,
+  spawnGroupId: string,
+  hordeKind: Exclude<UnitState['hordeKind'], null>,
+): UnitState[] {
+  const hordeUnits = spawnZombies(
+    state, origin, composition.hordeZombie, rng, cause, 'hordeZombie', spawnGroupId, hordeKind,
+  );
+  const normalUnits = spawnZombies(
+    state,
+    origin,
+    composition.zombie,
+    rng,
+    cause,
+    'zombie',
+    spawnGroupId,
+    hordeKind,
+    (position) => hordeUnits.some((horde) => hexDistance(position, horde.position) <= horde.vision),
+  );
+  return [...hordeUnits, ...normalUnits];
 }
 
 function overrunFacility(state: GameState, facility: FacilityState, rng: SeededRng): void {
@@ -1731,10 +1786,13 @@ function processHorde(state: GameState, rng: SeededRng): void {
   const entrance = getHordeEntrance(state.map, state.horde.nextDirection);
   if (state.turn === state.finalHordeTurn) {
     const groupId = `final-horde-${state.turn}`;
-    const count = state.config.horde.finalCount;
-    if (entrance) {
-      spawnZombies(state, entrance.tile, count, rng, 'final_horde', 'hordeZombie', groupId, 'final');
-    }
+    const composition = state.config.horde.finalComposition;
+    const spawned = entrance
+      ? spawnHordeComposition(state, entrance.tile, composition, rng, 'final_horde', groupId, 'final')
+      : [];
+    const hordeZombieCount = spawned.filter((unit) => unit.type === 'hordeZombie').length;
+    const zombieCount = spawned.filter((unit) => unit.type === 'zombie').length;
+    const count = spawned.length;
     state.horde.finalSpawnGroupId = groupId;
     state.horde.finalSpawnedCount = count;
     state.horde.finalHordeStatus = 'active';
@@ -1743,23 +1801,63 @@ function processHorde(state: GameState, rng: SeededRng): void {
     state.horde.warningType = 'none';
     state.horde.lastSpawnTurn = state.turn;
     state.statistics.finalHordeSpawned = count;
+    state.statistics.finalHordeZombiesSpawned += hordeZombieCount;
+    state.statistics.finalNormalZombiesSpawned += zombieCount;
     state.horde.totalSpawned += count;
-    emit(state, 'horde_spawned', { hordeKind: 'final', direction: entrance?.direction ?? state.horde.nextDirection, spawnGroupId: groupId });
+    emit(state, 'horde_spawned', {
+      hordeKind: 'final',
+      direction: entrance?.direction ?? state.horde.nextDirection,
+      spawnGroupId: groupId,
+      hordeZombieCount,
+      normalZombieCount: zombieCount,
+      units: spawned.map((unit) => ({
+        unitId: unit.id,
+        unitType: unit.type,
+        spawnGroupId: groupId,
+        hordeKind: 'final',
+        q: unit.position.q,
+        r: unit.position.r,
+      })),
+    });
     return;
   }
   if (state.turn > state.finalHordeTurn) return;
-  const count = state.config.horde.initialCount + state.horde.spawnedCount * state.config.horde.increment;
+  const composition = {
+    hordeZombie: state.config.horde.periodicInitial.hordeZombie + state.horde.spawnedCount * state.config.horde.periodicIncrement.hordeZombie,
+    zombie: state.config.horde.periodicInitial.zombie + state.horde.spawnedCount * state.config.horde.periodicIncrement.zombie,
+  };
   const groupId = `periodic-horde-${state.turn}`;
-  if (entrance) spawnZombies(state, entrance.tile, count, rng, 'periodic_horde', 'hordeZombie', groupId, 'periodic');
+  const spawned = entrance
+    ? spawnHordeComposition(state, entrance.tile, composition, rng, 'periodic_horde', groupId, 'periodic')
+    : [];
+  const hordeZombieCount = spawned.filter((unit) => unit.type === 'hordeZombie').length;
+  const zombieCount = spawned.filter((unit) => unit.type === 'zombie').length;
+  const count = spawned.length;
   state.horde.spawnedCount += 1;
   state.horde.totalSpawned += count;
+  state.statistics.periodicHordeZombiesSpawned += hordeZombieCount;
+  state.statistics.periodicNormalZombiesSpawned += zombieCount;
   state.horde.lastSpawnTurn = state.turn;
   state.horde.nextDirection = rng.pick(['north', 'east', 'south', 'west'] as const);
   const nextPeriodic = state.turn + state.config.horde.cycle;
   state.horde.nextSpawnTurn = nextPeriodic < state.finalHordeTurn ? nextPeriodic : state.finalHordeTurn;
   state.horde.warningType = state.horde.nextSpawnTurn === state.finalHordeTurn ? 'final' : 'periodic';
   state.horde.turnsRemaining = state.horde.nextSpawnTurn - state.turn;
-  emit(state, 'horde_spawned', { hordeKind: 'periodic', direction: entrance?.direction ?? 'north', spawnGroupId: groupId });
+  emit(state, 'horde_spawned', {
+    hordeKind: 'periodic',
+    direction: entrance?.direction ?? 'north',
+    spawnGroupId: groupId,
+    hordeZombieCount,
+    normalZombieCount: zombieCount,
+    units: spawned.map((unit) => ({
+      unitId: unit.id,
+      unitType: unit.type,
+      spawnGroupId: groupId,
+      hordeKind: 'periodic',
+      q: unit.position.q,
+      r: unit.position.r,
+    })),
+  });
 }
 
 function finishGame(state: GameState, outcome: 'won' | 'lost', reason: GameOverReason): void {
@@ -1796,7 +1894,7 @@ export function deriveVictoryProgress(state: Readonly<GameState>): VictoryProgre
   const finalHordeDefeated =
     state.horde.finalSpawnGroupId !== null &&
     !state.units.some(
-      (unit) => unit.type === 'hordeZombie' && unit.spawnGroupId === state.horde.finalSpawnGroupId,
+      (unit) => unit.spawnGroupId === state.horde.finalSpawnGroupId,
     );
   const suppliedAreaZombieClear = !state.units.some(
     (unit) =>
@@ -2486,6 +2584,33 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   return error(action, 'unknown_action', 'Unknown action');
 }
 
+/** Pure, stable, all-road-tile checkpoint explainability query. */
+export function getCheckpointPositionCandidates(
+  state: Readonly<GameState>,
+): CheckpointPositionCandidate[] {
+  const candidates: CheckpointPositionCandidate[] = [];
+  for (const branch of [...state.map.roadBranches].sort((left, right) => left.id.localeCompare(right.id))) {
+    const active = state.checkpoints.find(
+      (checkpoint) => checkpoint.status === 'operational' && (checkpoint.branchId ?? checkpoint.direction) === branch.id,
+    );
+    for (const position of branch.roadTiles) {
+      const action: Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }> = active
+        ? { type: 'RelocateCheckpoint', checkpointId: active.id, branchId: branch.id, position: { ...position } }
+        : { type: 'BuildCheckpoint', branchId: branch.id, position: { ...position } };
+      const reason = validateAction(state, action);
+      candidates.push({
+        actionType: action.type,
+        branchId: branch.id,
+        ...(action.type === 'RelocateCheckpoint' ? { checkpointId: action.checkpointId } : {}),
+        position: { ...position },
+        legal: reason === null,
+        reasonCode: reason?.code ?? null,
+      });
+    }
+  }
+  return candidates;
+}
+
 export class GameEngine implements HeadlessGame {
   private state: GameState;
 
@@ -2586,16 +2711,16 @@ export class GameEngine implements HeadlessGame {
         if (policy !== checkpoint.currentPolicy) actions.push({ type: 'SetCheckpointPolicy', checkpointId: checkpoint.id, policy });
       }
     }
-    for (const branch of [...this.state.map.roadBranches].sort((a, b) => a.id.localeCompare(b.id))) {
-      const active = this.state.checkpoints.find(
-        (checkpoint) => checkpoint.status === 'operational' && (checkpoint.branchId ?? checkpoint.direction) === branch.id,
-      );
-      for (const position of branch.roadTiles) {
-        const action: GameAction = active
-          ? { type: 'RelocateCheckpoint', checkpointId: active.id, branchId: branch.id, position: { ...position } }
-          : { type: 'BuildCheckpoint', branchId: branch.id, position: { ...position } };
-        if (!validateAction(this.state, action)) actions.push(action);
-      }
+    for (const candidate of getCheckpointPositionCandidates(this.state)) {
+      if (!candidate.legal) continue;
+      actions.push(candidate.actionType === 'RelocateCheckpoint'
+        ? {
+            type: 'RelocateCheckpoint',
+            checkpointId: candidate.checkpointId!,
+            branchId: candidate.branchId,
+            position: { ...candidate.position },
+          }
+        : { type: 'BuildCheckpoint', branchId: candidate.branchId, position: { ...candidate.position } });
     }
     for (const city of cities.filter((candidate) => isHexSupplied(this.state, candidate.position))) {
       if (!this.state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) {
@@ -2615,6 +2740,10 @@ export class GameEngine implements HeadlessGame {
     }
     actions.push({ type: 'EndTurn' });
     return actions;
+  }
+
+  public getCheckpointPositionCandidates(): CheckpointPositionCandidate[] {
+    return getCheckpointPositionCandidates(this.state);
   }
 
   public step(action: GameAction): StepResult {

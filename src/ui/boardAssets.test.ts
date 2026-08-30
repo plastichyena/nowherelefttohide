@@ -169,6 +169,18 @@ describe('board state asset mappings', () => {
   it('maps regular, periodic, and final units with distinct Horde layers', () => {
     expect(mapUnitAssetLayers({ type: 'police', hordeKind: null }).layers).toEqual([]);
     expect(mapUnitAssetLayers({ type: 'zombie', hordeKind: null }).layers).toEqual([]);
+    expect(mapUnitAssetLayers({ type: 'zombie', hordeKind: 'periodic' })).toMatchObject({
+      base: BOARD_ASSET_REGISTRY.units.zombie,
+      layers: ['horde'],
+      isHorde: true,
+      isFinalHorde: false,
+    });
+    expect(mapUnitAssetLayers({ type: 'zombie', hordeKind: 'final' })).toMatchObject({
+      base: BOARD_ASSET_REGISTRY.units.zombie,
+      layers: ['horde', 'final'],
+      overlays: [BOARD_UNIT_OVERLAYS.horde, BOARD_UNIT_OVERLAYS.final],
+      isFinalHorde: true,
+    });
     expect(mapUnitAssetLayers({ type: 'hordeZombie', hordeKind: 'periodic' })).toMatchObject({
       layers: ['horde'],
       isHorde: true,

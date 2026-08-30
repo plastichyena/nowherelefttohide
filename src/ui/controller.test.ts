@@ -9,9 +9,9 @@ vi.mock('phaser', () => ({
   },
 }));
 
-import type { FacilityState, GameAction, GameState, UnitState } from '../core/types';
+import type { CheckpointPositionCandidate, FacilityState, GameAction, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
-import { boardLegendViewModel, loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, renderBoardLegend, renderEndTurnForecast, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
+import { actionForCheckpointCandidate, boardLegendViewModel, checkpointCandidateViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, renderBoardLegend, renderEndTurnForecast, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 
@@ -124,11 +124,17 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported pre-v1.3 saves in both UI languages', () => {
-    const detail = 'checksum mismatch in v1.2.5 save';
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('サポートしていないため読み込めません');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('does not support migration');
+  it('reports unsupported v1.3.1-or-earlier saves in both UI languages', () => {
+    const detail = 'version mismatch in v1.3.1 save';
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.1以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.2');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.1 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.2');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 1.4.1');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 3');
   });
 
   it('selects a checkpoint so its three population pools are inspectable', () => {
@@ -145,6 +151,34 @@ describe('controller view models', () => {
     expect(localizeActionError('checkpoint_branch_action_limit', 'en')).toContain('branch');
     expect(localizeActionError('invalid_action_input', 'ja')).toContain('合法');
     expect(localizeActionError('invalid_action_input', 'en')).toContain('legal action');
+  });
+
+  it('uses Core checkpoint candidates directly and localizes their reason without mutating input', () => {
+    const candidates: CheckpointPositionCandidate[] = [
+      { actionType: 'BuildCheckpoint', branchId: 'north', position: { q: 7, r: 4 }, legal: true, reasonCode: null },
+      { actionType: 'RelocateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east', position: { q: 10, r: 7 }, legal: false, reasonCode: 'checkpoint_infection_blocked' },
+    ];
+    const before = JSON.stringify(candidates);
+    const views = checkpointCandidateViewModels(candidates, 'en');
+    expect(views[0]!.reason).toBeNull();
+    expect(views[1]!.reason).toContain('infect');
+    expect(actionForCheckpointCandidate(candidates[0]!)).toEqual({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 7, r: 4 } });
+    expect(actionForCheckpointCandidate(candidates[1]!)).toEqual({ type: 'RelocateCheckpoint', checkpointId: 'checkpoint-east', branchId: 'east', position: { q: 10, r: 7 } });
+    expect(JSON.stringify(candidates)).toBe(before);
+  });
+
+  it('localizes every v1.3.2 checkpoint candidate reason in both languages', () => {
+    const codes = [
+      'invalid_checkpoint_tile', 'invalid_checkpoint_branch', 'unknown_road_branch',
+      'checkpoint_requires_relocation', 'unknown_operational_checkpoint', 'checkpoint_same_position',
+      'checkpoint_wrong_branch', 'checkpoint_infection_blocked', 'checkpoint_branch_action_limit',
+      'checkpoint_abandoned_forward_block', 'checkpoint_supply_zombie_blocked',
+      'insufficient_civilian_goods', 'action_limit', 'wrong_phase', 'game_over',
+    ];
+    for (const code of codes) {
+      expect(localizeActionError(code, 'ja')).not.toBe(createTranslator('ja')('invalidAction'));
+      expect(localizeActionError(code, 'en')).not.toBe(createTranslator('en')('invalidAction'));
+    }
   });
 
   it('localizes Power Supply action errors', () => {
@@ -193,6 +227,19 @@ describe('controller view models', () => {
     }
     expect(createTranslator('ja')('finalHordeTurn')).toContain('Final Horde');
     expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
+  });
+
+  it('has bilingual v1.3.2 mixed-Horde composition and checkpoint explainability labels', () => {
+    const keys = [
+      'hordeComposition', 'periodicInitialHordeZombies', 'periodicInitialNormalZombies',
+      'periodicIncrementHordeZombies', 'periodicIncrementNormalZombies',
+      'finalHordeZombies', 'finalNormalZombies', 'hordeCompositionHint',
+      'checkpointCandidateHint', 'newGameError',
+    ];
+    for (const key of keys) {
+      expect(createTranslator('ja')(key)).not.toBe(key);
+      expect(createTranslator('en')(key)).not.toBe(key);
+    }
   });
 
   it('has bilingual explicit action-mode labels', () => {
@@ -267,6 +314,12 @@ describe('controller view models', () => {
     expect(english).toContain('data-legend-section="dynamic"');
     expect(english).toContain('Secured + stopped');
     expect(english).toContain('Forest Movement Cost');
+    expect(english).toContain('Periodic initial Horde Zombies');
+    expect(english).toContain('Periodic initial Normal Zombies');
+    expect(english).toContain('Final Horde Zombies');
+    expect(english).toContain('Final Normal Zombies');
+    expect(english).toContain('Mixed-Horde members');
+    expect(english).toContain('HP 20');
     expect(renderBoardLegend(null, 'en', ASSET_REGISTRY)).toContain('/assets/board/terrain/terrain_plain.png');
   });
 });

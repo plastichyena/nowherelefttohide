@@ -146,6 +146,10 @@ export interface GameMetrics {
   finalHordeSpawned: number;
   finalHordeKilled: number;
   finalHordeDefeated: boolean;
+  periodicHordeZombiesSpawned: number;
+  periodicNormalZombiesSpawned: number;
+  finalHordeZombiesSpawned: number;
+  finalNormalZombiesSpawned: number;
   normalZombiesKilled: number;
   hordeZombiesKilled: number;
   maxVisibleZombies: number;
@@ -381,6 +385,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     .filter((event) => event.type === 'horde_spawned' && event.payload.hordeKind === 'final')
     .reduce((total, event) => total + eventPayloadNumber(event, 'count'), 0);
   const finalHordeKilled = statisticNumber(statistics, 'finalHordeKilled') ?? 0;
+  const periodicHordeZombiesSpawned = statisticNumber(statistics, 'periodicHordeZombiesSpawned') ?? 0;
+  const periodicNormalZombiesSpawned = statisticNumber(statistics, 'periodicNormalZombiesSpawned') ?? 0;
+  const finalHordeZombiesSpawned = statisticNumber(statistics, 'finalHordeZombiesSpawned') ?? 0;
+  const finalNormalZombiesSpawned = statisticNumber(statistics, 'finalNormalZombiesSpawned') ?? 0;
   const maxPopulationObservation = Math.max(...observations.map(populationAtObservation), 0);
   const maxOvercrowdingObservation = Math.max(...observations.map(overcrowdingAtObservation), 0);
   const maxAdditionalFood = Math.max(...observations.map((observation) => numberOrZero(observation.endTurnForecast.overcrowding.additionalFood)), 0);
@@ -609,6 +617,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     finalHordeSpawned,
     finalHordeKilled,
     finalHordeDefeated,
+    periodicHordeZombiesSpawned,
+    periodicNormalZombiesSpawned,
+    finalHordeZombiesSpawned,
+    finalNormalZombiesSpawned,
     normalZombiesKilled,
     hordeZombiesKilled,
     maxVisibleZombies,
@@ -757,6 +769,10 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'hordeInterceptions',
   'finalHordeSpawned',
   'finalHordeKilled',
+  'periodicHordeZombiesSpawned',
+  'periodicNormalZombiesSpawned',
+  'finalHordeZombiesSpawned',
+  'finalNormalZombiesSpawned',
   'normalZombiesKilled',
   'hordeZombiesKilled',
   'maxVisibleZombies',

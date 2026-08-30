@@ -16,6 +16,7 @@ vi.mock('phaser', () => ({
 import {
   BOARD_RENDER_LAYER_ORDER,
   boardTextureKey,
+  checkpointCandidateMarkerStyle,
   classifyBoardAssetFailure,
   hordeWarningTileKeys,
   projectWorldToScreen,
@@ -88,6 +89,17 @@ describe('Phaser board asset boundary helpers', () => {
 
     expect(edges).toHaveLength(6);
     expect(new Set(edges.map((edge) => edge.tileKey))).toEqual(new Set(['7,7']));
+  });
+
+  it('distinguishes legal and invalid checkpoint candidates by symbol and line styling', () => {
+    const legal = checkpointCandidateMarkerStyle(true, false);
+    const invalid = checkpointCandidateMarkerStyle(false, false);
+    const selectedInvalid = checkpointCandidateMarkerStyle(false, true);
+    expect(legal.symbol).toBe('✓');
+    expect(invalid.symbol).toBe('×');
+    expect(invalid.color).not.toBe(legal.color);
+    expect(invalid.lineWidth).not.toBe(legal.lineWidth);
+    expect(selectedInvalid.lineWidth).toBeGreaterThan(invalid.lineWidth);
   });
 
   it('does not draw the shared edge between adjacent supplied Hexes', () => {

@@ -27,7 +27,10 @@ describe('v1.3 zombie, Final Horde and victory flow', () => {
   });
 
   it('spawns the Final Horde after its configured zombie phase and lets it act next turn', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 1, horde: { finalCount: 1 } });
+    const config = createDefaultConfig({
+      finalHordeTurn: 1,
+      horde: { finalComposition: { hordeZombie: 1, zombie: 0 } },
+    });
     const engine = new GameEngine(3, config);
     const spawn = engine.step({ type: 'EndTurn' });
     expect(spawn.error).toBeNull();
@@ -46,7 +49,10 @@ describe('v1.3 zombie, Final Horde and victory flow', () => {
   });
 
   it('wins immediately after an accepted action when all three current-supply conditions are met', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 1, horde: { finalCount: 1 } });
+    const config = createDefaultConfig({
+      finalHordeTurn: 1,
+      horde: { finalComposition: { hordeZombie: 1, zombie: 0 } },
+    });
     const engine = new GameEngine(11, config);
     engine.step({ type: 'EndTurn' });
     const snapshot = engine.getState();

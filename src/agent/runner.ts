@@ -1,5 +1,5 @@
 import { assertValidGameConfig, cloneConfig, createDefaultConfig } from '../core/config';
-import type { GameAction, GameConfig } from '../core/types';
+import type { GameAction, GameConfig, GameEvent } from '../core/types';
 import { actionKey, cloneAction, cloneJson, sortActions } from './action';
 import { collectGameMetrics, type GameMetrics } from './metrics';
 import { createAgentGame } from './game';
@@ -176,6 +176,13 @@ function phaseOf(observation: AgentObservation | null): string {
 
 function asPublicEvents(events: readonly unknown[]): AgentPublicEvent[] {
   return events.filter((event): event is AgentPublicEvent => isRecord(event) && typeof event.type === 'string').map((event) => clone(event as AgentPublicEvent));
+}
+
+function verificationEventsFromSnapshot(snapshot: unknown): GameEvent[] {
+  if (!isRecord(snapshot) || !Array.isArray(snapshot.events)) return [];
+  return snapshot.events
+    .filter((event): event is GameEvent => isRecord(event) && typeof event.type === 'string')
+    .map((event) => clone(event));
 }
 
 function publicActionError(code: string, message: string): AgentActionError {
@@ -525,6 +532,9 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
   const strategyName = strategyForAgent(agent, options.strategy);
   const baseArtifact = enrichArtifact(sourceArtifact, fallback, actions, decisionTrace, result, agent, strategyName);
   baseArtifact.observationTrace = clone(observations);
+  delete baseArtifact.verificationEvents;
+  const verificationEvents = verificationEventsFromSnapshot(debugAfter);
+  if (verificationEvents.length > 0) baseArtifact.verificationEvents = verificationEvents;
   if (observations[0]) {
     baseArtifact.initialRoadArrivalSchedule = observations[0].roadBranches.map((branch) => ({
       branchId: branch.branchId,
@@ -552,7 +562,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       supply: { initialRadius: config.checkpoint.initialSupplyRadius, suppliedTileKeys: [], branchRadii: [] },
       resources: { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0, electricityCapacity: 0, electricityRequired: 0, militarySupplyAvailable: false },
       population: { healthyCivilians: 0, cityResidents: 0, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
-      facilities: [], units: [], zombies: [], checkpoints: [],
+      facilities: [], units: [], zombies: [], checkpoints: [], checkpointPositionCandidates: [],
       horde: {
         warningType: 'none',
         warningDirection: 'north',
@@ -708,7 +718,7 @@ export function createAgent(strategy: AgentStrategyId, seed: number): GameAgent 
 function artifactValidationError(artifact: AgentRunArtifact): AgentActionError | null {
   if (!isRecord(artifact)) return publicActionError('artifact_invalid', 'Replay artifact must be a JSON object');
   if (typeof artifact.appVersion !== 'string' || artifact.appVersion.length === 0) {
-    return publicActionError('artifact_invalid', 'Replay artifact appVersion metadata is invalid');
+    return publicActionError('artifact_invalid', 'Replay artifact appVersion metadata must be a non-empty string');
   }
   const versions: Array<[string, unknown, string]> = [
     ['artifactSchemaVersion', artifact.artifactSchemaVersion, ARTIFACT_SCHEMA_VERSION],
@@ -736,6 +746,9 @@ function artifactValidationError(artifact: AgentRunArtifact): AgentActionError |
     !Array.isArray(artifact.observationTrace) ||
     artifact.observationTrace.length !== artifact.acceptedActions.length + 1
   )) return publicActionError('artifact_invalid', 'Replay artifact observation trace is incomplete');
+  if (artifact.verificationEvents !== undefined && !Array.isArray(artifact.verificationEvents)) {
+    return publicActionError('artifact_invalid', 'Replay artifact verificationEvents must be an array');
+  }
   const strategy = artifact.agent?.strategy;
   if (strategy !== undefined && strategy !== 'random' && strategy !== 'balanced') {
     return publicActionError('artifact_invalid', 'Replay artifact agent strategy is unsupported');
@@ -869,5 +882,16 @@ export function replayArtifact(
   if (actionsReplayed !== artifact.acceptedActions.length) mismatch = 'Replay did not consume the complete accepted action list';
   if (!mismatch && artifact.result && JSON.stringify(artifact.result) !== JSON.stringify(result)) mismatch = 'Replay final result differs from the artifact';
   if (!mismatch && artifact.result && (!observation.gameOver || observation.turn !== artifact.result.turn)) mismatch = 'Replay final observation differs from the artifact result';
+  if (!mismatch && artifact.verificationEvents) {
+    const candidate = game as AgentGame & { getDebugState?: () => unknown };
+    if (typeof candidate.getDebugState !== 'function') {
+      mismatch = 'Replay game cannot validate internal verification events';
+    } else {
+      const replayVerificationEvents = verificationEventsFromSnapshot(candidate.getDebugState());
+      if (JSON.stringify(artifact.verificationEvents) !== JSON.stringify(replayVerificationEvents)) {
+        mismatch = 'Replay internal verification events differ from the artifact';
+      }
+    }
+  }
   return { result, observation, actionsReplayed, error: null, reproduced: mismatch === null, mismatch };
 }

@@ -38,8 +38,8 @@ describe('Batch Simulation CLI', () => {
     expect(report.comparisons).toHaveLength(2);
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.technicalFailureCount).toBeGreaterThanOrEqual(0);
-    expect(report.schemaVersion).toBe('1.4.0');
-    expect(report.appVersion).toBe('1.3.1');
+    expect(report.schemaVersion).toBe('1.4.1');
+    expect(report.appVersion).toBe('1.3.2');
   });
 
   it('reports the runner default turn ceiling independently from finalHordeTurn', () => {
@@ -101,6 +101,10 @@ describe('Batch Simulation CLI', () => {
       'refineryFacilitiesCaptured',
       'powerPlantFacilitiesCaptured',
       'finalHordeSpawned',
+      'periodicHordeZombiesSpawned',
+      'periodicNormalZombiesSpawned',
+      'finalHordeZombiesSpawned',
+      'finalNormalZombiesSpawned',
       'finalHordeDefeated',
       'terrainEntriesByType.forest',
       'hordeTargetClearedCount',
@@ -113,6 +117,10 @@ describe('Batch Simulation CLI', () => {
       'refineryFacilitiesCaptured',
       'powerPlantFacilitiesCaptured',
       'finalHordeSpawned',
+      'periodicHordeZombiesSpawned',
+      'periodicNormalZombiesSpawned',
+      'finalHordeZombiesSpawned',
+      'finalNormalZombiesSpawned',
       'hordeTargetClearedCount',
     ] as const) {
       expect(row![header!.indexOf(key)]).toBe(String(report.games[0]![key]));

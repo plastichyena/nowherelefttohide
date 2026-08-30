@@ -5,7 +5,7 @@ import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.3.1');
+    expect(APP_VERSION).toBe('1.3.2');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -22,6 +22,10 @@ describe('AgentGame public boundary', () => {
     expect(first.finalHordeTurn).toBe(30);
     expect(first.apiVersion).toBe(OBSERVATION_API_VERSION);
     expect(first.roadBranches).toHaveLength(4);
+    expect(first.checkpointPositionCandidates).toHaveLength(28);
+    expect(first.checkpointPositionCandidates.every((candidate) =>
+      typeof candidate.legal === 'boolean' && (candidate.reasonCode === null || typeof candidate.reasonCode === 'string'),
+    )).toBe(true);
     expect(first.roadBranches.every((branch) => branch.turnsUntilArrival >= 0)).toBe(true);
     expect(first.supply.initialRadius).toBeGreaterThan(0);
     expect(first.units.every((unit) => typeof unit.inSupply === 'boolean')).toBe(true);
@@ -48,7 +52,7 @@ describe('AgentGame public boundary', () => {
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.3.1 API and current Config from the same adapter boundary', () => {
+  it('describes the v1.3.2 API, checkpoint candidates, and Horde composition from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
@@ -80,6 +84,17 @@ describe('AgentGame public boundary', () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
+    expect(info.rules.horde).toMatchObject({
+      periodicInitial: { hordeZombie: 2, zombie: 0 },
+      periodicIncrement: { hordeZombie: 1, zombie: 1 },
+      finalComposition: { hordeZombie: 7, zombie: 5 },
+    });
+    expect(info.rules.checkpointPositionCandidates).toMatchObject({
+      observationField: 'checkpointPositionCandidates',
+      includesIllegalCandidates: true,
+      fairPlay: { hiddenEnemiesBlock: false, blockerUnitIdsPublic: false },
+    });
+    expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('checkpoint_supply_zombie_blocked');
     expect(info.prohibited.join(' ')).toContain('SuppressInfection');
     info.methods.pop();
     expect(game.getApiInfo().methods).toContain('getRunArtifact');
@@ -131,7 +146,7 @@ describe('AgentGame public boundary', () => {
       configOverrides: {
         finalHordeTurn: 1,
         economy: { initialZombieCount: 0 },
-        horde: { finalCount: 4 },
+        horde: { finalComposition: { hordeZombie: 1, zombie: 3 } },
         units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       },
     });
@@ -141,20 +156,26 @@ describe('AgentGame public boundary', () => {
     const hordeEvents = result.events.filter((event) => event.type === 'horde_spawned');
     expect(hordeEvents).toHaveLength(1);
     expect(hordeEvents[0]!.payload).toMatchObject({ hordeKind: 'final', direction: expect.any(String) });
-    for (const hiddenField of ['zombieId', 'q', 'r', 'count', 'spawnGroupId']) {
+    for (const hiddenField of [
+      'zombieId', 'q', 'r', 'count', 'spawnGroupId', 'units', 'position',
+      'hordeZombieCount', 'normalZombieCount',
+    ]) {
       expect(hordeEvents[0]!.payload).not.toHaveProperty(hiddenField);
     }
+    expect(JSON.stringify(hordeEvents)).not.toContain('final-horde-1');
   });
 
   it('does not canonicalize a checkpoint action with the wrong branch', () => {
     const game = createAgentGame();
     const before = game.reset({ seed: 12, configOverrides: { economy: { initialZombieCount: 0 } } });
+    const privateBefore = game.getDebugState();
     const legalBuild = game.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
     expect(legalBuild).toBeDefined();
     const wrongBranch = before.roadBranches.find((branch) => branch.branchId !== legalBuild!.branchId)!.branchId;
     const result = game.step({ ...legalBuild!, branchId: wrongBranch });
-    expect(result.error?.code).toBe('action_not_legal');
+    expect(result.error?.code).toBe('invalid_checkpoint_branch');
     expect(game.getObservation()).toEqual(before);
+    expect(game.getDebugState()).toEqual(privateBefore);
     expect(game.getRunArtifact().acceptedActions).toHaveLength(0);
   });
 });

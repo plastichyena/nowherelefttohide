@@ -1,7 +1,7 @@
 import { gzipSync, strToU8 } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
-import { GameEngine } from '../core/engine';
+import { GameEngine, getCheckpointPositionCandidates } from '../core/engine';
 import { createInitialState } from '../core/state';
 import type { GameState } from '../core/types';
 import {
@@ -71,7 +71,7 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.3 save format', () => {
+describe('v1.3.2 save format', () => {
   it('round-trips a detached complete Save Format 3 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
@@ -93,14 +93,14 @@ describe('v1.3 save format', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('writes the v1.3-only version boundaries', () => {
+  it('writes the v1.3.2 version boundaries', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.gameVersion).toBe('1.4.0');
-    expect(config.version).toBe('1.4.0');
+    expect(envelope.gameVersion).toBe('1.4.1');
+    expect(config.version).toBe('1.4.1');
     expect(config.mapId).toBe('fixed-15x15-v2');
     expect(state).toHaveProperty('finalHordeTurn', 30);
     expect(state).not.toHaveProperty('maxTurns');
@@ -111,22 +111,31 @@ describe('v1.3 save format', () => {
     const config = createDefaultConfig({
       finalHordeTurn: 1,
       economy: { initialZombieCount: 0 },
-      horde: { cycle: 1, finalCount: 2 },
+      horde: { cycle: 1, finalComposition: { hordeZombie: 1, zombie: 1 } },
     });
     const engine = new GameEngine(16, config);
     const endTurn = engine.step({ type: 'EndTurn' });
     expect(endTurn.error).toBeNull();
     const state = clone(endTurn.state);
-    const finalHorde = state.units.filter((unit) => unit.type === 'hordeZombie');
+    const finalHorde = state.units.filter((unit) => unit.hordeKind === 'final');
     expect(finalHorde).toHaveLength(2);
     expect(finalHorde.every((unit) => unit.hordeKind === 'final' && unit.spawnGroupId === state.horde.finalSpawnGroupId)).toBe(true);
     expect(state.horde).toMatchObject({ finalHordeStatus: 'active', finalSpawnedCount: 2 });
     expect(state.statistics).toHaveProperty('finalHordeSpawned', 2);
+    expect(state.statistics).toMatchObject({ finalHordeZombiesSpawned: 1, finalNormalZombiesSpawned: 1 });
     expect(state.statistics.terrainEntriesByType).toEqual({ plain: 0, forest: 0, mountain: 0, water: 0 });
     expect(decodeSaveCode(encodeSaveCode(state)).state).toEqual(state);
   });
 
-  it('rejects v1.2.7 and earlier envelopes without changing the current state or RNG snapshot', () => {
+  it('re-derives identical checkpoint candidates after load without storing them in GameState', () => {
+    const state = initialState(91);
+    const before = getCheckpointPositionCandidates(state);
+    const loaded = decodeSaveCode(encodeSaveCode(state)).state!;
+    expect(getCheckpointPositionCandidates(loaded)).toEqual(before);
+    expect(loaded).not.toHaveProperty('checkpointCandidates');
+  });
+
+  it('rejects prior-version envelopes without changing the current state or RNG snapshot', () => {
     const current = initialState(18);
     const before = clone(current);
     const legacy = exportedEnvelope(current);
@@ -147,8 +156,8 @@ describe('v1.3 save format', () => {
   it('rejects a stale state/config version even when the envelope has Format 3', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
-    state.gameVersion = '1.3.0';
-    (state.config as Record<string, unknown>).version = '1.3.0';
+    state.gameVersion = '1.4.0';
+    (state.config as Record<string, unknown>).version = '1.4.0';
     const result = importSaveJson(JSON.stringify(resign(envelope)));
 
     expect(result).toMatchObject({ valid: false, state: null, envelope: null });

@@ -16,6 +16,24 @@ const PUBLIC_METHODS = [
   'isGameOver', 'getResult', 'getRunArtifact',
 ] as const;
 
+const CHECKPOINT_REASON_CODES: Readonly<Record<string, string>> = Object.freeze({
+  invalid_checkpoint_tile: 'The destination is not an empty road tile that can contain a checkpoint.',
+  invalid_checkpoint_branch: 'The destination does not belong to the selected road branch.',
+  unknown_road_branch: 'The selected road branch does not exist in the current state.',
+  checkpoint_requires_relocation: 'The branch already has an operational checkpoint; use RelocateCheckpoint.',
+  unknown_operational_checkpoint: 'Relocation requires a known operational checkpoint.',
+  checkpoint_same_position: 'Relocation must select a different road tile.',
+  checkpoint_wrong_branch: 'A checkpoint can only relocate within its current branch.',
+  checkpoint_infection_blocked: 'An infected operational checkpoint or remnant prevents changing position.',
+  checkpoint_branch_action_limit: 'This branch already built or relocated a checkpoint this turn.',
+  checkpoint_abandoned_forward_block: 'An infected ruined or abandoned site prevents placement at the same distance or farther from the capital.',
+  checkpoint_supply_zombie_blocked: 'A player-visible Zombie is inside the candidate supply area.',
+  insufficient_civilian_goods: 'The current Civilian Goods stock cannot pay the checkpoint construction cost.',
+  action_limit: 'The global action limit for this turn has been reached.',
+  wrong_phase: 'Checkpoint actions are only available during the player phase.',
+  game_over: 'No checkpoint action is available after Game Over.',
+});
+
 export function createAgentApiInfo(
   config: Readonly<GameConfig>,
   buildId: string,
@@ -35,7 +53,7 @@ export function createAgentApiInfo(
     methodSchemas: {
       getApiInfo: { arguments: 'none', returns: 'AgentApiInfo', description: 'Returns versions, public methods, fair-play boundaries, and static rules.' },
       reset: { arguments: 'AgentResetOptions? { seed?, configOverrides?, agent?: { id } }', returns: 'AgentObservation', description: 'Replaces the in-memory Agent session.' },
-      getObservation: { arguments: 'none', returns: `AgentObservation ${OBSERVATION_API_VERSION}`, description: 'Returns a deterministic JSON copy of current public information, including terrain, visibility, Horde status, and Victory progress.' },
+      getObservation: { arguments: 'none', returns: `AgentObservation ${OBSERVATION_API_VERSION}`, description: 'Returns a deterministic JSON copy of current public information, including terrain, visibility, checkpoint position candidates, Horde status, and Victory progress.' },
       getLegalActions: { arguments: 'none', returns: 'GameAction[]', description: 'Returns deterministic currently legal atomic actions.' },
       step: { arguments: 'one GameAction from getLegalActions()', returns: 'AgentStepResult', description: 'Validates and applies exactly one action through GameEngine.' },
       isGameOver: { arguments: 'none', returns: 'boolean', description: 'Reports whether the Agent session ended.' },
@@ -48,11 +66,13 @@ export function createAgentApiInfo(
       'Call step() with one listed action at a time until isGameOver() is true.',
       'All returned values are detached JSON-compatible copies.',
       'Map terrain, roads, facility/checkpoint overlays, supply, Horde warning facts, and Victory progress are public.',
+      'checkpointPositionCandidates contains every road tile with the Core-derived legal flag and first ActionError reason code.',
       'The enemy list contains only currently visible normal Zombies and Horde Zombies; hidden enemies are omitted.',
     ],
     prohibited: [
       'GameState, PRNG state, future random outcomes, hidden enemy positions/counts, and unspawned Horde size are not public.',
       'Zombie Current Target, Inherited Target, Target Reason, hidden Spawn coordinates, and hidden enemy history are not public.',
+      'Checkpoint candidates never reveal blocker unit IDs; hidden enemies do not block a candidate or change its reason code.',
       'LoadSnapshot, StartNewGame, SuppressInfection, arbitrary code, files, saves, localStorage, network, and Batch execution are not public actions.',
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
@@ -108,12 +128,12 @@ export function createAgentApiInfo(
       },
       horde: {
         cycle: config.horde.cycle,
-        initialCount: config.horde.initialCount,
-        increment: config.horde.increment,
+        periodicInitial: cloneJson(config.horde.periodicInitial),
+        periodicIncrement: cloneJson(config.horde.periodicIncrement),
         warningStartTurn: config.horde.warningStartTurn,
         spawnOnlyBeforeFinalTurn: config.horde.spawnOnlyBeforeFinalTurn,
         finalHordeTurn: config.finalHordeTurn,
-        finalCount: config.horde.finalCount,
+        finalComposition: cloneJson(config.horde.finalComposition),
       },
       victory: {
         requiresFinalHorde: true,
@@ -138,6 +158,27 @@ export function createAgentApiInfo(
           acceptanceRate: policies.strict.workerRate,
           infectionBatchRate: policies.strict.infectionRate,
           infectedPopulationRate: policies.strict.infectionPopulationRate,
+        },
+      },
+      checkpointPositionCandidates: {
+        observationField: 'checkpointPositionCandidates',
+        schema: {
+          actionType: 'BuildCheckpoint | RelocateCheckpoint',
+          branchId: 'string',
+          checkpointId: 'string (RelocateCheckpoint only; omitted for BuildCheckpoint)',
+          position: '{ q: number; r: number }',
+          legal: 'boolean',
+          reasonCode: 'ActionError.code | null',
+        },
+        ordering: 'branch_id_then_branch_road_tile_order',
+        includesIllegalCandidates: true,
+        reasonCodes: cloneJson(CHECKPOINT_REASON_CODES),
+        fairPlay: {
+          hiddenEnemiesBlock: false,
+          visibleEnemiesCanBlock: true,
+          blockerUnitIdsPublic: false,
+          prngStatePublic: false,
+          futureRandomOutcomesPublic: false,
         },
       },
       production: {

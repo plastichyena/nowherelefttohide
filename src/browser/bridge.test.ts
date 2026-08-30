@@ -54,6 +54,10 @@ describe('Developer / Browser Bridge', () => {
     expect(info.minimalExample).toContain('window.NLTH');
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.1, restRate: 0.2 });
     expect(info.rules.infection.stationedUnitsContainSpread).toBe(true);
+    expect(info.rules.checkpointPositionCandidates).toMatchObject({
+      observationField: 'checkpointPositionCandidates',
+      fairPlay: { hiddenEnemiesBlock: false, blockerUnitIdsPublic: false },
+    });
 
     const adapterInfo = createAgentGame({ buildId: 'test-build', bridgeApiVersion: BRIDGE_API_VERSION }).getApiInfo();
     expect(info).toEqual(adapterInfo);
@@ -88,9 +92,11 @@ describe('Developer / Browser Bridge', () => {
     observation.resources.food = -999;
     observation.map.tiles[0].q = 999;
     observation.facilities[0].healthyPopulation = -999;
+    observation.checkpointPositionCandidates[0]!.reasonCode = 'mutated';
     expect(api.getObservation().resources.food).not.toBe(-999);
     expect(api.getObservation().map.tiles[0].q).not.toBe(999);
     expect(api.getObservation().facilities[0].healthyPopulation).not.toBe(-999);
+    expect(api.getObservation().checkpointPositionCandidates[0]!.reasonCode).not.toBe('mutated');
 
     const legal = api.getLegalActions();
     const originalFirst = JSON.stringify(legal[0]);
@@ -102,7 +108,9 @@ describe('Developer / Browser Bridge', () => {
     expect(artifact.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(artifact.initialRoadArrivalSchedule).toHaveLength(4);
     expect(artifact.observationTrace).toHaveLength(1);
+    expect(artifact.observationTrace![0]!.checkpointPositionCandidates).toEqual(api.getObservation().checkpointPositionCandidates);
     expect(artifact.metrics).toBeDefined();
+    expect(artifact.verificationEvents).toBeUndefined();
     artifact.config.finalHordeTurn = 1;
     artifact.acceptedActions.push({ type: 'EndTurn' });
     expect(api.getRunArtifact().config.finalHordeTurn).not.toBe(1);
@@ -174,7 +182,7 @@ describe('Developer / Browser Bridge', () => {
     expect(legalBuild).toBeDefined();
     const wrongBranch = before.roadBranches.find((branch) => branch.branchId !== legalBuild!.branchId)!.branchId;
     const result = api.step({ ...legalBuild!, branchId: wrongBranch });
-    expect(result.error?.code).toBe('action_not_legal');
+    expect(result.error?.code).toBe('invalid_checkpoint_branch');
     expect(api.getObservation()).toEqual(before);
     expect(api.getRunArtifact().acceptedActions).toHaveLength(0);
   });
