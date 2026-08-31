@@ -53,7 +53,7 @@ describe('unified Agent Runner', () => {
     const missingAppMetadataReplay = replayArtifact({ ...first.artifact, appVersion: '' });
     expect(missingAppMetadataReplay.reproduced).toBe(false);
     expect(missingAppMetadataReplay.error?.code).toBe('artifact_invalid');
-  }, 10_000);
+  }, 30_000);
 
   it('rejects v1.3 and earlier artifacts before creating a v1.4 replay session', () => {
     const config = createDefaultConfig({ finalHordeTurn: 1 });

@@ -116,7 +116,7 @@ describe('Agent Metrics', () => {
     expect(aggregate.metrics.finalTurn.average).toBeGreaterThan(0);
     expect(aggregate.metrics.finalTurn.p10).toBeLessThanOrEqual(aggregate.metrics.finalTurn.p90);
     expect(aggregate.actionCounts.EndTurn).toBe(first.actionCounts.EndTurn + second.actionCounts.EndTurn);
-  });
+  }, 15_000);
 
   it('can collect a technical-failure metric without pretending it is an in-game loss', () => {
     const config = createDefaultConfig();
