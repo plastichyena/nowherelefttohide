@@ -1075,7 +1075,7 @@ West:  (x,15), x=0..14
 | `civilian-factory-1` | Civilian Factory | `(17,15)` | owned |
 | `civilian-factory-2` | Civilian Factory | `(25,16)` | disconnected |
 | `military-factory-1` | Military Factory | `(26,15)` | disconnected |
-| `military-factory-2` | Military Factory | `(4,15)` | disconnected |
+| `military-factory-2` | Military Factory | `(11,15)` | disconnected |
 | `refinery-1` | Refinery | `(15,13)` | owned |
 | `refinery-2` | Refinery | `(14,6)` | disconnected |
 | `power-plant-1` | Power Plant | `(15,17)` | owned |
@@ -1083,6 +1083,7 @@ West:  (x,15), x=0..14
 | `wind-power-plant-1` | Wind Power Plant | `(16,14)` | owned |
 
 - 初期所有Facilityはすべて初期Supply Radius内とする。
+- 初期未確保のMilitary Factoryを最低1つ初期Supply Radius内に配置する。
 - 各恒久Facility座標の基礎TerrainはPlainとする。
 - Facilityは現行どおりUrban Overlayを持つ。Road座標上の恒久FacilityはRoad Overlayも維持する。
 

@@ -91,7 +91,7 @@ const facilitySpecs: Array<{
   {
     id: 'military-factory-2',
     type: 'militaryFactory',
-    position: { q: 4, r: 15 },
+    position: { q: 11, r: 15 },
     startingOwned: false,
     startingWorkers: 0,
   },

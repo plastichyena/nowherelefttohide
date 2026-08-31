@@ -201,6 +201,15 @@ describe('Agent Observation 2.0.0 rule projections', () => {
     expect(police.fuelCostByLegalMove.every((move) => move.fuelCost >= 1 && move.projectedFuelAfterMove >= 0)).toBe(true);
     const wind = observation.facilities.find((facility) => facility.type === 'windPowerPlant')!;
     expect(wind).toMatchObject({ healthyPopulation: 0, zombieTargetValue: 5, constructible: false });
+    const nearbyMilitaryFactory = observation.facilities.find(
+      (facility) => facility.id === 'military-factory-2',
+    );
+    expect(nearbyMilitaryFactory).toMatchObject({
+      position: { q: 11, r: 15 },
+      owner: 'none',
+      status: 'unowned',
+      inSupply: true,
+    });
     expect(observation.strategicForecast.resources.fuel).toHaveProperty('singlePointOfFailure');
     expect(observation.constructibleFacilityPositionCandidates).toHaveLength(31 * 31 * 2);
     expect(observation.roadBranches.every((branch) => branch.currentPolicyTurns === 2)).toBe(true);

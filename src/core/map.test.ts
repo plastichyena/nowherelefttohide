@@ -106,7 +106,7 @@ describe('v1.4.0 fixed map', () => {
       'civilian-factory-1': ['civilianFactory', 17, 15, true],
       'civilian-factory-2': ['civilianFactory', 25, 16, false],
       'military-factory-1': ['militaryFactory', 26, 15, false],
-      'military-factory-2': ['militaryFactory', 4, 15, false],
+      'military-factory-2': ['militaryFactory', 11, 15, false],
       'refinery-1': ['refinery', 15, 13, true],
       'refinery-2': ['refinery', 14, 6, false],
       'power-plant-1': ['powerPlant', 15, 17, true],

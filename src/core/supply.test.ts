@@ -39,6 +39,24 @@ describe('road branches and supply network', () => {
     expect(getSectorBranchIds(state.map, { q: 18, r: 12 })).toEqual(expect.arrayContaining(['east', 'north']));
   });
 
+  it('places an unsecured military factory inside the initial capital supply network', () => {
+    const state = new GameEngine(1).getState();
+    const unsecuredMilitaryFactories = state.facilities.filter(
+      (facility) => facility.type === 'militaryFactory' && facility.owner !== 'player',
+    );
+    const nearbyFactory = unsecuredMilitaryFactories.find(
+      (facility) => facility.id === 'military-factory-2',
+    );
+
+    expect(unsecuredMilitaryFactories.length).toBeGreaterThan(0);
+    expect(nearbyFactory).toMatchObject({
+      position: { q: 11, r: 15 },
+      owner: 'none',
+      status: 'unowned',
+    });
+    expect(isHexSupplied(state, nearbyFactory!.position)).toBe(true);
+  });
+
   it('uses the candidate sector plus initial radius for zombie construction blockers', () => {
     const state = new GameEngine(1, createDefaultConfig({ units: { police: { vision: 10 } } })).getState();
     const blockers = getBlockingZombiesForCheckpoint(state, 'north', { q: 15, r: 9 });
