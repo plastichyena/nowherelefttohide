@@ -108,6 +108,27 @@ describe('unified Agent Runner', () => {
     expect(run.actions.filter((action) => action.type === 'EndTurn').length).toBeGreaterThan(0);
   });
 
+  it('keeps summary-only metrics identical while discarding heavyweight projections', () => {
+    const config = createDefaultConfig({ finalHordeTurn: 2, maxActionsPerTurn: 2 });
+    const options = {
+      strategy: 'random' as const,
+      config,
+      limits: { maxTurns: 4, maxDecisionsPerTurn: 2, maxDecisionsPerGame: 20 },
+    };
+    const full = runAgentGame(17, options);
+    const summary = runAgentGame(17, { ...options, summaryOnly: true });
+
+    expect(summary.metrics).toEqual(full.metrics);
+    expect(summary.actions).toEqual(full.actions);
+    expect(summary.observations.every((observation) => (
+      observation.map.tiles.length === 0 &&
+      observation.supply.suppliedTileKeys.length === 0 &&
+      observation.constructibleFacilityPositionCandidates.length === 0
+    ))).toBe(true);
+    expect(summary.artifact.observationTrace).toHaveLength(2);
+    expect(summary.artifact.fixedMap).toBeUndefined();
+  });
+
   it('keeps the default runner turn safety limit at 100 when the Final Horde is later', () => {
     const initial = createAgentGame().reset({ seed: 1 });
     const overRunnerLimit = { ...initial, turn: 101, finalHordeTurn: 250 };

@@ -607,6 +607,7 @@ export function runSimulationToDirectory(
         config: normalized.config,
         limits: normalized.limits,
         buildId: normalized.buildId,
+        summaryOnly,
         gameFactory: options.gameFactory,
         debugSnapshot: options.debugSnapshot,
         assertInvariant: options.assertInvariant,

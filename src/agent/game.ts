@@ -221,6 +221,12 @@ function checkpointCandidateProjectionKey(state: Readonly<GameState>): string {
 export interface AgentGameAdapterOptions {
   buildId?: string;
   bridgeApiVersion?: string;
+  /**
+   * Browser/API sessions keep their complete public trace for Replay export.
+   * Summary-only simulation runners can disable it because they own the
+   * metric history and never request a Replay artifact.
+   */
+  recordHistory?: boolean;
 }
 
 export class AgentGameAdapter implements AgentGame {
@@ -248,11 +254,13 @@ export class AgentGameAdapter implements AgentGame {
   } | null = null;
   private readonly buildId: string;
   private readonly bridgeApiVersion: string;
+  private readonly recordHistory: boolean;
 
   public constructor(options: AgentGameAdapterOptions = {}) {
     this.engine = new GameEngine(this.seed, this.config);
     this.buildId = options.buildId ?? 'local-unknown';
     this.bridgeApiVersion = options.bridgeApiVersion ?? BRIDGE_API_VERSION;
+    this.recordHistory = options.recordHistory ?? true;
     const observation = this.getObservation();
     this.initialObservation = cloneJson(observation);
     this.observations = [cloneJson(observation)];
@@ -366,7 +374,7 @@ export class AgentGameAdapter implements AgentGame {
     const observation = this.currentObservation();
     const events = publicEvents(before, result.state, result.events);
     this.events.push(...events);
-    this.observations.push(cloneJson(observation));
+    if (this.recordHistory) this.observations.push(cloneJson(observation));
     return {
       observation: cloneJson(observation),
       events,

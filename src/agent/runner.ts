@@ -102,6 +102,8 @@ export interface AgentRunnerGameOptions {
   debugSnapshot?: (game: AgentGame) => unknown;
   assertInvariant?: (snapshot: unknown, stage: 'before' | 'after') => void;
   failFast?: boolean;
+  /** Keep only fields consumed by metrics and omit the in-adapter Replay trace. */
+  summaryOnly?: boolean;
 }
 
 export interface AgentGameFactory {
@@ -178,8 +180,19 @@ function strategyForAgent(agent: GameAgent, requested?: AgentStrategyId): string
   return agent.id;
 }
 
-function defaultFactory(buildId: string | undefined): AgentGameFactory {
-  return () => createAgentGame({ buildId });
+function defaultFactory(buildId: string | undefined, recordHistory = true): AgentGameFactory {
+  return () => createAgentGame({ buildId, recordHistory });
+}
+
+function metricObservation(observation: AgentObservation): AgentObservation {
+  const recorded = clone(observation);
+  // These projections dominate a 31x31 observation but collectGameMetrics
+  // intentionally never reads them. Dropping them keeps long summary batches
+  // bounded without changing Agent decisions or full Replay runs.
+  recorded.map.tiles = [];
+  recorded.supply.suppliedTileKeys = [];
+  recorded.constructibleFacilityPositionCandidates = [];
+  return recorded;
 }
 
 function defaultAgent(strategy: AgentStrategyId, seed: number): GameAgent {
@@ -334,7 +347,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
   const agent = options.agent ?? defaultAgent(strategy, seed);
   const buildId = options.buildId ?? 'local-unknown';
   const limits = normalizeLimits(config, options.limits);
-  const gameFactory = options.gameFactory ?? defaultFactory(buildId);
+  const gameFactory = options.gameFactory ?? defaultFactory(buildId, !options.summaryOnly);
   const actions: GameAction[] = [];
   const events: AgentPublicEvent[] = [];
   const observations: AgentObservation[] = [];
@@ -399,7 +412,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     }));
     currentTurn = observation.turn;
     decisionsThisTurn = 0;
-    observations.push(clone(observation));
+    observations.push(options.summaryOnly ? metricObservation(observation) : clone(observation));
     snapshotFromGame('before');
   } catch (thrown) {
     fail('RESET_THREW', thrown instanceof Error ? thrown.message : String(thrown), null, thrown);
@@ -521,7 +534,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     actions.push(cloneAction(selected));
     events.push(...asPublicEvents(stepResult.events ?? []));
     observation = nextObservation;
-    observations.push(clone(observation));
+    observations.push(options.summaryOnly ? metricObservation(observation) : clone(observation));
     finalObservation = clone(observation);
     decisionsThisTurn += 1;
     snapshotFromGame('after');
@@ -548,7 +561,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
   }
 
   let sourceArtifact: AgentPublicRunArtifact | null = null;
-  if (game) {
+  if (game && !options.summaryOnly) {
     try {
       sourceArtifact = clone(game.getRunArtifact());
     } catch (thrown) {
@@ -558,8 +571,13 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
   const fallback = placeholderArtifact(seed, config, agent, buildId, actions, decisionTrace, result, observations[0] ?? null);
   const strategyName = strategyForAgent(agent, options.strategy);
   const baseArtifact = enrichArtifact(sourceArtifact, fallback, actions, decisionTrace, result, agent, strategyName);
-  baseArtifact.observationTrace = observations.map(compactArtifactObservation);
-  if (observations[0]) baseArtifact.fixedMap = clone(observations[0].map);
+  baseArtifact.observationTrace = options.summaryOnly
+    ? observations.length > 0
+      ? [compactArtifactObservation(observations[0]), compactArtifactObservation(observations.at(-1) ?? observations[0])]
+      : []
+    : observations.map(compactArtifactObservation);
+  if (observations[0] && !options.summaryOnly) baseArtifact.fixedMap = clone(observations[0].map);
+  else delete baseArtifact.fixedMap;
   delete baseArtifact.verificationEvents;
   const verificationEvents = verificationEventsFromSnapshot(debugAfter);
   if (verificationEvents.length > 0) baseArtifact.verificationEvents = verificationEvents;
