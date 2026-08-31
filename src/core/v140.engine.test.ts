@@ -238,6 +238,26 @@ describe('v1.4 Wind Power Plant', () => {
 });
 
 describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
+  it('never publishes AssignWorkers for building, disabled, or recovering production facilities', () => {
+    for (const operationalStatus of ['building', 'disabled', 'recovering'] as const) {
+      const engine = new GameEngine(1419, safeConfig());
+      const position = firstBuildable(engine, 'civilianDroneBase');
+      expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'civilianDroneBase', position }).error).toBeNull();
+      const scenario = cloneState(engine.getState());
+      const drone = scenario.facilities.find((facility) => facility.constructible && facility.type === 'civilianDroneBase')!;
+      drone.populationOperationalTurn = scenario.turn;
+      drone.operationalStatus = operationalStatus;
+      loadScenario(engine, scenario);
+
+      expect(engine.getLegalActions()).not.toContainEqual(expect.objectContaining({
+        type: 'AssignWorkers',
+        facilityId: drone.id,
+      }));
+      expect(engine.step({ type: 'AssignWorkers', facilityId: drone.id, workers: 1 }).error?.code)
+        .toBe('facility_not_operational');
+    }
+  });
+
   it('builds a Simple Farm in a Core candidate, keeps Build Turn inactive, and unlocks next turn', () => {
     const engine = new GameEngine(1420, safeConfig());
     const position = firstBuildable(engine, 'simpleFarm');

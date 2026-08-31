@@ -3542,7 +3542,8 @@ export class GameEngine implements HeadlessGame {
         facility.status !== 'owned' ||
         facility.infected > 0 ||
         !isProductionFacility(facility) ||
-        facility.populationOperationalTurn > this.state.turn
+        facility.populationOperationalTurn > this.state.turn ||
+        ['building', 'disabled', 'recovering'].includes(facility.operationalStatus)
       ) continue;
       const maximum = Math.min(facility.workerCapacity, facility.workers + supplyPopulationAvailable);
       for (let workers = 0; workers <= maximum; workers += 1) {
