@@ -486,8 +486,14 @@ function scoreAction(
           reasonCodes.push('SUPPLY_REFILL_AVAILABLE');
         }
       }
-      const infectedFacilities = observation.facilities.filter((facility) => facility.infectedPopulation > 0);
-      const infected = infectedFacilities.map((facility) => facility.position);
+      const infected = [
+        ...observation.facilities
+          .filter((facility) => facility.infectedPopulation > 0)
+          .map((facility) => facility.position),
+        ...observation.checkpoints
+          .filter((checkpoint) => checkpoint.infected > 0)
+          .map((checkpoint) => checkpoint.position),
+      ];
       const unowned = observation.facilities.filter((facility) => facility.owner === 'none');
       const zombiePositions = observation.zombies.map((zombie) => zombie.position);
       const beforeZombie = nearestDistance(unit.position, zombiePositions);
@@ -847,6 +853,7 @@ function scoreAction(
     if (action.policy === 'normal') score += 25;
     if (observation.population.infected > 0) {
       if (action.policy === 'strict') score += 110;
+      if (action.policy === 'normal') score -= 110;
       if (action.policy === 'passThrough') score -= 110;
       reasonCodes.push('POLICY_REDUCE_INFECTION_RISK');
     } else if (observation.population.healthyCivilians < 25) {

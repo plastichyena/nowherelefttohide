@@ -108,6 +108,54 @@ describe('Balanced Agent scenario intentions', () => {
     expect(result.trace?.reasonCodes).toContain('PREFER_POLICE_SUPPRESSION');
   });
 
+  it('moves a unit toward infection held in a checkpoint queue', () => {
+    const police = observation.units.find((candidate) => candidate.type === 'police')!;
+    const branch = observation.roadBranches[0]!;
+    const near = { q: police.position.q, r: police.position.r - 1 };
+    const away = { q: police.position.q, r: police.position.r + 1 };
+    const result = decide([
+      { type: 'Move', unitId: police.id, destination: near },
+      { type: 'Move', unitId: police.id, destination: away },
+      { type: 'EndTurn' },
+    ], (value) => {
+      value.zombies = [];
+      value.population.infected = 8;
+      value.facilities.forEach((facility) => { facility.infectedPopulation = 0; });
+      value.checkpoints = [{
+        id: 'infected-checkpoint',
+        branchId: branch.branchId,
+        position: { q: police.position.q, r: police.position.r - 4 },
+        direction: branch.direction,
+        status: 'operational',
+        role: 'remnant',
+        waiting: 0,
+        screening: 0,
+        approved: 0,
+        queuePeople: 8,
+        screeningCapacity: 10,
+        estimatedScreeningThroughput: 0,
+        arrivalIntervalMin: 2,
+        arrivalIntervalMax: 4,
+        arrivalPeopleMin: 5,
+        arrivalPeopleMax: 10,
+        queuePressureClass: 'low',
+        infected: 8,
+        remainingTurns: 0,
+        currentPolicy: 'strict',
+        currentPolicyTurns: 5,
+        nextPolicy: 'strict',
+        nextArrivalTurn: branch.nextArrivalTurn,
+        providesSupply: false,
+        infectionContained: false,
+        containingUnitId: null,
+        projectedSuppression: 0,
+        projectedCivilianDamage: 0,
+      }];
+    });
+    expect(result.action).toMatchObject({ type: 'Move', destination: near });
+    expect(result.trace?.reasonCodes).toContain('POLICE_RESPOND_TO_INFECTION');
+  });
+
   it('positions National Guard at a frontline facility when Horde arrival is imminent', () => {
     const unit = observation.units[0]!;
     const entrance = observation.map.tiles.find((tile) => tile.hordeEntranceDirections.includes(observation.horde.direction))!;
@@ -391,6 +439,7 @@ describe('Balanced Agent scenario intentions', () => {
     };
     const actions: GameAction[] = [
       { type: 'SetCheckpointPolicy', branchId: branch.branchId, policy: 'passThrough' },
+      { type: 'SetCheckpointPolicy', branchId: branch.branchId, policy: 'normal' },
       { type: 'SetCheckpointPolicy', branchId: branch.branchId, policy: 'strict' },
       { type: 'EndTurn' },
     ];
@@ -404,7 +453,7 @@ describe('Balanced Agent scenario intentions', () => {
     expect(population.trace?.reasonCodes).toContain('POLICY_GROW_POPULATION');
 
     const infection = decide(actions, (value) => {
-      value.checkpoints = [checkpoint];
+      value.checkpoints = [{ ...checkpoint, currentPolicy: 'strict', nextPolicy: 'strict' }];
       value.roadBranches[0]!.activeCheckpointId = checkpoint.id;
       value.population.healthyCivilians = 50;
       value.population.infected = 5;
