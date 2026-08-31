@@ -7,6 +7,7 @@ import { getPlayerVisibleTileKeys } from '../core/visibility';
 import type {
   CardinalDirection,
   CheckpointState,
+  ConstructibleFacilityType,
   FacilityState,
   FixedMap,
   GameState,
@@ -51,6 +52,11 @@ export interface BoardRenderState {
   checkpointInvalidPreviewPositions?: readonly HexCoord[];
   checkpointPreviewSelected?: HexCoord | null;
   blockedZombieIds?: readonly string[];
+  /** Core-provided BuildConstructibleFacility candidate preview. */
+  constructibleFacilityType?: ConstructibleFacilityType | null;
+  constructibleFacilityLegalPreviewPositions?: readonly HexCoord[];
+  constructibleFacilityInvalidPreviewPositions?: readonly HexCoord[];
+  constructibleFacilityPreviewSelected?: HexCoord | null;
 }
 
 export type BoardAssetFailureKind = 'missing' | 'load' | 'decode' | 'texture-registration';
@@ -208,6 +214,9 @@ const FALLBACK_FACILITY_SYMBOL: Record<string, string> = {
   militaryFactory: '⚒',
   refinery: '◈',
   powerPlant: '⚡',
+  windPowerPlant: '≋',
+  simpleFarm: 'f',
+  civilianDroneBase: '✈',
   checkpoint: '▤',
 };
 
@@ -359,6 +368,26 @@ export function checkpointCandidateMarkerStyle(
     symbol: legal ? '✓' : '×',
     lineWidth: selected ? 4 : legal ? 2 : 3,
     alpha: selected ? 0.38 : legal ? 0.2 : 0.26,
+  };
+}
+
+export interface ConstructibleCandidateMarkerStyle {
+  color: number;
+  symbol: '＋' | '×';
+  lineWidth: number;
+  alpha: number;
+}
+
+/** Keep Build Mode candidates distinguishable without relying on color alone. */
+export function constructibleCandidateMarkerStyle(
+  legal: boolean,
+  selected: boolean,
+): ConstructibleCandidateMarkerStyle {
+  return {
+    color: legal ? (selected ? 0xffd36e : 0x72e0c2) : (selected ? 0xff9a8d : 0xc86f68),
+    symbol: legal ? '＋' : '×',
+    lineWidth: selected ? 4 : legal ? 2 : 3,
+    alpha: selected ? 0.34 : legal ? 0.2 : 0.26,
   };
 }
 
@@ -865,6 +894,9 @@ export class HexBoardScene extends Phaser.Scene {
     const checkpointLegalPreview = new Set((render.checkpointLegalPreviewPositions ?? []).map((position) => hexKey(position)));
     const checkpointInvalidPreview = new Set((render.checkpointInvalidPreviewPositions ?? []).map((position) => hexKey(position)));
     const selectedCheckpointPreview = render.checkpointPreviewSelected ? hexKey(render.checkpointPreviewSelected) : null;
+    const constructibleLegalPreview = new Set((render.constructibleFacilityLegalPreviewPositions ?? []).map((position) => hexKey(position)));
+    const constructibleInvalidPreview = new Set((render.constructibleFacilityInvalidPreviewPositions ?? []).map((position) => hexKey(position)));
+    const selectedConstructiblePreview = render.constructibleFacilityPreviewSelected ? hexKey(render.constructibleFacilityPreviewSelected) : null;
     const blockedZombies = new Set(render.blockedZombieIds ?? []);
     const selected = render.selectedPosition;
     const hordeDirection = render.hordeDirection ?? null;
@@ -933,7 +965,7 @@ export class HexBoardScene extends Phaser.Scene {
       const facility = facilitiesByTile.get(key);
       const checkpoint = checkpointsByTile.get(key);
       const tileSelected = selected ? sameHex(selected, tile) : false;
-      this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKey === key, hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview);
+      this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKey === key, hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview, constructibleLegalPreview, constructibleInvalidPreview, selectedConstructiblePreview);
       if (facility) this.drawFacilityDynamic(facility, productionByFacility.get(facility.id), center, tileSelected, render, suppliedTiles, key, t);
       if (checkpoint) this.drawCheckpointDynamic(state, checkpoint, center);
       const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
@@ -1069,6 +1101,9 @@ export class HexBoardScene extends Phaser.Scene {
     checkpointLegalPreview: ReadonlySet<string>,
     checkpointInvalidPreview: ReadonlySet<string>,
     selectedCheckpointPreview: string | null,
+    constructibleLegalPreview: ReadonlySet<string>,
+    constructibleInvalidPreview: ReadonlySet<string>,
+    selectedConstructiblePreview: string | null,
   ): void {
     if (render.supplyOverlay && (suppliedTiles.has(tile.key) || suppliedTiles.has(key))) {
       this.graphics.fillStyle(0x38a9a4, 0.1);
@@ -1110,6 +1145,16 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.strokeCircle(center.x, center.y, HEX_SIZE * 0.78);
       this.drawMarker(this.graphics, center, style.color, style.alpha);
       this.addLabel(`checkpoint-candidate:${key}`, style.symbol, center.x, center.y, checkpointCandidateLegal ? '#d8f8e8' : '#ffd0ca', 10, true);
+    }
+    const constructibleCandidateLegal = constructibleLegalPreview.has(key);
+    const constructibleCandidateInvalid = constructibleInvalidPreview.has(key);
+    if (constructibleCandidateLegal || constructibleCandidateInvalid) {
+      const selected = selectedConstructiblePreview === key;
+      const style = constructibleCandidateMarkerStyle(constructibleCandidateLegal, selected);
+      this.graphics.lineStyle(style.lineWidth, style.color, 0.95);
+      this.graphics.strokeCircle(center.x, center.y, HEX_SIZE * 0.84);
+      this.drawMarker(this.graphics, center, style.color, style.alpha);
+      this.addLabel(`constructible-candidate:${key}`, style.symbol, center.x, center.y, constructibleCandidateLegal ? '#d8f8e8' : '#ffd0ca', 10, true);
     }
   }
 
@@ -1287,11 +1332,19 @@ export class HexBoardScene extends Phaser.Scene {
     } else if (type === 'farm') {
       graphics.fillTriangle(center.x, center.y - 13, center.x - 13, center.y + 11, center.x + 13, center.y + 11);
       graphics.strokeTriangle(center.x, center.y - 13, center.x - 13, center.y + 11, center.x + 13, center.y + 11);
-    } else if (type === 'refinery' || type === 'powerPlant') {
+    } else if (type === 'refinery' || type === 'powerPlant' || type === 'windPowerPlant') {
       graphics.fillCircle(center.x, center.y, 12);
       graphics.strokeCircle(center.x, center.y, 12);
       graphics.lineBetween(center.x - 8, center.y, center.x + 8, center.y);
       graphics.lineBetween(center.x, center.y - 8, center.x, center.y + 8);
+    } else if (type === 'simpleFarm') {
+      graphics.fillTriangle(center.x, center.y - 13, center.x - 13, center.y + 11, center.x + 13, center.y + 11);
+      graphics.strokeTriangle(center.x, center.y - 13, center.x - 13, center.y + 11, center.x + 13, center.y + 11);
+      graphics.lineBetween(center.x - 7, center.y + 6, center.x + 7, center.y + 6);
+    } else if (type === 'civilianDroneBase') {
+      graphics.fillRoundedRect(center.x - 13, center.y - 10, 26, 20, 5);
+      graphics.strokeRoundedRect(center.x - 13, center.y - 10, 26, 20, 5);
+      graphics.strokeCircle(center.x, center.y, 5);
     } else {
       graphics.fillRoundedRect(center.x - 13, center.y - 10, 26, 20, 4);
       graphics.strokeRoundedRect(center.x - 13, center.y - 10, 26, 20, 4);

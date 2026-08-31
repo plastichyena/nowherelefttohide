@@ -80,6 +80,9 @@ export const BOARD_FACILITY_TYPES = [
   'militaryFactory',
   'refinery',
   'powerPlant',
+  'windPowerPlant',
+  'simpleFarm',
+  'civilianDroneBase',
 ] as const satisfies readonly FacilityType[];
 
 export const BOARD_FACILITY_ASSET_TYPES = [...BOARD_FACILITY_TYPES, 'checkpoint'] as const;
@@ -132,6 +135,9 @@ export const BOARD_ASSET_REGISTRY = {
     militaryFactory: 'facilities/facility_military_factory.png',
     refinery: 'facilities/facility_refinery.png',
     powerPlant: 'facilities/facility_power_plant.png',
+    windPowerPlant: 'facilities/facility_wind_power_plant.png',
+    simpleFarm: 'facilities/facility_simple_farm.png',
+    civilianDroneBase: 'facilities/facility_civilian_drone_base.png',
     checkpoint: 'facilities/facility_checkpoint.png',
   },
   units: {

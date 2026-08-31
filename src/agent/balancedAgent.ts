@@ -38,6 +38,7 @@ function shortage(observation: AgentObservation): number {
   return observation.endTurnForecast.food.shortage +
     observation.endTurnForecast.civilianGoods.maintenanceShortage +
     observation.endTurnForecast.militaryGoods.shortage +
+    observation.endTurnForecast.fuel.totalFuelShortage +
     Math.max(0, observation.endTurnForecast.electricity.requiredPowerDemand - observation.endTurnForecast.electricity.requiredPowerAllocated);
 }
 
@@ -57,6 +58,8 @@ const PRODUCTION_TYPES: readonly FacilityType[] = [
   'militaryFactory',
   'refinery',
   'powerPlant',
+  'simpleFarm',
+  'civilianDroneBase',
 ];
 
 function ownedOperationalFacilities(observation: AgentObservation) {
@@ -121,6 +124,7 @@ function primaryGoal(
   legalActions: readonly GameAction[],
   threats: readonly ZombieThreat[],
 ): AgentPriorityGoal {
+  if (observation.strategicForecast.guaranteedDefeat.guaranteed) return 'avoid_defeat';
   const forecastCivilianLoss = observation.endTurnForecast.food.shortage + observation.endTurnForecast.civilianGoods.shortage;
   if (forecastCivilianLoss >= observation.population.healthyCivilians) return 'avoid_defeat';
   if (threats.some((threat) => threat.contactNextTurn)) return 'prevent_facility_contact';
@@ -148,11 +152,12 @@ function primaryGoal(
 }
 
 function facilityResourceValue(type: FacilityType, observation: AgentObservation): number {
-  if (type === 'farm') return observation.endTurnForecast.food.shortage > 0 ? 5 : 2;
+  if (type === 'farm' || type === 'simpleFarm') return observation.endTurnForecast.food.shortage > 0 ? 5 : 2;
   if (type === 'civilianFactory') return observation.endTurnForecast.civilianGoods.shortage > 0 ? 5 : 2;
   if (type === 'refinery') return observation.endTurnForecast.fuel.endingStock < observation.endTurnForecast.fuel.generationFuelDemand ? 5 : 2;
   if (type === 'powerPlant') return observation.endTurnForecast.electricity.physicalGenerationCapacity < observation.endTurnForecast.electricity.required ? 5 : 2;
   if (type === 'militaryFactory') return observation.resources.militarySupplyAvailable ? 1 : 4;
+  if (type === 'civilianDroneBase') return observation.horde.warningType === 'none' ? 2 : 4;
   if (type === 'city') return 3;
   return 4;
 }
@@ -174,6 +179,7 @@ function repeatSensitiveActionFamily(action: GameAction, observation: AgentObser
   if (action.type === 'BuildCheckpoint') return `BuildCheckpoint|${action.branchId ?? 'unknown'}`;
   if (action.type === 'RelocateCheckpoint') return `RelocateCheckpoint|${action.checkpointId}`;
   if (action.type === 'ActivateCheckpoint') return `ActivateCheckpoint|${action.branchId}`;
+  if (action.type === 'BuildConstructibleFacility') return `BuildConstructibleFacility|${action.facilityType}`;
   return null;
 }
 
@@ -217,6 +223,22 @@ function scoreAction(
   const checkpointSupplyBlocked = observation.checkpointPositionCandidates.some((candidate) =>
     candidate.reasonCode === 'checkpoint_supply_zombie_blocked',
   );
+  const highQueueCheckpoints = observation.checkpoints.filter((checkpoint) => checkpoint.queuePressureClass === 'high');
+  const guaranteedDefeat = observation.strategicForecast.guaranteedDefeat.guaranteed;
+
+  if (guaranteedDefeat) {
+    if (
+      action.type === 'AssignWorkers' ||
+      action.type === 'SetPowerSupply' ||
+      (action.type === 'BuildConstructibleFacility' && action.facilityType === 'simpleFarm')
+    ) {
+      score += 2_000;
+      reasonCodes.push('GUARANTEED_DEFEAT_DOMESTIC_RESPONSE');
+    } else if (action.type === 'Attack' || action.type === 'Move' || action.type === 'ProduceUnit') {
+      score -= 1_000;
+      reasonCodes.push('GUARANTEED_DEFEAT_BEATS_COMBAT');
+    }
+  }
 
   if (action.type === 'Attack') {
     const attacker = units.get(action.attackerId);
@@ -236,6 +258,12 @@ function scoreAction(
     if (threat?.threatensCriticalFacility) {
       score += weights.criticalFacilityDefense;
       reasonCodes.push('DEFEND_CRITICAL_FACILITY');
+    }
+    if (target && highQueueCheckpoints.some((checkpoint) =>
+      hexDistance(target.position, checkpoint.position) <= target.movement + target.effectiveRange,
+    )) {
+      score += weights.checkpoint * 3;
+      reasonCodes.push('DEFEND_HIGH_QUEUE_PRESSURE');
     }
     if (target?.type === 'hordeZombie') {
       score += weights.hordeDefense * 2;
@@ -388,13 +416,17 @@ function scoreAction(
   } else if (action.type === 'SetPowerSupply') {
     const facility = facilities.get(action.facilityId);
     if (facility) {
-      const maintenanceEmergency = facility.type === 'farm'
+      const maintenanceEmergency = facility.type === 'farm' || facility.type === 'simpleFarm'
         ? observation.endTurnForecast.food.shortage
         : facility.type === 'civilianFactory'
           ? observation.endTurnForecast.civilianGoods.maintenanceShortage
-          : observation.endTurnForecast.militaryGoods.shortage;
+          : facility.type === 'civilianDroneBase'
+            ? 0
+            : observation.endTurnForecast.militaryGoods.shortage;
       if (action.enabled) {
-        score += maintenanceEmergency > 0 ? 320 : 20;
+        score += maintenanceEmergency > 0 ? 320 : facility.type === 'civilianDroneBase' && (
+          observation.horde.warningType !== 'none' || observation.zombies.length === 0
+        ) ? 18 : 20;
         if (maintenanceEmergency > 0) reasonCodes.push('ENABLE_POWER_FOR_EMERGENCY_PRODUCTION');
         else reasonCodes.push('ENABLE_INDUSTRIAL_POWER_BOOST');
       } else if (!facility.production.projectedPowerSupplied && observation.endTurnForecast.electricity.shortage > 0) {
@@ -437,6 +469,23 @@ function scoreAction(
   } else if (action.type === 'Move') {
     const unit = units.get(action.unitId);
     if (unit) {
+      const fuelPreview = unit.fuelCostByLegalMove.find((move) =>
+        move.destination.q === action.destination.q && move.destination.r === action.destination.r,
+      );
+      if (fuelPreview) {
+        const distance = hexDistance(unit.position, action.destination);
+        const longRangeMultiplier = unit.type === 'nationalGuard' && distance >= 6 ? 2.5 : 1;
+        score -= fuelPreview.fuelCost * 12 * longRangeMultiplier;
+        reasonCodes.push(unit.type === 'nationalGuard' && distance >= 6 ? 'GUARD_LONG_RANGE_FUEL_COST' : 'MOVE_FUEL_COST');
+        const destinationSupplied = observation.supply.suppliedTileKeys.includes(hexKey(action.destination));
+        if (fuelPreview.projectedFuelAfterMove === 0 && !destinationSupplied && !urgentHorde) {
+          score -= 180;
+          reasonCodes.push('AVOID_OUT_OF_SUPPLY_FUEL_STRANDING');
+        } else if (destinationSupplied && unit.projectedRefillAmountIfTurnEndsNow > 0) {
+          score += Math.min(24, unit.projectedRefillAmountIfTurnEndsNow * 2);
+          reasonCodes.push('SUPPLY_REFILL_AVAILABLE');
+        }
+      }
       const infectedFacilities = observation.facilities.filter((facility) => facility.infectedPopulation > 0);
       const infected = infectedFacilities.map((facility) => facility.position);
       const unowned = observation.facilities.filter((facility) => facility.owner === 'none');
@@ -574,6 +623,14 @@ function scoreAction(
           reasonCodes.push('REMAIN_OUT_OF_SUPPLY');
         }
       }
+      if (highQueueCheckpoints.length > 0 && !urgentHorde) {
+        const beforeQueueDistance = nearestDistance(unit.position, highQueueCheckpoints.map((checkpoint) => checkpoint.position));
+        const afterQueueDistance = nearestDistance(action.destination, highQueueCheckpoints.map((checkpoint) => checkpoint.position));
+        if (afterQueueDistance < beforeQueueDistance) {
+          score += (beforeQueueDistance - afterQueueDistance) * weights.checkpoint * 2;
+          reasonCodes.push('MOVE_TO_DEFEND_HIGH_QUEUE');
+        }
+      }
     }
   } else if (action.type === 'Wait') {
     const unit = units.get(action.unitId);
@@ -676,6 +733,26 @@ function scoreAction(
       score -= 250;
       reasonCodes.push('PRESERVE_CIVILIANS');
     }
+  } else if (action.type === 'BuildConstructibleFacility') {
+    const candidate = observation.constructibleFacilityPositionCandidates.find((entry) =>
+      entry.facilityType === action.facilityType &&
+      entry.position.q === action.position.q && entry.position.r === action.position.r,
+    );
+    const foodDependency = observation.strategicForecast.resources.food;
+    const fuelEmergency = observation.endTurnForecast.fuel.totalFuelShortage > 0;
+    if (action.facilityType === 'simpleFarm') {
+      score += foodDependency.singlePointOfFailure ? weights.redundancy * 4 : 15;
+      if (observation.endTurnForecast.food.shortage > 0) score += 120;
+      if (fuelEmergency) score -= 80;
+      reasonCodes.push(foodDependency.singlePointOfFailure ? 'BUILD_FOOD_REDUNDANCY' : 'BUILD_SIMPLE_FARM');
+    } else {
+      const foggedTiles = observation.map.tiles.filter((tile) => !tile.visibleToPlayer).length;
+      score += Math.min(80, foggedTiles / 8);
+      if (observation.horde.warningType !== 'none') score += 35;
+      if (fuelEmergency || observation.endTurnForecast.food.shortage > 0 || guaranteedDefeat) score -= 220;
+      reasonCodes.push('BUILD_FORWARD_RECON_DRONE');
+    }
+    if (!candidate?.legal) score -= 10_000;
   } else if (action.type === 'BuildCheckpoint') {
     const branch = branchFor(observation, action.branchId);
     score += weights.checkpoint + (urgentHorde ? 30 : 0);
@@ -695,6 +772,14 @@ function scoreAction(
       if (branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_ARRIVAL_IMMINENT');
     }
     score += roadUrgency * 15;
+    const effect = observation.checkpointPositionCandidates.find((candidate) =>
+      candidate.actionType === 'BuildCheckpoint' && candidate.branchId === action.branchId &&
+      candidate.position.q === action.position.q && candidate.position.r === action.position.r,
+    );
+    if (effect && effect.projectedBranchRadius === effect.currentBranchRadius && effect.suppliedFacilityDelta === 0 && effect.newlyBuildableConstructibleHexCount === 0) {
+      score -= 90;
+      reasonCodes.push('CHECKPOINT_NO_SUPPLY_GAIN');
+    }
     reasonCodes.push('BUILD_CHECKPOINT');
   } else if (action.type === 'RelocateCheckpoint') {
     const checkpoint = observation.checkpoints.find((candidate) => candidate.id === action.checkpointId);
@@ -720,6 +805,14 @@ function scoreAction(
       score -= 35;
       reasonCodes.push('CHECKPOINT_RETREAT');
     }
+    const effect = observation.checkpointPositionCandidates.find((candidate) =>
+      candidate.actionType === 'RelocateCheckpoint' && candidate.checkpointId === action.checkpointId &&
+      candidate.position.q === action.position.q && candidate.position.r === action.position.r,
+    );
+    if (effect && effect.projectedBranchRadius === effect.currentBranchRadius && effect.suppliedFacilityDelta === 0 && effect.newlyBuildableConstructibleHexCount === 0 && !movingInward) {
+      score -= 90;
+      reasonCodes.push('CHECKPOINT_NO_SUPPLY_GAIN');
+    }
     reasonCodes.push('RELOCATE_CHECKPOINT');
   } else if (action.type === 'ActivateCheckpoint') {
     const branch = branchFor(observation, action.branchId);
@@ -740,6 +833,13 @@ function scoreAction(
       score += weights.checkpointFallback;
       reasonCodes.push('RETREAT_ADMINISTRATIVE_FRONT');
     }
+    const effect = observation.checkpointPositionCandidates.find((candidate) =>
+      candidate.actionType === 'ActivateCheckpoint' && candidate.checkpointId === action.checkpointId,
+    );
+    if (effect && effect.projectedBranchRadius === effect.currentBranchRadius && effect.suppliedFacilityDelta === 0 && effect.newlyBuildableConstructibleHexCount === 0) {
+      score -= 90;
+      reasonCodes.push('CHECKPOINT_NO_SUPPLY_GAIN');
+    }
   } else if (action.type === 'SetCheckpointPolicy') {
     const branch = branchFor(observation, action.branchId);
     if (action.policy === 'strict' && observation.population.healthyCivilians > 30) score += 55;
@@ -756,6 +856,15 @@ function scoreAction(
     }
     if (branch?.currentPolicy === action.policy) score -= 100;
     if (branch?.activeCheckpointId === null) score -= 100;
+    const queuePressure = observation.checkpoints
+      .filter((checkpoint) => checkpoint.branchId === action.branchId)
+      .map((checkpoint) => checkpoint.queuePressureClass);
+    if (queuePressure.includes('high')) {
+      if (action.policy === 'passThrough') score += 95;
+      else if (action.policy === 'normal') score += 60;
+      else score -= 85;
+      reasonCodes.push('REDUCE_HIGH_QUEUE_PRESSURE');
+    }
     if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_POLICY_BEFORE_ARRIVAL');
     reasonCodes.push(`SET_POLICY_${action.policy.toUpperCase()}`);
   } else if (action.type === 'EndTurn') {

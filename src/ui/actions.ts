@@ -274,7 +274,7 @@ export function actionForCheckpointPolicy(
   return actions.find(
     (action): action is Extract<GameAction, { type: 'SetCheckpointPolicy' }> =>
       action.type === 'SetCheckpointPolicy' &&
-      // v1.3.3 moves policy ownership to RoadBranchState. Policy actions are
+      // RoadBranchState owns policy state. Policy actions are
       // therefore always selected by their branch id, never by a checkpoint.
       action.branchId === branchId &&
       action.policy === policy,

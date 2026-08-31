@@ -46,13 +46,25 @@ export type FacilityType =
   | 'civilianFactory'
   | 'militaryFactory'
   | 'refinery'
-  | 'powerPlant';
+  | 'powerPlant'
+  | 'windPowerPlant'
+  | 'simpleFarm'
+  | 'civilianDroneBase';
+
+export type ConstructibleFacilityType = 'simpleFarm' | 'civilianDroneBase';
 
 export type FacilityId = string;
 
 export type FacilityStatus = 'unowned' | 'owned' | 'ruined';
 
-export type FacilityOperationalStatus = 'operational' | 'stopped' | 'infected' | 'ruined';
+export type FacilityOperationalStatus =
+  | 'building'
+  | 'operational'
+  | 'stopped'
+  | 'infected'
+  | 'disabled'
+  | 'recovering'
+  | 'ruined';
 
 export type UnitType = 'police' | 'nationalGuard' | 'zombie' | 'hordeZombie';
 
@@ -159,8 +171,8 @@ export interface FacilityDefinition {
 
 export interface FixedMap {
   id: string;
-  width: 15;
-  height: 15;
+  width: number;
+  height: number;
   tiles: HexTile[];
   roadTiles: HexCoord[];
   facilities: FacilityDefinition[];
@@ -185,6 +197,12 @@ export interface FacilityState extends FacilityDefinition {
   powerSupplyEnabled: boolean;
   /** Actual result of the most recently completed economy phase. */
   lastPowerSupplied: boolean | null;
+  /** Constructible facilities are dynamic state and never part of the fixed-map definition. */
+  constructible: boolean;
+  /** Turn on which a constructible facility was accepted, otherwise null. */
+  builtTurn: number | null;
+  /** First Player Turn on which a recovering special facility becomes operational. */
+  recoveryOperationalTurn: number | null;
 }
 
 export interface PopulationState {
@@ -240,6 +258,9 @@ export interface UnitState {
   range: number;
   vision: number;
   population: number;
+  /** Human-unit endurance. Zombie units always store zero for both values. */
+  currentFuel: number;
+  maxFuel: number;
   actionState: UnitActionState;
   canAttack: boolean;
   canMove: boolean;
@@ -283,6 +304,21 @@ export interface CheckpointPositionCandidate {
   actionType: 'BuildCheckpoint' | 'RelocateCheckpoint' | 'ActivateCheckpoint';
   branchId: string;
   checkpointId?: string;
+  position: HexCoord;
+  legal: boolean;
+  reasonCode: string | null;
+  currentBranchRadius?: number;
+  projectedBranchRadius?: number;
+  newlySuppliedHexCount?: number;
+  newlyUnsuppliedHexCount?: number;
+  newlySuppliedFacilityIds?: FacilityId[];
+  newlyUnsuppliedFacilityIds?: FacilityId[];
+  suppliedFacilityDelta?: number;
+  newlyBuildableConstructibleHexCount?: number;
+}
+
+export interface ConstructibleFacilityPositionCandidate {
+  facilityType: ConstructibleFacilityType;
   position: HexCoord;
   legal: boolean;
   reasonCode: string | null;
@@ -352,6 +388,8 @@ export type GameEventType =
   | 'supply_action_rejected'
   | 'power_supply_changed'
   | 'power_allocated'
+  | 'constructible_built'
+  | 'facility_disabled'
   | 'terrain_defense_applied'
   | 'enemy_spotted'
   | 'enemy_lost'
@@ -469,9 +507,59 @@ export interface CivilianGoodsForecast extends ForecastResourceRequirement {
 }
 
 export interface FuelForecast extends ForecastResourceRequirement {
+  turnStartFuel: number;
+  windPowerAvailable: number;
+  powerPlantPhysicalCapacity: number;
+  projectedPowerFuelDemand: number;
+  projectedPowerFuelUsed: number;
+  fuelAfterPower: number;
+  projectedUnitRefillDemand: number;
+  projectedUnitFuelRefilled: number;
+  projectedTotalFuelDemand: number;
+  projectedRefineryProduction: number;
+  projectedEndingFuel: number;
+  powerFuelShortage: number;
+  unitRefillFuelShortage: number;
+  totalFuelShortage: number;
   generationFuelDemand: number;
   projectedFuelUsed: number;
   generationFuelShortage: number;
+}
+
+export type StrategicResourceType = ResourceType | 'electricity';
+
+export interface ResourceContributorForecast {
+  facilityId: FacilityId;
+  amount: number;
+  share: number;
+}
+
+export interface CriticalResourceDependencyForecast {
+  resource: StrategicResourceType;
+  currentSupply: number;
+  currentDemand: number;
+  contributors: ResourceContributorForecast[];
+  largestContributorFacilityId: FacilityId | null;
+  projectedSupplyWithoutLargestContributor: number;
+  shortageWithoutLargestContributor: number;
+  singlePointOfFailure: boolean;
+  currentlyShort: boolean;
+}
+
+export interface GuaranteedDefeatForecast {
+  guaranteed: boolean;
+  causeResource: 'food' | 'civilianGoods' | null;
+  foodShortage: number;
+  civilianGoodsShortage: number;
+  projectedHealthyCivilians: number;
+  defeatReason: 'healthyCiviliansLost' | null;
+}
+
+export type QueuePressureClass = 'none' | 'low' | 'medium' | 'high';
+
+export interface StrategicForecast {
+  resources: Record<StrategicResourceType, CriticalResourceDependencyForecast>;
+  guaranteedDefeat: GuaranteedDefeatForecast;
 }
 
 export interface UnpoweredFacilityForecast {
@@ -528,6 +616,7 @@ export interface GameState {
   roadBranches: RoadBranchState[];
   pendingUnitProductions: UnitProductionOrder[];
   nextCheckpointNumber: number;
+  nextConstructibleFacilityNumber: number;
   nextUnitNumber: number;
   nextEventNumber: number;
   nextAssignmentOrder: number;
@@ -593,6 +682,12 @@ export interface BuildCheckpointAction {
   position: HexCoord;
 }
 
+export interface BuildConstructibleFacilityAction {
+  type: 'BuildConstructibleFacility';
+  facilityType: ConstructibleFacilityType;
+  position: HexCoord;
+}
+
 export interface RelocateCheckpointAction {
   type: 'RelocateCheckpoint';
   checkpointId: string;
@@ -636,6 +731,7 @@ export type GameAction =
   | TransferPopulationAction
   | SetCheckpointPolicyAction
   | SetPowerSupplyAction
+  | BuildConstructibleFacilityAction
   | BuildCheckpointAction
   | RelocateCheckpointAction
   | ActivateCheckpointAction
@@ -663,6 +759,7 @@ export interface HeadlessGame {
   getState(): Readonly<GameState>;
   getLegalActions(): GameAction[];
   getCheckpointPositionCandidates(): CheckpointPositionCandidate[];
+  getConstructibleFacilityPositionCandidates(facilityType: ConstructibleFacilityType): ConstructibleFacilityPositionCandidate[];
   step(action: GameAction): StepResult;
   isGameOver(): boolean;
   getResult(): GameResult | null;
@@ -675,6 +772,7 @@ export interface UnitConfig {
   range: number;
   vision: number;
   population: number;
+  maxFuel: number;
 }
 
 export interface ProductionRule {
@@ -686,6 +784,8 @@ export interface ProductionRule {
   powerCapacity: number;
   /** Electricity capacity generated per worker (used by power plants). */
   powerGeneration: number;
+  /** Fixed generation independent of workers, used by Wind Power Plants. */
+  fixedPowerGeneration: number;
 }
 
 export interface FacilityConfig {
@@ -693,6 +793,13 @@ export interface FacilityConfig {
   production: ProductionRule;
   /** Number of zombies created when this facility falls. */
   overrunSpawnCount: number;
+  buildCivilianGoods: number;
+  visionRadius: number;
+  zombieTargetValue: number;
+}
+
+export interface ConstructibleFacilityConfig {
+  limitPerTypeDivisor: number;
 }
 
 export interface HordeComposition {
@@ -814,6 +921,7 @@ export interface GameConfig {
   refugees: RefugeeConfig;
   infection: InfectionConfig;
   checkpoint: CheckpointConfig;
+  constructibleFacility: ConstructibleFacilityConfig;
   noise: NoiseConfig;
   terrain: TerrainConfig;
   vision: VisionConfig;

@@ -1,4 +1,5 @@
 import type { BaseTerrain, CheckpointPolicy, GameAction, GameConfig, HumanUnitType } from '../core/types';
+import { hexDistance } from '../core/hex';
 import {
   APP_VERSION,
   AGENT_API_VERSION,
@@ -21,6 +22,7 @@ export const ACTION_TYPES = [
   'SetCheckpointPolicy',
   'SetPowerSupply',
   'BuildCheckpoint',
+  'BuildConstructibleFacility',
   'RelocateCheckpoint',
   'ActivateCheckpoint',
   'ProduceUnit',
@@ -189,6 +191,37 @@ export interface GameMetrics {
   finalCivilianGoods: number;
   finalMilitaryGoods: number;
   finalFuel: number;
+  /** v1.4.0 large-theater mobility and logistics projections. */
+  mapWidth: number;
+  mapHeight: number;
+  humanHexesMovedByType: Record<HumanUnitType, number>;
+  maxSingleMoveDistanceByType: Record<HumanUnitType, number>;
+  longMoves6PlusByType: Record<HumanUnitType, number>;
+  unitFuelConsumedByType: Record<HumanUnitType, number>;
+  unitFuelRefilledByType: Record<HumanUnitType, number>;
+  commissioningFuelByType: Record<HumanUnitType, number>;
+  turnsUnitsEndedOutOfSupplyByType: Record<HumanUnitType, number>;
+  unitsUnableToMoveForFuel: number;
+  stateFuelSpentOnPower: number;
+  stateFuelSpentOnUnits: number;
+  fuelShortageTurns: number;
+  windPowerGenerated: number;
+  windDisabledTurns: number;
+  windOverruns: number;
+  windRecoveries: number;
+  simpleFarmsBuilt: number;
+  simpleFarmsDestroyed: number;
+  simpleFarmFoodProduced: number;
+  droneBasesBuilt: number;
+  droneBasesDestroyed: number;
+  maxDroneVisionRadius: number;
+  constructibleFacilityOverruns: number;
+  constructibleBuildRejectedByReason: Record<string, number>;
+  guaranteedDefeatWarnings: number;
+  guaranteedDefeatIgnored: number;
+  resourceSinglePointFailureTurnsByResource: Record<string, number>;
+  checkpointMovesWithNoSupplyGain: number;
+  checkpointQueuePressureTurnsByClass: Record<'none' | 'low' | 'medium' | 'high', number>;
   failure: MetricFailureInfo | null;
 }
 
@@ -590,6 +623,130 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const finalSecuredFacilities = finalObservation.facilities.filter(
     (facility) => facility.owner === 'player' && facility.status === 'owned',
   ).length;
+  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0 });
+  const humanHexesMovedByType = byHumanType();
+  const maxSingleMoveDistanceByType = byHumanType();
+  const longMoves6PlusByType = byHumanType();
+  const unitFuelConsumedByType = byHumanType();
+  const unitFuelRefilledByType = byHumanType();
+  const commissioningFuelByType = byHumanType();
+  for (let index = 1; index < observations.length; index += 1) {
+    const before = observations[index - 1]!;
+    const after = observations[index]!;
+    const action = input.actions[index - 1];
+    const previousUnits = new Map(before.units.map((unit) => [unit.id, unit] as const));
+    for (const unit of after.units) {
+      if (unit.type !== 'police' && unit.type !== 'nationalGuard') continue;
+      const previous = previousUnits.get(unit.id);
+      if (!previous) {
+        commissioningFuelByType[unit.type] += unit.currentFuel;
+        continue;
+      }
+      if (action?.type === 'Move' && action.unitId === unit.id) {
+        const distance = hexDistance(previous.position, unit.position);
+        humanHexesMovedByType[unit.type] += distance;
+        maxSingleMoveDistanceByType[unit.type] = Math.max(maxSingleMoveDistanceByType[unit.type], distance);
+        if (distance >= 6) longMoves6PlusByType[unit.type] += 1;
+        unitFuelConsumedByType[unit.type] += Math.max(0, previous.currentFuel - unit.currentFuel);
+      }
+      if (action?.type === 'EndTurn') {
+        unitFuelRefilledByType[unit.type] += Math.max(0, unit.currentFuel - previous.currentFuel);
+      }
+    }
+  }
+  const turnsUnitsEndedOutOfSupplyByType = byHumanType();
+  let unitsUnableToMoveForFuel = 0;
+  let fuelShortageTurns = 0;
+  let windPowerGenerated = 0;
+  let windDisabledTurns = 0;
+  let simpleFarmFoodProduced = 0;
+  let maxDroneVisionRadius = 0;
+  let guaranteedDefeatWarnings = 0;
+  const resourceSinglePointFailureTurnsByResource: Record<string, number> = {
+    food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0, electricity: 0,
+  };
+  const checkpointQueuePressureTurnsByClass: Record<'none' | 'low' | 'medium' | 'high', number> = {
+    none: 0, low: 0, medium: 0, high: 0,
+  };
+  for (const observation of turnObservations) {
+    for (const unit of observation.units) {
+      if (unit.type !== 'police' && unit.type !== 'nationalGuard') continue;
+      if (!unit.inSupply) turnsUnitsEndedOutOfSupplyByType[unit.type] += 1;
+      if (unit.canMove && unit.currentFuel === 0 && unit.fuelCostByLegalMove.length === 0) unitsUnableToMoveForFuel += 1;
+    }
+    if (observation.endTurnForecast.fuel.totalFuelShortage > 0) fuelShortageTurns += 1;
+    windPowerGenerated += observation.endTurnForecast.fuel.windPowerAvailable;
+    windDisabledTurns += observation.facilities.filter(
+      (facility) => facility.type === 'windPowerPlant' && facility.operationalStatus === 'disabled',
+    ).length;
+    simpleFarmFoodProduced += observation.facilities
+      .filter((facility) => facility.type === 'simpleFarm')
+      .reduce((total, facility) => total + numberOrZero(facility.production.projectedProduction.food), 0);
+    maxDroneVisionRadius = Math.max(
+      maxDroneVisionRadius,
+      ...observation.facilities
+        .filter((facility) => facility.type === 'civilianDroneBase')
+        .map((facility) => facility.vision),
+      0,
+    );
+    if (observation.strategicForecast.guaranteedDefeat.guaranteed) guaranteedDefeatWarnings += 1;
+    for (const [resource, dependency] of Object.entries(observation.strategicForecast.resources)) {
+      if (dependency.singlePointOfFailure) resourceSinglePointFailureTurnsByResource[resource] += 1;
+    }
+    for (const checkpoint of observation.checkpoints) {
+      checkpointQueuePressureTurnsByClass[checkpoint.queuePressureClass] += 1;
+    }
+  }
+  const stateFuelSpentOnPower = events
+    .filter((event) => event.type === 'resource_consumed' && event.payload.resource === 'fuel' && event.payload.reason === 'power_generation')
+    .reduce((total, event) => total + eventPayloadNumber(event, 'amount'), 0);
+  const stateFuelSpentOnUnits = events
+    .filter((event) => event.type === 'resource_consumed' && event.payload.resource === 'fuel' && event.payload.reason === 'unit_refill')
+    .reduce((total, event) => total + eventPayloadNumber(event, 'amount'), 0);
+  const constructed = (type: 'simpleFarm' | 'civilianDroneBase') => events.filter(
+    (event) => event.type === 'constructible_built' && event.payload.facilityType === type,
+  ).length;
+  const facilityTypesById = new Map<string, string>();
+  for (const observation of observations) {
+    for (const facility of observation.facilities) facilityTypesById.set(facility.id, facility.type);
+  }
+  const destroyed = (type: 'simpleFarm' | 'civilianDroneBase') => events.filter(
+    (event) => event.type === 'facility_overrun' && facilityTypesById.get(String(event.payload.facilityId)) === type,
+  ).length;
+  const constructibleFacilityOverruns = events.filter(
+    (event) => event.type === 'facility_overrun' && ['simpleFarm', 'civilianDroneBase'].includes(facilityTypesById.get(String(event.payload.facilityId)) ?? ''),
+  ).length;
+  const windOverruns = events.filter(
+    (event) => event.type === 'facility_disabled' && facilityTypesById.get(String(event.payload.facilityId)) === 'windPowerPlant',
+  ).length;
+  const windRecoveries = events.filter(
+    (event) => event.type === 'facility_recovered' && facilityTypesById.get(String(event.payload.facilityId)) === 'windPowerPlant',
+  ).length;
+  const constructibleBuildRejectedByReason: Record<string, number> = {};
+  for (const attempt of input.invalidAttempts ?? []) {
+    if (!attempt.error.code.startsWith('constructible_') && attempt.error.code !== 'invalid_constructible_facility_type') continue;
+    constructibleBuildRejectedByReason[attempt.error.code] = (constructibleBuildRejectedByReason[attempt.error.code] ?? 0) + 1;
+  }
+  const guaranteedDefeatIgnored = input.actions.reduce((total, action, index) =>
+    total + (action.type === 'EndTurn' && observations[index]?.strategicForecast.guaranteedDefeat.guaranteed ? 1 : 0),
+  0);
+  const checkpointMovesWithNoSupplyGain = input.actions.reduce((total, action, index) => {
+    if (!['BuildCheckpoint', 'RelocateCheckpoint', 'ActivateCheckpoint'].includes(action.type)) return total;
+    const candidates = observations[index]?.checkpointPositionCandidates ?? [];
+    const candidate = candidates.find((entry) =>
+      entry.actionType === action.type &&
+      entry.branchId === action.branchId &&
+      (action.type === 'ActivateCheckpoint' ||
+        (entry.position.q === action.position.q && entry.position.r === action.position.r)) &&
+      (action.type !== 'RelocateCheckpoint' || entry.checkpointId === action.checkpointId) &&
+      (action.type !== 'ActivateCheckpoint' || entry.checkpointId === action.checkpointId),
+    );
+    return total + (candidate &&
+      candidate.projectedBranchRadius === candidate.currentBranchRadius &&
+      candidate.suppliedFacilityDelta === 0 &&
+      candidate.newlyBuildableConstructibleHexCount === 0
+      ? 1 : 0);
+  }, 0);
   const outcome: MetricOutcome = input.failure ? 'technical_failure' : input.result?.outcome ?? 'technical_failure';
   const gameOverReason = input.failure ? null : input.result?.reason ?? null;
 
@@ -734,6 +891,36 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     finalCivilianGoods: numberOrZero(finalObservation.resources.civilianGoods),
     finalMilitaryGoods: numberOrZero(finalObservation.resources.militaryGoods),
     finalFuel: numberOrZero(finalObservation.resources.fuel),
+    mapWidth: input.initialObservation.map.width,
+    mapHeight: input.initialObservation.map.height,
+    humanHexesMovedByType,
+    maxSingleMoveDistanceByType,
+    longMoves6PlusByType,
+    unitFuelConsumedByType,
+    unitFuelRefilledByType,
+    commissioningFuelByType,
+    turnsUnitsEndedOutOfSupplyByType,
+    unitsUnableToMoveForFuel,
+    stateFuelSpentOnPower,
+    stateFuelSpentOnUnits,
+    fuelShortageTurns,
+    windPowerGenerated,
+    windDisabledTurns,
+    windOverruns,
+    windRecoveries,
+    simpleFarmsBuilt: constructed('simpleFarm'),
+    simpleFarmsDestroyed: destroyed('simpleFarm'),
+    simpleFarmFoodProduced,
+    droneBasesBuilt: constructed('civilianDroneBase'),
+    droneBasesDestroyed: destroyed('civilianDroneBase'),
+    maxDroneVisionRadius,
+    constructibleFacilityOverruns,
+    constructibleBuildRejectedByReason,
+    guaranteedDefeatWarnings,
+    guaranteedDefeatIgnored,
+    resourceSinglePointFailureTurnsByResource,
+    checkpointMovesWithNoSupplyGain,
+    checkpointQueuePressureTurnsByClass,
     failure: input.failure ? { ...input.failure } : null,
   };
 }
@@ -902,6 +1089,26 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'finalCivilianGoods',
   'finalMilitaryGoods',
   'finalFuel',
+  'mapWidth',
+  'mapHeight',
+  'unitsUnableToMoveForFuel',
+  'stateFuelSpentOnPower',
+  'stateFuelSpentOnUnits',
+  'fuelShortageTurns',
+  'windPowerGenerated',
+  'windDisabledTurns',
+  'windOverruns',
+  'windRecoveries',
+  'simpleFarmsBuilt',
+  'simpleFarmsDestroyed',
+  'simpleFarmFoodProduced',
+  'droneBasesBuilt',
+  'droneBasesDestroyed',
+  'maxDroneVisionRadius',
+  'constructibleFacilityOverruns',
+  'guaranteedDefeatWarnings',
+  'guaranteedDefeatIgnored',
+  'checkpointMovesWithNoSupplyGain',
 ];
 
 function percentile(sorted: readonly number[], fraction: number): number {

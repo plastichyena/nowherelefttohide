@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
 import { getCheckpointPositionCandidates } from '../core/engine';
 import { createInitialState, createUnit } from '../core/state';
-import { createAgentObservation } from './observation';
+import { compactArtifactObservation, createAgentObservation, restoreArtifactObservation } from './observation';
+import { createAgentGame } from './game';
 
-describe('Agent Observation 1.4.2 rule projections', () => {
+describe('Agent Observation 2.0.0 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -64,8 +65,10 @@ describe('Agent Observation 1.4.2 rule projections', () => {
     const state = createInitialState(128, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
     const powerPlant = state.facilities.find((facility) => facility.id === 'power-plant-1')!;
+    const wind = state.facilities.find((facility) => facility.type === 'windPowerPlant')!;
     farm.workers = 12;
     powerPlant.workers = 0;
+    wind.operationalStatus = 'disabled';
 
     const publicFarm = createAgentObservation(state).facilities.find((facility) => facility.id === farm.id)!;
     expect(publicFarm.production).toMatchObject({
@@ -84,7 +87,9 @@ describe('Agent Observation 1.4.2 rule projections', () => {
   it('keeps Farm production independent from Fuel while exposing the power-fuel shortage', () => {
     const state = createInitialState(129, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
+    const wind = state.facilities.find((facility) => facility.type === 'windPowerPlant')!;
     state.resources.fuel = 0;
+    wind.operationalStatus = 'disabled';
 
     const publicFarm = createAgentObservation(state).facilities.find((facility) => facility.id === farm.id)!;
     expect(publicFarm.production).toMatchObject({
@@ -123,17 +128,17 @@ describe('Agent Observation 1.4.2 rule projections', () => {
       .filter((id) => !observation.zombies.some((unit) => unit.id === id));
 
     expect(observation.finalHordeTurn).toBe(30);
-    expect(observation.map.tiles).toHaveLength(225);
-    expect(observation.map.tiles.filter((tile) => tile.terrain === 'forest')).toHaveLength(49);
-    expect(observation.map.tiles.filter((tile) => tile.terrain === 'mountain')).toHaveLength(32);
+    expect(observation.map.tiles).toHaveLength(961);
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'forest')).toHaveLength(197);
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'mountain')).toHaveLength(44);
     expect(observation.map.tiles.filter((tile) => tile.terrain === 'water')).toHaveLength(0);
     expect(observation.map.tiles).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        q: 7,
-        r: 2,
+        q: 2,
+        r: 1,
         terrain: 'forest',
-        road: true,
-        effectiveMovementCost: 1,
+        road: false,
+        effectiveMovementCost: 2,
         terrainDefenseSource: 'forest',
         terrainDamageMultiplier: 0.5,
       }),
@@ -176,7 +181,7 @@ describe('Agent Observation 1.4.2 rule projections', () => {
     const clearState = createInitialState(132, config);
     const clearCandidates = createAgentObservation(clearState).checkpointPositionCandidates;
     expect(clearCandidates).toEqual(getCheckpointPositionCandidates(clearState));
-    expect(clearCandidates).toHaveLength(28);
+    expect(clearCandidates).toHaveLength(60);
 
     const hiddenState = createInitialState(132, config);
     hiddenState.units.push(createUnit(hiddenState, 'zombie-secret-blocker', 'zombie', { q: 7, r: 1 }));
@@ -184,12 +189,34 @@ describe('Agent Observation 1.4.2 rule projections', () => {
     expect(hiddenObservation.checkpointPositionCandidates).toEqual(clearCandidates);
     expect(JSON.stringify(hiddenObservation)).not.toContain('zombie-secret-blocker');
 
-    const visibleState = createInitialState(132, config);
-    visibleState.units.find((unit) => unit.isPlayerUnit)!.position = { q: 7, r: 2 };
-    visibleState.units.find((unit) => unit.isPlayerUnit)!.vision = 1;
-    visibleState.units.push(createUnit(visibleState, 'zombie-visible-blocker', 'zombie', { q: 7, r: 1 }));
-    const visibleCandidates = createAgentObservation(visibleState).checkpointPositionCandidates;
-    expect(visibleCandidates.some((candidate) => candidate.reasonCode === 'checkpoint_supply_zombie_blocked')).toBe(true);
-    expect(JSON.stringify(visibleCandidates)).not.toContain('zombie-visible-blocker');
+    expect(JSON.stringify(hiddenObservation.constructibleFacilityPositionCandidates)).not.toContain('zombie-secret-blocker');
+  });
+
+  it('projects Fuel, special Facility state, Queue Pressure, and the Core strategic forecast', () => {
+    const game = createAgentGame();
+    const observation = game.reset({ seed: 140, configOverrides: { economy: { initialZombieCount: 0 } } });
+    const police = observation.units.find((unit) => unit.type === 'police')!;
+    expect(police).toMatchObject({ currentFuel: 12, maxFuel: 12, inSupply: true });
+    expect(police.fuelCostByLegalMove.length).toBeGreaterThan(0);
+    expect(police.fuelCostByLegalMove.every((move) => move.fuelCost >= 1 && move.projectedFuelAfterMove >= 0)).toBe(true);
+    const wind = observation.facilities.find((facility) => facility.type === 'windPowerPlant')!;
+    expect(wind).toMatchObject({ healthyPopulation: 0, zombieTargetValue: 5, constructible: false });
+    expect(observation.strategicForecast.resources.fuel).toHaveProperty('singlePointOfFailure');
+    expect(observation.constructibleFacilityPositionCandidates).toHaveLength(31 * 31 * 2);
+    expect(observation.roadBranches.every((branch) => branch.currentPolicyTurns === 2)).toBe(true);
+    expect(observation.checkpoints.every((checkpoint) => checkpoint.queuePressureClass === 'none' || checkpoint.queuePeople > 0)).toBe(true);
+  });
+
+  it('stores map topology once and restores complete Artifact observations', () => {
+    const game = createAgentGame();
+    const observation = game.reset({ seed: 141 });
+    const trace = compactArtifactObservation(observation);
+    expect(trace).not.toHaveProperty('map');
+    expect(trace.mapId).toBe(observation.map.id);
+    expect(restoreArtifactObservation(trace, observation.map)).toEqual(observation);
+
+    const constructible = game.getLegalActions().find((action) => action.type === 'BuildConstructibleFacility')!;
+    const afterBuild = game.step(constructible).observation;
+    expect(restoreArtifactObservation(compactArtifactObservation(afterBuild), observation.map)).toEqual(afterBuild);
   });
 });

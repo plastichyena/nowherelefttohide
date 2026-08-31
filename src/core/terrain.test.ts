@@ -4,7 +4,7 @@ import { GameEngine } from './engine';
 import { createInitialState } from './state';
 import { terrainAdjustedDamage, terrainDefenseAt } from './terrain';
 
-describe('v1.3 terrain defense', () => {
+describe('v1.4 terrain defense', () => {
   it('gives Urban defense to either side and Forest defense only to zombies', () => {
     const state = createInitialState(1, createDefaultConfig());
     const police = state.units.find((unit) => unit.type === 'police')!;
@@ -13,7 +13,7 @@ describe('v1.3 terrain defense', () => {
     zombie.position = { q: 4, r: 4 };
     expect(terrainDefenseAt(state, police)).toEqual({ source: 'none', multiplier: 1 });
     expect(terrainDefenseAt(state, zombie)).toEqual({ source: 'forest', multiplier: 0.5 });
-    zombie.position = { q: 7, r: 3 };
+    zombie.position = { q: 15, r: 8 };
     expect(terrainDefenseAt(state, zombie)).toEqual({ source: 'urban', multiplier: 0.5 });
     expect(terrainAdjustedDamage(state, zombie, 5).finalDamage).toBe(3);
     expect(terrainAdjustedDamage(state, zombie, 1).finalDamage).toBe(1);

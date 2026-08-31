@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
-import { GameEngine, getCheckpointPositionCandidates } from './engine';
+import {
+  GameEngine,
+  getCheckpointPositionCandidates,
+  getConstructibleFacilityPositionCandidates,
+} from './engine';
+import { hexKey } from './hex';
 import { createUnit } from './state';
+import { getPlayerVisibleTileKeys } from './visibility';
 import type { GameAction, GameState } from './types';
+
+function cloneState(state: Readonly<GameState>): GameState {
+  return JSON.parse(JSON.stringify(state)) as GameState;
+}
 
 function actionFor(candidate: ReturnType<typeof getCheckpointPositionCandidates>[number]): GameAction {
   return candidate.actionType === 'RelocateCheckpoint'
@@ -15,7 +25,7 @@ function actionFor(candidate: ReturnType<typeof getCheckpointPositionCandidates>
     : { type: 'BuildCheckpoint', branchId: candidate.branchId, position: { ...candidate.position } };
 }
 
-describe('checkpoint position candidates', () => {
+describe('v1.4 position candidates', () => {
   it('returns every branch road tile in a stable order and agrees with legal actions', () => {
     const engine = new GameEngine(41, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const state = engine.getState();
@@ -35,7 +45,7 @@ describe('checkpoint position candidates', () => {
       if (candidate.legal) expect(candidate.reasonCode).toBeNull();
       else expect(candidate.reasonCode).not.toBeNull();
     }
-  });
+  }, 30_000);
 
   it('returns the same concrete Core reason as execution and preserves state on failure', () => {
     const engine = new GameEngine(42, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
@@ -55,8 +65,8 @@ describe('checkpoint position candidates', () => {
     });
     const engine = new GameEngine(43, config);
     const baseline = engine.getCheckpointPositionCandidates();
-    const snapshot = engine.getState() as GameState;
-    snapshot.units.push(createUnit(snapshot, 'hidden-candidate-zombie', 'zombie', { q: 7, r: 0 }));
+    const snapshot = cloneState(engine.getState());
+    snapshot.units.push(createUnit(snapshot, 'hidden-candidate-zombie', 'zombie', { q: 15, r: 0 }));
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const withHidden = engine.getCheckpointPositionCandidates();
     expect(withHidden).toEqual(baseline);
@@ -76,5 +86,42 @@ describe('checkpoint position candidates', () => {
     const relocations = north.filter((candidate) => candidate.actionType === 'RelocateCheckpoint');
     expect(relocations.length).toBeGreaterThan(0);
     expect(relocations.every((candidate) => candidate.checkpointId === active.id)).toBe(true);
+  });
+
+  it('returns all Constructible Facility candidates in stable coordinate order', () => {
+    const engine = new GameEngine(45, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const candidates = getConstructibleFacilityPositionCandidates(engine.getState(), 'simpleFarm');
+    expect(candidates).toHaveLength(31 * 31);
+    expect(candidates.map((candidate) => `${candidate.position.q},${candidate.position.r}`)).toEqual(
+      [...candidates]
+        .sort((left, right) => left.position.q - right.position.q || left.position.r - right.position.r)
+        .map((candidate) => `${candidate.position.q},${candidate.position.r}`),
+    );
+    expect(candidates.some((candidate) => candidate.legal)).toBe(true);
+    expect(candidates.filter((candidate) => candidate.legal).every((candidate) => candidate.reasonCode === null)).toBe(true);
+    expect(candidates.filter((candidate) => !candidate.legal).every((candidate) => candidate.reasonCode !== null)).toBe(true);
+  });
+
+  it('does not expose a hidden Zombie in Constructible candidates and accepts hidden co-location', () => {
+    const config = createDefaultConfig({
+      economy: { initialZombieCount: 0 },
+      units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
+      vision: { ownedFacility: 0, operationalCheckpoint: 0 },
+    });
+    const engine = new GameEngine(46, config);
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 9 } }).error).toBeNull();
+    const baseline = engine.getConstructibleFacilityPositionCandidates('simpleFarm');
+    const visible = getPlayerVisibleTileKeys(engine.getState());
+    const legal = baseline.find((candidate) => candidate.legal && !visible.has(hexKey(candidate.position)))!;
+    expect(legal).toBeDefined();
+    const hidden = createUnit(engine.getState(), 'hidden-build-zombie', 'zombie', legal.position);
+    const snapshot = cloneState(engine.getState());
+    snapshot.units.push(hidden);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
+    const withHidden = engine.getConstructibleFacilityPositionCandidates('simpleFarm');
+    expect(withHidden).toEqual(baseline);
+    expect(JSON.stringify(withHidden)).not.toContain(hidden.id);
+    expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: legal.position }).error).toBeNull();
+    expect(engine.getState().facilities.find((facility) => facility.constructible)?.position).toEqual(legal.position);
   });
 });

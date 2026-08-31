@@ -58,7 +58,7 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '1.4.2';
+  schemaVersion: '2.0.0';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -302,7 +302,7 @@ function createSimulationReport(
     aggregate[agent] = aggregateMetrics(rows);
   }
   return {
-    schemaVersion: '1.4.2',
+    schemaVersion: '2.0.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -373,6 +373,24 @@ const CSV_COLUMNS: readonly string[] = [
   'noisePulsesEmitted', 'policeNoisePulses', 'nationalGuardNoisePulses', 'normalZombiesNoiseTargeted',
   'noiseTargetsReached', 'noiseTargetsOverriddenByHorde', 'noiseTargetsOverriddenByVisiblePopulation',
   'finalFood', 'finalCivilianGoods', 'finalMilitaryGoods', 'finalFuel',
+  'mapWidth', 'mapHeight',
+  'humanHexesMoved.police', 'humanHexesMoved.nationalGuard',
+  'maxSingleMoveDistance.police', 'maxSingleMoveDistance.nationalGuard',
+  'longMoves6Plus.police', 'longMoves6Plus.nationalGuard',
+  'unitFuelConsumed.police', 'unitFuelConsumed.nationalGuard',
+  'unitFuelRefilled.police', 'unitFuelRefilled.nationalGuard',
+  'commissioningFuel.police', 'commissioningFuel.nationalGuard',
+  'turnsUnitsEndedOutOfSupply.police', 'turnsUnitsEndedOutOfSupply.nationalGuard',
+  'unitsUnableToMoveForFuel', 'stateFuelSpentOnPower', 'stateFuelSpentOnUnits', 'fuelShortageTurns',
+  'windPowerGenerated', 'windDisabledTurns', 'windOverruns', 'windRecoveries',
+  'simpleFarmsBuilt', 'simpleFarmsDestroyed', 'simpleFarmFoodProduced',
+  'droneBasesBuilt', 'droneBasesDestroyed', 'maxDroneVisionRadius', 'constructibleFacilityOverruns',
+  'guaranteedDefeatWarnings', 'guaranteedDefeatIgnored', 'checkpointMovesWithNoSupplyGain',
+  'resourceSinglePointFailureTurns.food', 'resourceSinglePointFailureTurns.civilianGoods',
+  'resourceSinglePointFailureTurns.militaryGoods', 'resourceSinglePointFailureTurns.fuel',
+  'resourceSinglePointFailureTurns.electricity',
+  'checkpointQueuePressureTurns.none', 'checkpointQueuePressureTurns.low',
+  'checkpointQueuePressureTurns.medium', 'checkpointQueuePressureTurns.high',
   ...ACTION_TYPES.map((type) => `action.${type}`),
   ...PRIORITY_GOALS.map((goal) => `goal.${goal}`),
 ];
@@ -438,6 +456,26 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.noiseTargetsOverriddenByVisiblePopulation,
       game.finalFood, game.finalCivilianGoods,
       game.finalMilitaryGoods, game.finalFuel,
+      game.mapWidth, game.mapHeight,
+      game.humanHexesMovedByType.police, game.humanHexesMovedByType.nationalGuard,
+      game.maxSingleMoveDistanceByType.police, game.maxSingleMoveDistanceByType.nationalGuard,
+      game.longMoves6PlusByType.police, game.longMoves6PlusByType.nationalGuard,
+      game.unitFuelConsumedByType.police, game.unitFuelConsumedByType.nationalGuard,
+      game.unitFuelRefilledByType.police, game.unitFuelRefilledByType.nationalGuard,
+      game.commissioningFuelByType.police, game.commissioningFuelByType.nationalGuard,
+      game.turnsUnitsEndedOutOfSupplyByType.police, game.turnsUnitsEndedOutOfSupplyByType.nationalGuard,
+      game.unitsUnableToMoveForFuel, game.stateFuelSpentOnPower, game.stateFuelSpentOnUnits, game.fuelShortageTurns,
+      game.windPowerGenerated, game.windDisabledTurns, game.windOverruns, game.windRecoveries,
+      game.simpleFarmsBuilt, game.simpleFarmsDestroyed, game.simpleFarmFoodProduced,
+      game.droneBasesBuilt, game.droneBasesDestroyed, game.maxDroneVisionRadius, game.constructibleFacilityOverruns,
+      game.guaranteedDefeatWarnings, game.guaranteedDefeatIgnored, game.checkpointMovesWithNoSupplyGain,
+      game.resourceSinglePointFailureTurnsByResource.food ?? 0,
+      game.resourceSinglePointFailureTurnsByResource.civilianGoods ?? 0,
+      game.resourceSinglePointFailureTurnsByResource.militaryGoods ?? 0,
+      game.resourceSinglePointFailureTurnsByResource.fuel ?? 0,
+      game.resourceSinglePointFailureTurnsByResource.electricity ?? 0,
+      game.checkpointQueuePressureTurnsByClass.none, game.checkpointQueuePressureTurnsByClass.low,
+      game.checkpointQueuePressureTurnsByClass.medium, game.checkpointQueuePressureTurnsByClass.high,
       ...ACTION_TYPES.map((type) => game.actionCounts[type] ?? 0),
       ...PRIORITY_GOALS.map((goal) => game.priorityGoalCounts[goal] ?? 0),
     ];

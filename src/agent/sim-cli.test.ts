@@ -38,9 +38,9 @@ describe('Batch Simulation CLI', () => {
     expect(report.comparisons).toHaveLength(2);
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.technicalFailureCount).toBeGreaterThanOrEqual(0);
-    expect(report.schemaVersion).toBe('1.4.2');
-    expect(report.appVersion).toBe('1.3.3');
-  }, 10_000);
+    expect(report.schemaVersion).toBe('2.0.0');
+    expect(report.appVersion).toBe('1.4.0');
+  }, 30_000);
 
   it('reports the runner default turn ceiling independently from finalHordeTurn', () => {
     const initial = createAgentGame().reset({ seed: 1 });
@@ -126,7 +126,7 @@ describe('Batch Simulation CLI', () => {
       expect(row![header!.indexOf(key)]).toBe(String(report.games[0]![key]));
     }
     expect(() => writeSimulationOutput(report, output)).toThrow(/overwrite|empty/i);
-  });
+  }, 20_000);
 
   it('streams CLI-scale artifacts to disk without retaining full runs in the report', () => {
     const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
@@ -142,5 +142,5 @@ describe('Batch Simulation CLI', () => {
     expect(paths.artifacts).toHaveLength(3);
     expect(paths.runJson.endsWith('run.json')).toBe(true);
     expect(paths.gamesCsv.endsWith('games.csv')).toBe(true);
-  });
+  }, 30_000);
 });

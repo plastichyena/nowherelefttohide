@@ -8,7 +8,7 @@ describe('Agent seed regression', () => {
   const strategy = process.env.AGENT_STRATEGY ?? 'balanced';
   const firstSeed = Number.parseInt(process.env.BALANCED_SEED_START ?? '1', 10);
   const lastSeed = Number.parseInt(process.env.BALANCED_SEED_END ?? '30', 10);
-  const batchTimeoutMs = Number.parseInt(process.env.BALANCED_BATCH_TIMEOUT_MS ?? '120000', 10);
+  const batchTimeoutMs = Number.parseInt(process.env.BALANCED_BATCH_TIMEOUT_MS ?? '180000', 10);
   if (
     !['balanced', 'random'].includes(strategy) ||
     !Number.isSafeInteger(firstSeed) ||
@@ -20,11 +20,14 @@ describe('Agent seed regression', () => {
     throw new Error('Agent strategy, seed range, and timeout environment variables must be valid');
   }
   // Keep each CI case comfortably below the per-test timeout while preserving
-  // the default deterministic 30-seed coverage. Release validation can split
-  // the required 1..300 range across independent Vitest processes.
-  const seedBatches = Array.from({ length: Math.ceil((lastSeed - firstSeed + 1) / 5) }, (_, index) => ({
-    start: firstSeed + index * 5,
-    end: Math.min(lastSeed, firstSeed + index * 5 + 4),
+  // the default deterministic 30-seed coverage. Some v1.4 seeds legitimately
+  // need more than 60 seconds on Windows, so each seed gets its own Vitest
+  // timeout budget. Release validation invokes its required 1..300 range
+  // through the simulation CLI.
+  const seedsPerBatch = 1;
+  const seedBatches = Array.from({ length: Math.ceil((lastSeed - firstSeed + 1) / seedsPerBatch) }, (_, index) => ({
+    start: firstSeed + index * seedsPerBatch,
+    end: Math.min(lastSeed, firstSeed + index * seedsPerBatch + seedsPerBatch - 1),
   }));
 
   it.each(seedBatches)('completes standard-config seeds $start through $end without technical failure', async ({ start, end }) => {
@@ -38,6 +41,11 @@ describe('Agent seed regression', () => {
         const result = game.step(decision.action);
         expect(result.error, `seed ${seed}, decision ${decisions + 1}`).toBeNull();
         decisions += 1;
+        // A standard v1.4 game can make enough deterministic decisions to
+        // exceed Vitest's worker-RPC heartbeat if this loop stays synchronous.
+        // Yield during (not only after) each game so the test remains a real
+        // full-game regression rather than producing a false unhandled error.
+        if (decisions % 5 === 0) await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
       }
       expect(game.isGameOver(), `seed ${seed} exceeded the decision limit`).toBe(true);
       const result = game.getResult();

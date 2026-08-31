@@ -1,11 +1,11 @@
-# Nowhere Left to Hide v1.3.1 Board Asset Manifest
+# Nowhere Left to Hide v1.4.0 Board Asset Manifest
 
-- Generated: 2026-08-30
+- Generated: 2026-08-31
 - Runtime format: 256×256 PNG
 - Generated source resolutions: 1254×1254 for most sources, 1362×1155 for the
   twelve-Zombie Horde swarm, and 1536×1024 for Capital and Refinery; every
   checked-in runtime image is normalized to 256×256.
-- Runtime total: 27 PNG files, 1,109,255 bytes (approximately 1.06 MiB)
+- Runtime total: 30 PNG files, 1,328,850 bytes (approximately 1.27 MiB)
 - Source: original assets created for this project; no third-party images, real
   logos, seals, flags, or trademarks are included.
 - Provenance / licensing: generated specifically for this repository during
@@ -16,7 +16,8 @@
 - Mechanical post-processing: Pillow resize/crop/centering, alpha preservation,
   pointy-top terrain mask, LANCZOS downsampling, and optimized PNG compression.
   The deterministic steps and code-drawn overlays are in
-  `scripts/build_board_assets.py`.
+  `scripts/build_board_assets.py`. The v1.4 facility PNGs were normalized to
+  the same 256×256 RGBA contract and are loaded only through the UI Registry.
 
 ## Art direction and prompt family
 
@@ -68,6 +69,9 @@ approved result contains twelve Zombies.
 | `facilities/facility_military_factory.png` | `militaryFactory` | Factory and generic supply motif |
 | `facilities/facility_refinery.png` | `refinery` | Storage tanks and pipes |
 | `facilities/facility_power_plant.png` | `powerPlant` | Turbine hall and transmission tower |
+| `facilities/facility_wind_power_plant.png` | `windPowerPlant` | Wind turbine array and compact control hut; fixed 15 Electricity source |
+| `facilities/facility_simple_farm.png` | `simpleFarm` | Small forward farm, field rows, and utility shed |
+| `facilities/facility_civilian_drone_base.png` | `civilianDroneBase` | Forward civilian drone pad and communications mast |
 | `facilities/facility_checkpoint.png` | Checkpoint base | Barrier and guard booth |
 | `units/unit_police.png` | `police` | Fictional badge/emblem, sidearm, and blue laurel |
 | `units/unit_national_guard.png` | `nationalGuard` | Olive helmet and rifle |
@@ -103,7 +107,8 @@ warnings, and Horde entrance directions remain dynamic UI overlays.
 5. Keep the runtime total below 3 MiB and do not add a `water` mapping.
 
 The original single-Zombie concept, approved three-Zombie normal-unit source,
-and approved twelve-Zombie Horde source live in
+approved twelve-Zombie Horde source, and v1.4 facility references live in
 `Art/reference/v1.3.1-zombie-concepts/`. These high-resolution sources are not
 preloaded and are excluded from the runtime size budget; their 256px derivatives
-are the Registry assets listed above.
+are the Registry assets listed above. The v1.4 references are in
+`Art/reference/v1.4-facility-concepts/` and are original project artwork only.

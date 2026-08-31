@@ -1,6 +1,6 @@
 import { assertValidGameConfig, cloneConfig } from './config';
 import { hexKey } from './hex';
-import { createFixedMap } from './map';
+import { createFixedMap, FIXED_INITIAL_UNIT_POSITIONS } from './map';
 import { SeededRng } from './rng';
 import { getBranchSupplyRadius, isHexSupplied } from './supply';
 import { getVisibleEnemyUnits } from './visibility';
@@ -17,14 +17,15 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '1.4.2';
+export const GAME_VERSION = '2.0.0';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
 }
 
 export function isProductionFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return !isCityFacility(facility);
+  return ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'simpleFarm', 'civilianDroneBase']
+    .includes(facility.type);
 }
 
 export function cloneState(state: GameState): GameState {
@@ -37,6 +38,11 @@ export function positionKey(position: HexCoord): string {
 
 export function getFacilityState(state: GameState, facilityId: string): FacilityState | undefined {
   return state.facilities.find((facility) => facility.id === facilityId);
+}
+
+export function getFacilityAt(state: Pick<GameState, 'facilities'>, position: HexCoord): FacilityState | undefined {
+  const key = positionKey(position);
+  return state.facilities.find((facility) => positionKey(facility.position) === key);
 }
 
 export function getCheckpointAt(state: GameState, position: HexCoord): CheckpointState | undefined {
@@ -55,6 +61,14 @@ export function getUnitAt(state: GameState, position: HexCoord): UnitState | und
 
 export function isHumanUnit(unit: UnitState): boolean {
   return unit.type === 'police' || unit.type === 'nationalGuard';
+}
+
+export function facilityZombieTargetValue(
+  state: Pick<GameState, 'config'>,
+  facility: Readonly<FacilityState>,
+): number {
+  if (facility.type === 'windPowerPlant') return state.config.facilities.windPowerPlant.zombieTargetValue;
+  return facility.workers;
 }
 
 export function createUnit(
@@ -76,6 +90,8 @@ export function createUnit(
     range: stats.range,
     vision: stats.vision,
     population: stats.population,
+    currentFuel: type === 'police' || type === 'nationalGuard' ? stats.maxFuel : 0,
+    maxFuel: stats.maxFuel,
     actionState,
     canAttack: true,
     canMove: type !== 'zombie' && type !== 'hordeZombie',
@@ -246,14 +262,21 @@ function facilityStateFromDefinition(
     // Disconnected facilities may have isolated survivors or an outbreak.
     // They do not enter the player's economy until captured, but they are
     // still real map population and can be infected/overrun deterministically.
-    operationalStatus: infected > 0 ? 'infected' : owned && configuredWorkers > 0 ? 'operational' : 'stopped',
+    operationalStatus: infected > 0
+      ? 'infected'
+      : owned && (configuredWorkers > 0 || definition.type === 'windPowerPlant')
+        ? 'operational'
+        : 'stopped',
     workers: configuredWorkers,
     infected,
     securedOrder,
     lastAssignedOrder: securedOrder ?? 0,
     populationOperationalTurn: owned ? 1 : Number.MAX_SAFE_INTEGER,
-    powerSupplyEnabled: ['farm', 'civilianFactory', 'militaryFactory'].includes(definition.type),
+    powerSupplyEnabled: ['farm', 'civilianFactory', 'militaryFactory', 'simpleFarm', 'civilianDroneBase'].includes(definition.type),
     lastPowerSupplied: null,
+    constructible: false,
+    builtTurn: null,
+    recoveryOperationalTurn: null,
   };
 }
 
@@ -301,7 +324,7 @@ function directionFromRng(rng: SeededRng): CardinalDirection {
  */
 export function createInitialState(seed: number, config: GameConfig): GameState {
   assertValidGameConfig(config);
-  if (config.mapId !== 'fixed-15x15-v2') {
+  if (config.mapId !== 'fixed-31x31-v1') {
     throw new Error(`Unsupported map id: ${config.mapId}`);
   }
   if (!Number.isSafeInteger(seed)) {
@@ -379,8 +402,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       militarySupplyAvailable: true,
     },
     units: [
-      createUnit({ config: stateConfig }, 'police-1', 'police', { q: 7, r: 7 }),
-      createUnit({ config: stateConfig }, 'national-guard-1', 'nationalGuard', { q: 8, r: 7 }),
+      createUnit({ config: stateConfig }, 'police-1', 'police', { ...FIXED_INITIAL_UNIT_POSITIONS.police }),
+      createUnit({ config: stateConfig }, 'national-guard-1', 'nationalGuard', { ...FIXED_INITIAL_UNIT_POSITIONS.nationalGuard }),
       ...map.initialZombiePositions.slice(0, stateConfig.economy.initialZombieCount).map((position, index) =>
         createUnit({ config: stateConfig }, `zombie-${index + 1}`, 'zombie', position),
       ),
@@ -389,6 +412,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     roadBranches,
     pendingUnitProductions: [],
     nextCheckpointNumber: 1,
+    nextConstructibleFacilityNumber: 1,
     nextUnitNumber: 2,
     nextEventNumber: 1,
     nextAssignmentOrder: securedOrder + 1,

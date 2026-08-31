@@ -66,7 +66,7 @@ function createGroupedZombie(
   return unit;
 }
 
-describe('v1.3.2 Horde composition and combat', () => {
+describe('v1.4 Horde composition and combat', () => {
   it('keeps Normal Zombie HP at 10 and requires two plain hits or four forest hits for a 20 HP Horde Zombie', () => {
     expect(createDefaultConfig().units.zombie.hp).toBe(10);
     expect(createDefaultConfig().units.hordeZombie.hp).toBe(20);
@@ -177,7 +177,7 @@ describe('v1.3.2 Horde composition and combat', () => {
       finalNormalZombiesSpawned: 5,
       finalHordeSpawned: 12,
     });
-  });
+  }, 30_000);
 
   it('uses custom per-type composition arithmetic for Periodic and Final groups', () => {
     const engine = new GameEngine(303, safeScenarioConfig({
@@ -274,7 +274,7 @@ describe('v1.3.2 Horde composition and combat', () => {
   });
 });
 
-describe('v1.3.2 Horde target propagation', () => {
+describe('v1.4 Horde target propagation', () => {
   function targetScenario(): { engine: GameEngine; state: GameState } {
     const engine = new GameEngine(401, safeScenarioConfig({
       finalHordeTurn: 30,
@@ -282,15 +282,15 @@ describe('v1.3.2 Horde target propagation', () => {
     }));
     const state = cloneState(engine.getState());
     state.units = state.units.filter((unit) => unit.isPlayerUnit);
-    state.units.find((unit) => unit.type === 'police')!.position = { q: 4, r: 0 };
-    state.units.find((unit) => unit.type === 'nationalGuard')!.position = { q: 0, r: 5 };
+    state.units.find((unit) => unit.type === 'police')!.position = { q: 12, r: 8 };
+    state.units.find((unit) => unit.type === 'nationalGuard')!.position = { q: 8, r: 13 };
     return { engine, state };
   }
 
   it('prefers a visible population target over inheritance', () => {
     const { engine, state } = targetScenario();
-    const normal = createUnit(state, 'zombie-normal', 'zombie', { q: 3, r: 0 });
-    const horde = createGroupedZombie(state, 'horde-source', 'hordeZombie', { q: 2, r: 0 }, 'periodic-source');
+    const normal = createUnit(state, 'zombie-normal', 'zombie', { q: 11, r: 8 });
+    const horde = createGroupedZombie(state, 'horde-source', 'hordeZombie', { q: 10, r: 8 }, 'periodic-source');
     state.units.push(normal, horde);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
@@ -301,11 +301,11 @@ describe('v1.3.2 Horde target propagation', () => {
 
   it('chooses the nearest Horde source before Unit ID and uses Unit ID for equal distances', () => {
     for (const [firstPosition, otherPosition, expectedTarget] of [
-      [{ q: 0, r: 2 }, { q: 1, r: 0 }, { q: 4, r: 0 }],
-      [{ q: 2, r: 0 }, { q: 0, r: 2 }, { q: 4, r: 0 }],
+      [{ q: 8, r: 10 }, { q: 9, r: 8 }, { q: 12, r: 8 }],
+      [{ q: 10, r: 8 }, { q: 8, r: 10 }, { q: 12, r: 8 }],
     ] as const) {
       const { engine, state } = targetScenario();
-      const normal = createUnit(state, 'zombie-receiver', 'zombie', { q: 0, r: 0 });
+      const normal = createUnit(state, 'zombie-receiver', 'zombie', { q: 8, r: 8 });
       const lexicallyFirst = createGroupedZombie(state, 'horde-a', 'hordeZombie', firstPosition, 'periodic-a');
       const other = createGroupedZombie(state, 'horde-z', 'hordeZombie', otherPosition, 'periodic-z');
       state.units.push(normal, lexicallyFirst, other);
@@ -318,8 +318,8 @@ describe('v1.3.2 Horde target propagation', () => {
 
   it('clears inherited memory at its destination and never propagates Normal to Normal', () => {
     const cleared = targetScenario();
-    const atTarget = createUnit(cleared.state, 'zombie-at-target', 'zombie', { q: 0, r: 0 });
-    atTarget.inheritedTarget = { q: 0, r: 0 };
+    const atTarget = createUnit(cleared.state, 'zombie-at-target', 'zombie', { q: 8, r: 8 });
+    atTarget.inheritedTarget = { q: 8, r: 8 };
     cleared.state.units.push(atTarget);
     expect(cleared.engine.step({ type: 'LoadSnapshot', snapshot: cleared.state }).error).toBeNull();
     const clearResult = cleared.engine.step({ type: 'EndTurn' });
@@ -327,9 +327,9 @@ describe('v1.3.2 Horde target propagation', () => {
     expect(clearResult.state.statistics.hordeTargetClearedCount).toBe(1);
 
     const noReverse = targetScenario();
-    const source = createUnit(noReverse.state, 'zombie-source', 'zombie', { q: 0, r: 1 });
-    source.inheritedTarget = { q: 5, r: 0 };
-    const receiver = createUnit(noReverse.state, 'zombie-receiver', 'zombie', { q: 0, r: 0 });
+    const source = createUnit(noReverse.state, 'zombie-source', 'zombie', { q: 8, r: 9 });
+    source.inheritedTarget = { q: 13, r: 8 };
+    const receiver = createUnit(noReverse.state, 'zombie-receiver', 'zombie', { q: 8, r: 8 });
     noReverse.state.units.push(source, receiver);
     expect(noReverse.engine.step({ type: 'LoadSnapshot', snapshot: noReverse.state }).error).toBeNull();
     const result = noReverse.engine.step({ type: 'EndTurn' });

@@ -9,6 +9,33 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function visibleZombieTemplate(observation: AgentObservation) {
+  const visible = observation.zombies[0];
+  if (visible) return clone(visible);
+  const unit = observation.units[0]!;
+  return {
+    ...clone(unit),
+    id: 'visible-zombie-template',
+    type: 'zombie' as const,
+    unitType: 'zombie' as const,
+    hp: 10,
+    maxHp: 10,
+    attack: 5,
+    movement: 3,
+    range: 1,
+    baseRange: 1,
+    effectiveRange: 1,
+    population: 0,
+    canAttack: true,
+    canMove: true,
+    currentFuel: 0,
+    maxFuel: 0,
+    fuelCostByLegalMove: [],
+    projectedRefillDemandIfTurnEndsNow: 0,
+    projectedRefillAmountIfTurnEndsNow: 0,
+  };
+}
+
 describe('Balanced Agent scenario intentions', () => {
   let observation: AgentObservation;
   let unitId: string;
@@ -31,10 +58,12 @@ describe('Balanced Agent scenario intentions', () => {
       (value) => {
         value.population.healthyCivilians = 1;
         value.endTurnForecast.food.shortage = 2;
+        value.strategicForecast.guaranteedDefeat.guaranteed = true;
       },
     );
     expect(result.action.type).toBe('AssignWorkers');
     expect(result.trace?.priorityGoal).toBe('avoid_defeat');
+    expect(result.trace?.reasonCodes).toContain('GUARANTEED_DEFEAT_DOMESTIC_RESPONSE');
   });
 
   it('improves food or civilian-goods shortage', () => {
@@ -136,7 +165,7 @@ describe('Balanced Agent scenario intentions', () => {
 
   it('prioritizes a visible Horde Zombie over an equivalent normal Zombie', () => {
     const guard = observation.units.find((unit) => unit.type === 'nationalGuard')!;
-    const template = observation.zombies[0]!;
+    const template = visibleZombieTemplate(observation);
     const normal = { ...clone(template), id: 'visible-normal', type: 'zombie' as const, unitType: 'zombie' as const };
     const horde = { ...clone(template), id: 'visible-horde', type: 'hordeZombie' as const, unitType: 'hordeZombie' as const };
     const result = decide([
@@ -153,7 +182,7 @@ describe('Balanced Agent scenario intentions', () => {
 
   it('uses the public terrain multiplier when evaluating a lethal attack', () => {
     const guard = observation.units.find((unit) => unit.type === 'nationalGuard')!;
-    const template = observation.zombies[0]!;
+    const template = visibleZombieTemplate(observation);
     const forest = { ...clone(template), id: 'forest-zombie', hp: 6, terrainDefenseSource: 'forest' as const, terrainDamageMultiplier: 0.5 };
     const plain = { ...clone(template), id: 'plain-zombie', hp: 10, terrainDefenseSource: 'none' as const, terrainDamageMultiplier: 1 };
     const result = decide([
@@ -186,7 +215,7 @@ describe('Balanced Agent scenario intentions', () => {
 
   it('does not send a badly damaged unit into nearby danger', () => {
     const unit = observation.units[0]!;
-    const zombie = observation.zombies[0]!;
+    const zombie = visibleZombieTemplate(observation);
     const result = decide([
       { type: 'Move', unitId: unit.id, destination: zombie.position },
       { type: 'Wait', unitId: unit.id },
@@ -233,9 +262,18 @@ describe('Balanced Agent scenario intentions', () => {
       waiting: 0,
       screening: 0,
       approved: 0,
+      queuePeople: 0,
+      screeningCapacity: 10,
+      estimatedScreeningThroughput: 5,
+      arrivalIntervalMin: 2,
+      arrivalIntervalMax: 4,
+      arrivalPeopleMin: 5,
+      arrivalPeopleMax: 10,
+      queuePressureClass: 'none' as const,
       infected: 0,
       remainingTurns: 0,
       currentPolicy: 'normal' as const,
+      currentPolicyTurns: 2,
       nextPolicy: 'normal' as const,
       nextArrivalTurn: branch.nextArrivalTurn,
       providesSupply: true,
@@ -331,9 +369,18 @@ describe('Balanced Agent scenario intentions', () => {
       waiting: 5,
       screening: 0,
       approved: 0,
+      queuePeople: 5,
+      screeningCapacity: 10,
+      estimatedScreeningThroughput: 5,
+      arrivalIntervalMin: 2,
+      arrivalIntervalMax: 4,
+      arrivalPeopleMin: 5,
+      arrivalPeopleMax: 10,
+      queuePressureClass: 'low' as const,
       infected: 0,
       remainingTurns: 0,
       currentPolicy: 'normal' as const,
+      currentPolicyTurns: 2,
       nextPolicy: 'normal' as const,
       nextArrivalTurn: branch.nextArrivalTurn,
       providesSupply: true,

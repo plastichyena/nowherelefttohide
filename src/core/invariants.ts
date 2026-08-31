@@ -112,7 +112,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       errors.push(`Population ${field} must be a non-negative integer`);
     }
   }
-  if (!isNonNegativeInteger(state.actionsTakenThisTurn) || !isNonNegativeInteger(state.nextUnitNumber) || !isNonNegativeInteger(state.nextCheckpointNumber) || !isNonNegativeInteger(state.nextEventNumber) || !isNonNegativeInteger(state.nextAssignmentOrder)) {
+  if (!isNonNegativeInteger(state.actionsTakenThisTurn) || !isNonNegativeInteger(state.nextUnitNumber) || !isNonNegativeInteger(state.nextCheckpointNumber) || !isNonNegativeInteger(state.nextConstructibleFacilityNumber) || !isNonNegativeInteger(state.nextEventNumber) || !isNonNegativeInteger(state.nextAssignmentOrder)) {
     errors.push('State sequence counters must be non-negative integers');
   }
   for (const resource of nonNegativeFields) {
@@ -215,8 +215,8 @@ export function validateInvariants(state: GameState): InvariantResult {
   }
 
   const mapFacilityById = new Map(state.map.facilities.map((facility) => [facility.id, facility]));
-  if (state.facilities.length !== state.map.facilities.length) {
-    errors.push('Facility state count must match map');
+  if (state.facilities.filter((facility) => !facility.constructible).length !== state.map.facilities.length) {
+    errors.push('Permanent facility state count must match map');
   }
   const seenFacilities = new Set<string>();
   for (const facility of state.facilities) {
@@ -225,16 +225,22 @@ export function validateInvariants(state: GameState): InvariantResult {
     }
     seenFacilities.add(facility.id);
     const definition = mapFacilityById.get(facility.id);
-    if (!definition) {
-      errors.push(`Facility ${facility.id} does not exist in map`);
+    if (!definition && !facility.constructible) {
+      errors.push(`Permanent facility ${facility.id} does not exist in map`);
       continue;
     }
-    if (hexKey(definition.position) !== hexKey(facility.position)) {
+    if (definition && hexKey(definition.position) !== hexKey(facility.position)) {
       errors.push(`Facility ${facility.id} position differs from map`);
     }
     const configuredCapacity = state.config.facilities[facility.type]?.workerCapacity;
-    if (definition.workerCapacity !== configuredCapacity || facility.workerCapacity !== configuredCapacity) {
+    if ((definition && definition.workerCapacity !== configuredCapacity) || facility.workerCapacity !== configuredCapacity) {
       errors.push(`Facility ${facility.id} worker capacity must match config and map`);
+    }
+    if (!hexWithinBounds(facility.position, state.map.width, state.map.height)) {
+      errors.push(`Facility ${facility.id} is outside the map`);
+    }
+    if (facility.constructible && !['simpleFarm', 'civilianDroneBase'].includes(facility.type)) {
+      errors.push(`Facility ${facility.id} has an invalid constructible type`);
     }
     if (!isNonNegativeInteger(facility.workers) || !isNonNegativeInteger(facility.infected)) {
       errors.push(`Facility ${facility.id} population must be non-negative integers`);
@@ -251,7 +257,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (facility.lastPowerSupplied !== null && typeof facility.lastPowerSupplied !== 'boolean') {
       errors.push(`Facility ${facility.id} has an invalid last Power Supply result`);
     }
-    if (!['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type) && facility.powerSupplyEnabled) {
+    if (!['farm', 'civilianFactory', 'militaryFactory', 'simpleFarm', 'civilianDroneBase'].includes(facility.type) && facility.powerSupplyEnabled) {
       errors.push(`Facility ${facility.id} cannot request industrial boost power`);
     }
     if (facility.status === 'unowned' && facility.owner !== 'none') {
@@ -291,6 +297,12 @@ export function validateInvariants(state: GameState): InvariantResult {
     }
     if (!isNonNegativeInteger(unit.population)) {
       errors.push(`Unit ${unit.id} has invalid population`);
+    }
+    if (!isNonNegativeInteger(unit.currentFuel) || !isNonNegativeInteger(unit.maxFuel) || unit.currentFuel > unit.maxFuel) {
+      errors.push(`Unit ${unit.id} has invalid Fuel`);
+    }
+    if ((unit.type === 'zombie' || unit.type === 'hordeZombie') && (unit.currentFuel !== 0 || unit.maxFuel !== 0)) {
+      errors.push(`Zombie unit ${unit.id} cannot store Fuel`);
     }
     if (!['police', 'nationalGuard', 'zombie', 'hordeZombie'].includes(unit.type)) {
       errors.push(`Unit ${unit.id} has an invalid type`);

@@ -34,6 +34,9 @@ describe('board asset registry', () => {
       'militaryFactory',
       'refinery',
       'powerPlant',
+      'windPowerPlant',
+      'simpleFarm',
+      'civilianDroneBase',
       'checkpoint',
     ]);
     expect(Object.keys(BOARD_ASSET_REGISTRY.units)).toEqual([

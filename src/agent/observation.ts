@@ -4,12 +4,16 @@ import {
   forecastEndTurn,
   forecastFacilityProduction,
   forecastUnitSuppression,
+  forecastUnitRefills,
+  getConstructibleFacilityPositionCandidates,
   getCheckpointPositionCandidates,
+  getUnitLegalMoveFuelProjections,
 } from '../core/engine';
+import { deriveStrategicForecast, getQueuePressureClass } from '../core/forecast';
 import { deriveUnitRecovery } from '../core/recovery';
 import { hexKey } from '../core/hex';
 import { getTile } from '../core/map';
-import { isCityFacility, isProductionFacility } from '../core/state';
+import { facilityZombieTargetValue, isCityFacility, isProductionFacility } from '../core/state';
 import {
   deriveCheckpointRole,
   deriveSupplySnapshot,
@@ -30,6 +34,8 @@ import {
   HIDDEN_NOISE_METRIC_KEYS,
   OBSERVATION_API_VERSION,
   type AgentGameResult,
+  type AgentArtifactObservation,
+  type AgentMapObservation,
   type AgentObservation,
   type AgentUnitObservation,
 } from './types';
@@ -78,7 +84,11 @@ function publicTileDefense(state: Readonly<GameState>, tile: HexTile): PublicTer
   return { source: 'none', multiplier: 1 };
 }
 
-function publicUnit(unit: UnitState, state: Readonly<GameState>): AgentUnitObservation {
+function publicUnit(
+  unit: UnitState,
+  state: Readonly<GameState>,
+  refillByUnitId: ReadonlyMap<string, { demand: number; amount: number }>,
+): AgentUnitObservation {
   const inSupply = isHexSupplied(state, unit.position);
   const suppression = forecastUnitSuppression(state, unit);
   const recovery = unit.isPlayerUnit
@@ -87,6 +97,11 @@ function publicUnit(unit: UnitState, state: Readonly<GameState>): AgentUnitObser
   const currentRange = effectiveRange(state, unit);
   const positionTile = tileAt(state, unit.position);
   const defense = terrainDefenseAt(state, unit);
+  const refill = refillByUnitId.get(unit.id) ?? { demand: 0, amount: 0 };
+  const fuelCostByLegalMove = (unit.isPlayerUnit
+    ? getUnitLegalMoveFuelProjections(state, unit.id)
+    : [])
+    .sort((left, right) => left.destination.q - right.destination.q || left.destination.r - right.destination.r);
   return {
     id: unit.id,
     type: unit.type,
@@ -112,6 +127,11 @@ function publicUnit(unit: UnitState, state: Readonly<GameState>): AgentUnitObser
     canAttack: unit.canAttack,
     canMove: unit.canMove,
     inSupply,
+    currentFuel: unit.currentFuel,
+    maxFuel: unit.maxFuel,
+    fuelCostByLegalMove,
+    projectedRefillDemandIfTurnEndsNow: refill.demand,
+    projectedRefillAmountIfTurnEndsNow: refill.amount,
     recoveryClassIfTurnEndsNow: recovery?.recoveryClass ?? null,
     recoveryRateIfTurnEndsNow: recovery?.rate ?? 0,
     recoveryBaseAmountIfTurnEndsNow: recovery?.baseAmount ?? 0,
@@ -150,10 +170,31 @@ function containingUnitAt(state: Readonly<GameState>, q: number, r: number): Uni
     .sort((left, right) => left.id.localeCompare(right.id))[0];
 }
 
-/** Build the stable public-information view used by every v1.4 Agent. */
-export function createAgentObservation(state: Readonly<GameState>): AgentObservation {
+/**
+ * Immutable Core projections supplied by the Adapter for the current state.
+ * This keeps the standalone Observation factory fully self-contained while
+ * allowing the state-changing boundary to reuse projections whose inputs did
+ * not change between non-checkpoint actions.
+ */
+export interface AgentObservationProjectionCache {
+  checkpointPositionCandidates?: ReturnType<typeof getCheckpointPositionCandidates>;
+}
+
+/**
+ * Build the stable public-information view used by every Agent entry point.
+ * Fuel projections use the Core's state-only legal-move helper, so every
+ * consumer receives the exact action-cost preview without enumerating all
+ * non-move legal actions.
+ */
+export function createAgentObservation(
+  state: Readonly<GameState>,
+  projectionCache: AgentObservationProjectionCache = {},
+): AgentObservation {
   const supply = deriveSupplySnapshot(state);
   const visibleTileKeys = getPlayerVisibleTileKeys(state);
+  const refillByUnitId = new Map(
+    forecastUnitRefills(state).map((refill) => [refill.unitId, refill] as const),
+  );
   const productionByFacility = new Map(
     forecastFacilityProduction(state).map((projection) => [projection.facilityId, projection]),
   );
@@ -207,6 +248,7 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
         dormantCheckpointIds,
         fallbackAvailable,
         currentPolicy: branchState?.currentPolicy ?? 'normal',
+        currentPolicyTurns: state.config.refugees.policies[branchState?.currentPolicy ?? 'normal'].turns,
         preparedPostCount,
         preparedPostLimit: state.config.checkpoint.maxPreparedPostsPerDirection,
         checkpointActionsThisTurn: branchState?.checkpointActionsThisTurn ?? 0,
@@ -217,21 +259,27 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
     .sort((left, right) => left.id.localeCompare(right.id))
     .map((facility) => {
       const inSupply = isHexSupplied(state, facility.position);
+      const unavailableForOperation = ['building', 'disabled', 'recovering'].includes(facility.operationalStatus);
       const populationOperational =
         facility.owner === 'player' &&
         facility.status === 'owned' &&
         facility.infected === 0 &&
+        !unavailableForOperation &&
         facility.populationOperationalTurn <= state.turn;
       let populationUnavailableReason: string | null = null;
       if (facility.owner !== 'player') populationUnavailableReason = 'not_owned';
       else if (facility.status !== 'owned') populationUnavailableReason = 'facility_ruined';
       else if (facility.infected > 0) populationUnavailableReason = 'facility_infected';
+      else if (facility.operationalStatus === 'building') populationUnavailableReason = 'building';
+      else if (facility.operationalStatus === 'disabled') populationUnavailableReason = 'disabled';
+      else if (facility.operationalStatus === 'recovering') populationUnavailableReason = 'recovering';
       else if (facility.populationOperationalTurn > state.turn) populationUnavailableReason = 'available_next_turn';
       const assignable =
         isProductionFacility(facility) &&
         facility.owner === 'player' &&
         facility.status === 'owned' &&
         facility.infected === 0 &&
+        !unavailableForOperation &&
         facility.populationOperationalTurn <= state.turn;
       const populationIncreaseAvailable = assignable && inSupply && state.population.cityResidents > 0;
       const populationDecreaseAvailable = assignable && facility.workers > 0;
@@ -240,6 +288,7 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
         facility.owner === 'player' &&
         facility.status === 'owned' &&
         facility.infected === 0 &&
+        !unavailableForOperation &&
         facility.populationOperationalTurn <= state.turn &&
         inSupply;
       const rule = state.config.facilities[facility.type].production;
@@ -259,12 +308,20 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
         owner: facility.owner,
         status: facility.status,
         operationalStatus: facility.operationalStatus,
-        vision: facility.owner === 'player' && facility.status !== 'ruined'
+        constructible: facility.constructible,
+        builtTurn: facility.builtTurn,
+        recoveryOperationalTurn: facility.recoveryOperationalTurn,
+        vision: facility.owner === 'player' && facility.status !== 'ruined' && !unavailableForOperation
           ? facility.type === 'capital'
             ? state.config.checkpoint.initialSupplyRadius
-            : state.config.vision.ownedFacility
+            : facility.type === 'civilianDroneBase'
+              ? facility.workers > 0 && facility.powerSupplyEnabled && facility.lastPowerSupplied === true
+                ? facility.workers * 2
+                : 0
+              : state.config.vision.ownedFacility
           : 0,
         healthyPopulation: facility.workers,
+        zombieTargetValue: facilityZombieTargetValue(state, facility),
         infectedPopulation: facility.infected,
         populationCapacity: facility.workerCapacity,
         populationLimitKind: isCityFacility(facility) ? 'soft' as const : 'hard' as const,
@@ -372,8 +429,10 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
       infected: state.population.facilityInfected + state.population.checkpointInfected,
     },
     facilities,
-    units: orderedUnits.filter((unit) => unit.isPlayerUnit).map((unit) => publicUnit(unit, state)),
-    zombies: visibleEnemyUnits.map((unit) => publicUnit(unit, state)),
+    units: orderedUnits
+      .filter((unit) => unit.isPlayerUnit)
+      .map((unit) => publicUnit(unit, state, refillByUnitId)),
+    zombies: visibleEnemyUnits.map((unit) => publicUnit(unit, state, refillByUnitId)),
     checkpoints: [...state.checkpoints]
       .sort((left, right) => left.id.localeCompare(right.id))
       .map((checkpoint) => {
@@ -394,9 +453,24 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
           waiting: checkpoint.waiting,
           screening: checkpoint.screening,
           approved: checkpoint.approved,
+          queuePeople: checkpoint.waiting + checkpoint.screening + checkpoint.approved,
+          screeningCapacity: state.config.refugees.screeningCapacity,
+          estimatedScreeningThroughput: state.config.refugees.screeningCapacity / Math.max(
+            1,
+            state.config.refugees.policies[branch?.currentPolicy ?? 'normal'].turns,
+          ),
+          arrivalIntervalMin: state.config.refugees.arrivalIntervalMin,
+          arrivalIntervalMax: state.config.refugees.arrivalIntervalMax,
+          arrivalPeopleMin: state.config.refugees.arrivalPeopleMin,
+          arrivalPeopleMax: state.config.refugees.arrivalPeopleMax,
+          queuePressureClass: getQueuePressureClass(
+            checkpoint.waiting + checkpoint.screening + checkpoint.approved,
+            state.config.refugees.screeningCapacity,
+          ),
           infected: checkpoint.infected,
           remainingTurns: checkpoint.remainingTurns,
           currentPolicy: branch?.currentPolicy ?? 'normal',
+          currentPolicyTurns: state.config.refugees.policies[branch?.currentPolicy ?? 'normal'].turns,
           nextPolicy: checkpoint.screeningPolicy,
           nextArrivalTurn: checkpoint.nextArrivalTurn,
           providesSupply: role === 'active',
@@ -406,7 +480,13 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
           projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
         };
       }),
-    checkpointPositionCandidates: getCheckpointPositionCandidates(state),
+    checkpointPositionCandidates: projectionCache.checkpointPositionCandidates ?? getCheckpointPositionCandidates(state),
+    constructibleFacilityPositionCandidates: (['simpleFarm', 'civilianDroneBase'] as const)
+      .flatMap((facilityType) => getConstructibleFacilityPositionCandidates(state, facilityType))
+      .sort((left, right) =>
+        left.facilityType.localeCompare(right.facilityType) ||
+        left.position.q - right.position.q || left.position.r - right.position.r,
+      ),
     roadBranches,
     supply: {
       initialRadius: supply.initialRadius,
@@ -427,9 +507,83 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
     suppliedAreaZombieClear: victory.suppliedAreaZombieClear,
     suppliedAreaInfectionClear: victory.suppliedAreaInfectionClear,
     endTurnForecast: forecastEndTurn(state),
+    strategicForecast: deriveStrategicForecast(state),
     gameOver: state.gameOver,
     result: publicResult(state.result),
   } satisfies AgentObservation as unknown as JsonValue) as unknown as AgentObservation;
+}
+
+/** Remove fixed topology from one Artifact Schema 2.0.0 trace entry. */
+export function compactArtifactObservation(observation: AgentObservation): AgentArtifactObservation {
+  const copy = cloneJson(observation);
+  const { map, ...dynamic } = copy;
+  return {
+    ...dynamic,
+    mapId: map.id,
+    visibleTileKeys: map.tiles
+      .filter((tile) => tile.visibleToPlayer)
+      .map((tile) => `${tile.q},${tile.r}`)
+      .sort(),
+  };
+}
+
+/**
+ * Recreate a complete public observation for replay comparison from its
+ * fixed map and dynamic trace. Live Agent/Bridge observations are never
+ * compacted, only artifacts are.
+ */
+export function restoreArtifactObservation(
+  trace: AgentArtifactObservation,
+  fixedMap: AgentMapObservation,
+): AgentObservation {
+  if (trace.mapId !== fixedMap.id) throw new Error('Artifact trace mapId does not match fixedMap.id');
+  const visible = new Set(trace.visibleTileKeys);
+  const facilityByPosition = new Map(trace.facilities.map((facility) => [hexKey(facility.position), facility.id] as const));
+  const checkpointByPosition = new Map(trace.checkpoints.map((checkpoint) => [hexKey(checkpoint.position), checkpoint.id] as const));
+  const terrainMovement = new Map<string, number | null>();
+  const terrainDefense = new Map<string, { source: TerrainDefenseSource; multiplier: number }>();
+  for (const tile of fixedMap.tiles) {
+    if (!terrainMovement.has(tile.terrain) && !tile.road && !tile.urban) {
+      terrainMovement.set(tile.terrain, tile.effectiveMovementCost);
+    }
+    if (!terrainDefense.has(tile.terrain) && !tile.urban) {
+      terrainDefense.set(tile.terrain, { source: tile.terrainDefenseSource, multiplier: tile.terrainDamageMultiplier });
+    }
+  }
+  const urbanMultiplier = fixedMap.tiles.find((tile) => tile.urban)?.terrainDamageMultiplier ?? 0.5;
+  const map: AgentMapObservation = {
+    ...cloneJson(fixedMap),
+    tiles: fixedMap.tiles.map((tile) => {
+      const key = `${tile.q},${tile.r}`;
+      // `tile.facilityId` belongs to the immutable map's permanent Facility
+      // definition. Constructible Facilities make a Hex urban but never
+      // mutate that static ID, so retain it exactly as a live Observation
+      // does while using the dynamic list only for the urban overlay.
+      const dynamicFacilityId = facilityByPosition.get(key) ?? null;
+      const facilityId = tile.facilityId;
+      const checkpointId = checkpointByPosition.get(key) ?? null;
+      const urban = facilityId !== null || dynamicFacilityId !== null || checkpointId !== null;
+      const effectiveMovementCost = urban || tile.road
+        ? 1
+        : terrainMovement.get(tile.terrain) ?? tile.effectiveMovementCost;
+      const defense = urban
+        ? { source: 'urban' as const, multiplier: urbanMultiplier }
+        : terrainDefense.get(tile.terrain) ?? { source: 'none' as const, multiplier: 1 };
+      return {
+        ...tile,
+        urban,
+        facilityId,
+        checkpointId,
+        passable: effectiveMovementCost !== null,
+        effectiveMovementCost,
+        terrainDefenseSource: defense.source,
+        terrainDamageMultiplier: defense.multiplier,
+        visibleToPlayer: visible.has(key),
+      };
+    }),
+  };
+  const { mapId: _mapId, visibleTileKeys: _visibleTileKeys, ...dynamic } = cloneJson(trace);
+  return { ...dynamic, map } as AgentObservation;
 }
 
 export function createAgentResult(result: GameResult | null): AgentGameResult | null {

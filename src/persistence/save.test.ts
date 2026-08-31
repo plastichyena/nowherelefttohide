@@ -71,8 +71,8 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.3.3 save format', () => {
-  it('round-trips a detached complete Save Format 4 GameState through code and JSON', () => {
+describe('v1.4.0 Save Format 5', () => {
+  it('round-trips a detached complete Save Format 5 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -80,9 +80,9 @@ describe('v1.3.3 save format', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 4,
+      formatVersion: 5,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-15x15-v2',
+      mapId: 'fixed-31x31-v1',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -93,15 +93,19 @@ describe('v1.3.3 save format', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('writes the v1.3.3 version boundaries', () => {
+  it('writes the v1.4.0 version boundaries', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.gameVersion).toBe('1.4.2');
-    expect(config.version).toBe('1.4.2');
-    expect(config.mapId).toBe('fixed-15x15-v2');
+    expect(envelope.formatVersion).toBe(5);
+    expect(envelope.gameVersion).toBe('2.0.0');
+    expect(config.version).toBe('2.0.0');
+    expect(config.mapId).toBe('fixed-31x31-v1');
+    expect((state.map as Record<string, unknown>).width).toBe(31);
+    expect((state.map as Record<string, unknown>).height).toBe(31);
+    expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
     expect(state).toHaveProperty('finalHordeTurn', 30);
     expect(state).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('maxTurns');
@@ -127,6 +131,51 @@ describe('v1.3.3 save format', () => {
     expect(decodeSaveCode(encodeSaveCode(state)).state).toEqual(state);
   });
 
+  it('persists Unit Fuel and Wind / Constructible Facility state without derived Forecast fields', () => {
+    const engine = new GameEngine(73, createDefaultConfig());
+    const candidate = engine.getConstructibleFacilityPositionCandidates('simpleFarm').find((entry) => entry.legal)!;
+    const built = engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: candidate.position });
+    expect(built.error).toBeNull();
+    const state = clone(built.state);
+    const police = state.units.find((unit) => unit.type === 'police')!;
+    police.currentFuel = 7;
+    const wind = state.facilities.find((facility) => facility.type === 'windPowerPlant')!;
+    const constructible = state.facilities.find((facility) => facility.constructible)!;
+    const loaded = decodeSaveCode(encodeSaveCode(state));
+    expect(loaded.valid).toBe(true);
+    expect(loaded.state?.units.find((unit) => unit.id === police.id)?.currentFuel).toBe(7);
+    expect(loaded.state?.facilities.find((facility) => facility.id === wind.id)?.type).toBe('windPowerPlant');
+    expect(loaded.state?.facilities.find((facility) => facility.id === wind.id)).toMatchObject({
+      constructible: false,
+      builtTurn: null,
+      recoveryOperationalTurn: null,
+    });
+    expect(loaded.state?.facilities.find((facility) => facility.id === constructible.id)).toMatchObject({
+      type: 'simpleFarm',
+      constructible: true,
+      builtTurn: 1,
+      operationalStatus: 'building',
+    });
+    expect(loaded.state).not.toHaveProperty('forecast');
+  });
+
+  it('accepts 31x31 boundary coordinates and rejects coordinates outside the fixed map', () => {
+    const envelope = exportedEnvelope(initialState(83));
+    const state = envelope.state as Record<string, unknown>;
+    const units = state.units as Array<Record<string, unknown>>;
+    (units[0]!.position as Record<string, unknown>).q = 30;
+    (units[0]!.position as Record<string, unknown>).r = 30;
+    // This is only a coordinate-shape check, so keep the state checksum valid
+    // while allowing the relational invariant to report any other mismatch.
+    const boundaryResult = importSaveJson(JSON.stringify(resign(envelope)));
+    expect(boundaryResult.errors.join(' ')).not.toMatch(/outside|in-bounds/i);
+
+    (units[0]!.position as Record<string, unknown>).q = 31;
+    const outsideResult = importSaveJson(JSON.stringify(resign(envelope)));
+    expect(outsideResult.valid).toBe(false);
+    expect(outsideResult.errors.join(' ')).toMatch(/in-bounds|outside|map/i);
+  });
+
   it('re-derives identical checkpoint candidates after load without storing them in GameState', () => {
     const state = initialState(91);
     const before = getCheckpointPositionCandidates(state);
@@ -150,11 +199,11 @@ describe('v1.3.3 save format', () => {
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
     expect(result.errors.join(' ')).toMatch(/format version|incompatible|1\.2\.7/i);
-    expect(result.errors.join(' ')).toContain('v1.3.2 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toContain('v1.3.3 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Format 4', () => {
+  it('rejects a stale state/config version even when the envelope has Format 5', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     state.gameVersion = '1.4.0';
@@ -165,7 +214,7 @@ describe('v1.3.3 save format', () => {
     expect(result.errors.join(' ')).toMatch(/incompatible/i);
   });
 
-  it('rejects a partial v1.3 schema rather than treating it as a migration candidate', () => {
+  it('rejects a partial v1.4 schema rather than treating it as a migration candidate', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     delete (state.horde as Record<string, unknown>).finalHordeStatus;
@@ -192,7 +241,7 @@ describe('v1.3.3 save format', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v4 autosave key and never rewrites or removes a legacy key', () => {
+  it('uses the v5 autosave key and never rewrites or removes a legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
     legacy.formatVersion = 3;

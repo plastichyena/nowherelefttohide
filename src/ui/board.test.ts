@@ -18,6 +18,7 @@ import {
   boardTextureKey,
   checkpointCandidateMarkerStyle,
   classifyBoardAssetFailure,
+  constructibleCandidateMarkerStyle,
   hordeWarningTileKeys,
   projectWorldToScreen,
   roadTextureRotations,
@@ -71,17 +72,16 @@ describe('Phaser board asset boundary helpers', () => {
     )).toBeNull();
   });
 
-  it.each([
-    ['east', '14,7', '0,7'],
-    ['west', '0,7', '14,7'],
-    ['north', '7,0', '7,14'],
-    ['south', '7,14', '7,0'],
-  ] as const)('limits a %s Horde warning to its road branch', (direction, entrance, opposite) => {
-    const keys = hordeWarningTileKeys(createFixedMap(), direction);
+  it.each(['east', 'west', 'north', 'south'] as const)('limits a %s Horde warning to its road branch', (direction) => {
+    const map = createFixedMap();
+    const branch = map.roadBranches.find((candidate) => candidate.direction === direction)!;
+    const oppositeDirection = { east: 'west', west: 'east', north: 'south', south: 'north' }[direction];
+    const oppositeBranch = map.roadBranches.find((candidate) => candidate.direction === oppositeDirection)!;
+    const keys = hordeWarningTileKeys(map, direction);
 
-    expect(keys).toContain(entrance);
-    expect(keys).not.toContain('7,7');
-    expect(keys).not.toContain(opposite);
+    expect(keys).toContain(`${branch.entrance.q},${branch.entrance.r}`);
+    expect(keys).not.toContain(`${branch.capitalConnection.q},${branch.capitalConnection.r}`);
+    expect(keys).not.toContain(`${oppositeBranch.entrance.q},${oppositeBranch.entrance.r}`);
   });
 
   it('derives Supply outlines only from supplied-to-unsupplied edges', () => {
@@ -96,6 +96,17 @@ describe('Phaser board asset boundary helpers', () => {
     const invalid = checkpointCandidateMarkerStyle(false, false);
     const selectedInvalid = checkpointCandidateMarkerStyle(false, true);
     expect(legal.symbol).toBe('✓');
+    expect(invalid.symbol).toBe('×');
+    expect(invalid.color).not.toBe(legal.color);
+    expect(invalid.lineWidth).not.toBe(legal.lineWidth);
+    expect(selectedInvalid.lineWidth).toBeGreaterThan(invalid.lineWidth);
+  });
+
+  it('distinguishes legal and invalid constructible candidates by symbol and line styling', () => {
+    const legal = constructibleCandidateMarkerStyle(true, false);
+    const invalid = constructibleCandidateMarkerStyle(false, false);
+    const selectedInvalid = constructibleCandidateMarkerStyle(false, true);
+    expect(legal.symbol).toBe('＋');
     expect(invalid.symbol).toBe('×');
     expect(invalid.color).not.toBe(legal.color);
     expect(invalid.lineWidth).not.toBe(legal.lineWidth);

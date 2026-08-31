@@ -125,20 +125,22 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.3.2-or-earlier saves in both UI languages', () => {
-    const detail = 'version mismatch in v1.3.2 save';
+  it('reports unsupported v1.3.3-or-earlier saves in both UI languages', () => {
+    const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.2以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.3');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.3以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.0');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.2 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.3');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.3 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.0');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 1.4.1');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 3');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 5');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 5');
   });
 
-  it('projects all v1.3.3 checkpoint roles and branch fallback fields', () => {
+  it('projects all checkpoint roles and branch fallback fields', () => {
     const state = JSON.parse(JSON.stringify(new GameEngine(1).getState())) as GameState;
     const branch = state.map.roadBranches[0]!;
     const branchState = state.roadBranches.find((candidate) => candidate.branchId === branch.id)!;
@@ -272,7 +274,7 @@ describe('controller view models', () => {
     expect(JSON.stringify(candidates)).toBe(before);
   });
 
-  it('localizes every v1.3.2 checkpoint candidate reason in both languages', () => {
+  it('localizes every checkpoint candidate reason in both languages', () => {
     const codes = [
       'invalid_checkpoint_tile', 'invalid_checkpoint_branch', 'unknown_road_branch',
       'checkpoint_requires_relocation', 'unknown_operational_checkpoint', 'checkpoint_same_position',
@@ -318,7 +320,7 @@ describe('controller view models', () => {
     }
   });
 
-  it('has bilingual v1.3 terrain, visibility, Horde, and victory labels', () => {
+  it('has bilingual terrain, visibility, Horde, and victory labels', () => {
     const keys = [
       'finalHordeTurn', 'finalHordeWarning', 'spawnTurn', 'hordeStatusNotStarted',
       'terrain', 'baseTerrain', 'terrainPlain', 'terrainForest', 'terrainMountain', 'terrainWater',
@@ -335,7 +337,7 @@ describe('controller view models', () => {
     expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
   });
 
-  it('has bilingual v1.3.2 mixed-Horde composition and checkpoint explainability labels', () => {
+  it('has bilingual mixed-Horde composition and checkpoint explainability labels', () => {
     const keys = [
       'hordeComposition', 'periodicInitialHordeZombies', 'periodicInitialNormalZombies',
       'periodicIncrementHordeZombies', 'periodicIncrementNormalZombies',
@@ -348,7 +350,7 @@ describe('controller view models', () => {
     }
   });
 
-  it('has bilingual v1.3.3 fallback, activation, and Noise labels', () => {
+  it('has bilingual fallback, activation, and Noise labels', () => {
     const keys = [
       'branchPanel', 'branchRoleLimit', 'activeCheckpoint', 'standbyCheckpoint', 'dormantCheckpoint',
       'fallbackAvailable', 'fallbackUnavailable', 'preparedPostCount', 'checkpointRole',

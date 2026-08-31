@@ -26,12 +26,13 @@ describe('GameEngine', () => {
     const first = createInitialState(42, config);
     const second = createInitialState(42, config);
     expect(first).toEqual(second);
-    expect(first.facilities).toHaveLength(16);
-    expect(first.facilities.filter((facility) => facility.status === 'owned')).toHaveLength(5);
+    expect(first.facilities).toHaveLength(17);
+    expect(first.facilities.filter((facility) => facility.status === 'owned')).toHaveLength(6);
     expect(first.population.healthyCivilians).toBe(100);
     expect(first.facilities.find((facility) => facility.id === 'capital')?.workers).toBe(41);
     expect(first.map.initialZombiePositions).toEqual([
-      { q: 4, r: 4 }, { q: 11, r: 3 }, { q: 3, r: 11 }, { q: 11, r: 10 },
+      { q: 9, r: 9 }, { q: 21, r: 21 }, { q: 21, r: 9 },
+      { q: 9, r: 21 }, { q: 15, r: 6 }, { q: 15, r: 24 },
     ]);
     expect(first.units.filter((unit) => unit.isPlayerUnit)).toHaveLength(2);
     expect(validateInvariants(first)).toEqual({ valid: true, errors: [] });
@@ -54,7 +55,7 @@ describe('GameEngine', () => {
     expect(engine.getState()).toEqual(before);
 
     const brokenFacilityLink = engine.getState() as ReturnType<typeof createInitialState>;
-    brokenFacilityLink.map.tiles.find((tile) => tile.q === 7 && tile.r === 7)!.facilityId = null;
+    brokenFacilityLink.map.tiles.find((tile) => tile.q === 15 && tile.r === 15)!.facilityId = null;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: brokenFacilityLink }).error?.code).toBe('invalid_snapshot');
     expect(engine.getState()).toEqual(before);
 
@@ -76,24 +77,24 @@ describe('GameEngine', () => {
   it('provides an interception preview and stops movement on interception', () => {
     const engine = new GameEngine(7, createDefaultConfig());
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
-    snapshot.units.find((unit) => unit.type === 'zombie')!.position = { q: 7, r: 5 };
+    snapshot.units.find((unit) => unit.type === 'zombie')!.position = { q: 15, r: 13 };
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
-    const preview = previewMove(engine.getState(), 'police-1', { q: 7, r: 6 });
+    const preview = previewMove(engine.getState(), 'police-1', { q: 15, r: 14 });
     expect(preview.legal).toBe(true);
     expect(preview.interception).not.toBeNull();
-    const result = engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 7, r: 6 } });
+    const result = engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 15, r: 14 } });
     expect(result.error).toBeNull();
     const police = result.state.units.find((unit) => unit.id === 'police-1');
-    expect(police?.position).toEqual({ q: 7, r: 6 });
+    expect(police?.position).toEqual({ q: 15, r: 14 });
     expect(result.events.some((event) => event.type === 'interception')).toBe(true);
   });
 
   it('captures an empty disconnected facility by entering it', () => {
     const engine = new GameEngine(8, createDefaultConfig());
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
-    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 7, r: 4 };
+    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 15, r: 9 };
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
-    const result = engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 7, r: 3 } });
+    const result = engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 15, r: 8 } });
     expect(result.error).toBeNull();
     expect(result.state.facilities.find((facility) => facility.id === 'city-1')?.status).toBe('owned');
     expect(result.events.some((event) => event.type === 'facility_captured')).toBe(true);
@@ -125,7 +126,7 @@ describe('GameEngine', () => {
   it('reserves units and completes them at the following player turn start', () => {
     const engine = new GameEngine(31, createDefaultConfig({ finalHordeTurn: 3 }));
     const before = engine.getState();
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } }).error).toBeNull();
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 15, r: 15 } }).error).toBeNull();
     expect(engine.getState().pendingUnitProductions).toHaveLength(1);
     expect(engine.getState().population.healthyCivilians).toBe(before.population.healthyCivilians - 5);
     expect(engine.getState().population.unitPopulation).toBe(before.population.unitPopulation + 5);
@@ -147,18 +148,18 @@ describe('GameEngine', () => {
     }));
     const initialLedger = populationLedgerTotal(engine.getState() as ReturnType<typeof createInitialState>);
     expect(engine.getLegalActions()).toEqual(expect.arrayContaining([
-      { type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } },
-      { type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 7, r: 7 } },
+      { type: 'ProduceUnit', unitType: 'police', destination: { q: 15, r: 15 } },
+      { type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 15, r: 15 } },
     ]));
 
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } }).error).toBeNull();
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 15, r: 15 } }).error).toBeNull();
     expect(engine.getState().pendingUnitProductions[0]?.population).toBe(6);
     expect(engine.getState().population.healthyCivilians).toBe(94);
     expect(engine.getState().population.unitPopulation).toBe(23);
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.getState().units.filter((unit) => unit.type === 'police').map((unit) => unit.population)).toEqual([6, 6]);
 
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 7, r: 7 } }).error).toBeNull();
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 15, r: 15 } }).error).toBeNull();
     expect(engine.getState().pendingUnitProductions[0]?.population).toBe(11);
     expect(engine.getState().population.healthyCivilians).toBe(83);
     expect(engine.getState().population.unitPopulation).toBe(34);
@@ -175,7 +176,7 @@ describe('GameEngine', () => {
     }));
     expect(engine.getLegalActions().some((action) => action.type === 'ProduceUnit' && action.unitType === 'police')).toBe(false);
     const before = engine.getState();
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } }).error?.code).toBe('insufficient_production_cost');
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 15, r: 15 } }).error?.code).toBe('insufficient_production_cost');
     expect(engine.getState()).toEqual(before);
   });
 
@@ -188,7 +189,7 @@ describe('GameEngine', () => {
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.type !== 'zombie');
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
-    expect(engine.step({ type: 'BuildCheckpoint', position: { q: 7, r: 6 } }).error).toBeNull();
+    expect(engine.step({ type: 'BuildCheckpoint', position: { q: 15, r: 9 } }).error).toBeNull();
     const checkpointId = engine.getState().checkpoints[0]!.id;
     expect(engine.step({ type: 'SetCheckpointPolicy', branchId: 'north', policy: 'passThrough' }).error).toBeNull();
     const residents = engine.getState().population.cityResidents;
@@ -232,8 +233,8 @@ describe('GameEngine', () => {
     const engine = new GameEngine(101, createDefaultConfig({ finalHordeTurn: 3 }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
-    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 5, r: 7 };
-    snapshot.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 2, r: 2 };
+    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 13, r: 15 };
+    snapshot.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 10, r: 10 };
     const farm = snapshot.facilities.find((facility) => facility.id === 'farm-1')!;
     farm.workers = 15;
     farm.infected = 10;
@@ -249,11 +250,11 @@ describe('GameEngine', () => {
     const engine = new GameEngine(102, createDefaultConfig({ finalHordeTurn: 3 }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
-    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 7, r: 6 };
-    snapshot.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 2, r: 2 };
+    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 15, r: 9 };
+    snapshot.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 10, r: 10 };
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1',
-      position: { q: 7, r: 6 },
+      position: { q: 15, r: 9 },
       direction: 'north',
       status: 'operational',
       waiting: 5,
@@ -279,10 +280,10 @@ describe('GameEngine', () => {
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     const zombie = snapshot.units.find((unit) => unit.type === 'zombie')!;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit || unit.id === zombie.id);
-    zombie.position = { q: 7, r: 7 };
+    zombie.position = { q: 15, r: 15 };
     snapshot.facilities.find((facility) => facility.id === 'capital')!.workers = 0;
-    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 5, r: 7 };
-    snapshot.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 2, r: 2 };
+    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 13, r: 15 };
+    snapshot.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 10, r: 10 };
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
@@ -294,7 +295,7 @@ describe('GameEngine', () => {
   it('resolves counterattacks, prevents a counter from a destroyed defender, and blocks post-attack movement', () => {
     const engine = new GameEngine(104, createDefaultConfig({ finalHordeTurn: 3, economy: { initialZombieCount: 0 } }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
-    const zombie = createUnit(snapshot, 'zombie-test', 'zombie', { q: 7, r: 6 });
+    const zombie = createUnit(snapshot, 'zombie-test', 'zombie', { q: 15, r: 14 });
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
     snapshot.units.push(zombie);
     synchronizePopulation(snapshot);
@@ -303,8 +304,8 @@ describe('GameEngine', () => {
     const exchange = engine.step({ type: 'Attack', attackerId: 'police-1', targetId: zombie.id });
     expect(exchange.error).toBeNull();
     expect(exchange.state.units.find((unit) => unit.id === zombie.id)?.hp).toBe(5);
-    expect(exchange.state.units.find((unit) => unit.id === 'police-1')?.hp).toBe(22);
-    expect(engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 7, r: 5 } }).error?.code).toBe('unit_cannot_move');
+    expect(exchange.state.units.find((unit) => unit.id === 'police-1')?.hp).toBe(20);
+    expect(engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 15, r: 13 } }).error?.code).toBe('unit_cannot_move');
 
     const killSnapshot = engine.getState() as ReturnType<typeof createInitialState>;
     const target = killSnapshot.units.find((unit) => unit.id === zombie.id)!;
@@ -354,6 +355,7 @@ describe('GameEngine', () => {
     const engine = new GameEngine(107, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
+    snapshot.facilities.find((facility) => facility.id === 'wind-power-plant-1')!.operationalStatus = 'disabled';
     snapshot.resources.fuel = 5;
     synchronizePopulation(snapshot);
     const before = JSON.stringify(snapshot);
@@ -374,6 +376,7 @@ describe('GameEngine', () => {
     noPower.result = null;
     noPower.resources.fuel = 100;
     noPower.facilities.find((facility) => facility.id === 'power-plant-1')!.workers = 0;
+    noPower.facilities.find((facility) => facility.id === 'wind-power-plant-1')!.operationalStatus = 'disabled';
     synchronizePopulation(noPower);
     createCityPopulationSnapshot(noPower);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: noPower }).error).toBeNull();
@@ -394,7 +397,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot: initial }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
-    snapshot.units.push(createUnit(snapshot, 'zombie-range', 'zombie', { q: 10, r: 7 }));
+    snapshot.units.push(createUnit(snapshot, 'zombie-range', 'zombie', { q: 18, r: 15 }));
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.getState().resources.militarySupplyAvailable).toBe(false);
     expect(engine.getLegalActions().some((action) => action.type === 'Attack' && action.attackerId === 'national-guard-1' && action.targetId === 'zombie-range')).toBe(false);
@@ -410,7 +413,7 @@ describe('GameEngine', () => {
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
     snapshot.checkpoints.push({
-      id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
+      id: 'checkpoint-north-1', position: { q: 15, r: 9 }, direction: 'north', status: 'operational',
       waiting: 0, screening: 4, approved: 0, remainingTurns: 1, screeningPolicy: 'normal', nextArrivalTurn: null, infected: 0,
     });
     snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-north-1';
@@ -453,8 +456,8 @@ describe('GameEngine', () => {
     const engine = new GameEngine(110, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
-    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 2, r: 2 };
-    snapshot.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 3, r: 2 };
+    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 10, r: 10 };
+    snapshot.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 11, r: 10 };
     const farm = snapshot.facilities.find((facility) => facility.id === 'farm-1')!;
     farm.workers = 1;
     farm.infected = 1;
@@ -473,8 +476,8 @@ describe('GameEngine', () => {
 
     const capitalLoss = engine.getState() as ReturnType<typeof createInitialState>;
     capitalLoss.units = capitalLoss.units.filter((unit) => unit.isPlayerUnit);
-    capitalLoss.units.find((unit) => unit.id === 'police-1')!.position = { q: 2, r: 2 };
-    capitalLoss.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 3, r: 2 };
+    capitalLoss.units.find((unit) => unit.id === 'police-1')!.position = { q: 10, r: 10 };
+    capitalLoss.units.find((unit) => unit.id === 'national-guard-1')!.position = { q: 11, r: 10 };
     const capital = capitalLoss.facilities.find((facility) => facility.id === 'capital')!;
     capital.workers = 1;
     capital.infected = 1;
@@ -489,7 +492,7 @@ describe('GameEngine', () => {
       economy: { initialZombieCount: 0, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
     }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
-    const position = { q: 7, r: 6 };
+    const position = { q: 15, r: 9 };
     snapshot.units.find((unit) => unit.id === 'police-1')!.position = position;
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1', position, direction: 'north', status: 'ruined',
@@ -539,8 +542,16 @@ describe('GameEngine', () => {
     const engine = new GameEngine(112, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
+    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 15, r: 15 };
     snapshot.pendingUnitProductions.push({ id: 'production-tie', cityFacilityId: 'capital', unitType: 'police', population: 5, readyTurn: 2 });
-    const nearest = findNearestOpenTiles(snapshot.map, { q: 7, r: 7 }, new Set(snapshot.units.map((unit) => `${unit.position.q},${unit.position.r}`)));
+    const nearest = findNearestOpenTiles(
+      snapshot.map,
+      { q: 15, r: 15 },
+      new Set([
+        ...snapshot.units.map((unit) => `${unit.position.q},${unit.position.r}`),
+        '15,15',
+      ]),
+    );
     const callsBefore = snapshot.rngState.calls;
     synchronizePopulation(snapshot);
     expect(nearest.length).toBeGreaterThan(1);
@@ -639,9 +650,10 @@ describe('GameEngine', () => {
   it('keeps newly secured production facilities unavailable until the next player turn', () => {
     const engine = new GameEngine(203, createDefaultConfig({ finalHordeTurn: 3, economy: { initialZombieCount: 0 } }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
-    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 6, r: 5 };
+    snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 14, r: 5 };
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
-    expect(engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 6, r: 4 } }).error).toBeNull();
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 3 } }).error).toBeNull();
+    expect(engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 14, r: 4 } }).error).toBeNull();
     expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-2', workers: 1 }).error?.code).toBe('facility_not_yet_operational');
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-2', workers: 1 }).error).toBeNull();
@@ -664,6 +676,7 @@ describe('GameEngine', () => {
     city.owner = 'player';
     city.status = 'owned';
     city.workers = 51;
+    city.operationalStatus = 'operational';
     city.populationOperationalTurn = 1;
     city.securedOrder = 5;
     snapshot.facilities.find((facility) => facility.id === 'power-plant-1')!.workers = 1;
@@ -699,8 +712,8 @@ describe('GameEngine', () => {
 
   it('enforces recruitment hubs, supply-order conscription, and the last-civilian guard', () => {
     const engine = new GameEngine(205, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 5, r: 7 } }).error?.code).toBe('invalid_recruitment_hub');
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 7, r: 7 } }).error).toBeNull();
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 13, r: 15 } }).error?.code).toBe('invalid_recruitment_hub');
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 15, r: 15 } }).error).toBeNull();
     expect(engine.getState().facilities.find((facility) => facility.id === 'capital')?.workers).toBe(31);
 
     const last = engine.getState() as ReturnType<typeof createInitialState>;
@@ -711,7 +724,7 @@ describe('GameEngine', () => {
     createCityPopulationSnapshot(last);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: last }).error).toBeNull();
     const before = engine.getState();
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 7, r: 7 } }).error?.code).toBe('insufficient_production_cost');
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 15, r: 15 } }).error?.code).toBe('insufficient_production_cost');
     expect(engine.getState()).toEqual(before);
   });
 
@@ -724,11 +737,11 @@ describe('GameEngine', () => {
     const engine = new GameEngine(206, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.checkpoints.push({
-      id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
+      id: 'checkpoint-north-1', position: { q: 15, r: 9 }, direction: 'north', status: 'operational',
       waiting: 2, screening: 2, approved: 2, remainingTurns: 2, screeningPolicy: 'normal', nextArrivalTurn: null, infected: 0,
     });
     snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-north-1';
-    snapshot.units.push(createUnit(snapshot, 'zombie-pools', 'zombie', { q: 7, r: 6 }));
+    snapshot.units.push(createUnit(snapshot, 'zombie-pools', 'zombie', { q: 15, r: 9 }));
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
@@ -761,7 +774,7 @@ describe('GameEngine', () => {
     snapshot.cityPopulationSnapshot.supply.forEach((entry) => { entry.eligible = false; });
     snapshot.cityPopulationSnapshot.reception.forEach((entry) => { entry.eligible = false; });
     snapshot.checkpoints.push({
-      id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
+      id: 'checkpoint-north-1', position: { q: 15, r: 9 }, direction: 'north', status: 'operational',
       waiting: 2, screening: 0, approved: 0, remainingTurns: 0, screeningPolicy: 'passThrough', nextArrivalTurn: null, infected: 0,
     });
     snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-north-1';
@@ -781,7 +794,7 @@ describe('GameEngine', () => {
     const engine = new GameEngine(208, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.checkpoints.push({
-      id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
+      id: 'checkpoint-north-1', position: { q: 15, r: 9 }, direction: 'north', status: 'operational',
       waiting: 1, screening: 2, approved: 3, remainingTurns: 2, screeningPolicy: 'normal', nextArrivalTurn: null, infected: 2,
     });
     synchronizePopulation(snapshot);

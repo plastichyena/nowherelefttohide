@@ -54,7 +54,7 @@ export function createAgentApiInfo(
     methodSchemas: {
       getApiInfo: { arguments: 'none', returns: 'AgentApiInfo', description: 'Returns versions, public methods, fair-play boundaries, and static rules.' },
       reset: { arguments: 'AgentResetOptions? { seed?, configOverrides?, agent?: { id } }', returns: 'AgentObservation', description: 'Replaces the in-memory Agent session.' },
-      getObservation: { arguments: 'none', returns: `AgentObservation ${OBSERVATION_API_VERSION}`, description: 'Returns a deterministic JSON copy of current public information, including terrain, visibility, checkpoint position candidates, Horde status, and Victory progress.' },
+      getObservation: { arguments: 'none', returns: `AgentObservation ${OBSERVATION_API_VERSION}`, description: 'Returns a deterministic JSON copy of current public information, including Fuel previews, constructible candidates, strategic forecast, visibility, checkpoint candidates, Horde status, and Victory progress.' },
       getLegalActions: { arguments: 'none', returns: 'GameAction[]', description: 'Returns deterministic currently legal atomic actions.' },
       step: { arguments: 'one GameAction from getLegalActions()', returns: 'AgentStepResult', description: 'Validates and applies exactly one action through GameEngine.' },
       isGameOver: { arguments: 'none', returns: 'boolean', description: 'Reports whether the Agent session ended.' },
@@ -69,6 +69,9 @@ export function createAgentApiInfo(
       'Map terrain, roads, facility/checkpoint overlays, supply, Horde warning facts, and Victory progress are public.',
       'Checkpoint observations identify Active, Standby, Dormant, Remnant, Ruined, and Abandoned posts; branch policy belongs to the road branch.',
       'checkpointPositionCandidates contains every road tile or post with the Core-derived legal flag and first ActionError reason code.',
+      'Human Units publish current/max Fuel, only legal Move Fuel costs, post-Move Fuel, and same-EndTurn refill demand/allocation.',
+      'Facilities publish actual population and separate zombieTargetValue; Wind is a target value 5 but has no civilian population.',
+      'strategicForecast is the Core projection for resource dependencies, Guaranteed Defeat, and Checkpoint Queue Pressure.',
       'Combat noise exposes only center, unit type, and public noise class. Both human unit types are Medium in the standard rules.',
       'The enemy list contains only currently visible normal Zombies and Horde Zombies; hidden enemies are omitted.',
     ],
@@ -77,6 +80,7 @@ export function createAgentApiInfo(
       'Zombie Current Target, Inherited Target, Target Reason, hidden Spawn coordinates, and hidden enemy history are not public.',
       'Zombie Noise Target, exact Noise Radius, and affected hidden Zombie IDs or counts are not public.',
       'Checkpoint candidates never reveal blocker unit IDs; hidden enemies do not block a candidate or change its reason code.',
+      'Constructible candidates and actions use only visible Zombies. Hidden Zombies never make an otherwise legal Build candidate illegal.',
       'LoadSnapshot, StartNewGame, SuppressInfection, arbitrary code, files, saves, localStorage, network, and Batch execution are not public actions.',
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
@@ -194,6 +198,72 @@ export function createAgentApiInfo(
         standbyProvidesArrivalSupplyVision: false,
         dormantProvidesArrivalSupplyVision: false,
       },
+      unitFuel: {
+        movementByType: {
+          police: config.units.police.movement,
+          nationalGuard: config.units.nationalGuard.movement,
+        },
+        maxFuelByType: {
+          police: config.units.police.maxFuel,
+          nationalGuard: config.units.nationalGuard.maxFuel,
+        },
+        fuelCostFormulaByType: {
+          police: 'distance 0: 0; 1..5: 1; >=6: 1 + (distance - 5)',
+          nationalGuard: 'distance 0: 0; 1..5: 1; >=6: 1 + 2 * (distance - 5)',
+        },
+        refuelTiming: 'after_power_before_production',
+        refuelRequiresSupply: true,
+        shortageAllocation: 'unit_id_ascending_round_robin',
+      },
+      constructibleFacilities: {
+        types: ['simpleFarm', 'civilianDroneBase'],
+        limitFormula: 'ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor)',
+        buildConditions: [
+          'inside_player_supply',
+          'plain_base_terrain',
+          'no_road_urban_or_horde_entrance',
+          'no_facility_checkpoint_player_unit_or_visible_zombie',
+          'per_type_limit_resources_and_action_budget',
+        ],
+        costs: {
+          simpleFarm: config.facilities.simpleFarm.buildCivilianGoods,
+          civilianDroneBase: config.facilities.civilianDroneBase.buildCivilianGoods,
+        },
+        stateTransitions: [
+          'build_turn: building_empty_no_power_or_vision',
+          'next_player_turn: operational',
+          'empty_zombie_occupation: disabled',
+          'human_recapture: recovering',
+          'next_player_turn_after_recovery: operational_empty',
+        ],
+        simpleFarm: {
+          workerCapacity: config.facilities.simpleFarm.workerCapacity,
+          requiredPower: config.facilities.simpleFarm.production.powerCapacity,
+          foodPerWorker: config.facilities.simpleFarm.production.outputs.food ?? 0,
+        },
+        civilianDroneBase: {
+          workerCapacity: config.facilities.civilianDroneBase.workerCapacity,
+          requiredPower: config.facilities.civilianDroneBase.production.powerCapacity,
+          visionPerWorker: 2,
+        },
+        windPowerPlant: {
+          fixedPower: config.facilities.windPowerPlant.production.fixedPowerGeneration,
+          vision: config.facilities.windPowerPlant.visionRadius,
+          zombieTargetValue: config.facilities.windPowerPlant.zombieTargetValue,
+          supplySource: false,
+        },
+      },
+      strategicForecast: {
+        observationField: 'strategicForecast',
+        resources: ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricity'],
+        guaranteedDefeat: ['guaranteed', 'causeResource', 'foodShortage', 'civilianGoodsShortage', 'projectedHealthyCivilians', 'defeatReason'],
+        queuePressureThresholds: {
+          none: 'queuePeople == 0',
+          low: '0 < queuePeople <= screeningCapacity',
+          medium: 'screeningCapacity < queuePeople <= screeningCapacity * 2',
+          high: 'queuePeople > screeningCapacity * 2',
+        },
+      },
       noise: {
         classes: ['small', 'medium', 'large', 'extraLarge'],
         policeClass: config.noise.publicClass.police,
@@ -219,7 +289,7 @@ export function createAgentApiInfo(
         sameTurnProductionCanCoverProductionInputs: false,
         sameTurnCivilianGoodsCannotDirectlyFeedMilitaryFactories: true,
         civilianProductionCanReleaseTurnStartStockFromMaintenanceReservation: true,
-        powerAllocationOrder: ['required_cities', 'farm_and_civilian_factory_boost', 'input_ready_military_factory_boost'],
+        powerAllocationOrder: ['capital_and_cities', 'simple_farm', 'permanent_farm_and_civilian_factory', 'input_ready_military_factory', 'civilian_drone_base'],
       },
     },
     minimalExample: [

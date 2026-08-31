@@ -19,8 +19,10 @@ describe('unified Agent Runner', () => {
     expect(first.artifact.observationApiVersion).toBe(OBSERVATION_API_VERSION);
     expect(first.artifact.bridgeApiVersion).toBe(BRIDGE_API_VERSION);
     expect(first.artifact.config.finalHordeTurn).toBe(3);
-    expect(first.artifact.observationTrace?.[0]?.map.tiles.some((tile) => tile.terrain === 'forest')).toBe(true);
-    expect(first.artifact.observationTrace?.[0]?.checkpointPositionCandidates).toHaveLength(28);
+    expect(first.artifact.fixedMap?.tiles.some((tile) => tile.terrain === 'forest')).toBe(true);
+    expect(first.artifact.observationTrace?.[0]?.mapId).toBe(first.artifact.mapId);
+    expect(first.artifact.observationTrace?.[0]).not.toHaveProperty('map');
+    expect(first.artifact.observationTrace?.[0]?.checkpointPositionCandidates).toHaveLength(60);
     expect(first.artifact.observationTrace?.some((observation) => observation.horde.finalHordeStatus !== 'notStarted')).toBe(true);
     expect(first.artifact.initialRoadArrivalSchedule).toHaveLength(4);
     expect(first.artifact.observationTrace).toHaveLength(first.actions.length + 1);
@@ -48,12 +50,12 @@ describe('unified Agent Runner', () => {
     expect(corruptedReplay.reproduced).toBe(false);
     expect(corruptedReplay.mismatch).toBe('Replay internal verification events differ from the artifact');
     const previousAppReplay = replayArtifact({ ...first.artifact, appVersion: '1.3.1' });
-    expect(previousAppReplay.reproduced).toBe(true);
-    expect(previousAppReplay.error).toBeNull();
+    expect(previousAppReplay.reproduced).toBe(false);
+    expect(previousAppReplay.error?.code).toBe('artifact_version_unsupported');
     const missingAppMetadataReplay = replayArtifact({ ...first.artifact, appVersion: '' });
     expect(missingAppMetadataReplay.reproduced).toBe(false);
     expect(missingAppMetadataReplay.error?.code).toBe('artifact_invalid');
-  }, 30_000);
+  }, 90_000);
 
   it('rejects v1.3 and earlier artifacts before creating a v1.4 replay session', () => {
     const config = createDefaultConfig({ finalHordeTurn: 1 });

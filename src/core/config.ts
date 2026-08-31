@@ -14,8 +14,8 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '1.4.2';
-export const DEFAULT_MAP_ID = 'fixed-15x15-v2';
+export const CONFIG_VERSION = '2.0.0';
+export const DEFAULT_MAP_ID = 'fixed-31x31-v1';
 
 const facilityIds: FacilityId[] = [
   'capital',
@@ -34,6 +34,7 @@ const facilityIds: FacilityId[] = [
   'refinery-2',
   'power-plant-1',
   'power-plant-2',
+  'wind-power-plant-1',
 ];
 
 const emptyInputs = (): ProductionRule['inputs'] => ({});
@@ -45,15 +46,16 @@ function production(
   powerMode: ProductionRule['powerMode'],
   powerCapacity = 0,
   powerGeneration = 0,
+  fixedPowerGeneration = 0,
 ): ProductionRule {
-  return { inputs, outputs, powerMode, requiresPower: powerMode === 'required', powerCapacity, powerGeneration };
+  return { inputs, outputs, powerMode, requiresPower: powerMode === 'required', powerCapacity, powerGeneration, fixedPowerGeneration };
 }
 
 const defaultUnitConfig: Record<UnitType, UnitConfig> = {
-  police: { hp: 25, attack: 5, movement: 5, range: 1, vision: 5, population: 5 },
-  nationalGuard: { hp: 50, attack: 10, movement: 5, range: 2, vision: 5, population: 10 },
-  zombie: { hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0 },
-  hordeZombie: { hp: 20, attack: 5, movement: 3, range: 1, vision: 3, population: 0 },
+  police: { hp: 25, attack: 5, movement: 10, range: 1, vision: 5, population: 5, maxFuel: 12 },
+  nationalGuard: { hp: 50, attack: 10, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 22 },
+  zombie: { hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0 },
+  hordeZombie: { hp: 20, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0 },
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
@@ -61,36 +63,61 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
     workerCapacity: 100,
     production: production(emptyInputs(), { civilianGoods: 1 }, 'required', 5),
     overrunSpawnCount: 2,
+    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   city: {
     workerCapacity: 50,
     production: production(emptyInputs(), { civilianGoods: 1 }, 'required', 5),
     overrunSpawnCount: 2,
+    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   farm: {
     workerCapacity: 30,
     production: production(emptyInputs(), { food: 5 }, 'boost', 5),
     overrunSpawnCount: 2,
+    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   civilianFactory: {
     workerCapacity: 30,
     production: production(emptyInputs(), { civilianGoods: 5 }, 'boost', 5),
     overrunSpawnCount: 2,
+    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   militaryFactory: {
     workerCapacity: 30,
     production: production({ civilianGoods: 1 }, { militaryGoods: 2 }, 'boost', 5),
     overrunSpawnCount: 2,
+    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   refinery: {
     workerCapacity: 30,
     production: production(emptyInputs(), { fuel: 5 }, 'none'),
     overrunSpawnCount: 2,
+    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   powerPlant: {
     workerCapacity: 30,
     production: production(emptyInputs(), emptyOutputs(), 'none', 0, 10),
     overrunSpawnCount: 2,
+    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
+  },
+  windPowerPlant: {
+    workerCapacity: 0,
+    production: production(emptyInputs(), emptyOutputs(), 'none', 0, 0, 15),
+    overrunSpawnCount: 0,
+    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 5,
+  },
+  simpleFarm: {
+    workerCapacity: 10,
+    production: production(emptyInputs(), { food: 5 }, 'required', 5),
+    overrunSpawnCount: 2,
+    buildCivilianGoods: 15, visionRadius: 1, zombieTargetValue: 0,
+  },
+  civilianDroneBase: {
+    workerCapacity: 5,
+    production: production(emptyInputs(), emptyOutputs(), 'required', 5),
+    overrunSpawnCount: 2,
+    buildCivilianGoods: 25, visionRadius: 10, zombieTargetValue: 0,
   },
 };
 
@@ -118,6 +145,7 @@ const initialWorkersByFacility: Record<FacilityId, number> = {
   'refinery-2': 0,
   'power-plant-1': 3,
   'power-plant-2': 0,
+  'wind-power-plant-1': 0,
 };
 
 const defaultEconomy: EconomyConfig = {
@@ -125,7 +153,7 @@ const defaultEconomy: EconomyConfig = {
   militaryGoodsPerUnitPopulation: 1,
   initialResources,
   initialWorkersByFacility,
-  initialZombieCount: 4,
+  initialZombieCount: 6,
 };
 
 const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopulationConfig> =
@@ -213,6 +241,9 @@ export const DEFAULT_CONFIG: GameConfig = {
     requiresPolice: false,
     consumesPower: false,
     initialSupplyRadius: 5,
+  },
+  constructibleFacility: {
+    limitPerTypeDivisor: 2,
   },
   noise: {
     police: 4,
@@ -314,8 +345,11 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       errors.push(`units.${type} is required`);
       continue;
     }
-    for (const key of ['hp', 'attack', 'movement', 'range', 'vision', 'population'] as const) {
+    for (const key of ['hp', 'attack', 'movement', 'range', 'vision', 'population', 'maxFuel'] as const) {
       requireInteger(errors, unit[key], `units.${type}.${key}`, 0);
+    }
+    if ((type === 'police' || type === 'nationalGuard') && unit.maxFuel < 1) {
+      errors.push(`units.${type}.maxFuel must be at least 1`);
     }
   }
 
@@ -327,6 +361,9 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     'militaryFactory',
     'refinery',
     'powerPlant',
+    'windPowerPlant',
+    'simpleFarm',
+    'civilianDroneBase',
   ];
   for (const type of facilityTypes) {
     const facility = config.facilities?.[type];
@@ -334,18 +371,22 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       errors.push(`facilities.${type} is required`);
       continue;
     }
-    requireInteger(errors, facility.workerCapacity, `facilities.${type}.workerCapacity`, 1);
+    requireInteger(errors, facility.workerCapacity, `facilities.${type}.workerCapacity`, type === 'windPowerPlant' ? 0 : 1);
     requireInteger(errors, facility.overrunSpawnCount, `facilities.${type}.overrunSpawnCount`, 0);
+    requireInteger(errors, facility.buildCivilianGoods, `facilities.${type}.buildCivilianGoods`, 0);
+    requireInteger(errors, facility.visionRadius, `facilities.${type}.visionRadius`, 0);
+    requireInteger(errors, facility.zombieTargetValue, `facilities.${type}.zombieTargetValue`, 0);
     if (!facility.production || typeof facility.production !== 'object') {
       errors.push(`facilities.${type}.production is required`);
       continue;
     }
     requireInteger(errors, facility.production.powerCapacity, `facilities.${type}.production.powerCapacity`, 0);
     requireInteger(errors, facility.production.powerGeneration, `facilities.${type}.production.powerGeneration`, 0);
+    requireInteger(errors, facility.production.fixedPowerGeneration, `facilities.${type}.production.fixedPowerGeneration`, 0);
     if (!['required', 'boost', 'none'].includes(facility.production.powerMode)) {
       errors.push(`facilities.${type}.production.powerMode must be required, boost, or none`);
     }
-    const expectedPowerMode = type === 'capital' || type === 'city'
+    const expectedPowerMode = type === 'capital' || type === 'city' || type === 'simpleFarm' || type === 'civilianDroneBase'
       ? 'required'
       : ['farm', 'civilianFactory', 'militaryFactory'].includes(type)
         ? 'boost'
@@ -397,6 +438,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       'refinery-2': 'refinery',
       'power-plant-1': 'powerPlant',
       'power-plant-2': 'powerPlant',
+      'wind-power-plant-1': 'windPowerPlant',
     };
     for (const facilityId of facilityIds) {
       const initial = initialFacilityPopulation[facilityId];
@@ -441,8 +483,8 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('economy is required');
   } else {
     requireInteger(errors, economy.initialZombieCount, 'economy.initialZombieCount', 0);
-    if (economy.initialZombieCount > 4) {
-      errors.push('economy.initialZombieCount cannot exceed the four fixed-map positions');
+    if (economy.initialZombieCount > 6) {
+      errors.push('economy.initialZombieCount cannot exceed the six fixed-map positions');
     }
     const stock = economy.initialResources;
     if (!stock || typeof stock !== 'object') {
@@ -517,6 +559,13 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     if (typeof checkpoint.requiresPolice !== 'boolean' || typeof checkpoint.consumesPower !== 'boolean') {
       errors.push('checkpoint flags must be boolean');
     }
+  }
+
+  const constructibleFacility = config.constructibleFacility;
+  if (!constructibleFacility || typeof constructibleFacility !== 'object') {
+    errors.push('constructibleFacility is required');
+  } else {
+    requireInteger(errors, constructibleFacility.limitPerTypeDivisor, 'constructibleFacility.limitPerTypeDivisor', 1);
   }
 
   const noise = config.noise;

@@ -3,6 +3,7 @@ import type { GameAction, GameConfig, GameEvent } from '../core/types';
 import { actionKey, cloneAction, cloneJson, sortActions } from './action';
 import { collectGameMetrics, type GameMetrics } from './metrics';
 import { createAgentGame } from './game';
+import { compactArtifactObservation, restoreArtifactObservation } from './observation';
 import {
   AGENT_API_VERSION,
   APP_VERSION,
@@ -130,6 +131,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Compare JSON-compatible values without treating object key insertion order as game state. */
+function jsonEquivalent(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => jsonEquivalent(value, right[index]));
+  }
+  if (!isRecord(left) || !isRecord(right)) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return leftKeys.length === rightKeys.length &&
+    leftKeys.every((key) => Object.hasOwn(right, key) && jsonEquivalent(left[key], right[key]));
+}
+
 function errorFromUnknown(error: unknown, fallbackCode: string, fallbackMessage: string): AgentActionError {
   if (isRecord(error) && typeof error.code === 'string' && typeof error.message === 'string') {
     return { code: error.code, message: error.message };
@@ -226,6 +242,7 @@ function placeholderArtifact(
     invalidAttempts: [],
     decisionTrace: clone([...traces]),
     result: clone(result),
+    fixedMap: initialObservation ? clone(initialObservation.map) : undefined,
   };
 }
 
@@ -256,6 +273,7 @@ function enrichArtifact(
   artifact.invalidAttempts = Array.isArray(artifact.invalidAttempts) ? clone(artifact.invalidAttempts) : [];
   artifact.decisionTrace = clone([...traces]);
   artifact.result = clone(result);
+  if (!artifact.fixedMap && fallback.fixedMap) artifact.fixedMap = clone(fallback.fixedMap);
   if (!Array.isArray(artifact.initialRoadArrivalSchedule)) {
     artifact.initialRoadArrivalSchedule = clone(fallback.initialRoadArrivalSchedule);
   }
@@ -540,7 +558,8 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
   const fallback = placeholderArtifact(seed, config, agent, buildId, actions, decisionTrace, result, observations[0] ?? null);
   const strategyName = strategyForAgent(agent, options.strategy);
   const baseArtifact = enrichArtifact(sourceArtifact, fallback, actions, decisionTrace, result, agent, strategyName);
-  baseArtifact.observationTrace = clone(observations);
+  baseArtifact.observationTrace = observations.map(compactArtifactObservation);
+  if (observations[0]) baseArtifact.fixedMap = clone(observations[0].map);
   delete baseArtifact.verificationEvents;
   const verificationEvents = verificationEventsFromSnapshot(debugAfter);
   if (verificationEvents.length > 0) baseArtifact.verificationEvents = verificationEvents;
@@ -571,7 +590,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       supply: { initialRadius: config.checkpoint.initialSupplyRadius, suppliedTileKeys: [], branchRadii: [] },
       resources: { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0, electricityCapacity: 0, electricityRequired: 0, militarySupplyAvailable: false },
       population: { healthyCivilians: 0, cityResidents: 0, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
-      facilities: [], units: [], zombies: [], checkpoints: [], checkpointPositionCandidates: [],
+      facilities: [], units: [], zombies: [], checkpoints: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [],
       horde: {
         warningType: 'none',
         warningDirection: 'north',
@@ -595,12 +614,22 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
         food: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0 },
         civilianGoods: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0, productionInputDemand: 0, productionInputAllocated: 0, productionInputShortage: 0, maintenanceShortage: 0 },
         militaryGoods: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0 },
-        fuel: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0, generationFuelDemand: 0, projectedFuelUsed: 0, generationFuelShortage: 0 },
+        fuel: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0, turnStartFuel: 0, windPowerAvailable: 0, powerPlantPhysicalCapacity: 0, projectedPowerFuelDemand: 0, projectedPowerFuelUsed: 0, fuelAfterPower: 0, projectedUnitRefillDemand: 0, projectedUnitFuelRefilled: 0, projectedTotalFuelDemand: 0, projectedRefineryProduction: 0, projectedEndingFuel: 0, powerFuelShortage: 0, unitRefillFuelShortage: 0, totalFuelShortage: 0, generationFuelDemand: 0, projectedFuelUsed: 0, generationFuelShortage: 0 },
         electricity: { physicalGenerationCapacity: 0, fuelLimitedGenerationCapacity: 0, availableGenerationCapacity: 0, requiredPowerDemand: 0, industrialBoostDemand: 0, requiredPowerAllocated: 0, industrialBoostAllocated: 0, unpoweredFacilities: [], capacity: 0, required: 0, shortage: 0 },
+      },
+      strategicForecast: {
+        resources: {
+          food: { resource: 'food', currentSupply: 0, currentDemand: 0, contributors: [], largestContributorFacilityId: null, projectedSupplyWithoutLargestContributor: 0, shortageWithoutLargestContributor: 0, singlePointOfFailure: false, currentlyShort: false },
+          civilianGoods: { resource: 'civilianGoods', currentSupply: 0, currentDemand: 0, contributors: [], largestContributorFacilityId: null, projectedSupplyWithoutLargestContributor: 0, shortageWithoutLargestContributor: 0, singlePointOfFailure: false, currentlyShort: false },
+          militaryGoods: { resource: 'militaryGoods', currentSupply: 0, currentDemand: 0, contributors: [], largestContributorFacilityId: null, projectedSupplyWithoutLargestContributor: 0, shortageWithoutLargestContributor: 0, singlePointOfFailure: false, currentlyShort: false },
+          fuel: { resource: 'fuel', currentSupply: 0, currentDemand: 0, contributors: [], largestContributorFacilityId: null, projectedSupplyWithoutLargestContributor: 0, shortageWithoutLargestContributor: 0, singlePointOfFailure: false, currentlyShort: false },
+          electricity: { resource: 'electricity', currentSupply: 0, currentDemand: 0, contributors: [], largestContributorFacilityId: null, projectedSupplyWithoutLargestContributor: 0, shortageWithoutLargestContributor: 0, singlePointOfFailure: false, currentlyShort: false },
+        },
+        guaranteedDefeat: { guaranteed: false, causeResource: null, foodShortage: 0, civilianGoodsShortage: 0, projectedHealthyCivilians: 0, defeatReason: null },
       },
       gameOver: true,
       result: null,
-    } as AgentObservation),
+    } as unknown as AgentObservation),
     finalObservation,
     observations,
     actions,
@@ -731,6 +760,7 @@ function artifactValidationError(artifact: AgentRunArtifact): AgentActionError |
     return publicActionError('artifact_invalid', 'Replay artifact appVersion metadata must be a non-empty string');
   }
   const versions: Array<[string, unknown, string]> = [
+    ['appVersion', artifact.appVersion, APP_VERSION],
     ['artifactSchemaVersion', artifact.artifactSchemaVersion, ARTIFACT_SCHEMA_VERSION],
     ['gameRulesVersion', artifact.gameRulesVersion, GAME_RULES_VERSION],
     ['agentApiVersion', artifact.agentApiVersion, AGENT_API_VERSION],
@@ -748,13 +778,17 @@ function artifactValidationError(artifact: AgentRunArtifact): AgentActionError |
   if (typeof artifact.config.mapId !== 'string' || artifact.config.mapId !== artifact.mapId) {
     return publicActionError('artifact_invalid', 'Replay artifact map metadata does not match its config');
   }
+  if (!artifact.fixedMap || !isRecord(artifact.fixedMap) || artifact.fixedMap.id !== artifact.mapId || !Array.isArray(artifact.fixedMap.tiles)) {
+    return publicActionError('artifact_invalid', 'Replay artifact fixedMap is missing or does not match map metadata');
+  }
   if (!Array.isArray(artifact.acceptedActions)) return publicActionError('artifact_invalid', 'Replay artifact acceptedActions is invalid');
   if (!Array.isArray(artifact.initialRoadArrivalSchedule)) return publicActionError('artifact_invalid', 'Replay artifact road schedule is missing');
   if (!artifact.result) return publicActionError('artifact_incomplete', 'Replay requires a completed Result');
   if (!isRecord(artifact.agent) || typeof artifact.agent.id !== 'string') return publicActionError('artifact_invalid', 'Replay artifact agent metadata is invalid');
   if (artifact.observationTrace !== undefined && (
     !Array.isArray(artifact.observationTrace) ||
-    artifact.observationTrace.length !== artifact.acceptedActions.length + 1
+    artifact.observationTrace.length !== artifact.acceptedActions.length + 1 ||
+    artifact.observationTrace.some((trace) => !isRecord(trace) || trace.mapId !== artifact.mapId || !Array.isArray(trace.visibleTileKeys))
   )) return publicActionError('artifact_invalid', 'Replay artifact observation trace is incomplete');
   if (artifact.verificationEvents !== undefined && !Array.isArray(artifact.verificationEvents)) {
     return publicActionError('artifact_invalid', 'Replay artifact verificationEvents must be an array');
@@ -814,7 +848,7 @@ export function replayArtifact(
   const expectedSchedule = artifact.initialRoadArrivalSchedule
     .map((entry) => ({ branchId: entry.branchId, nextArrivalTurn: entry.nextArrivalTurn }))
     .sort((left, right) => left.branchId.localeCompare(right.branchId));
-  if (JSON.stringify(scheduleFromObservation(observation)) !== JSON.stringify(expectedSchedule)) {
+  if (!jsonEquivalent(scheduleFromObservation(observation), expectedSchedule)) {
     return {
       result: null,
       observation,
@@ -824,8 +858,21 @@ export function replayArtifact(
       mismatch: 'Replay initial road-arrival schedule differs from the artifact',
     };
   }
-  const expectedObservations = artifact.observationTrace;
-  if (expectedObservations && JSON.stringify(expectedObservations[0]) !== JSON.stringify(observation)) {
+  let expectedObservations: AgentObservation[] | undefined;
+  try {
+    expectedObservations = artifact.observationTrace?.map((trace) => restoreArtifactObservation(trace, artifact.fixedMap!));
+  } catch (thrown) {
+    const message = thrown instanceof Error ? thrown.message : 'Replay artifact observation trace is invalid';
+    return {
+      result: null,
+      observation: null,
+      actionsReplayed: 0,
+      error: publicActionError('artifact_invalid', message),
+      reproduced: false,
+      mismatch: message,
+    };
+  }
+  if (expectedObservations && !jsonEquivalent(expectedObservations[0], observation)) {
     return {
       result: null,
       observation,
@@ -875,7 +922,7 @@ export function replayArtifact(
     };
     actionsReplayed += 1;
     observation = clone(step.observation);
-    if (expectedObservations && JSON.stringify(expectedObservations[actionsReplayed]) !== JSON.stringify(observation)) {
+    if (expectedObservations && !jsonEquivalent(expectedObservations[actionsReplayed], observation)) {
       return {
         result: clone(game.getResult()),
         observation,
@@ -890,7 +937,7 @@ export function replayArtifact(
   const result = clone(game.getResult());
   let mismatch: string | null = null;
   if (actionsReplayed !== artifact.acceptedActions.length) mismatch = 'Replay did not consume the complete accepted action list';
-  if (!mismatch && artifact.result && JSON.stringify(artifact.result) !== JSON.stringify(result)) mismatch = 'Replay final result differs from the artifact';
+  if (!mismatch && artifact.result && !jsonEquivalent(artifact.result, result)) mismatch = 'Replay final result differs from the artifact';
   if (!mismatch && artifact.result && (!observation.gameOver || observation.turn !== artifact.result.turn)) mismatch = 'Replay final observation differs from the artifact result';
   if (!mismatch && artifact.verificationEvents) {
     const candidate = game as AgentGame & { getDebugState?: () => unknown };
@@ -898,7 +945,7 @@ export function replayArtifact(
       mismatch = 'Replay game cannot validate internal verification events';
     } else {
       const replayVerificationEvents = verificationEventsFromSnapshot(candidate.getDebugState());
-      if (JSON.stringify(artifact.verificationEvents) !== JSON.stringify(replayVerificationEvents)) {
+      if (!jsonEquivalent(artifact.verificationEvents, replayVerificationEvents)) {
         mismatch = 'Replay internal verification events differ from the artifact';
       }
     }

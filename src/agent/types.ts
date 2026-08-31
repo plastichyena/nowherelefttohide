@@ -4,6 +4,7 @@ import type {
   CheckpointPositionCandidate,
   CheckpointRole,
   CheckpointStatus,
+  ConstructibleFacilityPositionCandidate,
   DeepPartial,
   EndTurnForecast,
   FacilityOperationalStatus,
@@ -24,6 +25,7 @@ import type {
   PowerSupplyReason,
   ResourceState,
   ResourceType,
+  StrategicForecast,
   BaseTerrain,
   TerrainDefenseSource,
   UnitActionState,
@@ -32,15 +34,15 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.3.3';
-export const GAME_RULES_VERSION = '1.4.2';
-export const SAVE_FORMAT_VERSION = '4';
-export const AGENT_API_VERSION = '1.4.2';
-export const OBSERVATION_API_VERSION = '1.4.2';
-export const BRIDGE_API_VERSION = '1.4.2';
-export const BALANCED_AGENT_VERSION = '3.1.0';
-export const RANDOM_AGENT_VERSION = '1.2.0';
-export const ARTIFACT_SCHEMA_VERSION = '1.4.2';
+export const APP_VERSION = '1.4.0';
+export const GAME_RULES_VERSION = '2.0.0';
+export const SAVE_FORMAT_VERSION = '5';
+export const AGENT_API_VERSION = '2.0.0';
+export const OBSERVATION_API_VERSION = '2.0.0';
+export const BRIDGE_API_VERSION = '2.0.0';
+export const BALANCED_AGENT_VERSION = '4.0.0';
+export const RANDOM_AGENT_VERSION = '2.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '2.0.0';
 
 export interface AgentMapTileObservation {
   q: number;
@@ -83,6 +85,7 @@ export interface AgentRoadBranchObservation {
   /** Structural fallback availability; never reveals hidden-Zombie exclusion. */
   fallbackAvailable: boolean;
   currentPolicy: CheckpointPolicy;
+  currentPolicyTurns: number;
   preparedPostCount: number;
   preparedPostLimit: number;
   checkpointActionsThisTurn: number;
@@ -102,9 +105,17 @@ export interface AgentFacilityObservation {
   owner: 'player' | 'none';
   status: FacilityStatus;
   operationalStatus: FacilityOperationalStatus;
+  /** True only for player-built Simple Farms and Civilian Drone Bases. */
+  constructible: boolean;
+  /** The Player Turn in which this constructible was accepted, if applicable. */
+  builtTurn: number | null;
+  /** Recovery completion turn for disabled special facilities, if pending. */
+  recoveryOperationalTurn: number | null;
   /** Vision radius contributed by this facility at the current state. */
   vision: number;
   healthyPopulation: number;
+  /** Zombie targeting value is deliberately distinct from real population. */
+  zombieTargetValue: number;
   infectedPopulation: number;
   populationCapacity: number;
   populationLimitKind: 'soft' | 'hard';
@@ -170,6 +181,16 @@ export interface AgentUnitObservation {
   canAttack: boolean;
   canMove: boolean;
   inSupply: boolean;
+  currentFuel: number;
+  maxFuel: number;
+  /** Exact Core previews for every currently legal Move of this Unit. */
+  fuelCostByLegalMove: Array<{
+    destination: HexCoord;
+    fuelCost: number;
+    projectedFuelAfterMove: number;
+  }>;
+  projectedRefillDemandIfTurnEndsNow: number;
+  projectedRefillAmountIfTurnEndsNow: number;
   recoveryClassIfTurnEndsNow: UnitRecoveryClass | null;
   recoveryRateIfTurnEndsNow: number;
   recoveryBaseAmountIfTurnEndsNow: number;
@@ -197,9 +218,18 @@ export interface AgentCheckpointObservation {
   waiting: number;
   screening: number;
   approved: number;
+  queuePeople: number;
+  screeningCapacity: number;
+  estimatedScreeningThroughput: number;
+  arrivalIntervalMin: number;
+  arrivalIntervalMax: number;
+  arrivalPeopleMin: number;
+  arrivalPeopleMax: number;
+  queuePressureClass: 'none' | 'low' | 'medium' | 'high';
   infected: number;
   remainingTurns: number;
   currentPolicy: CheckpointPolicy;
+  currentPolicyTurns: number;
   nextPolicy: CheckpointPolicy;
   nextArrivalTurn: number | null;
   providesSupply: boolean;
@@ -319,6 +349,30 @@ export interface AgentApiInfo {
       fallbackPriority: string[];
       standbyProvidesArrivalSupplyVision: false;
       dormantProvidesArrivalSupplyVision: false;
+    };
+    unitFuel: {
+      movementByType: Record<'police' | 'nationalGuard', number>;
+      maxFuelByType: Record<'police' | 'nationalGuard', number>;
+      fuelCostFormulaByType: Record<'police' | 'nationalGuard', string>;
+      refuelTiming: 'after_power_before_production';
+      refuelRequiresSupply: true;
+      shortageAllocation: 'unit_id_ascending_round_robin';
+    };
+    constructibleFacilities: {
+      types: Array<'simpleFarm' | 'civilianDroneBase'>;
+      limitFormula: string;
+      buildConditions: string[];
+      costs: Record<'simpleFarm' | 'civilianDroneBase', number>;
+      stateTransitions: string[];
+      simpleFarm: { workerCapacity: number; requiredPower: number; foodPerWorker: number };
+      civilianDroneBase: { workerCapacity: number; requiredPower: number; visionPerWorker: number };
+      windPowerPlant: { fixedPower: number; vision: number; zombieTargetValue: number; supplySource: false };
+    };
+    strategicForecast: {
+      observationField: 'strategicForecast';
+      resources: string[];
+      guaranteedDefeat: string[];
+      queuePressureThresholds: Record<'none' | 'low' | 'medium' | 'high', string>;
     };
     noise: {
       classes: NoiseClass[];
@@ -441,6 +495,7 @@ export interface AgentObservation {
   zombies: AgentUnitObservation[];
   checkpoints: AgentCheckpointObservation[];
   checkpointPositionCandidates: CheckpointPositionCandidate[];
+  constructibleFacilityPositionCandidates: ConstructibleFacilityPositionCandidate[];
   roadBranches: AgentRoadBranchObservation[];
   supply: AgentSupplyObservation;
   horde: {
@@ -464,6 +519,7 @@ export interface AgentObservation {
   suppliedAreaZombieClear: boolean;
   suppliedAreaInfectionClear: boolean;
   endTurnForecast: EndTurnForecast;
+  strategicForecast: StrategicForecast;
   gameOver: boolean;
   result: AgentGameResult | null;
 }
@@ -561,14 +617,25 @@ export interface AgentRunArtifact {
   invalidAttempts: InvalidActionAttempt[];
   decisionTrace: AgentDecisionTrace[];
   result: AgentGameResult | null;
-  /** Public observations at reset and after each accepted action, when retained by a runner. */
-  observationTrace?: AgentObservation[];
+  /** Static map projection stored once per game by Artifact Schema 2.0.0. */
+  fixedMap?: AgentMapObservation;
+  /** Dynamic public observations at reset and after each accepted action. */
+  observationTrace?: AgentArtifactObservation[];
   /** Present on complete Runner artifacts and optionally on a live AgentGame. */
   metrics?: AgentPublicMetrics;
   /** Local/CI Runner-only Core events. Browser Bridge artifacts never include this field. */
   verificationEvents?: GameEvent[];
   events?: AgentPublicEvent[];
 }
+
+/**
+ * Artifact Schema 2.0.0 stores topology once and keeps only dynamic map
+ * visibility in each trace entry.  Live observations remain complete.
+ */
+export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {
+  mapId: string;
+  visibleTileKeys: string[];
+};
 
 /**
  * Noise reaction counts can reveal hidden enemy activity.  They are retained

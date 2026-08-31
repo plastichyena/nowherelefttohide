@@ -8,8 +8,8 @@ import {
 describe('GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('1.4.2');
-    expect(DEFAULT_CONFIG.mapId).toBe('fixed-15x15-v2');
+    expect(DEFAULT_CONFIG.version).toBe('2.0.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('fixed-31x31-v1');
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(10);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, powerMode: 'boost' });
     expect(DEFAULT_CONFIG.finalHordeTurn).toBe(30);
@@ -41,8 +41,8 @@ describe('GameConfig', () => {
       nationalGuard: 5,
       publicClass: { police: 'medium', nationalGuard: 'medium' },
     });
-    expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, attack: 5, movement: 5, range: 1, vision: 5, population: 5 });
-    expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, attack: 10, movement: 5, range: 2, population: 10 });
+    expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, attack: 5, movement: 10, range: 1, vision: 5, population: 5, maxFuel: 12 });
+    expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, attack: 10, movement: 10, range: 2, population: 10, maxFuel: 22 });
     expect(DEFAULT_CONFIG.naturalRecovery).toEqual({ combatRate: 0.1, restRate: 0.2, rounding: 'ceil' });
     expect(DEFAULT_CONFIG.facilities).toMatchObject({
       farm: { workerCapacity: 30 },
@@ -50,6 +50,13 @@ describe('GameConfig', () => {
       militaryFactory: { workerCapacity: 30 },
       refinery: { workerCapacity: 30 },
       powerPlant: { workerCapacity: 30 },
+      windPowerPlant: {
+        workerCapacity: 0,
+        production: { fixedPowerGeneration: 15 },
+        zombieTargetValue: 5,
+      },
+      simpleFarm: { workerCapacity: 10, buildCivilianGoods: 15 },
+      civilianDroneBase: { workerCapacity: 5, buildCivilianGoods: 25 },
     });
     expect(DEFAULT_CONFIG.economy.initialWorkersByFacility).toMatchObject({
       capital: 41,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GameAction } from '../core/types';
 import { BalancedAgent } from './balancedAgent';
 import { createAgentGame } from './game';
-import type { AgentObservation } from './types';
+import type { AgentObservation, AgentUnitObservation } from './types';
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -22,6 +22,31 @@ function unitByType(observation: AgentObservation, type: 'police' | 'nationalGua
   const unit = observation.units.find((candidate) => candidate.type === type);
   if (!unit) throw new Error(`Missing ${type} unit`);
   return unit;
+}
+
+function visibleZombie(observation: AgentObservation, id: string): AgentUnitObservation {
+  const template = observation.zombies[0] ?? observation.units[0]!;
+  return {
+    ...clone(template),
+    id,
+    type: 'zombie',
+    unitType: 'zombie',
+    hp: 10,
+    maxHp: 10,
+    attack: 5,
+    movement: 3,
+    range: 1,
+    baseRange: 1,
+    effectiveRange: 1,
+    population: 0,
+    canAttack: true,
+    canMove: true,
+    currentFuel: 0,
+    maxFuel: 0,
+    fuelCostByLegalMove: [],
+    projectedRefillDemandIfTurnEndsNow: 0,
+    projectedRefillAmountIfTurnEndsNow: 0,
+  };
 }
 
 /** Keep each scenario focused on the strategic conflict under test. */
@@ -49,23 +74,22 @@ function stabilize(observation: AgentObservation): AgentObservation {
 
 describe('Balanced Agent facility-contact denial', () => {
   it.each([
-    ['the state capital', 'capital', { q: 7, r: 4 }],
-    ['an operational farm', 'farm-1', { q: 5, r: 4 }],
+    ['the state capital', 'capital', { q: 15, r: 12 }],
+    ['an operational farm', 'farm-1', { q: 13, r: 12 }],
   ] as const)('attacks a zombie that can contact %s during the next zombie turn', (_label, facilityId, threatPosition) => {
     const observation = stabilize(freshObservation());
     const targetFacility = facilityById(observation, facilityId);
     targetFacility.healthyPopulation = Math.max(targetFacility.healthyPopulation, 10);
 
-    const threat = observation.zombies[0]!;
-    const decoy = observation.zombies[1]!;
-    threat.id = 'zombie-threat';
+    const threat = visibleZombie(observation, 'zombie-threat');
+    const decoy = visibleZombie(observation, 'zombie-a');
     threat.position = threatPosition;
     threat.hp = 10;
     threat.maxHp = 10;
-    decoy.id = 'zombie-a';
     decoy.position = { q: 0, r: 0 };
     decoy.hp = 10;
     decoy.maxHp = 10;
+    observation.zombies = [threat, decoy];
 
     const guard = unitByType(observation, 'nationalGuard');
     guard.position = { q: threatPosition.q, r: threatPosition.r + 1 };
@@ -86,7 +110,6 @@ describe('Balanced Agent facility-contact denial', () => {
 
   it('moves National Guard into firing range of a facility-contact threat before chasing a nearer decoy', () => {
     const observation = stabilize(freshObservation());
-    observation.zombies = observation.zombies.slice(0, 2);
     const targetFacility = facilityById(observation, 'military-factory-1');
     for (const facility of observation.facilities) {
       if (facility.id !== targetFacility.id) {
@@ -99,24 +122,23 @@ describe('Balanced Agent facility-contact denial', () => {
     }
     targetFacility.healthyPopulation = 10;
 
-    const threat = observation.zombies[0]!;
-    const decoy = observation.zombies[1]!;
-    threat.id = 'zombie-threat';
+    const threat = visibleZombie(observation, 'zombie-threat');
+    const decoy = visibleZombie(observation, 'zombie-decoy');
     // One Forest step plus the Urban destination costs exactly the Zombie's
-    // three movement points, so this remains a next-phase contact threat in v1.3.
-    threat.position = { q: 5, r: 3 };
-    decoy.id = 'zombie-decoy';
-    decoy.position = { q: 10, r: 7 };
+    // three movement points, so this remains a next-phase contact threat in v1.4.
+    threat.position = { q: 25, r: 15 };
+    decoy.position = { q: 26, r: 19 };
+    observation.zombies = [threat, decoy];
 
     const guard = unitByType(observation, 'nationalGuard');
-    guard.position = { q: 7, r: 7 };
+    guard.position = { q: 26, r: 20 };
     guard.range = 2;
     guard.movement = 5;
     guard.actionState = 'ready';
     guard.canMove = true;
 
-    const firingPosition = { q: 7, r: 3 };
-    const nearerDecoyPosition = { q: 9, r: 7 };
+    const firingPosition = { q: 26, r: 16 };
+    const nearerDecoyPosition = { q: 26, r: 19 };
     const actions: GameAction[] = [
       { type: 'Move', unitId: guard.id, destination: nearerDecoyPosition },
       { type: 'Move', unitId: guard.id, destination: firingPosition },
@@ -128,8 +150,8 @@ describe('Balanced Agent facility-contact denial', () => {
 
   it('keeps Police out of the frontline when no facility or Horde emergency exists', () => {
     const observation = stabilize(freshObservation());
-    observation.zombies = observation.zombies.slice(0, 1);
-    const zombie = observation.zombies[0]!;
+    const zombie = visibleZombie(observation, 'frontline-zombie');
+    observation.zombies = [zombie];
     zombie.position = { q: 7, r: 2 };
 
     const police = unitByType(observation, 'police');
@@ -151,7 +173,7 @@ describe('Balanced Agent facility-contact denial', () => {
     const observation = stabilize(freshObservation());
     observation.zombies = [];
     observation.horde.direction = 'east';
-    observation.horde.turnsRemaining = 1;
+    observation.horde.turnsRemaining = 5;
     const infectedFacility = facilityById(observation, 'farm-1');
     infectedFacility.infectedPopulation = 1;
     infectedFacility.operationalStatus = 'infected';
@@ -164,11 +186,11 @@ describe('Balanced Agent facility-contact denial', () => {
     police.recoveryClassIfTurnEndsNow = 'combat';
     police.recoveryRateIfTurnEndsNow = 0.1;
     const guard = unitByType(observation, 'nationalGuard');
-    guard.position = { q: 9, r: 7 };
+    guard.position = { q: 20, r: 15 };
     guard.movement = 5;
     guard.actionState = 'ready';
     guard.canMove = true;
-    const eastEntrance = { q: 14, r: 7 };
+    const eastEntrance = { q: 30, r: 15 };
 
     const actions: GameAction[] = [
       { type: 'Move', unitId: guard.id, destination: eastEntrance },
@@ -225,12 +247,15 @@ describe('Balanced Agent facility-contact denial', () => {
     const militaryFactory = facilityById(observation, 'military-factory-1');
     const farm = facilityById(observation, 'farm-1');
     militaryFactory.healthyPopulation = 0;
-    farm.healthyPopulation = 0;
+    // A farm at its sustainable baseline is a genuine but lower-value alternative.
+    // The military factory must be preferred while the reserve has a large deficit.
+    farm.healthyPopulation = 8;
     militaryFactory.populationOperational = true;
+    militaryFactory.inSupply = true;
     farm.populationOperational = true;
 
     const actions: GameAction[] = [
-      { type: 'AssignWorkers', facilityId: farm.id, workers: 5 },
+      { type: 'AssignWorkers', facilityId: farm.id, workers: 9 },
       { type: 'AssignWorkers', facilityId: militaryFactory.id, workers: 5 },
     ];
     const result = new BalancedAgent().decide(observation, actions);

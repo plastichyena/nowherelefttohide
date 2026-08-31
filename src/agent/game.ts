@@ -1,10 +1,10 @@
 import { assertValidGameConfig, cloneConfig, createDefaultConfig, DEFAULT_MAP_ID } from '../core/config';
-import { GameEngine, validateAction } from '../core/engine';
+import { GameEngine, getCheckpointPositionCandidates, validateAction } from '../core/engine';
 import { hexKey } from '../core/hex';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
 import type { DeepPartial, GameAction, GameConfig, GameEvent, GameState, JsonObject, JsonValue } from '../core/types';
 import { actionKey, cloneAction, cloneJson, sortActions } from './action';
-import { createAgentObservation, createAgentResult } from './observation';
+import { compactArtifactObservation, createAgentObservation, createAgentResult } from './observation';
 import {
   AGENT_API_VERSION,
   APP_VERSION,
@@ -173,6 +173,51 @@ function publicEvents(
     .filter((event) => Object.keys(event.payload).length > 0 || event.type === 'game_over');
 }
 
+/**
+ * Exact public-state dependency key for the expensive all-road checkpoint
+ * projection. It deliberately captures only inputs used by Core validation
+ * and projected supply effects, so a domestic action can reuse the result
+ * without hiding an updated candidate or reason code.
+ */
+function checkpointCandidateProjectionKey(state: Readonly<GameState>): string {
+  const visibleTiles = getPlayerVisibleTileKeys(state);
+  return JSON.stringify({
+    phase: state.phase,
+    gameOver: state.gameOver,
+    actionBudgetReached: state.actionsTakenThisTurn >= state.config.maxActionsPerTurn,
+    civilianGoods: state.resources.civilianGoods,
+    facilities: state.facilities
+      .map((facility) => [facility.id, facility.position.q, facility.position.r] as const)
+      .sort((left, right) => left[0].localeCompare(right[0])),
+    checkpoints: state.checkpoints
+      .map((checkpoint) => [
+        checkpoint.id,
+        checkpoint.branchId ?? checkpoint.direction,
+        checkpoint.position.q,
+        checkpoint.position.r,
+        checkpoint.status,
+        checkpoint.infected,
+      ] as const)
+      .sort((left, right) => left[0].localeCompare(right[0])),
+    roadBranches: state.roadBranches
+      .map((branch) => [
+        branch.branchId,
+        branch.checkpointActionsThisTurn,
+        branch.activeCheckpointId,
+        [...branch.standbyCheckpointIds].sort(),
+      ] as const)
+      .sort((left, right) => left[0].localeCompare(right[0])),
+    playerUnits: state.units
+      .filter((unit) => unit.isPlayerUnit)
+      .map((unit) => [unit.id, unit.position.q, unit.position.r] as const)
+      .sort((left, right) => left[0].localeCompare(right[0])),
+    visibleZombies: state.units
+      .filter((unit) => !unit.isPlayerUnit && visibleTiles.has(hexKey(unit.position)))
+      .map((unit) => [unit.id, unit.type, unit.position.q, unit.position.r] as const)
+      .sort((left, right) => left[0].localeCompare(right[0])),
+  });
+}
+
 export interface AgentGameAdapterOptions {
   buildId?: string;
   bridgeApiVersion?: string;
@@ -188,6 +233,19 @@ export class AgentGameAdapter implements AgentGame {
   private initialObservation: AgentObservation | null = null;
   private observations: AgentObservation[] = [];
   private events: AgentPublicEvent[] = [];
+  /** State changes only through this Adapter, so this avoids duplicate Core enumeration. */
+  private cachedLegalActions: GameAction[] | null = null;
+  /**
+   * The runner asks for the same post-step observation again before choosing
+   * the next action. Keep one private snapshot for that state, while every
+   * public boundary still receives a detached JSON clone.
+   */
+  private cachedObservation: AgentObservation | null = null;
+  /** Checkpoint candidate projection keyed by every Core input it reads. */
+  private cachedCheckpointPositionCandidates: {
+    key: string;
+    candidates: ReturnType<typeof getCheckpointPositionCandidates>;
+  } | null = null;
   private readonly buildId: string;
   private readonly bridgeApiVersion: string;
 
@@ -215,6 +273,9 @@ export class AgentGameAdapter implements AgentGame {
     this.acceptedActions = [];
     this.invalidAttempts = [];
     this.events = [];
+    this.cachedLegalActions = null;
+    this.cachedObservation = null;
+    this.cachedCheckpointPositionCandidates = null;
     const observation = this.getObservation();
     this.initialObservation = cloneJson(observation);
     this.observations = [cloneJson(observation)];
@@ -222,15 +283,42 @@ export class AgentGameAdapter implements AgentGame {
   }
 
   public getObservation(): AgentObservation {
-    return createAgentObservation(this.engine.getState());
+    return cloneJson(this.currentObservation());
+  }
+
+  private currentObservation(): AgentObservation {
+    if (this.cachedObservation === null) {
+      const state = this.engine.getState();
+      const checkpointCandidatesKey = checkpointCandidateProjectionKey(state);
+      if (this.cachedCheckpointPositionCandidates?.key !== checkpointCandidatesKey) {
+        this.cachedCheckpointPositionCandidates = {
+          key: checkpointCandidatesKey,
+          candidates: getCheckpointPositionCandidates(state),
+        };
+      }
+      this.cachedObservation = createAgentObservation(state, {
+        checkpointPositionCandidates: this.cachedCheckpointPositionCandidates.candidates,
+      });
+    }
+    return this.cachedObservation;
   }
 
   public getLegalActions(): GameAction[] {
-    return sortActions(this.engine.getLegalActions()).map(cloneAction);
+    return this.currentLegalActions().map(cloneAction);
+  }
+
+  private currentLegalActions(): GameAction[] {
+    if (this.cachedLegalActions === null) {
+      this.cachedLegalActions = sortActions(this.engine.getLegalActions()).map(cloneAction);
+    }
+    return this.cachedLegalActions;
   }
 
   public step(action: GameAction): AgentStepResult {
-    const legal = this.getLegalActions();
+    // Legal actions are already cached for this state. `getLegalActions()`
+    // clones for external callers, but a step only needs the private snapshot
+    // to locate the canonical engine action.
+    const legal = this.currentLegalActions();
     let matched: GameAction | undefined;
     try {
       const candidateKey = actionKey(action);
@@ -240,7 +328,12 @@ export class AgentGameAdapter implements AgentGame {
     }
     if (!matched) {
       let error = publicError('action_not_legal', 'Action is not in the current legal action list');
-      if (action.type === 'BuildCheckpoint' || action.type === 'RelocateCheckpoint' || action.type === 'ActivateCheckpoint') {
+      if (
+        action.type === 'BuildCheckpoint' ||
+        action.type === 'RelocateCheckpoint' ||
+        action.type === 'ActivateCheckpoint' ||
+        action.type === 'BuildConstructibleFacility'
+      ) {
         try {
           const coreError = validateAction(this.engine.getState(), action);
           if (coreError) error = publicError(coreError.code, coreError.message);
@@ -268,18 +361,21 @@ export class AgentGameAdapter implements AgentGame {
       return { observation, events: [], error, gameOver: result.gameOver, result: this.getResult() };
     }
     this.acceptedActions.push(cloneAction(matched));
-    const observation = this.getObservation();
+    this.cachedLegalActions = null;
+    this.cachedObservation = null;
+    const observation = this.currentObservation();
     const events = publicEvents(before, result.state, result.events);
     this.events.push(...events);
     this.observations.push(cloneJson(observation));
     return {
-      observation,
+      observation: cloneJson(observation),
       events,
       error: null,
       gameOver: result.gameOver,
       result: this.getResult(),
     };
   }
+
 
   public isGameOver(): boolean {
     return this.engine.isGameOver();
@@ -327,7 +423,8 @@ export class AgentGameAdapter implements AgentGame {
       invalidAttempts: this.invalidAttempts,
       decisionTrace: [],
       result: this.getResult(),
-      observationTrace: this.observations,
+      fixedMap: cloneJson(initialObservation.map),
+      observationTrace: this.observations.map(compactArtifactObservation),
       metrics: publicMetrics(metrics),
       events: this.events,
     });

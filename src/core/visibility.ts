@@ -16,6 +16,13 @@ export function getPlayerVisibleTileKeys(state: Readonly<GameState>): Set<string
   }
   for (const facility of state.facilities) {
     if (facility.owner !== 'player' || facility.status === 'ruined') continue;
+    if (['building', 'disabled', 'recovering'].includes(facility.operationalStatus)) continue;
+    if (facility.type === 'civilianDroneBase') {
+      if (facility.workers > 0 && facility.powerSupplyEnabled && facility.lastPowerSupplied === true) {
+        addRadius(state, visible, facility.position, facility.workers * 2);
+      }
+      continue;
+    }
     addRadius(
       state,
       visible,

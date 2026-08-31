@@ -5,6 +5,7 @@ import type {
   AgentCheckpointObservation,
   AgentFacilityObservation,
   AgentMapTileObservation,
+  AgentObservation,
   AgentUnitObservation,
 } from '../agent/types';
 import { hexKey } from '../core/hex';
@@ -24,6 +25,8 @@ import type {
   CheckpointPositionCandidate,
   CheckpointStatus,
   CheckpointState,
+  ConstructibleFacilityPositionCandidate,
+  ConstructibleFacilityType,
   EndTurnForecast,
   FacilityState,
   GameAction,
@@ -96,6 +99,9 @@ type CheckpointPlacement = {
   mode: 'build' | 'relocate';
   checkpointId?: string;
   branchId?: RoadBranchId;
+};
+type ConstructiblePlacement = {
+  facilityType: ConstructibleFacilityType;
 };
 type CheckpointPreviewTarget = { branchId: RoadBranchId; position: HexCoord };
 export type NavigationMode = 'map' | 'domestic';
@@ -551,6 +557,124 @@ export function powerHudViewModel(
   };
 }
 
+export type StrategicWarningTier = 'critical' | 'high' | 'warning' | 'info';
+
+export interface StrategicWarningViewModel {
+  tier: StrategicWarningTier;
+  key: string;
+  title: string;
+  detail: string;
+}
+
+const STRATEGIC_RESOURCES = ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricity'] as const;
+
+function queuePressureLabel(value: AgentObservation['checkpoints'][number]['queuePressureClass'], locale: Locale): string {
+  const t = createTranslator(locale);
+  return t(`queuePressure${value[0]!.toUpperCase()}${value.slice(1)}`);
+}
+
+/**
+ * Build the visible warning hierarchy from the Core-owned Strategic Forecast.
+ * This projection intentionally consumes only public Observation fields: no
+ * hidden Zombie position, target, or future RNG value is consulted here.
+ */
+export function strategicWarningViewModel(
+  observation: Pick<AgentObservation, 'strategicForecast' | 'checkpoints' | 'checkpointPositionCandidates'>,
+  locale: Locale,
+): StrategicWarningViewModel[] {
+  const t = createTranslator(locale);
+  const warnings: StrategicWarningViewModel[] = [];
+  const forecast = observation.strategicForecast;
+  const defeat = forecast.guaranteedDefeat;
+  if (defeat.guaranteed) {
+    const cause = defeat.causeResource ? t(defeat.causeResource) : t('healthyCivilians');
+    warnings.push({
+      tier: 'critical',
+      key: 'guaranteedDefeat',
+      title: t('guaranteedDefeat'),
+      detail: `${t('causeResource')}: ${cause} · ${t('projectedHealthyCivilians')}: ${defeat.projectedHealthyCivilians} · ${t('guaranteedDefeatBody')}`,
+    });
+  }
+  for (const resource of STRATEGIC_RESOURCES) {
+    // Fuel has a dedicated, lower-tier logistics warning.  Keep it out of
+    // the generic current-shortage bucket so the documented hierarchy does
+    // not turn a refill shortfall into the same tier as Food/Electricity.
+    if (resource === 'fuel') continue;
+    const entry = forecast.resources[resource];
+    if (!entry?.currentlyShort) continue;
+    warnings.push({
+      tier: 'high',
+      key: `shortage:${resource}`,
+      title: `${t('forecastShortage')}: ${t(resource)}`,
+      detail: `${t('shortage')}: ${resource === 'electricity' ? entry.currentDemand - entry.currentSupply : Math.max(0, entry.currentDemand - entry.currentSupply)}`,
+    });
+  }
+  for (const checkpoint of observation.checkpoints) {
+    if (checkpoint.queuePressureClass !== 'high') continue;
+    warnings.push({
+      tier: 'high',
+      key: `queue:${checkpoint.id}`,
+      title: `${t('queuePressure')} · ${t('strategicHigh')}`,
+      detail: `${checkpoint.id} · ${queuePressureLabel(checkpoint.queuePressureClass, locale)} · ${t('queuePeople')}: ${checkpoint.queuePeople}/${checkpoint.screeningCapacity}`,
+    });
+  }
+  for (const resource of STRATEGIC_RESOURCES) {
+    const entry = forecast.resources[resource];
+    if (!entry?.singlePointOfFailure) continue;
+    warnings.push({
+      tier: 'warning',
+      key: `single-point:${resource}`,
+      title: `${t('singlePointOfFailure')}: ${t(resource)}`,
+      detail: `${t('largestContributor')}: ${entry.largestContributorFacilityId ?? t('none')} · ${t('shortageWithoutContributor')}: ${entry.shortageWithoutLargestContributor}`,
+    });
+  }
+  const noGain = observation.checkpointPositionCandidates.find((candidate) =>
+    candidate.legal && (candidate.actionType === 'RelocateCheckpoint' || candidate.actionType === 'ActivateCheckpoint') &&
+      (candidate.newlySuppliedHexCount ?? 0) === 0 && (candidate.suppliedFacilityDelta ?? 0) === 0 &&
+      (candidate.newlyBuildableConstructibleHexCount ?? 0) === 0,
+  );
+  if (noGain) {
+    warnings.push({
+      tier: 'warning',
+      key: `checkpoint-no-gain:${noGain.branchId}:${noGain.position.q},${noGain.position.r}`,
+      title: t('noGainCheckpoint'),
+      detail: `${noGain.branchId} · ${noGain.position.q},${noGain.position.r}`,
+    });
+  }
+  const hasFuelShortage = Boolean(forecast.resources.fuel?.currentlyShort);
+  if (hasFuelShortage) {
+    warnings.push({ tier: 'warning', key: 'fuel-shortage', title: t('fuelShortage'), detail: t('tipFuel') });
+  }
+  const queueInfo = observation.checkpoints
+    .filter((checkpoint) => checkpoint.queuePressureClass === 'low' || checkpoint.queuePressureClass === 'medium')
+    .sort((left, right) => left.id.localeCompare(right.id))[0];
+  if (queueInfo) {
+    warnings.push({
+      tier: 'info',
+      key: `queue-info:${queueInfo.id}`,
+      title: `${t('queuePressure')} · ${queuePressureLabel(queueInfo.queuePressureClass, locale)}`,
+      detail: `${queueInfo.id} · ${t('queuePeople')}: ${queueInfo.queuePeople}/${queueInfo.screeningCapacity}`,
+    });
+  }
+  if (warnings.length === 0) {
+    warnings.push({ tier: 'info', key: 'normal-forecast', title: t('forecastNormal'), detail: t('strategicForecast') });
+  }
+  const order: Record<StrategicWarningTier, number> = { critical: 0, high: 1, warning: 2, info: 3 };
+  return warnings.sort((left, right) => order[left.tier] - order[right.tier] || left.key.localeCompare(right.key));
+}
+
+export function renderStrategicWarnings(
+  observation: Pick<AgentObservation, 'strategicForecast' | 'checkpoints' | 'checkpointPositionCandidates'>,
+  locale: Locale,
+  options: { compact?: boolean } = {},
+): string {
+  const t = createTranslator(locale);
+  const warnings = strategicWarningViewModel(observation, locale);
+  const visible = options.compact ? warnings.filter((warning) => warning.tier === 'critical').slice(0, 1) : warnings;
+  if (visible.length === 0) return '';
+  return `<section class="strategic-warnings${options.compact ? ' strategic-warnings-compact' : ''}" data-strategic-warnings="true" aria-label="${escapeHtml(t('strategicForecast'))}">${visible.map((warning) => `<article class="strategic-warning tier-${warning.tier}" data-warning-tier="${warning.tier}" data-warning-key="${escapeHtml(warning.key)}"><strong>${escapeHtml(t(`strategic${warning.tier[0]!.toUpperCase()}${warning.tier.slice(1)}`))}: ${escapeHtml(warning.title)}</strong><span>${escapeHtml(warning.detail)}</span></article>`).join('')}</section>`;
+}
+
 /**
  * The Help legend accepts the UI registry without making the Core depend on
  * asset paths.  Keeping the small structural interface here also lets the
@@ -593,7 +717,7 @@ export interface BoardLegendViewModel {
 const LEGEND_TERRAINS = ['plain', 'forest', 'mountain'] as const;
 const LEGEND_OVERLAYS = ['road', 'urban'] as const;
 const LEGEND_UNITS = ['police', 'nationalGuard', 'zombie', 'hordeZombie'] as const;
-const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'checkpoint'] as const;
+const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'checkpoint'] as const;
 
 function legendAssetFromRegistry(
   registry: BoardLegendRegistry | undefined,
@@ -708,7 +832,12 @@ function configLegendEntries(
     if (key === 'checkpoint') continue;
     const facility = config.facilities[key];
     const production = facility.production;
-    add(`facility.${key}`, facilityLabel(key, locale), `${t('legendWorkers')} ${facility.workerCapacity} · ${t('legendMode')} ${powerModeLabel(production.powerMode, locale)} · ${t('legendPowerCapacity')} ${production.powerCapacity} · ${t('legendPowerGeneration')} ${production.powerGeneration} · ${t('legendInputs')} ${formatResourceAmounts(production.inputs, locale, true)} · ${t('legendOutputs')} ${formatResourceAmounts(production.outputs, locale, true)}`);
+    const generation = production.fixedPowerGeneration > 0
+      ? `${production.fixedPowerGeneration} ${t('fixed')}`
+      : String(production.powerGeneration);
+    const build = facility.buildCivilianGoods > 0 ? ` · ${t('buildCost')} ${facility.buildCivilianGoods}` : '';
+    const target = facility.zombieTargetValue > 0 ? ` · ${t('zombieTargetValue')} ${facility.zombieTargetValue}` : '';
+    add(`facility.${key}`, facilityLabel(key, locale), `${t('legendWorkers')} ${facility.workerCapacity} · ${t('legendMode')} ${powerModeLabel(production.powerMode, locale)} · ${t('legendPowerCapacity')} ${production.powerCapacity} · ${t('legendPowerGeneration')} ${generation} · ${t('legendInputs')} ${formatResourceAmounts(production.inputs, locale, true)} · ${t('legendOutputs')} ${formatResourceAmounts(production.outputs, locale, true)}${build}${target}`);
   }
   add('populationConsumption', t('legendPopulationConsumption'), `${t('food')} ${config.economy.populationConsumption.food} · ${t('civilianGoods')} ${config.economy.populationConsumption.civilianGoods}`);
   add('militaryGoodsPerUnit', t('legendMilitaryGoodsPerUnit'), String(config.economy.militaryGoodsPerUnitPopulation));
@@ -936,6 +1065,9 @@ function facilityLabel(type: string, locale: Locale): string {
     militaryFactory: ['軍需工場', 'Military Factory'],
     refinery: ['製油所', 'Refinery'],
     powerPlant: ['発電所', 'Power Plant'],
+    windPowerPlant: ['風力発電所', 'Wind Power Plant'],
+    simpleFarm: ['簡易農場', 'Simple Farm'],
+    civilianDroneBase: ['民間ドローン基地', 'Civilian Drone Base'],
   };
   return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
 }
@@ -969,7 +1101,7 @@ export function selectionShowsSupplyOverlay(
 }
 
 function isPowerSupplyFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return facility.type === 'farm' || facility.type === 'civilianFactory' || facility.type === 'militaryFactory';
+  return facility.type === 'farm' || facility.type === 'civilianFactory' || facility.type === 'militaryFactory' || facility.type === 'simpleFarm' || facility.type === 'civilianDroneBase';
 }
 
 function formatPercent(value: number, locale: Locale): string {
@@ -1046,12 +1178,20 @@ function forecastResourceCard(
   } else if (resource === 'fuel') {
     const fuel = detail as EndTurnForecast['fuel'];
     rows = [
-      [t('startingStock'), String(fuel.startingStock)],
-      [t('generationFuelDemand'), String(fuel.generationFuelDemand)],
-      [t('projectedFuelUsed'), String(fuel.projectedFuelUsed)],
-      [t('generationFuelShortage'), String(fuel.generationFuelShortage)],
-      [t('projectedProduction'), formatForecastAmount(fuel.projectedProduction)],
-      [t('endingStock'), String(fuel.endingStock)],
+      [t('currentFuel'), String(fuel.turnStartFuel)],
+      [t('windPowerAvailable'), String(fuel.windPowerAvailable)],
+      [t('powerPlantPhysicalCapacity'), String(fuel.powerPlantPhysicalCapacity)],
+      [t('powerFuelDemand'), String(fuel.projectedPowerFuelDemand)],
+      [t('powerFuelUsed'), String(fuel.projectedPowerFuelUsed)],
+      [t('fuelAfterPower'), String(fuel.fuelAfterPower)],
+      [t('unitRefillDemand'), String(fuel.projectedUnitRefillDemand)],
+      [t('unitRefillAmount'), String(fuel.projectedUnitFuelRefilled)],
+      [t('totalFuelDemand'), String(fuel.projectedTotalFuelDemand)],
+      [t('refineryProduction'), formatForecastAmount(fuel.projectedRefineryProduction)],
+      [t('projectedEndingFuel'), String(fuel.projectedEndingFuel)],
+      [t('fuelShortage'), String(fuel.powerFuelShortage)],
+      [t('unitRefillShortage'), String(fuel.unitRefillFuelShortage)],
+      [t('totalFuelShortage'), String(fuel.totalFuelShortage)],
     ];
   } else {
     rows = [
@@ -1062,7 +1202,8 @@ function forecastResourceCard(
       [t('shortage'), String(detail.shortage)],
     ];
   }
-  return `<section class="forecast-card resource-forecast-card"><h4>${escapeHtml(t(resource))}</h4><dl class="forecast-detail-grid">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl></section>`;
+  const note = resource === 'fuel' ? `<p class="muted">${escapeHtml(t('fuelSupplyOrder'))}</p>` : '';
+  return `<section class="forecast-card resource-forecast-card" data-forecast-resource="${resource}"><h4>${escapeHtml(t(resource))}</h4><dl class="forecast-detail-grid">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>${note}</section>`;
 }
 
 /** Render the complete public EndTurn forecast for the human-facing sheet. */
@@ -1177,6 +1318,18 @@ export function localizeActionError(code: string | undefined, locale: Locale): s
     power_supply_not_applicable: locale === 'ja' ? '電力供給を変更できるのはFarm・民需工場・軍需工場だけです。' : 'Power Supply can only be changed for Farms, Civilian Factories, and Military Factories.',
     power_supply_unavailable: locale === 'ja' ? '所有中で安全かつ操作可能な産業施設だけ変更できます。' : 'Only an owned, safe, and available industrial facility can change Power Supply.',
     invalid_power_supply: locale === 'ja' ? 'Power SupplyはONまたはOFFで指定してください。' : 'Power Supply must be ON or OFF.',
+    insufficient_unit_fuel: locale === 'ja' ? '移動Fuelが不足しています。' : 'The Unit does not have enough Fuel for this move.',
+    constructible_out_of_supply: t('buildSupplyRequired'),
+    constructible_invalid_terrain: locale === 'ja' ? '建設にはPlainが必要です。' : 'Only Plain terrain can be built on.',
+    constructible_road_blocked: locale === 'ja' ? 'Road Hexには建設できません。' : 'Road Hexes cannot be built on.',
+    constructible_entrance_blocked: locale === 'ja' ? 'Horde Entranceには建設できません。' : 'Horde Entrances cannot be built on.',
+    constructible_facility_occupied: locale === 'ja' ? '既存FacilityがあるHexには建設できません。' : 'A facility already occupies this Hex.',
+    constructible_checkpoint_occupied: locale === 'ja' ? 'CheckpointがあるHexには建設できません。' : 'A Checkpoint already occupies this Hex.',
+    constructible_player_unit_occupied: locale === 'ja' ? 'Player UnitがいるHexには建設できません。' : 'A player Unit occupies this Hex.',
+    constructible_visible_zombie_occupied: locale === 'ja' ? '視認中ZombieがいるHexには建設できません。' : 'A visible Zombie occupies this Hex.',
+    constructible_facility_limit_reached: locale === 'ja' ? 'このFacility Typeの建設上限に達しています。' : 'The per-type constructible facility limit has been reached.',
+    invalid_constructible_facility_type: locale === 'ja' ? '建設Facility Typeが不正です。' : 'Unknown constructible facility type.',
+    outside_map: locale === 'ja' ? '盤面外です。' : 'Position is outside the map.',
   };
   return messages[code ?? ''] ?? t('invalidAction');
 }
@@ -1205,7 +1358,7 @@ function gameOverReasonLabel(reason: GameResult['reason'], locale: Locale): stri
 function stateSummary(state: Readonly<GameState>, locale: Locale): string {
   const t = createTranslator(locale);
   const population = populationLocationTotals(state);
-  return `${t('population')} ${population.total} · ${t('healthyCivilians')} ${population.healthyCivilians} · ${t('facilities')} ${state.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length}/16`;
+  return `${t('population')} ${population.total} · ${t('healthyCivilians')} ${population.healthyCivilians} · ${t('facilities')} ${state.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length}/${state.map.facilities.length}`;
 }
 
 function asPreview(value: unknown, fallback: { unit: UnitState; destination: HexCoord }): MovePreview {
@@ -1244,6 +1397,9 @@ export class GameUiController {
   private checkpointPlacement: CheckpointPlacement | null = null;
   private checkpointPreviewTarget: CheckpointPreviewTarget | null = null;
   private checkpointPlacementMessage: string | null = null;
+  private constructiblePlacement: ConstructiblePlacement | null = null;
+  private constructiblePreviewTarget: HexCoord | null = null;
+  private constructiblePlacementMessage: string | null = null;
   private supplyOverlay = false;
   private lastSaveCode: string | null = null;
   private toastMessage: string | null = null;
@@ -1283,6 +1439,9 @@ export class GameUiController {
     this.checkpointPlacement = null;
     this.checkpointPreviewTarget = null;
     this.checkpointPlacementMessage = null;
+    this.constructiblePlacement = null;
+    this.constructiblePreviewTarget = null;
+    this.constructiblePlacementMessage = null;
     this.supplyOverlay = false;
     this.destroyBoard();
     const t = this.translator();
@@ -1411,6 +1570,9 @@ export class GameUiController {
       this.checkpointPlacement = null;
       this.checkpointPreviewTarget = null;
       this.checkpointPlacementMessage = null;
+      this.constructiblePlacement = null;
+      this.constructiblePreviewTarget = null;
+      this.constructiblePlacementMessage = null;
       this.supplyOverlay = false;
       this.guideShown = !this.hasSeenGuide();
       this.renderGame();
@@ -1467,6 +1629,7 @@ export class GameUiController {
         <span class="resource-pill infected-pill">☣ <b data-bind="infected">0</b><small>${escapeHtml(t('infected'))}</small></span>
       </section>
       <section class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><div class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></div><div class="horde-facts"><span><small>${escapeHtml(t('direction'))}</small><b data-bind="horde-direction">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span></div></section>
+      <section class="strategic-critical-strip" data-bind="strategic-critical" data-warning-tier="critical" aria-live="assertive" hidden><strong>${escapeHtml(t('strategicCritical'))}</strong><span data-bind="strategic-critical-text"></span></section>
       <section class="victory-progress" aria-live="polite" aria-label="${escapeHtml(t('victoryProgress'))}"><strong>${escapeHtml(t('victoryProgress'))}</strong><div data-bind="victory-progress"></div></section>
       <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="unit-context-layer" data-unit-context-layer aria-live="polite"></div>${noiseDebugMount}<div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
       <section class="bottom-sheet" data-sheet="standard" aria-label="${escapeHtml(t('selected'))}">
@@ -1572,8 +1735,11 @@ export class GameUiController {
     this.root.oninput = (event) => this.onInput(event);
     this.root.onchange = (event) => this.onInput(event);
     const previewCandidate = (event: Event): void => {
-      const element = (event.target as HTMLElement).closest<HTMLElement>('.checkpoint-candidate');
-      if (element) this.previewCheckpointCandidate(element);
+      const target = event.target as HTMLElement;
+      const checkpointElement = target.closest<HTMLElement>('.checkpoint-candidate');
+      if (checkpointElement) this.previewCheckpointCandidate(checkpointElement);
+      const constructibleElement = target.closest<HTMLElement>('.constructible-candidate');
+      if (constructibleElement) this.previewConstructibleCandidate(constructibleElement);
     };
     this.root.onpointerover = previewCandidate;
     (this.root as HTMLElement & { onfocusin: ((event: FocusEvent) => void) | null }).onfocusin = previewCandidate;
@@ -1585,7 +1751,7 @@ export class GameUiController {
       case 'continue': this.loadAutosave(); break;
       case 'load': this.showLoadModal(); break;
       case 'options': this.beginNewGame(); break;
-      case 'toggle-language': this.locale = toggleLocale(this.locale); persistLocale(this.locale); this.checkpointPlacementMessage = null; this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
+      case 'toggle-language': this.locale = toggleLocale(this.locale); persistLocale(this.locale); this.checkpointPlacementMessage = null; this.constructiblePlacementMessage = null; this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
       case 'title': this.showTitle(); break;
       case 'help': this.showHelp(); break;
       case 'toggle-supply': this.supplyOverlay = !this.supplyOverlay; this.updateView(); break;
@@ -1613,6 +1779,10 @@ export class GameUiController {
       case 'toggle-power-supply': this.setPowerSupply(element); break;
       case 'produce-police': this.produce('police'); break;
       case 'produce-guard': this.produce('nationalGuard'); break;
+      case 'build-simple-farm': this.startConstructibleBuild('simpleFarm'); break;
+      case 'build-civilian-drone-base': this.startConstructibleBuild('civilianDroneBase'); break;
+      case 'constructible-place-cancel': this.constructiblePlacement = null; this.constructiblePreviewTarget = null; this.constructiblePlacementMessage = null; this.updateView(); break;
+      case 'constructible-build-at': this.executeConstructibleCandidate(element); break;
       case 'build-checkpoint': this.buildCheckpoint(); break;
       case 'relocate-checkpoint': this.startRelocation(); break;
       case 'checkpoint-place-cancel': this.checkpointPlacement = null; this.checkpointPreviewTarget = null; this.checkpointPlacementMessage = null; this.updateView(); break;
@@ -1636,6 +1806,9 @@ export class GameUiController {
     this.checkpointPlacement = null;
     this.checkpointPreviewTarget = null;
     this.checkpointPlacementMessage = null;
+    this.constructiblePlacement = null;
+    this.constructiblePreviewTarget = null;
+    this.constructiblePlacementMessage = null;
     if (this.state && selected) this.selection = resolveTileSelection(this.state, selected, mode);
     else if (mode === 'domestic' && this.selection?.kind === 'unit') this.selection = null;
     this.sheetState = mode === 'domestic' ? 'expanded' : 'standard';
@@ -1664,6 +1837,7 @@ export class GameUiController {
     const sheetBody = this.root.querySelector<HTMLElement>('[data-bind="sheet-body"]');
     if (this.selection?.kind === 'facility') this.updateFacilitySupplementalControls();
     if (sheetBody && !this.selection) sheetBody.insertAdjacentHTML('beforeend', this.renderBranchFlow());
+    if (sheetBody && (!this.selection || this.constructiblePlacement)) sheetBody.insertAdjacentHTML('beforeend', this.renderConstructiblePlacement());
     if (sheetBody && this.checkpointPlacement) sheetBody.insertAdjacentHTML('beforeend', this.renderCheckpointPlacement());
     this.updateBoard();
     this.renderUnitContextUi();
@@ -1692,6 +1866,7 @@ export class GameUiController {
 
   private updateHud(): void {
     if (!this.state) return;
+    const t = this.translator();
     const observation = createAgentObservation(this.state);
     const population = populationLocationTotals(this.state);
     const forecast = forecastEndTurn(this.state);
@@ -1735,6 +1910,15 @@ export class GameUiController {
     }
     const hordeCard = this.root.querySelector<HTMLElement>('[data-bind="horde-card"]');
     if (hordeCard) hordeCard.dataset.hordeState = finalHordeVisible ? 'final' : warningType;
+    const strategicWarnings = strategicWarningViewModel(observation, this.locale);
+    const critical = strategicWarnings.find((warning) => warning.tier === 'critical');
+    const criticalStrip = this.root.querySelector<HTMLElement>('[data-bind="strategic-critical"]');
+    if (criticalStrip) {
+      criticalStrip.hidden = !critical;
+      criticalStrip.dataset.warningTier = critical ? critical.tier : 'none';
+      const text = criticalStrip.querySelector<HTMLElement>('[data-bind="strategic-critical-text"]');
+      if (text) text.textContent = critical ? `${critical.title} · ${critical.detail}` : '';
+    }
     const progress = this.root.querySelector<HTMLElement>('[data-bind="victory-progress"]');
     if (progress) {
       const progressItems = [
@@ -1753,13 +1937,20 @@ export class GameUiController {
       powerElement.classList.toggle('is-shortage', powerHud.isShortage);
       powerElement.dataset.powerState = powerHud.isShortage ? 'shortage' : 'ok';
     }
+    const fuelElement = this.root.querySelector<HTMLElement>('.fuel-pill');
+    if (fuelElement) {
+      const fuel = forecast.fuel;
+      fuelElement.title = `${t('fuelForecast')}: ${t('currentFuel')} ${fuel.turnStartFuel} · ${t('powerFuelDemand')} ${fuel.projectedPowerFuelDemand} · ${t('unitRefillDemand')} ${fuel.projectedUnitRefillDemand} · ${t('projectedEndingFuel')} ${fuel.projectedEndingFuel}`;
+      fuelElement.setAttribute('aria-label', `${t('fuel')}: ${fuel.turnStartFuel}. ${t('totalFuelDemand')}: ${fuel.projectedTotalFuelDemand}. ${t('projectedEndingFuel')}: ${fuel.projectedEndingFuel}`);
+    }
   }
 
   private updateBoard(): void {
     if (!this.state || !this.boardScene) return;
     const supply = deriveSupplySnapshot(this.state);
-    const supplyContext = this.supplyOverlay || Boolean(this.checkpointPlacement) || selectionShowsSupplyOverlay(this.state, this.selection);
+    const supplyContext = this.supplyOverlay || Boolean(this.checkpointPlacement) || Boolean(this.constructiblePlacement) || selectionShowsSupplyOverlay(this.state, this.selection);
     const preview = this.checkpointPreview();
+    const constructiblePreview = this.constructibleFacilityPreview();
     const previewTarget = this.checkpointPlacement ? this.checkpointPreviewTarget : null;
     const suppliedTileKeys = previewTarget
       ? getSuppliedTileKeys(this.state, { branchId: previewTarget.branchId, checkpointPosition: previewTarget.position })
@@ -1782,6 +1973,10 @@ export class GameUiController {
       checkpointInvalidPreviewPositions: preview.invalidPositions,
       blockedZombieIds: preview.blockedZombieIds,
       checkpointPreviewSelected: previewTarget?.position,
+      constructibleFacilityType: this.constructiblePlacement?.facilityType ?? null,
+      constructibleFacilityLegalPreviewPositions: constructiblePreview.legalPositions,
+      constructibleFacilityInvalidPreviewPositions: constructiblePreview.invalidPositions,
+      constructibleFacilityPreviewSelected: this.constructiblePreviewTarget,
     };
     this.boardScene.updateState(render);
   }
@@ -1818,6 +2013,27 @@ export class GameUiController {
     return { legalPositions, invalidPositions, blockedZombieIds };
   }
 
+  private constructibleFacilityCandidates(
+    facilityType = this.constructiblePlacement?.facilityType,
+  ): ConstructibleFacilityPositionCandidate[] {
+    if (!this.engine || !facilityType) return [];
+    try {
+      return this.engine.getConstructibleFacilityPositionCandidates(facilityType)
+        .map((candidate) => ({ ...candidate, position: { ...candidate.position } }));
+    } catch {
+      return [];
+    }
+  }
+
+  private constructibleFacilityPreview(): { legalPositions: HexCoord[]; invalidPositions: HexCoord[] } {
+    if (!this.constructiblePlacement) return { legalPositions: [], invalidPositions: [] };
+    const candidates = this.constructibleFacilityCandidates();
+    return {
+      legalPositions: candidates.filter((candidate) => candidate.legal).map((candidate) => ({ ...candidate.position })),
+      invalidPositions: candidates.filter((candidate) => !candidate.legal).map((candidate) => ({ ...candidate.position })),
+    };
+  }
+
   private selectedVision(): { origin: HexCoord; radius: number } | null {
     if (!this.state || !this.selection) return null;
     if (this.selection.kind === 'unit') {
@@ -1827,11 +2043,12 @@ export class GameUiController {
     if (this.selection.kind === 'facility') {
       const facility = this.state.facilities.find((candidate) => candidate.id === this.selection?.id);
       if (!facility || facility.owner !== 'player' || facility.status === 'ruined') return null;
+      const publicFacility = createAgentObservation(this.state).facilities.find((candidate) => candidate.id === facility.id);
       return {
         origin: { ...facility.position },
-        radius: facility.type === 'capital'
+        radius: publicFacility?.vision ?? (facility.type === 'capital'
           ? this.state.config.checkpoint.initialSupplyRadius
-          : this.state.config.vision.ownedFacility,
+          : this.state.config.vision.ownedFacility),
       };
     }
     const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === this.selection?.id);
@@ -1936,6 +2153,13 @@ export class GameUiController {
   }
 
   private cancelUnitInteractionLevel(): void {
+    if (this.constructiblePlacement) {
+      this.constructiblePlacement = null;
+      this.constructiblePreviewTarget = null;
+      this.constructiblePlacementMessage = null;
+      this.updateView();
+      return;
+    }
     if (this.checkpointPlacement) return;
     switch (unitInteractionCancelStep(this.unitActionMode, Boolean(this.pendingMove || this.pendingAttackTargetId), Boolean(this.selection))) {
       case 'target': this.cancelUnitTarget(); break;
@@ -2005,6 +2229,24 @@ export class GameUiController {
 
   private onTileTap(position: HexCoord): void {
     if (!this.state || !this.engine) return;
+    if (this.constructiblePlacement) {
+      const candidate = this.constructibleFacilityCandidates().find((entry) => samePosition(entry.position, position));
+      if (!candidate) return;
+      this.constructiblePreviewTarget = { ...candidate.position };
+      if (!candidate.legal) {
+        this.constructiblePlacementMessage = localizeActionError(candidate.reasonCode ?? undefined, this.locale);
+        this.updateView();
+        return;
+      }
+      if (this.apply({ type: 'BuildConstructibleFacility', facilityType: candidate.facilityType, position: { ...candidate.position } })) {
+        this.constructiblePlacement = null;
+        this.constructiblePreviewTarget = null;
+        this.constructiblePlacementMessage = null;
+        this.supplyOverlay = true;
+        this.updateView();
+      }
+      return;
+    }
     if (this.checkpointPlacement) {
       const candidate = this.checkpointCandidates().find((entry) => samePosition(entry.position, position));
       if (!candidate) return;
@@ -2369,6 +2611,54 @@ export class GameUiController {
     this.updateRecruitmentReasons();
   }
 
+  private startConstructibleBuild(facilityType: ConstructibleFacilityType): void {
+    if (!this.state || !this.engine) return;
+    const placement: ConstructiblePlacement = { facilityType };
+    const candidates = this.constructibleFacilityCandidates(facilityType);
+    if (candidates.length === 0) {
+      this.showToast(this.translator()('buildSupplyRequired'));
+      return;
+    }
+    this.selection = null;
+    this.unitActionMode = null;
+    this.pendingMove = null;
+    this.pendingAttackTargetId = null;
+    this.checkpointPlacement = null;
+    this.checkpointPreviewTarget = null;
+    this.checkpointPlacementMessage = null;
+    this.constructiblePlacement = placement;
+    this.constructiblePlacementMessage = null;
+    const first = candidates.find((candidate) => candidate.legal) ?? candidates[0]!;
+    this.constructiblePreviewTarget = { ...first.position };
+    this.supplyOverlay = true;
+    this.sheetState = 'standard';
+    this.updateView();
+  }
+
+  private executeConstructibleCandidate(element: HTMLElement): void {
+    if (!this.state || !this.engine || !this.constructiblePlacement) return;
+    const q = numberValue(element.dataset.q, NaN);
+    const r = numberValue(element.dataset.r, NaN);
+    if (!Number.isInteger(q) || !Number.isInteger(r)) return;
+    const candidate = this.constructibleFacilityCandidates().find((entry) =>
+      entry.position.q === q && entry.position.r === r,
+    );
+    if (!candidate) return;
+    this.constructiblePreviewTarget = { ...candidate.position };
+    if (!candidate.legal) {
+      this.constructiblePlacementMessage = localizeActionError(candidate.reasonCode ?? undefined, this.locale);
+      this.updateView();
+      return;
+    }
+    if (this.apply({ type: 'BuildConstructibleFacility', facilityType: candidate.facilityType, position: { ...candidate.position } })) {
+      this.constructiblePlacement = null;
+      this.constructiblePreviewTarget = null;
+      this.constructiblePlacementMessage = null;
+      this.supplyOverlay = true;
+      this.updateView();
+    }
+  }
+
   private buildCheckpoint(): void {
     const placement: CheckpointPlacement = { mode: 'build' };
     const candidates = this.checkpointCandidates(placement);
@@ -2535,6 +2825,25 @@ export class GameUiController {
     this.updateBoard();
   }
 
+  private previewConstructibleCandidate(element: HTMLElement): void {
+    if (!this.state || !this.constructiblePlacement) return;
+    const q = numberValue(element.dataset.q, NaN);
+    const r = numberValue(element.dataset.r, NaN);
+    if (!Number.isInteger(q) || !Number.isInteger(r)) return;
+    const candidate = this.constructibleFacilityCandidates().find((entry) => entry.position.q === q && entry.position.r === r);
+    if (!candidate) return;
+    const current = this.constructiblePreviewTarget;
+    if (current?.q === q && current.r === r) return;
+    this.constructiblePreviewTarget = { q, r };
+    this.constructiblePlacementMessage = candidate.legal ? null : localizeActionError(candidate.reasonCode ?? undefined, this.locale);
+    const message = this.root.querySelector<HTMLElement>('[data-constructible-inline-message]');
+    if (message) {
+      message.textContent = this.constructiblePlacementMessage ?? '';
+      message.hidden = !this.constructiblePlacementMessage;
+    }
+    this.updateBoard();
+  }
+
   private updateRecruitmentReasons(): void {
     if (!this.state) return;
     const city = this.selectedCity();
@@ -2613,6 +2922,9 @@ export class GameUiController {
       this.checkpointPlacement = null;
       this.checkpointPreviewTarget = null;
       this.checkpointPlacementMessage = null;
+      this.constructiblePlacement = null;
+      this.constructiblePreviewTarget = null;
+      this.constructiblePlacementMessage = null;
       this.lastSaveCode = null;
       this.renderGame();
       if (shouldAutosaveAfterLoad(migrated)) this.autosave();
@@ -2703,7 +3015,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointFallback', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipPolicy', 'tipNoise', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointFallback', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
@@ -2832,6 +3144,45 @@ export class GameUiController {
       escapeHtml(t('arrivalSchedule')) + '</h3>' + cards + '</section>' + renderNoiseEventLog(this.state, this.locale);
   }
 
+  /**
+   * Render the Core-backed Constructible Facility picker and candidate mode.
+   * The complete candidate query remains on the board; the sheet keeps a
+   * compact coordinate list so a 31×31 map does not become an unwieldy DOM
+   * wall on mobile.
+   */
+  private renderConstructiblePlacement(): string {
+    if (!this.state) return '';
+    const t = this.translator();
+    const types: ConstructibleFacilityType[] = ['simpleFarm', 'civilianDroneBase'];
+    if (!this.constructiblePlacement) {
+      const buttons = types.map((facilityType) => {
+        const config = this.state!.config.facilities[facilityType];
+        const count = this.state!.facilities.filter((facility) => facility.constructible && facility.type === facilityType).length;
+        const limit = Math.ceil(this.state!.map.roadBranches.length / Math.max(1, this.state!.config.constructibleFacility.limitPerTypeDivisor));
+        const action = facilityType === 'simpleFarm' ? 'build-simple-farm' : 'build-civilian-drone-base';
+        const label = facilityType === 'simpleFarm' ? t('buildSimpleFarm') : t('buildCivilianDroneBase');
+        return `<button class="secondary-button constructible-build-button" data-action="${action}" data-facility-type="${facilityType}">${escapeHtml(label)} · ${escapeHtml(t('buildCost'))} ${config.buildCivilianGoods} · ${escapeHtml(t('buildLimit'))} ${count}/${limit}</button>`;
+      }).join('');
+      return `<section class="constructible-placement constructible-picker" data-constructible-picker="true" aria-labelledby="constructible-heading"><div class="section-heading"><h3 id="constructible-heading">${escapeHtml(t('buildFacility'))}</h3><span class="status-chip">${escapeHtml(t('supply'))}</span></div><p class="muted">${escapeHtml(t('buildModeHint'))}</p><div class="action-row constructible-build-actions">${buttons}</div><p class="muted">${escapeHtml(t('tipBuild'))}</p></section>`;
+    }
+    const facilityType = this.constructiblePlacement.facilityType;
+    const candidates = this.constructibleFacilityCandidates(facilityType);
+    const legal = candidates.filter((candidate) => candidate.legal);
+    const invalid = candidates.filter((candidate) => !candidate.legal);
+    const selected = this.constructiblePreviewTarget
+      ? candidates.find((candidate) => samePosition(candidate.position, this.constructiblePreviewTarget!))
+      : undefined;
+    // Keep the sheet usable on a phone while preserving a representative set
+    // of invalid candidates for keyboard/touch users; every candidate remains
+    // available as a map marker and is still validated by Core on selection.
+    const listed = [...legal.slice(0, 40), ...invalid.slice(0, 12)];
+    const buttons = listed.map((candidate) => `<button class="constructible-candidate ${candidate.legal ? 'legal' : 'invalid'}${selected && samePosition(selected.position, candidate.position) ? ' selected' : ''}" data-action="constructible-build-at" data-facility-type="${facilityType}" data-q="${candidate.position.q}" data-r="${candidate.position.r}" aria-invalid="${String(!candidate.legal)}" title="${escapeHtml(candidate.reasonCode ? localizeActionError(candidate.reasonCode, this.locale) : t('buildLegal'))}"><span aria-hidden="true">${candidate.legal ? '✓' : '×'}</span> ${escapeHtml(candidate.position.q + ',' + candidate.position.r)}</button>`).join('');
+    const selectedReason = selected && !selected.legal
+      ? localizeActionError(selected.reasonCode ?? undefined, this.locale)
+      : this.constructiblePlacementMessage;
+    return `<section class="constructible-placement" data-constructible-placement="true" data-facility-type="${facilityType}" aria-labelledby="constructible-placement-heading"><div class="section-heading"><h3 id="constructible-placement-heading">${escapeHtml(t('buildMode'))}: ${escapeHtml(facilityLabel(facilityType, this.locale))}</h3><button class="ghost-button compact-button" data-action="constructible-place-cancel">${escapeHtml(t('buildCancel'))}</button></div><p class="muted">${escapeHtml(t('buildModeHint'))}</p><dl class="forecast-detail-grid constructible-summary"><div><dt>${escapeHtml(t('buildLegal'))}</dt><dd>${legal.length}</dd></div><div><dt>${escapeHtml(t('buildIllegal'))}</dt><dd>${invalid.length}</dd></div><div><dt>${escapeHtml(t('buildCost'))}</dt><dd>${this.state.config.facilities[facilityType].buildCivilianGoods} ${escapeHtml(t('civilianGoods'))}</dd></div></dl><div class="constructible-candidates" aria-label="${escapeHtml(t('buildCandidate'))}">${buttons}</div><p class="checkpoint-inline-message constructible-inline-message" data-constructible-inline-message role="status" aria-live="polite"${selectedReason ? '' : ' hidden'}>${escapeHtml(selectedReason ?? '')}</p><p class="muted">${escapeHtml(t('buildCandidate'))}: ${legal.length} · ${escapeHtml(t('buildIllegal'))}: ${invalid.length}</p></section>`;
+  }
+
   private renderCheckpointPlacement(): string {
     if (!this.state || !this.checkpointPlacement) return '';
     const t = this.translator();
@@ -2874,7 +3225,7 @@ export class GameUiController {
       const forecast = forecastEndTurn(this.state);
       title.textContent = prompt;
       summary.textContent = stateSummary(this.state, this.locale);
-      body.innerHTML = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl>${renderEndTurnForecast(forecast, this.locale)}<p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>`;
+      body.innerHTML = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl>${renderStrategicWarnings(observation, this.locale)}${renderEndTurnForecast(forecast, this.locale)}<p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>`;
       return;
     }
     if (this.selection.kind === 'unit') {
@@ -2884,7 +3235,7 @@ export class GameUiController {
       const publicUnit = observation.units.find((candidate) => candidate.id === unit.id);
       const publicTile = mapTileForPosition(observation, unit.position);
       title.textContent = `${unitLabel(unit.type, this.locale)} · ${unit.id}`;
-      summary.textContent = `HP ${unit.hp}/${unit.maxHp} · ${t('move')} ${unit.movement} · ${t('attack')} ${unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range} · ${t('vision')} ${publicUnit?.vision ?? unit.vision}`;
+      summary.textContent = `HP ${unit.hp}/${unit.maxHp} · ${t('unitFuel')} ${publicUnit?.currentFuel ?? unit.currentFuel}/${publicUnit?.maxFuel ?? unit.maxFuel} · ${t('move')} ${unit.movement} · ${t('attack')} ${unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range} · ${t('vision')} ${publicUnit?.vision ?? unit.vision}`;
       const risk = this.pendingMove?.interceptionRisk;
       const riskText = typeof risk === 'number' ? risk <= 0.2 ? t('low') : risk <= 0.5 ? t('medium') : t('high') : String(risk ?? t('none'));
       const canWait = actions.some((action) => action.type === 'Wait');
@@ -2914,6 +3265,12 @@ export class GameUiController {
       ? t('infected')
       : facility.status === 'ruined'
         ? t('ruined')
+        : facility.operationalStatus === 'building'
+          ? t('stateBuilding')
+          : facility.operationalStatus === 'disabled'
+            ? t('stateDisabled')
+            : facility.operationalStatus === 'recovering'
+              ? t('stateRecovering')
         : facility.workers <= 0
           ? t('stopped')
           : projectedPowerUnavailable
@@ -3006,11 +3363,26 @@ export class GameUiController {
     const noiseSection = noiseClass
       ? `<section class="noise-forecast" data-noise-class="${escapeHtml(noiseClass)}"><h3>${escapeHtml(t('noise'))}</h3><p><strong>${escapeHtml(t('noiseClass'))}</strong>: ${escapeHtml(t(`noiseClass${noiseClass[0]!.toUpperCase()}${noiseClass.slice(1)}`))}</p><p class="muted">${escapeHtml(t('noiseCombatHint'))}</p></section>`
       : '';
+    const currentFuel = publicUnit?.currentFuel ?? unit.currentFuel;
+    const maxFuel = publicUnit?.maxFuel ?? unit.maxFuel;
+    const selectedMove = this.pendingMove && publicUnit
+      ? publicUnit.fuelCostByLegalMove.find((move) => samePosition(move.destination, this.pendingMove!.destination))
+      : undefined;
+    const refillDemand = publicUnit?.projectedRefillDemandIfTurnEndsNow ?? Math.max(0, maxFuel - currentFuel);
+    const refillAmount = publicUnit?.projectedRefillAmountIfTurnEndsNow ?? 0;
+    const refillReason = !supplied
+      ? t('refillOutOfSupply')
+      : refillDemand <= 0
+        ? t('refillNotNeeded')
+        : refillAmount < refillDemand
+          ? t('refillStateFuelShortage')
+          : t('refillAvailable');
+    const fuelSection = `<section class="unit-fuel-forecast" data-unit-fuel="true"><h3>${escapeHtml(t('unitFuel'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentFuel'))}</dt><dd>${currentFuel}/${maxFuel}</dd></div>${selectedMove ? `<div><dt>${escapeHtml(t('fuelCost'))}</dt><dd>-${selectedMove.fuelCost}</dd></div><div><dt>${escapeHtml(t('fuelAfterMove'))}</dt><dd>${selectedMove.projectedFuelAfterMove}/${maxFuel}</dd></div>` : ''}<div><dt>${escapeHtml(t('refillDemand'))}</dt><dd>${refillDemand}</dd></div><div><dt>${escapeHtml(t('refillAmount'))}</dt><dd>${refillAmount}</dd></div><div><dt>${escapeHtml(t('refillReason'))}</dt><dd>${escapeHtml(refillReason)}</dd></div></dl><p class="muted">${escapeHtml(t('tipFuel'))}</p></section>`;
     const infectionSection = infectedTarget
       ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicUnit?.infectionContainmentCapable ? 'is-contained' : 'warning-text'}">${escapeHtml(publicUnit?.infectionContainmentCapable ? t('infectionContained') : t('infectionNotContained'))}</p>${publicUnit?.suppressionAvailableIfTurnEndsNow ? `<p class="muted">${escapeHtml(t('automaticSuppression'))}: ${escapeHtml(t('projectedSuppression'))} ${Math.min(infectedTarget.infected, publicUnit.suppressionPower)} · ${escapeHtml(t('suppressionPower'))} ${publicUnit.suppressionPower}</p>${publicUnit.suppressionCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicUnit.suppressionCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}` : `<p class="muted">${escapeHtml(t('automaticSuppressionUnavailable'))}</p>`}<p class="muted">${escapeHtml(t('tipSuppression'))}</p></section>`
       : '';
     const preview = this.pendingMove
-      ? `<div class="preview-card"><strong>${escapeHtml(t('preview'))}</strong><p>${escapeHtml(t('path'))}: ${this.pendingMove.path.length} <span>→ ${this.pendingMove.destination.q},${this.pendingMove.destination.r}</span></p><p>${escapeHtml(t('interceptionRisk'))}: <b class="risk-${riskText.toLowerCase()}">${escapeHtml(riskText)}</b></p><div class="action-row"><button class="primary-button" data-action="confirm-move">${escapeHtml(t('confirm'))}</button><button class="ghost-button" data-action="cancel-move">${escapeHtml(t('cancel'))}</button></div></div>`
+      ? `<div class="preview-card"><strong>${escapeHtml(t('preview'))}</strong><p>${escapeHtml(t('path'))}: ${Math.max(0, this.pendingMove.path.length - 1)} <span>→ ${this.pendingMove.destination.q},${this.pendingMove.destination.r}</span></p>${selectedMove ? `<p>${escapeHtml(t('fuelCost'))}: <b>-${selectedMove.fuelCost}</b> · ${escapeHtml(t('fuelAfterMove'))}: <b>${selectedMove.projectedFuelAfterMove}/${maxFuel}</b></p>` : ''}<p>${escapeHtml(t('interceptionRisk'))}: <b class="risk-${riskText.toLowerCase()}">${escapeHtml(riskText)}</b></p><div class="action-row"><button class="primary-button" data-action="confirm-move">${escapeHtml(t('confirm'))}</button><button class="ghost-button" data-action="cancel-move">${escapeHtml(t('cancel'))}</button></div></div>`
       : '';
     const actionHint = this.pendingMove || this.pendingAttackTargetId
       ? t('confirmTargetNearby')
@@ -3019,7 +3391,7 @@ export class GameUiController {
         : this.unitActionMode === 'attack'
           ? t('selectAttackTarget')
           : t('selectUnitAction');
-    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p><section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
+    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${fuelSection}<section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
   }
 
   /**
@@ -3049,6 +3421,25 @@ export class GameUiController {
     if (!publicFacility) return '';
     const t = this.translator();
     const production = publicFacility.production;
+    const statusLabel = publicFacility.operationalStatus === 'building'
+      ? t('stateBuilding')
+      : publicFacility.operationalStatus === 'disabled'
+        ? t('stateDisabled')
+        : publicFacility.operationalStatus === 'recovering'
+          ? t('stateRecovering')
+          : publicFacility.operationalStatus === 'operational'
+            ? t('operational')
+            : publicFacility.operationalStatus === 'stopped'
+              ? t('stopped')
+              : publicFacility.operationalStatus === 'infected'
+                ? t('infected')
+                : t('ruined');
+    const type = publicFacility.type;
+    const config = this.state?.config.facilities[type];
+    const buildCost = config?.buildCivilianGoods ?? 0;
+    const currentVision = publicFacility.vision;
+    const visionLimit = type === 'civilianDroneBase' ? config?.visionRadius ?? 10 : currentVision;
+    const facilityFacts = `<section class="facility-facts" data-facility-facts="true"><h3>${escapeHtml(t('facilityStatus'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('facilityStatus'))}</dt><dd>${escapeHtml(statusLabel)}</dd></div><div><dt>${escapeHtml(t('healthyPopulation'))}</dt><dd>${publicFacility.healthyPopulation}/${publicFacility.populationCapacity}</dd></div><div><dt>${escapeHtml(t('facilitySupply'))}</dt><dd>${escapeHtml(publicFacility.inSupply ? t('supplied') : t('outOfSupply'))}</dd></div><div><dt>${escapeHtml(t('facilityVision'))}</dt><dd>${currentVision}${type === 'civilianDroneBase' ? `/${visionLimit}` : ''}</dd></div><div><dt>${escapeHtml(t('zombieTargetValue'))}</dt><dd>${publicFacility.zombieTargetValue}</dd></div><div><dt>${escapeHtml(t('constructible'))}</dt><dd>${publicFacility.constructible ? t('owned') : t('none')}</dd></div>${publicFacility.constructible ? `<div><dt>${escapeHtml(t('buildTurn'))}</dt><dd>${publicFacility.builtTurn ?? '—'}</dd></div><div><dt>${escapeHtml(t('buildCost'))}</dt><dd>${buildCost} ${escapeHtml(t('civilianGoods'))}</dd></div><div><dt>${escapeHtml(t('recoveryTurn'))}</dt><dd>${publicFacility.recoveryOperationalTurn ?? '—'}</dd></div>` : ''}</dl></section>`;
     const powerMode = production.powerMode ?? (production.requiresPower ? 'required' : 'none');
     const powerRequirement = powerMode !== 'none' && production.requiredPowerCapacity > 0
       ? String(production.requiredPowerCapacity)
@@ -3082,7 +3473,14 @@ export class GameUiController {
     const infection = publicFacility.infectedPopulation > 0
       ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicFacility.infectionContained ? 'is-contained' : 'warning-text'}">${escapeHtml(publicFacility.infectionContained ? t('infectionContained') : t('infectionNotContained'))}</p><p class="muted">${escapeHtml(t('automaticSuppression'))}: ${publicFacility.projectedSuppression > 0 ? publicFacility.projectedSuppression : t('automaticSuppressionUnavailable')}</p>${publicFacility.projectedCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicFacility.projectedCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}</section>`
       : '';
-    return `<section class="production-forecast"><h3>${escapeHtml(t('productionForecast'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('powerMode'))}</dt><dd>${escapeHtml(powerModeLabel(powerMode, this.locale))}</dd></div><div><dt>${escapeHtml(t('powerSupply'))}</dt><dd>${escapeHtml(powerSupply)}</dd></div><div><dt>${escapeHtml(t('projectedPower'))}</dt><dd>${escapeHtml(projectedPower)}</dd></div><div><dt>${escapeHtml(t('powerReason'))}</dt><dd>${escapeHtml(powerReason || t('none'))}</dd></div><div><dt>${escapeHtml(t('lastPowerSupplied'))}</dt><dd>${escapeHtml(lastPower)}</dd></div><div><dt>${escapeHtml(t('productionMultiplier'))}</dt><dd>×${production.projectedProductionMultiplier ?? 1}</dd></div><div><dt>${escapeHtml(t('baseProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(baseProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedInput'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedInput, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('powerRequirement'))}</dt><dd>${escapeHtml(powerRequirement)}</dd></div><div><dt>${escapeHtml(t('powerGeneration'))}</dt><dd>${escapeHtml(powerGeneration)}</dd></div></dl><p class="muted">${escapeHtml(t('perWorker'))}: ${escapeHtml(t('currentProduction'))} ${escapeHtml(formatResourceAmounts(production.outputsPerWorker, this.locale))} · ${escapeHtml(t('inputConsumption'))} ${escapeHtml(formatResourceAmounts(production.inputsPerWorker, this.locale))}</p>${powerWarning}${stopped}<p class="muted">${escapeHtml(t('projectedLoss'))}: ${escapeHtml(formatResourceAmounts(production.projectedOutputLossIfInfectedOrOverrun, this.locale))} · ${escapeHtml(t('powerGeneration'))} ${production.projectedPowerLossIfInfectedOrOverrun}</p></section>${infection}`;
+    const specialRule = type === 'windPowerPlant'
+      ? `<p class="muted">${escapeHtml(t('windPowerGeneration'))}: 15 · ${escapeHtml(t('windFuelCost'))}: 0 · ${escapeHtml(t('windZombieTarget'))}: 5 · ${escapeHtml(t('facilityVision'))}: ${currentVision}</p>`
+      : type === 'simpleFarm'
+        ? `<p class="muted">${escapeHtml(t('foodPerWorker'))}: 5 · ${escapeHtml(t('powerRequirement'))}: 5 · ${escapeHtml(t('buildCost'))}: ${buildCost}</p>`
+        : type === 'civilianDroneBase'
+          ? `<p class="muted">${escapeHtml(t('droneVision'))}: ${publicFacility.healthyPopulation} × 2 = ${currentVision} · ${escapeHtml(t('powerRequirement'))}: 5 · ${escapeHtml(t('buildCost'))}: ${buildCost}</p>`
+          : '';
+    return `${facilityFacts}<section class="production-forecast"><h3>${escapeHtml(t('productionForecast'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('powerMode'))}</dt><dd>${escapeHtml(powerModeLabel(powerMode, this.locale))}</dd></div><div><dt>${escapeHtml(t('powerSupply'))}</dt><dd>${escapeHtml(powerSupply)}</dd></div><div><dt>${escapeHtml(t('projectedPower'))}</dt><dd>${escapeHtml(projectedPower)}</dd></div><div><dt>${escapeHtml(t('powerReason'))}</dt><dd>${escapeHtml(powerReason || t('none'))}</dd></div><div><dt>${escapeHtml(t('lastPowerSupplied'))}</dt><dd>${escapeHtml(lastPower)}</dd></div><div><dt>${escapeHtml(t('productionMultiplier'))}</dt><dd>×${production.projectedProductionMultiplier ?? 1}</dd></div><div><dt>${escapeHtml(t('baseProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(baseProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedInput'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedInput, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('powerRequirement'))}</dt><dd>${escapeHtml(powerRequirement)}</dd></div><div><dt>${escapeHtml(t('powerGeneration'))}</dt><dd>${escapeHtml(powerGeneration)}</dd></div></dl><p class="muted">${escapeHtml(t('perWorker'))}: ${escapeHtml(t('currentProduction'))} ${escapeHtml(formatResourceAmounts(production.outputsPerWorker, this.locale))} · ${escapeHtml(t('inputConsumption'))} ${escapeHtml(formatResourceAmounts(production.inputsPerWorker, this.locale))}</p>${specialRule}${powerWarning}${stopped}<p class="muted">${escapeHtml(t('projectedLoss'))}: ${escapeHtml(formatResourceAmounts(production.projectedOutputLossIfInfectedOrOverrun, this.locale))} · ${escapeHtml(t('powerGeneration'))} ${production.projectedPowerLossIfInfectedOrOverrun}</p></section>${infection}`;
   }
 
   private renderCheckpointSheet(

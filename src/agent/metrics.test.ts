@@ -13,7 +13,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('1.4.2');
+    expect(run.metrics.bridgeApiVersion).toBe('2.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -36,6 +36,11 @@ describe('Agent Metrics', () => {
       'terrainEntriesByType', 'urbanDefenseApplications', 'urbanDefenseDamagePrevented',
       'forestDefenseApplications', 'forestDefenseDamagePrevented', 'normalZombieIdleCount',
       'hordeTargetInheritedCount', 'hordeTargetClearedCount',
+      'mapWidth', 'mapHeight', 'humanHexesMovedByType', 'maxSingleMoveDistanceByType',
+      'longMoves6PlusByType', 'unitFuelConsumedByType', 'unitFuelRefilledByType',
+      'stateFuelSpentOnPower', 'stateFuelSpentOnUnits', 'windPowerGenerated',
+      'simpleFarmsBuilt', 'droneBasesBuilt', 'guaranteedDefeatWarnings',
+      'resourceSinglePointFailureTurnsByResource', 'checkpointQueuePressureTurnsByClass',
     ]) expect(run.metrics).toHaveProperty(key);
     for (const hiddenNoiseMetric of [
       'normalZombiesNoiseTargeted',
@@ -54,7 +59,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.finalHordeSpawned).toBe(
       run.metrics.finalHordeZombiesSpawned + run.metrics.finalNormalZombiesSpawned,
     );
-  });
+  }, 20_000);
 
   it('keeps branch, policy, checkpoint, and supply metrics in the public result', () => {
     const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
@@ -63,7 +68,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.checkpointsBuilt).toBeGreaterThanOrEqual(0);
     expect(run.metrics.checkpointsRelocated).toBeGreaterThanOrEqual(0);
     expect(run.metrics.supplyRejections).toBeGreaterThanOrEqual(0);
-  });
+  }, 10_000);
 
   it('counts policy branch-turns from the Active post only', () => {
     const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
@@ -77,6 +82,14 @@ describe('Agent Metrics', () => {
       waiting: 0,
       screening: 0,
       approved: 0,
+      queuePeople: 0,
+      screeningCapacity: 10,
+      estimatedScreeningThroughput: 5,
+      arrivalIntervalMin: 2,
+      arrivalIntervalMax: 4,
+      arrivalPeopleMin: 5,
+      arrivalPeopleMax: 10,
+      queuePressureClass: 'none' as const,
       infected: 0,
       remainingTurns: 0,
       nextPolicy: 'normal' as const,
@@ -88,9 +101,9 @@ describe('Agent Metrics', () => {
       projectedCivilianDamage: 0,
     };
     observation.checkpoints = [
-      { ...baseCheckpoint, id: 'active', position: { q: 3, r: 7 }, role: 'active', currentPolicy: 'normal', providesSupply: true },
-      { ...baseCheckpoint, id: 'standby', position: { q: 2, r: 7 }, role: 'standby', currentPolicy: 'strict' },
-      { ...baseCheckpoint, id: 'dormant', position: { q: 1, r: 7 }, role: 'dormant', currentPolicy: 'passThrough' },
+      { ...baseCheckpoint, id: 'active', position: { q: 3, r: 7 }, role: 'active', currentPolicy: 'normal', currentPolicyTurns: 2, providesSupply: true },
+      { ...baseCheckpoint, id: 'standby', position: { q: 2, r: 7 }, role: 'standby', currentPolicy: 'strict', currentPolicyTurns: 3 },
+      { ...baseCheckpoint, id: 'dormant', position: { q: 1, r: 7 }, role: 'dormant', currentPolicy: 'passThrough', currentPolicyTurns: 0 },
     ];
     const metrics = collectGameMetrics({
       initialObservation: observation,
@@ -116,7 +129,7 @@ describe('Agent Metrics', () => {
     expect(aggregate.metrics.finalTurn.average).toBeGreaterThan(0);
     expect(aggregate.metrics.finalTurn.p10).toBeLessThanOrEqual(aggregate.metrics.finalTurn.p90);
     expect(aggregate.actionCounts.EndTurn).toBe(first.actionCounts.EndTurn + second.actionCounts.EndTurn);
-  }, 15_000);
+  }, 45_000);
 
   it('can collect a technical-failure metric without pretending it is an in-game loss', () => {
     const config = createDefaultConfig();

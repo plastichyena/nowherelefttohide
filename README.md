@@ -8,11 +8,13 @@
 
 ## PoCの範囲
 
-- 固定15×15ヘックス、16施設、東西南北の道路とHorde入口
+- 固定31×31ヘックス、17恒久施設、東西南北の道路支線とHorde入口
 - Plain／Forest／Mountainの固定地形、重み付き移動、Urban／Forest防御、共通VisibilityとFog of War
 - 州都、地方都市、農場、工場、製油所、発電所の確保・稼働・感染・陥落・復旧
-- 警察・州兵の移動、迎撃、攻撃、反撃、待機、自然回復
+- 警察・州兵のMovement 10、機種別Fuel、補給、迎撃、攻撃、反撃、待機、自然回復
 - 食料・民需品・軍需品・燃料・電力Capacityの生産と不足処理
+- Fuel不要のWind Power Plant、Supply内に建設できるSimple Farm／Civilian Drone Base
+- Fuel／電力、Single Point of Failure、確定経済敗北、Checkpoint供給効果、Queue PressureのForecast
 - 所在地を持つ都市住民・生産施設労働者、都市間移住、都市過密
 - 検問所、避難民の到着・審査、waiting / screening / approved、潜伏感染
 - 道路方面ごとの独立到着予定、複数Checkpoint Post、Active / Standby / Dormant、Automatic Fallback
@@ -26,7 +28,7 @@
 - ブラウザJavaScriptから利用できる、通常UI・保存領域と分離したDeveloper / Browser Bridge
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.3.3の確定要件は [`Doc/Nowhere Left to Hide PoC v1.3.3 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.3.3%20アップデート要件%20確定版.md) で確認できます。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.4.0の実装目標となった確定要件は [`Doc/Nowhere Left to Hide PoC v1.4.0 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.4.0%20アップデート要件%20確定版.md) です。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## ローカルで起動する
 
@@ -58,15 +60,15 @@ Open https://plastichyena.github.io/nowherelefttohide/ and use the documented wi
 
 公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・Checkpoint候補Schema／Reason Code・生産/電力の静的ルールを返します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
 
-v1.3.3ではHuman UIとAgentが同じVisibility関数、Checkpoint Role導出、候補Queryを使います。ObservationはActive／Standby／Dormantと構造上のFallback可否、全Action種別の候補とReason Codeを返します。Combat NoiseはCenter、Unit Type、公開Classだけを返し、正確なRadius、Hidden Enemyの反応数・ID・Targetは公開しません。Vision外のEnemy位置・個体ID・Target・Spawn座標も従来どおり非公開です。
+v1.4.0ではHuman UIとAgentが同じVisibility、Forecast、Checkpoint／Constructible候補Queryを使います。ObservationはUnit Fuel、施設状態、Active／Standby／Dormant、構造上のFallback可否、Projected Supply Effect、全Action種別の候補とReason Codeを返します。Combat NoiseはCenter、Unit Type、公開Classだけを返し、正確なRadius、Hidden Enemyの反応数・ID・Targetは公開しません。Vision外のEnemy位置・個体ID・Target・Spawn座標も従来どおり非公開です。
 
 ## Agent Simulation CLI
 
 Random／Balancedは共通RunnerとAgentGameを使います。BalancedはGameStateを参照せず、公開Observationと合法手だけから完全に決定的なActionを選びます。
 
 ```bash
-npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-run
-npm run sim -- --agent=random,balanced --seeds=1,2,3 --out=output/simulations/comparison
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-run
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random,balanced --seeds=1,2,3 --out=output/simulations/comparison
 ```
 
 出力先には正本`run.json`、固定列UTF-8の`games.csv`、成功・敗北・技術的失敗を含むゲーム単位Artifactを生成します。ローカル／CIの完全Artifactだけは`verificationEvents`へMixed Hordeの内部Group・Type別生成数・Unit所属を保持し、Replayで内部Event列まで照合します。Browser Bridgeの`getRunArtifact()`にはこの内部情報を含めません。既存の非空出力先は既定で上書きしません。上書きする場合だけ`--overwrite`を明示してください。ゲーム内敗北は正常完遂であり、技術的失敗が1件でもある場合だけExit Codeが非0になります。
@@ -118,7 +120,7 @@ Turn 30にHorde Zombie 7体とNormal Zombie 5体からなる12体のFinal Horde�
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.3.3`、Game Rules / GameState / Configは `1.4.2`、Fixed Mapは `fixed-15x15-v2`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.4.2`です。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.4.0`、Game Rules / GameState / Configは `2.0.0`、Fixed Mapは `fixed-31x31-v1`、Agent / Observation / Browser Bridgeは `2.0.0`、Artifact Schemaは `2.0.0`です。
 
 ## CoreとHeadless API
 
@@ -132,6 +134,7 @@ interface HeadlessGame {
   getState(): Readonly<GameState>;
   getLegalActions(): GameAction[];
   getCheckpointPositionCandidates(): CheckpointPositionCandidate[];
+  getConstructibleFacilityPositionCandidates(type: ConstructibleFacilityType): ConstructibleFacilityPositionCandidate[];
   step(action: GameAction): StepResult;
   isGameOver(): boolean;
   getResult(): GameResult | null;
@@ -142,27 +145,27 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不正Config、不変条件違反のデータは現在状態へ適用しません。App/Release `1.3.3`、Game Rules / State / Config `1.4.2`、Save Format `4`を使用します。v1.3.2以前の保存データ、Replay、Artifactは変換せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不正Config、不変条件違反のデータは現在状態へ適用しません。App/Release `1.4.0`、Game Rules / State / Config `2.0.0`、Save Format `5`を使用します。v1.3.3以前の保存データ、Replay、Artifactは変換せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
 
 ## テスト
 
 ```bash
 npm run typecheck
 npm test
-npm run test:random -- --games=100
-npm run test:balanced -- --games=100
-npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.3.3-balanced-300-part-1
-npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.3.3-balanced-300-part-2
-npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.3.3-balanced-300-part-3
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --out=output/simulations/random-smoke --overwrite
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-smoke --overwrite
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=300 --seed=1 --out=output/simulations/v1.4.0-balanced-300 --overwrite
 npm run build
-npm run test:browser-bridge -- --dist=dist
+npm run test:browser-bridge
 ```
 
 Coreテストでは、移動・戦闘、資源・電力、不足被害、感染・鎮圧・陥落・復旧、避難民、Horde、勝敗、保存往復、不変条件、Seed再現性を確認します。Random／Balancedは公開Observationと合法手だけを使う統一Runnerで実行し、失敗時にはVersion、Config、Map ID、Seed、Action列、直前Observationとデバッグ用Stateを出力します。
 
-リリース前300 Seedは完全なReplay／Failure Artifactを保持するため、Node.jsの既定ヒープ内で安定して実行できる100ゲーム単位に分割します。3実行は連続した固定Seed 1～300を網羅します。
+リリース前には標準ConfigのBalanced固定Seed 1～300を完遂します。さらにFuel 2水準、Simple Farm Food 2水準、Final Horde Turn 3水準の全12組合せを、Random／Balancedそれぞれ固定Seed 1～100で比較します。
 
 `test:random`と`test:balanced`は標準ConfigのSeed群を共通Batch CLIで実行します。CIでは各100ゲームに加え、Observation境界、Replay、Production Bridge smokeを検証します。
+
+`.github/workflows/v140-release-validation.yml` は手動Release検証として、全24感度Batchと標準Balanced 300ゲームを独立Jobで実行し、各ReportをArtifactへ保存します。
 
 ## GitHub ActionsとPages
 
@@ -172,10 +175,10 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 2. `npm ci`（lockfile固定）
 3. `npm run typecheck`
 4. `npm test`
-5. `npm run test:random -- --games=100`
-6. `npm run test:balanced -- --games=100`
+5. `npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --out=output/simulations/random-smoke --overwrite`
+6. `npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-smoke --overwrite`
 7. `npm run build`
-8. `npm run test:browser-bridge -- --dist=dist`
+8. `npm run test:browser-bridge`
 9. `main`へのpush時だけGitHub Pagesへデプロイ
 
 Workflowは`actions/configure-pages`でPagesの有効化を要求し、相対asset URLで生成した`dist`を公開します。リポジトリ/組織ポリシーが自動有効化を拒否した場合だけ、Pages設定のSourceを「GitHub Actions」に変更してください。

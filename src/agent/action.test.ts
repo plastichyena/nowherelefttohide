@@ -11,4 +11,11 @@ describe('Agent action keys', () => {
     expect(actionKey({ ...relocate, branchId: undefined })).not.toBe(actionKey(relocate));
     expect(sortActions([relocate, build])).toEqual([build, relocate]);
   });
+
+  it('keys constructible builds by facility type and position', () => {
+    const farm = { type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: { q: 14, r: 14 } } as const;
+    const drone = { type: 'BuildConstructibleFacility', facilityType: 'civilianDroneBase', position: { q: 14, r: 14 } } as const;
+    expect(actionKey(farm)).toBe('BuildConstructibleFacility|simpleFarm|14,14');
+    expect(actionKey(drone)).toBe('BuildConstructibleFacility|civilianDroneBase|14,14');
+  });
 });

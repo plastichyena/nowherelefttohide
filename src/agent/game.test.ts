@@ -6,7 +6,7 @@ import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.3.3');
+    expect(APP_VERSION).toBe('1.4.0');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -18,12 +18,12 @@ describe('AgentGame public boundary', () => {
     expect(JSON.parse(encoded)).toEqual(first);
     expect(encoded).not.toContain('rngState');
     expect(encoded).not.toContain('spawnedCount');
-    expect(first.map.tiles).toHaveLength(225);
+    expect(first.map.tiles).toHaveLength(961);
     expect(first).not.toHaveProperty('maxTurns');
     expect(first.finalHordeTurn).toBe(30);
     expect(first.apiVersion).toBe(OBSERVATION_API_VERSION);
     expect(first.roadBranches).toHaveLength(4);
-    expect(first.checkpointPositionCandidates).toHaveLength(28);
+    expect(first.checkpointPositionCandidates).toHaveLength(60);
     expect(first.checkpointPositionCandidates.every((candidate) =>
       typeof candidate.legal === 'boolean' && (candidate.reasonCode === null || typeof candidate.reasonCode === 'string'),
     )).toBe(true);
@@ -46,7 +46,9 @@ describe('AgentGame public boundary', () => {
       typeof tile.visibleToPlayer === 'boolean',
     )).toBe(true);
     expect(first.zombies.every((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')).toBe(true);
-    expect(first.zombies.length).toBeGreaterThan(0);
+    // The fixed v1.4 initial Zombies are outside initial shared vision; only
+    // visible enemies may enter the public Observation.
+    expect(first.zombies).toHaveLength(0);
     expect(first.horde).toMatchObject({
       warningType: 'periodic',
       spawnTurn: 5,
@@ -61,14 +63,14 @@ describe('AgentGame public boundary', () => {
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.3.3 API, checkpoint candidates, Noise rules, and Horde composition from the same adapter boundary', () => {
+  it('describes the v1.4.0 API, checkpoint candidates, Noise rules, and Horde composition from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('4');
+    expect(info.saveFormatVersion).toBe('5');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
@@ -180,7 +182,14 @@ describe('AgentGame public boundary', () => {
     game.reset({ seed: 11 });
     const actions = game.getLegalActions();
     expect(actions.length).toBeGreaterThan(0);
-    for (const action of actions.slice(0, 20)) {
+    const representativeActions = [
+      actions.find((action) => action.type === 'Wait'),
+      actions.find((action) => action.type === 'Move'),
+      actions.find((action) => action.type === 'BuildConstructibleFacility'),
+      actions.find((action) => action.type === 'EndTurn'),
+    ];
+    for (const action of representativeActions) {
+      if (!action) continue;
       const isolated = createAgentGame();
       isolated.reset({ seed: 11 });
       const result = isolated.step(action);

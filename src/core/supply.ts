@@ -16,11 +16,21 @@ export interface SupplySnapshot {
   branchRadii: Array<{ branchId: RoadBranchId; radius: number }>;
 }
 
+interface SupplyGeometry {
+  capital: HexCoord;
+  tiles: Array<{ key: string; distance: number; branchIds: RoadBranchId[] }>;
+  byKey: Map<string, { key: string; distance: number; branchIds: RoadBranchId[] }>;
+}
+
+const supplyGeometryByMapId = new Map<string, SupplyGeometry>();
+
 function stableBranches(map: Readonly<FixedMap>): RoadBranchDefinition[] {
   return [...map.roadBranches].sort((left, right) => left.id.localeCompare(right.id));
 }
 
 export function getCapitalPosition(map: Readonly<FixedMap>): HexCoord {
+  const cached = supplyGeometryByMapId.get(map.id);
+  if (cached) return { ...cached.capital };
   const capital = map.facilities.find((facility) => facility.type === 'capital');
   if (!capital) throw new Error('Map does not contain a capital facility');
   return { ...capital.position };
@@ -61,7 +71,7 @@ export function getBranchIdAt(
 }
 
 /** Return every equally-near branch so boundary tiles stay shared. */
-export function getSectorBranchIds(
+function computeSectorBranchIds(
   map: Readonly<FixedMap>,
   position: HexCoord,
 ): RoadBranchId[] {
@@ -74,6 +84,30 @@ export function getSectorBranchIds(
   }));
   const minimum = Math.min(...distances.map((entry) => entry.distance));
   return distances.filter((entry) => entry.distance === minimum).map((entry) => entry.branchId);
+}
+
+function supplyGeometry(map: Readonly<FixedMap>): SupplyGeometry {
+  const cached = supplyGeometryByMapId.get(map.id);
+  if (cached) return cached;
+  const capitalDefinition = map.facilities.find((facility) => facility.type === 'capital');
+  if (!capitalDefinition) throw new Error('Map does not contain a capital facility');
+  const capital = { ...capitalDefinition.position };
+  const tiles = map.tiles.map((tile) => ({
+    key: tile.key,
+    distance: hexDistance(capital, tile),
+    branchIds: computeSectorBranchIds(map, tile),
+  }));
+  const geometry = { capital, tiles, byKey: new Map(tiles.map((tile) => [tile.key, tile])) };
+  supplyGeometryByMapId.set(map.id, geometry);
+  return geometry;
+}
+
+export function getSectorBranchIds(
+  map: Readonly<FixedMap>,
+  position: HexCoord,
+): RoadBranchId[] {
+  const cached = supplyGeometry(map).byKey.get(hexKey(position));
+  return cached ? [...cached.branchIds] : computeSectorBranchIds(map, position);
 }
 
 export function activeCheckpointForBranch(
@@ -107,15 +141,18 @@ export function isHexSuppliedByBranch(
   branchId: RoadBranchId,
   candidateCheckpointPosition?: HexCoord,
 ): boolean {
-  const distance = hexDistance(getCapitalPosition(state.map), position);
-  return getSectorBranchIds(state.map, position).includes(branchId) &&
+  const tile = supplyGeometry(state.map).byKey.get(hexKey(position));
+  const distance = tile?.distance ?? hexDistance(getCapitalPosition(state.map), position);
+  const branchIds = tile?.branchIds ?? computeSectorBranchIds(state.map, position);
+  return branchIds.includes(branchId) &&
     distance <= getBranchSupplyRadius(state, branchId, candidateCheckpointPosition);
 }
 
 export function isHexSupplied(state: Readonly<GameState>, position: HexCoord): boolean {
-  const distance = hexDistance(getCapitalPosition(state.map), position);
+  const tile = supplyGeometry(state.map).byKey.get(hexKey(position));
+  const distance = tile?.distance ?? hexDistance(getCapitalPosition(state.map), position);
   if (distance <= state.config.checkpoint.initialSupplyRadius) return true;
-  return getSectorBranchIds(state.map, position).some(
+  return (tile?.branchIds ?? computeSectorBranchIds(state.map, position)).some(
     (branchId) => distance <= getBranchSupplyRadius(state, branchId),
   );
 }
@@ -124,16 +161,23 @@ export function getSuppliedTileKeys(
   state: Readonly<GameState>,
   override?: { branchId: RoadBranchId; checkpointPosition: HexCoord },
 ): string[] {
-  return state.map.tiles
+  const geometry = supplyGeometry(state.map);
+  const branchRadii = new Map(state.map.roadBranches.map((branch) => [
+    branch.id,
+    getBranchSupplyRadius(
+      state,
+      branch.id,
+      override?.branchId === branch.id ? override.checkpointPosition : undefined,
+    ),
+  ] as const));
+  return geometry.tiles
     .filter((tile) => {
-      const position = { q: tile.q, r: tile.r };
-      if (hexDistance(getCapitalPosition(state.map), position) <= state.config.checkpoint.initialSupplyRadius) {
+      if (tile.distance <= state.config.checkpoint.initialSupplyRadius) {
         return true;
       }
-      return getSectorBranchIds(state.map, position).some((branchId) => {
-        const candidate = override?.branchId === branchId ? override.checkpointPosition : undefined;
-        return hexDistance(getCapitalPosition(state.map), position) <= getBranchSupplyRadius(state, branchId, candidate);
-      });
+      return tile.branchIds.some((branchId) => tile.distance <= (
+        branchRadii.get(branchId) ?? state.config.checkpoint.initialSupplyRadius
+      ));
     })
     .map((tile) => tile.key)
     .sort();

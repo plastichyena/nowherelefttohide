@@ -5,8 +5,8 @@ import { hexKey, hexNeighbors } from './hex';
 import { createUnit } from './state';
 import type { GameState } from './types';
 
-describe('v1.3 zombie, Final Horde and victory flow', () => {
-  it('rejects corrupted v1.3 Horde and metric snapshot fields without changing the live state', () => {
+describe('v1.4 zombie, Final Horde and victory flow', () => {
+  it('rejects corrupted v1.4 Horde and metric snapshot fields without changing the live state', () => {
     const engine = new GameEngine(23, createDefaultConfig());
     const before = engine.getState();
     const corrupted = JSON.parse(JSON.stringify(before)) as GameState;
@@ -90,14 +90,20 @@ describe('v1.3 zombie, Final Horde and victory flow', () => {
     const engine = new GameEngine(19, config);
     const editable = JSON.parse(JSON.stringify(engine.getState())) as GameState;
     const police = editable.units.find((unit) => unit.type === 'police')!;
-    police.position = { q: 4, r: 2 };
+    const zombie = editable.units.find((unit) => unit.id === 'zombie-1')!;
+    zombie.position = { q: 21, r: 15 };
+    zombie.canAttack = false;
+    police.position = { q: 19, r: 15 };
+    const guard = editable.units.find((unit) => unit.type === 'nationalGuard')!;
+    guard.position = { q: 0, r: 0 };
+    guard.vision = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: editable }).error).toBeNull();
 
-    const result = engine.step({ type: 'Move', unitId: police.id, destination: { q: 4, r: 3 } });
+    const result = engine.step({ type: 'Move', unitId: police.id, destination: { q: 20, r: 15 } });
     expect(result.error).toBeNull();
     expect(result.events).toContainEqual(expect.objectContaining({
       type: 'enemy_spotted',
-      payload: expect.objectContaining({ unitId: 'zombie-1', q: 4, r: 4 }),
+      payload: expect.objectContaining({ unitId: 'zombie-1', q: 21, r: 15 }),
     }));
   });
 
@@ -106,14 +112,20 @@ describe('v1.3 zombie, Final Horde and victory flow', () => {
     const engine = new GameEngine(5, config);
     const editable = JSON.parse(JSON.stringify(engine.getState()));
     const police = editable.units.find((unit: { type: string }) => unit.type === 'police');
-    police.position = { q: 4, r: 3 };
+    const zombie = editable.units.find((unit: { id: string }) => unit.id === 'zombie-1');
+    zombie.position = { q: 21, r: 15 };
+    zombie.canAttack = true;
+    police.position = { q: 19, r: 15 };
+    const guard = editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard');
+    guard.position = { q: 0, r: 0 };
+    guard.vision = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: editable }).error).toBeNull();
-    expect(engine.getLegalActions()).toContainEqual({ type: 'Move', unitId: police.id, destination: { q: 4, r: 4 } });
+    expect(engine.getLegalActions()).toContainEqual({ type: 'Move', unitId: police.id, destination: { q: 21, r: 15 } });
     expect(engine.getLegalActions().some((action) => action.type === 'Attack' && action.targetId === 'zombie-1')).toBe(false);
 
-    const result = engine.step({ type: 'Move', unitId: police.id, destination: { q: 4, r: 4 } });
+    const result = engine.step({ type: 'Move', unitId: police.id, destination: { q: 21, r: 15 } });
     expect(result.error).toBeNull();
-    expect(result.state.units.find((unit) => unit.id === police.id)?.position).toEqual({ q: 4, r: 3 });
+    expect(result.state.units.find((unit) => unit.id === police.id)?.position).toEqual({ q: 20, r: 15 });
     expect(new Set(result.state.units.map((unit) => `${unit.position.q},${unit.position.r}`)).size).toBe(result.state.units.length);
   });
 
@@ -122,8 +134,14 @@ describe('v1.3 zombie, Final Horde and victory flow', () => {
     const engine = new GameEngine(13, config);
     const editable = JSON.parse(JSON.stringify(engine.getState()));
     editable.units = editable.units.filter((unit: { isPlayerUnit: boolean }) => unit.isPlayerUnit);
-    const normal = createUnit(editable, 'zombie-test', 'zombie', { q: 0, r: 0 });
-    const horde = createUnit(editable, 'horde-test', 'hordeZombie', { q: 1, r: 0 });
+    const normal = createUnit(editable, 'zombie-test', 'zombie', { q: 13, r: 13 });
+    normal.vision = 1;
+    const horde = createUnit(editable, 'horde-test', 'hordeZombie', { q: 14, r: 13 });
+    horde.vision = 0;
+    editable.units.find((unit: { type: string }) => unit.type === 'police')!.position = { q: 0, r: 0 };
+    editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard')!.position = { q: 30, r: 30 };
+    editable.units.find((unit: { type: string }) => unit.type === 'police')!.vision = 0;
+    editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard')!.vision = 0;
     horde.spawnGroupId = 'periodic-test';
     horde.hordeKind = 'periodic';
     editable.units.push(normal, horde);
@@ -131,7 +149,7 @@ describe('v1.3 zombie, Final Horde and victory flow', () => {
 
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
-    expect(result.state.units.find((unit) => unit.id === normal.id)?.inheritedTarget).toEqual({ q: 7, r: 7 });
+    expect(result.state.units.find((unit) => unit.id === normal.id)?.inheritedTarget).toEqual({ q: 15, r: 15 });
     expect(result.state.statistics.hordeTargetInheritedCount).toBe(1);
   });
 
@@ -140,9 +158,9 @@ describe('v1.3 zombie, Final Horde and victory flow', () => {
     const engine = new GameEngine(17, config);
     const editable = JSON.parse(JSON.stringify(engine.getState()));
     editable.units = editable.units.filter((unit: { isPlayerUnit: boolean }) => unit.isPlayerUnit);
-    editable.units.push(createUnit(editable, 'zombie-hidden', 'zombie', { q: 7, r: 1 }));
+    editable.units.push(createUnit(editable, 'zombie-hidden', 'zombie', { q: 15, r: 1 }));
     expect(engine.step({ type: 'LoadSnapshot', snapshot: editable }).error).toBeNull();
-    const action = { type: 'BuildCheckpoint', branchId: 'north', position: { q: 7, r: 0 } } as const;
+    const action = { type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 0 } } as const;
     expect(engine.getLegalActions()).toContainEqual(action);
     expect(engine.step(action).error).toBeNull();
   });

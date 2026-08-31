@@ -37,6 +37,12 @@ SOURCE_FILES = {
     "facilities/facility_checkpoint.png": "exec-f7da9ed3-9ef1-47df-bc41-3f81cd6f9437.png",
 }
 
+V140_SOURCE_FILES = {
+    "facilities/facility_wind_power_plant.png": "wind_power_plant_concept.png",
+    "facilities/facility_simple_farm.png": "simple_farm_concept.png",
+    "facilities/facility_civilian_drone_base.png": "civilian_drone_base_concept.png",
+}
+
 
 def contain(source: Image.Image, bounds: tuple[int, int], y_offset: int = 0) -> Image.Image:
     image = source.convert("RGBA")
@@ -155,12 +161,29 @@ def build(source_root: Path, output_root: Path) -> None:
     draw_overlays(output_root)
 
 
+def build_v140(source_root: Path, output_root: Path) -> None:
+    """Post-process the three v1.4.0 facility concepts without rebuilding legacy assets."""
+    for relative, source_name in V140_SOURCE_FILES.items():
+        destination = output_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source = Image.open(source_root / source_name)
+        contain(source, (218, 218), y_offset=3).save(
+            destination,
+            optimize=True,
+            compress_level=9,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source_root", type=Path)
     parser.add_argument("output_root", type=Path)
+    parser.add_argument("--v140-only", action="store_true")
     args = parser.parse_args()
-    build(args.source_root, args.output_root)
+    if args.v140_only:
+        build_v140(args.source_root, args.output_root)
+    else:
+        build(args.source_root, args.output_root)
 
 
 if __name__ == "__main__":

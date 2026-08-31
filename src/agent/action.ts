@@ -13,6 +13,7 @@ export function actionKey(action: GameAction): string {
   if (action.type === 'SetCheckpointPolicy') return `SetCheckpointPolicy|${action.branchId}|${action.policy}`;
   if (action.type === 'SetPowerSupply') return `SetPowerSupply|${action.facilityId}|${action.enabled ? 'on' : 'off'}`;
   if (action.type === 'BuildCheckpoint') return `BuildCheckpoint|${action.branchId ?? ''}|${action.position.q},${action.position.r}`;
+  if (action.type === 'BuildConstructibleFacility') return `BuildConstructibleFacility|${action.facilityType}|${action.position.q},${action.position.r}`;
   if (action.type === 'RelocateCheckpoint') return `RelocateCheckpoint|${action.checkpointId}|${action.branchId ?? ''}|${action.position.q},${action.position.r}`;
   if (action.type === 'ActivateCheckpoint') return `ActivateCheckpoint|${action.branchId}|${action.checkpointId}`;
   if (action.type === 'ProduceUnit') {

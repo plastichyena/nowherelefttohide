@@ -107,8 +107,11 @@ describe('Developer / Browser Bridge', () => {
     const artifact = api.getRunArtifact();
     expect(artifact.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(artifact.initialRoadArrivalSchedule).toHaveLength(4);
+    expect(artifact.fixedMap?.id).toBe(artifact.mapId);
     expect(artifact.observationTrace).toHaveLength(1);
     expect(artifact.observationTrace![0]!.checkpointPositionCandidates).toEqual(api.getObservation().checkpointPositionCandidates);
+    expect(artifact.observationTrace![0]).not.toHaveProperty('map');
+    expect(artifact.observationTrace![0]!.visibleTileKeys.length).toBeGreaterThan(0);
     expect(artifact.metrics).toBeDefined();
     for (const hiddenNoiseMetric of [
       'normalZombiesNoiseTargeted',
@@ -226,5 +229,16 @@ describe('Developer / Browser Bridge', () => {
     const result = api.step(action!);
     expect(result.error).toBeNull();
     expect(result.observation.facilities.find((facility) => facility.id === 'farm-1')?.production.powerSupplyEnabled).toBe(false);
+  });
+
+  it('accepts BuildConstructibleFacility through the same validated public boundary', () => {
+    const api = bridge();
+    api.reset({ seed: 127, configOverrides: { economy: { initialZombieCount: 0 } } });
+    const action = api.getLegalActions().find((candidate) => candidate.type === 'BuildConstructibleFacility');
+    expect(action).toBeDefined();
+    const result = api.step(action!);
+    expect(result.error).toBeNull();
+    expect(result.observation.facilities.some((facility) => facility.constructible)).toBe(true);
+    expect(result.observation.facilities.find((facility) => facility.constructible)?.operationalStatus).toBe('building');
   });
 });

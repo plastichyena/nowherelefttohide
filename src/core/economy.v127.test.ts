@@ -8,9 +8,24 @@ function editableState(engine: GameEngine): GameState {
   return JSON.parse(JSON.stringify(engine.getState())) as GameState;
 }
 
-describe('v1.2.7 economy and power grid', () => {
+function disableWind(state: GameState): void {
+  const wind = state.facilities.find((facility) => facility.id === 'wind-power-plant-1');
+  if (!wind) throw new Error('Missing Wind Power Plant');
+  wind.operationalStatus = 'disabled';
+  wind.lastPowerSupplied = null;
+  wind.powerSupplyEnabled = false;
+}
+
+function disableWindInEngine(engine: GameEngine): void {
+  const state = editableState(engine);
+  disableWind(state);
+  expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
+}
+
+describe('v1.4 economy and power grid', () => {
   it('uses Fuel only for actual power allocations and doubles powered maintenance industry', () => {
     const engine = new GameEngine(127, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    disableWindInEngine(engine);
     const forecast = forecastEndTurn(engine.getState());
     expect(forecast.electricity).toMatchObject({
       physicalGenerationCapacity: 30,
@@ -27,6 +42,7 @@ describe('v1.2.7 economy and power grid', () => {
   it('lets same-turn maintenance goods cover maintenance but never chains refinery Fuel into generation', () => {
     const engine = new GameEngine(128, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const state = editableState(engine);
+    disableWind(state);
     state.resources.food = 0;
     state.resources.civilianGoods = 0;
     state.resources.militaryGoods = 0;
@@ -45,6 +61,7 @@ describe('v1.2.7 economy and power grid', () => {
   it('reserves starting Civilian Goods for maintenance and only then feeds Military Factories', () => {
     const engine = new GameEngine(129, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const state = editableState(engine);
+    disableWind(state);
     const military = state.facilities.find((facility) => facility.id === 'military-factory-1')!;
     military.owner = 'player';
     military.status = 'owned';
@@ -71,6 +88,7 @@ describe('v1.2.7 economy and power grid', () => {
   it('allocates required cities, then Farm/Civilian Factory, then input-ready Military Factory', () => {
     const engine = new GameEngine(130, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const state = editableState(engine);
+    disableWind(state);
     state.facilities.find((facility) => facility.id === 'power-plant-1')!.workers = 1;
     state.facilities.find((facility) => facility.id === 'capital')!.workers += 2;
     synchronizePopulation(state);
@@ -83,6 +101,7 @@ describe('v1.2.7 economy and power grid', () => {
 
   it('changes industrial boost requests only through SetPowerSupply and refreshes forecast immediately', () => {
     const engine = new GameEngine(131, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    disableWindInEngine(engine);
     const before = forecastEndTurn(engine.getState());
     expect(before.electricity.industrialBoostDemand).toBe(10);
     const result = engine.step({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false });
@@ -95,6 +114,7 @@ describe('v1.2.7 economy and power grid', () => {
   it('allows unlimited Power Supply changes without consuming the player action budget', () => {
     const engine = new GameEngine(1311, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const state = editableState(engine);
+    disableWind(state);
     state.actionsTakenThisTurn = state.config.maxActionsPerTurn;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
 
@@ -107,6 +127,7 @@ describe('v1.2.7 economy and power grid', () => {
 
   it('records unmet power reasons in End Turn events even when a facility did not request power', () => {
     const engine = new GameEngine(1312, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    disableWindInEngine(engine);
     expect(engine.step({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
@@ -123,6 +144,7 @@ describe('v1.2.7 economy and power grid', () => {
   it('never partially powers a facility and keeps an unpowered city administratively usable', () => {
     const engine = new GameEngine(132, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const state = editableState(engine);
+    disableWind(state);
     const capital = state.facilities.find((facility) => facility.id === 'capital')!;
     const city = state.facilities.find((facility) => facility.id === 'city-1')!;
     city.owner = 'player';
@@ -152,6 +174,7 @@ describe('v1.2.7 economy and power grid', () => {
       facilities: { powerPlant: { production: { powerGeneration: 3 } } },
     }));
     const state = editableState(engine);
+    disableWind(state);
     const plant = state.facilities.find((facility) => facility.id === 'power-plant-1')!;
     const capital = state.facilities.find((facility) => facility.id === 'capital')!;
     capital.workers += plant.workers - 1;

@@ -99,8 +99,8 @@ function run(): void {
     if (!bundle.includes(method)) fail(`production bundle does not contain bridge method marker: ${method}`);
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
-  for (const marker of ['1.3.3', '1.4.2', 'fixed-15x15-v2', 'SetPowerSupply', 'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches', 'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates', 'noiseClass', 'periodicInitial', 'finalComposition', 'periodicHordeZombiesSpawned', 'artifactSchemaVersion', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression', 'visibleToPlayer', 'finalHordeStatus']) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.3.3 schema marker: ${marker}`);
+  for (const marker of ['1.4.0', '2.0.0', 'fixed-31x31-v1', 'SetPowerSupply', 'BuildConstructibleFacility', 'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches', 'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates', 'constructibleFacilityPositionCandidates', 'strategicForecast', 'queuePressureClass', 'currentFuel', 'projectedRefillAmountIfTurnEndsNow', 'zombieTargetValue', 'noiseClass', 'periodicInitial', 'finalComposition', 'periodicHordeZombiesSpawned', 'artifactSchemaVersion', 'fixedMap', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression', 'visibleToPlayer', 'finalHordeStatus']) {
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.4.0 schema marker: ${marker}`);
   }
   const productionCodeAndStyles = filesUnder(dist)
     .filter((path) => path.endsWith('.js') || path.endsWith('.css'))

@@ -7,7 +7,7 @@ import type {
   UnitState,
 } from './types';
 
-type TerrainState = Pick<GameState, 'map' | 'checkpoints' | 'config'>;
+type TerrainState = Pick<GameState, 'map' | 'facilities' | 'checkpoints' | 'config'>;
 
 export interface TerrainDefense {
   source: TerrainDefenseSource;
@@ -18,6 +18,7 @@ export function isUrbanHex(state: Readonly<TerrainState>, position: HexCoord): b
   const tile = getTile(state.map, position);
   if (tile?.facilityId) return true;
   const key = hexKey(position);
+  if (state.facilities.some((facility) => hexKey(facility.position) === key)) return true;
   return state.checkpoints.some((checkpoint) => hexKey(checkpoint.position) === key);
 }
 

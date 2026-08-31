@@ -74,7 +74,7 @@ describe('board runtime PNG files', () => {
     expect(paths).toHaveLength(new Set(paths).size);
     expect(paths.some((path) => /water/iu.test(path))).toBe(false);
     expect(paths.filter((path) => path.startsWith('units/'))).toHaveLength(4);
-    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(8);
+    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(11);
     for (const path of paths.filter((entry) => entry.startsWith('units/') || entry.startsWith('facilities/') || entry.startsWith('overlays/'))) {
       const rgba = decodeRgba(readPng(path));
       const alpha = Array.from({ length: 256 * 256 }, (_, index) => rgba[index * 4 + 3]!);

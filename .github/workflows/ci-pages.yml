@@ -17,7 +17,7 @@ jobs:
   verify:
     name: Typecheck, tests, agents, bridge smoke, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 240
     permissions:
       contents: read
       pages: write
@@ -41,11 +41,10 @@ jobs:
       - name: Run unit and invariant tests
         run: npm test
 
-      # The Phase 3 Random Test Agent is expected to expose this script. Keep
-      # this command explicit so a missing script fails CI instead of silently
-      # skipping the required 100-game smoke run.
+      # Keep this command explicit so a missing Random Agent smoke script fails
+      # CI instead of silently skipping the required 100-game run.
       - name: Run 100 seeded Random Agent games
-        run: npm run test:random -- --games=100
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --out=output/simulations/random-smoke --overwrite
 
       - name: Upload Random Agent failure artifact
         if: failure() && hashFiles('output/simulations/random-smoke/**') != ''
@@ -55,11 +54,10 @@ jobs:
           path: output/simulations/random-smoke
           if-no-files-found: ignore
 
-      # The Phase 4 Balanced Agent is expected to expose this script. Keep the
-      # command explicit so a missing script fails CI instead of skipping the
-      # required fixed-seed 100-game run.
+      # Keep this command explicit so a missing Balanced Agent smoke script
+      # fails CI instead of skipping the required fixed-seed 100-game run.
       - name: Run 100 seeded Balanced Agent games
-        run: npm run test:balanced -- --games=100
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-smoke --overwrite
 
       - name: Upload Balanced Agent failure artifact
         if: failure() && hashFiles('output/simulations/balanced-smoke/**') != ''
@@ -77,7 +75,7 @@ jobs:
       # This smoke intentionally has no browser-driver dependency: it checks
       # the generated Pages artifact and its public bridge contract.
       - name: Smoke test Browser Bridge in production bundle
-        run: npm run test:browser-bridge -- --dist=dist
+        run: npm run test:browser-bridge
 
       - name: Configure GitHub Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

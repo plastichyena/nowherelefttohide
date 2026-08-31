@@ -1,0 +1,100 @@
+name: v1.4 Release Validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v140-release-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sensitivity:
+    name: ${{ matrix.agent }} fuel-${{ matrix.fuel }} farm-${{ matrix.farmFood }} horde-${{ matrix.finalTurn }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: [random, balanced]
+        fuel: [standard, half]
+        farmFood: [5, 10]
+        finalTurn: [30, 35, 40]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run fixed-seed sensitivity batch
+        shell: bash
+        env:
+          AGENT: ${{ matrix.agent }}
+          FUEL: ${{ matrix.fuel }}
+          FARM_FOOD: ${{ matrix.farmFood }}
+          FINAL_TURN: ${{ matrix.finalTurn }}
+        run: |
+          set -euo pipefail
+          if [[ "${FUEL}" == "half" ]]; then
+            POLICE_FUEL=6
+            GUARD_FUEL=11
+          else
+            POLICE_FUEL=12
+            GUARD_FUEL=22
+          fi
+          export POLICE_FUEL GUARD_FUEL
+          CONFIG_JSON="$(node -e 'console.log(JSON.stringify({units:{police:{maxFuel:Number(process.env.POLICE_FUEL)},nationalGuard:{maxFuel:Number(process.env.GUARD_FUEL)}},facilities:{simpleFarm:{production:{outputs:{food:Number(process.env.FARM_FOOD)}}}},finalHordeTurn:Number(process.env.FINAL_TURN)}))')"
+          npx --no-install vite-node --script src/agent/sim-cli.ts \
+            --agent="${AGENT}" \
+            --games=100 \
+            --seed=1 \
+            --config-json="${CONFIG_JSON}" \
+            --out="output/simulations/v140-${AGENT}-${FUEL}-farm${FARM_FOOD}-horde${FINAL_TURN}" \
+            --overwrite
+
+      - name: Upload sensitivity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v140-${{ matrix.agent }}-${{ matrix.fuel }}-farm${{ matrix.farmFood }}-horde${{ matrix.finalTurn }}
+          path: output/simulations/v140-*
+          if-no-files-found: error
+          retention-days: 30
+
+  balanced-300:
+    name: Balanced standard seeds 1-300
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run release batch
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=300 --seed=1 --out=output/simulations/v140-balanced-release-300 --overwrite
+
+      - name: Upload release report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v140-balanced-release-300
+          path: output/simulations/v140-balanced-release-300
+          if-no-files-found: error
+          retention-days: 30
