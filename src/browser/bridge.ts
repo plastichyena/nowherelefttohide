@@ -1,14 +1,16 @@
 import { cloneAction, cloneJson } from '../agent/action';
 import { createAgentGame } from '../agent/game';
-import { collectGameMetrics } from '../agent/metrics';
 import {
   BRIDGE_API_VERSION,
+  type AgentGameResult,
+  type AgentPublicConfig,
+  type AgentPublicMetrics,
+  type AgentPublicRunArtifact,
   type AgentActionError,
   type AgentApiInfo,
   type AgentGame,
   type AgentObservation,
   type AgentResetOptions,
-  type AgentRunArtifact,
   type AgentStepResult,
 } from '../agent/types';
 import type { GameAction, JsonValue } from '../core/types';
@@ -25,9 +27,25 @@ export interface BrowserBridgeApi {
   readonly getLegalActions: () => GameAction[];
   readonly step: (action: GameAction) => AgentStepResult;
   readonly isGameOver: () => boolean;
-  readonly getResult: () => AgentRunArtifact['result'];
-  readonly getRunArtifact: () => AgentRunArtifact;
+  readonly getResult: () => AgentGameResult | null;
+  readonly getRunArtifact: () => BrowserBridgeArtifact;
 }
+
+/** Production artifact config: Noise classes are public; exact radii are not. */
+export type BrowserBridgePublicConfig = AgentPublicConfig;
+
+export type BrowserBridgePublicMetrics = Omit<AgentPublicMetrics, 'config'> & {
+  config: BrowserBridgePublicConfig;
+};
+
+/**
+ * A Browser Bridge trace is deliberately not a verification replay artifact.
+ * Local/CI runners retain the complete config needed for deterministic replay.
+ */
+export type BrowserBridgeArtifact = Omit<AgentPublicRunArtifact, 'config' | 'metrics'> & {
+  config: BrowserBridgePublicConfig;
+  metrics?: BrowserBridgePublicMetrics;
+};
 
 export interface BrowserBridgeOptions {
   /** Build metadata is supplied by CI; local builds use local-unknown. */
@@ -151,8 +169,8 @@ function isBridgeAction(value: unknown): value is GameAction {
         );
       case 'SetCheckpointPolicy':
         return (
-          hasOnlyKeys(value, ['type', 'checkpointId', 'policy']) &&
-          isSafeId(value.checkpointId) &&
+          hasOnlyKeys(value, ['type', 'branchId', 'policy']) &&
+          isSafeId(value.branchId) &&
           (value.policy === 'passThrough' || value.policy === 'normal' || value.policy === 'strict')
         );
       case 'SetPowerSupply':
@@ -170,6 +188,10 @@ function isBridgeAction(value: unknown): value is GameAction {
           isSafeId(value.checkpointId) &&
           isCoordinate(value.position) &&
           (value.branchId === undefined || isSafeId(value.branchId));
+      case 'ActivateCheckpoint':
+        return hasOnlyKeys(value, ['type', 'branchId', 'checkpointId']) &&
+          isSafeId(value.branchId) &&
+          isSafeId(value.checkpointId);
       case 'ProduceUnit':
         return (
           hasOnlyKeys(value, ['type', 'unitType'], ['destination']) &&
@@ -218,6 +240,19 @@ function cloneAttemptAction(value: unknown): unknown {
   return isBoundedJson(value) ? cloneJson(value) : { type: '__invalid_browser_bridge_input__' };
 }
 
+function publicMetrics(
+  metrics: AgentPublicMetrics,
+  acceptedActionCount: number,
+  invalidAttemptCount: number,
+): BrowserBridgePublicMetrics {
+  return cloneJson({
+    ...metrics,
+    totalAgentDecisions: acceptedActionCount + invalidAttemptCount,
+    acceptedActionCount,
+    invalidAttemptCount,
+  });
+}
+
 export function createBrowserBridge(options: BrowserBridgeOptions = {}): BrowserBridgeApi {
   const game = createAgentGame({ buildId: resolveBuildId(options.buildId), bridgeApiVersion: BRIDGE_API_VERSION });
   let decision = 0;
@@ -252,38 +287,18 @@ export function createBrowserBridge(options: BrowserBridgeOptions = {}): Browser
     return cloneJson(result);
   };
   const isGameOver = (): boolean => game.isGameOver();
-  const getResult = (): AgentRunArtifact['result'] => cloneJson(game.getResult());
-  const getRunArtifact = (): AgentRunArtifact => {
+  const getResult = (): AgentGameResult | null => cloneJson(game.getResult());
+  const getRunArtifact = (): BrowserBridgeArtifact => {
     const artifact = game.getRunArtifact();
     // The Adapter records semantically invalid actions.  Replace its decision
     // list with the bridge-level chronological list so malformed boundary
     // inputs are visible too, without exposing GameState.
-    const observationTrace = artifact.observationTrace ?? [game.getObservation()];
-    const initialObservation = observationTrace[0]!;
-    const finalObservation = observationTrace.at(-1) ?? initialObservation;
-    const events = artifact.events ?? [];
     const actions = artifact.acceptedActions ?? [];
-    const metrics = collectGameMetrics({
-      initialObservation,
-      finalObservation,
-      observations: observationTrace,
-      actions,
-      events,
-      result: artifact.result,
-      invalidAttemptCount: invalidAttempts.length,
+    return cloneJson({
+      ...artifact,
       invalidAttempts,
-      totalAgentDecisions: actions.length + invalidAttempts.length,
-      agent: { id: artifact.agent.id, version: artifact.agent.version ?? 'external' },
-      config: artifact.config,
-      buildId: artifact.buildId,
-      seed: artifact.seed,
-      appVersion: artifact.appVersion,
-      gameRulesVersion: artifact.gameRulesVersion,
-      agentApiVersion: artifact.agentApiVersion,
-      observationApiVersion: artifact.observationApiVersion,
-      bridgeApiVersion: artifact.bridgeApiVersion,
-    });
-    return cloneJson({ ...artifact, invalidAttempts, metrics });
+      metrics: artifact.metrics ? publicMetrics(artifact.metrics, actions.length, invalidAttempts.length) : undefined,
+    }) as BrowserBridgeArtifact;
   };
 
   return Object.freeze({

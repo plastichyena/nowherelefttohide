@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { forecastFacilityProduction } from '../core/engine';
 import { HEX_DIRECTION_ORDER, hexDistance, hexKey, hexNeighbor } from '../core/hex';
-import { getSectorBranchIds } from '../core/supply';
+import { deriveCheckpointRole, getSectorBranchIds } from '../core/supply';
 import { effectiveMovementCost, isUrbanHex } from '../core/terrain';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
 import type {
@@ -331,6 +331,15 @@ function unitLineColor(unit: UnitState, selected: boolean, target: boolean, bloc
   if (target) return 0xff8c69;
   if (selected) return 0x9ae9ff;
   return 0x071019;
+}
+
+function roleLabelColor(role: string): string {
+  if (role === 'active') return '#8ff0d4';
+  if (role === 'standby') return '#79c7ff';
+  if (role === 'dormant') return '#c4a7f5';
+  if (role === 'remnant') return '#d7bd76';
+  if (role === 'ruined') return '#ff8d82';
+  return '#b895af';
 }
 
 export interface CheckpointCandidateMarkerStyle {
@@ -926,7 +935,7 @@ export class HexBoardScene extends Phaser.Scene {
       const tileSelected = selected ? sameHex(selected, tile) : false;
       this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKey === key, hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview);
       if (facility) this.drawFacilityDynamic(facility, productionByFacility.get(facility.id), center, tileSelected, render, suppliedTiles, key, t);
-      if (checkpoint) this.drawCheckpointDynamic(checkpoint, center);
+      if (checkpoint) this.drawCheckpointDynamic(state, checkpoint, center);
       const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
       units.forEach((unit, index) => this.drawUnitDynamic(unit, center, getFacilityUnitOffset(Boolean(facility || checkpoint)), index, units.length, tileSelected, render, suppliedTiles, key, attackTargets, blockedZombies, t));
     }
@@ -1131,7 +1140,25 @@ export class HexBoardScene extends Phaser.Scene {
     void t;
   }
 
-  private drawCheckpointDynamic(checkpoint: CheckpointState, center: { x: number; y: number }): void {
+  private drawCheckpointDynamic(state: Readonly<GameState>, checkpoint: CheckpointState, center: { x: number; y: number }): void {
+    const role = deriveCheckpointRole(state, checkpoint);
+    const roleColor = role === 'active'
+      ? 0x8ff0d4
+      : role === 'standby'
+        ? 0x79c7ff
+        : role === 'dormant'
+          ? 0xc4a7f5
+          : role === 'remnant'
+            ? 0xd7bd76
+            : role === 'ruined'
+              ? 0xff8d82
+              : 0x9d7f9b;
+    // The branch role is public checkpoint state. A subtle role ring keeps it
+    // legible at a glance without exposing any hidden checkpoint internals.
+    this.graphics.lineStyle(2, roleColor, 0.9);
+    this.graphics.strokeCircle(center.x, center.y, 20);
+    const roleMark = role === 'active' ? 'A' : role === 'standby' ? 'S' : role === 'dormant' ? 'D' : role === 'remnant' ? 'R' : role === 'ruined' ? 'X' : '∅';
+    this.addLabel(`checkpoint:${checkpoint.id}:role`, roleMark, center.x - 18, center.y - 18, roleLabelColor(role), 8, true);
     if (checkpoint.infected > 0) {
       this.addLabel(`checkpoint:${checkpoint.id}:infection`, `!${checkpoint.infected}`, center.x + 15, center.y + 14, '#ff8d82', 8, true);
       this.graphics.lineStyle(2, 0xff665f, 0.9);

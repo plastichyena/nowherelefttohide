@@ -20,8 +20,9 @@ describe('v1.3 player visibility', () => {
     state.checkpoints.push({
       id: 'checkpoint-test', position: { q: 7, r: 1 }, direction: 'north', branchId: 'north',
       status: 'operational', waiting: 0, screening: 0, approved: 0, remainingTurns: 0,
-      screeningPolicy: 'normal', currentPolicy: 'normal', nextArrivalTurn: 2, infected: 0,
+      screeningPolicy: 'normal', nextArrivalTurn: 2, infected: 0,
     });
+    state.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-test';
     expect(getPlayerVisibleTileKeys(state).has('7,0')).toBe(true);
     state.checkpoints[0]!.status = 'ruined';
     expect(getPlayerVisibleTileKeys(state).has('7,0')).toBe(false);

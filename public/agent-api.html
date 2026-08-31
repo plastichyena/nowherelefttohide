@@ -25,15 +25,15 @@
       <h1>Nowhere Left to Hide — Agent API</h1>
       <p class="note">The game page exposes <code>window.NLTH</code> for a browser JavaScript agent. This is an in-memory developer bridge, not an HTTP API.</p>
 
-      <h2>v1.3.2 contract</h2>
-      <p><code>App/Release 1.3.2</code> uses <code>Game Rules / GameState / Config 1.4.1</code>, <code>Fixed Map fixed-15x15-v2</code>, <code>Save Format 3</code>, and <code>Agent / Observation / Bridge / Artifact Schema 1.4.1</code>. Observations expose player-visible terrain, visibility, enemies, Horde warnings, victory progress, economy, supply, recovery, suppression, and Core-generated Checkpoint candidates. Future random draws and hidden enemy state are never exposed.</p>
-      <p>Legal actions may include <code>SetPowerSupply</code>, <code>BuildCheckpoint</code>, and <code>RelocateCheckpoint</code>. Infection suppression is an engine-owned End Turn consequence; <code>SuppressInfection</code> is not public. v1.3.1 and earlier saves, replays, and artifacts are rejected without conversion, deletion, overwrite, or state change.</p>
+      <h2>v1.3.3 contract</h2>
+      <p><code>App/Release 1.3.3</code> uses <code>Game Rules / GameState / Config 1.4.2</code>, <code>Fixed Map fixed-15x15-v2</code>, <code>Save Format 4</code>, and <code>Agent / Observation / Bridge / Artifact Schema 1.4.2</code>. Observations expose player-visible terrain, visibility, enemies, Horde warnings, victory progress, economy, supply, recovery, suppression, Checkpoint Roles, and Core-generated Checkpoint candidates. Future random draws and hidden enemy state are never exposed.</p>
+      <p>Legal actions may include <code>SetPowerSupply</code>, <code>BuildCheckpoint</code>, <code>RelocateCheckpoint</code>, and <code>ActivateCheckpoint</code>. Infection suppression is an engine-owned End Turn consequence; <code>SuppressInfection</code> is not public. v1.3.2 and earlier saves, replays, and artifacts are rejected without conversion, deletion, overwrite, or state change.</p>
 
-      <h2>v1.3.2 rules visible to agents</h2>
+      <h2>v1.3.3 rules visible to agents</h2>
       <ul>
         <li>Tiles expose Plain/Forest/Mountain terrain, road and urban overlays, weighted movement cost, terrain defense, and current player visibility.</li>
         <li>Enemy arrays contain only visible normal and Horde Zombies. Hidden positions, IDs, target memory, and exact spawn coordinates are not exposed through observations, legal actions, events, or the bridge.</li>
-        <li>Police/National Guard vision is 5; the Capital, owned facilities, and operational checkpoints add shared visibility. The Human UI and Agent API use the same Core visibility function.</li>
+        <li>Police/National Guard vision is 5; the Capital, owned facilities, and Active checkpoints add shared visibility. The Human UI and Agent API use the same Core visibility function.</li>
         <li>Periodic and Final Hordes mix HP 20 Horde Zombies with HP 10 Normal Zombies. Standard compositions are 2/0 through 6/4 for Periodic Hordes and 7/5 for the Final Horde. Warnings expose type, direction, remaining turns, and spawn turn but not pre-spawn size.</li>
         <li>At the next player-turn start, supplied surviving units recover 10% of max HP after attack, counterattack, interception, or suppression, and 20% after only moving, waiting, or taking no action. Out-of-supply units recover 0%; configured rounding is applied.</li>
         <li>A human unit stationed at an infected location contains internal spread. With an unused attack, the engine may automatically suppress at the infection phase after End Turn. Police suppress without civilian damage; National Guard suppresses more but has civilian damage.</li>
@@ -41,9 +41,11 @@
         <li>Cities need 5 power for population Civilian Goods but retain administration during outage. Farm/Civilian/Military factories run at ×1 unpowered and ×2 powered; Refinery and Power Plant are not boost targets.</li>
         <li>Power uses turn-start Fuel only at <code>Fuel 1 → Electricity 5</code>, with no partial facility allocation. Required cities are first, Farm/Civilian Factory boosts second, and input-ready Military Factory boosts third.</li>
         <li>Same-turn Food/Civilian/Military Goods production pays maintenance but cannot chain into production inputs. Forecasts separate maintenance shortage, Military Factory input shortage, generation Fuel demand/usage, and physical power capacity.</li>
-        <li><code>checkpointPositionCandidates</code> contains every branch road tile with <code>actionType</code>, <code>branchId</code>, optional <code>checkpointId</code>, <code>position</code>, <code>legal</code>, and a Core <code>reasonCode</code>. Use it instead of reconstructing legality.</li>
-        <li>Checkpoint Reason Codes distinguish invalid tiles/branches, relocation requirements, infection, per-branch and global action limits, abandoned-site forward blocks, visible-zombie blocks, and Civilian Goods shortage. Hidden enemies neither block candidates nor appear through IDs, messages, or candidate differences.</li>
-        <li>Checkpoint policy details describe screening time, acceptance, infection chance, and infected share. Strict is a trade-off, not an unconditional best choice.</li>
+        <li>Each road branch exposes one Active post, zero or more Standby and Dormant posts, a structural fallback flag, branch policy, and its prepared-post limit. Only Active posts receive arrivals, provide supply, and provide checkpoint vision. Fallback considers capital-side Standby first, then Dormant, without revealing hidden-Zombie exclusions.</li>
+        <li><code>checkpointPositionCandidates</code> contains every branch road tile or activatable post with <code>actionType</code>, <code>branchId</code>, optional <code>checkpointId</code>, <code>position</code>, <code>legal</code>, and a Core <code>reasonCode</code>. Use it instead of reconstructing legality.</li>
+        <li>Checkpoint Reason Codes distinguish invalid tiles/branches, prepared-post limits, activation/relocation requirements, infection, per-branch and global action limits, visible-zombie blocks, and Civilian Goods shortage. Hidden enemies neither block candidates nor appear through IDs, messages, or candidate differences.</li>
+        <li>Checkpoint policy belongs to the branch and follows its Active post. Policy details describe screening time, acceptance, infection chance, and infected share. Strict is a trade-off, not an unconditional best choice.</li>
+        <li>A Combat Noise event exposes its center, Human Unit type, and public class only. Police and National Guard are both <code>medium</code> in this version. Exact radius, affected Zombie IDs/counts, and Zombie Noise Targets are not public.</li>
       </ul>
 
       <h2>Available methods</h2>
@@ -73,11 +75,11 @@ npm run test:browser-bridge -- --dist=dist</code></pre>
         <li>Discover the bridge from this page and the game URL without UI clicks or query parameters.</li>
         <li>Read API information, observation, and legal actions before choosing one action per <code>step()</code>.</li>
         <li>After an invalid action, read its error, choose a listed legal action, and continue until Game Over.</li>
-        <li>Collect the result and run artifact; the artifact contains replay inputs, not the private GameState or hidden chain of thought.</li>
+        <li>Collect the result and Browser Bridge artifact as a public play trace; it contains neither private GameState nor hidden chain of thought. Local/CI verification artifacts retain the complete configuration needed for deterministic replay.</li>
       </ul>
 
       <h2>Not exposed</h2>
-      <p><code>getState</code>, <code>LoadSnapshot</code>, arbitrary code execution, file operations, save operations, local storage, network access, and Batch execution are not part of the public bridge.</p>
+      <p><code>getState</code>, <code>LoadSnapshot</code>, arbitrary code execution, file operations, save operations, local storage, network access, Batch execution, exact Noise Radius, and hidden Noise reactions are not part of the public bridge.</p>
     </main>
   </body>
 </html>

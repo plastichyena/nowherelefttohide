@@ -2,6 +2,7 @@ import type {
   CardinalDirection,
   CheckpointPolicy,
   CheckpointPositionCandidate,
+  CheckpointRole,
   CheckpointStatus,
   DeepPartial,
   EndTurnForecast,
@@ -18,6 +19,7 @@ import type {
   HordeComposition,
   HumanUnitType,
   JsonObject,
+  NoiseClass,
   PowerMode,
   PowerSupplyReason,
   ResourceState,
@@ -30,15 +32,15 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.3.2';
-export const GAME_RULES_VERSION = '1.4.1';
-export const SAVE_FORMAT_VERSION = '3';
-export const AGENT_API_VERSION = '1.4.1';
-export const OBSERVATION_API_VERSION = '1.4.1';
-export const BRIDGE_API_VERSION = '1.4.1';
-export const BALANCED_AGENT_VERSION = '3.0.0';
+export const APP_VERSION = '1.3.3';
+export const GAME_RULES_VERSION = '1.4.2';
+export const SAVE_FORMAT_VERSION = '4';
+export const AGENT_API_VERSION = '1.4.2';
+export const OBSERVATION_API_VERSION = '1.4.2';
+export const BRIDGE_API_VERSION = '1.4.2';
+export const BALANCED_AGENT_VERSION = '3.1.0';
 export const RANDOM_AGENT_VERSION = '1.2.0';
-export const ARTIFACT_SCHEMA_VERSION = '1.4.1';
+export const ARTIFACT_SCHEMA_VERSION = '1.4.2';
 
 export interface AgentMapTileObservation {
   q: number;
@@ -76,6 +78,13 @@ export interface AgentRoadBranchObservation {
   turnsUntilArrival: number;
   activeCheckpointId: string | null;
   activeCheckpointStatus: CheckpointStatus | null;
+  standbyCheckpointIds: string[];
+  dormantCheckpointIds: string[];
+  /** Structural fallback availability; never reveals hidden-Zombie exclusion. */
+  fallbackAvailable: boolean;
+  currentPolicy: CheckpointPolicy;
+  preparedPostCount: number;
+  preparedPostLimit: number;
   checkpointActionsThisTurn: number;
   checkpointActionAvailable: boolean;
 }
@@ -184,6 +193,7 @@ export interface AgentCheckpointObservation {
   /** Vision radius contributed by an operational checkpoint. */
   vision?: number;
   status: 'operational' | 'remnant' | 'ruined' | 'abandoned';
+  role: CheckpointRole;
   waiting: number;
   screening: number;
   approved: number;
@@ -283,9 +293,9 @@ export interface AgentApiInfo {
     checkpointPositionCandidates: {
       observationField: 'checkpointPositionCandidates';
       schema: {
-        actionType: 'BuildCheckpoint | RelocateCheckpoint';
+        actionType: 'BuildCheckpoint | RelocateCheckpoint | ActivateCheckpoint';
         branchId: 'string';
-        checkpointId: 'string (RelocateCheckpoint only; omitted for BuildCheckpoint)';
+        checkpointId: 'string (RelocateCheckpoint / ActivateCheckpoint; omitted for BuildCheckpoint)';
         position: '{ q: number; r: number }';
         legal: 'boolean';
         reasonCode: 'ActionError.code | null';
@@ -300,6 +310,25 @@ export interface AgentApiInfo {
         prngStatePublic: false;
         futureRandomOutcomesPublic: false;
       };
+    };
+    checkpoint: {
+      roles: CheckpointRole[];
+      activePerBranchLimit: 1;
+      preparedPostLimit: number;
+      policyOwner: 'road_branch';
+      fallbackPriority: string[];
+      standbyProvidesArrivalSupplyVision: false;
+      dormantProvidesArrivalSupplyVision: false;
+    };
+    noise: {
+      classes: NoiseClass[];
+      policeClass: NoiseClass;
+      nationalGuardClass: NoiseClass;
+      distance: 'hex';
+      terrainAttenuation: false;
+      normalZombieAffected: true;
+      hordeZombieAffected: false;
+      targetPriority: string[];
     };
     production: {
       workerCapacityByFacilityType: Record<FacilityType, number>;
@@ -371,6 +400,21 @@ export interface AgentGameResult {
     normalZombieIdleCount: number;
     hordeTargetInheritedCount: number;
     hordeTargetClearedCount: number;
+    standbyCheckpointsCreated: number;
+    dormantCheckpointsCreated: number;
+    checkpointActivations: number;
+    checkpointFallbacks: number;
+    checkpointFallbacksByBranch: Record<string, number>;
+    checkpointFallbacksFromStandby: number;
+    checkpointFallbacksFromDormant: number;
+    checkpointFallbacksPreventingUnmanagedArrival: number;
+    maxCheckpointPostsPerBranch: number;
+    maxPreparedCheckpointPostsPerBranch: number;
+    activeCheckpointLosses: number;
+    /** Public combat facts. Hidden reactions are intentionally not exposed. */
+    noisePulsesEmitted: number;
+    policeNoisePulses: number;
+    nationalGuardNoisePulses: number;
   };
 }
 
@@ -520,11 +564,38 @@ export interface AgentRunArtifact {
   /** Public observations at reset and after each accepted action, when retained by a runner. */
   observationTrace?: AgentObservation[];
   /** Present on complete Runner artifacts and optionally on a live AgentGame. */
-  metrics?: GameMetrics;
+  metrics?: AgentPublicMetrics;
   /** Local/CI Runner-only Core events. Browser Bridge artifacts never include this field. */
   verificationEvents?: GameEvent[];
   events?: AgentPublicEvent[];
 }
+
+/**
+ * Noise reaction counts can reveal hidden enemy activity.  They are retained
+ * only in local/CI verification metrics and never in a production result or
+ * Browser Bridge artifact.
+ */
+export const HIDDEN_NOISE_METRIC_KEYS = [
+  'normalZombiesNoiseTargeted',
+  'noiseTargetsReached',
+  'noiseTargetsOverriddenByHorde',
+  'noiseTargetsOverriddenByVisiblePopulation',
+] as const;
+
+export type HiddenNoiseMetricKey = typeof HIDDEN_NOISE_METRIC_KEYS[number];
+export type AgentPublicConfig = Omit<GameConfig, 'noise'> & {
+  noise: Pick<GameConfig['noise'], 'publicClass'>;
+};
+export type AgentPublicMetrics = Omit<GameMetrics, HiddenNoiseMetricKey | 'config'> & {
+  config: AgentPublicConfig;
+};
+export type AgentPublicRunArtifact = Omit<
+  AgentRunArtifact,
+  'artifactType' | 'config' | 'metrics' | 'verificationEvents'
+> & {
+  config: AgentPublicConfig;
+  metrics?: AgentPublicMetrics;
+};
 
 export interface AgentGame {
   getApiInfo(): AgentApiInfo;
@@ -534,7 +605,7 @@ export interface AgentGame {
   step(action: GameAction): AgentStepResult;
   isGameOver(): boolean;
   getResult(): AgentGameResult | null;
-  getRunArtifact(): AgentRunArtifact;
+  getRunArtifact(): AgentPublicRunArtifact;
 }
 
 export type AgentStrategyId = 'random' | 'balanced';

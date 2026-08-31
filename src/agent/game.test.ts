@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createAgentGame } from './game';
+import { createAgentResult } from './observation';
 import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, GAME_RULES_VERSION, OBSERVATION_API_VERSION } from './types';
 import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.3.2');
+    expect(APP_VERSION).toBe('1.3.3');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -27,6 +28,14 @@ describe('AgentGame public boundary', () => {
       typeof candidate.legal === 'boolean' && (candidate.reasonCode === null || typeof candidate.reasonCode === 'string'),
     )).toBe(true);
     expect(first.roadBranches.every((branch) => branch.turnsUntilArrival >= 0)).toBe(true);
+    expect(first.roadBranches.every((branch) =>
+      branch.currentPolicy === 'normal' &&
+      branch.preparedPostCount === 0 &&
+      branch.preparedPostLimit === 3 &&
+      branch.standbyCheckpointIds.length === 0 &&
+      branch.dormantCheckpointIds.length === 0 &&
+      branch.fallbackAvailable === false,
+    )).toBe(true);
     expect(first.supply.initialRadius).toBeGreaterThan(0);
     expect(first.units.every((unit) => typeof unit.inSupply === 'boolean')).toBe(true);
     expect(first.units.every((unit) => unit.baseRange >= unit.effectiveRange)).toBe(true);
@@ -52,14 +61,14 @@ describe('AgentGame public boundary', () => {
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.3.2 API, checkpoint candidates, and Horde composition from the same adapter boundary', () => {
+  it('describes the v1.3.3 API, checkpoint candidates, Noise rules, and Horde composition from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('3');
+    expect(info.saveFormatVersion).toBe('4');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
@@ -95,7 +104,24 @@ describe('AgentGame public boundary', () => {
       fairPlay: { hiddenEnemiesBlock: false, blockerUnitIdsPublic: false },
     });
     expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('checkpoint_supply_zombie_blocked');
+    expect(info.rules.checkpoint).toMatchObject({
+      activePerBranchLimit: 1,
+      preparedPostLimit: 3,
+      policyOwner: 'road_branch',
+      fallbackPriority: ['capital_side_standby', 'capital_side_dormant'],
+    });
+    expect(info.rules.noise).toEqual({
+      classes: ['small', 'medium', 'large', 'extraLarge'],
+      policeClass: 'medium',
+      nationalGuardClass: 'medium',
+      distance: 'hex',
+      terrainAttenuation: false,
+      normalZombieAffected: true,
+      hordeZombieAffected: false,
+      targetPriority: ['visible_population', 'inherited_horde', 'noise', 'idle'],
+    });
     expect(info.prohibited.join(' ')).toContain('SuppressInfection');
+    expect(info.prohibited.join(' ')).toContain('exact Noise Radius');
     info.methods.pop();
     expect(game.getApiInfo().methods).toContain('getRunArtifact');
   });
@@ -110,6 +136,28 @@ describe('AgentGame public boundary', () => {
     expect(fresh.facilities[0]!.healthyPopulation).toBeGreaterThanOrEqual(0);
   });
 
+  it('removes hidden Noise reaction metrics from a production result', () => {
+    const result = createAgentResult({
+      outcome: 'lost',
+      reason: 'test',
+      turn: 1,
+      statistics: {
+        noisePulsesEmitted: 1,
+        normalZombiesNoiseTargeted: 3,
+        noiseTargetsReached: 2,
+        noiseTargetsOverriddenByHorde: 1,
+        noiseTargetsOverriddenByVisiblePopulation: 1,
+      },
+    } as unknown as Parameters<typeof createAgentResult>[0])!;
+    expect(result.statistics).toMatchObject({ noisePulsesEmitted: 1 });
+    for (const key of [
+      'normalZombiesNoiseTargeted',
+      'noiseTargetsReached',
+      'noiseTargetsOverriddenByHorde',
+      'noiseTargetsOverriddenByVisiblePopulation',
+    ]) expect(result.statistics).not.toHaveProperty(key);
+  });
+
   it('rejects illegal actions and invalid reset input without changing the session', () => {
     const game = createAgentGame();
     const before = game.reset({ seed: 9, agent: { id: 'safe-agent' } });
@@ -120,6 +168,9 @@ describe('AgentGame public boundary', () => {
     expect(game.getRunArtifact().artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(game.getRunArtifact().appVersion).toBe(APP_VERSION);
     expect(game.getRunArtifact().invalidAttempts).toHaveLength(1);
+    expect(game.getRunArtifact().config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'medium' } });
+    expect(game.getRunArtifact().metrics?.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'medium' } });
+    expect(JSON.stringify(game.getRunArtifact())).not.toContain('"police":4');
     expect(() => game.reset({ seed: 10, configOverrides: { unknown: 1 } as never })).toThrow(/Unknown field/);
     expect(game.getObservation()).toEqual(before);
   });

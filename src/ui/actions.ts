@@ -268,12 +268,28 @@ export function projectCityTransfer(
 
 export function actionForCheckpointPolicy(
   actions: readonly GameAction[],
-  checkpointId: string,
+  branchId: string,
   policy: Extract<GameAction, { type: 'SetCheckpointPolicy' }>['policy'],
 ): Extract<GameAction, { type: 'SetCheckpointPolicy' }> | undefined {
   return actions.find(
     (action): action is Extract<GameAction, { type: 'SetCheckpointPolicy' }> =>
-      action.type === 'SetCheckpointPolicy' && action.checkpointId === checkpointId && action.policy === policy,
+      action.type === 'SetCheckpointPolicy' &&
+      // v1.3.3 moves policy ownership to RoadBranchState. Policy actions are
+      // therefore always selected by their branch id, never by a checkpoint.
+      action.branchId === branchId &&
+      action.policy === policy,
+  );
+}
+
+/** Find the Core-provided activation action for one branch post. */
+export function actionForCheckpointActivation(
+  actions: readonly GameAction[],
+  branchId: string,
+  checkpointId: string,
+): Extract<GameAction, { type: 'ActivateCheckpoint' }> | undefined {
+  return actions.find(
+    (action): action is Extract<GameAction, { type: 'ActivateCheckpoint' }> =>
+      action.type === 'ActivateCheckpoint' && action.branchId === branchId && action.checkpointId === checkpointId,
   );
 }
 

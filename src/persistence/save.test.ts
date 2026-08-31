@@ -71,8 +71,8 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.3.2 save format', () => {
-  it('round-trips a detached complete Save Format 3 GameState through code and JSON', () => {
+describe('v1.3.3 save format', () => {
+  it('round-trips a detached complete Save Format 4 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -80,7 +80,7 @@ describe('v1.3.2 save format', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 3,
+      formatVersion: 4,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-15x15-v2',
       seed: 77,
@@ -93,14 +93,14 @@ describe('v1.3.2 save format', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('writes the v1.3.2 version boundaries', () => {
+  it('writes the v1.3.3 version boundaries', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.gameVersion).toBe('1.4.1');
-    expect(config.version).toBe('1.4.1');
+    expect(envelope.gameVersion).toBe('1.4.2');
+    expect(config.version).toBe('1.4.2');
     expect(config.mapId).toBe('fixed-15x15-v2');
     expect(state).toHaveProperty('finalHordeTurn', 30);
     expect(state).not.toHaveProperty('maxTurns');
@@ -139,21 +139,22 @@ describe('v1.3.2 save format', () => {
     const current = initialState(18);
     const before = clone(current);
     const legacy = exportedEnvelope(current);
-    legacy.formatVersion = 2;
-    legacy.gameVersion = '1.3.0';
+    legacy.formatVersion = 3;
+    legacy.gameVersion = '1.4.1';
     const legacyState = legacy.state as Record<string, unknown>;
-    legacyState.gameVersion = '1.3.0';
-    (legacyState.config as Record<string, unknown>).version = '1.3.0';
+    legacyState.gameVersion = '1.4.1';
+    (legacyState.config as Record<string, unknown>).version = '1.4.1';
 
     const result = decodeSaveCode(codeForEnvelope(legacy));
     expect(result.valid).toBe(false);
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
     expect(result.errors.join(' ')).toMatch(/format version|incompatible|1\.2\.7/i);
+    expect(result.errors.join(' ')).toContain('v1.3.2 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Format 3', () => {
+  it('rejects a stale state/config version even when the envelope has Format 4', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     state.gameVersion = '1.4.0';
@@ -191,11 +192,11 @@ describe('v1.3.2 save format', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v3 autosave key and never rewrites or removes a legacy key', () => {
+  it('uses the v4 autosave key and never rewrites or removes a legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
-    legacy.formatVersion = 2;
-    legacy.gameVersion = '1.3.0';
+    legacy.formatVersion = 3;
+    legacy.gameVersion = '1.4.1';
     storage.setItem(LEGACY_AUTOSAVE_KEY, codeForEnvelope(legacy));
     const beforeLegacy = storage.getItem(LEGACY_AUTOSAVE_KEY);
     const store = new AutoSaveStore({ storage });

@@ -15,9 +15,10 @@
 - 食料・民需品・軍需品・燃料・電力Capacityの生産と不足処理
 - 所在地を持つ都市住民・生産施設労働者、都市間移住、都市過密
 - 検問所、避難民の到着・審査、waiting / screening / approved、潜伏感染
-- 道路方面ごとの独立到着予定、検問所の建設・移設、remnant / ruined / abandoned状態
+- 道路方面ごとの独立到着予定、複数Checkpoint Post、Active / Standby / Dormant、Automatic Fallback
 - 州都と稼働中検問所を起点にした供給範囲、セクター境界、供給外Actionの理由表示
 - Seed付き乱数によるゾンビAI、避難民、感染、Hordeの再現
+- 戦闘地点から通常Zombieを誘引する決定的なCombat Noiseと、Horde／人口Targetとの優先順位
 - HP 20のHorde Zombieと通常Zombieを組み合わせたPeriodic／Final Horde
 - Core生成の全道路Checkpoint候補と、Human／Agent共通の利用不能理由
 - 自動保存、セーブコード、JSON保存・復元
@@ -25,7 +26,7 @@
 - ブラウザJavaScriptから利用できる、通常UI・保存領域と分離したDeveloper / Browser Bridge
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.3.2の変更記録は [`Doc/Nowhere Left to Hide PoC v1.3.2アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.3.2アップデート要件%20確定版.md) で確認できます。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.3.3の確定要件は [`Doc/Nowhere Left to Hide PoC v1.3.3 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.3.3%20アップデート要件%20確定版.md) で確認できます。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## ローカルで起動する
 
@@ -57,7 +58,7 @@ Open https://plastichyena.github.io/nowherelefttohide/ and use the documented wi
 
 公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・Checkpoint候補Schema／Reason Code・生産/電力の静的ルールを返します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
 
-v1.3.2ではHuman UIとAgentが同じVisibility関数とCheckpoint候補Queryを使います。Observationは固定Terrain、実効移動コスト、防御補正、各タイルの可視状態、自軍と現在可視なEnemy、全道路タイルの`checkpointPositionCandidates`とReason Code、Periodic／Final Horde警告、3つのVictory進捗を返します。Vision外のEnemy位置・個体ID・Target・Spawn座標は公開せず、Hidden Enemyだけを理由にCheckpoint候補を不合法化しません。経済Forecast、回復、鎮圧、補給、検問所の既存公開情報も維持します。
+v1.3.3ではHuman UIとAgentが同じVisibility関数、Checkpoint Role導出、候補Queryを使います。ObservationはActive／Standby／Dormantと構造上のFallback可否、全Action種別の候補とReason Codeを返します。Combat NoiseはCenter、Unit Type、公開Classだけを返し、正確なRadius、Hidden Enemyの反応数・ID・Targetは公開しません。Vision外のEnemy位置・個体ID・Target・Spawn座標も従来どおり非公開です。
 
 ## Agent Simulation CLI
 
@@ -111,12 +112,13 @@ Turn 30にHorde Zombie 7体とNormal Zombie 5体からなる12体のFinal Horde�
 
 - `finalHordeTurn`
 - `terrain` / `vision`
+- `checkpoint.maxPreparedPostsPerDirection` / `noise`
 - `horde.cycle` / `periodicInitial` / `periodicIncrement` / `finalComposition`
 - 避難民の到着間隔・人数・審査枠
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.3.2`、Game Rules / GameState / Configは `1.4.1`、Fixed Mapは `fixed-15x15-v2`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.4.1`です。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.3.3`、Game Rules / GameState / Configは `1.4.2`、Fixed Mapは `fixed-15x15-v2`、Agent / Observation / Browser Bridge / Artifact Schemaは `1.4.2`です。
 
 ## CoreとHeadless API
 
@@ -140,7 +142,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不正Config、不変条件違反のデータは現在状態へ適用しません。App/Release `1.3.2`、Game Rules / State / Config `1.4.1`、Save Format `3`を使用します。v1.3.1以前の保存データ、Replay、Artifactは変換せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し/読み込みできます。Version不一致、破損、不正Config、不変条件違反のデータは現在状態へ適用しません。App/Release `1.3.3`、Game Rules / State / Config `1.4.2`、Save Format `4`を使用します。v1.3.2以前の保存データ、Replay、Artifactは変換せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
 
 ## テスト
 
@@ -149,9 +151,9 @@ npm run typecheck
 npm test
 npm run test:random -- --games=100
 npm run test:balanced -- --games=100
-npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.3.2-balanced-300-part-1
-npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.3.2-balanced-300-part-2
-npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.3.2-balanced-300-part-3
+npm run sim -- --agent=balanced --games=100 --seed=1 --out=output/simulations/v1.3.3-balanced-300-part-1
+npm run sim -- --agent=balanced --games=100 --seed=101 --out=output/simulations/v1.3.3-balanced-300-part-2
+npm run sim -- --agent=balanced --games=100 --seed=201 --out=output/simulations/v1.3.3-balanced-300-part-3
 npm run build
 npm run test:browser-bridge -- --dist=dist
 ```

@@ -11,6 +11,7 @@ import { hexKey } from '../core/hex';
 import { getTile } from '../core/map';
 import { isCityFacility, isProductionFacility } from '../core/state';
 import {
+  deriveCheckpointRole,
   deriveSupplySnapshot,
   isHexSupplied,
 } from '../core/supply';
@@ -26,6 +27,7 @@ import type {
   UnitState,
 } from '../core/types';
 import {
+  HIDDEN_NOISE_METRIC_KEYS,
   OBSERVATION_API_VERSION,
   type AgentGameResult,
   type AgentObservation,
@@ -37,7 +39,15 @@ function cloneJson<T>(value: T): T {
 }
 
 function publicResult(result: GameResult | null): AgentGameResult | null {
-  return result ? cloneJson(result) : null;
+  if (!result) return null;
+  const statistics = cloneJson(result.statistics) as unknown as Record<string, unknown>;
+  for (const key of HIDDEN_NOISE_METRIC_KEYS) delete statistics[key];
+  return cloneJson({
+    outcome: result.outcome,
+    reason: result.reason,
+    turn: result.turn,
+    statistics,
+  }) as AgentGameResult;
 }
 
 interface PublicTerrainProjection {
@@ -147,15 +157,41 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
   const productionByFacility = new Map(
     forecastFacilityProduction(state).map((projection) => [projection.facilityId, projection]),
   );
+  const branchStatesById = new Map(state.roadBranches.map((branch) => [branch.branchId, branch] as const));
+  const checkpointRoleById = new Map(
+    state.checkpoints.map((checkpoint) => [checkpoint.id, deriveCheckpointRole(state, checkpoint)] as const),
+  );
   const roadBranches = [...state.map.roadBranches]
     .sort((left, right) => left.id.localeCompare(right.id))
     .map((definition) => {
-      const branchState = state.roadBranches.find((candidate) => candidate.branchId === definition.id);
+      const branchState = branchStatesById.get(definition.id);
       const activeCheckpoint = branchState?.activeCheckpointId
         ? state.checkpoints.find((checkpoint) => checkpoint.id === branchState.activeCheckpointId)
-        : state.checkpoints.find(
-          (checkpoint) => checkpoint.status === 'operational' && (checkpoint.branchId ?? checkpoint.direction) === definition.id,
+        : undefined;
+      const standbyCheckpointIds = [...(branchState?.standbyCheckpointIds ?? [])].sort();
+      const dormantCheckpointIds = state.checkpoints
+        .filter((checkpoint) =>
+          (checkpoint.branchId ?? checkpoint.direction) === definition.id &&
+          checkpointRoleById.get(checkpoint.id) === 'dormant',
+        )
+        .map((checkpoint) => checkpoint.id)
+        .sort();
+      const activeRoadIndex = activeCheckpoint
+        ? definition.roadTiles.findIndex((position) => hexKey(position) === hexKey(activeCheckpoint.position))
+        : -1;
+      const fallbackAvailable = activeRoadIndex > 0 && state.checkpoints.some((checkpoint) => {
+        const role = checkpointRoleById.get(checkpoint.id);
+        if (
+          (checkpoint.branchId ?? checkpoint.direction) !== definition.id ||
+          checkpoint.status !== 'operational' ||
+          (role !== 'standby' && role !== 'dormant')
+        ) return false;
+        const checkpointRoadIndex = definition.roadTiles.findIndex(
+          (position) => hexKey(position) === hexKey(checkpoint.position),
         );
+        return checkpointRoadIndex >= 0 && checkpointRoadIndex < activeRoadIndex;
+      });
+      const preparedPostCount = (activeCheckpoint ? 1 : 0) + standbyCheckpointIds.length;
       const nextArrivalTurn = branchState?.nextArrivalTurn ?? state.turn;
       return {
         branchId: definition.id,
@@ -167,6 +203,12 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
         turnsUntilArrival: Math.max(0, nextArrivalTurn - state.turn),
         activeCheckpointId: activeCheckpoint?.id ?? null,
         activeCheckpointStatus: activeCheckpoint?.status ?? null,
+        standbyCheckpointIds,
+        dormantCheckpointIds,
+        fallbackAvailable,
+        currentPolicy: branchState?.currentPolicy ?? 'normal',
+        preparedPostCount,
+        preparedPostLimit: state.config.checkpoint.maxPreparedPostsPerDirection,
         checkpointActionsThisTurn: branchState?.checkpointActionsThisTurn ?? 0,
         checkpointActionAvailable: (branchState?.checkpointActionsThisTurn ?? 0) < 1,
       };
@@ -335,6 +377,8 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
     checkpoints: [...state.checkpoints]
       .sort((left, right) => left.id.localeCompare(right.id))
       .map((checkpoint) => {
+        const role = checkpointRoleById.get(checkpoint.id) ?? 'abandoned';
+        const branch = branchStatesById.get(checkpoint.branchId ?? checkpoint.direction);
         const containingUnit = checkpoint.infected > 0
           ? containingUnitAt(state, checkpoint.position.q, checkpoint.position.r)
           : undefined;
@@ -344,17 +388,18 @@ export function createAgentObservation(state: Readonly<GameState>): AgentObserva
           branchId: checkpoint.branchId ?? checkpoint.direction,
           position: { ...checkpoint.position },
           direction: checkpoint.direction,
-          vision: checkpoint.status === 'operational' ? state.config.vision.operationalCheckpoint : 0,
+          vision: role === 'active' ? state.config.vision.operationalCheckpoint : 0,
           status: checkpoint.status,
+          role,
           waiting: checkpoint.waiting,
           screening: checkpoint.screening,
           approved: checkpoint.approved,
           infected: checkpoint.infected,
           remainingTurns: checkpoint.remainingTurns,
-          currentPolicy: checkpoint.currentPolicy,
+          currentPolicy: branch?.currentPolicy ?? 'normal',
           nextPolicy: checkpoint.screeningPolicy,
           nextArrivalTurn: checkpoint.nextArrivalTurn,
-          providesSupply: checkpoint.status === 'operational',
+          providesSupply: role === 'active',
           infectionContained: checkpoint.infected > 0 && containingUnit !== undefined,
           containingUnitId: containingUnit?.id ?? null,
           projectedSuppression: suppression?.projectedSuppression ?? 0,

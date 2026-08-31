@@ -1,0 +1,6 @@
+.noise-debug-mount { position: absolute; z-index: 5; top: 8px; right: 8px; max-width: min(92%, 360px); pointer-events: none; }
+.noise-debug-overlay { margin: 0; padding: 8px 9px; border: 1px dashed #f0a45d; border-radius: 7px; background: #211b18e8; color: #f8ead5; box-shadow: 0 4px 18px #0008; font-size: 0.68rem; }
+.noise-debug-overlay strong { color: #f8c67d; }
+.noise-debug-overlay dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 7px; margin: 5px 0 0; }
+.noise-debug-overlay dt { color: #c8b7a0; }
+.noise-debug-overlay dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }

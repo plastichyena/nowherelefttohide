@@ -58,7 +58,7 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '1.4.1';
+  schemaVersion: '1.4.2';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -302,7 +302,7 @@ function createSimulationReport(
     aggregate[agent] = aggregateMetrics(rows);
   }
   return {
-    schemaVersion: '1.4.1',
+    schemaVersion: '1.4.2',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -341,7 +341,11 @@ const CSV_COLUMNS: readonly string[] = [
   'resourceShortageLosses', 'refugeesAccepted', 'totalRefugeeArrivals', 'unmanagedPassThrough',
   'refugeesDeparted', 'refugeesScreened.passThrough', 'refugeesScreened.normal', 'refugeesScreened.strict',
   'checkpointsBuilt', 'checkpointsRelocated', 'checkpointRetreats', 'checkpointsRuined', 'checkpointsRecovered',
-  'checkpointsAbandoned', 'checkpointsRemoved', 'unmanagedBranchTurns', 'maxSuppliedFacilities',
+  'checkpointsAbandoned', 'checkpointsRemoved', 'standbyCheckpointsCreated', 'dormantCheckpointsCreated',
+  'checkpointActivations', 'checkpointFallbacks', 'checkpointFallbacksFromStandby', 'checkpointFallbacksFromDormant',
+  'checkpointFallbacksPreventingUnmanagedArrival', 'maxCheckpointPostsPerBranch', 'maxPreparedCheckpointPostsPerBranch',
+  'activeCheckpointLosses', 'checkpointFallbacks.north', 'checkpointFallbacks.east', 'checkpointFallbacks.south',
+  'checkpointFallbacks.west', 'unmanagedBranchTurns', 'maxSuppliedFacilities',
   'maxSupplyRadius', 'supplyLosses', 'supplyRejections',
   'arrivals.north', 'arrivals.east', 'arrivals.south', 'arrivals.west',
   'maxOvercrowding', 'maxOvercrowdingAdditionalFood',
@@ -366,6 +370,8 @@ const CSV_COLUMNS: readonly string[] = [
   'terrainEntriesByType.plain', 'terrainEntriesByType.forest', 'terrainEntriesByType.mountain', 'terrainEntriesByType.water',
   'urbanDefenseApplications', 'urbanDefenseDamagePrevented', 'forestDefenseApplications', 'forestDefenseDamagePrevented',
   'normalZombieIdleCount', 'hordeTargetInheritedCount', 'hordeTargetClearedCount',
+  'noisePulsesEmitted', 'policeNoisePulses', 'nationalGuardNoisePulses', 'normalZombiesNoiseTargeted',
+  'noiseTargetsReached', 'noiseTargetsOverriddenByHorde', 'noiseTargetsOverriddenByVisiblePopulation',
   'finalFood', 'finalCivilianGoods', 'finalMilitaryGoods', 'finalFuel',
   ...ACTION_TYPES.map((type) => `action.${type}`),
   ...PRIORITY_GOALS.map((goal) => `goal.${goal}`),
@@ -392,6 +398,12 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.refugeesDeparted, game.refugeesScreenedByPolicy.passThrough ?? 0, game.refugeesScreenedByPolicy.normal ?? 0,
       game.refugeesScreenedByPolicy.strict ?? 0, game.checkpointsBuilt, game.checkpointsRelocated, game.checkpointRetreats,
       game.checkpointsRuined, game.checkpointsRecovered, game.checkpointsAbandoned, game.checkpointsRemoved,
+      game.standbyCheckpointsCreated, game.dormantCheckpointsCreated, game.checkpointActivations,
+      game.checkpointFallbacks, game.checkpointFallbacksFromStandby, game.checkpointFallbacksFromDormant,
+      game.checkpointFallbacksPreventingUnmanagedArrival, game.maxCheckpointPostsPerBranch,
+      game.maxPreparedCheckpointPostsPerBranch, game.activeCheckpointLosses,
+      game.checkpointFallbacksByBranch.north ?? 0, game.checkpointFallbacksByBranch.east ?? 0,
+      game.checkpointFallbacksByBranch.south ?? 0, game.checkpointFallbacksByBranch.west ?? 0,
       game.unmanagedBranchTurns, game.maxSuppliedFacilities, game.maxSupplyRadius, game.supplyLosses, game.supplyRejections,
       game.refugeeArrivalsByBranch.north ?? 0, game.refugeeArrivalsByBranch.east ?? 0,
       game.refugeeArrivalsByBranch.south ?? 0, game.refugeeArrivalsByBranch.west ?? 0,
@@ -421,6 +433,9 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.urbanDefenseApplications, game.urbanDefenseDamagePrevented,
       game.forestDefenseApplications, game.forestDefenseDamagePrevented,
       game.normalZombieIdleCount, game.hordeTargetInheritedCount, game.hordeTargetClearedCount,
+      game.noisePulsesEmitted, game.policeNoisePulses, game.nationalGuardNoisePulses,
+      game.normalZombiesNoiseTargeted, game.noiseTargetsReached, game.noiseTargetsOverriddenByHorde,
+      game.noiseTargetsOverriddenByVisiblePopulation,
       game.finalFood, game.finalCivilianGoods,
       game.finalMilitaryGoods, game.finalFuel,
       ...ACTION_TYPES.map((type) => game.actionCounts[type] ?? 0),

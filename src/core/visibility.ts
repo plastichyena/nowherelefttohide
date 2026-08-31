@@ -1,4 +1,5 @@
 import { hexDistance, hexKey } from './hex';
+import { deriveCheckpointRole } from './supply';
 import type { GameState, HexCoord, UnitState } from './types';
 
 function addRadius(state: Readonly<GameState>, visible: Set<string>, origin: HexCoord, radius: number): void {
@@ -23,7 +24,7 @@ export function getPlayerVisibleTileKeys(state: Readonly<GameState>): Set<string
     );
   }
   for (const checkpoint of state.checkpoints) {
-    if (checkpoint.status === 'operational') {
+    if (deriveCheckpointRole(state, checkpoint) === 'active') {
       addRadius(state, visible, checkpoint.position, state.config.vision.operationalCheckpoint);
     }
   }

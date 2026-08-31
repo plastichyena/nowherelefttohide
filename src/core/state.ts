@@ -17,7 +17,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '1.4.1';
+export const GAME_VERSION = '1.4.2';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -81,6 +81,7 @@ export function createUnit(
     canMove: type !== 'zombie' && type !== 'hordeZombie',
     isPlayerUnit: type !== 'zombie' && type !== 'hordeZombie',
     inheritedTarget: null,
+    noiseTarget: null,
     spawnGroupId: null,
     hordeKind: null,
     activity: { moved: false, attacked: false, intercepted: false, suppressed: false },
@@ -155,6 +156,17 @@ export function synchronizePopulation(state: GameState): void {
       (candidate) => candidate.branchId === (checkpoint.branchId ?? checkpoint.direction),
     );
     checkpoint.nextArrivalTurn = branch?.nextArrivalTurn ?? null;
+  }
+  for (const branch of state.roadBranches) {
+    const allPosts = state.checkpoints.filter(
+      (checkpoint) => (checkpoint.branchId ?? checkpoint.direction) === branch.branchId,
+    ).length;
+    const prepared = (branch.activeCheckpointId === null ? 0 : 1) + branch.standbyCheckpointIds.length;
+    state.statistics.maxCheckpointPostsPerBranch = Math.max(state.statistics.maxCheckpointPostsPerBranch, allPosts);
+    state.statistics.maxPreparedCheckpointPostsPerBranch = Math.max(
+      state.statistics.maxPreparedCheckpointPostsPerBranch,
+      prepared,
+    );
   }
 }
 
@@ -322,6 +334,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
         1 + rng.nextInt(stateConfig.refugees.arrivalIntervalMin, stateConfig.refugees.arrivalIntervalMax),
       checkpointActionsThisTurn: 0,
       activeCheckpointId: null,
+      standbyCheckpointIds: [],
+      currentPolicy: 'normal' as const,
     }));
   const state: GameState = {
     gameVersion: GAME_VERSION,
@@ -438,6 +452,24 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       normalZombieIdleCount: 0,
       hordeTargetInheritedCount: 0,
       hordeTargetClearedCount: 0,
+      standbyCheckpointsCreated: 0,
+      dormantCheckpointsCreated: 0,
+      checkpointActivations: 0,
+      checkpointFallbacks: 0,
+      checkpointFallbacksByBranch: Object.fromEntries(roadBranches.map((branch) => [branch.branchId, 0])),
+      checkpointFallbacksFromStandby: 0,
+      checkpointFallbacksFromDormant: 0,
+      checkpointFallbacksPreventingUnmanagedArrival: 0,
+      maxCheckpointPostsPerBranch: 0,
+      maxPreparedCheckpointPostsPerBranch: 0,
+      activeCheckpointLosses: 0,
+      noisePulsesEmitted: 0,
+      policeNoisePulses: 0,
+      nationalGuardNoisePulses: 0,
+      normalZombiesNoiseTargeted: 0,
+      noiseTargetsReached: 0,
+      noiseTargetsOverriddenByHorde: 0,
+      noiseTargetsOverriddenByVisiblePopulation: 0,
     },
     gameOver: false,
     result: null,

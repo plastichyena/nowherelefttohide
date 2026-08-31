@@ -18,6 +18,7 @@ import {
   type InvalidActionAttempt,
   type AgentObservation,
   type AgentPublicEvent,
+  type AgentPublicRunArtifact,
   type AgentRunArtifact,
   type AgentStepResult,
   type AgentStrategyId,
@@ -185,6 +186,12 @@ function verificationEventsFromSnapshot(snapshot: unknown): GameEvent[] {
     .map((event) => clone(event));
 }
 
+/** Exact statistics stay in local/CI verification artifacts only. */
+function verificationStatisticsFromSnapshot(snapshot: unknown): unknown {
+  if (!isRecord(snapshot) || !isRecord(snapshot.statistics)) return undefined;
+  return clone(snapshot.statistics);
+}
+
 function publicActionError(code: string, message: string): AgentActionError {
   return { code, message };
 }
@@ -223,7 +230,7 @@ function placeholderArtifact(
 }
 
 function enrichArtifact(
-  source: AgentRunArtifact | null,
+  source: AgentPublicRunArtifact | AgentRunArtifact | null,
   fallback: AgentRunArtifact,
   actions: readonly GameAction[],
   traces: readonly AgentDecisionTrace[],
@@ -231,7 +238,9 @@ function enrichArtifact(
   agent: GameAgent,
   strategy: string,
 ): AgentRunArtifact {
-  const artifact = source && isRecord(source) ? clone(source) : fallback;
+  const artifact: AgentRunArtifact = source && isRecord(source)
+    ? clone(source) as unknown as AgentRunArtifact
+    : fallback;
   artifact.artifactSchemaVersion = ARTIFACT_SCHEMA_VERSION;
   artifact.appVersion = APP_VERSION;
   artifact.gameRulesVersion = fallback.gameRulesVersion;
@@ -520,7 +529,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     fail('RESULT_MISSING', 'AgentGame reached Game Over without a result');
   }
 
-  let sourceArtifact: AgentRunArtifact | null = null;
+  let sourceArtifact: AgentPublicRunArtifact | null = null;
   if (game) {
     try {
       sourceArtifact = clone(game.getRunArtifact());
@@ -606,6 +615,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     buildId,
     seed,
     failure: metricFailure,
+    verificationStatistics: verificationStatisticsFromSnapshot(debugAfter),
   });
 
   baseArtifact.metrics = clone(metrics);

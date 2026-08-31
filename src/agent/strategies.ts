@@ -18,6 +18,10 @@ export interface BalancedStrategyWeights {
   overcrowdingRelief: number;
   production: number;
   checkpoint: number;
+  checkpointFallback: number;
+  enemyForestPenalty: number;
+  urbanHold: number;
+  noiseRisk: number;
   recoveryWait: number;
   repeatPenalty: number;
   endTurn: number;
@@ -56,6 +60,10 @@ export const BALANCED_WEIGHTS: Readonly<BalancedStrategyWeights> = {
   overcrowdingRelief: 80,
   production: 75,
   checkpoint: 35,
+  checkpointFallback: 55,
+  enemyForestPenalty: 115,
+  urbanHold: 75,
+  noiseRisk: 14,
   recoveryWait: 30,
   repeatPenalty: 500,
   endTurn: 20,

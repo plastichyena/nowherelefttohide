@@ -67,6 +67,10 @@ export type CheckpointPolicy = 'passThrough' | 'normal' | 'strict';
 
 export type CheckpointStatus = 'operational' | 'remnant' | 'ruined' | 'abandoned';
 
+export type CheckpointRole = 'active' | 'standby' | 'dormant' | 'remnant' | 'ruined' | 'abandoned';
+
+export type NoiseClass = 'small' | 'medium' | 'large' | 'extraLarge';
+
 export type RoadBranchId = string;
 
 export type GamePhase =
@@ -243,6 +247,8 @@ export interface UnitState {
   isPlayerUnit: boolean;
   /** Internal-only remembered coordinate inherited from a visible Horde Zombie. */
   inheritedTarget: HexCoord | null;
+  /** Internal-only remembered combat-noise coordinate for a normal Zombie. */
+  noiseTarget: HexCoord | null;
   /** Identifies periodic/final Horde membership without exposing it through public APIs. */
   spawnGroupId: string | null;
   hordeKind: 'periodic' | 'final' | null;
@@ -266,7 +272,6 @@ export interface CheckpointState {
   approved: number;
   remainingTurns: number;
   screeningPolicy: CheckpointPolicy;
-  currentPolicy: CheckpointPolicy;
   nextArrivalTurn: number | null;
   /** Infection is tracked separately from people still waiting for processing. */
   infected: number;
@@ -275,7 +280,7 @@ export interface CheckpointState {
 }
 
 export interface CheckpointPositionCandidate {
-  actionType: 'BuildCheckpoint' | 'RelocateCheckpoint';
+  actionType: 'BuildCheckpoint' | 'RelocateCheckpoint' | 'ActivateCheckpoint';
   branchId: string;
   checkpointId?: string;
   position: HexCoord;
@@ -288,6 +293,8 @@ export interface RoadBranchState {
   nextArrivalTurn: number;
   checkpointActionsThisTurn: number;
   activeCheckpointId: string | null;
+  standbyCheckpointIds: string[];
+  currentPolicy: CheckpointPolicy;
 }
 
 export interface UnitProductionOrder {
@@ -338,6 +345,9 @@ export type GameEventType =
   | 'checkpoint_removed'
   | 'checkpoint_abandoned'
   | 'checkpoint_recovered'
+  | 'checkpoint_activated'
+  | 'checkpoint_fallback'
+  | 'checkpoint_role_changed'
   | 'supply_changed'
   | 'supply_action_rejected'
   | 'power_supply_changed'
@@ -348,6 +358,10 @@ export type GameEventType =
   | 'zombie_idle'
   | 'horde_target_inherited'
   | 'horde_target_cleared'
+  | 'noise_emitted'
+  | 'noise_targeted'
+  | 'noise_target_reached'
+  | 'noise_target_overridden'
   | 'victory_progress_changed'
   | 'horde_spawned'
   | 'game_over';
@@ -408,6 +422,24 @@ export interface GameStatistics {
   normalZombieIdleCount: number;
   hordeTargetInheritedCount: number;
   hordeTargetClearedCount: number;
+  standbyCheckpointsCreated: number;
+  dormantCheckpointsCreated: number;
+  checkpointActivations: number;
+  checkpointFallbacks: number;
+  checkpointFallbacksByBranch: Record<RoadBranchId, number>;
+  checkpointFallbacksFromStandby: number;
+  checkpointFallbacksFromDormant: number;
+  checkpointFallbacksPreventingUnmanagedArrival: number;
+  maxCheckpointPostsPerBranch: number;
+  maxPreparedCheckpointPostsPerBranch: number;
+  activeCheckpointLosses: number;
+  noisePulsesEmitted: number;
+  policeNoisePulses: number;
+  nationalGuardNoisePulses: number;
+  normalZombiesNoiseTargeted: number;
+  noiseTargetsReached: number;
+  noiseTargetsOverriddenByHorde: number;
+  noiseTargetsOverriddenByVisiblePopulation: number;
 }
 
 export interface GameResult {
@@ -545,7 +577,7 @@ export interface TransferPopulationAction {
 
 export interface SetCheckpointPolicyAction {
   type: 'SetCheckpointPolicy';
-  checkpointId: string;
+  branchId: RoadBranchId;
   policy: CheckpointPolicy;
 }
 
@@ -566,6 +598,12 @@ export interface RelocateCheckpointAction {
   checkpointId: string;
   branchId?: RoadBranchId;
   position: HexCoord;
+}
+
+export interface ActivateCheckpointAction {
+  type: 'ActivateCheckpoint';
+  branchId: RoadBranchId;
+  checkpointId: string;
 }
 
 export interface ProduceUnitAction {
@@ -600,6 +638,7 @@ export type GameAction =
   | SetPowerSupplyAction
   | BuildCheckpointAction
   | RelocateCheckpointAction
+  | ActivateCheckpointAction
   | ProduceUnitAction
   | EndTurnAction
   | StartNewGameAction
@@ -711,10 +750,16 @@ export interface InfectionConfig {
 
 export interface CheckpointConfig {
   constructionCivilianGoods: number;
-  maxPerDirection: number;
+  maxPreparedPostsPerDirection: number;
   requiresPolice: boolean;
   consumesPower: boolean;
   initialSupplyRadius: number;
+}
+
+export interface NoiseConfig {
+  police: number;
+  nationalGuard: number;
+  publicClass: Record<HumanUnitType, NoiseClass>;
 }
 
 export interface EconomyConfig {
@@ -769,6 +814,7 @@ export interface GameConfig {
   refugees: RefugeeConfig;
   infection: InfectionConfig;
   checkpoint: CheckpointConfig;
+  noise: NoiseConfig;
   terrain: TerrainConfig;
   vision: VisionConfig;
 }

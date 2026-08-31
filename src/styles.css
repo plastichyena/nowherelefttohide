@@ -321,3 +321,40 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
   .top-hud > .supply-toggle { grid-row: 1 / span 2; grid-column: 3; align-self: center; }
   .top-hud > .icon-button:not(.supply-toggle) { grid-row: 1 / span 2; grid-column: 4; align-self: center; }
 }
+
+/* v1.3.3 checkpoint fallback, public Noise Class, and development diagnostics */
+.branch-panel { margin: 10px 0; padding: 10px; border: 1px solid #3f7180; border-radius: 9px; background: #102b33; }
+.branch-panel .section-heading { margin-bottom: 7px; }
+.branch-panel h3 { margin: 0; }
+.branch-panel-card { margin: 7px 0 0; padding: 8px; border: 1px solid #2d5b67; border-radius: 8px; background: #0d242c; }
+.branch-panel-card:first-child { margin-top: 0; }
+.branch-panel-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 7px 0 0; }
+.branch-panel-grid > div { min-width: 0; }
+.branch-panel-grid dt { color: var(--muted); font-size: 0.62rem; }
+.branch-panel-grid dd { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0 0; color: #edf9fa; font-size: 0.74rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.branch-role-chip { display: inline-flex; min-width: 0; flex-direction: column; gap: 1px; padding: 3px 5px; border: 1px solid #416a72; border-radius: 6px; background: #102a31; }
+.branch-role-chip strong { font-size: 0.67rem; line-height: 1.1; }
+.branch-role-chip small { color: var(--muted); font-size: 0.6rem; line-height: 1.1; }
+.branch-role-chip.role-active { border-color: #4b9f86; color: #8ff0d4; }
+.branch-role-chip.role-standby { border-color: #4d8eb7; color: #79c7ff; }
+.branch-role-chip.role-dormant { border-color: #8065a2; color: #c4a7f5; }
+.branch-role-chip.role-remnant { border-color: #806f43; color: #d7bd76; }
+.branch-role-chip.role-ruined { border-color: #8c4f4b; color: #ff8d82; }
+.branch-role-chip.role-abandoned { border-color: #67405f; color: #b895af; }
+.branch-candidate-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #23414c; }
+.branch-candidate { min-height: 42px; }
+.branch-role-summary { margin: 8px 0 0; color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
+.noise-forecast { margin: 9px 0; padding: 9px 10px; border: 1px solid #7b6948; border-radius: 9px; background: #2b2920; }
+.noise-forecast h3 { margin: 0 0 6px; }
+.noise-forecast[data-noise-class="medium"] { border-color: #b18c54; }
+.noise-class-value { color: #f0d17d; font-weight: 800; text-transform: capitalize; }
+.noise-log { margin: 10px 0; padding: 9px 10px; border: 1px solid #6a5e46; border-radius: 9px; background: #27251e; }
+.noise-log h3 { margin: 0 0 6px; }
+.noise-log ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.noise-log li { display: flex; flex-wrap: wrap; gap: 5px; color: #e8e0c7; font-size: 0.72rem; line-height: 1.35; }
+.noise-log li strong { color: #f0d17d; }
+@media (max-width: 560px) {
+  .branch-panel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .branch-panel-grid > div:last-child { grid-column: 1 / -1; }
+  .branch-candidate-actions { grid-template-columns: 1fr; }
+}

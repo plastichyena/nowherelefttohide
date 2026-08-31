@@ -163,6 +163,23 @@ export function validateInvariants(state: GameState): InvariantResult {
     'normalZombieIdleCount',
     'hordeTargetInheritedCount',
     'hordeTargetClearedCount',
+    'standbyCheckpointsCreated',
+    'dormantCheckpointsCreated',
+    'checkpointActivations',
+    'checkpointFallbacks',
+    'checkpointFallbacksFromStandby',
+    'checkpointFallbacksFromDormant',
+    'checkpointFallbacksPreventingUnmanagedArrival',
+    'maxCheckpointPostsPerBranch',
+    'maxPreparedCheckpointPostsPerBranch',
+    'activeCheckpointLosses',
+    'noisePulsesEmitted',
+    'policeNoisePulses',
+    'nationalGuardNoisePulses',
+    'normalZombiesNoiseTargeted',
+    'noiseTargetsReached',
+    'noiseTargetsOverriddenByHorde',
+    'noiseTargetsOverriddenByVisiblePopulation',
   ] as const) {
     if (!isNonNegativeInteger(state.statistics[field])) {
       errors.push(`Statistic ${field} must be a non-negative integer`);
@@ -284,6 +301,9 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (unit.inheritedTarget && !hexWithinBounds(unit.inheritedTarget, state.map.width, state.map.height)) {
       errors.push(`Unit ${unit.id} has an invalid inherited target`);
     }
+    if (unit.noiseTarget && !hexWithinBounds(unit.noiseTarget, state.map.width, state.map.height)) {
+      errors.push(`Unit ${unit.id} has an invalid noise target`);
+    }
     if (unit.actionState === 'destroyed') {
       errors.push(`Destroyed unit ${unit.id} must be removed from state`);
     }
@@ -299,11 +319,11 @@ export function validateInvariants(state: GameState): InvariantResult {
       if (!['periodic', 'final'].includes(unit.hordeKind ?? '') || typeof unit.spawnGroupId !== 'string' || unit.spawnGroupId.length === 0) {
         errors.push(`Horde Zombie ${unit.id} requires Horde kind and spawn group`);
       }
-      if (unit.inheritedTarget !== null) errors.push(`Horde Zombie ${unit.id} cannot inherit a target`);
+      if (unit.inheritedTarget !== null || unit.noiseTarget !== null) errors.push(`Horde Zombie ${unit.id} cannot retain an internal target`);
       if (unit.hordeKind === 'final' && unit.spawnGroupId !== state.horde.finalSpawnGroupId) {
         errors.push(`Final Horde Zombie ${unit.id} must use the active Final Horde group`);
       }
-    } else if (unit.inheritedTarget !== null || unit.hordeKind !== null || unit.spawnGroupId !== null) {
+    } else if (unit.inheritedTarget !== null || unit.noiseTarget !== null || unit.hordeKind !== null || unit.spawnGroupId !== null) {
       errors.push(`Human unit ${unit.id} cannot contain Zombie target or Horde group state`);
     }
   }
@@ -367,15 +387,35 @@ export function validateInvariants(state: GameState): InvariantResult {
         checkpoint.status === 'operational' &&
         (checkpoint.branchId ?? checkpoint.direction) === branch.branchId,
     );
-    if (operational.length > 1) errors.push(`Road branch ${branch.branchId} has multiple operational checkpoints`);
     if (
       branch.activeCheckpointId !== null &&
       !operational.some((checkpoint) => checkpoint.id === branch.activeCheckpointId)
     ) {
       errors.push(`Road branch ${branch.branchId} active checkpoint is invalid`);
     }
+    if (!Array.isArray(branch.standbyCheckpointIds) || new Set(branch.standbyCheckpointIds).size !== branch.standbyCheckpointIds.length) {
+      errors.push(`Road branch ${branch.branchId} has invalid standby checkpoint ids`);
+    }
+    if (branch.activeCheckpointId !== null && branch.standbyCheckpointIds.includes(branch.activeCheckpointId)) {
+      errors.push(`Road branch ${branch.branchId} active checkpoint cannot also be standby`);
+    }
+    for (const checkpointId of branch.standbyCheckpointIds) {
+      if (!operational.some((checkpoint) => checkpoint.id === checkpointId)) {
+        errors.push(`Road branch ${branch.branchId} standby checkpoint ${checkpointId} is invalid`);
+      }
+    }
+    const preparedCount = (branch.activeCheckpointId === null ? 0 : 1) + branch.standbyCheckpointIds.length;
+    if (preparedCount > state.config.checkpoint.maxPreparedPostsPerDirection) {
+      errors.push(`Road branch ${branch.branchId} exceeds the prepared checkpoint limit`);
+    }
+    if (!['passThrough', 'normal', 'strict'].includes(branch.currentPolicy)) {
+      errors.push(`Road branch ${branch.branchId} has invalid policy`);
+    }
     if (!isNonNegativeInteger(state.statistics.refugeeArrivalsByBranch?.[branch.branchId])) {
       errors.push(`Statistic refugeeArrivalsByBranch.${branch.branchId} must be a non-negative integer`);
+    }
+    if (!isNonNegativeInteger(state.statistics.checkpointFallbacksByBranch?.[branch.branchId])) {
+      errors.push(`Statistic checkpointFallbacksByBranch.${branch.branchId} must be a non-negative integer`);
     }
   }
 

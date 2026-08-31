@@ -9,12 +9,12 @@ import type { GameState, JsonValue } from '../core/types';
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 3;
+export const SAVE_FORMAT_VERSION = 4;
 /** v1.3 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v3';
-/** Read-only compatibility probe for the v1.2.7 autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v2';
-const OLDER_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v1';
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v4';
+/** Read-only compatibility probe for the immediately preceding autosave namespace. */
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v3';
+const OLDER_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v2';
 /** Deprecated metadata exports. They are never migration targets in v1.3. */
 export const V125_GAME_VERSION = '1.2.0';
 export const V126_GAME_VERSION = '1.2.1';
@@ -172,7 +172,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.3.2 / Game Rules ${CURRENT_GAME_VERSION} / Save Format 3 (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。`;
+  return `${subject} is incompatible with v1.3.3 / Game Rules ${CURRENT_GAME_VERSION} / Save Format 4 (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -180,7 +180,7 @@ function reject(errors: string[]): SaveValidationResult {
 }
 
 function requireFields(errors: string[], value: Record<string, unknown>, path: string, fields: readonly string[]): void {
-  for (const field of fields) if (!hasOwn(value, field)) errors.push(`${path}.${field} is required for Save Format 3`);
+  for (const field of fields) if (!hasOwn(value, field)) errors.push(`${path}.${field} is required for Save Format 4`);
 }
 
 function validateCoordinate(errors: string[], value: unknown, path: string): void {
@@ -191,7 +191,7 @@ function validateCoordinate(errors: string[], value: unknown, path: string): voi
 
 /**
  * Reject obsolete container shapes before casting. The core invariant checker
- * performs relational validation; this guard makes v1.3 additions an explicit
+ * performs relational validation; this guard makes v1.3.3 additions an explicit
  * save boundary instead of silently accepting partial or migrated snapshots.
  */
 function validateV13Shape(state: Record<string, unknown>, errors: string[]): void {
@@ -210,7 +210,7 @@ function validateV13Shape(state: Record<string, unknown>, errors: string[]): voi
   if (!isRecord(config)) {
     errors.push('state.config must be an object');
   } else {
-    requireFields(errors, config, 'state.config', ['version', 'mapId', 'finalHordeTurn', 'terrain', 'vision', 'horde', 'units']);
+    requireFields(errors, config, 'state.config', ['version', 'mapId', 'finalHordeTurn', 'terrain', 'vision', 'horde', 'units', 'checkpoint', 'noise']);
     if (hasOwn(config, 'maxTurns')) errors.push('state.config.maxTurns is obsolete; use finalHordeTurn');
     if (config.version !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(config.version, 'state.config.version'));
     if (config.finalHordeTurn !== state.finalHordeTurn) errors.push('state.finalHordeTurn must match state.config.finalHordeTurn');
@@ -239,6 +239,19 @@ function validateV13Shape(state: Record<string, unknown>, errors: string[]): voi
     } else {
       for (const type of UNIT_TYPES) if (!isRecord(config.units[type]) || !isInteger(config.units[type].vision)) errors.push(`state.config.units.${type}.vision is required`);
     }
+    const checkpointConfig = config.checkpoint;
+    if (!isRecord(checkpointConfig) || !isInteger(checkpointConfig.maxPreparedPostsPerDirection, 1)) {
+      errors.push('state.config.checkpoint.maxPreparedPostsPerDirection is invalid');
+    }
+    const noise = config.noise;
+    if (
+      !isRecord(noise) ||
+      !isInteger(noise.police, 0) ||
+      !isInteger(noise.nationalGuard, 0) ||
+      !isRecord(noise.publicClass) ||
+      !['small', 'medium', 'large', 'extraLarge'].includes(noise.publicClass.police as string) ||
+      !['small', 'medium', 'large', 'extraLarge'].includes(noise.publicClass.nationalGuard as string)
+    ) errors.push('state.config.noise is invalid');
   }
 
   const map = state.map;
@@ -266,6 +279,7 @@ function validateV13Shape(state: Record<string, unknown>, errors: string[]): voi
       if (!UNIT_TYPES.includes(unit.type as typeof UNIT_TYPES[number])) errors.push(`${path}.type is invalid`);
       if (!isInteger(unit.vision)) errors.push(`${path}.vision is required`);
       if (unit.inheritedTarget !== null) validateCoordinate(errors, unit.inheritedTarget, `${path}.inheritedTarget`);
+      if (unit.noiseTarget !== null) validateCoordinate(errors, unit.noiseTarget, `${path}.noiseTarget`);
       if (unit.spawnGroupId !== null && (typeof unit.spawnGroupId !== 'string' || unit.spawnGroupId.length === 0)) errors.push(`${path}.spawnGroupId is invalid`);
       if (unit.hordeKind !== null && !HORDE_KINDS.includes(unit.hordeKind as typeof HORDE_KINDS[number])) errors.push(`${path}.hordeKind is invalid`);
       if (unit.type === 'hordeZombie' && unit.hordeKind === null) errors.push(`${path}.hordeZombie requires hordeKind`);
@@ -283,6 +297,23 @@ function validateV13Shape(state: Record<string, unknown>, errors: string[]): voi
     if (!isInteger(horde.finalSpawnedCount)) errors.push('state.horde.finalSpawnedCount is invalid');
   }
 
+  if (!Array.isArray(state.roadBranches)) {
+    errors.push('state.roadBranches must be an array');
+  } else {
+    for (const [index, branch] of state.roadBranches.entries()) {
+      const path = `state.roadBranches[${index}]`;
+      if (!isRecord(branch)) {
+        errors.push(`${path} must be an object`);
+        continue;
+      }
+      requireFields(errors, branch, path, ['branchId', 'activeCheckpointId', 'standbyCheckpointIds', 'currentPolicy']);
+      if (typeof branch.branchId !== 'string' || branch.branchId.length === 0) errors.push(`${path}.branchId is invalid`);
+      if (branch.activeCheckpointId !== null && (typeof branch.activeCheckpointId !== 'string' || branch.activeCheckpointId.length === 0)) errors.push(`${path}.activeCheckpointId is invalid`);
+      if (!Array.isArray(branch.standbyCheckpointIds) || branch.standbyCheckpointIds.some((id) => typeof id !== 'string' || id.length === 0) || new Set(branch.standbyCheckpointIds).size !== (branch.standbyCheckpointIds as unknown[]).length) errors.push(`${path}.standbyCheckpointIds is invalid`);
+      if (!['passThrough', 'normal', 'strict'].includes(branch.currentPolicy as string)) errors.push(`${path}.currentPolicy is invalid`);
+    }
+  }
+
   const statistics = state.statistics;
   const statisticFields = [
     'finalHordeSpawned', 'finalHordeKilled', 'normalZombiesKilled', 'hordeZombiesKilled', 'maxVisibleZombies',
@@ -291,13 +322,19 @@ function validateV13Shape(state: Record<string, unknown>, errors: string[]): voi
     'turnsAfterFinalHorde', 'urbanDefenseApplications', 'urbanDefenseDamagePrevented',
     'forestDefenseApplications', 'forestDefenseDamagePrevented', 'normalZombieIdleCount',
     'hordeTargetInheritedCount', 'hordeTargetClearedCount',
+    'standbyCheckpointsCreated', 'dormantCheckpointsCreated', 'checkpointActivations', 'checkpointFallbacks',
+    'checkpointFallbacksFromStandby', 'checkpointFallbacksFromDormant',
+    'checkpointFallbacksPreventingUnmanagedArrival', 'maxCheckpointPostsPerBranch',
+    'maxPreparedCheckpointPostsPerBranch', 'activeCheckpointLosses',
+    'noisePulsesEmitted', 'policeNoisePulses', 'nationalGuardNoisePulses', 'normalZombiesNoiseTargeted',
+    'noiseTargetsReached', 'noiseTargetsOverriddenByHorde', 'noiseTargetsOverriddenByVisiblePopulation',
   ];
   if (!isRecord(statistics)) {
     errors.push('state.statistics must be an object');
   } else {
     requireFields(errors, statistics, 'state.statistics', [
       ...statisticFields, 'finalHordeDefeated', 'suppliedAreaZombieClearTurn', 'suppliedAreaInfectionClearTurn',
-      'victoryTurn', 'terrainEntriesByType',
+      'victoryTurn', 'terrainEntriesByType', 'checkpointFallbacksByBranch',
     ]);
     for (const field of statisticFields) if (!isInteger(statistics[field])) errors.push(`state.statistics.${field} is invalid`);
     if (typeof statistics.finalHordeDefeated !== 'boolean') errors.push('state.statistics.finalHordeDefeated is invalid');
@@ -307,6 +344,7 @@ function validateV13Shape(state: Record<string, unknown>, errors: string[]): voi
     } else {
       for (const terrainType of BASE_TERRAINS) if (!isInteger(statistics.terrainEntriesByType[terrainType])) errors.push(`state.statistics.terrainEntriesByType.${terrainType} is invalid`);
     }
+    if (!isRecord(statistics.checkpointFallbacksByBranch) || Object.values(statistics.checkpointFallbacksByBranch).some((value) => !isInteger(value))) errors.push('state.statistics.checkpointFallbacksByBranch is invalid');
   }
 
   if (!Array.isArray(state.events) || !state.events.every(isJsonValue)) errors.push('state.events must contain JSON-compatible events');
@@ -363,7 +401,9 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   if (!isRecord(value)) return reject(['Save envelope must be a JSON object']);
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
-  if (value.formatVersion !== SAVE_FORMAT_VERSION) errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.3.1 and earlier saves cannot be loaded`);
+  if (value.formatVersion !== SAVE_FORMAT_VERSION) {
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.3.2 and earlier saves cannot be loaded or converted`);
+  }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (typeof value.mapId !== 'string' || value.mapId.length === 0) errors.push('mapId must be a non-empty string');
   if (!Number.isSafeInteger(value.seed)) errors.push('seed must be a safe integer');
@@ -401,7 +441,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   return { valid: true, errors: [], state: clone(state), envelope };
 }
 
-/** Create a checksummed, URL-safe v1.3 save code. */
+/** Create a checksummed, URL-safe v1.3.3 save code. */
 export function encodeSaveCode(state: GameState): string {
   const errors = validateStateForSave(state);
   if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
@@ -498,7 +538,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the v1.3 key; legacy data is deliberately preserved. */
+  /** Clears only the v1.3.3/v4 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

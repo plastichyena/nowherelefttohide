@@ -1,6 +1,8 @@
 import { hexDistance, hexKey } from './hex';
 import type {
   FixedMap,
+  CheckpointRole,
+  CheckpointState,
   GameState,
   HexCoord,
   RoadBranchDefinition,
@@ -38,6 +40,18 @@ export function getRoadBranchState(
   return state.roadBranches.find((branch) => branch.branchId === branchId);
 }
 
+/** Shared role derivation for Core, UI and public adapters. */
+export function deriveCheckpointRole(
+  state: Readonly<GameState>,
+  checkpoint: Readonly<CheckpointState>,
+): CheckpointRole {
+  if (checkpoint.status !== 'operational') return checkpoint.status;
+  const branch = getRoadBranchState(state, checkpoint.branchId ?? checkpoint.direction);
+  if (branch?.activeCheckpointId === checkpoint.id) return 'active';
+  if (branch?.standbyCheckpointIds.includes(checkpoint.id)) return 'standby';
+  return 'dormant';
+}
+
 export function getBranchIdAt(
   map: Readonly<FixedMap>,
   position: HexCoord,
@@ -62,7 +76,7 @@ export function getSectorBranchIds(
   return distances.filter((entry) => entry.distance === minimum).map((entry) => entry.branchId);
 }
 
-function operationalCheckpointForBranch(
+export function activeCheckpointForBranch(
   state: Readonly<GameState>,
   branchId: RoadBranchId,
 ) {
@@ -71,11 +85,7 @@ function operationalCheckpointForBranch(
     ? state.checkpoints.find((checkpoint) => checkpoint.id === branchState.activeCheckpointId)
     : undefined;
   if (byId?.status === 'operational') return byId;
-  return state.checkpoints.find(
-    (checkpoint) =>
-      checkpoint.status === 'operational' &&
-      (checkpoint.branchId ?? checkpoint.direction) === branchId,
-  );
+  return undefined;
 }
 
 export function getBranchSupplyRadius(
@@ -86,7 +96,7 @@ export function getBranchSupplyRadius(
   const initialRadius = state.config.checkpoint.initialSupplyRadius;
   const checkpoint = candidateCheckpointPosition
     ? { position: candidateCheckpointPosition }
-    : operationalCheckpointForBranch(state, branchId);
+    : activeCheckpointForBranch(state, branchId);
   if (!checkpoint) return initialRadius;
   return Math.max(initialRadius, hexDistance(getCapitalPosition(state.map), checkpoint.position));
 }

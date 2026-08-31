@@ -4,7 +4,7 @@ import { getCheckpointPositionCandidates } from '../core/engine';
 import { createInitialState, createUnit } from '../core/state';
 import { createAgentObservation } from './observation';
 
-describe('Agent Observation 1.4.1 rule projections', () => {
+describe('Agent Observation 1.4.2 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -164,6 +164,7 @@ describe('Agent Observation 1.4.1 rule projections', () => {
       suppliedAreaInfectionClear: observation.suppliedAreaInfectionClear,
     });
     expect(JSON.stringify(observation)).not.toContain('inheritedTarget');
+    expect(JSON.stringify(observation)).not.toContain('noiseTarget');
     expect(JSON.stringify(observation)).not.toContain('spawnGroupId');
   });
 

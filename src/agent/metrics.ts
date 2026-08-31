@@ -22,6 +22,7 @@ export const ACTION_TYPES = [
   'SetPowerSupply',
   'BuildCheckpoint',
   'RelocateCheckpoint',
+  'ActivateCheckpoint',
   'ProduceUnit',
   'EndTurn',
 ] as const;
@@ -89,6 +90,17 @@ export interface GameMetrics {
   checkpointsRecovered: number;
   checkpointsAbandoned: number;
   checkpointsRemoved: number;
+  standbyCheckpointsCreated: number;
+  dormantCheckpointsCreated: number;
+  checkpointActivations: number;
+  checkpointFallbacks: number;
+  checkpointFallbacksByBranch: Record<string, number>;
+  checkpointFallbacksFromStandby: number;
+  checkpointFallbacksFromDormant: number;
+  checkpointFallbacksPreventingUnmanagedArrival: number;
+  maxCheckpointPostsPerBranch: number;
+  maxPreparedCheckpointPostsPerBranch: number;
+  activeCheckpointLosses: number;
   unmanagedBranchTurns: number;
   maxSuppliedFacilities: number;
   maxSupplyRadius: number;
@@ -165,6 +177,14 @@ export interface GameMetrics {
   normalZombieIdleCount: number;
   hordeTargetInheritedCount: number;
   hordeTargetClearedCount: number;
+  noisePulsesEmitted: number;
+  policeNoisePulses: number;
+  nationalGuardNoisePulses: number;
+  /** Verification-only values; Browser Bridge artifacts remove these keys. */
+  normalZombiesNoiseTargeted: number;
+  noiseTargetsReached: number;
+  noiseTargetsOverriddenByHorde: number;
+  noiseTargetsOverriddenByVisiblePopulation: number;
   finalFood: number;
   finalCivilianGoods: number;
   finalMilitaryGoods: number;
@@ -194,6 +214,8 @@ export interface GameMetricsInput {
   agentApiVersion?: string;
   observationApiVersion?: string;
   bridgeApiVersion?: string;
+  /** Local/CI runner only: exact GameStatistics from the debug snapshot. */
+  verificationStatistics?: unknown;
 }
 
 function numberOrZero(value: unknown): number {
@@ -299,7 +321,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     priorityGoalCounts[trace.priorityGoal] = (priorityGoalCounts[trace.priorityGoal] ?? 0) + 1;
   }
 
-  const statistics = input.result?.statistics;
+  const statistics = input.verificationStatistics ?? input.result?.statistics;
   const statisticArrivals = numericRecord(statistics && isRecord(statistics) ? statistics.refugeeArrivalsByBranch : undefined);
   const observedBranchIds = new Set<string>([
     ...input.initialObservation.roadBranches.map((branch) => branch.branchId),
@@ -347,6 +369,44 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const checkpointsRecovered = statisticNumber(statistics, 'checkpointsRecovered') ?? eventCount('checkpoint_recovered');
   const checkpointsAbandoned = statisticNumber(statistics, 'checkpointsAbandoned') ?? eventCount('checkpoint_abandoned');
   const checkpointsRemoved = statisticNumber(statistics, 'checkpointsRemoved') ?? eventCount('checkpoint_removed');
+  const standbyCheckpointsCreated = statisticNumber(statistics, 'standbyCheckpointsCreated') ?? events.filter(
+    (event) => event.type === 'checkpoint_built' && event.payload.role === 'standby',
+  ).length;
+  const dormantCheckpointsCreated = statisticNumber(statistics, 'dormantCheckpointsCreated') ?? 0;
+  const checkpointActivations = statisticNumber(statistics, 'checkpointActivations') ?? eventCount('checkpoint_activated');
+  const checkpointFallbacks = statisticNumber(statistics, 'checkpointFallbacks') ?? eventCount('checkpoint_fallback');
+  const checkpointFallbacksByBranch = numericRecord(
+    isRecord(statistics) ? statistics.checkpointFallbacksByBranch : undefined,
+  );
+  const checkpointFallbacksFromStandby = statisticNumber(statistics, 'checkpointFallbacksFromStandby') ?? 0;
+  const checkpointFallbacksFromDormant = statisticNumber(statistics, 'checkpointFallbacksFromDormant') ?? 0;
+  const checkpointFallbacksPreventingUnmanagedArrival = statisticNumber(
+    statistics,
+    'checkpointFallbacksPreventingUnmanagedArrival',
+  ) ?? 0;
+  const maxCheckpointPostsPerBranchFromObservation = Math.max(
+    ...observations.map((observation) => {
+      const byBranch = new Map<string, number>();
+      for (const checkpoint of observation.checkpoints) {
+        byBranch.set(checkpoint.branchId, (byBranch.get(checkpoint.branchId) ?? 0) + 1);
+      }
+      return Math.max(...byBranch.values(), 0);
+    }),
+    0,
+  );
+  const maxPreparedCheckpointPostsPerBranchFromObservation = Math.max(
+    ...observations.flatMap((observation) => observation.roadBranches.map((branch) => branch.preparedPostCount)),
+    0,
+  );
+  const maxCheckpointPostsPerBranch = Math.max(
+    statisticNumber(statistics, 'maxCheckpointPostsPerBranch') ?? 0,
+    maxCheckpointPostsPerBranchFromObservation,
+  );
+  const maxPreparedCheckpointPostsPerBranch = Math.max(
+    statisticNumber(statistics, 'maxPreparedCheckpointPostsPerBranch') ?? 0,
+    maxPreparedCheckpointPostsPerBranchFromObservation,
+  );
+  const activeCheckpointLosses = statisticNumber(statistics, 'activeCheckpointLosses') ?? 0;
   const unmanagedBranchTurns = statisticNumber(statistics, 'unmanagedBranchTurns') ?? observations.reduce(
     (total, observation) => total + observation.roadBranches.filter((branch) => branch.activeCheckpointId === null).length,
     0,
@@ -393,7 +453,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const maxOvercrowdingObservation = Math.max(...observations.map(overcrowdingAtObservation), 0);
   const maxAdditionalFood = Math.max(...observations.map((observation) => numberOrZero(observation.endTurnForecast.overcrowding.additionalFood)), 0);
   const maxAdditionalCivilianGoods = Math.max(...observations.map((observation) => numberOrZero(observation.endTurnForecast.overcrowding.additionalCivilianGoods)), 0);
-  const maxPopulation = Math.max(numberOrZero(statistics?.maxPopulation), maxPopulationObservation);
+  const maxPopulation = Math.max(statisticNumber(statistics, 'maxPopulation') ?? 0, maxPopulationObservation);
   const turnObservations = [...new Map(observations.map((observation) => [observation.turn, observation])).values()]
     .sort((left, right) => left.turn - right.turn);
   const finalHordeDefeated = statisticBoolean(statistics, 'finalHordeDefeated')
@@ -428,6 +488,20 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const hordeTargetClearedCount = statisticNumber(statistics, 'hordeTargetClearedCount') ?? events.filter(
     (event) => event.type === 'horde_target_cleared',
   ).length;
+  const noisePulsesEmitted = statisticNumber(statistics, 'noisePulsesEmitted') ?? eventCount('noise_emitted');
+  const policeNoisePulses = statisticNumber(statistics, 'policeNoisePulses') ?? events.filter(
+    (event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'police',
+  ).length;
+  const nationalGuardNoisePulses = statisticNumber(statistics, 'nationalGuardNoisePulses') ?? events.filter(
+    (event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'nationalGuard',
+  ).length;
+  const normalZombiesNoiseTargeted = statisticNumber(statistics, 'normalZombiesNoiseTargeted') ?? 0;
+  const noiseTargetsReached = statisticNumber(statistics, 'noiseTargetsReached') ?? 0;
+  const noiseTargetsOverriddenByHorde = statisticNumber(statistics, 'noiseTargetsOverriddenByHorde') ?? 0;
+  const noiseTargetsOverriddenByVisiblePopulation = statisticNumber(
+    statistics,
+    'noiseTargetsOverriddenByVisiblePopulation',
+  ) ?? 0;
   const productionFacilities = observations.flatMap((observation) => observation.facilities.filter(
     (facility) => facility.type !== 'capital' && facility.type !== 'city',
   ));
@@ -504,7 +578,9 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   ).length;
   const branchTurns: Record<CheckpointPolicy, number> = { passThrough: 0, normal: 0, strict: 0 };
   for (const observation of turnObservations) {
-    for (const checkpoint of observation.checkpoints.filter((candidate) => candidate.status === 'operational')) {
+    for (const checkpoint of observation.checkpoints.filter(
+      (candidate) => candidate.status === 'operational' && candidate.role === 'active',
+    )) {
       branchTurns[checkpoint.currentPolicy] += 1;
     }
   }
@@ -541,9 +617,9 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     initialPopulation: populationAtObservation(input.initialObservation),
     finalHealthyCivilianPopulation: numberOrZero(finalObservation.population.healthyCivilians),
     maxPopulation,
-    civilianLosses: numberOrZero(statistics?.civilianLosses),
-    infectionLosses: numberOrZero(statistics?.infectionLosses),
-    resourceShortageLosses: numberOrZero(statistics?.resourceShortageLosses),
+    civilianLosses: statisticNumber(statistics, 'civilianLosses') ?? 0,
+    infectionLosses: statisticNumber(statistics, 'infectionLosses') ?? 0,
+    resourceShortageLosses: statisticNumber(statistics, 'resourceShortageLosses') ?? 0,
     refugeesAccepted,
     refugeeArrivalsByBranch,
     totalRefugeeArrivals,
@@ -559,6 +635,17 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     checkpointsRecovered,
     checkpointsAbandoned,
     checkpointsRemoved,
+    standbyCheckpointsCreated,
+    dormantCheckpointsCreated,
+    checkpointActivations,
+    checkpointFallbacks,
+    checkpointFallbacksByBranch,
+    checkpointFallbacksFromStandby,
+    checkpointFallbacksFromDormant,
+    checkpointFallbacksPreventingUnmanagedArrival,
+    maxCheckpointPostsPerBranch,
+    maxPreparedCheckpointPostsPerBranch,
+    activeCheckpointLosses,
     unmanagedBranchTurns,
     maxSuppliedFacilities,
     maxSupplyRadius,
@@ -609,11 +696,11 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     checkpointPassThroughScreenedRate: rate(refugeesScreenedByPolicy.passThrough, totalScreened),
     checkpointNormalScreenedRate: rate(refugeesScreenedByPolicy.normal, totalScreened),
     checkpointStrictScreenedRate: rate(refugeesScreenedByPolicy.strict, totalScreened),
-    unitLosses: numberOrZero(statistics?.unitLosses),
+    unitLosses: statisticNumber(statistics, 'unitLosses') ?? 0,
     zombiesKilled: statisticNumber(statistics, 'normalZombiesKilled') === null && statisticNumber(statistics, 'hordeZombiesKilled') === null
       ? destroyedZombieEvents
       : normalZombiesKilled + hordeZombiesKilled,
-    hordeInterceptions: numberOrZero(statistics?.hordeInterceptions),
+    hordeInterceptions: statisticNumber(statistics, 'hordeInterceptions') ?? 0,
     finalHordeSpawned,
     finalHordeKilled,
     finalHordeDefeated,
@@ -636,6 +723,13 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     normalZombieIdleCount,
     hordeTargetInheritedCount,
     hordeTargetClearedCount,
+    noisePulsesEmitted,
+    policeNoisePulses,
+    nationalGuardNoisePulses,
+    normalZombiesNoiseTargeted,
+    noiseTargetsReached,
+    noiseTargetsOverriddenByHorde,
+    noiseTargetsOverriddenByVisiblePopulation,
     finalFood: numberOrZero(finalObservation.resources.food),
     finalCivilianGoods: numberOrZero(finalObservation.resources.civilianGoods),
     finalMilitaryGoods: numberOrZero(finalObservation.resources.militaryGoods),
@@ -714,6 +808,16 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'checkpointsRecovered',
   'checkpointsAbandoned',
   'checkpointsRemoved',
+  'standbyCheckpointsCreated',
+  'dormantCheckpointsCreated',
+  'checkpointActivations',
+  'checkpointFallbacks',
+  'checkpointFallbacksFromStandby',
+  'checkpointFallbacksFromDormant',
+  'checkpointFallbacksPreventingUnmanagedArrival',
+  'maxCheckpointPostsPerBranch',
+  'maxPreparedCheckpointPostsPerBranch',
+  'activeCheckpointLosses',
   'unmanagedBranchTurns',
   'maxSuppliedFacilities',
   'maxSupplyRadius',
@@ -787,6 +891,13 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'normalZombieIdleCount',
   'hordeTargetInheritedCount',
   'hordeTargetClearedCount',
+  'noisePulsesEmitted',
+  'policeNoisePulses',
+  'nationalGuardNoisePulses',
+  'normalZombiesNoiseTargeted',
+  'noiseTargetsReached',
+  'noiseTargetsOverriddenByHorde',
+  'noiseTargetsOverriddenByVisiblePopulation',
   'finalFood',
   'finalCivilianGoods',
   'finalMilitaryGoods',

@@ -14,7 +14,7 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '1.4.1';
+export const CONFIG_VERSION = '1.4.2';
 export const DEFAULT_MAP_ID = 'fixed-15x15-v2';
 
 const facilityIds: FacilityId[] = [
@@ -209,10 +209,15 @@ export const DEFAULT_CONFIG: GameConfig = {
   },
   checkpoint: {
     constructionCivilianGoods: 5,
-    maxPerDirection: 1,
+    maxPreparedPostsPerDirection: 3,
     requiresPolice: false,
     consumesPower: false,
     initialSupplyRadius: 5,
+  },
+  noise: {
+    police: 4,
+    nationalGuard: 5,
+    publicClass: { police: 'medium', nationalGuard: 'medium' },
   },
   terrain: {
     movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
@@ -507,10 +512,23 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('checkpoint is required');
   } else {
     requireInteger(errors, checkpoint.constructionCivilianGoods, 'checkpoint.constructionCivilianGoods', 0);
-    requireInteger(errors, checkpoint.maxPerDirection, 'checkpoint.maxPerDirection', 1);
+    requireInteger(errors, checkpoint.maxPreparedPostsPerDirection, 'checkpoint.maxPreparedPostsPerDirection', 1);
     requireInteger(errors, checkpoint.initialSupplyRadius, 'checkpoint.initialSupplyRadius', 0);
     if (typeof checkpoint.requiresPolice !== 'boolean' || typeof checkpoint.consumesPower !== 'boolean') {
       errors.push('checkpoint flags must be boolean');
+    }
+  }
+
+  const noise = config.noise;
+  if (!noise || typeof noise !== 'object') {
+    errors.push('noise is required');
+  } else {
+    requireInteger(errors, noise.police, 'noise.police', 0);
+    requireInteger(errors, noise.nationalGuard, 'noise.nationalGuard', 0);
+    for (const unitType of ['police', 'nationalGuard'] as const) {
+      if (!['small', 'medium', 'large', 'extraLarge'].includes(noise.publicClass?.[unitType])) {
+        errors.push(`noise.publicClass.${unitType} is invalid`);
+      }
     }
   }
 

@@ -110,7 +110,19 @@ describe('Developer / Browser Bridge', () => {
     expect(artifact.observationTrace).toHaveLength(1);
     expect(artifact.observationTrace![0]!.checkpointPositionCandidates).toEqual(api.getObservation().checkpointPositionCandidates);
     expect(artifact.metrics).toBeDefined();
-    expect(artifact.verificationEvents).toBeUndefined();
+    for (const hiddenNoiseMetric of [
+      'normalZombiesNoiseTargeted',
+      'noiseTargetsReached',
+      'noiseTargetsOverriddenByHorde',
+      'noiseTargetsOverriddenByVisiblePopulation',
+    ]) expect(artifact.metrics).not.toHaveProperty(hiddenNoiseMetric);
+    expect(artifact.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'medium' } });
+    expect(artifact.metrics!.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'medium' } });
+    const encodedArtifact = JSON.stringify(artifact);
+    expect(encodedArtifact).not.toContain('"police":4');
+    expect(encodedArtifact).not.toContain('"nationalGuard":5');
+    expect(encodedArtifact).not.toContain('"artifactType"');
+    expect('verificationEvents' in artifact).toBe(false);
     artifact.config.finalHordeTurn = 1;
     artifact.acceptedActions.push({ type: 'EndTurn' });
     expect(api.getRunArtifact().config.finalHordeTurn).not.toBe(1);

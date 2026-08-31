@@ -9,6 +9,7 @@ import type {
 } from '../agent/types';
 import { hexKey } from '../core/hex';
 import {
+  deriveCheckpointRole,
   deriveSupplySnapshot,
   getBlockingZombiesForCheckpoint,
   getBranchSupplyRadius,
@@ -21,6 +22,7 @@ import type {
   CardinalDirection,
   CheckpointPolicy,
   CheckpointPositionCandidate,
+  CheckpointStatus,
   CheckpointState,
   EndTurnForecast,
   FacilityState,
@@ -38,6 +40,7 @@ import type {
 } from '../core/types';
 import {
   actionForCheckpointPolicy,
+  actionForCheckpointActivation,
   actionForPopulationTransfer,
   actionForUnitProduction,
   actionForPowerSupply,
@@ -88,6 +91,7 @@ export type EngineFactory = () => UiGameEngine;
 
 type Screen = 'title' | 'game';
 type SheetState = 'collapsed' | 'standard' | 'expanded';
+const IS_DEVELOPMENT_BUILD = import.meta.env.DEV;
 type CheckpointPlacement = {
   mode: 'build' | 'relocate';
   checkpointId?: string;
@@ -114,6 +118,223 @@ export interface CheckpointCandidateViewModel {
   reason: string | null;
 }
 
+export type CheckpointRole = 'active' | 'standby' | 'dormant' | 'remnant' | 'ruined' | 'abandoned';
+
+export interface CheckpointRoleViewModel {
+  id: string;
+  branchId: RoadBranchId;
+  position: HexCoord;
+  status: CheckpointStatus;
+  role: CheckpointRole;
+  waiting: number;
+  screening: number;
+  approved: number;
+  infected: number;
+}
+
+export interface BranchPanelViewModel {
+  branchId: RoadBranchId;
+  direction: CardinalDirection | string;
+  activeCheckpointId: string | null;
+  standbyCheckpointIds: string[];
+  dormantCheckpointIds: string[];
+  fallbackAvailable: boolean;
+  currentPolicy: CheckpointPolicy;
+  preparedPostCount: number;
+  preparedPostLimit: number;
+  checkpoints: CheckpointRoleViewModel[];
+}
+
+type UnknownRecord = Record<string, unknown>;
+
+function unknownRecord(value: unknown): UnknownRecord {
+  return value && typeof value === 'object' ? value as UnknownRecord : {};
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+}
+
+function checkpointBranchId(checkpoint: Pick<CheckpointState, 'branchId' | 'direction'>): RoadBranchId {
+  return checkpoint.branchId ?? checkpoint.direction;
+}
+
+function branchStateFor(state: Readonly<GameState>, branchId: RoadBranchId): UnknownRecord {
+  const branch = (state.roadBranches ?? []).find((candidate) => candidate.branchId === branchId);
+  return unknownRecord(branch);
+}
+
+/** Derive role from the Core branch role sources; CheckpointState has no copy. */
+export function checkpointRoleFor(
+  state: Readonly<GameState>,
+  checkpoint: Readonly<CheckpointState>,
+): CheckpointRole {
+  // Delegate to the Core's common pure function so Human UI, Observation,
+  // Headless and Agent cannot drift on role derivation.
+  return deriveCheckpointRole(state, checkpoint);
+}
+
+function checkpointRoleViewModel(state: Readonly<GameState>, checkpoint: Readonly<CheckpointState>): CheckpointRoleViewModel {
+  return {
+    id: checkpoint.id,
+    branchId: checkpointBranchId(checkpoint),
+    position: { ...checkpoint.position },
+    status: checkpoint.status,
+    role: checkpointRoleFor(state, checkpoint),
+    waiting: Math.max(0, checkpoint.waiting ?? 0),
+    screening: Math.max(0, checkpoint.screening ?? 0),
+    approved: Math.max(0, checkpoint.approved ?? 0),
+    infected: Math.max(0, checkpoint.infected ?? 0),
+  };
+}
+
+/**
+ * Build the branch-level administrative panel from public/Core state.  All
+ * actionability remains in Core; this is a read-only projection only.
+ */
+export function branchPanelViewModel(
+  state: Readonly<GameState>,
+  branchId?: RoadBranchId,
+): BranchPanelViewModel[] {
+  const definitions = [...(state.map?.roadBranches ?? [])]
+    .filter((definition) => !branchId || definition.id === branchId)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  return definitions.map((definition) => {
+    const id = definition.id;
+    const branch = branchStateFor(state, id);
+    const checkpoints = (state.checkpoints ?? [])
+      .filter((checkpoint) => checkpointBranchId(checkpoint) === id)
+      .map((checkpoint) => checkpointRoleViewModel(state, checkpoint))
+      .sort((left, right) => left.id.localeCompare(right.id));
+    const configuredActiveCheckpointId = typeof branch.activeCheckpointId === 'string'
+      ? branch.activeCheckpointId
+      : null;
+    const activeCheckpointId = configuredActiveCheckpointId && checkpoints.some((checkpoint) =>
+      checkpoint.id === configuredActiveCheckpointId && checkpoint.role === 'active')
+      ? configuredActiveCheckpointId
+      : checkpoints.find((checkpoint) => checkpoint.role === 'active')?.id ?? null;
+    const standbyCheckpointIds = stringArray(branch.standbyCheckpointIds);
+    const standby = standbyCheckpointIds.length > 0
+      ? [...standbyCheckpointIds].sort()
+      : checkpoints.filter((checkpoint) => checkpoint.role === 'standby').map((checkpoint) => checkpoint.id);
+    const dormantCheckpointIds = stringArray(branch.dormantCheckpointIds);
+    const dormant = dormantCheckpointIds.length > 0
+      ? [...dormantCheckpointIds].sort()
+      : checkpoints.filter((checkpoint) => checkpoint.role === 'dormant').map((checkpoint) => checkpoint.id);
+    const configuredLimit = branch.preparedPostLimit;
+    const fallbackLimit = unknownRecord(state.config?.checkpoint).maxPreparedPostsPerDirection;
+    const preparedPostLimit = typeof configuredLimit === 'number'
+      ? Math.max(0, Math.trunc(configuredLimit))
+      : typeof fallbackLimit === 'number'
+        ? Math.max(0, Math.trunc(fallbackLimit))
+        : 3;
+    const preparedPostCount = typeof branch.preparedPostCount === 'number'
+      ? Math.max(0, Math.trunc(branch.preparedPostCount))
+      : (activeCheckpointId ? 1 : 0) + standby.length;
+    const currentPolicy = branch.currentPolicy === 'passThrough' || branch.currentPolicy === 'normal' || branch.currentPolicy === 'strict'
+      ? branch.currentPolicy
+      : 'normal';
+    const activeCheckpoint = checkpoints.find((checkpoint) => checkpoint.id === activeCheckpointId && checkpoint.status === 'operational');
+    const activeRoadIndex = activeCheckpoint
+      ? definition.roadTiles.findIndex((position) => hexKey(position) === hexKey(activeCheckpoint.position))
+      : -1;
+    // This is deliberately structural: hidden Zombie blockers do not affect
+    // the public fallbackAvailable flag. Match the Agent Observation rule by
+    // requiring a reserve post on the capital side of the current Active.
+    const fallbackAvailable = activeRoadIndex > 0 && [...standby, ...dormant].some((checkpointId) => {
+      const reserve = checkpoints.find((checkpoint) => checkpoint.id === checkpointId);
+      if (!reserve || reserve.status !== 'operational') return false;
+      const reserveRoadIndex = definition.roadTiles.findIndex((position) => hexKey(position) === hexKey(reserve.position));
+      return reserveRoadIndex >= 0 && reserveRoadIndex < activeRoadIndex;
+    });
+    return {
+      branchId: id,
+      direction: definition.direction,
+      activeCheckpointId,
+      standbyCheckpointIds: [...standby],
+      dormantCheckpointIds: [...dormant],
+      fallbackAvailable,
+      currentPolicy,
+      preparedPostCount,
+      preparedPostLimit,
+      checkpoints,
+    };
+  });
+}
+
+/**
+ * Render branch role and fallback depth without revealing hidden blocker
+ * information. This helper is intentionally independent from Phaser.
+ */
+export function renderBranchPanel(
+  state: Readonly<GameState>,
+  locale: Locale,
+): string {
+  const t = createTranslator(locale);
+  const panels = branchPanelViewModel(state);
+  const roleLabel = (role: CheckpointRole): string => t(`checkpointRole.${role}`);
+  return `<section class="branch-panel" data-branch-panel="true" aria-labelledby="branch-panel-heading"><div class="section-heading"><h3 id="branch-panel-heading">${escapeHtml(t('branchPanel'))}</h3><span class="status-chip">${escapeHtml(t('branchRoleLimit'))}</span></div>${panels.map((panel) => {
+    const checkpoint = (id: string) => panel.checkpoints.find((candidate) => candidate.id === id);
+    const roleChip = (id: string, role: CheckpointRole): string => {
+      const item = checkpoint(id);
+      return `<span class="branch-role-chip role-${role}" data-checkpoint-id="${escapeHtml(id)}" data-checkpoint-role="${role}"><strong>${escapeHtml(roleLabel(role))}</strong><small>${escapeHtml(id)}${item ? ` · ${item.position.q},${item.position.r}` : ''}</small></span>`;
+    };
+    const active = panel.activeCheckpointId ? roleChip(panel.activeCheckpointId, 'active') : `<span class="muted">${escapeHtml(t('noCheckpoint'))}</span>`;
+    const standby = panel.standbyCheckpointIds.map((id) => roleChip(id, 'standby')).join('') || `<span class="muted">${escapeHtml(t('none'))}</span>`;
+    const dormant = panel.dormantCheckpointIds.map((id) => roleChip(id, 'dormant')).join('') || `<span class="muted">${escapeHtml(t('none'))}</span>`;
+    const lifecycle = panel.checkpoints
+      .filter((checkpoint) => checkpoint.role === 'remnant' || checkpoint.role === 'ruined' || checkpoint.role === 'abandoned')
+      .map((checkpoint) => roleChip(checkpoint.id, checkpoint.role))
+      .join('') || `<span class="muted">${escapeHtml(t('none'))}</span>`;
+    return `<article class="branch-panel-card" data-branch-id="${escapeHtml(panel.branchId)}" data-active-checkpoint-id="${escapeHtml(panel.activeCheckpointId ?? '')}" data-standby-checkpoint-ids="${escapeHtml(panel.standbyCheckpointIds.join(','))}" data-dormant-checkpoint-ids="${escapeHtml(panel.dormantCheckpointIds.join(','))}" data-fallback-available="${String(panel.fallbackAvailable)}" data-current-policy="${escapeHtml(panel.currentPolicy)}" data-prepared-count="${panel.preparedPostCount}" data-prepared-limit="${panel.preparedPostLimit}"><div class="branch-flow-heading"><strong>${escapeHtml(formatDirection(panel.direction as CardinalDirection, locale))} · ${escapeHtml(panel.branchId)}</strong><span class="status-chip ${panel.fallbackAvailable ? 'is-supplied' : ''}">${escapeHtml(panel.fallbackAvailable ? t('fallbackAvailable') : t('fallbackUnavailable'))}</span></div><dl class="branch-panel-grid"><div><dt>${escapeHtml(t('activeCheckpoint'))}</dt><dd>${active}</dd></div><div><dt>${escapeHtml(t('standbyCheckpoint'))}</dt><dd>${standby}</dd></div><div><dt>${escapeHtml(t('dormantCheckpoint'))}</dt><dd>${dormant}</dd></div><div><dt>${escapeHtml(t('checkpointRole'))}</dt><dd>${lifecycle}</dd></div><div><dt>${escapeHtml(t('checkpointPolicy'))}</dt><dd>${escapeHtml(t(panel.currentPolicy))}</dd></div><div><dt>${escapeHtml(t('preparedPostCount'))}</dt><dd>${panel.preparedPostCount}/${panel.preparedPostLimit}</dd></div></dl></article>`;
+  }).join('')}</section>`;
+}
+
+export type NoiseClass = 'small' | 'medium' | 'large' | 'extraLarge';
+
+/** Production-safe class mapping. Exact Core radii never cross this helper. */
+export function noiseClassForUnit(unitType: string): NoiseClass | null {
+  return unitType === 'police' || unitType === 'nationalGuard' ? 'medium' : null;
+}
+
+/**
+ * Render only the public portion of Noise events.  Even if a malformed or
+ * internal event accidentally reaches this function, exact radii, affected
+ * IDs, counts, and target memory are intentionally ignored.
+ */
+export function renderNoiseEventLog(
+  state: Pick<Readonly<GameState>, 'events'>,
+  locale: Locale,
+  limit = 6,
+): string {
+  const t = createTranslator(locale);
+  const safeLimit = Number.isFinite(limit) ? Math.max(0, Math.trunc(limit)) : 0;
+  const noiseEvents = [...(state.events ?? [])].filter((event) => event.type === 'noise_emitted');
+  const events = safeLimit === 0 ? [] : noiseEvents.slice(-safeLimit);
+  if (events.length === 0) return '';
+  const rows = events.map((event) => {
+    const payload = unknownRecord(event.payload);
+    const sourceUnitType = typeof payload.sourceUnitType === 'string' ? payload.sourceUnitType : t('unit');
+    const noiseClass = payload.noiseClass === 'small' || payload.noiseClass === 'medium' || payload.noiseClass === 'large' || payload.noiseClass === 'extraLarge'
+      ? payload.noiseClass
+      : 'medium';
+    const q = typeof payload.q === 'number' ? payload.q : null;
+    const r = typeof payload.r === 'number' ? payload.r : null;
+    const center = q !== null && r !== null ? `${q},${r}` : '—';
+    const sourceTypeLabel = sourceUnitType === 'police' || sourceUnitType === 'nationalGuard'
+      ? unitLabel(sourceUnitType, locale)
+      : sourceUnitType;
+    const source = typeof payload.sourceUnitId === 'string'
+      ? `${payload.sourceUnitId} · ${sourceTypeLabel}`
+      : sourceTypeLabel;
+    const classLabel = t(`noiseClass${noiseClass[0]!.toUpperCase()}${noiseClass.slice(1)}`);
+    return `<li><strong>${escapeHtml(t('noiseEmitted'))}</strong><span>${escapeHtml(source)} · ${escapeHtml(t('noiseClass'))}: ${escapeHtml(classLabel)} · ${escapeHtml(t('noiseCenter'))}: ${escapeHtml(center)}</span></li>`;
+  }).join('');
+  return `<section class="noise-log" data-noise-log="true"><h3>${escapeHtml(t('noiseLog'))}</h3><ul>${rows}</ul><p class="muted">${escapeHtml(t('noiseCombatHint'))}</p></section>`;
+}
+
 /** Localize Core-owned candidate results without duplicating checkpoint rules in the UI. */
 export function checkpointCandidateViewModels(
   candidates: readonly CheckpointPositionCandidate[],
@@ -130,19 +351,27 @@ export function checkpointCandidateViewModels(
 
 export function actionForCheckpointCandidate(
   candidate: CheckpointPositionCandidate,
-): Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }> {
-  return candidate.actionType === 'RelocateCheckpoint'
-    ? {
+): GameAction {
+  if (candidate.actionType === 'RelocateCheckpoint') {
+    return {
       type: 'RelocateCheckpoint',
       checkpointId: candidate.checkpointId ?? '',
       branchId: candidate.branchId,
       position: { ...candidate.position },
-    }
-    : {
-      type: 'BuildCheckpoint',
-      branchId: candidate.branchId,
-      position: { ...candidate.position },
     };
+  }
+  if (candidate.actionType === 'ActivateCheckpoint') {
+    return {
+      type: 'ActivateCheckpoint',
+      branchId: candidate.branchId,
+      checkpointId: candidate.checkpointId ?? '',
+    };
+  }
+  return {
+    type: 'BuildCheckpoint',
+    branchId: candidate.branchId,
+    position: { ...candidate.position },
+  };
 }
 
 export interface BoardContextPlacement {
@@ -494,7 +723,7 @@ function configLegendEntries(
   add('finalHordeZombies', t('finalHordeZombies'), String(config.horde.finalComposition.hordeZombie));
   add('finalNormalZombies', t('finalNormalZombies'), String(config.horde.finalComposition.zombie));
   add('initialSupplyRadius', t('initialSupplyRadius'), String(config.checkpoint.initialSupplyRadius));
-  add('checkpointMaxPerDirection', t('checkpointMaxPerDirection'), String(config.checkpoint.maxPerDirection));
+  add('checkpointMaxPerDirection', t('checkpointMaxPerDirection'), String(config.checkpoint.maxPreparedPostsPerDirection));
   add('checkpointConstructionCost', t('checkpointConstructionCost'), String(config.checkpoint.constructionCivilianGoods));
   add('screeningCapacity', t('screeningCapacity'), String(config.refugees.screeningCapacity));
   for (const policy of ['passThrough', 'normal', 'strict'] as const) {
@@ -936,6 +1165,9 @@ export function localizeActionError(code: string | undefined, locale: Locale): s
     checkpoint_branch_action_limit: t('checkpointActionLimit'),
     checkpoint_infection_blocked: t('checkpointInfected'),
     checkpoint_requires_relocation: locale === 'ja' ? 'この方面には稼働中の検問所があります。移設を選択してください。' : 'This branch has an operational checkpoint. Choose relocation.',
+    checkpoint_prepared_post_limit_reached: t('checkpointPreparedPostLimitReached'),
+    checkpoint_standby_requires_rear_position: t('checkpointStandbyRequiresRearPosition'),
+    checkpoint_not_activatable: t('checkpointNotActivatable'),
     invalid_checkpoint_branch: locale === 'ja' ? '指定した道路タイルは有効な方面に属していません。' : 'The selected road tile does not belong to a valid branch.',
     unknown_road_branch: locale === 'ja' ? '道路方面を確認できません。' : 'The road branch is unknown.',
     checkpoint_wrong_branch: locale === 'ja' ? '検問所は現在の方面内だけで移設できます。' : 'A checkpoint can only relocate within its current branch.',
@@ -1210,6 +1442,12 @@ export class GameUiController {
     if (!this.state || !this.engine) return;
     const t = this.translator();
     const phaseIndicator = phaseIndicatorViewModel(this.state.phase, this.locale);
+    // Keep the debug mount point out of production markup entirely.  The
+    // Core may opt into providing diagnostics, but the controller never
+    // fabricates them and never stores them in GameState.
+    const noiseDebugMount = IS_DEVELOPMENT_BUILD
+      ? '<div class="noise-debug-mount" data-noise-debug-mount hidden></div>'
+      : '';
     this.root.className = 'app-shell game-screen';
     this.root.innerHTML = `
       <header class="top-hud">
@@ -1230,7 +1468,7 @@ export class GameUiController {
       </section>
       <section class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><div class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></div><div class="horde-facts"><span><small>${escapeHtml(t('direction'))}</small><b data-bind="horde-direction">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span></div></section>
       <section class="victory-progress" aria-live="polite" aria-label="${escapeHtml(t('victoryProgress'))}"><strong>${escapeHtml(t('victoryProgress'))}</strong><div data-bind="victory-progress"></div></section>
-      <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="unit-context-layer" data-unit-context-layer aria-live="polite"></div><div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
+      <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="unit-context-layer" data-unit-context-layer aria-live="polite"></div>${noiseDebugMount}<div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
       <section class="bottom-sheet" data-sheet="standard" aria-label="${escapeHtml(t('selected'))}">
         <button class="sheet-handle" type="button" data-action="sheet-toggle"><span></span><span class="sr-only">${escapeHtml(t('selected'))}</span></button>
         <div class="sheet-header" data-action="sheet-toggle"><div><strong data-bind="selection-title">${escapeHtml(t('selectUnit'))}</strong><small data-bind="selection-summary">${escapeHtml(stateSummary(this.state, this.locale))}</small></div><span data-bind="sheet-state">${escapeHtml(sheetStateLabel(this.sheetState, this.locale))}</span></div>
@@ -1380,6 +1618,9 @@ export class GameUiController {
       case 'checkpoint-place-cancel': this.checkpointPlacement = null; this.checkpointPreviewTarget = null; this.checkpointPlacementMessage = null; this.updateView(); break;
       case 'checkpoint-build-at': this.buildCheckpointAt(element); break;
       case 'checkpoint-relocate-at': this.relocateCheckpointAt(element); break;
+      case 'checkpoint-build-direct': this.executeCheckpointCandidate(element, 'BuildCheckpoint'); break;
+      case 'checkpoint-relocate-direct': this.executeCheckpointCandidate(element, 'RelocateCheckpoint'); break;
+      case 'activate-checkpoint': this.activateCheckpoint(element); break;
       default: break;
     }
   }
@@ -1426,6 +1667,7 @@ export class GameUiController {
     if (sheetBody && this.checkpointPlacement) sheetBody.insertAdjacentHTML('beforeend', this.renderCheckpointPlacement());
     this.updateBoard();
     this.renderUnitContextUi();
+    this.updateNoiseDebugOverlay();
     const sheet = this.root.querySelector<HTMLElement>('.bottom-sheet');
     sheet?.setAttribute('data-sheet', this.sheetState);
     const sheetState = this.root.querySelector<HTMLElement>('[data-bind="sheet-state"]');
@@ -1544,6 +1786,20 @@ export class GameUiController {
     this.boardScene.updateState(render);
   }
 
+  private updateNoiseDebugOverlay(): void {
+    if (!IS_DEVELOPMENT_BUILD) return;
+    const mount = this.root.querySelector<HTMLElement>('[data-noise-debug-mount]');
+    if (!mount || !this.state) return;
+    const state = this.state;
+    const locale = this.locale;
+    void import('./noiseDebug').then(({ renderDevelopmentNoiseDebug }) => {
+      if (!mount.isConnected) return;
+      const markup = renderDevelopmentNoiseDebug(state, locale);
+      mount.innerHTML = markup;
+      mount.hidden = markup.length === 0;
+    });
+  }
+
   private checkpointPreview(): { legalPositions: HexCoord[]; invalidPositions: HexCoord[]; blockedZombieIds: string[] } {
     if (!this.state || !this.checkpointPlacement) return { legalPositions: [], invalidPositions: [], blockedZombieIds: [] };
     const candidates = this.checkpointCandidates();
@@ -1607,6 +1863,18 @@ export class GameUiController {
         .filter((candidate) => candidate.actionType === actionType)
         .filter((candidate) => !placement.branchId || candidate.branchId === placement.branchId)
         .filter((candidate) => placement.mode !== 'relocate' || candidate.checkpointId === placement.checkpointId)
+        .map((candidate) => ({ ...candidate, position: { ...candidate.position } }));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Return every Core candidate for a branch, preserving Build/Relocate pairs. */
+  private checkpointCandidatesForBranch(branchId: RoadBranchId): CheckpointPositionCandidate[] {
+    if (!this.engine) return [];
+    try {
+      return this.engine.getCheckpointPositionCandidates()
+        .filter((candidate) => candidate.branchId === branchId)
         .map((candidate) => ({ ...candidate, position: { ...candidate.position } }));
     } catch {
       return [];
@@ -2074,8 +2342,9 @@ export class GameUiController {
     this.apply(action);
   }
 
-  private setPolicy(checkpointId: string, policy: CheckpointPolicy): void {
-    const action = actionForCheckpointPolicy(this.legalActions(), checkpointId, policy) ?? { type: 'SetCheckpointPolicy', checkpointId, policy } as const;
+  private setPolicy(branchId: string, policy: CheckpointPolicy): void {
+    const requested: Extract<GameAction, { type: 'SetCheckpointPolicy' }> = { type: 'SetCheckpointPolicy', branchId, policy };
+    const action = actionForCheckpointPolicy(this.legalActions(), branchId, policy) ?? requested;
     const reason = this.state ? actionReasonFor(this.state, action, this.locale) : this.translator()('invalidAction');
     if (reason) this.showToast(reason);
     else this.apply(action);
@@ -2182,6 +2451,49 @@ export class GameUiController {
       this.supplyOverlay = true;
       this.updateView();
     }
+  }
+
+  /** Execute a branch-panel candidate while preserving its Action type. */
+  private executeCheckpointCandidate(
+    element: HTMLElement,
+    actionType: 'BuildCheckpoint' | 'RelocateCheckpoint',
+  ): void {
+    if (!this.state || !this.engine) return;
+    const branchId = element.dataset.branchId;
+    const checkpointId = element.dataset.checkpointId;
+    const q = numberValue(element.dataset.q, NaN);
+    const r = numberValue(element.dataset.r, NaN);
+    if (!branchId || !Number.isInteger(q) || !Number.isInteger(r)) return;
+    const candidate = this.checkpointCandidatesForBranch(branchId).find((entry) =>
+      entry.actionType === actionType &&
+      entry.position.q === q && entry.position.r === r &&
+      (actionType !== 'RelocateCheckpoint' || entry.checkpointId === checkpointId),
+    );
+    if (!candidate) return;
+    if (!candidate.legal) {
+      this.showToast(localizeActionError(candidate.reasonCode ?? undefined, this.locale));
+      return;
+    }
+    this.apply(actionForCheckpointCandidate(candidate));
+  }
+
+  private activateCheckpoint(element: HTMLElement): void {
+    if (!this.state) return;
+    const branchId = element.dataset.branchId;
+    const checkpointId = element.dataset.checkpointId;
+    if (!branchId || !checkpointId) return;
+    const requested: Extract<GameAction, { type: 'ActivateCheckpoint' }> = {
+      type: 'ActivateCheckpoint',
+      branchId,
+      checkpointId,
+    };
+    const action = actionForCheckpointActivation(this.legalActions(), branchId, checkpointId) ?? requested;
+    const reason = actionReasonFor(this.state, action, this.locale);
+    if (reason) {
+      this.showToast(reason);
+      return;
+    }
+    this.apply(action);
   }
 
   private relocateCheckpointAt(element: HTMLElement): void {
@@ -2391,7 +2703,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipPolicy', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointFallback', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipPolicy', 'tipNoise', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
@@ -2471,19 +2783,42 @@ export class GameUiController {
     const t = this.translator();
     const branches = [...this.state.map.roadBranches].sort((left, right) => left.id.localeCompare(right.id));
     const supply = deriveSupplySnapshot(this.state);
+    const panels = branchPanelViewModel(this.state);
     const cards = branches.map((branch) => {
       const branchState = this.state!.roadBranches.find((candidate) => candidate.branchId === branch.id);
-      const checkpoint = this.state!.checkpoints.find((candidate) =>
-        candidate.status === 'operational' && (candidate.branchId ?? candidate.direction) === branch.id,
-      );
-      const policy = checkpoint
-        ? this.state!.config.refugees.policies[checkpoint.currentPolicy]
-        : this.state!.config.refugees.policies.passThrough;
+      const panel = panels.find((candidate) => candidate.branchId === branch.id);
+      const checkpoint = panel?.activeCheckpointId
+        ? this.state!.checkpoints.find((candidate) => candidate.id === panel.activeCheckpointId)
+        : undefined;
+      const policyKey: CheckpointPolicy = panel?.currentPolicy ?? 'passThrough';
+      const policy = this.state!.config.refugees.policies[policyKey];
       const remaining = branchState ? Math.max(0, branchState.nextArrivalTurn - this.state!.turn) : 0;
       const range = String(this.state!.config.refugees.arrivalPeopleMin) + '–' + String(this.state!.config.refugees.arrivalPeopleMax);
       const destination = checkpoint ? t('checkpoint') + ' · ' + checkpoint.id : t('noCheckpoint');
       const policyText = formatPercent(policy.workerRate, this.locale) + ' / ' + formatPercent(policy.infectionRate, this.locale);
       const radius = supply.branchRadii.find((entry) => entry.branchId === branch.id)?.radius ?? this.state!.config.checkpoint.initialSupplyRadius;
+      const candidates = this.checkpointCandidatesForBranch(branch.id);
+      const candidateButtons = candidates.map((candidate) => {
+        const direction = formatDirection(branch.direction, this.locale);
+        const isBuild = candidate.actionType === 'BuildCheckpoint';
+        const isRelocate = candidate.actionType === 'RelocateCheckpoint';
+        const actionLabel = isBuild
+          ? t('buildCandidate')
+          : isRelocate
+            ? t('relocateCandidate')
+            : t('activateCheckpoint');
+        const action = isBuild
+          ? 'checkpoint-build-direct'
+          : isRelocate
+            ? 'checkpoint-relocate-direct'
+            : 'activate-checkpoint';
+        const checkpointAttribute = candidate.checkpointId ? ` data-checkpoint-id="${escapeHtml(candidate.checkpointId)}"` : '';
+        const reason = candidate.reasonCode ? localizeActionError(candidate.reasonCode, this.locale) : '';
+        return `<button class="checkpoint-candidate branch-candidate ${candidate.legal ? 'legal' : 'invalid'}" data-action="${action}" data-branch-id="${escapeHtml(candidate.branchId)}" data-q="${candidate.position.q}" data-r="${candidate.position.r}"${checkpointAttribute} aria-invalid="${String(!candidate.legal)}" title="${escapeHtml(reason)}"><span aria-hidden="true">${candidate.legal ? '✓' : '×'}</span> ${escapeHtml(actionLabel)} · ${escapeHtml(direction)} · ${candidate.position.q},${candidate.position.r}</button>`;
+      }).join('');
+      const roleSummary = panel
+        ? `<p class="branch-role-summary"><strong>${escapeHtml(t('activeCheckpoint'))}</strong>: ${escapeHtml(panel.activeCheckpointId ?? t('none'))} · <strong>${escapeHtml(t('standbyCheckpoint'))}</strong>: ${panel.standbyCheckpointIds.length} · <strong>${escapeHtml(t('dormantCheckpoint'))}</strong>: ${panel.dormantCheckpointIds.length}</p>`
+        : '';
       return '<article class="branch-flow-card"><div class="branch-flow-heading"><strong>' +
         escapeHtml(formatDirection(branch.direction, this.locale)) + ' · ' + escapeHtml(branch.id) +
         '</strong><span class="status-chip">' + escapeHtml(destination) + '</span></div><dl class="branch-flow-grid"><div><dt>' +
@@ -2491,10 +2826,10 @@ export class GameUiController {
         '</dd></div><div><dt>' + escapeHtml(t('arrivalRange')) + '</dt><dd>' + escapeHtml(range) +
         '</dd></div><div><dt>' + escapeHtml(t('screeningProbability')) + '</dt><dd>' + escapeHtml(policyText) +
         '</dd></div><div><dt>' + escapeHtml(t('supplyRadius')) + '</dt><dd>' + String(radius) +
-        '</dd></div></dl>' + (!checkpoint ? '<p class="muted">' + escapeHtml(t('unmanagedPassThrough')) + '</p>' : '') + '</article>';
+        '</dd></div></dl>' + roleSummary + (!checkpoint ? '<p class="muted">' + escapeHtml(t('unmanagedPassThrough')) + '</p>' : '') + (candidateButtons ? `<div class="branch-candidate-actions" aria-label="${escapeHtml(t('sameHexActions'))}">${candidateButtons}</div>` : '') + '</article>';
     }).join('');
-    return '<section class="branch-flow-section" aria-labelledby="branch-flow-heading"><h3 id="branch-flow-heading">' +
-      escapeHtml(t('arrivalSchedule')) + '</h3>' + cards + '</section>';
+    return renderBranchPanel(this.state, this.locale) + '<section class="branch-flow-section" aria-labelledby="branch-flow-heading"><h3 id="branch-flow-heading">' +
+      escapeHtml(t('arrivalSchedule')) + '</h3>' + cards + '</section>' + renderNoiseEventLog(this.state, this.locale);
   }
 
   private renderCheckpointPlacement(): string {
@@ -2667,6 +3002,10 @@ export class GameUiController {
     const infectedCheckpoint = this.state?.checkpoints.find((checkpoint) =>
       checkpoint.infected > 0 && samePosition(checkpoint.position, unit.position));
     const infectedTarget = infectedFacility ?? infectedCheckpoint;
+    const noiseClass = noiseClassForUnit(unit.type);
+    const noiseSection = noiseClass
+      ? `<section class="noise-forecast" data-noise-class="${escapeHtml(noiseClass)}"><h3>${escapeHtml(t('noise'))}</h3><p><strong>${escapeHtml(t('noiseClass'))}</strong>: ${escapeHtml(t(`noiseClass${noiseClass[0]!.toUpperCase()}${noiseClass.slice(1)}`))}</p><p class="muted">${escapeHtml(t('noiseCombatHint'))}</p></section>`
+      : '';
     const infectionSection = infectedTarget
       ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicUnit?.infectionContainmentCapable ? 'is-contained' : 'warning-text'}">${escapeHtml(publicUnit?.infectionContainmentCapable ? t('infectionContained') : t('infectionNotContained'))}</p>${publicUnit?.suppressionAvailableIfTurnEndsNow ? `<p class="muted">${escapeHtml(t('automaticSuppression'))}: ${escapeHtml(t('projectedSuppression'))} ${Math.min(infectedTarget.infected, publicUnit.suppressionPower)} · ${escapeHtml(t('suppressionPower'))} ${publicUnit.suppressionPower}</p>${publicUnit.suppressionCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicUnit.suppressionCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}` : `<p class="muted">${escapeHtml(t('automaticSuppressionUnavailable'))}</p>`}<p class="muted">${escapeHtml(t('tipSuppression'))}</p></section>`
       : '';
@@ -2680,7 +3019,7 @@ export class GameUiController {
         : this.unitActionMode === 'attack'
           ? t('selectAttackTarget')
           : t('selectUnitAction');
-    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p><section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
+    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p><section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
   }
 
   /**
@@ -2755,17 +3094,22 @@ export class GameUiController {
     publicTile?: AgentMapTileObservation,
   ): void {
     const t = this.translator();
+    const branchId = checkpointBranchId(checkpoint);
+    const role = checkpointRoleFor(this.state!, checkpoint);
     const statusLabel = t(checkpoint.status);
-    const branchId = checkpoint.branchId ?? checkpoint.direction;
+    const roleLabel = t(`checkpointRole.${role}`);
     const branch = this.state?.map.roadBranches.find((candidate) => candidate.id === branchId);
     const branchState = this.state?.roadBranches.find((candidate) => candidate.branchId === branchId);
+    const branchPanel = this.state ? branchPanelViewModel(this.state, branchId)[0] : undefined;
     const supplied = this.state ? getSuppliedTileKeys(this.state).includes(String(checkpoint.position.q) + ',' + String(checkpoint.position.r)) : false;
-    const policyEditable = checkpoint.status === 'operational' || checkpoint.status === 'remnant';
-    const newPolicyActionAvailable = this.legalActions().some((action) => action.type === 'SetCheckpointPolicy' && action.checkpointId === checkpoint.id);
+    const branchPolicy = branchPanel?.currentPolicy ?? 'normal';
+    const policyEditable = role === 'active' && checkpoint.status === 'operational';
+    const newPolicyActionAvailable = this.legalActions().some((action) =>
+      action.type === 'SetCheckpointPolicy' && action.branchId === branchId);
     const requestedPolicy: Extract<GameAction, { type: 'SetCheckpointPolicy' }> = {
       type: 'SetCheckpointPolicy',
-      checkpointId: checkpoint.id,
-      policy: checkpoint.currentPolicy === 'normal' ? 'strict' : 'normal',
+      branchId,
+      policy: branchPolicy === 'normal' ? 'strict' : 'normal',
     };
     const newPolicyReason = !policyEditable
       ? t('invalidAction')
@@ -2777,19 +3121,24 @@ export class GameUiController {
       checkpointId: checkpoint.id,
       branchId: checkpoint.branchId ?? checkpoint.direction,
     }).length > 0;
-    const statusSummary = statusLabel + ' · ' + formatDirection(checkpoint.direction, this.locale);
+    const activationRequested: Extract<GameAction, { type: 'ActivateCheckpoint' }> = { type: 'ActivateCheckpoint', branchId, checkpointId: checkpoint.id };
+    const activationAvailable = Boolean(actionForCheckpointActivation(this.legalActions(), branchId, checkpoint.id));
+    const activationReason = (role === 'standby' || role === 'dormant') && !activationAvailable
+      ? actionReasonFor(this.state!, activationRequested, this.locale) ?? t('invalidAction')
+      : null;
+    const statusSummary = roleLabel + ' · ' + statusLabel + ' · ' + formatDirection(checkpoint.direction, this.locale);
     title.textContent = t('checkpoint') + ' · ' + checkpoint.id;
     summary.textContent = `${statusSummary} · ${t('vision')} ${publicCheckpoint?.vision ?? 0}`;
     const branchText = branch ? formatDirection(branch.direction, this.locale) + ' · ' + branch.id : branchId;
     const arrivalText = branchState ? t('arrivalIn') + ' ' + String(Math.max(0, branchState.nextArrivalTurn - this.state!.turn)) : t('unavailable');
     const newPolicies: CheckpointPolicy[] = ['passThrough', 'normal', 'strict'];
-    const newPolicyOptions = newPolicies.map((policy) => '<option value="' + policy + '" ' + (checkpoint.currentPolicy === policy ? 'selected' : '') + '>' + escapeHtml(t(policy)) + '</option>').join('');
+    const newPolicyOptions = newPolicies.map((policy) => '<option value="' + policy + '" ' + (branchPolicy === policy ? 'selected' : '') + '>' + escapeHtml(t(policy)) + '</option>').join('');
     const policyDetails = checkpointPolicyDetails(this.state!.config.refugees.policies, this.locale);
     const infectionSection = checkpoint.infected > 0
       ? '<section class="infection-forecast"><h3>' + escapeHtml(t('infectionForecast')) + '</h3><p class="' + (publicCheckpoint?.infectionContained ? 'is-contained' : 'warning-text') + '">' + escapeHtml(publicCheckpoint?.infectionContained ? t('infectionContained') : t('infectionNotContained')) + '</p><p class="muted">' + escapeHtml(t('automaticSuppression')) + ': ' + String(publicCheckpoint?.projectedSuppression ?? 0) + '</p>' + ((publicCheckpoint?.projectedCivilianDamage ?? 0) > 0 ? '<p class="warning-text">' + escapeHtml(t('projectedCivilianDamage')) + ': ' + String(publicCheckpoint?.projectedCivilianDamage) + '</p>' : '<p class="muted">' + escapeHtml(t('noCivilianDamage')) + '</p>') + '</section>'
       : '';
-    body.innerHTML = this.renderTerrainDetails(publicTile, publicCheckpoint?.vision ?? 0) + '<section class="checkpoint-card checkpoint-status-' + escapeHtml(checkpoint.status) + '"><div class="checkpoint-heading"><strong>' +
-      escapeHtml(t('checkpointStatus')) + ': ' + escapeHtml(statusLabel) + '</strong><span class="status-chip ' + (supplied ? 'is-supplied' : 'is-out-of-supply') +
+    body.innerHTML = this.renderTerrainDetails(publicTile, publicCheckpoint?.vision ?? 0) + '<section class="checkpoint-card checkpoint-status-' + escapeHtml(checkpoint.status) + '" data-checkpoint-id="' + escapeHtml(checkpoint.id) + '" data-checkpoint-role="' + escapeHtml(role) + '" data-checkpoint-status="' + escapeHtml(checkpoint.status) + '"><div class="checkpoint-heading"><strong>' +
+      escapeHtml(t('checkpointStatus')) + ': ' + escapeHtml(roleLabel) + ' · ' + escapeHtml(statusLabel) + '</strong><span class="status-chip ' + (supplied ? 'is-supplied' : 'is-out-of-supply') +
       '">' + escapeHtml(supplied ? t('supplied') : t('outOfSupply')) + '</span></div><dl class="location-grid"><div><dt>' +
       escapeHtml(t('branch')) + '</dt><dd>' + escapeHtml(branchText) + '</dd></div><div><dt>' + escapeHtml(t('nextArrival')) +
       '</dt><dd>' + escapeHtml(arrivalText) + '</dd></div><div><dt>' + escapeHtml(t('waiting')) + '</dt><dd>' + String(checkpoint.waiting) +
@@ -2797,9 +3146,10 @@ export class GameUiController {
       escapeHtml(t('approved')) + '</dt><dd>' + String(checkpoint.approved) + '</dd></div><div><dt>' + escapeHtml(t('infected')) +
       '</dt><dd>' + String(checkpoint.infected) + '</dd></div><div><dt>' + escapeHtml(t('remainingScreeningTurns')) +
       '</dt><dd>' + String(checkpoint.remainingTurns) + '</dd></div></dl><p class="muted">' + escapeHtml(t('tipCheckpoint')) +
-      '</p><label>' + escapeHtml(t('checkpointPolicy')) + '<select data-policy="' + escapeHtml(checkpoint.id) + '" ' +
-       (policyEditable ? '' : 'disabled') + '>' + newPolicyOptions + '</select></label><p class="muted">' + escapeHtml(t('checkpointPolicy')) + ': ' + escapeHtml(t(checkpoint.currentPolicy)) + ' · ' + escapeHtml(t('nextPolicy')) + ': ' + escapeHtml(t(checkpoint.screeningPolicy)) + '</p>' + infectionSection + '<section class="policy-details"><h3>' + escapeHtml(t('policyDetails')) + '</h3><p class="muted">' + escapeHtml(t('policyTradeoff')) + '</p><ul class="policy-list">' + policyDetails + '</ul></section>' +
+      '</p><p class="checkpoint-role-help"><strong>' + escapeHtml(t('checkpointRole')) + '</strong>: ' + escapeHtml(roleLabel) + '</p><label>' + escapeHtml(t('branchPolicy')) + '<select data-policy="' + escapeHtml(branchId) + '" ' +
+       (policyEditable ? '' : 'disabled') + '>' + newPolicyOptions + '</select></label><p class="muted">' + escapeHtml(t('checkpointPolicy')) + ': ' + escapeHtml(t(branchPolicy)) + ' · ' + escapeHtml(t('nextPolicy')) + ': ' + escapeHtml(t(checkpoint.screeningPolicy)) + '</p>' + infectionSection + '<section class="policy-details"><h3>' + escapeHtml(t('policyDetails')) + '</h3><p class="muted">' + escapeHtml(t('policyTradeoff')) + '</p><ul class="policy-list">' + policyDetails + '</ul></section>' +
       (newPolicyReason ? '<p class="warning-text">' + escapeHtml(newPolicyReason) + '</p>' : '') +
+      ((role === 'standby' || role === 'dormant') ? '<section class="checkpoint-activation"><p class="muted">' + escapeHtml(t('activateCheckpointHint')) + '</p><button class="secondary-button" data-action="activate-checkpoint" data-branch-id="' + escapeHtml(branchId) + '" data-checkpoint-id="' + escapeHtml(checkpoint.id) + '" ' + (activationAvailable ? '' : 'disabled') + '>' + escapeHtml(t('activateCheckpoint')) + '</button>' + (activationReason ? '<p class="warning-text">' + escapeHtml(activationReason) + '</p>' : '') + '</section>' : '') +
       (newRelocationAvailable ? '<div class="action-row"><button class="secondary-button" data-action="relocate-checkpoint">' +
         escapeHtml(t('relocateCheckpoint')) + '</button></div>' : '') + '</section>';
     return;

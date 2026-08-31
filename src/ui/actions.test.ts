@@ -4,6 +4,8 @@ import { forecastEndTurn, GameEngine } from '../core/engine';
 import type { GameState } from '../core/types';
 import {
   actionForPopulationTransfer,
+  actionForCheckpointActivation,
+  actionForCheckpointPolicy,
   actionForPowerSupply,
   actionForWorkerAssignment,
   clampInteger,
@@ -97,5 +99,23 @@ describe('UI action projection', () => {
     ], 'farm-1', false);
     expect(action).toEqual({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false });
     expect(actionForPowerSupply([], 'farm-1', true)).toBeUndefined();
+  });
+
+  it('matches checkpoint policy actions by branch id', () => {
+    const action = actionForCheckpointPolicy([
+      { type: 'SetCheckpointPolicy', branchId: 'east', policy: 'strict' },
+    ], 'east', 'strict');
+    expect(action).toEqual({ type: 'SetCheckpointPolicy', branchId: 'east', policy: 'strict' });
+    expect(actionForCheckpointPolicy([
+      { type: 'SetCheckpointPolicy', branchId: 'east', policy: 'strict' },
+    ], 'checkpoint-east-1', 'strict')).toBeUndefined();
+  });
+
+  it('matches activation actions by branch and checkpoint id', () => {
+    const action = actionForCheckpointActivation([
+      { type: 'ActivateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east-2' },
+    ], 'east', 'checkpoint-east-2');
+    expect(action).toEqual({ type: 'ActivateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east-2' });
+    expect(actionForCheckpointActivation([], 'east', 'checkpoint-east-2')).toBeUndefined();
   });
 });

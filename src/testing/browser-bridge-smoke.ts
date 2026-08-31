@@ -99,8 +99,15 @@ function run(): void {
     if (!bundle.includes(method)) fail(`production bundle does not contain bridge method marker: ${method}`);
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
-  for (const marker of ['1.3.2', '1.4.1', 'fixed-15x15-v2', 'SetPowerSupply', 'RelocateCheckpoint', 'roadBranches', 'suppliedTileKeys', 'checkpointPositionCandidates', 'periodicInitial', 'finalComposition', 'periodicHordeZombiesSpawned', 'artifactSchemaVersion', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression', 'visibleToPlayer', 'finalHordeStatus']) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.3.2 schema marker: ${marker}`);
+  for (const marker of ['1.3.3', '1.4.2', 'fixed-15x15-v2', 'SetPowerSupply', 'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches', 'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates', 'noiseClass', 'periodicInitial', 'finalComposition', 'periodicHordeZombiesSpawned', 'artifactSchemaVersion', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression', 'visibleToPlayer', 'finalHordeStatus']) {
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.3.3 schema marker: ${marker}`);
+  }
+  const productionCodeAndStyles = filesUnder(dist)
+    .filter((path) => path.endsWith('.js') || path.endsWith('.css'))
+    .map((path) => readFileSync(path, 'utf8'))
+    .join('\n');
+  for (const forbidden of ['data-noise-debug-overlay', 'getDevelopmentNoiseDebug', 'Internal Noise Target', '.noise-debug-overlay']) {
+    if (productionCodeAndStyles.includes(forbidden)) fail(`development-only Noise diagnostic leaked into production: ${forbidden}`);
   }
   // This is deliberately a static smoke: the project has no browser-driver
   // dependency. The companion page documents the real-browser E2E sequence.

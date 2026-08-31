@@ -190,7 +190,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'BuildCheckpoint', position: { q: 7, r: 6 } }).error).toBeNull();
     const checkpointId = engine.getState().checkpoints[0]!.id;
-    expect(engine.step({ type: 'SetCheckpointPolicy', checkpointId, policy: 'passThrough' }).error).toBeNull();
+    expect(engine.step({ type: 'SetCheckpointPolicy', branchId: 'north', policy: 'passThrough' }).error).toBeNull();
     const residents = engine.getState().population.cityResidents;
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
@@ -261,7 +261,6 @@ describe('GameEngine', () => {
       approved: 0,
       remainingTurns: 0,
       screeningPolicy: 'normal',
-      currentPolicy: 'normal',
       nextArrivalTurn: null,
       infected: 10,
     });
@@ -412,8 +411,9 @@ describe('GameEngine', () => {
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
-      waiting: 0, screening: 4, approved: 0, remainingTurns: 1, screeningPolicy: 'normal', currentPolicy: 'strict', nextArrivalTurn: null, infected: 0,
+      waiting: 0, screening: 4, approved: 0, remainingTurns: 1, screeningPolicy: 'normal', nextArrivalTurn: null, infected: 0,
     });
+    snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-north-1';
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const beforeNormal = engine.getState().population.cityResidents;
@@ -424,7 +424,7 @@ describe('GameEngine', () => {
     const checkpoint = passThrough.checkpoints[0]!;
     checkpoint.waiting = 4;
     checkpoint.screening = 0;
-    checkpoint.currentPolicy = 'passThrough';
+    passThrough.roadBranches.find((branch) => branch.branchId === 'north')!.currentPolicy = 'passThrough';
     checkpoint.nextArrivalTurn = null;
     synchronizePopulation(passThrough);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: passThrough }).error).toBeNull();
@@ -435,7 +435,7 @@ describe('GameEngine', () => {
     const strict = engine.getState() as ReturnType<typeof createInitialState>;
     strict.checkpoints[0]!.waiting = 4;
     strict.checkpoints[0]!.screening = 0;
-    strict.checkpoints[0]!.currentPolicy = 'strict';
+    strict.roadBranches.find((branch) => branch.branchId === 'north')!.currentPolicy = 'strict';
     strict.checkpoints[0]!.nextArrivalTurn = null;
     synchronizePopulation(strict);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: strict }).error).toBeNull();
@@ -494,7 +494,7 @@ describe('GameEngine', () => {
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1', position, direction: 'north', status: 'ruined',
       waiting: 0, screening: 0, approved: 0, remainingTurns: 0,
-      screeningPolicy: 'normal', currentPolicy: 'normal', nextArrivalTurn: 1, infected: 1,
+      screeningPolicy: 'normal', nextArrivalTurn: 1, infected: 1,
     });
     const scheduledTurn = snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.nextArrivalTurn;
     synchronizePopulation(snapshot);
@@ -725,8 +725,9 @@ describe('GameEngine', () => {
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
-      waiting: 2, screening: 2, approved: 2, remainingTurns: 2, screeningPolicy: 'normal', currentPolicy: 'normal', nextArrivalTurn: null, infected: 0,
+      waiting: 2, screening: 2, approved: 2, remainingTurns: 2, screeningPolicy: 'normal', nextArrivalTurn: null, infected: 0,
     });
+    snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-north-1';
     snapshot.units.push(createUnit(snapshot, 'zombie-pools', 'zombie', { q: 7, r: 6 }));
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
@@ -761,8 +762,10 @@ describe('GameEngine', () => {
     snapshot.cityPopulationSnapshot.reception.forEach((entry) => { entry.eligible = false; });
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
-      waiting: 2, screening: 0, approved: 0, remainingTurns: 0, screeningPolicy: 'passThrough', currentPolicy: 'passThrough', nextArrivalTurn: null, infected: 0,
+      waiting: 2, screening: 0, approved: 0, remainingTurns: 0, screeningPolicy: 'passThrough', nextArrivalTurn: null, infected: 0,
     });
+    snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-north-1';
+    snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.currentPolicy = 'passThrough';
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
@@ -779,7 +782,7 @@ describe('GameEngine', () => {
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1', position: { q: 7, r: 6 }, direction: 'north', status: 'operational',
-      waiting: 1, screening: 2, approved: 3, remainingTurns: 2, screeningPolicy: 'normal', currentPolicy: 'normal', nextArrivalTurn: null, infected: 2,
+      waiting: 1, screening: 2, approved: 3, remainingTurns: 2, screeningPolicy: 'normal', nextArrivalTurn: null, infected: 2,
     });
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();

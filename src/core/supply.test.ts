@@ -67,7 +67,8 @@ describe('road branches and supply network', () => {
     expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 7, r: 1 } }).error).toBeNull();
     const after = engine.getState();
     expect(after.resources.civilianGoods).toBe(goods - 5);
-    expect(after.checkpoints[0]).toMatchObject({ branchId: 'north', status: 'operational', currentPolicy: 'normal' });
+    expect(after.checkpoints[0]).toMatchObject({ branchId: 'north', status: 'operational' });
+    expect(after.roadBranches.find((branch) => branch.branchId === 'north')!.currentPolicy).toBe('normal');
     expect(after.roadBranches.find((branch) => branch.branchId === 'north')).toMatchObject({
       nextArrivalTurn: schedule,
       checkpointActionsThisTurn: 1,
@@ -99,7 +100,7 @@ describe('road branches and supply network', () => {
       waiting: 3,
     });
     const active = after.checkpoints.find((checkpoint) => checkpoint.status === 'operational')!;
-    expect(active.currentPolicy).toBe('normal');
+    expect(after.roadBranches.find((branch) => branch.branchId === 'north')!.currentPolicy).toBe('normal');
     expect(engine.step({
       type: 'RelocateCheckpoint',
       checkpointId: active.id,

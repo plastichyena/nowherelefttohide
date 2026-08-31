@@ -63,7 +63,7 @@ describe('checkpoint position candidates', () => {
     expect(JSON.stringify(withHidden)).not.toContain('hidden-candidate-zombie');
   });
 
-  it('switches a built branch to relocation candidates for the active checkpoint', () => {
+  it('offers distinct rear build and relocation candidates for the active checkpoint', () => {
     const engine = new GameEngine(44, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const build = engine.getCheckpointPositionCandidates().find(
       (candidate) => candidate.branchId === 'north' && candidate.legal,
@@ -72,7 +72,9 @@ describe('checkpoint position candidates', () => {
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const active = engine.getState().checkpoints.find((checkpoint) => checkpoint.status === 'operational')!;
     const north = engine.getCheckpointPositionCandidates().filter((candidate) => candidate.branchId === 'north');
-    expect(north.every((candidate) => candidate.actionType === 'RelocateCheckpoint')).toBe(true);
-    expect(north.every((candidate) => candidate.checkpointId === active.id)).toBe(true);
+    expect(north.some((candidate) => candidate.actionType === 'BuildCheckpoint')).toBe(true);
+    const relocations = north.filter((candidate) => candidate.actionType === 'RelocateCheckpoint');
+    expect(relocations.length).toBeGreaterThan(0);
+    expect(relocations.every((candidate) => candidate.checkpointId === active.id)).toBe(true);
   });
 });

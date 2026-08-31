@@ -13,7 +13,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('1.4.1');
+    expect(run.metrics.bridgeApiVersion).toBe('1.4.2');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -37,6 +37,15 @@ describe('Agent Metrics', () => {
       'forestDefenseApplications', 'forestDefenseDamagePrevented', 'normalZombieIdleCount',
       'hordeTargetInheritedCount', 'hordeTargetClearedCount',
     ]) expect(run.metrics).toHaveProperty(key);
+    for (const hiddenNoiseMetric of [
+      'normalZombiesNoiseTargeted',
+      'noiseTargetsReached',
+      'noiseTargetsOverriddenByHorde',
+      'noiseTargetsOverriddenByVisiblePopulation',
+    ]) {
+      expect(run.metrics).toHaveProperty(hiddenNoiseMetric);
+      expect(run.result!.statistics).not.toHaveProperty(hiddenNoiseMetric);
+    }
     expect(run.result).not.toBeNull();
     expect(run.metrics.periodicHordeZombiesSpawned).toBe(run.result!.statistics.periodicHordeZombiesSpawned);
     expect(run.metrics.periodicNormalZombiesSpawned).toBe(run.result!.statistics.periodicNormalZombiesSpawned);
@@ -54,6 +63,47 @@ describe('Agent Metrics', () => {
     expect(run.metrics.checkpointsBuilt).toBeGreaterThanOrEqual(0);
     expect(run.metrics.checkpointsRelocated).toBeGreaterThanOrEqual(0);
     expect(run.metrics.supplyRejections).toBeGreaterThanOrEqual(0);
+  });
+
+  it('counts policy branch-turns from the Active post only', () => {
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
+    const run = runAgentGame(4, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 10 } });
+    const observation = structuredClone(run.initialObservation!);
+    const baseCheckpoint = {
+      branchId: 'west',
+      direction: 'west' as const,
+      vision: 1,
+      status: 'operational' as const,
+      waiting: 0,
+      screening: 0,
+      approved: 0,
+      infected: 0,
+      remainingTurns: 0,
+      nextPolicy: 'normal' as const,
+      nextArrivalTurn: null,
+      providesSupply: false,
+      infectionContained: true,
+      containingUnitId: null,
+      projectedSuppression: 0,
+      projectedCivilianDamage: 0,
+    };
+    observation.checkpoints = [
+      { ...baseCheckpoint, id: 'active', position: { q: 3, r: 7 }, role: 'active', currentPolicy: 'normal', providesSupply: true },
+      { ...baseCheckpoint, id: 'standby', position: { q: 2, r: 7 }, role: 'standby', currentPolicy: 'strict' },
+      { ...baseCheckpoint, id: 'dormant', position: { q: 1, r: 7 }, role: 'dormant', currentPolicy: 'passThrough' },
+    ];
+    const metrics = collectGameMetrics({
+      initialObservation: observation,
+      finalObservation: observation,
+      observations: [observation],
+      actions: [],
+      result: null,
+      agent: { id: 'metrics-test', version: '1' },
+      config,
+    });
+    expect(metrics.checkpointNormalBranchTurns).toBe(1);
+    expect(metrics.checkpointStrictBranchTurns).toBe(0);
+    expect(metrics.checkpointPassThroughBranchTurns).toBe(0);
   });
 
   it('aggregates averages, percentiles, outcomes, and action totals', () => {

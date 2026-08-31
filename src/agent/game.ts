@@ -10,9 +10,13 @@ import {
   APP_VERSION,
   ARTIFACT_SCHEMA_VERSION,
   BRIDGE_API_VERSION,
+  HIDDEN_NOISE_METRIC_KEYS,
   OBSERVATION_API_VERSION,
   type AgentActionError,
   type AgentGame,
+  type AgentPublicConfig,
+  type AgentPublicMetrics,
+  type AgentPublicRunArtifact,
   type AgentObservation,
   type AgentPublicEvent,
   type AgentResetOptions,
@@ -89,10 +93,29 @@ function safeUnknownClone(value: unknown): unknown {
   }
 }
 
+/** Remove hidden-Zombie reaction counts from all production artifact paths. */
+function publicMetrics(metrics: ReturnType<typeof collectGameMetrics>): AgentPublicMetrics {
+  const value = cloneJson(metrics) as unknown as Record<string, unknown>;
+  for (const key of HIDDEN_NOISE_METRIC_KEYS) delete value[key];
+  value.config = createAgentPublicConfig(metrics.config);
+  return value as AgentPublicMetrics;
+}
+
+/** Public AgentGame artifacts expose Noise classes, never exact radii. */
+export function createAgentPublicConfig(config: GameConfig): AgentPublicConfig {
+  const value = cloneJson(config) as unknown as Record<string, unknown>;
+  const noise = isPlainObject(value.noise) ? value.noise : {};
+  value.noise = { publicClass: cloneJson(noise.publicClass as JsonValue) };
+  return value as unknown as AgentPublicConfig;
+}
+
 const INTERNAL_EVENT_TYPES = new Set([
   'zombie_idle',
   'horde_target_inherited',
   'horde_target_cleared',
+  'noise_targeted',
+  'noise_target_reached',
+  'noise_target_overridden',
 ]);
 
 function publicEvents(
@@ -114,7 +137,14 @@ function publicEvents(
   return events
     .filter((event) => !INTERNAL_EVENT_TYPES.has(event.type))
     .map((event) => {
-      const payload = cloneJson(event.payload) as JsonObject;
+      let payload = cloneJson(event.payload) as JsonObject;
+      if (event.type === 'noise_emitted') {
+        payload = Object.fromEntries(
+          ['sourceUnitId', 'sourceUnitType', 'q', 'r', 'noiseClass']
+            .filter((field) => Object.prototype.hasOwnProperty.call(payload, field))
+            .map((field) => [field, payload[field]!]),
+        ) as JsonObject;
+      }
       if (event.type === 'horde_spawned') {
         for (const field of [
           'units', 'unit', 'spawnedUnits', 'position', 'positions', 'spawnGroupId', 'groupId',
@@ -210,7 +240,7 @@ export class AgentGameAdapter implements AgentGame {
     }
     if (!matched) {
       let error = publicError('action_not_legal', 'Action is not in the current legal action list');
-      if (action.type === 'BuildCheckpoint' || action.type === 'RelocateCheckpoint') {
+      if (action.type === 'BuildCheckpoint' || action.type === 'RelocateCheckpoint' || action.type === 'ActivateCheckpoint') {
         try {
           const coreError = validateAction(this.engine.getState(), action);
           if (coreError) error = publicError(coreError.code, coreError.message);
@@ -259,7 +289,7 @@ export class AgentGameAdapter implements AgentGame {
     return createAgentResult(this.engine.getResult());
   }
 
-  public getRunArtifact(): AgentRunArtifact {
+  public getRunArtifact(): AgentPublicRunArtifact {
     const observation = this.getObservation();
     const initialObservation = this.initialObservation ?? observation;
     const metrics = collectGameMetrics({
@@ -279,7 +309,6 @@ export class AgentGameAdapter implements AgentGame {
     });
     return cloneJson({
       artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
-      artifactType: this.isGameOver() ? 'replay' : undefined,
       appVersion: APP_VERSION,
       gameRulesVersion: observation.gameRulesVersion,
       agentApiVersion: AGENT_API_VERSION,
@@ -288,7 +317,7 @@ export class AgentGameAdapter implements AgentGame {
       buildId: this.buildId,
       mapId: observation.map.id,
       seed: this.seed,
-      config: this.config,
+      config: createAgentPublicConfig(this.config),
       agent: { id: this.agentId },
       initialRoadArrivalSchedule: initialObservation.roadBranches.map((branch) => ({
         branchId: branch.branchId,
@@ -299,7 +328,7 @@ export class AgentGameAdapter implements AgentGame {
       decisionTrace: [],
       result: this.getResult(),
       observationTrace: this.observations,
-      metrics,
+      metrics: publicMetrics(metrics),
       events: this.events,
     });
   }

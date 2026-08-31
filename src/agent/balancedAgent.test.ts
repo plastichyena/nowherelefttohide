@@ -200,7 +200,12 @@ describe('Balanced Agent scenario intentions', () => {
   it('evaluates checkpoint construction and screening policy', () => {
     const build = decide([{ type: 'BuildCheckpoint', position: { q: 0, r: 7 } }, { type: 'EndTurn' }]);
     expect(build.action.type).toBe('BuildCheckpoint');
-    const policy = decide([{ type: 'SetCheckpointPolicy', checkpointId: 'cp-1', policy: 'strict' }, { type: 'EndTurn' }]);
+    const policy = decide([
+      { type: 'SetCheckpointPolicy', branchId: observation.roadBranches[0]!.branchId, policy: 'strict' },
+      { type: 'EndTurn' },
+    ], (value) => {
+      value.roadBranches[0]!.activeCheckpointId = 'cp-1';
+    });
     expect(policy.action.type).toBe('SetCheckpointPolicy');
   });
 
@@ -224,6 +229,7 @@ describe('Balanced Agent scenario intentions', () => {
       position: { ...branch.roadTiles[0]! },
       direction: branch.direction,
       status: 'operational' as const,
+      role: 'active' as const,
       waiting: 0,
       screening: 0,
       approved: 0,
@@ -321,6 +327,7 @@ describe('Balanced Agent scenario intentions', () => {
       position: { ...branch.roadTiles[0]! },
       direction: branch.direction,
       status: 'operational' as const,
+      role: 'active' as const,
       waiting: 5,
       screening: 0,
       approved: 0,
@@ -336,8 +343,8 @@ describe('Balanced Agent scenario intentions', () => {
       projectedCivilianDamage: 0,
     };
     const actions: GameAction[] = [
-      { type: 'SetCheckpointPolicy', checkpointId: checkpoint.id, policy: 'passThrough' },
-      { type: 'SetCheckpointPolicy', checkpointId: checkpoint.id, policy: 'strict' },
+      { type: 'SetCheckpointPolicy', branchId: branch.branchId, policy: 'passThrough' },
+      { type: 'SetCheckpointPolicy', branchId: branch.branchId, policy: 'strict' },
       { type: 'EndTurn' },
     ];
     const population = decide(actions, (value) => {

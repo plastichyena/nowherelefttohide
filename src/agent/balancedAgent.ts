@@ -129,13 +129,21 @@ function primaryGoal(
   }
   if (observation.population.infected > 0) return 'suppress_infection';
   if (observation.horde.finalHordeStatus === 'active' || (observation.horde.warningType !== 'none' && observation.horde.turnsRemaining <= BALANCED_THRESHOLDS.hordeUrgentTurns)) return 'defend_horde';
+  const missingActiveCheckpoint = observation.roadBranches.some((branch) => branch.activeCheckpointId === null);
+  const checkpointNetworkAction = legalActions.some((action) =>
+    action.type === 'BuildCheckpoint' || action.type === 'RelocateCheckpoint' || action.type === 'ActivateCheckpoint' || action.type === 'SetCheckpointPolicy',
+  );
+  const checkpointBlocked = observation.checkpointPositionCandidates.some((candidate) =>
+    candidate.reasonCode === 'checkpoint_supply_zombie_blocked',
+  );
+  if (missingActiveCheckpoint && (checkpointNetworkAction || checkpointBlocked)) return 'manage_checkpoint';
   if (shortage(observation) > 0) return 'restore_economy';
   if (!observation.resources.militarySupplyAvailable || militaryReserveDeficit(observation) > 0) return 'restore_military_supply';
   if (observation.endTurnForecast.overcrowding.additionalFood > 0) return 'reduce_overcrowding';
   if (legalActions.some((action) => action.type === 'Attack')) return 'combat';
   if (legalActions.some((action) => action.type === 'ProduceUnit')) return 'build_forces';
   if (legalActions.some((action) => action.type === 'Move') && observation.facilities.some((facility) => facility.owner === 'none')) return 'secure_facilities';
-  if (legalActions.some((action) => action.type === 'BuildCheckpoint' || action.type === 'RelocateCheckpoint' || action.type === 'SetCheckpointPolicy')) return 'manage_checkpoint';
+  if (checkpointNetworkAction) return 'manage_checkpoint';
   return 'end_turn';
 }
 
@@ -161,10 +169,11 @@ function repeatSensitiveActionFamily(action: GameAction, observation: AgentObser
     return facility?.type === 'militaryFactory' ? 'AssignWorkers|militaryFactory' : `AssignWorkers|${action.facilityId}`;
   }
   if (action.type === 'TransferPopulation') return 'TransferPopulation';
-  if (action.type === 'SetCheckpointPolicy') return `SetCheckpointPolicy|${action.checkpointId}`;
+  if (action.type === 'SetCheckpointPolicy') return `SetCheckpointPolicy|${action.branchId}`;
   if (action.type === 'SetPowerSupply') return `SetPowerSupply|${action.facilityId}`;
   if (action.type === 'BuildCheckpoint') return `BuildCheckpoint|${action.branchId ?? 'unknown'}`;
   if (action.type === 'RelocateCheckpoint') return `RelocateCheckpoint|${action.checkpointId}`;
+  if (action.type === 'ActivateCheckpoint') return `ActivateCheckpoint|${action.branchId}`;
   return null;
 }
 
@@ -205,6 +214,9 @@ function scoreAction(
   const urgentThreats = threats.filter((threat) => threat.contactNextTurn);
   const reserveDeficit = militaryReserveDeficit(observation);
   const roadUrgency = unmanagedRoadUrgency(observation);
+  const checkpointSupplyBlocked = observation.checkpointPositionCandidates.some((candidate) =>
+    candidate.reasonCode === 'checkpoint_supply_zombie_blocked',
+  );
 
   if (action.type === 'Attack') {
     const attacker = units.get(action.attackerId);
@@ -243,7 +255,31 @@ function scoreAction(
       reasonCodes.push('PRESERVE_POLICE_FOR_SUPPRESSION');
     }
     if (attacker && target) {
+      const urgentCombat = Boolean(threat?.contactNextTurn || threat?.threatensCriticalFacility || threat?.threatensCapital);
       const targetWillDie = projectedDamage >= target.hp;
+      if (target.terrainDefenseSource === 'forest' && !urgentCombat && !targetWillDie) {
+        score -= weights.enemyForestPenalty;
+        reasonCodes.push('AVOID_NONURGENT_FOREST_FIGHT');
+      }
+      const visibleNormalNearAttacker = observation.zombies.filter((zombie) =>
+        zombie.type === 'zombie' && hexDistance(attacker.position, zombie.position) <= attacker.vision,
+      ).length;
+      if (visibleNormalNearAttacker > 0) {
+        score -= visibleNormalNearAttacker * weights.noiseRisk;
+        reasonCodes.push('PUBLIC_MEDIUM_NOISE_RISK');
+      }
+      if (attacker.terrainDefenseSource === 'urban') {
+        score += weights.urbanHold;
+        reasonCodes.push('USE_URBAN_DEFENSE');
+        if (visibleNormalNearAttacker > 0) {
+          score += visibleNormalNearAttacker * weights.noiseRisk * 0.75;
+          reasonCodes.push('URBAN_NOISE_DEFENSE');
+        }
+      }
+      if (checkpointSupplyBlocked && !targetWillDie) {
+        score += weights.checkpoint * 2;
+        reasonCodes.push('CLEAR_CHECKPOINT_SUPPLY_BLOCKER');
+      }
       const followUpThreats = observation.zombies.filter((zombie) =>
         (!targetWillDie || zombie.id !== target.id) &&
         hexDistance(attacker.position, zombie.position) <= zombie.movement + zombie.effectiveRange,
@@ -423,6 +459,15 @@ function scoreAction(
           reasonCodes.push('USE_URBAN_DEFENSE');
         }
       }
+      const currentTile = observation.map.tiles.find((tile) => tile.q === unit.position.q && tile.r === unit.position.r);
+      if (
+        currentTile?.terrainDefenseSource === 'urban' &&
+        destinationTile?.terrainDefenseSource !== 'urban' &&
+        urgentThreats.length === 0
+      ) {
+        score -= weights.urbanHold;
+        reasonCodes.push('HOLD_URBAN_DEFENSE');
+      }
       if (observation.zombies.length === 0 && !observation.suppliedAreaZombieClear) {
         const coverageGain = observation.map.tiles.filter((tile) =>
           !tile.visibleToPlayer && hexDistance(action.destination, tile) <= unit.vision,
@@ -558,6 +603,17 @@ function scoreAction(
       score += weights.policePreservation * 0.35;
       reasonCodes.push('HOLD_POLICE_IN_RESERVE');
     }
+    if (
+      unit?.terrainDefenseSource === 'urban' &&
+      unit.inSupply &&
+      unit.actionState === 'ready' &&
+      unit.hp === unit.maxHp &&
+      observation.zombies.length > 0 &&
+      urgentThreats.length === 0
+    ) {
+      score += weights.urbanHold;
+      reasonCodes.push('WAIT_ON_URBAN_DEFENSE');
+    }
     if (urgentHorde && unit?.actionState === 'ready') score -= 25;
   } else if (action.type === 'ProduceUnit') {
     const unitCount = observation.units.length;
@@ -626,6 +682,15 @@ function scoreAction(
     if (branch) {
       score += branch.turnsUntilArrival <= 1 ? 140 : branch.turnsUntilArrival <= 2 ? 65 : 0;
       if (branch.activeCheckpointId === null) reasonCodes.push('ROAD_UNMANAGED_ARRIVAL');
+      else {
+        const reserve = Math.max(0, observation.resources.civilianGoods - 5);
+        score += weights.checkpointFallback + Math.min(40, reserve);
+        reasonCodes.push('BUILD_STANDBY_CHECKPOINT');
+        if (branch.fallbackAvailable) {
+          score -= 20;
+          reasonCodes.push('FALLBACK_ALREADY_PREPARED');
+        }
+      }
       if (branch.checkpointActionAvailable) reasonCodes.push('CHECKPOINT_BUILD_AVAILABLE');
       if (branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_ARRIVAL_IMMINENT');
     }
@@ -656,9 +721,27 @@ function scoreAction(
       reasonCodes.push('CHECKPOINT_RETREAT');
     }
     reasonCodes.push('RELOCATE_CHECKPOINT');
-  } else if (action.type === 'SetCheckpointPolicy') {
+  } else if (action.type === 'ActivateCheckpoint') {
+    const branch = branchFor(observation, action.branchId);
     const checkpoint = observation.checkpoints.find((candidate) => candidate.id === action.checkpointId);
-    const branch = branchFor(observation, checkpoint?.branchId);
+    score += weights.checkpointFallback;
+    if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival <= 2) {
+      score += 75;
+      reasonCodes.push('ROAD_ARRIVAL_IMMINENT');
+    }
+    if (checkpoint?.role === 'standby') {
+      score += weights.checkpointFallback;
+      reasonCodes.push('ACTIVATE_STANDBY_CHECKPOINT');
+    } else if (checkpoint?.role === 'dormant') {
+      score += weights.checkpointFallback * 0.65;
+      reasonCodes.push('ACTIVATE_DORMANT_CHECKPOINT');
+    }
+    if (urgentThreats.length > 0 || urgentHorde) {
+      score += weights.checkpointFallback;
+      reasonCodes.push('RETREAT_ADMINISTRATIVE_FRONT');
+    }
+  } else if (action.type === 'SetCheckpointPolicy') {
+    const branch = branchFor(observation, action.branchId);
     if (action.policy === 'strict' && observation.population.healthyCivilians > 30) score += 55;
     if (action.policy === 'passThrough' && observation.population.healthyCivilians < 25) score += 50;
     if (action.policy === 'normal') score += 25;
@@ -671,7 +754,7 @@ function scoreAction(
       if (action.policy === 'strict') score -= 45;
       reasonCodes.push('POLICY_GROW_POPULATION');
     }
-    if (checkpoint && checkpoint.currentPolicy === action.policy) score -= 100;
+    if (branch?.currentPolicy === action.policy) score -= 100;
     if (branch?.activeCheckpointId === null) score -= 100;
     if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_POLICY_BEFORE_ARRIVAL');
     reasonCodes.push(`SET_POLICY_${action.policy.toUpperCase()}`);

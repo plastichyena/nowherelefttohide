@@ -9,6 +9,8 @@ import { effectiveMovementCost, terrainAdjustedDamage } from './terrain';
 import { canUnitSee, getPlayerVisibleTileKeys, getVisibleEnemyUnits, isVisibleToPlayer } from './visibility';
 import {
   getBlockingZombiesForCheckpoint,
+  activeCheckpointForBranch,
+  deriveCheckpointRole,
   getBranchIdAt,
   getBranchSupplyRadius,
   getCapitalPosition,
@@ -275,6 +277,8 @@ function resolveCombat(
   if (!state.units.some((unit) => unit.id === attacker.id) || !state.units.some((unit) => unit.id === defender.id)) {
     return;
   }
+  const human = attacker.isPlayerUnit ? attacker : defender.isPlayerUnit ? defender : null;
+  if (human) emitCombatNoise(state, human, { ...human.position });
   markAttacked(attacker, kind === 'interception');
   emit(state, kind === 'interception' ? 'interception' : 'attack', {
     attackerId: attacker.id,
@@ -639,20 +643,50 @@ function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rn
   }
 }
 
-function removeEmptyCheckpointRemnants(state: GameState): void {
-  const removed = state.checkpoints.filter(
-    (checkpoint) =>
-      checkpoint.status === 'remnant' &&
-      totalCheckpointPeople(checkpoint) === 0 &&
-      checkpoint.infected === 0,
+function checkpointHasZombie(state: Readonly<GameState>, checkpoint: Readonly<CheckpointState>): boolean {
+  return state.units.some(
+    (unit) =>
+      (unit.type === 'zombie' || unit.type === 'hordeZombie') &&
+      hexKey(unit.position) === hexKey(checkpoint.position),
   );
-  for (const checkpoint of removed) {
-    state.checkpoints.splice(state.checkpoints.findIndex((candidate) => candidate.id === checkpoint.id), 1);
-    state.statistics.checkpointsRemoved += 1;
-    emit(state, 'checkpoint_removed', {
+}
+
+function preparedCheckpointCount(state: Readonly<GameState>, branchId: string): number {
+  const branch = getRoadBranchState(state, branchId);
+  return branch ? (branch.activeCheckpointId === null ? 0 : 1) + branch.standbyCheckpointIds.length : 0;
+}
+
+function assignOperationalReserveRole(state: GameState, checkpoint: CheckpointState): 'standby' | 'dormant' {
+  const branchId = checkpoint.branchId ?? checkpoint.direction;
+  const branch = getRoadBranchState(state, branchId);
+  if (!branch) return 'dormant';
+  branch.standbyCheckpointIds = branch.standbyCheckpointIds.filter((id) => id !== checkpoint.id);
+  if (preparedCheckpointCount(state, branchId) < state.config.checkpoint.maxPreparedPostsPerDirection) {
+    branch.standbyCheckpointIds.push(checkpoint.id);
+    return 'standby';
+  }
+  return 'dormant';
+}
+
+function resolveCheckpointRemnants(state: GameState): void {
+  for (const checkpoint of state.checkpoints) {
+    if (
+      checkpoint.status !== 'remnant' ||
+      totalCheckpointPeople(checkpoint) !== 0 ||
+      checkpoint.infected !== 0 ||
+      checkpointHasZombie(state, checkpoint)
+    ) continue;
+    checkpoint.status = 'operational';
+    checkpoint.overrunProcessed = false;
+    const role = assignOperationalReserveRole(state, checkpoint);
+    if (role === 'standby') state.statistics.standbyCheckpointsCreated += 1;
+    else state.statistics.dormantCheckpointsCreated += 1;
+    emit(state, 'checkpoint_role_changed', {
       checkpointId: checkpoint.id,
       branchId: checkpoint.branchId ?? checkpoint.direction,
-      reason: 'remnant_empty',
+      fromRole: 'remnant',
+      toRole: role,
+      reason: 'remnant_resolved',
     });
   }
 }
@@ -701,15 +735,7 @@ function processUnmanagedArrival(
 
 function processRefugees(state: GameState, rng: SeededRng): void {
   for (const branch of [...state.roadBranches].sort((a, b) => a.branchId.localeCompare(b.branchId))) {
-    const checkpoint = branch.activeCheckpointId
-      ? state.checkpoints.find(
-        (candidate) => candidate.id === branch.activeCheckpointId && candidate.status === 'operational',
-      )
-      : state.checkpoints.find(
-        (candidate) =>
-          candidate.status === 'operational' &&
-          (candidate.branchId ?? candidate.direction) === branch.branchId,
-      );
+    const checkpoint = activeCheckpointForBranch(state, branch.branchId);
     if (!checkpoint) state.statistics.unmanagedBranchTurns += 1;
     if (branch.nextArrivalTurn === state.turn) {
       const people = rng.nextInt(state.config.refugees.arrivalPeopleMin, state.config.refugees.arrivalPeopleMax);
@@ -738,18 +764,21 @@ function processRefugees(state: GameState, rng: SeededRng): void {
         resolveScreeningBatch(state, checkpoint, rng);
       }
     }
-    if (checkpoint.screening === 0 && checkpoint.waiting > 0) {
+    const role = deriveCheckpointRole(state, checkpoint);
+    if (checkpoint.screening === 0 && checkpoint.waiting > 0 && (role === 'active' || role === 'remnant')) {
+      const branch = getRoadBranchState(state, checkpoint.branchId ?? checkpoint.direction);
+      const policy = branch?.currentPolicy ?? 'normal';
       const batch = Math.min(checkpoint.waiting, state.config.refugees.screeningCapacity);
       checkpoint.waiting -= batch;
       checkpoint.screening = batch;
-      checkpoint.screeningPolicy = checkpoint.currentPolicy;
-      checkpoint.remainingTurns = state.config.refugees.policies[checkpoint.currentPolicy].turns;
+      checkpoint.screeningPolicy = policy;
+      checkpoint.remainingTurns = state.config.refugees.policies[policy].turns;
       if (checkpoint.remainingTurns === 0) {
         resolveScreeningBatch(state, checkpoint, rng);
       }
     }
   }
-  removeEmptyCheckpointRemnants(state);
+  resolveCheckpointRemnants(state);
 }
 
 function emptyFacilityProjection(
@@ -1363,18 +1392,85 @@ function overrunFacility(state: GameState, facility: FacilityState, rng: SeededR
   spawnZombies(state, facility.position, state.config.facilities[facility.type].overrunSpawnCount, rng, 'facility_overrun');
 }
 
+function checkpointBranchIndex(state: Readonly<GameState>, branchId: string, position: HexCoord): number {
+  return getRoadBranch(state.map, branchId)?.roadTiles.findIndex((tile) => hexKey(tile) === hexKey(position)) ?? -1;
+}
+
+function resolveCheckpointFallback(
+  state: GameState,
+  branchId: string,
+  lostCheckpoint: Readonly<CheckpointState>,
+): CheckpointState | null {
+  const branch = getRoadBranchState(state, branchId);
+  if (!branch) return null;
+  branch.activeCheckpointId = null;
+  branch.standbyCheckpointIds = branch.standbyCheckpointIds.filter((id) => id !== lostCheckpoint.id);
+  const lostIndex = checkpointBranchIndex(state, branchId, lostCheckpoint.position);
+  const operationalBehind = (checkpoint: CheckpointState): boolean =>
+    checkpoint.status === 'operational' &&
+    (checkpoint.branchId ?? checkpoint.direction) === branchId &&
+    checkpointBranchIndex(state, branchId, checkpoint.position) >= 0 &&
+    checkpointBranchIndex(state, branchId, checkpoint.position) < lostIndex &&
+    !checkpointHasZombie(state, checkpoint);
+  const selectFrontmost = (checkpoints: CheckpointState[]): CheckpointState | null =>
+    [...checkpoints].sort(
+      (left, right) =>
+        checkpointBranchIndex(state, branchId, right.position) - checkpointBranchIndex(state, branchId, left.position) ||
+        left.id.localeCompare(right.id),
+    )[0] ?? null;
+  const standby = selectFrontmost(
+    branch.standbyCheckpointIds
+      .map((id) => state.checkpoints.find((checkpoint) => checkpoint.id === id))
+      .filter((checkpoint): checkpoint is CheckpointState => checkpoint !== undefined && operationalBehind(checkpoint)),
+  );
+  const dormant = standby
+    ? null
+    : selectFrontmost(
+        state.checkpoints.filter(
+          (checkpoint) =>
+            operationalBehind(checkpoint) &&
+            checkpoint.id !== branch.activeCheckpointId &&
+            !branch.standbyCheckpointIds.includes(checkpoint.id),
+        ),
+      );
+  const replacement = standby ?? dormant;
+  if (!replacement) return null;
+  const sourceRole = standby ? 'standby' : 'dormant';
+  branch.standbyCheckpointIds = branch.standbyCheckpointIds.filter((id) => id !== replacement.id);
+  branch.activeCheckpointId = replacement.id;
+  state.statistics.checkpointFallbacks += 1;
+  state.statistics.checkpointFallbacksByBranch[branchId] =
+    (state.statistics.checkpointFallbacksByBranch[branchId] ?? 0) + 1;
+  if (sourceRole === 'standby') state.statistics.checkpointFallbacksFromStandby += 1;
+  else state.statistics.checkpointFallbacksFromDormant += 1;
+  state.statistics.checkpointFallbacksPreventingUnmanagedArrival += 1;
+  emit(state, 'checkpoint_fallback', {
+    branchId,
+    lostCheckpointId: lostCheckpoint.id,
+    checkpointId: replacement.id,
+    fromRole: sourceRole,
+  });
+  return replacement;
+}
+
 function overrunCheckpoint(state: GameState, checkpoint: CheckpointState, rng: SeededRng): void {
   if (checkpoint.overrunProcessed || checkpoint.status === 'abandoned') {
     return;
   }
+  const previousRole = deriveCheckpointRole(state, checkpoint);
   const wasOperational = checkpoint.status === 'operational';
-  const beforeSupply = wasOperational ? getSuppliedTileKeys(state) : [];
+  const wasActive = previousRole === 'active';
+  const beforeSupply = wasActive ? getSuppliedTileKeys(state) : [];
   checkpoint.overrunProcessed = true;
   if (wasOperational) {
     checkpoint.status = 'ruined';
     const branch = getRoadBranchState(state, checkpoint.branchId ?? checkpoint.direction);
-    if (branch?.activeCheckpointId === checkpoint.id) branch.activeCheckpointId = null;
+    if (branch) branch.standbyCheckpointIds = branch.standbyCheckpointIds.filter((id) => id !== checkpoint.id);
     state.statistics.checkpointsRuined += 1;
+    if (wasActive) {
+      state.statistics.activeCheckpointLosses += 1;
+      resolveCheckpointFallback(state, checkpoint.branchId ?? checkpoint.direction, checkpoint);
+    }
   }
   const previousInfected = checkpoint.infected;
   checkpoint.infected = Math.max(
@@ -1394,7 +1490,7 @@ function overrunCheckpoint(state: GameState, checkpoint: CheckpointState, rng: S
     previousStatus: wasOperational ? 'operational' : checkpoint.status,
   });
   spawnZombies(state, checkpoint.position, state.config.facilities.capital.overrunSpawnCount, rng, 'checkpoint_overrun');
-  if (wasOperational) {
+  if (wasActive) {
     emitSupplyChanged(state, checkpoint.branchId ?? checkpoint.direction, beforeSupply, 'checkpoint_ruined');
   }
 }
@@ -1462,18 +1558,26 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
     const branch = getRoadBranchState(state, checkpoint.branchId ?? checkpoint.direction);
     checkpoint.status = 'operational';
     checkpoint.overrunProcessed = false;
-    if (branch) branch.activeCheckpointId = checkpoint.id;
+    let role: 'active' | 'standby' | 'dormant' = 'dormant';
+    if (branch?.activeCheckpointId === null) {
+      branch.activeCheckpointId = checkpoint.id;
+      role = 'active';
+    } else {
+      role = assignOperationalReserveRole(state, checkpoint);
+      if (role === 'standby') state.statistics.standbyCheckpointsCreated += 1;
+      else state.statistics.dormantCheckpointsCreated += 1;
+    }
     state.statistics.checkpointsRecovered += 1;
     emit(state, 'checkpoint_recovered', {
       checkpointId: checkpoint.id,
       branchId: checkpoint.branchId ?? checkpoint.direction,
       unitId: unit.id,
+      role,
     });
-    emitSupplyChanged(state, checkpoint.branchId ?? checkpoint.direction, beforeSupply, 'checkpoint_recovered');
+    if (role === 'active') emitSupplyChanged(state, checkpoint.branchId ?? checkpoint.direction, beforeSupply, 'checkpoint_recovered');
   } else if (
     checkpoint.infected === 0 &&
-    (checkpoint.status === 'abandoned' ||
-      (checkpoint.status === 'remnant' && totalCheckpointPeople(checkpoint) === 0))
+    checkpoint.status === 'abandoned'
   ) {
     state.checkpoints.splice(state.checkpoints.findIndex((candidate) => candidate.id === checkpoint.id), 1);
     state.statistics.checkpointsRemoved += 1;
@@ -1484,6 +1588,7 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
       unitId: unit.id,
     });
   }
+  resolveCheckpointRemnants(state);
   return true;
 }
 
@@ -1551,9 +1656,11 @@ interface HumanTarget {
 
 interface ZombieDecision {
   target: HexCoord | null;
-  reason: 'visible_population' | 'inherited_horde' | 'capital' | 'idle';
+  reason: 'visible_population' | 'inherited_horde' | 'noise' | 'capital' | 'idle';
   inheritedTarget: HexCoord | null;
   inheritedChanged: 'set' | 'cleared' | null;
+  noiseTarget: HexCoord | null;
+  noiseChanged: 'reached' | 'overridden_horde' | 'overridden_visible' | null;
 }
 
 function zombieTargets(state: GameState): HumanTarget[] {
@@ -1618,6 +1725,51 @@ function chooseVisiblePopulationTarget(state: GameState, zombie: UnitState, rng:
   return (tied.length > 1 ? rng.pick(tied) : tied[0])?.target ?? null;
 }
 
+function hasVisiblePopulationTarget(state: GameState, zombie: UnitState): boolean {
+  return zombieTargets(state).some(
+    (target) => canUnitSee(zombie, target.position) && targetPath(state, zombie, target) !== null,
+  );
+}
+
+function emitCombatNoise(state: GameState, source: UnitState, center: HexCoord): void {
+  if (source.type !== 'police' && source.type !== 'nationalGuard') return;
+  const radius = state.config.noise[source.type];
+  const noiseClass = state.config.noise.publicClass[source.type];
+  const affected: string[] = [];
+  for (const zombie of state.units.filter((unit) => unit.type === 'zombie').sort((a, b) => a.id.localeCompare(b.id))) {
+    if (
+      hexDistance(zombie.position, center) > radius ||
+      hexKey(zombie.position) === hexKey(center) ||
+      zombie.inheritedTarget !== null ||
+      zombie.noiseTarget !== null ||
+      hasVisiblePopulationTarget(state, zombie)
+    ) continue;
+    zombie.noiseTarget = { ...center };
+    affected.push(zombie.id);
+  }
+  state.statistics.noisePulsesEmitted += 1;
+  if (source.type === 'police') state.statistics.policeNoisePulses += 1;
+  else state.statistics.nationalGuardNoisePulses += 1;
+  state.statistics.normalZombiesNoiseTargeted += affected.length;
+  emit(state, 'noise_emitted', {
+    sourceUnitId: source.id,
+    sourceUnitType: source.type,
+    q: center.q,
+    r: center.r,
+    noiseClass,
+  });
+  if (affected.length > 0) {
+    emit(state, 'noise_targeted', {
+      sourceUnitId: source.id,
+      q: center.q,
+      r: center.r,
+      radius,
+      affectedZombieIds: affected,
+      affectedCount: affected.length,
+    });
+  }
+}
+
 function nearestAttackableHuman(state: GameState, zombie: UnitState): UnitState | null {
   const candidates = state.units
     .filter(
@@ -1646,6 +1798,8 @@ function targetDecisionSnapshot(state: GameState, rng: SeededRng): Map<string, Z
       reason: visible ? 'visible_population' : 'capital',
       inheritedTarget: null,
       inheritedChanged: null,
+      noiseTarget: null,
+      noiseChanged: null,
     });
   }
   for (const zombie of snapshot.units.filter((unit) => unit.type === 'zombie').sort((a, b) => a.id.localeCompare(b.id))) {
@@ -1656,11 +1810,15 @@ function targetDecisionSnapshot(state: GameState, rng: SeededRng): Map<string, Z
         reason: 'visible_population',
         inheritedTarget: zombie.inheritedTarget,
         inheritedChanged: null,
+        noiseTarget: null,
+        noiseChanged: zombie.noiseTarget ? 'overridden_visible' : null,
       });
       continue;
     }
     let memory = zombie.inheritedTarget;
+    let noiseMemory = zombie.noiseTarget;
     let inheritedChanged: ZombieDecision['inheritedChanged'] = null;
+    let noiseChanged: ZombieDecision['noiseChanged'] = null;
     if (memory && hexKey(memory) === hexKey(zombie.position)) {
       memory = null;
       inheritedChanged = 'cleared';
@@ -1676,13 +1834,27 @@ function targetDecisionSnapshot(state: GameState, rng: SeededRng): Map<string, Z
       if (inherited) {
         memory = { ...inherited };
         inheritedChanged = 'set';
+        if (noiseMemory) {
+          noiseMemory = null;
+          noiseChanged = 'overridden_horde';
+        }
       }
     }
+    if (memory && noiseMemory) {
+      noiseMemory = null;
+      noiseChanged = 'overridden_horde';
+    }
+    if (!memory && noiseMemory && hexKey(noiseMemory) === hexKey(zombie.position)) {
+      noiseMemory = null;
+      noiseChanged = 'reached';
+    }
     decisions.set(zombie.id, {
-      target: memory,
-      reason: memory ? 'inherited_horde' : 'idle',
+      target: memory ?? noiseMemory,
+      reason: memory ? 'inherited_horde' : noiseMemory ? 'noise' : 'idle',
       inheritedTarget: memory,
       inheritedChanged,
+      noiseTarget: noiseMemory,
+      noiseChanged,
     });
   }
   return decisions;
@@ -1697,15 +1869,37 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
   for (const zombieId of zombieIds) {
     const zombie = getUnit(state, zombieId);
     if (!zombie) continue;
-    const decision = decisions.get(zombieId) ?? { target: null, reason: 'idle' as const, inheritedTarget: null, inheritedChanged: null };
+    const decision = decisions.get(zombieId) ?? {
+      target: null,
+      reason: 'idle' as const,
+      inheritedTarget: null,
+      inheritedChanged: null,
+      noiseTarget: null,
+      noiseChanged: null,
+    };
     if (zombie.type === 'zombie') {
+      const noiseAcquiredAfterSnapshot =
+        zombie.noiseTarget !== null && decision.noiseTarget === null && decision.noiseChanged === null
+          ? { ...zombie.noiseTarget }
+          : null;
       zombie.inheritedTarget = decision.inheritedTarget ? { ...decision.inheritedTarget } : null;
+      zombie.noiseTarget = noiseAcquiredAfterSnapshot ?? (decision.noiseTarget ? { ...decision.noiseTarget } : null);
       if (decision.inheritedChanged === 'set') {
         state.statistics.hordeTargetInheritedCount += 1;
         emit(state, 'horde_target_inherited', { zombieId, q: decision.target!.q, r: decision.target!.r });
       } else if (decision.inheritedChanged === 'cleared') {
         state.statistics.hordeTargetClearedCount += 1;
         emit(state, 'horde_target_cleared', { zombieId });
+      }
+      if (decision.noiseChanged === 'overridden_horde') {
+        state.statistics.noiseTargetsOverriddenByHorde += 1;
+        emit(state, 'noise_target_overridden', { zombieId, reason: 'inherited_horde' });
+      } else if (decision.noiseChanged === 'overridden_visible') {
+        state.statistics.noiseTargetsOverriddenByVisiblePopulation += 1;
+        emit(state, 'noise_target_overridden', { zombieId, reason: 'visible_population' });
+      } else if (decision.noiseChanged === 'reached') {
+        state.statistics.noiseTargetsReached += 1;
+        emit(state, 'noise_target_reached', { zombieId });
       }
     }
     const immediateTarget = zombie.canAttack ? nearestAttackableHuman(state, zombie) : null;
@@ -1727,6 +1921,17 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
       applyMovement(state, zombie, path, zombie.movement);
     }
     const survivor = getUnit(state, zombieId);
+    if (
+      survivor?.type === 'zombie' &&
+      decision.reason === 'noise' &&
+      decision.target &&
+      hexKey(survivor.position) === hexKey(decision.target) &&
+      survivor.noiseTarget !== null
+    ) {
+      survivor.noiseTarget = null;
+      state.statistics.noiseTargetsReached += 1;
+      emit(state, 'noise_target_reached', { zombieId });
+    }
     const afterMoveTarget = survivor?.canAttack ? nearestAttackableHuman(state, survivor) : null;
     if (survivor && afterMoveTarget) {
       resolveCombat(state, survivor, afterMoveTarget, 'attack');
@@ -2010,7 +2215,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
   }
   createCityPopulationSnapshot(state);
   placeApprovedRefugees(state);
-  removeEmptyCheckpointRemnants(state);
+  resolveCheckpointRemnants(state);
   synchronizePopulation(state);
   checkImmediateGameEnd(state);
   saveRng(state, rng);
@@ -2147,15 +2352,6 @@ function checkpointDirection(state: Readonly<GameState>, branchId: string): Card
   return getRoadBranch(state.map, branchId)?.direction ?? null;
 }
 
-function checkpointBranchInfectionBlocker(state: Readonly<GameState>, branchId: string): CheckpointState | undefined {
-  return state.checkpoints.find(
-    (checkpoint) =>
-      (checkpoint.branchId ?? checkpoint.direction) === branchId &&
-      ['operational', 'remnant'].includes(checkpoint.status) &&
-      checkpoint.infected > 0,
-  );
-}
-
 function checkpointForwardBlockers(state: Readonly<GameState>, branchId: string): CheckpointState[] {
   return state.checkpoints.filter(
     (checkpoint) =>
@@ -2170,6 +2366,7 @@ function validateCheckpointDestination(
   action: Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }>,
   branchId: string,
   ignoredCheckpointId?: string,
+  zombieBlockerMode: 'supply' | 'tile' = 'supply',
 ): ActionError | null {
   const tile = getTile(state.map, action.position);
   if (
@@ -2197,10 +2394,16 @@ function validateCheckpointDestination(
   if (forwardBlocker) {
     return error(action, 'checkpoint_abandoned_forward_block', 'An infected ruined or abandoned site only permits a position closer to the capital');
   }
-  const zombies = getBlockingZombiesForCheckpoint(state, branchId, action.position)
-    .filter((zombie) => isVisibleToPlayer(state, zombie.position));
+  const zombies = state.units
+    .filter((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')
+    .filter((zombie) => isVisibleToPlayer(state, zombie.position))
+    .filter((zombie) =>
+      zombieBlockerMode === 'tile'
+        ? hexKey(zombie.position) === hexKey(action.position)
+        : getBlockingZombiesForCheckpoint(state, branchId, action.position).some((candidate) => candidate.id === zombie.id),
+    );
   if (zombies.length > 0) {
-    return error(action, 'checkpoint_supply_zombie_blocked', `Checkpoint supply area contains zombie ${zombies[0]!.id}`);
+    return error(action, 'checkpoint_supply_zombie_blocked', 'A visible Zombie blocks this checkpoint position or supply area');
   }
   if (state.resources.civilianGoods < state.config.checkpoint.constructionCivilianGoods) {
     return error(action, 'insufficient_civilian_goods', 'Not enough civilian goods');
@@ -2222,26 +2425,25 @@ function validateBuildCheckpointAction(
     };
   }
   const branch = getRoadBranchState(state, branchId);
-  const existingActive = state.checkpoints.find(
-    (checkpoint) =>
-      checkpoint.status === 'operational' &&
-      (checkpoint.branchId ?? checkpoint.direction) === branchId,
-  );
-  if (branch?.activeCheckpointId || existingActive) {
-    return {
-      branchId,
-      error: error(action, 'checkpoint_requires_relocation', 'Use RelocateCheckpoint while this branch has an operational checkpoint'),
-    };
-  }
-  if (checkpointBranchInfectionBlocker(state, branchId)) {
-    return {
-      branchId,
-      error: error(action, 'checkpoint_infection_blocked', 'Operational checkpoints and remnants must be cleared before changing position'),
-    };
+  if (!branch) return { branchId, error: error(action, 'unknown_road_branch', 'Unknown road branch') };
+  const active = activeCheckpointForBranch(state, branchId);
+  if (active) {
+    if (preparedCheckpointCount(state, branchId) >= state.config.checkpoint.maxPreparedPostsPerDirection) {
+      return {
+        branchId,
+        error: error(action, 'checkpoint_prepared_post_limit_reached', 'This branch already has the maximum prepared checkpoint posts'),
+      };
+    }
+    if (checkpointBranchIndex(state, branchId, action.position) >= checkpointBranchIndex(state, branchId, active.position)) {
+      return {
+        branchId,
+        error: error(action, 'checkpoint_standby_requires_rear_position', 'A standby checkpoint must be closer to the capital than the active checkpoint'),
+      };
+    }
   }
   return {
     branchId,
-    error: validateCheckpointDestination(state, action, branchId),
+    error: validateCheckpointDestination(state, action, branchId, undefined, active ? 'tile' : 'supply'),
   };
 }
 
@@ -2252,7 +2454,9 @@ function validateRelocateCheckpointAction(
   const budget = playerActionBudgetError(state, action);
   if (budget) return { source: null, branchId: null, error: budget };
   const source = state.checkpoints.find((checkpoint) => checkpoint.id === action.checkpointId);
-  if (!source || source.status !== 'operational') {
+  const sourceBranchId = source ? source.branchId ?? source.direction : null;
+  const sourceBranch = sourceBranchId ? getRoadBranchState(state, sourceBranchId) : undefined;
+  if (!source || source.status !== 'operational' || sourceBranch?.activeCheckpointId !== source.id) {
     return {
       source: null,
       branchId: null,
@@ -2274,11 +2478,11 @@ function validateRelocateCheckpointAction(
       error: error(action, 'checkpoint_wrong_branch', 'A checkpoint can only relocate on its current branch'),
     };
   }
-  if (checkpointBranchInfectionBlocker(state, branchId)) {
+  if (source.infected > 0) {
     return {
       source,
       branchId,
-      error: error(action, 'checkpoint_infection_blocked', 'Operational checkpoints and remnants must be cleared before relocation'),
+      error: error(action, 'checkpoint_infection_blocked', 'The active checkpoint must be cleared before relocation'),
     };
   }
   return {
@@ -2292,6 +2496,7 @@ function createOperationalCheckpoint(
   state: GameState,
   branchId: string,
   position: HexCoord,
+  role: 'active' | 'standby',
 ): CheckpointState {
   const direction = checkpointDirection(state, branchId);
   if (!direction) throw new Error(`Unknown checkpoint branch: ${branchId}`);
@@ -2307,13 +2512,13 @@ function createOperationalCheckpoint(
     approved: 0,
     remainingTurns: 0,
     screeningPolicy: 'normal',
-    currentPolicy: 'normal',
     nextArrivalTurn: branch?.nextArrivalTurn ?? null,
     infected: 0,
     overrunProcessed: false,
   };
   state.checkpoints.push(checkpoint);
-  if (branch) branch.activeCheckpointId = checkpoint.id;
+  if (branch && role === 'active') branch.activeCheckpointId = checkpoint.id;
+  if (branch && role === 'standby') branch.standbyCheckpointIds.push(checkpoint.id);
   return checkpoint;
 }
 
@@ -2340,6 +2545,7 @@ function buildCheckpoint(state: GameState, action: Extract<GameAction, { type: '
   if (validation.error) return validation.error;
   const branchId = validation.branchId!;
   const branch = getRoadBranchState(state, branchId);
+  const role = branch?.activeCheckpointId ? 'standby' as const : 'active' as const;
   const beforeSupply = getSuppliedTileKeys(state);
   state.resources.civilianGoods -= state.config.checkpoint.constructionCivilianGoods;
   const ruined = state.checkpoints.filter(
@@ -2347,25 +2553,31 @@ function buildCheckpoint(state: GameState, action: Extract<GameAction, { type: '
       checkpoint.status === 'ruined' &&
       (checkpoint.branchId ?? checkpoint.direction) === branchId,
   );
-  const checkpoint = createOperationalCheckpoint(state, branchId, action.position);
-  for (const old of ruined) {
-    old.status = 'abandoned';
-    state.statistics.checkpointsAbandoned += 1;
-    emit(state, 'checkpoint_abandoned', { checkpointId: old.id, branchId, replacementId: checkpoint.id });
+  const checkpoint = createOperationalCheckpoint(state, branchId, action.position, role);
+  if (role === 'active') {
+    for (const old of ruined) {
+      old.status = 'abandoned';
+      state.statistics.checkpointsAbandoned += 1;
+      emit(state, 'checkpoint_abandoned', { checkpointId: old.id, branchId, replacementId: checkpoint.id });
+    }
   }
   if (branch) branch.checkpointActionsThisTurn += 1;
   state.actionsTakenThisTurn += 1;
   state.statistics.checkpointsBuilt += 1;
-  if (ruined.length > 0) {
+  if (role === 'standby') state.statistics.standbyCheckpointsCreated += 1;
+  if (role === 'active' && ruined.length > 0) {
     state.statistics.checkpointRetreats += 1;
   }
   emit(state, 'checkpoint_built', {
     checkpointId: checkpoint.id,
     branchId,
     direction: checkpoint.direction,
-    retreat: ruined.length > 0,
+    role,
+    retreat: role === 'active' && ruined.length > 0,
   });
-  emitSupplyChanged(state, branchId, beforeSupply, ruined.length > 0 ? 'checkpoint_retreat' : 'checkpoint_built');
+  if (role === 'active') {
+    emitSupplyChanged(state, branchId, beforeSupply, ruined.length > 0 ? 'checkpoint_retreat' : 'checkpoint_built');
+  }
   return null;
 }
 
@@ -2379,34 +2591,144 @@ function relocateCheckpoint(
   const branchId = validation.branchId!;
   const beforeSupply = getSuppliedTileKeys(state);
   state.resources.civilianGoods -= state.config.checkpoint.constructionCivilianGoods;
-  source.status = 'remnant';
-  const replacement = createOperationalCheckpoint(state, branchId, action.position);
   const branch = getRoadBranchState(state, branchId);
+  if (branch) {
+    branch.activeCheckpointId = null;
+    branch.standbyCheckpointIds = branch.standbyCheckpointIds.filter((id) => id !== source.id);
+  }
+  const replacement = createOperationalCheckpoint(state, branchId, action.position, 'active');
+  const sourceBecomesRemnant = totalCheckpointPeople(source) > 0 || source.infected > 0 || checkpointHasZombie(state, source);
+  let sourceRole: 'remnant' | 'standby' | 'dormant';
+  if (sourceBecomesRemnant) {
+    source.status = 'remnant';
+    sourceRole = 'remnant';
+  } else {
+    sourceRole = assignOperationalReserveRole(state, source);
+    if (sourceRole === 'standby') state.statistics.standbyCheckpointsCreated += 1;
+    else state.statistics.dormantCheckpointsCreated += 1;
+  }
   if (branch) branch.checkpointActionsThisTurn += 1;
   state.actionsTakenThisTurn += 1;
   state.statistics.checkpointsRelocated += 1;
-  emit(state, 'checkpoint_remnant_created', {
-    checkpointId: source.id,
-    branchId,
-    replacementId: replacement.id,
-  });
+  if (sourceRole === 'remnant') {
+    emit(state, 'checkpoint_remnant_created', {
+      checkpointId: source.id,
+      branchId,
+      replacementId: replacement.id,
+    });
+  } else {
+    emit(state, 'checkpoint_role_changed', {
+      checkpointId: source.id,
+      branchId,
+      fromRole: 'active',
+      toRole: sourceRole,
+      reason: 'checkpoint_relocated',
+    });
+  }
   emit(state, 'checkpoint_relocated', {
     checkpointId: replacement.id,
     sourceCheckpointId: source.id,
     branchId,
+    sourceRole,
   });
-  removeEmptyCheckpointRemnants(state);
+  resolveCheckpointRemnants(state);
   emitSupplyChanged(state, branchId, beforeSupply, 'checkpoint_relocated');
+  return null;
+}
+
+function validateActivateCheckpointAction(
+  state: Readonly<GameState>,
+  action: Extract<GameAction, { type: 'ActivateCheckpoint' }>,
+): { target: CheckpointState | null; branchId: string | null; error: ActionError | null } {
+  const budget = playerActionBudgetError(state, action);
+  if (budget) return { target: null, branchId: null, error: budget };
+  const branch = getRoadBranchState(state, action.branchId);
+  if (!branch) return { target: null, branchId: null, error: error(action, 'unknown_road_branch', 'Unknown road branch') };
+  if (branch.checkpointActionsThisTurn >= 1) {
+    return { target: null, branchId: action.branchId, error: error(action, 'checkpoint_branch_action_limit', 'This branch already changed checkpoints this turn') };
+  }
+  const target = state.checkpoints.find((checkpoint) => checkpoint.id === action.checkpointId);
+  if (!target || (target.branchId ?? target.direction) !== action.branchId || target.status !== 'operational') {
+    return { target: null, branchId: action.branchId, error: error(action, 'unknown_operational_checkpoint', 'Activation requires an operational checkpoint on this branch') };
+  }
+  const role = deriveCheckpointRole(state, target);
+  if (role !== 'standby' && role !== 'dormant') {
+    return { target, branchId: action.branchId, error: error(action, 'checkpoint_not_activatable', 'Only a standby or dormant checkpoint can be activated') };
+  }
+  const visibleZombieOnTarget = state.units.some(
+    (unit) =>
+      (unit.type === 'zombie' || unit.type === 'hordeZombie') &&
+      hexKey(unit.position) === hexKey(target.position) &&
+      isVisibleToPlayer(state, unit.position),
+  );
+  if (visibleZombieOnTarget) {
+    return { target, branchId: action.branchId, error: error(action, 'checkpoint_supply_zombie_blocked', 'A visible Zombie occupies this checkpoint') };
+  }
+  const active = activeCheckpointForBranch(state, action.branchId);
+  if (
+    active &&
+    checkpointBranchIndex(state, action.branchId, target.position) > checkpointBranchIndex(state, action.branchId, active.position) &&
+    getBlockingZombiesForCheckpoint(state, action.branchId, target.position).some((zombie) => isVisibleToPlayer(state, zombie.position))
+  ) {
+    return { target, branchId: action.branchId, error: error(action, 'checkpoint_supply_zombie_blocked', 'A visible Zombie blocks forward supply expansion') };
+  }
+  return { target, branchId: action.branchId, error: null };
+}
+
+function activateCheckpoint(
+  state: GameState,
+  action: Extract<GameAction, { type: 'ActivateCheckpoint' }>,
+): ActionError | null {
+  const validation = validateActivateCheckpointAction(state, action);
+  if (validation.error) return validation.error;
+  const branchId = validation.branchId!;
+  const branch = getRoadBranchState(state, branchId)!;
+  const target = validation.target!;
+  const beforeSupply = getSuppliedTileKeys(state);
+  const previousRole = deriveCheckpointRole(state, target);
+  const oldActive = activeCheckpointForBranch(state, branchId);
+  branch.standbyCheckpointIds = branch.standbyCheckpointIds.filter((id) => id !== target.id);
+  branch.activeCheckpointId = target.id;
+  let oldActiveRole: 'none' | 'remnant' | 'standby' | 'dormant' = 'none';
+  if (oldActive && oldActive.id !== target.id) {
+    if (totalCheckpointPeople(oldActive) > 0 || oldActive.infected > 0 || checkpointHasZombie(state, oldActive)) {
+      oldActive.status = 'remnant';
+      oldActiveRole = 'remnant';
+      emit(state, 'checkpoint_remnant_created', { checkpointId: oldActive.id, branchId, replacementId: target.id });
+    } else {
+      oldActiveRole = assignOperationalReserveRole(state, oldActive);
+      if (oldActiveRole === 'standby') state.statistics.standbyCheckpointsCreated += 1;
+      else state.statistics.dormantCheckpointsCreated += 1;
+    }
+    emit(state, 'checkpoint_role_changed', {
+      checkpointId: oldActive.id,
+      branchId,
+      fromRole: 'active',
+      toRole: oldActiveRole,
+      reason: 'checkpoint_activated',
+    });
+  }
+  branch.checkpointActionsThisTurn += 1;
+  state.actionsTakenThisTurn += 1;
+  state.statistics.checkpointActivations += 1;
+  emit(state, 'checkpoint_activated', {
+    checkpointId: target.id,
+    branchId,
+    fromRole: previousRole,
+    previousActiveCheckpointId: oldActive?.id ?? null,
+    previousActiveRole: oldActiveRole,
+  });
+  emitSupplyChanged(state, branchId, beforeSupply, 'checkpoint_activated');
   return null;
 }
 
 function setCheckpointPolicy(state: GameState, action: Extract<GameAction, { type: 'SetCheckpointPolicy' }>): ActionError | null {
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
-  const checkpoint = state.checkpoints.find((candidate) => candidate.id === action.checkpointId);
-  if (!checkpoint || !['operational', 'remnant'].includes(checkpoint.status)) return error(action, 'unknown_checkpoint', 'Checkpoint does not accept policy changes');
+  const branch = getRoadBranchState(state, action.branchId);
+  if (!branch || !activeCheckpointForBranch(state, action.branchId)) return error(action, 'unknown_operational_checkpoint', 'This branch has no active checkpoint');
   if (!['passThrough', 'normal', 'strict'].includes(action.policy)) return error(action, 'invalid_policy', 'Unknown checkpoint policy');
-  checkpoint.currentPolicy = action.policy;
+  branch.currentPolicy = action.policy;
   state.actionsTakenThisTurn += 1;
   return null;
 }
@@ -2573,6 +2895,7 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   if (state.actionsTakenThisTurn >= state.config.maxActionsPerTurn) return error(action, 'action_limit', 'The action limit for this turn has been reached');
   if (action.type === 'BuildCheckpoint') return validateBuildCheckpointAction(state, action).error;
   if (action.type === 'RelocateCheckpoint') return validateRelocateCheckpointAction(state, action).error;
+  if (action.type === 'ActivateCheckpoint') return validateActivateCheckpointAction(state, action).error;
   const candidate = cloneState(state as GameState);
   if (action.type === 'Move') return move(candidate, action);
   if (action.type === 'Attack') return attack(candidate, action);
@@ -2590,25 +2913,61 @@ export function getCheckpointPositionCandidates(
 ): CheckpointPositionCandidate[] {
   const candidates: CheckpointPositionCandidate[] = [];
   for (const branch of [...state.map.roadBranches].sort((left, right) => left.id.localeCompare(right.id))) {
-    const active = state.checkpoints.find(
-      (checkpoint) => checkpoint.status === 'operational' && (checkpoint.branchId ?? checkpoint.direction) === branch.id,
-    );
+    const active = activeCheckpointForBranch(state, branch.id);
     for (const position of branch.roadTiles) {
-      const action: Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }> = active
-        ? { type: 'RelocateCheckpoint', checkpointId: active.id, branchId: branch.id, position: { ...position } }
-        : { type: 'BuildCheckpoint', branchId: branch.id, position: { ...position } };
+      const actions: Array<Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }>> = [
+        { type: 'BuildCheckpoint', branchId: branch.id, position: { ...position } },
+      ];
+      if (active) actions.push({ type: 'RelocateCheckpoint', checkpointId: active.id, branchId: branch.id, position: { ...position } });
+      for (const action of actions) {
+        const reason = validateAction(state, action);
+        candidates.push({
+          actionType: action.type,
+          branchId: branch.id,
+          ...(action.type === 'RelocateCheckpoint' ? { checkpointId: action.checkpointId } : {}),
+          position: { ...position },
+          legal: reason === null,
+          reasonCode: reason?.code ?? null,
+        });
+      }
+    }
+    for (const checkpoint of state.checkpoints
+      .filter((candidate) =>
+        (candidate.branchId ?? candidate.direction) === branch.id &&
+        candidate.status === 'operational' &&
+        ['standby', 'dormant'].includes(deriveCheckpointRole(state, candidate)),
+      )
+      .sort((left, right) =>
+        checkpointBranchIndex(state, branch.id, left.position) - checkpointBranchIndex(state, branch.id, right.position) ||
+        left.id.localeCompare(right.id),
+      )) {
+      const action: Extract<GameAction, { type: 'ActivateCheckpoint' }> = {
+        type: 'ActivateCheckpoint',
+        branchId: branch.id,
+        checkpointId: checkpoint.id,
+      };
       const reason = validateAction(state, action);
       candidates.push({
-        actionType: action.type,
+        actionType: 'ActivateCheckpoint',
         branchId: branch.id,
-        ...(action.type === 'RelocateCheckpoint' ? { checkpointId: action.checkpointId } : {}),
-        position: { ...position },
+        checkpointId: checkpoint.id,
+        position: { ...checkpoint.position },
         legal: reason === null,
         reasonCode: reason?.code ?? null,
       });
     }
   }
-  return candidates;
+  const actionOrder: Record<CheckpointPositionCandidate['actionType'], number> = {
+    BuildCheckpoint: 0,
+    RelocateCheckpoint: 1,
+    ActivateCheckpoint: 2,
+  };
+  return candidates.sort((left, right) =>
+    left.branchId.localeCompare(right.branchId) ||
+    checkpointBranchIndex(state, left.branchId, left.position) - checkpointBranchIndex(state, right.branchId, right.position) ||
+    actionOrder[left.actionType] - actionOrder[right.actionType] ||
+    (left.checkpointId ?? '').localeCompare(right.checkpointId ?? ''),
+  );
 }
 
 export class GameEngine implements HeadlessGame {
@@ -2706,9 +3065,10 @@ export class GameEngine implements HeadlessGame {
         }
       }
     }
-    for (const checkpoint of this.state.checkpoints.filter((candidate) => ['operational', 'remnant'].includes(candidate.status)).sort((a, b) => a.id.localeCompare(b.id))) {
+    for (const branch of [...this.state.roadBranches].sort((a, b) => a.branchId.localeCompare(b.branchId))) {
+      if (!activeCheckpointForBranch(this.state, branch.branchId)) continue;
       for (const policy of ['passThrough', 'normal', 'strict'] as const) {
-        if (policy !== checkpoint.currentPolicy) actions.push({ type: 'SetCheckpointPolicy', checkpointId: checkpoint.id, policy });
+        if (policy !== branch.currentPolicy) actions.push({ type: 'SetCheckpointPolicy', branchId: branch.branchId, policy });
       }
     }
     for (const candidate of getCheckpointPositionCandidates(this.state)) {
@@ -2720,7 +3080,9 @@ export class GameEngine implements HeadlessGame {
             branchId: candidate.branchId,
             position: { ...candidate.position },
           }
-        : { type: 'BuildCheckpoint', branchId: candidate.branchId, position: { ...candidate.position } });
+        : candidate.actionType === 'ActivateCheckpoint'
+          ? { type: 'ActivateCheckpoint', branchId: candidate.branchId, checkpointId: candidate.checkpointId! }
+          : { type: 'BuildCheckpoint', branchId: candidate.branchId, position: { ...candidate.position } });
     }
     for (const city of cities.filter((candidate) => isHexSupplied(this.state, candidate.position))) {
       if (!this.state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) {
@@ -2790,6 +3152,7 @@ export class GameEngine implements HeadlessGame {
     else if (action.type === 'SetPowerSupply') actionError = setPowerSupply(candidate, action);
     else if (action.type === 'BuildCheckpoint') actionError = buildCheckpoint(candidate, action);
     else if (action.type === 'RelocateCheckpoint') actionError = relocateCheckpoint(candidate, action);
+    else if (action.type === 'ActivateCheckpoint') actionError = activateCheckpoint(candidate, action);
     else if (action.type === 'ProduceUnit') actionError = produceUnit(candidate, action);
     else actionError = error(action, 'unknown_action', 'Unknown or retired action');
 

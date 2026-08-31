@@ -9,11 +9,12 @@ vi.mock('phaser', () => ({
   },
 }));
 
-import type { CheckpointPositionCandidate, FacilityState, GameAction, GameState, UnitState } from '../core/types';
+import type { CheckpointPositionCandidate, CheckpointState, FacilityState, GameAction, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
-import { actionForCheckpointCandidate, boardLegendViewModel, checkpointCandidateViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, renderBoardLegend, renderEndTurnForecast, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
+import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderNoiseEventLog, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
+import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
 
 function testState(units: Partial<UnitState>[], facilities: Partial<FacilityState>[] = []): GameState {
   return { units, facilities } as unknown as GameState;
@@ -124,17 +125,119 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.3.1-or-earlier saves in both UI languages', () => {
-    const detail = 'version mismatch in v1.3.1 save';
+  it('reports unsupported v1.3.2-or-earlier saves in both UI languages', () => {
+    const detail = 'version mismatch in v1.3.2 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.1以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.2');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.2以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.3');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.1 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.2');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.2 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.3');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
     expect(createTranslator('ja')('tipSave')).toContain('Game Rules 1.4.1');
     expect(createTranslator('en')('tipSave')).toContain('Save Format 3');
+  });
+
+  it('projects all v1.3.3 checkpoint roles and branch fallback fields', () => {
+    const state = JSON.parse(JSON.stringify(new GameEngine(1).getState())) as GameState;
+    const branch = state.map.roadBranches[0]!;
+    const branchState = state.roadBranches.find((candidate) => candidate.branchId === branch.id)!;
+    const roadPosition = (index: number): { q: number; r: number } => ({ ...branch.roadTiles[index]! });
+    const checkpoint = (id: string, status: CheckpointState['status'], q: number, r: number): CheckpointState => ({
+      id,
+      position: { q, r },
+      direction: branch.direction,
+      branchId: branch.id,
+      status,
+      waiting: 0,
+      screening: 0,
+      approved: 0,
+      remainingTurns: 0,
+      screeningPolicy: 'normal',
+      nextArrivalTurn: null,
+      infected: 0,
+    });
+    state.checkpoints = [
+      checkpoint('cp-active', 'operational', roadPosition(5).q, roadPosition(5).r),
+      checkpoint('cp-standby', 'operational', roadPosition(4).q, roadPosition(4).r),
+      checkpoint('cp-dormant', 'operational', roadPosition(3).q, roadPosition(3).r),
+      checkpoint('cp-remnant', 'remnant', roadPosition(2).q, roadPosition(2).r),
+      checkpoint('cp-ruined', 'ruined', roadPosition(1).q, roadPosition(1).r),
+      checkpoint('cp-abandoned', 'abandoned', roadPosition(0).q, roadPosition(0).r),
+    ];
+    branchState.activeCheckpointId = 'cp-active';
+    branchState.standbyCheckpointIds = ['cp-standby'];
+    branchState.currentPolicy = 'strict';
+
+    expect(checkpointRoleFor(state, state.checkpoints[0]!)).toBe('active');
+    expect(checkpointRoleFor(state, state.checkpoints[1]!)).toBe('standby');
+    expect(checkpointRoleFor(state, state.checkpoints[2]!)).toBe('dormant');
+    expect(checkpointRoleFor(state, state.checkpoints[3]!)).toBe('remnant');
+    expect(checkpointRoleFor(state, state.checkpoints[4]!)).toBe('ruined');
+    expect(checkpointRoleFor(state, state.checkpoints[5]!)).toBe('abandoned');
+
+    const panel = branchPanelViewModel(state, branch.id)[0]!;
+    expect(panel.activeCheckpointId).toBe('cp-active');
+    expect(panel.standbyCheckpointIds).toEqual(['cp-standby']);
+    expect(panel.dormantCheckpointIds).toEqual(['cp-dormant']);
+    expect(panel.fallbackAvailable).toBe(true);
+    expect(panel.currentPolicy).toBe('strict');
+    expect(panel.preparedPostCount).toBe(2);
+    expect(panel.preparedPostLimit).toBe(state.config.checkpoint.maxPreparedPostsPerDirection);
+    const html = renderBranchPanel(state, 'en');
+    expect(html).toContain('data-fallback-available="true"');
+    expect(html).toContain('data-current-policy="strict"');
+    expect(html).toContain('data-checkpoint-role="active"');
+    expect(html).toContain('data-checkpoint-role="standby"');
+    expect(html).toContain('data-checkpoint-role="dormant"');
+  });
+
+  it('keeps Noise Class public while isolating exact diagnostics to the debug helper', () => {
+    expect(noiseClassForUnit('police')).toBe('medium');
+    expect(noiseClassForUnit('nationalGuard')).toBe('medium');
+    expect(noiseClassForUnit('zombie')).toBeNull();
+    const publicLog = renderNoiseEventLog({
+      events: [{
+        type: 'noise_emitted',
+        payload: {
+          sourceUnitId: 'police-1',
+          sourceUnitType: 'police',
+          noiseClass: 'medium',
+          q: 2,
+          r: 3,
+          radius: 4,
+          affectedNormalZombieIds: ['zombie-hidden'],
+        },
+      }],
+    } as unknown as Pick<GameState, 'events'>, 'en');
+    expect(publicLog).toContain('Medium');
+    expect(publicLog).toContain('Police');
+    expect(publicLog).toContain('2,3');
+    expect(publicLog).not.toContain('zombie-hidden');
+    expect(publicLog).not.toContain('Exact Radius');
+    expect(renderNoiseEventLog({ events: [{ type: 'noise_emitted', payload: {} }] } as unknown as Pick<GameState, 'events'>, 'en', 0)).toBe('');
+    const debug = renderNoiseDebugOverlay({
+      center: { q: 2, r: 3 },
+      radius: 4,
+      radiusHexes: [{ q: 2, r: 3 }],
+      affectedNormalZombieIds: ['zombie-hidden'],
+      noiseTargets: [{ zombieId: 'zombie-hidden', target: { q: 2, r: 4 } }],
+    }, 'en');
+    expect(debug).toContain('4');
+    expect(debug).toContain('zombie-hidden');
+    const debugState = structuredClone(new GameEngine(99).getState());
+    const hiddenZombie = debugState.units.find((unit) => unit.type === 'zombie')!;
+    hiddenZombie.noiseTarget = { q: 2, r: 3 };
+    debugState.events.push(
+      { id: 'noise-public', turn: 1, phase: 'player', type: 'noise_emitted', payload: { sourceUnitId: 'police-1', sourceUnitType: 'police', q: 2, r: 3, noiseClass: 'medium' } },
+      { id: 'noise-private', turn: 1, phase: 'player', type: 'noise_targeted', payload: { sourceUnitId: 'police-1', q: 2, r: 3, radius: 4, affectedZombieIds: [hiddenZombie.id] } },
+    );
+    expect(deriveDevelopmentNoiseDebug(debugState)).toMatchObject({
+      center: { q: 2, r: 3 },
+      radius: 4,
+      affectedNormalZombieIds: [hiddenZombie.id],
+      noiseTargets: expect.arrayContaining([{ zombieId: hiddenZombie.id, target: { q: 2, r: 3 } }]),
+    });
   });
 
   it('selects a checkpoint so its three population pools are inspectable', () => {
@@ -157,6 +260,7 @@ describe('controller view models', () => {
     const candidates: CheckpointPositionCandidate[] = [
       { actionType: 'BuildCheckpoint', branchId: 'north', position: { q: 7, r: 4 }, legal: true, reasonCode: null },
       { actionType: 'RelocateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east', position: { q: 10, r: 7 }, legal: false, reasonCode: 'checkpoint_infection_blocked' },
+      { actionType: 'ActivateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east-2', position: { q: 9, r: 7 }, legal: true, reasonCode: null },
     ];
     const before = JSON.stringify(candidates);
     const views = checkpointCandidateViewModels(candidates, 'en');
@@ -164,6 +268,7 @@ describe('controller view models', () => {
     expect(views[1]!.reason).toContain('infect');
     expect(actionForCheckpointCandidate(candidates[0]!)).toEqual({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 7, r: 4 } });
     expect(actionForCheckpointCandidate(candidates[1]!)).toEqual({ type: 'RelocateCheckpoint', checkpointId: 'checkpoint-east', branchId: 'east', position: { q: 10, r: 7 } });
+    expect(actionForCheckpointCandidate(candidates[2]!)).toEqual({ type: 'ActivateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east-2' });
     expect(JSON.stringify(candidates)).toBe(before);
   });
 
@@ -173,6 +278,7 @@ describe('controller view models', () => {
       'checkpoint_requires_relocation', 'unknown_operational_checkpoint', 'checkpoint_same_position',
       'checkpoint_wrong_branch', 'checkpoint_infection_blocked', 'checkpoint_branch_action_limit',
       'checkpoint_abandoned_forward_block', 'checkpoint_supply_zombie_blocked',
+      'checkpoint_prepared_post_limit_reached', 'checkpoint_standby_requires_rear_position', 'checkpoint_not_activatable',
       'insufficient_civilian_goods', 'action_limit', 'wrong_phase', 'game_over',
     ];
     for (const code of codes) {
@@ -235,6 +341,23 @@ describe('controller view models', () => {
       'periodicIncrementHordeZombies', 'periodicIncrementNormalZombies',
       'finalHordeZombies', 'finalNormalZombies', 'hordeCompositionHint',
       'checkpointCandidateHint', 'newGameError',
+    ];
+    for (const key of keys) {
+      expect(createTranslator('ja')(key)).not.toBe(key);
+      expect(createTranslator('en')(key)).not.toBe(key);
+    }
+  });
+
+  it('has bilingual v1.3.3 fallback, activation, and Noise labels', () => {
+    const keys = [
+      'branchPanel', 'branchRoleLimit', 'activeCheckpoint', 'standbyCheckpoint', 'dormantCheckpoint',
+      'fallbackAvailable', 'fallbackUnavailable', 'preparedPostCount', 'checkpointRole',
+      'checkpointRole.active', 'checkpointRole.standby', 'checkpointRole.dormant',
+      'checkpointRole.remnant', 'checkpointRole.ruined', 'checkpointRole.abandoned',
+      'activateCheckpoint', 'activateCheckpointHint', 'branchPolicy', 'buildCandidate',
+      'relocateCandidate', 'sameHexActions', 'tipCheckpointFallback', 'noise', 'noiseClass',
+      'noiseClassMedium', 'noiseCombatHint', 'noiseLog', 'noiseEmitted', 'noiseCenter', 'tipNoise',
+      'checkpointPreparedPostLimitReached', 'checkpointStandbyRequiresRearPosition', 'checkpointNotActivatable',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);

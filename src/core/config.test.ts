@@ -8,7 +8,7 @@ import {
 describe('GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('1.4.1');
+    expect(DEFAULT_CONFIG.version).toBe('1.4.2');
     expect(DEFAULT_CONFIG.mapId).toBe('fixed-15x15-v2');
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(10);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, powerMode: 'boost' });
@@ -32,8 +32,14 @@ describe('GameConfig', () => {
     });
     expect(DEFAULT_CONFIG.checkpoint).toMatchObject({
       constructionCivilianGoods: 5,
+      maxPreparedPostsPerDirection: 3,
       requiresPolice: false,
       initialSupplyRadius: 5,
+    });
+    expect(DEFAULT_CONFIG.noise).toEqual({
+      police: 4,
+      nationalGuard: 5,
+      publicClass: { police: 'medium', nationalGuard: 'medium' },
     });
     expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, attack: 5, movement: 5, range: 1, vision: 5, population: 5 });
     expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, attack: 10, movement: 5, range: 2, population: 10 });
