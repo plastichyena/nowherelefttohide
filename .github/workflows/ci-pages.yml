@@ -44,7 +44,7 @@ jobs:
       # Keep this command explicit so a missing Random Agent smoke script fails
       # CI instead of silently skipping the required 100-game run.
       - name: Run 100 seeded Random Agent games
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --out=output/simulations/random-smoke --overwrite
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --summary-only --out=output/simulations/random-smoke --overwrite
 
       - name: Upload Random Agent failure artifact
         if: failure() && hashFiles('output/simulations/random-smoke/**') != ''
@@ -57,7 +57,7 @@ jobs:
       # Keep this command explicit so a missing Balanced Agent smoke script
       # fails CI instead of skipping the required fixed-seed 100-game run.
       - name: Run 100 seeded Balanced Agent games
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-smoke --overwrite
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --summary-only --out=output/simulations/balanced-smoke --overwrite
 
       - name: Upload Balanced Agent failure artifact
         if: failure() && hashFiles('output/simulations/balanced-smoke/**') != ''

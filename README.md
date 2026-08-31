@@ -67,11 +67,11 @@ v1.4.0ではHuman UIとAgentが同じVisibility、Forecast、Checkpoint／Constr
 Random／Balancedは共通RunnerとAgentGameを使います。BalancedはGameStateを参照せず、公開Observationと合法手だけから完全に決定的なActionを選びます。
 
 ```bash
-npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-run
-npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random,balanced --seeds=1,2,3 --out=output/simulations/comparison
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --summary-only --out=output/simulations/balanced-run
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random,balanced --seeds=1,2,3 --summary-only --out=output/simulations/comparison
 ```
 
-出力先には正本`run.json`、固定列UTF-8の`games.csv`、成功・敗北・技術的失敗を含むゲーム単位Artifactを生成します。ローカル／CIの完全Artifactだけは`verificationEvents`へMixed Hordeの内部Group・Type別生成数・Unit所属を保持し、Replayで内部Event列まで照合します。Browser Bridgeの`getRunArtifact()`にはこの内部情報を含めません。既存の非空出力先は既定で上書きしません。上書きする場合だけ`--overwrite`を明示してください。ゲーム内敗北は正常完遂であり、技術的失敗が1件でもある場合だけExit Codeが非0になります。
+出力先には正本`run.json`、固定列UTF-8の`games.csv`を生成します。既定では成功・敗北・技術的失敗を含むゲーム単位Artifactも生成し、ローカル／CIの完全Artifactだけは`verificationEvents`へMixed Hordeの内部Group・Type別生成数・Unit所属を保持してReplayで内部Event列まで照合します。100ゲーム以上の集計検証では`--summary-only`により指標・成否・比較を`run.json`／`games.csv`へ残しつつ、巨大な完全Replayだけを省略できます。Browser Bridgeの`getRunArtifact()`には内部情報を含めません。既存の非空出力先は既定で上書きしません。上書きする場合だけ`--overwrite`を明示してください。ゲーム内敗北は正常完遂であり、技術的失敗が1件でもある場合だけExit Codeが非0になります。
 
 ## AI Portable Package
 
@@ -152,9 +152,9 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 ```bash
 npm run typecheck
 npm test
-npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --out=output/simulations/random-smoke --overwrite
-npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-smoke --overwrite
-npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=300 --seed=1 --out=output/simulations/v1.4.0-balanced-300 --overwrite
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --summary-only --out=output/simulations/random-smoke --overwrite
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --summary-only --out=output/simulations/balanced-smoke --overwrite
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=300 --seed=1 --summary-only --out=output/simulations/v1.4.0-balanced-300 --overwrite
 npm run build
 npm run test:browser-bridge
 ```
@@ -175,8 +175,8 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 2. `npm ci`（lockfile固定）
 3. `npm run typecheck`
 4. `npm test`
-5. `npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --out=output/simulations/random-smoke --overwrite`
-6. `npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --out=output/simulations/balanced-smoke --overwrite`
+5. `npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --summary-only --out=output/simulations/random-smoke --overwrite`
+6. `npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --summary-only --out=output/simulations/balanced-smoke --overwrite`
 7. `npm run build`
 8. `npm run test:browser-bridge`
 9. `main`へのpush時だけGitHub Pagesへデプロイ

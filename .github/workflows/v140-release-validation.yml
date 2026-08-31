@@ -57,6 +57,7 @@ jobs:
             --agent="${AGENT}" \
             --games=100 \
             --seed=1 \
+            --summary-only \
             --config-json="${CONFIG_JSON}" \
             --out="output/simulations/v140-${AGENT}-${FUEL}-farm${FARM_FOOD}-horde${FINAL_TURN}" \
             --overwrite
@@ -98,7 +99,7 @@ jobs:
         run: npm ci
 
       - name: Run release batch
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=${{ matrix.seed }} --out=output/simulations/v140-balanced-release-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/v140-balanced-release-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
 
       - name: Upload release report
         if: always()

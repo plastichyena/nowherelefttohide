@@ -39,6 +39,7 @@ export interface ParsedSimulationArguments {
   limits: Partial<AgentRunnerLimits>;
   failFast: boolean;
   overwrite: boolean;
+  summaryOnly: boolean;
   buildId?: string;
   help: boolean;
 }
@@ -149,6 +150,7 @@ export function parseSimulationArgs(argv: readonly string[]): ParsedSimulationAr
     limits: {},
     failFast: false,
     overwrite: false,
+    summaryOnly: false,
     help: false,
   };
   // npm 11 may consume unknown script flags as npm_config_* variables before
@@ -187,12 +189,15 @@ export function parseSimulationArgs(argv: readonly string[]): ParsedSimulationAr
   if (envFailFast !== undefined && ['1', 'true', 'yes'].includes(envFailFast.toLowerCase())) parsed.failFast = true;
   const envOverwrite = npmConfig('overwrite', 'force');
   if (envOverwrite !== undefined && ['1', 'true', 'yes'].includes(envOverwrite.toLowerCase())) parsed.overwrite = true;
+  const envSummaryOnly = npmConfig('summary-only', 'summary_only', 'summaryonly');
+  if (envSummaryOnly !== undefined && ['1', 'true', 'yes'].includes(envSummaryOnly.toLowerCase())) parsed.summaryOnly = true;
   const rest = [...argv];
   while (rest.length > 0) {
     const argument = rest.shift()!;
     if (argument === '--help' || argument === '-h') parsed.help = true;
     else if (argument === '--fail-fast') parsed.failFast = true;
     else if (argument === '--overwrite' || argument === '--force') parsed.overwrite = true;
+    else if (argument === '--summary-only') parsed.summaryOnly = true;
     else if (argument === '--agent' || argument.startsWith('--agent=')) parsed.agents = parseAgents(optionValue(argument, '--agent', rest));
     else if (argument === '--agents' || argument.startsWith('--agents=')) parsed.agents = parseAgents(optionValue(argument, '--agents', rest));
     else if (argument === '--strategy' || argument.startsWith('--strategy=')) parsed.agents = parseAgents(optionValue(argument, '--strategy', rest));
@@ -577,11 +582,12 @@ export function writeSimulationRuns(
 export function runSimulationToDirectory(
   options: SimulationRunOptions,
   outDirectory: string,
-  writeOptions: { overwrite?: boolean } = {},
+  writeOptions: { overwrite?: boolean; summaryOnly?: boolean } = {},
 ): StreamedSimulationOutput {
   const normalized = normalizeRunOptions(options);
   const outputDirectory = isAbsolute(outDirectory) ? outDirectory : resolve(outDirectory);
   const overwrite = writeOptions.overwrite ?? false;
+  const summaryOnly = writeOptions.summaryOnly ?? false;
   ensureOutputDirectory(outputDirectory, overwrite);
   const artifactDirectory = join(outputDirectory, ARTIFACT_DIRECTORY);
   ensureOutputDirectory(artifactDirectory, overwrite);
@@ -616,10 +622,12 @@ export function runSimulationToDirectory(
           message: run.failure.message,
         });
       }
-      const path = join(artifactDirectory, artifactFileName(artifactIndex, run.metrics));
-      if (!overwrite && existsSync(path)) throw new Error(`Refusing to overwrite existing artifact: ${path}`);
-      writeFileSync(path, `${JSON.stringify(run.artifact, null, 2)}\n`, 'utf8');
-      artifactPaths.push(path);
+      if (!summaryOnly) {
+        const path = join(artifactDirectory, artifactFileName(artifactIndex, run.metrics));
+        if (!overwrite && existsSync(path)) throw new Error(`Refusing to overwrite existing artifact: ${path}`);
+        writeFileSync(path, `${JSON.stringify(run.artifact, null, 2)}\n`, 'utf8');
+        artifactPaths.push(path);
+      }
       if (normalized.failFast && run.technicalFailure) break simulation;
     }
   }
@@ -631,7 +639,7 @@ export function runSimulationToDirectory(
 }
 
 export function usage(): string {
-  return `Usage: npm run sim -- --agent=balanced --games=1000 --seed=1 --out=output/simulations/run-name
+  return `Usage: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=1000 --seed=1 --summary-only --out=output/simulations/run-name
 
 Options:
   --agent=random|balanced[,agent]   Agent strategy (default: balanced)
@@ -646,6 +654,7 @@ Options:
   --fail-fast                      Stop after the first technical failure
   --out=PATH                       Output directory
   --overwrite                      Explicitly permit replacing output files
+  --summary-only                   Write run.json and games.csv without full per-game Replay artifacts
   --help                            Show this help
 `;
 }
@@ -666,7 +675,7 @@ export function runCli(argv: readonly string[] = process.argv.slice(2)): number 
     limits: parsed.limits,
     failFast: parsed.failFast,
     buildId: parsed.buildId,
-  }, parsed.out, { overwrite: parsed.overwrite });
+  }, parsed.out, { overwrite: parsed.overwrite, summaryOnly: parsed.summaryOnly });
   process.stdout.write(`${JSON.stringify({ output: resolve(parsed.out), games: report.games.length, technicalFailures: report.technicalFailureCount, exitCode: report.exitCode })}\n`);
   return report.exitCode;
 }

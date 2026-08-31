@@ -20,15 +20,16 @@ describe('Batch Simulation CLI', () => {
     expect(parsed.agents).toEqual(['random', 'balanced']);
     expect(parsed.seeds).toEqual([1, 2]);
   });
-  it('parses agents, explicit seeds, runner limits, and fail-fast', () => {
+  it('parses agents, explicit seeds, runner limits, fail-fast, and summary-only', () => {
     const parsed = parseSimulationArgs([
       '--agent=random,balanced', '--seeds=4,9', '--max-decisions-per-turn=3',
-      '--max-decisions-per-game=30', '--max-turns=8', '--fail-fast', '--out=out/sim',
+      '--max-decisions-per-game=30', '--max-turns=8', '--fail-fast', '--summary-only', '--out=out/sim',
     ]);
     expect(parsed.agents).toEqual(['random', 'balanced']);
     expect(parsed.seeds).toEqual([4, 9]);
     expect(parsed.limits).toEqual({ maxDecisionsPerTurn: 3, maxDecisionsPerGame: 30, maxTurns: 8 });
     expect(parsed.failFast).toBe(true);
+    expect(parsed.summaryOnly).toBe(true);
   });
 
   it('runs multiple strategies against the same seed set and reports comparisons', () => {
@@ -143,4 +144,19 @@ describe('Batch Simulation CLI', () => {
     expect(paths.runJson.endsWith('run.json')).toBe(true);
     expect(paths.gamesCsv.endsWith('games.csv')).toBe(true);
   }, 30_000);
+
+  it('writes compact batch summaries without materializing full Replay JSON files', () => {
+    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
+    const output = mkdtempSync(join(tmpdir(), 'nlth-sim-summary-'));
+    const { report, paths } = runSimulationToDirectory({
+      agents: ['random'],
+      seeds: [10, 11],
+      config,
+      limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 },
+    }, output, { summaryOnly: true });
+    expect(report.games).toHaveLength(2);
+    expect(paths.artifacts).toEqual([]);
+    expect(paths.runJson.endsWith('run.json')).toBe(true);
+    expect(paths.gamesCsv.endsWith('games.csv')).toBe(true);
+  }, 20_000);
 });
