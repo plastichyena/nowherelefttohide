@@ -27,6 +27,7 @@ You may use, run, reproduce, and make technically necessary modifications to the
 4. **Commercial benchmarking and evaluation services**
    - Paid or subscription-based services may use the Software as an evaluation or benchmark environment.
    - Such services may host and execute copies of the Software and may make modifications reasonably necessary for automation, measurement, interoperability, accessibility, deployment, or reproducible evaluation.
+   - Such services may also distribute or make available copies of the Software only to the extent technically necessary to deliver the permitted evaluation or benchmark service, including delivery of client-side browser code to service users. Any such distribution must preserve notices required by the applicable license terms and must not be used to provide paid access whose primary purpose is to play or obtain the Game itself.
    - This permission applies even when Nowhere Left to Hide is a substantial or central benchmark environment, provided the primary purpose of the offering is evaluation, research, testing, measurement, or analysis rather than providing the game itself as a paid entertainment product.
 
 5. **Interoperating tools and agents**
