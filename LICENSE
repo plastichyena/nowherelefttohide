@@ -1,0 +1,22 @@
+# Nowhere Left to Hide — Software License
+
+Except for material covered by `ASSETS_LICENSE.md`, `THIRD_PARTY_NOTICES`, or an explicit per-file notice, the software in this repository is licensed under the **PolyForm Noncommercial License 1.0.0**:
+
+https://polyformproject.org/licenses/noncommercial/1.0.0
+
+The license terms at that URL are incorporated here by reference.
+
+Required Notice: Copyright (c) 2026 plastichyena.
+Required Notice: Nowhere Left to Hide is an independently developed personal game project. Preserve this notice when distributing the Software or a modified version.
+Required Notice: Additional permissions for gameplay, monetized media, commercial research, AI evaluation, and benchmarking are granted in `ADDITIONAL_PERMISSIONS.md`.
+
+## Scope
+
+For this repository, “Software” includes the project-authored source code, scripts, tests, configuration, HTML/CSS/JavaScript/TypeScript, game implementation, and project-authored documentation, except where another file in the repository states different terms.
+
+The following are not licensed under this file:
+
+- project visual assets listed in `ASSETS_LICENSE.md`;
+- third-party packages and other third-party material listed in `THIRD_PARTY_NOTICES` or carrying their own license notice.
+
+This is a source-available license with use restrictions and is not an OSI-approved open-source license.
