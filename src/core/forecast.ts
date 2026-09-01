@@ -49,8 +49,8 @@ export function deriveStrategicForecast(state: Readonly<GameState>): StrategicFo
     },
     militaryGoods: {
       supply: economy.militaryGoods.startingStock + economy.militaryGoods.projectedProduction,
-      demand: economy.militaryGoods.maintenanceRequired,
-      short: economy.militaryGoods.shortage > 0,
+      demand: economy.militaryGoods.totalRefillDemand,
+      short: economy.militaryGoods.totalUnfilledRefillDemand > 0,
     },
     fuel: {
       supply: economy.fuel.turnStartFuel + economy.fuel.projectedRefineryProduction,

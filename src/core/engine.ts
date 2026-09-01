@@ -64,6 +64,7 @@ import type {
   RoadBranchId,
   HumanUnitType,
   JsonObject,
+  MilitaryGoodsForecast,
   MoveAction,
   PowerSupplyReason,
   ResourceType,
@@ -80,6 +81,27 @@ export interface MovePreview {
   interception: { interceptorId: string; position: HexCoord } | null;
   fuelCost: number;
   projectedFuelAfterMove: number;
+  movementMode: 'normal' | 'emergency';
+  effectiveMovementCost: number;
+}
+
+export interface UnitCombatProjection {
+  distance: number;
+  canAttack: boolean;
+  militaryGoodsCost: number;
+  projectedMilitaryGoodsAfterAttack: number;
+  effectiveAttack: number;
+  reason: 'out_of_range' | 'insufficient_military_goods' | null;
+}
+
+export interface UnitLegalAttackProjection {
+  targetUnitId: string;
+  distance: number;
+  militaryGoodsCost: number;
+  projectedMilitaryGoodsAfterAttack: number;
+  effectiveAttack: number;
+  projectedDamageBeforeTerrain: number;
+  projectedDamageAfterTerrain: number;
 }
 
 export interface FacilityProductionProjection {
@@ -155,10 +177,106 @@ function stableFacilities(state: GameState, descending = false): FacilityState[]
 }
 
 export function effectiveRange(state: Readonly<GameState>, unit: Readonly<UnitState>): number {
-  if (unit.type === 'nationalGuard' && !state.resources.militarySupplyAvailable) {
-    return Math.min(1, unit.range);
+  if (!unit.isPlayerUnit) return unit.range;
+  for (let distance = unit.range; distance >= 1; distance -= 1) {
+    if (forecastUnitCombatAtDistance(state, unit, distance).canAttack) return distance;
   }
-  return unit.range;
+  return 0;
+}
+
+/** Pure distance/resource projection shared by every Human combat path. */
+export function forecastUnitCombatAtDistance(
+  state: Readonly<GameState>,
+  unit: Readonly<UnitState>,
+  distance: number,
+): UnitCombatProjection {
+  const normalizedDistance = Math.max(0, Math.floor(distance));
+  if (normalizedDistance < 1 || normalizedDistance > unit.range) {
+    return {
+      distance: normalizedDistance,
+      canAttack: false,
+      militaryGoodsCost: 0,
+      projectedMilitaryGoodsAfterAttack: unit.currentMilitaryGoods,
+      effectiveAttack: 0,
+      reason: 'out_of_range',
+    };
+  }
+  if (!unit.isPlayerUnit) {
+    return {
+      distance: normalizedDistance,
+      canAttack: true,
+      militaryGoodsCost: 0,
+      projectedMilitaryGoodsAfterAttack: 0,
+      effectiveAttack: unit.attack,
+      reason: null,
+    };
+  }
+  const config = state.config.units[unit.type as HumanUnitType];
+  const configuredCost = config.attackMilitaryGoodsCostByRange[normalizedDistance];
+  const militaryGoodsCost = Number.isInteger(configuredCost) ? configuredCost : 0;
+  if (unit.currentMilitaryGoods >= militaryGoodsCost) {
+    return {
+      distance: normalizedDistance,
+      canAttack: true,
+      militaryGoodsCost,
+      projectedMilitaryGoodsAfterAttack: unit.currentMilitaryGoods - militaryGoodsCost,
+      effectiveAttack: unit.attack,
+      reason: null,
+    };
+  }
+  if (normalizedDistance === 1 && unit.currentMilitaryGoods === 0) {
+    return {
+      distance: normalizedDistance,
+      canAttack: true,
+      militaryGoodsCost: 0,
+      projectedMilitaryGoodsAfterAttack: 0,
+      effectiveAttack: Math.max(1, Math.ceil(unit.attack * config.militaryGoodsShortageAttackMultiplier)),
+      reason: null,
+    };
+  }
+  return {
+    distance: normalizedDistance,
+    canAttack: false,
+    militaryGoodsCost,
+    projectedMilitaryGoodsAfterAttack: unit.currentMilitaryGoods,
+    effectiveAttack: 0,
+    reason: 'insufficient_military_goods',
+  };
+}
+
+/** Exact public attack previews for the Unit's currently legal visible targets. */
+export function getUnitLegalAttackProjections(
+  state: Readonly<GameState>,
+  unitId: string,
+): UnitLegalAttackProjection[] {
+  const snapshot = state as GameState;
+  const unit = getUnit(snapshot, unitId);
+  if (
+    !unit ||
+    !unit.isPlayerUnit ||
+    snapshot.phase !== 'player' ||
+    snapshot.gameOver ||
+    unit.actionState === 'acted' ||
+    !unit.canAttack
+  ) return [];
+  return getVisibleEnemyUnits(snapshot)
+    .map((target) => {
+      const distance = hexDistance(unit.position, target.position);
+      const projection = forecastUnitCombatAtDistance(snapshot, unit, distance);
+      if (!projection.canAttack) return null;
+      const terrainDamage = terrainAdjustedDamage(snapshot, target, projection.effectiveAttack);
+      return {
+        targetUnitId: target.id,
+        distance,
+        militaryGoodsCost: projection.militaryGoodsCost,
+        projectedMilitaryGoodsAfterAttack: projection.projectedMilitaryGoodsAfterAttack,
+        effectiveAttack: projection.effectiveAttack,
+        projectedDamageBeforeTerrain: terrainDamage.baseDamage,
+        projectedDamageAfterTerrain: Math.min(target.hp, terrainDamage.finalDamage),
+      };
+    })
+    .filter((entry): entry is UnitLegalAttackProjection => entry !== null)
+    .sort((left, right) => left.targetUnitId.localeCompare(right.targetUnitId));
 }
 
 export interface SuppressionProjection {
@@ -167,12 +285,25 @@ export interface SuppressionProjection {
   suppressionPower: number;
   projectedSuppression: number;
   projectedCivilianDamage: number;
+  militaryGoodsCost: number;
+  projectedMilitaryGoodsAfterSuppression: number;
+}
+
+function infectedSuppressionTarget(
+  state: Readonly<GameState>,
+  unit: Readonly<UnitState>,
+): FacilityState | CheckpointState | null {
+  const key = hexKey(unit.position);
+  return state.facilities.find((candidate) => hexKey(candidate.position) === key && candidate.infected > 0)
+    ?? state.checkpoints.find((candidate) => hexKey(candidate.position) === key && candidate.infected > 0)
+    ?? null;
 }
 
 /** Conditional EndTurn suppression derived only from the current public state. */
 export function forecastUnitSuppression(
   state: Readonly<GameState>,
   unit: Readonly<UnitState>,
+  militaryGoods = unit.currentMilitaryGoods,
 ): SuppressionProjection | null {
   if (
     !unit.isPlayerUnit ||
@@ -180,11 +311,12 @@ export function forecastUnitSuppression(
     unit.activity.attacked ||
     unit.activity.intercepted
   ) return null;
-  const key = hexKey(unit.position);
-  const facility = state.facilities.find((candidate) => hexKey(candidate.position) === key && candidate.infected > 0);
-  const checkpoint = state.checkpoints.find((candidate) => hexKey(candidate.position) === key && candidate.infected > 0);
-  const target = facility ?? checkpoint;
+  const target = infectedSuppressionTarget(state, unit);
   if (!target) return null;
+  const facility = 'workers' in target ? target : null;
+  const checkpoint = 'waiting' in target ? target : null;
+  const militaryGoodsCost = state.config.units[unit.type as HumanUnitType].suppressionMilitaryGoodsCost;
+  if (militaryGoods < militaryGoodsCost) return null;
   const suppressionPower = unit.type === 'police'
     ? state.config.infection.policeSuppression
     : state.config.infection.nationalGuardSuppression;
@@ -201,6 +333,8 @@ export function forecastUnitSuppression(
     projectedCivilianDamage: unit.type === 'nationalGuard'
       ? Math.min(healthyPopulation, Math.ceil(suppressionPower * state.config.infection.nationalGuardCivilianDamageRate))
       : 0,
+    militaryGoodsCost,
+    projectedMilitaryGoodsAfterSuppression: militaryGoods - militaryGoodsCost,
   };
 }
 
@@ -245,6 +379,8 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string): void {
     q: unit.position.q,
     r: unit.position.r,
     inSupply: unit.isPlayerUnit ? isHexSupplied(state, unit.position) : false,
+    lostFuel: unit.isPlayerUnit ? unit.currentFuel : 0,
+    lostMilitaryGoods: unit.isPlayerUnit ? unit.currentMilitaryGoods : 0,
   });
 }
 
@@ -292,24 +428,43 @@ function resolveCombat(
   if (!state.units.some((unit) => unit.id === attacker.id) || !state.units.some((unit) => unit.id === defender.id)) {
     return;
   }
+  const attackDistance = hexDistance(attacker.position, defender.position);
+  const attackProjection = forecastUnitCombatAtDistance(state, attacker, attackDistance);
+  if (!attackProjection.canAttack) return;
   const human = attacker.isPlayerUnit ? attacker : defender.isPlayerUnit ? defender : null;
   if (human) emitCombatNoise(state, human, { ...human.position });
   markAttacked(attacker, kind === 'interception');
+  if (attacker.isPlayerUnit) attacker.currentMilitaryGoods = attackProjection.projectedMilitaryGoodsAfterAttack;
   emit(state, kind === 'interception' ? 'interception' : 'attack', {
     attackerId: attacker.id,
     defenderId: defender.id,
+    distance: attackDistance,
+    effectiveAttack: attackProjection.effectiveAttack,
+    militaryGoodsCost: attackProjection.militaryGoodsCost,
+    militaryGoodsRemaining: attacker.isPlayerUnit ? attacker.currentMilitaryGoods : 0,
   });
   if (kind === 'interception') {
     state.statistics.hordeInterceptions += attacker.isPlayerUnit ? 1 : 0;
   }
-  dealDamage(state, defender, attacker.attack, attacker.id, kind);
+  dealDamage(state, defender, attackProjection.effectiveAttack, attacker.id, kind);
   if (!state.units.some((unit) => unit.id === defender.id)) {
     return;
   }
-  if (defender.canAttack && hexDistance(defender.position, attacker.position) <= effectiveRange(state, defender)) {
+  const counterDistance = hexDistance(defender.position, attacker.position);
+  const counterProjection = forecastUnitCombatAtDistance(state, defender, counterDistance);
+  if (defender.canAttack && counterProjection.canAttack) {
     markAttacked(defender);
-    emit(state, 'attack', { attackerId: defender.id, defenderId: attacker.id, counterattack: true });
-    dealDamage(state, attacker, defender.attack, defender.id, 'counterattack');
+    if (defender.isPlayerUnit) defender.currentMilitaryGoods = counterProjection.projectedMilitaryGoodsAfterAttack;
+    emit(state, 'attack', {
+      attackerId: defender.id,
+      defenderId: attacker.id,
+      counterattack: true,
+      distance: counterDistance,
+      effectiveAttack: counterProjection.effectiveAttack,
+      militaryGoodsCost: counterProjection.militaryGoodsCost,
+      militaryGoodsRemaining: defender.isPlayerUnit ? defender.currentMilitaryGoods : 0,
+    });
+    dealDamage(state, attacker, counterProjection.effectiveAttack, defender.id, 'counterattack');
   }
 }
 
@@ -320,7 +475,7 @@ function interceptorsAt(state: GameState, mover: UnitState, position: HexCoord):
         candidate.id !== mover.id &&
         candidate.isPlayerUnit !== mover.isPlayerUnit &&
         candidate.canAttack &&
-        hexDistance(candidate.position, position) <= effectiveRange(state, candidate),
+        forecastUnitCombatAtDistance(state, candidate, hexDistance(candidate.position, position)).canAttack,
     )
     .sort((left, right) => left.id.localeCompare(right.id));
 }
@@ -362,6 +517,7 @@ function applyMovement(
   mover: UnitState,
   path: HexCoord[],
   movementBudget: number,
+  movementMode: 'normal' | 'emergency' = 'normal',
 ): { reached: HexCoord; interception: UnitState | null } {
   let reached = { ...mover.position };
   let interception: UnitState | null = null;
@@ -388,7 +544,9 @@ function applyMovement(
   }
   if (state.units.some((unit) => unit.id === mover.id)) {
     if (isHumanUnit(mover)) {
-      const fuelUsed = unitMoveFuelCost(mover.type as HumanUnitType, traversed.length);
+      const fuelUsed = movementMode === 'normal'
+        ? unitMoveFuelCost(mover.type as HumanUnitType, traversed.length)
+        : 0;
       mover.currentFuel = Math.max(0, mover.currentFuel - fuelUsed);
       mover.activity.moved = traversed.length > 0;
       mover.canMove = false;
@@ -400,14 +558,24 @@ function applyMovement(
       q: reached.q,
       r: reached.r,
       hexesMoved: traversed.length,
-      fuelUsed: isHumanUnit(mover) ? unitMoveFuelCost(mover.type as HumanUnitType, traversed.length) : 0,
+      effectiveMovementCost: spent,
+      movementMode: isHumanUnit(mover) ? movementMode : 'normal',
+      fuelUsed: isHumanUnit(mover) && movementMode === 'normal'
+        ? unitMoveFuelCost(mover.type as HumanUnitType, traversed.length)
+        : 0,
     });
     tryCapture(state, mover);
   }
   return { reached, interception };
 }
 
-function getMovePath(state: GameState, action: MoveAction): { unit: UnitState; path: HexCoord[] } | ActionError {
+function getMovePath(state: GameState, action: MoveAction): {
+  unit: UnitState;
+  path: HexCoord[];
+  movementMode: 'normal' | 'emergency';
+  effectiveMovementCost: number;
+  fuelCost: number;
+} | ActionError {
   const unit = getUnit(state, action.unitId);
   if (!unit || !unit.isPlayerUnit) {
     return error(action, 'unknown_unit', 'A player unit is required');
@@ -438,13 +606,19 @@ function getMovePath(state: GameState, action: MoveAction): { unit: UnitState; p
   if (!path) {
     return error(action, 'no_path', 'No path is available');
   }
-  if (path.length <= 1 || pathMovementCost(path, (position) => effectiveMovementCost(state, position)) > unit.movement) {
+  const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
+  const movementBudget = movementMode === 'emergency'
+    ? state.config.units[unit.type as HumanUnitType].emergencyMovementPoints
+    : unit.movement;
+  const effectiveCost = pathMovementCost(path, (position) => effectiveMovementCost(state, position));
+  if (path.length <= 1 || effectiveCost > movementBudget) {
     return error(action, 'out_of_range', 'Destination exceeds movement range');
   }
-  if (unit.currentFuel < unitMoveFuelCost(unit.type as HumanUnitType, path.length - 1)) {
+  const fuelCost = movementMode === 'normal' ? unitMoveFuelCost(unit.type as HumanUnitType, path.length - 1) : 0;
+  if (movementMode === 'normal' && unit.currentFuel < fuelCost) {
     return error(action, 'insufficient_unit_fuel', 'The unit does not have enough Fuel for this move');
   }
-  return { unit, path };
+  return { unit, path, movementMode, effectiveMovementCost: effectiveCost, fuelCost };
 }
 
 function reachableMovePaths(state: GameState, unit: UnitState) {
@@ -454,13 +628,17 @@ function reachableMovePaths(state: GameState, unit: UnitState) {
       .filter((candidate) => candidate.id !== unit.id && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
       .map((candidate) => hexKey(candidate.position)),
   );
+  const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
+  const movementBudget = movementMode === 'emergency'
+    ? state.config.units[unit.type as HumanUnitType].emergencyMovementPoints
+    : unit.movement;
   return findReachablePaths(
     state.map,
     unit.position,
-    unit.movement,
+    movementBudget,
     blocked,
     (position) => effectiveMovementCost(state, position),
-  ).filter((entry) => unit.currentFuel >= unitMoveFuelCost(unit.type as HumanUnitType, entry.path.length - 1));
+  ).filter((entry) => movementMode === 'emergency' || unit.currentFuel >= unitMoveFuelCost(unit.type as HumanUnitType, entry.path.length - 1));
 }
 
 function reachableDestinations(state: GameState, unit: UnitState): HexCoord[] {
@@ -470,13 +648,26 @@ function reachableDestinations(state: GameState, unit: UnitState): HexCoord[] {
 export function getUnitLegalMoveFuelProjections(
   state: Readonly<GameState>,
   unitId: string,
-): Array<{ destination: HexCoord; fuelCost: number; projectedFuelAfterMove: number }> {
+): Array<{
+  destination: HexCoord;
+  fuelCost: number;
+  projectedFuelAfterMove: number;
+  movementMode: 'normal' | 'emergency';
+  effectiveMovementCost: number;
+}> {
   const snapshot = state as GameState;
   const unit = getUnit(snapshot, unitId);
   if (!unit || !unit.isPlayerUnit || unit.actionState === 'acted' || !unit.canMove || snapshot.phase !== 'player') return [];
   return reachableMovePaths(snapshot, unit).map((entry) => {
-    const fuelCost = unitMoveFuelCost(unit.type as HumanUnitType, entry.path.length - 1);
-    return { destination: { ...entry.position }, fuelCost, projectedFuelAfterMove: unit.currentFuel - fuelCost };
+    const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
+    const fuelCost = movementMode === 'normal' ? unitMoveFuelCost(unit.type as HumanUnitType, entry.path.length - 1) : 0;
+    return {
+      destination: { ...entry.position },
+      fuelCost,
+      projectedFuelAfterMove: unit.currentFuel - fuelCost,
+      movementMode,
+      effectiveMovementCost: pathMovementCost(entry.path, (position) => effectiveMovementCost(snapshot, position)),
+    };
   });
 }
 
@@ -486,7 +677,17 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
   const initiallyVisible = getPlayerVisibleTileKeys(snapshot);
   const candidate = getMovePath(snapshot, { type: 'Move', unitId, destination });
   if ('code' in candidate) {
-    return { legal: false, reason: candidate.message, path: [], reached: null, interception: null, fuelCost: 0, projectedFuelAfterMove: 0 };
+    return {
+      legal: false,
+      reason: candidate.message,
+      path: [],
+      reached: null,
+      interception: null,
+      fuelCost: 0,
+      projectedFuelAfterMove: 0,
+      movementMode: 'normal',
+      effectiveMovementCost: 0,
+    };
   }
   const mover = candidate.unit;
   for (const position of candidate.path.slice(1)) {
@@ -494,7 +695,11 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
       .filter((interceptor) => initiallyVisible.has(hexKey(interceptor.position)));
     if (interceptors[0]) {
       const entered = candidate.path.findIndex((step) => hexKey(step) === hexKey(position));
-      const fuelCost = unitMoveFuelCost(mover.type as HumanUnitType, entered);
+      const partialPath = candidate.path.slice(0, entered + 1);
+      const effectiveCost = pathMovementCost(partialPath, (step) => effectiveMovementCost(snapshot, step));
+      const fuelCost = candidate.movementMode === 'normal'
+        ? unitMoveFuelCost(mover.type as HumanUnitType, entered)
+        : 0;
       return {
         legal: true,
         reason: null,
@@ -503,6 +708,8 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
         interception: { interceptorId: interceptors[0].id, position: { ...position } },
         fuelCost,
         projectedFuelAfterMove: mover.currentFuel - fuelCost,
+        movementMode: candidate.movementMode,
+        effectiveMovementCost: effectiveCost,
       };
     }
   }
@@ -512,8 +719,10 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
     path: candidate.path,
     reached: { ...destination },
     interception: null,
-    fuelCost: unitMoveFuelCost(mover.type as HumanUnitType, candidate.path.length - 1),
-    projectedFuelAfterMove: mover.currentFuel - unitMoveFuelCost(mover.type as HumanUnitType, candidate.path.length - 1),
+    fuelCost: candidate.fuelCost,
+    projectedFuelAfterMove: mover.currentFuel - candidate.fuelCost,
+    movementMode: candidate.movementMode,
+    effectiveMovementCost: candidate.effectiveMovementCost,
   };
 }
 
@@ -875,6 +1084,73 @@ interface EconomyPlan {
   unitRefills: Array<{ unitId: string; amount: number }>;
 }
 
+function calculateMilitaryGoodsPlan(
+  state: Readonly<GameState>,
+  projectedProduction: number,
+): MilitaryGoodsForecast {
+  const units = state.units
+    .filter((unit) => unit.isPlayerUnit)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const working = units.map((unit) => {
+    const fixedRequested = state.config.units[unit.type as HumanUnitType].fixedMilitaryGoodsUpkeepPerTurn;
+    const fixedConsumption = Math.min(unit.currentMilitaryGoods, fixedRequested);
+    const afterFixed = unit.currentMilitaryGoods - fixedConsumption;
+    return {
+      unit,
+      inSupply: isHexSupplied(state, unit.position),
+      fixedConsumption,
+      afterFixed,
+      refillDemand: Math.max(0, unit.maxMilitaryGoods - afterFixed),
+      refillAmount: 0,
+    };
+  });
+  let nationalAvailable = state.resources.militaryGoods + projectedProduction;
+  while (nationalAvailable > 0 && working.some((entry) => entry.inSupply && entry.refillAmount < entry.refillDemand)) {
+    for (const entry of working) {
+      if (nationalAvailable <= 0) break;
+      if (!entry.inSupply || entry.refillAmount >= entry.refillDemand) continue;
+      entry.refillAmount += 1;
+      nationalAvailable -= 1;
+    }
+  }
+  const forecastUnits = working.map((entry) => {
+    const afterRefill = entry.afterFixed + entry.refillAmount;
+    const suppression = forecastUnitSuppression(state, entry.unit, afterRefill);
+    const hasSuppressionTarget = infectedSuppressionTarget(state, entry.unit) !== null;
+    const suppressionCost = suppression?.militaryGoodsCost ?? 0;
+    return {
+      unitId: entry.unit.id,
+      unitType: entry.unit.type as HumanUnitType,
+      inSupply: entry.inSupply,
+      beforeFixed: entry.unit.currentMilitaryGoods,
+      fixedConsumption: entry.fixedConsumption,
+      afterFixed: entry.afterFixed,
+      refillDemand: entry.refillDemand,
+      projectedRefillAmount: entry.refillAmount,
+      unfilledRefillDemand: entry.refillDemand - entry.refillAmount,
+      afterRefill,
+      suppressionCost,
+      suppressionStatus: suppression
+        ? 'suppression' as const
+        : hasSuppressionTarget
+          ? 'containment_only' as const
+          : 'none' as const,
+      afterSuppression: afterRefill - suppressionCost,
+    };
+  });
+  const totalRefillDemand = forecastUnits.reduce((sum, unit) => sum + unit.refillDemand, 0);
+  const projectedTotalRefilled = forecastUnits.reduce((sum, unit) => sum + unit.projectedRefillAmount, 0);
+  return {
+    startingStock: state.resources.militaryGoods,
+    projectedProduction,
+    totalRefillDemand,
+    projectedTotalRefilled,
+    totalUnfilledRefillDemand: totalRefillDemand - projectedTotalRefilled,
+    projectedEndingStock: nationalAvailable,
+    units: forecastUnits,
+  };
+}
+
 function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const facilities = stableFacilities(state as GameState);
   const isOwned = (facility: Readonly<FacilityState>) => facility.owner === 'player' && facility.status === 'owned';
@@ -890,7 +1166,6 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const maintenance = {
     food: normalFood + overcrowdingAdditionalConsumption(normalFood, overcrowding),
     civilianGoods: normalCivilian + overcrowdingAdditionalConsumption(normalCivilian, overcrowding),
-    militaryGoods: state.population.unitPopulation * state.config.economy.militaryGoodsPerUnitPopulation,
   };
 
   const powerPlantPhysicalCapacity = facilities
@@ -1101,8 +1376,9 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   }
   const projectedUnitRefillDemand = refillUnits.reduce((total, unit) => total + unit.maxFuel - unit.currentFuel, 0);
   const projectedUnitFuelRefilled = [...unitRefillAmounts.values()].reduce((total, amount) => total + amount, 0);
+  const militaryGoods = calculateMilitaryGoodsPlan(state, production('militaryGoods'));
   const resourceForecast = (
-    resource: 'food' | 'militaryGoods',
+    resource: 'food',
     maintenanceRequired: number,
   ): EndTurnForecast['food'] => {
     const startingStock = state.resources[resource];
@@ -1155,7 +1431,7 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
         required: maintenance.civilianGoods + militaryInputDemand,
         shortage: civilianShortage,
       },
-      militaryGoods: resourceForecast('militaryGoods', maintenance.militaryGoods),
+      militaryGoods,
       fuel: {
         startingStock: state.resources.fuel,
         projectedProduction: fuelProduction,
@@ -1314,11 +1590,25 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
   const forecast = plan.forecast;
   state.resources.food = forecast.food.endingStock;
   state.resources.civilianGoods = forecast.civilianGoods.endingStock;
-  state.resources.militaryGoods = forecast.militaryGoods.endingStock;
+  state.resources.militaryGoods = forecast.militaryGoods.projectedEndingStock;
   state.resources.fuel = forecast.fuel.endingStock;
   state.resources.electricityCapacity = forecast.electricity.physicalGenerationCapacity;
   state.resources.electricityRequired = forecast.electricity.required;
-  state.resources.militarySupplyAvailable = forecast.militaryGoods.shortage === 0;
+
+  for (const unitForecast of forecast.militaryGoods.units) {
+    const unit = getUnit(state, unitForecast.unitId);
+    if (!unit) continue;
+    unit.currentMilitaryGoods = unitForecast.afterFixed;
+    if (unitForecast.fixedConsumption > 0) {
+      emit(state, 'resource_consumed', {
+        resource: 'militaryGoods',
+        amount: unitForecast.fixedConsumption,
+        reason: 'unit_fixed_upkeep',
+        unitId: unit.id,
+        unitType: unit.type,
+      });
+    }
+  }
 
   for (const projection of plan.facilities) {
     const facility = getFacilityState(state, projection.facilityId)!;
@@ -1366,6 +1656,20 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
           : forecast.fuel.projectedProduction;
     if (amount > 0) emit(state, 'resource_produced', { resource, amount });
   }
+  for (const unitForecast of forecast.militaryGoods.units) {
+    const unit = getUnit(state, unitForecast.unitId);
+    if (!unit) continue;
+    unit.currentMilitaryGoods = unitForecast.afterRefill;
+    if (unitForecast.projectedRefillAmount > 0) {
+      emit(state, 'resource_consumed', {
+        resource: 'militaryGoods',
+        amount: unitForecast.projectedRefillAmount,
+        reason: 'unit_refill',
+        unitId: unit.id,
+        unitType: unit.type,
+      });
+    }
+  }
   emit(state, 'resource_consumed', {
     resource: 'food',
     amount: forecast.food.maintenanceRequired - forecast.food.shortage,
@@ -1378,13 +1682,12 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
     population: forecast.populationConsumers,
     overcrowding: forecast.overcrowding.additionalCivilianGoods,
   });
-  emit(state, 'resource_consumed', {
-    resource: 'militaryGoods',
-    amount: forecast.militaryGoods.maintenanceRequired - forecast.militaryGoods.shortage,
-    population: state.population.unitPopulation,
-  });
-  if (forecast.militaryGoods.shortage > 0) {
-    emit(state, 'resource_shortage', { resource: 'militaryGoods', amount: forecast.militaryGoods.shortage });
+  if (forecast.militaryGoods.totalUnfilledRefillDemand > 0) {
+    emit(state, 'resource_shortage', {
+      resource: 'militaryGoods',
+      amount: forecast.militaryGoods.totalUnfilledRefillDemand,
+      reason: 'unit_refill',
+    });
   }
   if (forecast.fuel.generationFuelShortage > 0) {
     emit(state, 'resource_shortage', { resource: 'fuel', amount: forecast.fuel.generationFuelShortage, reason: 'power_generation' });
@@ -1663,6 +1966,8 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
   if (!unit.canAttack || unit.activity.attacked || unit.activity.intercepted || facility.infected <= 0) {
     return false;
   }
+  const militaryGoodsCost = state.config.units[unit.type as HumanUnitType].suppressionMilitaryGoodsCost;
+  if (unit.currentMilitaryGoods < militaryGoodsCost) return false;
   const amount = unit.type === 'police' ? state.config.infection.policeSuppression : state.config.infection.nationalGuardSuppression;
   const suppressed = Math.min(facility.infected, amount);
   facility.infected -= suppressed;
@@ -1680,7 +1985,15 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
   unit.canMove = false;
   unit.actionState = 'acted';
   unit.activity.suppressed = true;
-  emit(state, 'infection_suppressed', { facilityId: facility.id, unitId: unit.id, remaining: facility.infected });
+  unit.currentMilitaryGoods -= militaryGoodsCost;
+  emit(state, 'infection_suppressed', {
+    facilityId: facility.id,
+    unitId: unit.id,
+    unitType: unit.type,
+    remaining: facility.infected,
+    militaryGoodsCost,
+    militaryGoodsRemaining: unit.currentMilitaryGoods,
+  });
   if (facility.infected > 0) {
     facility.operationalStatus = facility.status === 'ruined' ? 'ruined' : 'infected';
   }
@@ -1700,6 +2013,8 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
   if (!unit.canAttack || unit.activity.attacked || unit.activity.intercepted || checkpoint.infected <= 0) {
     return false;
   }
+  const militaryGoodsCost = state.config.units[unit.type as HumanUnitType].suppressionMilitaryGoodsCost;
+  if (unit.currentMilitaryGoods < militaryGoodsCost) return false;
   const beforeSupply = checkpoint.status === 'ruined' ? getSuppliedTileKeys(state) : [];
   const amount = unit.type === 'police' ? state.config.infection.policeSuppression : state.config.infection.nationalGuardSuppression;
   const suppressed = Math.min(checkpoint.infected, amount);
@@ -1717,7 +2032,15 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
   unit.canMove = false;
   unit.actionState = 'acted';
   unit.activity.suppressed = true;
-  emit(state, 'infection_suppressed', { checkpointId: checkpoint.id, unitId: unit.id, remaining: checkpoint.infected });
+  unit.currentMilitaryGoods -= militaryGoodsCost;
+  emit(state, 'infection_suppressed', {
+    checkpointId: checkpoint.id,
+    unitId: unit.id,
+    unitType: unit.type,
+    remaining: checkpoint.infected,
+    militaryGoodsCost,
+    militaryGoodsRemaining: unit.currentMilitaryGoods,
+  });
   if (checkpoint.infected === 0 && checkpoint.status === 'ruined') {
     const branch = getRoadBranchState(state, checkpoint.branchId ?? checkpoint.direction);
     checkpoint.status = 'operational';
@@ -3050,7 +3373,10 @@ function move(state: GameState, action: MoveAction): ActionError | null {
   if (budget) return budget;
   const result = getMovePath(state, action);
   if ('code' in result) return result;
-  applyMovement(state, result.unit, result.path, result.unit.movement);
+  const movementBudget = result.movementMode === 'emergency'
+    ? state.config.units[result.unit.type as HumanUnitType].emergencyMovementPoints
+    : result.unit.movement;
+  applyMovement(state, result.unit, result.path, movementBudget, result.movementMode);
   state.actionsTakenThisTurn += 1;
   synchronizePopulation(state);
   return null;
@@ -3064,7 +3390,8 @@ function attack(state: GameState, action: AttackAction): ActionError | null {
   if (!attacker || !attacker.isPlayerUnit || !target || !isAttackable(attacker, target) || !isVisibleToPlayer(state, target.position)) {
     return error(action, 'invalid_target', 'A visible enemy target and player attacker are required');
   }
-  if (attacker.actionState === 'acted' || !attacker.canAttack || hexDistance(attacker.position, target.position) > effectiveRange(state, attacker)) {
+  const combatProjection = forecastUnitCombatAtDistance(state, attacker, hexDistance(attacker.position, target.position));
+  if (attacker.actionState === 'acted' || !attacker.canAttack || !combatProjection.canAttack) {
     return error(action, 'attack_not_legal', 'Target is outside range or this unit cannot attack');
   }
   attacker.actionState = 'acted';
@@ -3530,7 +3857,7 @@ export class GameEngine implements HeadlessGame {
       }
       if (unit.canAttack && unit.actionState !== 'acted') {
         for (const target of visibleEnemies) {
-          if (hexDistance(unit.position, target.position) <= effectiveRange(this.state, unit)) {
+          if (forecastUnitCombatAtDistance(this.state, unit, hexDistance(unit.position, target.position)).canAttack) {
             actions.push({ type: 'Attack', attackerId: unit.id, targetId: target.id });
           }
         }

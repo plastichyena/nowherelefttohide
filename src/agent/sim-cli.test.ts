@@ -39,8 +39,8 @@ describe('Batch Simulation CLI', () => {
     expect(report.comparisons).toHaveLength(2);
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.technicalFailureCount).toBeGreaterThanOrEqual(0);
-    expect(report.schemaVersion).toBe('2.0.0');
-    expect(report.appVersion).toBe('1.4.0');
+    expect(report.schemaVersion).toBe('2.1.0');
+    expect(report.appVersion).toBe('1.4.1');
   }, 30_000);
 
   it('reports the runner default turn ceiling independently from finalHordeTurn', () => {

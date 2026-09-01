@@ -438,6 +438,46 @@ export class AgentGameAdapter implements AgentGame {
     });
   }
 
+  /**
+   * Private Session persistence hook. This deliberately remains outside the
+   * AgentGame/browser contract and returns a detached complete state only to
+   * the local Session layer.
+   */
+  public exportPrivateSessionState(): GameState {
+    return cloneJson(this.engine.getState());
+  }
+
+  /**
+   * Restore a private Session snapshot through the same validated Core
+   * LoadSnapshot action. The current Adapter is replaced only after validation
+   * succeeds, so a rejected snapshot cannot damage the active session.
+   */
+  public restorePrivateSessionState(
+    snapshot: GameState,
+    options: { agentId?: string } = {},
+  ): AgentObservation {
+    const snapshotCopy = cloneJson(snapshot);
+    const config = cloneConfig(snapshotCopy.config);
+    const next = new GameEngine(snapshotCopy.seed, config);
+    const loaded = next.step({ type: 'LoadSnapshot', snapshot: snapshotCopy });
+    if (loaded.error) throw new Error(`${loaded.error.code}: ${loaded.error.message}`);
+
+    this.engine = next;
+    this.seed = snapshotCopy.seed;
+    this.config = config;
+    if (options.agentId !== undefined) this.agentId = options.agentId;
+    this.acceptedActions = [];
+    this.invalidAttempts = [];
+    this.events = [];
+    this.cachedLegalActions = null;
+    this.cachedObservation = null;
+    this.cachedCheckpointPositionCandidates = null;
+    const observation = this.getObservation();
+    this.initialObservation = cloneJson(observation);
+    this.observations = [cloneJson(observation)];
+    return cloneJson(observation);
+  }
+
   /** Local/CI failure diagnostics only. Not part of AgentGame or window.NLTH. */
   public getDebugState(): Readonly<GameState> {
     return this.engine.getState();

@@ -1,6 +1,6 @@
 # Play Nowhere Left to Hide with an AI
 
-This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.4.0.
+This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.4.1.
 
 The portable AI package produced by GitHub Actions contains this repository, installed dependencies, and a Linux x64 Node.js runtime. No separate Node.js installation or `npm install` is required after extracting the package.
 
@@ -9,18 +9,65 @@ The portable AI package produced by GitHub Actions contains this repository, ins
 Give the extracted package (or its ZIP) to an AI environment that can inspect files and execute local commands, then ask it to play the game. A useful prompt is:
 
 ```text
-Play Nowhere Left to Hide as the governor. Use only the public AgentGame interface and player-visible observations. On each turn, inspect the observation and legal actions, explain briefly why you choose an action, apply exactly one legal action, and continue until Game Over. At the end, summarize the result and the decisions that mattered most.
+Play Nowhere Left to Hide as the governor. Use the Session CLI and only its public observations, legal actions, step results, events, and your own Public Decision Log. Create a Session, inspect status, submit exactly one listed action with a short public decisionSummary per step, and continue until Game Over. If this response must end, report the Session ID so the next response can resume it with status. At the end, report the result and retain the artifact.
 ```
 
 ## Portable package commands
 
-From the extracted package root:
+From the extracted package root, create a persistent Session:
+
+```bash
+./run-session.sh new --session-id=my-game --seed=1 --agent-id=my-agent
+./run-session.sh status --session=my-game
+```
+
+`status` is also the resume command: run it with the same Session ID in a later process or AI response. It returns the current public observation, legal actions, Session metadata, and Game Over status in one JSON value. There is intentionally no separate `resume` command.
+
+Choose exactly one action from `legalActions`, then submit it with a short public rationale. `step` accepts JSON from standard input or `--input`:
+
+```bash
+printf '%s\n' '{"action":{"type":"EndTurn"},"decisionSummary":"No higher-priority legal action remains."}' | \
+  ./run-session.sh step --session=my-game
+
+./run-session.sh step --session=my-game --input=next-step.json
+```
+
+The `decisionSummary` is required, must contain 1–500 Unicode code points after trimming, and should be a concise public explanation or reason code—not private chain-of-thought. A malformed request is rejected without consuming a Decision number. A well-formed but illegal action is recorded as a rejected Decision without changing game state or RNG; inspect the returned error and current legal actions before retrying.
+
+The complete seven-command interface is:
+
+- `new`: create a new, non-overwriting Session
+- `status`: inspect or resume the current Active Session
+- `step`: apply one action plus `decisionSummary`
+- `save-checkpoint`: create a manual Checkpoint
+- `list-checkpoints`: list public Checkpoint metadata
+- `load-checkpoint`: branch from a Checkpoint into a required new Session ID
+- `artifact`: obtain the current or final public Run Artifact
+
+Checkpoint and branch example:
+
+```bash
+./run-session.sh save-checkpoint --session=my-game
+./run-session.sh list-checkpoints --session=my-game
+./run-session.sh load-checkpoint --session=my-game \
+  --checkpoint=PASTE_RETURNED_CHECKPOINT_ID --new-session-id=my-branch
+./run-session.sh status --session=my-branch
+./run-session.sh artifact --session=my-branch
+```
+
+Use the exact Checkpoint ID returned by `save-checkpoint` or `list-checkpoints`; the example ID is illustrative. Loading never rewinds or overwrites the parent Session. It creates a child Session whose lineage and public history continue from that Checkpoint. Automatic Checkpoints are created after every five completed turns by default (configurable with positive `--checkpoint-interval` on `new`), and a final Checkpoint is created at Game Over.
+
+Session data defaults to `output/sessions`; pass the same `--root=PATH` to every command to use another root. Active state is committed after each well-formed Decision, so a later `status` continues the same Decision Log and Run Artifact. If Active data is reported corrupt or incompatible, do not edit private files and do not expect an automatic rollback: list the valid Checkpoints and explicitly create a new branch with `load-checkpoint`.
+
+The Session directory includes a private Save Format 6 checkpoint state solely so the runtime can resume deterministically. Do not inspect or use private state, RNG state, hidden enemies/targets, or non-public configuration for decisions. The public `trace.ndjson`, CLI JSON, and Artifact Schema 2.1.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
+
+For a quick built-in-agent smoke test instead of an interactive Session:
 
 ```bash
 ./run-npm.sh run sim -- --agent=balanced --games=1 --seed=1 --out=output/ai-smoke --overwrite
 ```
 
-This runs the built-in Balanced Agent and is a quick way to verify that the bundled runtime works.
+This runs the built-in Balanced Agent and is a quick way to verify that the bundled runtime works. The package workflow separately exercises all seven Session commands with the bundled Node.js runtime.
 
 For custom TypeScript driver scripts, use the bundled `vite-node` launcher instead of installing tools globally:
 
@@ -51,20 +98,23 @@ Recommended loop:
 8. repeat until `isGameOver()` is true
 9. report `getResult()` and keep `getRunArtifact()` as a public play trace for debugging
 
-## v1.4.0 tactical context
+## v1.4.1 tactical context
 
 Use the current `AgentObservation` as the source of truth for conditional forecasts. It does not reveal future random draws or private state.
 
 - Map tiles expose base terrain, road/urban overlays, effective movement cost, terrain defense, and `visibleToPlayer`. Human movement, zombies, replay, and agents share the same weighted pathfinding rules.
 - Enemy arrays contain only currently visible `zombie` and `hordeZombie` units. Never infer hidden enemies from missing movement or checkpoint actions: public planning treats hidden occupied hexes as empty, and execution can stop movement safely when one is encountered.
-- Police and National Guard have vision 5, Movement 10, and individual Fuel pools. Use `currentFuel`, `maxFuel`, and `fuelCostByLegalMove`: legal moves already exclude Fuel-short moves and show post-move Fuel. Supplied Units are refilled after Power Fuel is spent, in Unit-ID round-robin order; a Unit outside Supply receives no refill.
+- Police and National Guard have vision 5, Movement 10, individual Fuel pools, and individual carried Military Goods. Use `currentFuel`, `maxFuel`, `currentMilitaryGoods`, `maxMilitaryGoods`, and the exact legal-move/attack previews rather than reconstructing costs.
+- With Fuel above 0, moves use the normal Unit-type Fuel formula. With Fuel exactly 0, Police retain 3 effective MP and National Guard 2 effective MP as Emergency Movement. Legal moves identify `movementMode`, exact `effectiveMovementCost`, Fuel cost, and projected Fuel. Forest/Mountain still cost 2/3 MP, Fuel stays 0, and a surviving Unit may still Attack or Wait after moving. Supplied Units can refill Fuel at End Turn; an unsupplied Unit can use Emergency Movement again next turn.
+- Police carry up to 5 Military Goods and have no fixed End Turn consumption. National Guard carry up to 20 and consume 1 at the start of End Turn economy. After Military Factory production, supplied Units refill from national stock in Unit-ID ascending round-robin order; unsupplied Units do not refill. Remaining carried Fuel and Military Goods are lost when a Unit is destroyed.
+- A distance-1 attack costs 1 Military Good when available. At 0, Police/National Guard may still attack at distance 1 with effective attack 1/2 and consume 0. National Guard distance 2 requires and consumes 2; it is not legal with only 0 or 1. Read `attackPreviews` for distance, cost, projected balance, effective attack, and terrain-adjusted damage. The same ammunition rules govern counterattack and interception.
 - The Capital, owned facilities, and active checkpoints add shared visibility. Wind Power Plant also gives Vision 1. A powered Civilian Drone Base gives Vision `workers × 2`. Standby and Dormant checkpoints do not. Hidden enemy positions, IDs, target memory, spawn coordinates, and counts are not public.
 - Periodic and Final Hordes are mixed groups. Normal Zombies keep normal HP 10 and AI; Horde Zombies have HP 20 and carry the strategic target. Standard Periodic compositions are 2/0, 3/1, 4/2, 5/3, and 6/4 Horde/Normal; the Final composition is 7/5. Warnings expose type, direction, remaining turns, spawn turn, and Final Horde status—but not pre-spawn size or exact positions.
 - There is no game-rule turn limit. After the Final Horde spawns on the configured turn, play continues until defeat or all three public victory flags are true: `finalHordeDefeated`, `suppliedAreaZombieClear`, and `suppliedAreaInfectionClear`.
 
 - A surviving supplied unit recovers at the next player-turn start. Combat, counterattack, interception, or automatic infection suppression uses the configured 10% combat rate; only moving, waiting, or taking no action uses the configured 20% rest rate; out of supply is 0%. The observation reports the class, rate, base amount, timing, and survival/supply conditions.
-- A police or National Guard unit stationed at an infected location contains internal spread. If it still has an attack available and did not spend it on normal combat, the engine can automatically suppress during the infection phase after End Turn. Police suppression has no civilian damage; National Guard suppression is stronger but can cause civilian damage.
-- Use `baseRange` and `effectiveRange` rather than assuming a unit's range. National Guard is base range 2, falling to effective range 1 while military supply is short.
+- A police or National Guard unit stationed at an infected location contains internal spread regardless of its carried Military Goods. If it still has an attack available and has at least 1 Military Good after refill, automatic suppression consumes 1 during the infection phase. At 0 it only contains spread: it does not suppress and does not consume its attack. Police suppression has no civilian damage; National Guard suppression is stronger but can cause civilian damage.
+- Use `baseRange`, `effectiveRange`, attack previews, and shortage reasons rather than assuming a unit's range. National Guard distance 2 is available only while it can pay the cost of 2; the removed global `militarySupplyAvailable` state is not part of v1.4.1.
 - Wind Power Plant supplies 15 Electricity at Fuel 0 and has Zombie Target Value 5, but no civilian population or Supply source. Its disabled/recovering state supplies neither power nor vision. `zombieTargetValue` is distinct from real population and must not be treated as consumption or Defeat population.
 - `BuildConstructibleFacility` creates a Simple Farm (Civilian Goods 15) or Civilian Drone Base (Civilian Goods 25) only on a Core-listed supplied, empty Plain Hex with no road, urban overlay, entrance, Player Unit, or visible Zombie. Build Turn is inactive; operations begin next Player Turn. Read `constructibleFacilityPositionCandidates` rather than reconstructing legality.
 - Simple Farm needs 5 Electricity and produces Food 5 per worker. Drone Base needs 5 Electricity and provides Vision 2 per worker. Both have independent per-type cap `ceil(roadBranchCount / 2)`, preserve existing workers/functions outside Supply, but cannot gain workers there.
@@ -80,7 +130,7 @@ There is no public `SuppressInfection` action. Infection response is resolved by
 
 The AI player should not use `GameEngine.getState()`, `AgentGameAdapter.getDebugState()`, save internals, hidden future random values, or other non-public implementation details to make decisions. Those exist for development and diagnostics, not as player-visible information.
 
-The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.4.0` uses Game Rules, Agent, Observation, Bridge, and Artifact contracts `2.0.0`, Fixed Map `fixed-31x31-v1`, Save Format `5`, Balanced Agent `4.0.0`, and Random Agent `2.0.0`. Artifact Schema 2.0.0 stores the fixed map once and trace entries reference it by `mapId`; live observations remain complete.
+The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.4.1` uses Game Rules `2.1.0`, Agent/Observation/Browser Bridge API `3.0.0`, Fixed Map `fixed-31x31-v1`, Save Format `6`, Artifact Schema `2.1.0`, Checkpoint Schema `1.0.0`, Balanced Agent `4.1.0`, and Random Agent `2.1.0`. Artifact Schema 2.1.0 stores fixed topology once, includes the public Decision Log and optional Session lineage, and keeps private Checkpoint state outside player-facing artifacts.
 
 ## Package layout
 
@@ -92,6 +142,7 @@ nowhere-left-to-hide-ai-<version>-<commit>-linux-x64/
 ├─ BUILD_INFO.txt
 ├─ run-npm.sh
 ├─ run-vite-node.sh
+├─ run-session.sh
 ├─ runtime/
 │  └─ node/              # bundled Linux x64 Node.js runtime
 └─ game/

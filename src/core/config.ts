@@ -14,7 +14,7 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '2.0.0';
+export const CONFIG_VERSION = '2.1.0';
 export const DEFAULT_MAP_ID = 'fixed-31x31-v1';
 
 const facilityIds: FacilityId[] = [
@@ -52,10 +52,30 @@ function production(
 }
 
 const defaultUnitConfig: Record<UnitType, UnitConfig> = {
-  police: { hp: 25, attack: 5, movement: 10, range: 1, vision: 5, population: 5, maxFuel: 12 },
-  nationalGuard: { hp: 50, attack: 10, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 22 },
-  zombie: { hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0 },
-  hordeZombie: { hp: 20, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0 },
+  police: {
+    hp: 25, attack: 5, movement: 10, range: 1, vision: 5, population: 5, maxFuel: 12,
+    maxMilitaryGoods: 5, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: { 1: 1 }, suppressionMilitaryGoodsCost: 1,
+    militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 3,
+  },
+  nationalGuard: {
+    hp: 50, attack: 10, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 22,
+    maxMilitaryGoods: 20, fixedMilitaryGoodsUpkeepPerTurn: 1,
+    attackMilitaryGoodsCostByRange: { 1: 1, 2: 2 }, suppressionMilitaryGoodsCost: 1,
+    militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
+  },
+  zombie: {
+    hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
+    maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
+    militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
+  },
+  hordeZombie: {
+    hp: 20, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
+    maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
+    militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
+  },
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
@@ -150,7 +170,6 @@ const initialWorkersByFacility: Record<FacilityId, number> = {
 
 const defaultEconomy: EconomyConfig = {
   populationConsumption: { food: 1, civilianGoods: 1 },
-  militaryGoodsPerUnitPopulation: 1,
   initialResources,
   initialWorkersByFacility,
   initialZombieCount: 6,
@@ -345,11 +364,40 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       errors.push(`units.${type} is required`);
       continue;
     }
-    for (const key of ['hp', 'attack', 'movement', 'range', 'vision', 'population', 'maxFuel'] as const) {
+    for (const key of [
+      'hp', 'attack', 'movement', 'range', 'vision', 'population', 'maxFuel',
+      'maxMilitaryGoods', 'fixedMilitaryGoodsUpkeepPerTurn', 'suppressionMilitaryGoodsCost',
+      'emergencyMovementPoints',
+    ] as const) {
       requireInteger(errors, unit[key], `units.${type}.${key}`, 0);
+    }
+    if (typeof unit.militaryGoodsShortageAttackMultiplier !== 'number'
+      || !Number.isFinite(unit.militaryGoodsShortageAttackMultiplier)
+      || unit.militaryGoodsShortageAttackMultiplier < 0
+      || unit.militaryGoodsShortageAttackMultiplier > 1) {
+      errors.push(`units.${type}.militaryGoodsShortageAttackMultiplier must be between 0 and 1`);
+    }
+    if (!unit.attackMilitaryGoodsCostByRange || typeof unit.attackMilitaryGoodsCostByRange !== 'object') {
+      errors.push(`units.${type}.attackMilitaryGoodsCostByRange is required`);
+    } else if (type === 'police' || type === 'nationalGuard') {
+      for (let distance = 1; distance <= unit.range; distance += 1) {
+        requireInteger(
+          errors,
+          unit.attackMilitaryGoodsCostByRange[distance],
+          `units.${type}.attackMilitaryGoodsCostByRange.${distance}`,
+          0,
+        );
+      }
     }
     if ((type === 'police' || type === 'nationalGuard') && unit.maxFuel < 1) {
       errors.push(`units.${type}.maxFuel must be at least 1`);
+    }
+    if ((type === 'police' || type === 'nationalGuard') && unit.maxMilitaryGoods < 1) {
+      errors.push(`units.${type}.maxMilitaryGoods must be at least 1`);
+    }
+    if ((type === 'zombie' || type === 'hordeZombie')
+      && (unit.maxMilitaryGoods !== 0 || unit.emergencyMovementPoints !== 0)) {
+      errors.push(`units.${type} must not carry military goods or use emergency movement`);
     }
   }
 

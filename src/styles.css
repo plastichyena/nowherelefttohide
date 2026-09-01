@@ -128,6 +128,13 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .unit-context-layer { position: absolute; inset: 0; z-index: 8; overflow: hidden; pointer-events: none; }
 .unit-action-menu, .unit-target-confirm, .unit-mode-indicator { position: absolute; pointer-events: auto; }
 .unit-action-menu, .unit-target-confirm { display: flex; align-items: center; gap: 6px; max-width: calc(100% - 16px); padding: 6px; border: 1px solid #35606e; border-radius: 12px; background: #10232ded; box-shadow: 0 8px 22px #0008; transform: translate(-50%, -50%); }
+.unit-target-confirm { max-width: min(520px, calc(100% - 16px)); }
+.attack-preview-detail, .move-preview-detail { display: grid; min-width: 0; gap: 2px 8px; padding: 4px 7px; color: #dce9ed; font-size: 0.69rem; line-height: 1.25; }
+.attack-preview-detail { grid-template-columns: repeat(2, minmax(0, auto)); }
+.attack-preview-detail span:last-of-type, .attack-preview-detail .warning-text { grid-column: 1 / -1; }
+.attack-preview-detail .warning-text { margin: 1px 0 0; font-size: 0.66rem; }
+.move-preview-detail { grid-template-columns: 1fr; }
+.move-preview-detail[data-move-mode="emergency"] { color: #ffd990; }
 .unit-action-menu[hidden], .unit-target-confirm[hidden], .unit-mode-indicator[hidden] { display: none; }
 .unit-action-menu button, .unit-target-confirm button { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; gap: 5px; padding: 7px 10px; border: 1px solid #396878; border-radius: 9px; background: #18313c; color: #e8f0f3; font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
 .unit-action-menu button:hover, .unit-target-confirm button:hover { border-color: #66d5d8; background: #214b58; }
@@ -138,6 +145,11 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .unit-action-menu button[data-unit-action="wait"] { color: #bcefd0; }
 .unit-target-confirm button[data-unit-action="confirm"], .unit-target-confirm button[data-action="confirm"] { background: #27584e; border-color: #5ab994; color: #bcefd0; }
 .unit-target-confirm button[data-unit-action="cancel"], .unit-target-confirm button[data-action="cancel"] { background: #302819; border-color: #89703d; color: #f7dfa0; }
+.forecast-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.military-unit-forecast { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 0.72rem; }
+.military-unit-forecast th, .military-unit-forecast td { padding: 5px 7px; border-bottom: 1px solid #284652; text-align: right; white-space: nowrap; }
+.military-unit-forecast th:first-child, .military-unit-forecast td:first-child { position: sticky; left: 0; text-align: left; background: #132832; }
+.unit-military-goods, .attack-confirm-preview { margin: 9px 0; padding: 9px 10px; border: 1px solid #8c7041; border-left: 3px solid #d4a85a; border-radius: 9px; background: #2a261b; }
 .unit-mode-indicator { top: 8px; left: 50%; max-width: calc(100% - 16px); padding: 6px 10px; border: 1px solid #35606e; border-radius: 9px; background: #0c1b24e8; color: #d8f8e8; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-align: center; transform: translateX(-50%); }
 .unit-mode-indicator button { min-width: 44px; min-height: 44px; margin-left: 6px; padding: 7px 10px; border: 1px solid #89703d; border-radius: 9px; background: #302819; color: #f7dfa0; font-size: 0.76rem; font-weight: 700; }
 .unit-mode-indicator button:hover { border-color: #d7b75f; background: #40331e; }
@@ -403,6 +415,10 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .fuel-order-note strong { color: #d8f8e8; }
 
 @media (max-width: 560px) {
+  .unit-target-confirm { gap: 3px; padding: 4px; }
+  .attack-preview-detail, .move-preview-detail { max-width: calc(100vw - 116px); font-size: 0.62rem; }
+  .attack-preview-detail { grid-template-columns: 1fr; }
+  .attack-preview-detail span:last-of-type, .attack-preview-detail .warning-text { grid-column: 1; }
   .strategic-critical-strip { padding-inline: 10px; }
   .strategic-critical-strip span { font-size: 0.7rem; }
   .constructible-build-actions { grid-template-columns: 1fr; }

@@ -127,7 +127,6 @@ export interface ResourceState extends ResourceStock {
   /** Electricity is a per-turn capacity, not a consumable stockpile. */
   electricityCapacity: number;
   electricityRequired: number;
-  militarySupplyAvailable: boolean;
 }
 
 export interface HexTile {
@@ -261,6 +260,9 @@ export interface UnitState {
   /** Human-unit endurance. Zombie units always store zero for both values. */
   currentFuel: number;
   maxFuel: number;
+  /** Human-unit carried ammunition/supplies. Zombie units always store zero. */
+  currentMilitaryGoods: number;
+  maxMilitaryGoods: number;
   actionState: UnitActionState;
   canAttack: boolean;
   canMove: boolean;
@@ -526,6 +528,34 @@ export interface FuelForecast extends ForecastResourceRequirement {
   generationFuelShortage: number;
 }
 
+export type MilitaryGoodsSuppressionStatus = 'suppression' | 'containment_only' | 'none';
+
+export interface MilitaryGoodsUnitForecast {
+  unitId: string;
+  unitType: HumanUnitType;
+  inSupply: boolean;
+  beforeFixed: number;
+  fixedConsumption: number;
+  afterFixed: number;
+  refillDemand: number;
+  projectedRefillAmount: number;
+  unfilledRefillDemand: number;
+  afterRefill: number;
+  suppressionCost: number;
+  suppressionStatus: MilitaryGoodsSuppressionStatus;
+  afterSuppression: number;
+}
+
+export interface MilitaryGoodsForecast {
+  startingStock: number;
+  projectedProduction: number;
+  totalRefillDemand: number;
+  projectedTotalRefilled: number;
+  totalUnfilledRefillDemand: number;
+  projectedEndingStock: number;
+  units: MilitaryGoodsUnitForecast[];
+}
+
 export type StrategicResourceType = ResourceType | 'electricity';
 
 export interface ResourceContributorForecast {
@@ -577,7 +607,7 @@ export interface EndTurnForecast {
   };
   food: ForecastResourceRequirement;
   civilianGoods: CivilianGoodsForecast;
-  militaryGoods: ForecastResourceRequirement;
+  militaryGoods: MilitaryGoodsForecast;
   fuel: FuelForecast;
   electricity: {
     physicalGenerationCapacity: number;
@@ -773,6 +803,12 @@ export interface UnitConfig {
   vision: number;
   population: number;
   maxFuel: number;
+  maxMilitaryGoods: number;
+  fixedMilitaryGoodsUpkeepPerTurn: number;
+  attackMilitaryGoodsCostByRange: Record<number, number>;
+  suppressionMilitaryGoodsCost: number;
+  militaryGoodsShortageAttackMultiplier: number;
+  emergencyMovementPoints: number;
 }
 
 export interface ProductionRule {
@@ -874,7 +910,6 @@ export interface EconomyConfig {
     food: number;
     civilianGoods: number;
   };
-  militaryGoodsPerUnitPopulation: number;
   initialResources: ResourceStock;
   initialWorkersByFacility: Record<FacilityId, number>;
   initialZombieCount: number;

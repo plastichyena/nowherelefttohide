@@ -222,6 +222,22 @@ export interface GameMetrics {
   resourceSinglePointFailureTurnsByResource: Record<string, number>;
   checkpointMovesWithNoSupplyGain: number;
   checkpointQueuePressureTurnsByClass: Record<'none' | 'low' | 'medium' | 'high', number>;
+  fixedMilitaryGoodsConsumedByType: Record<HumanUnitType, number>;
+  attackMilitaryGoodsConsumedByType: Record<HumanUnitType, number>;
+  counterattackMilitaryGoodsConsumedByType: Record<HumanUnitType, number>;
+  interceptionMilitaryGoodsConsumedByType: Record<HumanUnitType, number>;
+  suppressionMilitaryGoodsConsumedByType: Record<HumanUnitType, number>;
+  militaryGoodsRefilledByType: Record<HumanUnitType, number>;
+  unfilledMilitaryGoodsRefillByType: Record<HumanUnitType, number>;
+  militaryGoodsLostOnDestructionByType: Record<HumanUnitType, number>;
+  zeroMilitaryGoodsWeakAttacksByType: Record<HumanUnitType, number>;
+  nationalGuardAttacksByRange: Record<'range1' | 'range2', number>;
+  nationalGuardMilitaryGoodsConsumedByRange: Record<'range1' | 'range2', number>;
+  militaryGoodsRefillShortageTurns: number;
+  emergencyMovesByType: Record<HumanUnitType, number>;
+  emergencyMovementHexesByType: Record<HumanUnitType, number>;
+  emergencyMovementPointsByType: Record<HumanUnitType, number>;
+  emergencyReturnsToSupplyByType: Record<HumanUnitType, number>;
   failure: MetricFailureInfo | null;
 }
 
@@ -630,6 +646,27 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const unitFuelConsumedByType = byHumanType();
   const unitFuelRefilledByType = byHumanType();
   const commissioningFuelByType = byHumanType();
+  const fixedMilitaryGoodsConsumedByType = byHumanType();
+  const attackMilitaryGoodsConsumedByType = byHumanType();
+  const counterattackMilitaryGoodsConsumedByType = byHumanType();
+  const interceptionMilitaryGoodsConsumedByType = byHumanType();
+  const suppressionMilitaryGoodsConsumedByType = byHumanType();
+  const militaryGoodsRefilledByType = byHumanType();
+  const unfilledMilitaryGoodsRefillByType = byHumanType();
+  const militaryGoodsLostOnDestructionByType = byHumanType();
+  const zeroMilitaryGoodsWeakAttacksByType = byHumanType();
+  const emergencyMovesByType = byHumanType();
+  const emergencyMovementHexesByType = byHumanType();
+  const emergencyMovementPointsByType = byHumanType();
+  const emergencyReturnsToSupplyByType = byHumanType();
+  const nationalGuardAttacksByRange = { range1: 0, range2: 0 };
+  const nationalGuardMilitaryGoodsConsumedByRange = { range1: 0, range2: 0 };
+  const humanUnitTypeById = new Map<string, HumanUnitType>();
+  for (const observation of observations) {
+    for (const unit of observation.units) {
+      if (unit.type === 'police' || unit.type === 'nationalGuard') humanUnitTypeById.set(unit.id, unit.type);
+    }
+  }
   for (let index = 1; index < observations.length; index += 1) {
     const before = observations[index - 1]!;
     const after = observations[index]!;
@@ -662,6 +699,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   let simpleFarmFoodProduced = 0;
   let maxDroneVisionRadius = 0;
   let guaranteedDefeatWarnings = 0;
+  let militaryGoodsRefillShortageTurns = 0;
   const resourceSinglePointFailureTurnsByResource: Record<string, number> = {
     food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0, electricity: 0,
   };
@@ -675,6 +713,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       if (unit.canMove && unit.currentFuel === 0 && unit.fuelCostByLegalMove.length === 0) unitsUnableToMoveForFuel += 1;
     }
     if (observation.endTurnForecast.fuel.totalFuelShortage > 0) fuelShortageTurns += 1;
+    if (observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand > 0) militaryGoodsRefillShortageTurns += 1;
+    for (const unit of observation.endTurnForecast.militaryGoods.units) {
+      unfilledMilitaryGoodsRefillByType[unit.unitType] += unit.unfilledRefillDemand;
+    }
     windPowerGenerated += observation.endTurnForecast.fuel.windPowerAvailable;
     windDisabledTurns += observation.facilities.filter(
       (facility) => facility.type === 'windPowerPlant' && facility.operationalStatus === 'disabled',
@@ -703,6 +745,44 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const stateFuelSpentOnUnits = events
     .filter((event) => event.type === 'resource_consumed' && event.payload.resource === 'fuel' && event.payload.reason === 'unit_refill')
     .reduce((total, event) => total + eventPayloadNumber(event, 'amount'), 0);
+  for (const event of events) {
+    const unitTypeValue = typeof event.payload.unitType === 'string'
+      ? event.payload.unitType
+      : typeof event.payload.attackerId === 'string'
+        ? humanUnitTypeById.get(event.payload.attackerId)
+        : undefined;
+    const unitType = unitTypeValue === 'police' || unitTypeValue === 'nationalGuard' ? unitTypeValue : null;
+    if (!unitType) continue;
+    const militaryGoodsCost = eventPayloadNumber(event, 'militaryGoodsCost');
+    if (event.type === 'resource_consumed' && event.payload.resource === 'militaryGoods') {
+      if (event.payload.reason === 'unit_fixed_upkeep') fixedMilitaryGoodsConsumedByType[unitType] += eventPayloadNumber(event, 'amount');
+      if (event.payload.reason === 'unit_refill') militaryGoodsRefilledByType[unitType] += eventPayloadNumber(event, 'amount');
+    } else if (event.type === 'infection_suppressed') {
+      suppressionMilitaryGoodsConsumedByType[unitType] += militaryGoodsCost;
+    } else if (event.type === 'attack' || event.type === 'interception') {
+      if (event.type === 'interception') interceptionMilitaryGoodsConsumedByType[unitType] += militaryGoodsCost;
+      else if (event.payload.counterattack === true) counterattackMilitaryGoodsConsumedByType[unitType] += militaryGoodsCost;
+      else attackMilitaryGoodsConsumedByType[unitType] += militaryGoodsCost;
+      const effectiveAttack = eventPayloadNumber(event, 'effectiveAttack');
+      if (militaryGoodsCost === 0 && effectiveAttack < input.config.units[unitType].attack) {
+        zeroMilitaryGoodsWeakAttacksByType[unitType] += 1;
+      }
+      if (unitType === 'nationalGuard') {
+        const rangeKey = eventPayloadNumber(event, 'distance') >= 2 ? 'range2' : 'range1';
+        nationalGuardAttacksByRange[rangeKey] += 1;
+        nationalGuardMilitaryGoodsConsumedByRange[rangeKey] += militaryGoodsCost;
+      }
+    } else if (event.type === 'unit_destroyed') {
+      militaryGoodsLostOnDestructionByType[unitType] += eventPayloadNumber(event, 'lostMilitaryGoods');
+    } else if (event.type === 'unit_moved' && event.payload.movementMode === 'emergency') {
+      emergencyMovesByType[unitType] += 1;
+      emergencyMovementHexesByType[unitType] += eventPayloadNumber(event, 'hexesMoved');
+      emergencyMovementPointsByType[unitType] += eventPayloadNumber(event, 'effectiveMovementCost');
+      const destinationKey = `${String(event.payload.q)},${String(event.payload.r)}`;
+      const observationAtTurn = [...observations].reverse().find((observation) => observation.turn === event.turn);
+      if (observationAtTurn?.supply.suppliedTileKeys.includes(destinationKey)) emergencyReturnsToSupplyByType[unitType] += 1;
+    }
+  }
   const constructed = (type: 'simpleFarm' | 'civilianDroneBase') => events.filter(
     (event) => event.type === 'constructible_built' && event.payload.facilityType === type,
   ).length;
@@ -921,6 +1001,22 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     resourceSinglePointFailureTurnsByResource,
     checkpointMovesWithNoSupplyGain,
     checkpointQueuePressureTurnsByClass,
+    fixedMilitaryGoodsConsumedByType,
+    attackMilitaryGoodsConsumedByType,
+    counterattackMilitaryGoodsConsumedByType,
+    interceptionMilitaryGoodsConsumedByType,
+    suppressionMilitaryGoodsConsumedByType,
+    militaryGoodsRefilledByType,
+    unfilledMilitaryGoodsRefillByType,
+    militaryGoodsLostOnDestructionByType,
+    zeroMilitaryGoodsWeakAttacksByType,
+    nationalGuardAttacksByRange,
+    nationalGuardMilitaryGoodsConsumedByRange,
+    militaryGoodsRefillShortageTurns,
+    emergencyMovesByType,
+    emergencyMovementHexesByType,
+    emergencyMovementPointsByType,
+    emergencyReturnsToSupplyByType,
     failure: input.failure ? { ...input.failure } : null,
   };
 }

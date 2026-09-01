@@ -10,16 +10,17 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.4 saves. */
+/** The sole game-rules version accepted by v1.4.1 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 5;
-/** v1.4 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v5';
+export const SAVE_FORMAT_VERSION = 6;
+/** v1.4.1 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v6';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v4';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v5';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v4',
   'nowhere-left-to-hide:auto-save:v3',
   'nowhere-left-to-hide:auto-save:v2',
 ] as const;
@@ -372,7 +373,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.3.3 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.4.0 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -558,9 +559,8 @@ function validateV14Shape(state: Record<string, unknown>, errors: string[]): voi
   if (!isRecord(resources)) {
     errors.push('state.resources must be an object');
   } else {
-    requireFields(errors, resources, 'state.resources', ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricityCapacity', 'electricityRequired', 'militarySupplyAvailable']);
+    requireFields(errors, resources, 'state.resources', ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricityCapacity', 'electricityRequired']);
     for (const resource of ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricityCapacity', 'electricityRequired'] as const) if (!isInteger(resources[resource])) errors.push(`state.resources.${resource} is invalid`);
-    if (typeof resources.militarySupplyAvailable !== 'boolean') errors.push('state.resources.militarySupplyAvailable is invalid');
   }
 
   const facilities = state.facilities;
@@ -641,6 +641,8 @@ function validateV14Shape(state: Record<string, unknown>, errors: string[]): voi
         'population',
         'currentFuel',
         'maxFuel',
+        'currentMilitaryGoods',
+        'maxMilitaryGoods',
         'actionState',
         'canAttack',
         'canMove',
@@ -654,16 +656,21 @@ function validateV14Shape(state: Record<string, unknown>, errors: string[]): voi
       if (typeof unit.id !== 'string' || unit.id.length === 0) errors.push(`${path}.id is invalid`);
       if (!UNIT_TYPES.includes(unit.type as typeof UNIT_TYPES[number])) errors.push(`${path}.type is invalid`);
       validateCoordinate(errors, unit.position, `${path}.position`);
-      for (const field of ['hp', 'maxHp', 'attack', 'movement', 'range', 'vision', 'population', 'currentFuel', 'maxFuel'] as const) if (!isInteger(unit[field])) errors.push(`${path}.${field} is invalid`);
+      for (const field of ['hp', 'maxHp', 'attack', 'movement', 'range', 'vision', 'population', 'currentFuel', 'maxFuel', 'currentMilitaryGoods', 'maxMilitaryGoods'] as const) if (!isInteger(unit[field])) errors.push(`${path}.${field} is invalid`);
       if (isInteger(unit.currentFuel) && isInteger(unit.maxFuel) && unit.currentFuel > unit.maxFuel) errors.push(`${path}.currentFuel exceeds maxFuel`);
+      if (isInteger(unit.currentMilitaryGoods) && isInteger(unit.maxMilitaryGoods) && unit.currentMilitaryGoods > unit.maxMilitaryGoods) errors.push(`${path}.currentMilitaryGoods exceeds maxMilitaryGoods`);
       const configuredUnit = isRecord(config) && isRecord(config.units)
         ? config.units[unit.type as string]
         : undefined;
       if (isRecord(configuredUnit) && isInteger(configuredUnit.maxFuel) && unit.maxFuel !== configuredUnit.maxFuel) errors.push(`${path}.maxFuel must match state.config.units.${String(unit.type)}.maxFuel`);
+      if (isRecord(configuredUnit) && isInteger(configuredUnit.maxMilitaryGoods) && unit.maxMilitaryGoods !== configuredUnit.maxMilitaryGoods) errors.push(`${path}.maxMilitaryGoods must match state.config.units.${String(unit.type)}.maxMilitaryGoods`);
       if (unit.type === 'zombie' || unit.type === 'hordeZombie') {
         if (unit.currentFuel !== 0 || unit.maxFuel !== 0) errors.push(`${path} Zombie Fuel must be zero`);
-      } else if (!HUMAN_UNIT_TYPES.includes(unit.type as typeof HUMAN_UNIT_TYPES[number]) || (isInteger(unit.maxFuel) && unit.maxFuel < 1)) {
-        errors.push(`${path} human unit maxFuel is invalid`);
+        if (unit.currentMilitaryGoods !== 0 || unit.maxMilitaryGoods !== 0) errors.push(`${path} Zombie Military Goods must be zero`);
+      } else if (!HUMAN_UNIT_TYPES.includes(unit.type as typeof HUMAN_UNIT_TYPES[number])
+        || (isInteger(unit.maxFuel) && unit.maxFuel < 1)
+        || (isInteger(unit.maxMilitaryGoods) && unit.maxMilitaryGoods < 1)) {
+        errors.push(`${path} human unit capacity is invalid`);
       }
       if (!['ready', 'moved', 'acted', 'destroyed'].includes(unit.actionState as string)) errors.push(`${path}.actionState is invalid`);
       for (const field of ['canAttack', 'canMove', 'isPlayerUnit'] as const) if (typeof unit[field] !== 'boolean') errors.push(`${path}.${field} is invalid`);
@@ -848,7 +855,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.3.3以前 / v1.3.3 and earlier saves cannot be loaded or converted; Save Format 4 or below is rejected without conversion, deletion, or overwrite`);
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.0以前 / v1.4.0 and earlier saves cannot be loaded or converted; Save Format 5 or below is rejected without conversion, deletion, or overwrite`);
   }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (value.mapId !== FIXED_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID}`);
@@ -887,14 +894,14 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   return { valid: true, errors: [], state: clone(state), envelope };
 }
 
-/** Create a checksummed, URL-safe v1.4.0 Save Format 5 code. */
+/** Create a checksummed, URL-safe v1.4.1 Save Format 6 code. */
 export function encodeSaveCode(state: GameState): string {
   const errors = validateStateForSave(state);
   if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
   return toBase64Url(gzipSync(strToU8(canonicalJson(makeEnvelope(state))), { level: 9 }));
 }
 
-/** Decode and validate a v1.4 save code without changing caller-owned state. */
+/** Decode and validate a v1.4.1 save code without changing caller-owned state. */
 export function decodeSaveCode(code: string): SaveValidationResult {
   if (typeof code !== 'string' || code.trim().length === 0) return reject(['Save code is empty']);
   try {

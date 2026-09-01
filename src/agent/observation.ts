@@ -8,6 +8,7 @@ import {
   getConstructibleFacilityPositionCandidates,
   getCheckpointPositionCandidates,
   getUnitLegalMoveFuelProjections,
+  getUnitLegalAttackProjections,
 } from '../core/engine';
 import { deriveStrategicForecast, getQueuePressureClass } from '../core/forecast';
 import { deriveUnitRecovery } from '../core/recovery';
@@ -24,6 +25,7 @@ import { getPlayerVisibleTileKeys } from '../core/visibility';
 import type {
   GameResult,
   GameState,
+  EndTurnForecast,
   HexTile,
   JsonValue,
   ResourceType,
@@ -88,6 +90,7 @@ function publicUnit(
   unit: UnitState,
   state: Readonly<GameState>,
   refillByUnitId: ReadonlyMap<string, { demand: number; amount: number }>,
+  militaryByUnitId: ReadonlyMap<string, EndTurnForecast['militaryGoods']['units'][number]>,
 ): AgentUnitObservation {
   const inSupply = isHexSupplied(state, unit.position);
   const suppression = forecastUnitSuppression(state, unit);
@@ -98,10 +101,15 @@ function publicUnit(
   const positionTile = tileAt(state, unit.position);
   const defense = terrainDefenseAt(state, unit);
   const refill = refillByUnitId.get(unit.id) ?? { demand: 0, amount: 0 };
+  const military = militaryByUnitId.get(unit.id);
+  const unitConfig = state.config.units[unit.type];
   const fuelCostByLegalMove = (unit.isPlayerUnit
     ? getUnitLegalMoveFuelProjections(state, unit.id)
     : [])
     .sort((left, right) => left.destination.q - right.destination.q || left.destination.r - right.destination.r);
+  const attackPreviews = unit.isPlayerUnit
+    ? getUnitLegalAttackProjections(state, unit.id)
+    : [];
   return {
     id: unit.id,
     type: unit.type,
@@ -119,8 +127,8 @@ function publicUnit(
     range: unit.range,
     baseRange: unit.range,
     effectiveRange: currentRange,
-    rangeModifierReason: unit.type === 'nationalGuard' && currentRange < unit.range
-      ? 'military_supply_shortage'
+    rangeModifierReason: unit.isPlayerUnit && currentRange < unit.range
+      ? 'carried_military_goods_shortage'
       : null,
     population: unit.population,
     actionState: unit.actionState,
@@ -129,9 +137,20 @@ function publicUnit(
     inSupply,
     currentFuel: unit.currentFuel,
     maxFuel: unit.maxFuel,
+    currentMilitaryGoods: unit.currentMilitaryGoods,
+    maxMilitaryGoods: unit.maxMilitaryGoods,
+    fixedMilitaryGoodsUpkeepPerTurn: unitConfig.fixedMilitaryGoodsUpkeepPerTurn,
+    attackMilitaryGoodsCostByRange: cloneJson(unitConfig.attackMilitaryGoodsCostByRange),
+    suppressionMilitaryGoodsCost: unitConfig.suppressionMilitaryGoodsCost,
+    emergencyMovementPoints: unitConfig.emergencyMovementPoints,
+    emergencyMovementAvailable: unit.isPlayerUnit && unit.currentFuel === 0 && unit.canMove,
     fuelCostByLegalMove,
+    attackPreviews,
     projectedRefillDemandIfTurnEndsNow: refill.demand,
     projectedRefillAmountIfTurnEndsNow: refill.amount,
+    projectedMilitaryGoodsAfterFixedConsumption: military?.afterFixed ?? unit.currentMilitaryGoods,
+    projectedMilitaryGoodsAfterRefill: military?.afterRefill ?? unit.currentMilitaryGoods,
+    projectedMilitaryGoodsAfterSuppression: military?.afterSuppression ?? unit.currentMilitaryGoods,
     recoveryClassIfTurnEndsNow: recovery?.recoveryClass ?? null,
     recoveryRateIfTurnEndsNow: recovery?.rate ?? 0,
     recoveryBaseAmountIfTurnEndsNow: recovery?.baseAmount ?? 0,
@@ -149,7 +168,8 @@ function publicUnit(
           : 0
     ),
     suppressionCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
-    suppressionAvailableIfTurnEndsNow: suppression !== null,
+    suppressionAvailableIfTurnEndsNow: military?.suppressionStatus === 'suppression',
+    suppressionStatusIfTurnEndsNow: military?.suppressionStatus ?? 'none',
     suppressionTargetId: suppression?.targetId ?? null,
   };
 }
@@ -194,6 +214,10 @@ export function createAgentObservation(
   const visibleTileKeys = getPlayerVisibleTileKeys(state);
   const refillByUnitId = new Map(
     forecastUnitRefills(state).map((refill) => [refill.unitId, refill] as const),
+  );
+  const endTurnForecast = forecastEndTurn(state);
+  const militaryByUnitId = new Map(
+    endTurnForecast.militaryGoods.units.map((unit) => [unit.unitId, unit] as const),
   );
   const productionByFacility = new Map(
     forecastFacilityProduction(state).map((projection) => [projection.facilityId, projection]),
@@ -431,8 +455,8 @@ export function createAgentObservation(
     facilities,
     units: orderedUnits
       .filter((unit) => unit.isPlayerUnit)
-      .map((unit) => publicUnit(unit, state, refillByUnitId)),
-    zombies: visibleEnemyUnits.map((unit) => publicUnit(unit, state, refillByUnitId)),
+      .map((unit) => publicUnit(unit, state, refillByUnitId, militaryByUnitId)),
+    zombies: visibleEnemyUnits.map((unit) => publicUnit(unit, state, refillByUnitId, militaryByUnitId)),
     checkpoints: [...state.checkpoints]
       .sort((left, right) => left.id.localeCompare(right.id))
       .map((checkpoint) => {
@@ -506,14 +530,14 @@ export function createAgentObservation(
     finalHordeDefeated: victory.finalHordeDefeated,
     suppliedAreaZombieClear: victory.suppliedAreaZombieClear,
     suppliedAreaInfectionClear: victory.suppliedAreaInfectionClear,
-    endTurnForecast: forecastEndTurn(state),
+    endTurnForecast,
     strategicForecast: deriveStrategicForecast(state),
     gameOver: state.gameOver,
     result: publicResult(state.result),
   } satisfies AgentObservation as unknown as JsonValue) as unknown as AgentObservation;
 }
 
-/** Remove fixed topology from one Artifact Schema 2.0.0 trace entry. */
+/** Remove fixed topology from one Artifact Schema 2.1.0 trace entry. */
 export function compactArtifactObservation(observation: AgentObservation): AgentArtifactObservation {
   const copy = cloneJson(observation);
   const { map, ...dynamic } = copy;

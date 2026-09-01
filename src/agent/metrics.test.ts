@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
+import { createInitialState } from '../core/state';
 import { collectGameMetrics, aggregateMetrics } from './metrics';
+import { createAgentObservation } from './observation';
 import { runAgentGame } from './runner';
+import type { AgentPublicEvent } from './types';
 
 describe('Agent Metrics', () => {
   it('collects required game-level values and deterministic action counts', () => {
@@ -13,7 +16,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('2.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('3.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -41,6 +44,14 @@ describe('Agent Metrics', () => {
       'stateFuelSpentOnPower', 'stateFuelSpentOnUnits', 'windPowerGenerated',
       'simpleFarmsBuilt', 'droneBasesBuilt', 'guaranteedDefeatWarnings',
       'resourceSinglePointFailureTurnsByResource', 'checkpointQueuePressureTurnsByClass',
+      'fixedMilitaryGoodsConsumedByType', 'attackMilitaryGoodsConsumedByType',
+      'counterattackMilitaryGoodsConsumedByType', 'interceptionMilitaryGoodsConsumedByType',
+      'suppressionMilitaryGoodsConsumedByType', 'militaryGoodsRefilledByType',
+      'unfilledMilitaryGoodsRefillByType', 'militaryGoodsLostOnDestructionByType',
+      'zeroMilitaryGoodsWeakAttacksByType', 'nationalGuardAttacksByRange',
+      'nationalGuardMilitaryGoodsConsumedByRange', 'militaryGoodsRefillShortageTurns',
+      'emergencyMovesByType', 'emergencyMovementHexesByType',
+      'emergencyMovementPointsByType', 'emergencyReturnsToSupplyByType',
     ]) expect(run.metrics).toHaveProperty(key);
     for (const hiddenNoiseMetric of [
       'normalZombiesNoiseTargeted',
@@ -117,6 +128,79 @@ describe('Agent Metrics', () => {
     expect(metrics.checkpointNormalBranchTurns).toBe(1);
     expect(metrics.checkpointStrictBranchTurns).toBe(0);
     expect(metrics.checkpointPassThroughBranchTurns).toBe(0);
+  });
+
+  it('classifies every Military Goods and Emergency Movement metric from public facts', () => {
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0 } });
+    const observation = createAgentObservation(createInitialState(145, config));
+    const policeForecast = observation.endTurnForecast.militaryGoods.units.find((unit) => unit.unitType === 'police')!;
+    policeForecast.unfilledRefillDemand = 3;
+    observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand = 3;
+    const suppliedDestination = observation.supply.suppliedTileKeys[0]!.split(',').map(Number);
+    const event = (id: string, type: AgentPublicEvent['type'], payload: AgentPublicEvent['payload']): AgentPublicEvent => ({
+      id,
+      turn: observation.turn,
+      phase: observation.phase,
+      type,
+      payload,
+    });
+    const events: AgentPublicEvent[] = [
+      event('fixed', 'resource_consumed', {
+        resource: 'militaryGoods', reason: 'unit_fixed_upkeep', unitType: 'nationalGuard', amount: 1,
+      }),
+      event('refill', 'resource_consumed', {
+        resource: 'militaryGoods', reason: 'unit_refill', unitType: 'police', amount: 4,
+      }),
+      event('suppression', 'infection_suppressed', { unitType: 'police', militaryGoodsCost: 1 }),
+      event('attack-r2', 'attack', {
+        unitType: 'nationalGuard', distance: 2, militaryGoodsCost: 2, effectiveAttack: 10,
+      }),
+      event('counter-r1', 'attack', {
+        unitType: 'nationalGuard', counterattack: true, distance: 1, militaryGoodsCost: 1, effectiveAttack: 10,
+      }),
+      event('interception-r2', 'interception', {
+        unitType: 'nationalGuard', distance: 2, militaryGoodsCost: 2, effectiveAttack: 10,
+      }),
+      event('weak-police', 'attack', {
+        unitType: 'police', distance: 1, militaryGoodsCost: 0, effectiveAttack: 1,
+      }),
+      event('destroyed', 'unit_destroyed', { unitType: 'police', lostMilitaryGoods: 3 }),
+      event('emergency-return', 'unit_moved', {
+        unitType: 'police', movementMode: 'emergency', hexesMoved: 2, effectiveMovementCost: 3,
+        q: suppliedDestination[0], r: suppliedDestination[1],
+      }),
+      event('emergency-field', 'unit_moved', {
+        unitType: 'nationalGuard', movementMode: 'emergency', hexesMoved: 1, effectiveMovementCost: 2,
+        q: -1, r: -1,
+      }),
+    ];
+
+    const metrics = collectGameMetrics({
+      initialObservation: observation,
+      finalObservation: observation,
+      observations: [observation],
+      actions: [],
+      events,
+      result: null,
+      agent: { id: 'v141-metrics-test', version: '1' },
+      config,
+    });
+    expect(metrics.fixedMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 1 });
+    expect(metrics.attackMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 2 });
+    expect(metrics.counterattackMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 1 });
+    expect(metrics.interceptionMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 2 });
+    expect(metrics.suppressionMilitaryGoodsConsumedByType).toEqual({ police: 1, nationalGuard: 0 });
+    expect(metrics.militaryGoodsRefilledByType).toEqual({ police: 4, nationalGuard: 0 });
+    expect(metrics.unfilledMilitaryGoodsRefillByType).toEqual({ police: 3, nationalGuard: 0 });
+    expect(metrics.militaryGoodsLostOnDestructionByType).toEqual({ police: 3, nationalGuard: 0 });
+    expect(metrics.zeroMilitaryGoodsWeakAttacksByType).toEqual({ police: 1, nationalGuard: 0 });
+    expect(metrics.nationalGuardAttacksByRange).toEqual({ range1: 1, range2: 2 });
+    expect(metrics.nationalGuardMilitaryGoodsConsumedByRange).toEqual({ range1: 1, range2: 4 });
+    expect(metrics.militaryGoodsRefillShortageTurns).toBe(1);
+    expect(metrics.emergencyMovesByType).toEqual({ police: 1, nationalGuard: 1 });
+    expect(metrics.emergencyMovementHexesByType).toEqual({ police: 2, nationalGuard: 1 });
+    expect(metrics.emergencyMovementPointsByType).toEqual({ police: 3, nationalGuard: 2 });
+    expect(metrics.emergencyReturnsToSupplyByType).toEqual({ police: 1, nationalGuard: 0 });
   });
 
   it('aggregates averages, percentiles, outcomes, and action totals', () => {

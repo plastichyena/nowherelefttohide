@@ -385,7 +385,7 @@ describe('GameEngine', () => {
     expect(unpowered.fuel.projectedFuelUsed).toBe(0);
   });
 
-  it('lowers every national-guard effective range when military goods are short', () => {
+  it('blocks a range-2 national-guard attack when that unit carries fewer than two military goods', () => {
     const config = createDefaultConfig({
       finalHordeTurn: 3,
       economy: { initialZombieCount: 0, initialResources: { food: 2000, civilianGoods: 2000, militaryGoods: 0, fuel: 2000 } },
@@ -397,9 +397,9 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot: initial }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
+    snapshot.units.find((unit) => unit.id === 'national-guard-1')!.currentMilitaryGoods = 1;
     snapshot.units.push(createUnit(snapshot, 'zombie-range', 'zombie', { q: 18, r: 15 }));
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
-    expect(engine.getState().resources.militarySupplyAvailable).toBe(false);
     expect(engine.getLegalActions().some((action) => action.type === 'Attack' && action.attackerId === 'national-guard-1' && action.targetId === 'zombie-range')).toBe(false);
   });
 

@@ -1,4 +1,4 @@
-# Nowhere Left to Hide v1.4.0 Board Asset Manifest
+# Nowhere Left to Hide v1.4.1 Board Asset Manifest
 
 - Generated: 2026-08-31
 - Runtime format: 256×256 PNG

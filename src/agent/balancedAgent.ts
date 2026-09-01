@@ -37,7 +37,7 @@ function weightedDistance(observation: AgentObservation, start: HexCoord, target
 function shortage(observation: AgentObservation): number {
   return observation.endTurnForecast.food.shortage +
     observation.endTurnForecast.civilianGoods.maintenanceShortage +
-    observation.endTurnForecast.militaryGoods.shortage +
+    observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand +
     observation.endTurnForecast.fuel.totalFuelShortage +
     Math.max(0, observation.endTurnForecast.electricity.requiredPowerDemand - observation.endTurnForecast.electricity.requiredPowerAllocated);
 }
@@ -114,9 +114,15 @@ function zombieThreats(observation: AgentObservation): ZombieThreat[] {
 }
 
 function militaryReserveDeficit(observation: AgentObservation): number {
-  const maintenance = observation.endTurnForecast.militaryGoods.maintenanceRequired;
-  const target = maintenance * BALANCED_THRESHOLDS.militaryReserveTurns + BALANCED_THRESHOLDS.militaryProductionCostBuffer;
-  return Math.max(0, target - observation.resources.militaryGoods);
+  const forecast = observation.endTurnForecast.militaryGoods;
+  const fixedUpkeep = observation.units.reduce(
+    (total, unit) => total + unit.fixedMilitaryGoodsUpkeepPerTurn,
+    0,
+  );
+  const target = forecast.totalUnfilledRefillDemand
+    + fixedUpkeep * BALANCED_THRESHOLDS.militaryReserveTurns
+    + BALANCED_THRESHOLDS.militaryProductionCostBuffer;
+  return Math.max(forecast.totalUnfilledRefillDemand, target - forecast.projectedEndingStock);
 }
 
 function primaryGoal(
@@ -142,7 +148,7 @@ function primaryGoal(
   );
   if (missingActiveCheckpoint && (checkpointNetworkAction || checkpointBlocked)) return 'manage_checkpoint';
   if (shortage(observation) > 0) return 'restore_economy';
-  if (!observation.resources.militarySupplyAvailable || militaryReserveDeficit(observation) > 0) return 'restore_military_supply';
+  if (observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand > 0 || militaryReserveDeficit(observation) > 0) return 'restore_military_supply';
   if (observation.endTurnForecast.overcrowding.additionalFood > 0) return 'reduce_overcrowding';
   if (legalActions.some((action) => action.type === 'Attack')) return 'combat';
   if (legalActions.some((action) => action.type === 'ProduceUnit')) return 'build_forces';
@@ -156,7 +162,7 @@ function facilityResourceValue(type: FacilityType, observation: AgentObservation
   if (type === 'civilianFactory') return observation.endTurnForecast.civilianGoods.shortage > 0 ? 5 : 2;
   if (type === 'refinery') return observation.endTurnForecast.fuel.endingStock < observation.endTurnForecast.fuel.generationFuelDemand ? 5 : 2;
   if (type === 'powerPlant') return observation.endTurnForecast.electricity.physicalGenerationCapacity < observation.endTurnForecast.electricity.required ? 5 : 2;
-  if (type === 'militaryFactory') return observation.resources.militarySupplyAvailable ? 1 : 4;
+  if (type === 'militaryFactory') return observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand > 0 ? 5 : 2;
   if (type === 'civilianDroneBase') return observation.horde.warningType === 'none' ? 2 : 4;
   if (type === 'city') return 3;
   return 4;
@@ -246,7 +252,25 @@ function scoreAction(
     const threat = threatByZombie.get(action.targetId);
     score += weights.attack;
     reasonCodes.push('ATTACK_THREAT');
-    const projectedDamage = attacker && target ? Math.max(1, Math.ceil(attacker.attack * target.terrainDamageMultiplier)) : 0;
+    const publishedPreview = attacker?.attackPreviews.find((preview) => preview.targetUnitId === action.targetId);
+    const attackDistance = attacker && target ? hexDistance(attacker.position, target.position) : 0;
+    const fallbackCost = attacker?.attackMilitaryGoodsCostByRange[attackDistance] ?? 0;
+    const fallbackEffectiveAttack = attacker
+      ? attacker.currentMilitaryGoods >= fallbackCost
+        ? attacker.attack
+        : attackDistance === 1
+          ? Math.max(1, Math.ceil(attacker.attack * 0.2))
+          : 0
+      : 0;
+    const attackMilitaryGoodsCost = publishedPreview?.militaryGoodsCost ?? fallbackCost;
+    const attackEffectiveAttack = publishedPreview?.effectiveAttack ?? fallbackEffectiveAttack;
+    const projectedDamage = publishedPreview?.projectedDamageAfterTerrain
+      ?? (target && attackEffectiveAttack > 0 ? Math.max(1, Math.ceil(attackEffectiveAttack * target.terrainDamageMultiplier)) : 0);
+    if (attacker) {
+      score -= attackMilitaryGoodsCost * 8;
+      if (attackMilitaryGoodsCost > 0) reasonCodes.push('PRESERVE_CARRIED_MILITARY_GOODS');
+      if (attackEffectiveAttack < attacker.attack) reasonCodes.push('MILITARY_GOODS_ZERO_WEAK_ATTACK');
+    }
     if (attacker && target && projectedDamage >= target.hp) {
       score += weights.lethalAttack;
       reasonCodes.push('LETHAL_ATTACK');
@@ -276,7 +300,7 @@ function scoreAction(
         score += weights.safeGuardShot * 0.5;
         reasonCodes.push('SAFE_RANGE_ATTACK');
       }
-      if (attacker.rangeModifierReason === 'military_supply_shortage') reasonCodes.push('MILITARY_SUPPLY_RANGE_REDUCED');
+      if (attacker.rangeModifierReason === 'carried_military_goods_shortage') reasonCodes.push('CARRIED_MILITARY_GOODS_RANGE_REDUCED');
     }
     if (attacker?.type === 'police' && !threat?.threatensCapital) {
       score -= weights.policePreservation;
@@ -349,8 +373,8 @@ function scoreAction(
         targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation, facility.healthyPopulation + Math.ceil(physicalDeficit / generationPerWorker)));
       } else if (facility.type === 'militaryFactory' && reserveDeficit > 0) {
         const immediateCivilianShortage = observation.endTurnForecast.food.shortage + observation.endTurnForecast.civilianGoods.shortage;
-        if (immediateCivilianShortage === 0 || !observation.resources.militarySupplyAvailable) {
-          const sustainableOutputWorkers = Math.ceil(observation.endTurnForecast.militaryGoods.maintenanceRequired / 2);
+        if (immediateCivilianShortage === 0 || observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand > 0) {
+          const sustainableOutputWorkers = Math.ceil(observation.endTurnForecast.militaryGoods.totalRefillDemand / 2);
           const reserveRecoveryWorkers = Math.min(3, Math.ceil(reserveDeficit / 10));
           targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation, sustainableOutputWorkers + reserveRecoveryWorkers));
         }
@@ -398,7 +422,7 @@ function scoreAction(
       if (facility.type === 'militaryFactory' && delta > 0 && reserveDeficit > 0) {
         const usefulWorkers = Math.min(delta, Math.max(0, targetWorkers - facility.healthyPopulation));
         const immediateCivilianShortage = observation.endTurnForecast.food.shortage + observation.endTurnForecast.civilianGoods.shortage;
-        const urgencyMultiplier = immediateCivilianShortage > 0 && observation.resources.militarySupplyAvailable ? 0.2 : 1;
+        const urgencyMultiplier = immediateCivilianShortage > 0 && observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand === 0 ? 0.2 : 1;
         score += usefulWorkers * weights.militaryReserve * Math.min(12, reserveDeficit) * urgencyMultiplier;
         reasonCodes.push('BUILD_MILITARY_RESERVE');
       }
@@ -422,7 +446,7 @@ function scoreAction(
           ? observation.endTurnForecast.civilianGoods.maintenanceShortage
           : facility.type === 'civilianDroneBase'
             ? 0
-            : observation.endTurnForecast.militaryGoods.shortage;
+            : observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand;
       if (action.enabled) {
         score += maintenanceEmergency > 0 ? 320 : facility.type === 'civilianDroneBase' && (
           observation.horde.warningType !== 'none' || observation.zombies.length === 0
@@ -476,9 +500,16 @@ function scoreAction(
         const distance = hexDistance(unit.position, action.destination);
         const longRangeMultiplier = unit.type === 'nationalGuard' && distance >= 6 ? 2.5 : 1;
         score -= fuelPreview.fuelCost * 12 * longRangeMultiplier;
-        reasonCodes.push(unit.type === 'nationalGuard' && distance >= 6 ? 'GUARD_LONG_RANGE_FUEL_COST' : 'MOVE_FUEL_COST');
+        reasonCodes.push(fuelPreview.movementMode === 'emergency'
+          ? 'EMERGENCY_MOVEMENT'
+          : unit.type === 'nationalGuard' && distance >= 6
+            ? 'GUARD_LONG_RANGE_FUEL_COST'
+            : 'MOVE_FUEL_COST');
         const destinationSupplied = observation.supply.suppliedTileKeys.includes(hexKey(action.destination));
-        if (fuelPreview.projectedFuelAfterMove === 0 && !destinationSupplied && !urgentHorde) {
+        if (fuelPreview.movementMode === 'emergency' && destinationSupplied) {
+          score += 220;
+          reasonCodes.push('EMERGENCY_RETURN_TO_SUPPLY');
+        } else if (fuelPreview.projectedFuelAfterMove === 0 && !destinationSupplied && !urgentHorde) {
           score -= 180;
           reasonCodes.push('AVOID_OUT_OF_SUPPLY_FUEL_STRANDING');
         } else if (destinationSupplied && unit.projectedRefillAmountIfTurnEndsNow > 0) {
@@ -500,7 +531,17 @@ function scoreAction(
       const afterZombie = nearestDistance(action.destination, zombiePositions);
       const effectiveRange = unit.effectiveRange;
       const lethalShotsFromDestination = observation.zombies.filter((zombie) =>
-        hexDistance(action.destination, zombie.position) <= effectiveRange && Math.max(1, Math.ceil(unit.attack * zombie.terrainDamageMultiplier)) >= zombie.hp,
+        (() => {
+          const distance = hexDistance(action.destination, zombie.position);
+          if (distance > effectiveRange) return false;
+          const militaryGoodsCost = unit.attackMilitaryGoodsCostByRange[distance] ?? Number.POSITIVE_INFINITY;
+          const effectiveAttack = unit.currentMilitaryGoods >= militaryGoodsCost
+            ? unit.attack
+            : distance === 1
+              ? Math.max(1, Math.ceil(unit.attack * 0.2))
+              : 0;
+          return Math.max(1, Math.ceil(effectiveAttack * zombie.terrainDamageMultiplier)) >= zombie.hp;
+        })(),
       ).length;
       const zombiesReachingDestination = observation.zombies.filter((zombie) =>
         hexDistance(action.destination, zombie.position) <= zombie.movement + zombie.effectiveRange,
@@ -651,6 +692,9 @@ function scoreAction(
         score -= unit.suppressionCivilianDamage * 30;
         reasonCodes.push('AVOID_SUPPRESSION_CIVILIAN_DAMAGE');
       }
+    } else if (unit?.suppressionStatusIfTurnEndsNow === 'containment_only') {
+      score += weights.suppression * 0.35;
+      reasonCodes.push('CONTAIN_INFECTION_WITHOUT_MILITARY_GOODS');
     }
     if (unit && unit.hp < unit.maxHp && unit.recoveryClassIfTurnEndsNow === 'rest') {
       score += weights.recoveryWait * unit.recoveryRateIfTurnEndsNow * 15 * (1 - unit.hp / unit.maxHp);
@@ -717,14 +761,12 @@ function scoreAction(
       score += weights.contactDenial * 1.5;
       reasonCodes.push('BUILD_SECOND_CONTACT_DENIAL_UNIT');
     }
-    const unitPopulation = action.unitType === 'police' ? 5 : 10;
-    const perPopulationMaintenance = observation.population.unitPopulation > 0
-      ? observation.endTurnForecast.militaryGoods.maintenanceRequired / observation.population.unitPopulation
-      : 1;
-    const projectedMaintenance = observation.endTurnForecast.militaryGoods.maintenanceRequired + unitPopulation * perPopulationMaintenance;
     const productionCost = action.unitType === 'police' ? 10 : 25;
+    const projectedFixedUpkeep = action.unitType === 'police' ? 0 : 1;
     const unsupportedTurns = activeMilitaryFactory ? 1 : 2;
-    const minimumMilitaryStock = productionCost + projectedMaintenance * unsupportedTurns;
+    const minimumMilitaryStock = productionCost
+      + observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand
+      + projectedFixedUpkeep * unsupportedTurns;
     if (observation.resources.militaryGoods < minimumMilitaryStock) {
       score -= weights.militaryReserve * (minimumMilitaryStock - observation.resources.militaryGoods);
       reasonCodes.push('PRESERVE_MILITARY_RESERVE');

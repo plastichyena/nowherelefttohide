@@ -493,6 +493,9 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
 
     const traceSource = decision.trace;
     if (traceSource) {
+      const reasonCodes = [...(traceSource.reasonCodes ?? [])];
+      const publicSummary = traceSource.decisionSummary?.trim()
+        || `${traceSource.priorityGoal}: ${reasonCodes.slice(0, 3).join(', ') || 'selected highest-ranked legal action'}`;
       const trace: AgentDecisionTrace = {
         turn: turnForDecision,
         decision: actions.length + 1,
@@ -500,7 +503,8 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
         selectedAction: cloneAction(selected),
         selectedScore: traceSource.selectedScore,
         topCandidates: clone(traceSource.topCandidates ?? []),
-        reasonCodes: [...(traceSource.reasonCodes ?? [])],
+        reasonCodes,
+        decisionSummary: [...publicSummary].slice(0, 500).join(''),
       };
       decisionTrace.push(trace);
     }
@@ -606,7 +610,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       map: { id: config.mapId, width: 15, height: 15, coordinateSystem: 'axial-q-r', tiles: [] },
       roadBranches: [],
       supply: { initialRadius: config.checkpoint.initialSupplyRadius, suppliedTileKeys: [], branchRadii: [] },
-      resources: { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0, electricityCapacity: 0, electricityRequired: 0, militarySupplyAvailable: false },
+      resources: { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0, electricityCapacity: 0, electricityRequired: 0 },
       population: { healthyCivilians: 0, cityResidents: 0, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
       facilities: [], units: [], zombies: [], checkpoints: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [],
       horde: {
@@ -631,7 +635,15 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
         overcrowding: { cities: [], additionalFood: 0, additionalCivilianGoods: 0 },
         food: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0 },
         civilianGoods: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0, productionInputDemand: 0, productionInputAllocated: 0, productionInputShortage: 0, maintenanceShortage: 0 },
-        militaryGoods: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0 },
+        militaryGoods: {
+          startingStock: 0,
+          projectedProduction: 0,
+          totalRefillDemand: 0,
+          projectedTotalRefilled: 0,
+          totalUnfilledRefillDemand: 0,
+          projectedEndingStock: 0,
+          units: [],
+        },
         fuel: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0, turnStartFuel: 0, windPowerAvailable: 0, powerPlantPhysicalCapacity: 0, projectedPowerFuelDemand: 0, projectedPowerFuelUsed: 0, fuelAfterPower: 0, projectedUnitRefillDemand: 0, projectedUnitFuelRefilled: 0, projectedTotalFuelDemand: 0, projectedRefineryProduction: 0, projectedEndingFuel: 0, powerFuelShortage: 0, unitRefillFuelShortage: 0, totalFuelShortage: 0, generationFuelDemand: 0, projectedFuelUsed: 0, generationFuelShortage: 0 },
         electricity: { physicalGenerationCapacity: 0, fuelLimitedGenerationCapacity: 0, availableGenerationCapacity: 0, requiredPowerDemand: 0, industrialBoostDemand: 0, requiredPowerAllocated: 0, industrialBoostAllocated: 0, unpoweredFacilities: [], capacity: 0, required: 0, shortage: 0 },
       },

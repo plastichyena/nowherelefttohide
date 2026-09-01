@@ -57,7 +57,7 @@ describe('unified Agent Runner', () => {
     expect(missingAppMetadataReplay.error?.code).toBe('artifact_invalid');
   }, 90_000);
 
-  it('rejects v1.3 and earlier artifacts before creating a v1.4 replay session', () => {
+  it('rejects v1.4.0 and earlier artifacts before creating a v1.4.1 replay session', () => {
     const config = createDefaultConfig({ finalHordeTurn: 1 });
     const run = runAgentGame(2, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 3 } });
     const oldArtifact = {
@@ -94,6 +94,16 @@ describe('unified Agent Runner', () => {
       bridgeApiVersion: '1.3.0',
     });
     expect(v13Replay).toMatchObject({ reproduced: false, actionsReplayed: 0, error: { code: 'artifact_version_unsupported' } });
+    const v140Replay = replayArtifact({
+      ...run.artifact,
+      appVersion: '1.4.0',
+      gameRulesVersion: '2.0.0',
+      artifactSchemaVersion: '2.0.0',
+      agentApiVersion: '2.0.0',
+      observationApiVersion: '2.0.0',
+      bridgeApiVersion: '2.0.0',
+    });
+    expect(v140Replay).toMatchObject({ reproduced: false, actionsReplayed: 0, error: { code: 'artifact_version_unsupported' } });
   });
 
   it('forces EndTurn at the runner per-turn limit for agents without traces', () => {

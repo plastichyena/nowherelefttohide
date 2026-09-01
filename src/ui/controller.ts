@@ -82,6 +82,10 @@ export interface MovePreview {
   destination: HexCoord;
   interceptionRisk?: number | string;
   firstInterception?: HexCoord | null;
+  movementMode?: 'normal' | 'emergency';
+  effectiveMovementCost?: number;
+  fuelCost?: number;
+  projectedFuelAfterMove?: number;
   [key: string]: unknown;
 }
 
@@ -840,7 +844,14 @@ function configLegendEntries(
     add(`facility.${key}`, facilityLabel(key, locale), `${t('legendWorkers')} ${facility.workerCapacity} · ${t('legendMode')} ${powerModeLabel(production.powerMode, locale)} · ${t('legendPowerCapacity')} ${production.powerCapacity} · ${t('legendPowerGeneration')} ${generation} · ${t('legendInputs')} ${formatResourceAmounts(production.inputs, locale, true)} · ${t('legendOutputs')} ${formatResourceAmounts(production.outputs, locale, true)}${build}${target}`);
   }
   add('populationConsumption', t('legendPopulationConsumption'), `${t('food')} ${config.economy.populationConsumption.food} · ${t('civilianGoods')} ${config.economy.populationConsumption.civilianGoods}`);
-  add('militaryGoodsPerUnit', t('legendMilitaryGoodsPerUnit'), String(config.economy.militaryGoodsPerUnitPopulation));
+  for (const key of ['police', 'nationalGuard'] as const) {
+    const unit = config.units[key];
+    const attackCosts = Object.entries(unit.attackMilitaryGoodsCostByRange)
+      .sort(([left], [right]) => Number(left) - Number(right))
+      .map(([range, cost]) => `${t('distance')} ${range}: ${cost}`)
+      .join(' / ');
+    add(`militaryGoods.${key}`, `${unitLabel(key, locale)} · ${t('carriedMilitaryGoods')}`, `${t('max')} ${unit.maxMilitaryGoods} · ${t('fixedConsumption')} ${unit.fixedMilitaryGoodsUpkeepPerTurn} · ${t('attackCostByDistance')} ${attackCosts} · ${t('suppression')} ${unit.suppressionMilitaryGoodsCost} · ${t('emergencyMovement')} ${unit.emergencyMovementPoints} MP`);
+  }
   add('maxActionsPerTurn', t('maxActionsPerTurn'), String(config.maxActionsPerTurn));
   add('finalHordeTurn', t('finalHordeTurn'), String(config.finalHordeTurn));
   add('hordeCycle', t('hordeCycle'), String(config.horde.cycle));
@@ -1157,8 +1168,8 @@ function formatForecastAmount(value: number): string {
 }
 
 function forecastResourceCard(
-  resource: 'food' | 'civilianGoods' | 'militaryGoods' | 'fuel',
-  detail: EndTurnForecast['food'] | EndTurnForecast['civilianGoods'] | EndTurnForecast['militaryGoods'] | EndTurnForecast['fuel'],
+  resource: 'food' | 'civilianGoods' | 'fuel',
+  detail: EndTurnForecast['food'] | EndTurnForecast['civilianGoods'] | EndTurnForecast['fuel'],
   locale: Locale,
 ): string {
   const t = createTranslator(locale);
@@ -1206,6 +1217,34 @@ function forecastResourceCard(
   return `<section class="forecast-card resource-forecast-card" data-forecast-resource="${resource}"><h4>${escapeHtml(t(resource))}</h4><dl class="forecast-detail-grid">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>${note}</section>`;
 }
 
+/** Render the Unit-carried Military Goods plan without recreating Core allocation rules. */
+export function renderMilitaryGoodsForecast(
+  detail: EndTurnForecast['militaryGoods'],
+  locale: Locale,
+): string {
+  const t = createTranslator(locale);
+  const rows: Array<[string, string]> = [
+    [t('startingStock'), String(detail.startingStock)],
+    [t('projectedProduction'), formatForecastAmount(detail.projectedProduction)],
+    [t('militaryRefillDemand'), String(detail.totalRefillDemand)],
+    [t('militaryRefillAmount'), String(detail.projectedTotalRefilled)],
+    [t('militaryUnfilledDemand'), String(detail.totalUnfilledRefillDemand)],
+    [t('endingStock'), String(detail.projectedEndingStock)],
+  ];
+  const unitRows = detail.units.map((unit) => {
+    const status = unit.suppressionStatus === 'suppression'
+      ? t('suppressionWillRun')
+      : unit.suppressionStatus === 'containment_only'
+        ? t('containmentOnly')
+        : t('none');
+    return `<tr data-military-unit="${escapeHtml(unit.unitId)}"><th scope="row">${escapeHtml(unit.unitId)}</th><td>${unit.beforeFixed}</td><td>-${unit.fixedConsumption}</td><td>${unit.afterFixed}</td><td>+${unit.projectedRefillAmount}</td><td>${unit.unfilledRefillDemand}</td><td>${unit.afterRefill}</td><td>${escapeHtml(status)}${unit.suppressionCost > 0 ? ` (-${unit.suppressionCost})` : ''}</td><td>${unit.afterSuppression}</td></tr>`;
+  }).join('');
+  const unitTable = detail.units.length > 0
+    ? `<div class="forecast-table-scroll"><table class="military-unit-forecast"><thead><tr><th>${escapeHtml(t('unit'))}</th><th>${escapeHtml(t('beforeFixed'))}</th><th>${escapeHtml(t('fixedConsumption'))}</th><th>${escapeHtml(t('afterFixed'))}</th><th>${escapeHtml(t('refillAmount'))}</th><th>${escapeHtml(t('militaryUnfilledDemand'))}</th><th>${escapeHtml(t('afterRefill'))}</th><th>${escapeHtml(t('suppression'))}</th><th>${escapeHtml(t('afterSuppression'))}</th></tr></thead><tbody>${unitRows}</tbody></table></div>`
+    : `<p class="muted">${escapeHtml(t('noHumanUnits'))}</p>`;
+  return `<section class="forecast-card resource-forecast-card military-goods-forecast" data-forecast-resource="militaryGoods"><h4>${escapeHtml(t('militaryGoods'))}</h4><dl class="forecast-detail-grid">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl><h5>${escapeHtml(t('unitMilitaryGoodsForecast'))}</h5>${unitTable}</section>`;
+}
+
 /** Render the complete public EndTurn forecast for the human-facing sheet. */
 export function renderEndTurnForecast(forecast: EndTurnForecast, locale: Locale): string {
   const t = createTranslator(locale);
@@ -1214,7 +1253,38 @@ export function renderEndTurnForecast(forecast: EndTurnForecast, locale: Locale)
   const unpowered = electricity.unpoweredFacilities.length > 0
     ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredFacilities'))}</strong>: ${electricity.unpoweredFacilities.map((entry) => `${escapeHtml(entry.facilityId)} · ${escapeHtml(powerReasonLabel(entry.reason, locale))}`).join(' / ')}</p>`
     : `<p class="muted">${escapeHtml(t('unpoweredFacilities'))}: ${escapeHtml(t('none'))}</p>`;
-  return `<section class="forecast-card end-turn-forecast"><h3>${escapeHtml(t('endTurnForecast'))}</h3><p class="muted">${escapeHtml(t('overcrowding'))}: ${escapeHtml(formatPercent(forecast.overcrowding.cities.reduce((total, city) => total + city.excess / Math.max(1, city.softCap), 0), locale))} · ${escapeHtml(t('additionalFood'))} ${forecast.overcrowding.additionalFood} · ${escapeHtml(t('additionalCivilianGoods'))} ${forecast.overcrowding.additionalCivilianGoods}</p>${forecastResourceCard('food', forecast.food, locale)}${forecastResourceCard('civilianGoods', forecast.civilianGoods, locale)}${forecastResourceCard('militaryGoods', forecast.militaryGoods, locale)}${forecastResourceCard('fuel', forecast.fuel, locale)}<section class="forecast-card power-forecast"><h4>${escapeHtml(t('electricity'))}</h4><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('physicalGenerationCapacity'))}</dt><dd>${electricity.physicalGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('fuelLimitedGenerationCapacity'))}</dt><dd>${electricity.fuelLimitedGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('availableGenerationCapacity'))}</dt><dd>${electricity.availableGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('requiredPowerDemand'))}</dt><dd>${electricity.requiredPowerDemand}</dd></div><div><dt>${escapeHtml(t('industrialBoostDemand'))}</dt><dd>${electricity.industrialBoostDemand}</dd></div><div><dt>${escapeHtml(t('requiredPowerAllocated'))}</dt><dd>${electricity.requiredPowerAllocated}</dd></div><div><dt>${escapeHtml(t('industrialBoostAllocated'))}</dt><dd>${electricity.industrialBoostAllocated}</dd></div><div><dt>${escapeHtml(t('shortage'))}</dt><dd>${electricity.shortage}</dd></div></dl><p class="muted">${escapeHtml(t('powerHudLabel'))}: ${escapeHtml(powerHud.display)}</p>${unpowered}</section></section>`;
+  return `<section class="forecast-card end-turn-forecast"><h3>${escapeHtml(t('endTurnForecast'))}</h3><p class="muted">${escapeHtml(t('overcrowding'))}: ${escapeHtml(formatPercent(forecast.overcrowding.cities.reduce((total, city) => total + city.excess / Math.max(1, city.softCap), 0), locale))} · ${escapeHtml(t('additionalFood'))} ${forecast.overcrowding.additionalFood} · ${escapeHtml(t('additionalCivilianGoods'))} ${forecast.overcrowding.additionalCivilianGoods}</p>${forecastResourceCard('food', forecast.food, locale)}${forecastResourceCard('civilianGoods', forecast.civilianGoods, locale)}${renderMilitaryGoodsForecast(forecast.militaryGoods, locale)}${forecastResourceCard('fuel', forecast.fuel, locale)}<section class="forecast-card power-forecast"><h4>${escapeHtml(t('electricity'))}</h4><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('physicalGenerationCapacity'))}</dt><dd>${electricity.physicalGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('fuelLimitedGenerationCapacity'))}</dt><dd>${electricity.fuelLimitedGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('availableGenerationCapacity'))}</dt><dd>${electricity.availableGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('requiredPowerDemand'))}</dt><dd>${electricity.requiredPowerDemand}</dd></div><div><dt>${escapeHtml(t('industrialBoostDemand'))}</dt><dd>${electricity.industrialBoostDemand}</dd></div><div><dt>${escapeHtml(t('requiredPowerAllocated'))}</dt><dd>${electricity.requiredPowerAllocated}</dd></div><div><dt>${escapeHtml(t('industrialBoostAllocated'))}</dt><dd>${electricity.industrialBoostAllocated}</dd></div><div><dt>${escapeHtml(t('shortage'))}</dt><dd>${electricity.shortage}</dd></div></dl><p class="muted">${escapeHtml(t('powerHudLabel'))}: ${escapeHtml(powerHud.display)}</p>${unpowered}</section></section>`;
+}
+
+type AgentAttackPreview = AgentUnitObservation['attackPreviews'][number];
+
+export function renderAttackPreview(preview: AgentAttackPreview, locale: Locale, baseAttack?: number): string {
+  const t = createTranslator(locale);
+  const shortage = baseAttack !== undefined && preview.effectiveAttack < baseAttack;
+  return `<div class="attack-preview-detail" data-attack-preview="${escapeHtml(preview.targetUnitId)}"><span>${escapeHtml(t('distance'))} <b>${preview.distance}</b></span><span>${escapeHtml(t('attackMilitaryGoodsCost'))} <b>${preview.militaryGoodsCost}</b></span><span>${escapeHtml(t('militaryGoodsAfterAttack'))} <b>${preview.projectedMilitaryGoodsAfterAttack}</b></span><span>${escapeHtml(t('effectiveAttack'))} <b>${preview.effectiveAttack}</b></span><span>${escapeHtml(t('damageBeforeTerrain'))} <b>${preview.projectedDamageBeforeTerrain}</b> → ${escapeHtml(t('damageAfterTerrain'))} <b>${preview.projectedDamageAfterTerrain}</b></span>${shortage ? `<strong class="warning-text">${escapeHtml(t('militaryGoodsWeakAttackWarning'))}</strong>` : ''}</div>`;
+}
+
+/** Human-facing projection of the public carried-Military-Goods fields. */
+export function renderUnitMilitaryGoodsDetails(
+  unit: AgentUnitObservation,
+  locale: Locale,
+  shortageMultiplier = 0.2,
+): string {
+  const t = createTranslator(locale);
+  const costs = Object.entries(unit.attackMilitaryGoodsCostByRange)
+    .map(([range, cost]) => [Number(range), cost] as const)
+    .sort(([left], [right]) => left - right)
+    .map(([range, cost]) => `${t('distance')} ${range}: ${cost}`)
+    .join(' / ');
+  const minimumAttack = Math.max(1, Math.ceil(unit.attack * shortageMultiplier));
+  const suppressionStatus = unit.suppressionStatusIfTurnEndsNow === 'suppression'
+    ? t('suppressionWillRun')
+    : unit.suppressionStatusIfTurnEndsNow === 'containment_only'
+      ? t('containmentOnly')
+      : t('none');
+  const projectedMilitaryRefill = Math.max(0, unit.projectedMilitaryGoodsAfterRefill - unit.projectedMilitaryGoodsAfterFixedConsumption);
+  const guardRangeRule = unit.type === 'nationalGuard' ? ` ${escapeHtml(t('guardRangeTwoMilitaryGoodsRule'))}` : '';
+  return `<section class="unit-military-goods" data-unit-military-goods="true"><h3>${escapeHtml(t('carriedMilitaryGoods'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentMilitaryGoods'))}</dt><dd>${unit.currentMilitaryGoods}/${unit.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('fixedConsumption'))}</dt><dd>-${unit.fixedMilitaryGoodsUpkeepPerTurn}</dd></div><div><dt>${escapeHtml(t('afterFixed'))}</dt><dd>${unit.projectedMilitaryGoodsAfterFixedConsumption}</dd></div><div><dt>${escapeHtml(t('militaryRefillAmount'))}</dt><dd>+${projectedMilitaryRefill}</dd></div><div><dt>${escapeHtml(t('afterRefill'))}</dt><dd>${unit.projectedMilitaryGoodsAfterRefill}</dd></div><div><dt>${escapeHtml(t('suppression'))}</dt><dd>${escapeHtml(suppressionStatus)} · ${escapeHtml(t('cost'))} ${unit.suppressionMilitaryGoodsCost}</dd></div><div><dt>${escapeHtml(t('afterSuppression'))}</dt><dd>${unit.projectedMilitaryGoodsAfterSuppression}</dd></div><div><dt>${escapeHtml(t('emergencyMovementLimit'))}</dt><dd>${unit.emergencyMovementPoints} MP · ${escapeHtml(t(unit.emergencyMovementAvailable ? 'available' : 'unavailable'))}</dd></div></dl><p><strong>${escapeHtml(t('attackCostByDistance'))}</strong>: ${escapeHtml(costs || t('none'))}</p><p class="muted">${escapeHtml(t('zeroMilitaryGoodsAttack'))}: ${minimumAttack}.${guardRangeRule}</p><p class="muted">${escapeHtml(t('unitStoresLostOnDestruction'))}</p></section>`;
 }
 
 function recoveryClassLabel(recoveryClass: AgentUnitObservation['recoveryClassIfTurnEndsNow'], locale: Locale): string {
@@ -2190,7 +2260,19 @@ export class GameUiController {
     if (this.pendingMove || this.pendingAttackTargetId) {
       const confirmAction = this.pendingMove ? 'confirm-move' : 'confirm-attack';
       const confirmLabel = this.pendingMove ? t('confirmMove') : t('confirmAttack');
-      layer.innerHTML = `<div class="unit-target-confirm" data-unit-context-ui role="group" aria-label="${escapeHtml(confirmLabel)}"><button type="button" class="unit-context-button unit-context-cancel" data-action="unit-target-cancel" data-unit-action="cancel" aria-label="${escapeHtml(t('cancelTarget'))}"><span aria-hidden="true">×</span><small>${escapeHtml(t('cancel'))}</small></button><button type="button" class="unit-context-button unit-context-confirm" data-action="${confirmAction}" data-unit-action="confirm" aria-label="${escapeHtml(confirmLabel)}"><span aria-hidden="true">✓</span><small>${escapeHtml(confirmLabel)}</small></button></div>`;
+      const publicUnit = createAgentObservation(this.state).units.find((candidate) => candidate.id === unit.id);
+      const attackPreview = this.pendingAttackTargetId
+        ? publicUnit?.attackPreviews.find((candidate) => candidate.targetUnitId === this.pendingAttackTargetId)
+        : undefined;
+      const movePreview = this.pendingMove
+        ? publicUnit?.fuelCostByLegalMove.find((candidate) => samePosition(candidate.destination, this.pendingMove!.destination))
+        : undefined;
+      const detail = attackPreview
+        ? renderAttackPreview(attackPreview, this.locale, publicUnit?.attack)
+        : movePreview
+          ? `<div class="move-preview-detail" data-move-mode="${movePreview.movementMode}"><strong>${escapeHtml(t(movePreview.movementMode === 'emergency' ? 'emergencyMovement' : 'normalMovement'))}</strong><span>${escapeHtml(t('effectiveMovementCost'))} ${movePreview.effectiveMovementCost}</span><span>${escapeHtml(t('fuelCost'))} ${movePreview.fuelCost} · ${escapeHtml(t('fuelAfterMove'))} ${movePreview.projectedFuelAfterMove}</span></div>`
+          : '';
+      layer.innerHTML = `<div class="unit-target-confirm" data-unit-context-ui role="group" aria-label="${escapeHtml(confirmLabel)}"><button type="button" class="unit-context-button unit-context-cancel" data-action="unit-target-cancel" data-unit-action="cancel" aria-label="${escapeHtml(t('cancelTarget'))}"><span aria-hidden="true">×</span><small>${escapeHtml(t('cancel'))}</small></button>${detail}<button type="button" class="unit-context-button unit-context-confirm" data-action="${confirmAction}" data-unit-action="confirm" aria-label="${escapeHtml(confirmLabel)}"><span aria-hidden="true">✓</span><small>${escapeHtml(confirmLabel)}</small></button></div>`;
       this.positionUnitContextUi();
       return;
     }
@@ -2384,7 +2466,7 @@ export class GameUiController {
     if (forecast.civilianGoods.productionInputShortage > 0) {
       projected.push([t('productionInputWarning'), forecast.civilianGoods.productionInputShortage]);
     }
-    if (forecast.militaryGoods.shortage > 0) projected.push([t('militaryGoods'), forecast.militaryGoods.shortage]);
+    if (forecast.militaryGoods.totalUnfilledRefillDemand > 0) projected.push([t('militaryGoods'), forecast.militaryGoods.totalUnfilledRefillDemand]);
     if (forecast.fuel.generationFuelShortage > 0) {
       projected.push([t('generationFuelWarning'), forecast.fuel.generationFuelShortage]);
     }
@@ -3015,7 +3097,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointFallback', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointFallback', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
@@ -3235,7 +3317,7 @@ export class GameUiController {
       const publicUnit = observation.units.find((candidate) => candidate.id === unit.id);
       const publicTile = mapTileForPosition(observation, unit.position);
       title.textContent = `${unitLabel(unit.type, this.locale)} · ${unit.id}`;
-      summary.textContent = `HP ${unit.hp}/${unit.maxHp} · ${t('unitFuel')} ${publicUnit?.currentFuel ?? unit.currentFuel}/${publicUnit?.maxFuel ?? unit.maxFuel} · ${t('move')} ${unit.movement} · ${t('attack')} ${unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range} · ${t('vision')} ${publicUnit?.vision ?? unit.vision}`;
+      summary.textContent = `HP ${unit.hp}/${unit.maxHp} · ${t('unitFuel')} ${publicUnit?.currentFuel ?? unit.currentFuel}/${publicUnit?.maxFuel ?? unit.maxFuel} · ${t('carriedMilitaryGoods')} ${publicUnit?.currentMilitaryGoods ?? unit.currentMilitaryGoods}/${publicUnit?.maxMilitaryGoods ?? unit.maxMilitaryGoods} · ${t('move')} ${unit.movement} · ${t('attack')} ${unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range} · ${t('vision')} ${publicUnit?.vision ?? unit.vision}`;
       const risk = this.pendingMove?.interceptionRisk;
       const riskText = typeof risk === 'number' ? risk <= 0.2 ? t('low') : risk <= 0.5 ? t('medium') : t('high') : String(risk ?? t('none'));
       const canWait = actions.some((action) => action.type === 'Wait');
@@ -3351,8 +3433,8 @@ export class GameUiController {
       : t('unavailable');
     const baseRange = publicUnit?.baseRange ?? unit.range;
     const effectiveRange = publicUnit?.effectiveRange ?? unit.range;
-    const rangeReason = publicUnit?.rangeModifierReason === 'military_supply_shortage'
-      ? t('militarySupplyShortage')
+    const rangeReason = publicUnit?.rangeModifierReason === 'carried_military_goods_shortage'
+      ? t('carriedMilitaryGoodsShortage')
       : '';
     const infectedFacility = this.state?.facilities.find((facility) =>
       facility.infected > 0 && samePosition(facility.position, unit.position));
@@ -3377,13 +3459,28 @@ export class GameUiController {
         : refillAmount < refillDemand
           ? t('refillStateFuelShortage')
           : t('refillAvailable');
-    const fuelSection = `<section class="unit-fuel-forecast" data-unit-fuel="true"><h3>${escapeHtml(t('unitFuel'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentFuel'))}</dt><dd>${currentFuel}/${maxFuel}</dd></div>${selectedMove ? `<div><dt>${escapeHtml(t('fuelCost'))}</dt><dd>-${selectedMove.fuelCost}</dd></div><div><dt>${escapeHtml(t('fuelAfterMove'))}</dt><dd>${selectedMove.projectedFuelAfterMove}/${maxFuel}</dd></div>` : ''}<div><dt>${escapeHtml(t('refillDemand'))}</dt><dd>${refillDemand}</dd></div><div><dt>${escapeHtml(t('refillAmount'))}</dt><dd>${refillAmount}</dd></div><div><dt>${escapeHtml(t('refillReason'))}</dt><dd>${escapeHtml(refillReason)}</dd></div></dl><p class="muted">${escapeHtml(t('tipFuel'))}</p></section>`;
+    const movementMode = selectedMove?.movementMode ?? (publicUnit?.emergencyMovementAvailable ? 'emergency' : 'normal');
+    const fuelSection = `<section class="unit-fuel-forecast" data-unit-fuel="true"><h3>${escapeHtml(t('unitFuel'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentFuel'))}</dt><dd>${currentFuel}/${maxFuel}</dd></div><div><dt>${escapeHtml(t('movementMode'))}</dt><dd data-movement-mode="${movementMode}">${escapeHtml(t(movementMode === 'emergency' ? 'emergencyMovement' : 'normalMovement'))}</dd></div><div><dt>${escapeHtml(t('emergencyMovementLimit'))}</dt><dd>${publicUnit?.emergencyMovementPoints ?? 0} MP</dd></div>${selectedMove ? `<div><dt>${escapeHtml(t('effectiveMovementCost'))}</dt><dd>${selectedMove.effectiveMovementCost} MP</dd></div><div><dt>${escapeHtml(t('fuelCost'))}</dt><dd>-${selectedMove.fuelCost}</dd></div><div><dt>${escapeHtml(t('fuelAfterMove'))}</dt><dd>${selectedMove.projectedFuelAfterMove}/${maxFuel}</dd></div>` : ''}<div><dt>${escapeHtml(t('refillDemand'))}</dt><dd>${refillDemand}</dd></div><div><dt>${escapeHtml(t('refillAmount'))}</dt><dd>${refillAmount}</dd></div><div><dt>${escapeHtml(t('refillReason'))}</dt><dd>${escapeHtml(refillReason)}</dd></div></dl>${publicUnit?.emergencyMovementAvailable ? `<p class="warning-text">${escapeHtml(t('emergencyMovementActive'))}</p>` : ''}<p class="muted">${escapeHtml(t('tipFuel'))}</p></section>`;
+    const militaryGoodsSection = publicUnit
+      ? renderUnitMilitaryGoodsDetails(
+        publicUnit,
+        this.locale,
+        unit.type === 'police' || unit.type === 'nationalGuard'
+          ? this.state?.config.units[unit.type].militaryGoodsShortageAttackMultiplier ?? 0.2
+          : 0.2,
+      )
+      : '';
     const infectionSection = infectedTarget
-      ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicUnit?.infectionContainmentCapable ? 'is-contained' : 'warning-text'}">${escapeHtml(publicUnit?.infectionContainmentCapable ? t('infectionContained') : t('infectionNotContained'))}</p>${publicUnit?.suppressionAvailableIfTurnEndsNow ? `<p class="muted">${escapeHtml(t('automaticSuppression'))}: ${escapeHtml(t('projectedSuppression'))} ${Math.min(infectedTarget.infected, publicUnit.suppressionPower)} · ${escapeHtml(t('suppressionPower'))} ${publicUnit.suppressionPower}</p>${publicUnit.suppressionCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicUnit.suppressionCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}` : `<p class="muted">${escapeHtml(t('automaticSuppressionUnavailable'))}</p>`}<p class="muted">${escapeHtml(t('tipSuppression'))}</p></section>`
+      ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicUnit?.infectionContainmentCapable ? 'is-contained' : 'warning-text'}">${escapeHtml(publicUnit?.infectionContainmentCapable ? t('infectionContained') : t('infectionNotContained'))}</p>${publicUnit?.suppressionAvailableIfTurnEndsNow ? `<p class="muted">${escapeHtml(t('automaticSuppression'))}: ${escapeHtml(t('projectedSuppression'))} ${Math.min(infectedTarget.infected, publicUnit.suppressionPower)} · ${escapeHtml(t('suppressionPower'))} ${publicUnit.suppressionPower} · ${escapeHtml(t('cost'))} ${publicUnit.suppressionMilitaryGoodsCost}</p>${publicUnit.suppressionCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicUnit.suppressionCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}` : publicUnit?.suppressionStatusIfTurnEndsNow === 'containment_only' ? `<p class="warning-text">${escapeHtml(t('containmentOnly'))}: ${escapeHtml(t('suppressionMilitaryGoodsUnavailable'))}</p>` : `<p class="muted">${escapeHtml(t('automaticSuppressionUnavailable'))}</p>`}<p class="muted">${escapeHtml(t('tipSuppression'))}</p></section>`
       : '';
+    const selectedAttack = this.pendingAttackTargetId
+      ? publicUnit?.attackPreviews.find((candidate) => candidate.targetUnitId === this.pendingAttackTargetId)
+      : undefined;
     const preview = this.pendingMove
-      ? `<div class="preview-card"><strong>${escapeHtml(t('preview'))}</strong><p>${escapeHtml(t('path'))}: ${Math.max(0, this.pendingMove.path.length - 1)} <span>→ ${this.pendingMove.destination.q},${this.pendingMove.destination.r}</span></p>${selectedMove ? `<p>${escapeHtml(t('fuelCost'))}: <b>-${selectedMove.fuelCost}</b> · ${escapeHtml(t('fuelAfterMove'))}: <b>${selectedMove.projectedFuelAfterMove}/${maxFuel}</b></p>` : ''}<p>${escapeHtml(t('interceptionRisk'))}: <b class="risk-${riskText.toLowerCase()}">${escapeHtml(riskText)}</b></p><div class="action-row"><button class="primary-button" data-action="confirm-move">${escapeHtml(t('confirm'))}</button><button class="ghost-button" data-action="cancel-move">${escapeHtml(t('cancel'))}</button></div></div>`
-      : '';
+      ? `<div class="preview-card"><strong>${escapeHtml(t('preview'))} · ${escapeHtml(t(movementMode === 'emergency' ? 'emergencyMovement' : 'normalMovement'))}</strong><p>${escapeHtml(t('path'))}: ${Math.max(0, this.pendingMove.path.length - 1)} <span>→ ${this.pendingMove.destination.q},${this.pendingMove.destination.r}</span></p>${selectedMove ? `<p>${escapeHtml(t('effectiveMovementCost'))}: <b>${selectedMove.effectiveMovementCost} MP</b> · ${escapeHtml(t('fuelCost'))}: <b>-${selectedMove.fuelCost}</b> · ${escapeHtml(t('fuelAfterMove'))}: <b>${selectedMove.projectedFuelAfterMove}/${maxFuel}</b></p>` : ''}<p>${escapeHtml(t('interceptionRisk'))}: <b class="risk-${riskText.toLowerCase()}">${escapeHtml(riskText)}</b></p><div class="action-row"><button class="primary-button" data-action="confirm-move">${escapeHtml(t('confirm'))}</button><button class="ghost-button" data-action="cancel-move">${escapeHtml(t('cancel'))}</button></div></div>`
+      : selectedAttack
+        ? `<div class="preview-card attack-confirm-preview"><strong>${escapeHtml(t('attackPreview'))}</strong>${renderAttackPreview(selectedAttack, this.locale, publicUnit?.attack)}</div>`
+        : '';
     const actionHint = this.pendingMove || this.pendingAttackTargetId
       ? t('confirmTargetNearby')
       : this.unitActionMode === 'move'
@@ -3391,7 +3488,7 @@ export class GameUiController {
         : this.unitActionMode === 'attack'
           ? t('selectAttackTarget')
           : t('selectUnitAction');
-    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${fuelSection}<section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
+    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${fuelSection}${militaryGoodsSection}<section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
   }
 
   /**

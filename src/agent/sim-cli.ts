@@ -59,7 +59,7 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '2.0.0';
+  schemaVersion: '2.1.0';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -307,7 +307,7 @@ function createSimulationReport(
     aggregate[agent] = aggregateMetrics(rows);
   }
   return {
-    schemaVersion: '2.0.0',
+    schemaVersion: '2.1.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -387,6 +387,22 @@ const CSV_COLUMNS: readonly string[] = [
   'commissioningFuel.police', 'commissioningFuel.nationalGuard',
   'turnsUnitsEndedOutOfSupply.police', 'turnsUnitsEndedOutOfSupply.nationalGuard',
   'unitsUnableToMoveForFuel', 'stateFuelSpentOnPower', 'stateFuelSpentOnUnits', 'fuelShortageTurns',
+  'fixedMilitaryGoodsConsumed.police', 'fixedMilitaryGoodsConsumed.nationalGuard',
+  'attackMilitaryGoodsConsumed.police', 'attackMilitaryGoodsConsumed.nationalGuard',
+  'counterattackMilitaryGoodsConsumed.police', 'counterattackMilitaryGoodsConsumed.nationalGuard',
+  'interceptionMilitaryGoodsConsumed.police', 'interceptionMilitaryGoodsConsumed.nationalGuard',
+  'suppressionMilitaryGoodsConsumed.police', 'suppressionMilitaryGoodsConsumed.nationalGuard',
+  'militaryGoodsRefilled.police', 'militaryGoodsRefilled.nationalGuard',
+  'unfilledMilitaryGoodsRefill.police', 'unfilledMilitaryGoodsRefill.nationalGuard',
+  'militaryGoodsLostOnDestruction.police', 'militaryGoodsLostOnDestruction.nationalGuard',
+  'zeroMilitaryGoodsWeakAttacks.police', 'zeroMilitaryGoodsWeakAttacks.nationalGuard',
+  'nationalGuardAttacks.range1', 'nationalGuardAttacks.range2',
+  'nationalGuardMilitaryGoodsConsumed.range1', 'nationalGuardMilitaryGoodsConsumed.range2',
+  'militaryGoodsRefillShortageTurns',
+  'emergencyMoves.police', 'emergencyMoves.nationalGuard',
+  'emergencyMovementHexes.police', 'emergencyMovementHexes.nationalGuard',
+  'emergencyMovementPoints.police', 'emergencyMovementPoints.nationalGuard',
+  'emergencyReturnsToSupply.police', 'emergencyReturnsToSupply.nationalGuard',
   'windPowerGenerated', 'windDisabledTurns', 'windOverruns', 'windRecoveries',
   'simpleFarmsBuilt', 'simpleFarmsDestroyed', 'simpleFarmFoodProduced',
   'droneBasesBuilt', 'droneBasesDestroyed', 'maxDroneVisionRadius', 'constructibleFacilityOverruns',
@@ -470,6 +486,22 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.commissioningFuelByType.police, game.commissioningFuelByType.nationalGuard,
       game.turnsUnitsEndedOutOfSupplyByType.police, game.turnsUnitsEndedOutOfSupplyByType.nationalGuard,
       game.unitsUnableToMoveForFuel, game.stateFuelSpentOnPower, game.stateFuelSpentOnUnits, game.fuelShortageTurns,
+      game.fixedMilitaryGoodsConsumedByType.police, game.fixedMilitaryGoodsConsumedByType.nationalGuard,
+      game.attackMilitaryGoodsConsumedByType.police, game.attackMilitaryGoodsConsumedByType.nationalGuard,
+      game.counterattackMilitaryGoodsConsumedByType.police, game.counterattackMilitaryGoodsConsumedByType.nationalGuard,
+      game.interceptionMilitaryGoodsConsumedByType.police, game.interceptionMilitaryGoodsConsumedByType.nationalGuard,
+      game.suppressionMilitaryGoodsConsumedByType.police, game.suppressionMilitaryGoodsConsumedByType.nationalGuard,
+      game.militaryGoodsRefilledByType.police, game.militaryGoodsRefilledByType.nationalGuard,
+      game.unfilledMilitaryGoodsRefillByType.police, game.unfilledMilitaryGoodsRefillByType.nationalGuard,
+      game.militaryGoodsLostOnDestructionByType.police, game.militaryGoodsLostOnDestructionByType.nationalGuard,
+      game.zeroMilitaryGoodsWeakAttacksByType.police, game.zeroMilitaryGoodsWeakAttacksByType.nationalGuard,
+      game.nationalGuardAttacksByRange.range1, game.nationalGuardAttacksByRange.range2,
+      game.nationalGuardMilitaryGoodsConsumedByRange.range1, game.nationalGuardMilitaryGoodsConsumedByRange.range2,
+      game.militaryGoodsRefillShortageTurns,
+      game.emergencyMovesByType.police, game.emergencyMovesByType.nationalGuard,
+      game.emergencyMovementHexesByType.police, game.emergencyMovementHexesByType.nationalGuard,
+      game.emergencyMovementPointsByType.police, game.emergencyMovementPointsByType.nationalGuard,
+      game.emergencyReturnsToSupplyByType.police, game.emergencyReturnsToSupplyByType.nationalGuard,
       game.windPowerGenerated, game.windDisabledTurns, game.windOverruns, game.windRecoveries,
       game.simpleFarmsBuilt, game.simpleFarmsDestroyed, game.simpleFarmFoodProduced,
       game.droneBasesBuilt, game.droneBasesDestroyed, game.maxDroneVisionRadius, game.constructibleFacilityOverruns,

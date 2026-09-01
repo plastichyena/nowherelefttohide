@@ -69,7 +69,7 @@ export function createAgentApiInfo(
       'Map terrain, roads, facility/checkpoint overlays, supply, Horde warning facts, and Victory progress are public.',
       'Checkpoint observations identify Active, Standby, Dormant, Remnant, Ruined, and Abandoned posts; branch policy belongs to the road branch.',
       'checkpointPositionCandidates contains every road tile or post with the Core-derived legal flag and first ActionError reason code.',
-      'Human Units publish current/max Fuel, only legal Move Fuel costs, post-Move Fuel, and same-EndTurn refill demand/allocation.',
+      'Human Units publish current/max Fuel and carried Military Goods, legal Move mode/cost previews, distance-based Attack costs, and same-EndTurn refill/suppression projections.',
       'Facilities publish actual population and separate zombieTargetValue; Wind is a target value 5 but has no civilian population.',
       'strategicForecast is the Core projection for resource dependencies, Guaranteed Defeat, and Checkpoint Queue Pressure.',
       'Combat noise exposes only center, unit type, and public noise class. Both human unit types are Medium in the standard rules.',
@@ -106,7 +106,6 @@ export function createAgentApiInfo(
         nationalGuard: { baseRange: config.units.nationalGuard.range },
         zombie: { baseRange: config.units.zombie.range },
         hordeZombie: { baseRange: config.units.hordeZombie.range },
-        nationalGuardMilitarySupplyShortageRange: Math.min(1, config.units.nationalGuard.range),
       },
       terrain: {
         movementCost: cloneJson(config.terrain.movementCost),
@@ -214,6 +213,38 @@ export function createAgentApiInfo(
         refuelTiming: 'after_power_before_production',
         refuelRequiresSupply: true,
         shortageAllocation: 'unit_id_ascending_round_robin',
+        emergencyMovementPointsByType: {
+          police: config.units.police.emergencyMovementPoints,
+          nationalGuard: config.units.nationalGuard.emergencyMovementPoints,
+        },
+        emergencyMovementTrigger: 'current_fuel_zero',
+        emergencyMovementUsesEffectiveMovementCost: true,
+      },
+      unitMilitaryGoods: {
+        maxByType: {
+          police: config.units.police.maxMilitaryGoods,
+          nationalGuard: config.units.nationalGuard.maxMilitaryGoods,
+        },
+        fixedUpkeepByType: {
+          police: config.units.police.fixedMilitaryGoodsUpkeepPerTurn,
+          nationalGuard: config.units.nationalGuard.fixedMilitaryGoodsUpkeepPerTurn,
+        },
+        attackCostByRange: {
+          police: cloneJson(config.units.police.attackMilitaryGoodsCostByRange),
+          nationalGuard: cloneJson(config.units.nationalGuard.attackMilitaryGoodsCostByRange),
+        },
+        suppressionCostByType: {
+          police: config.units.police.suppressionMilitaryGoodsCost,
+          nationalGuard: config.units.nationalGuard.suppressionMilitaryGoodsCost,
+        },
+        shortageAttackMultiplierByType: {
+          police: config.units.police.militaryGoodsShortageAttackMultiplier,
+          nationalGuard: config.units.nationalGuard.militaryGoodsShortageAttackMultiplier,
+        },
+        refillTiming: 'after_military_factory_production_before_suppression',
+        refillRequiresSupply: true,
+        shortageAllocation: 'unit_id_ascending_round_robin',
+        destroyedUnitReturnsCarriedGoods: false,
       },
       constructibleFacilities: {
         types: ['simpleFarm', 'civilianDroneBase'],

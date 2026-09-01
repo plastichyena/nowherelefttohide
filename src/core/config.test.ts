@@ -8,7 +8,7 @@ import {
 describe('GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('2.0.0');
+    expect(DEFAULT_CONFIG.version).toBe('2.1.0');
     expect(DEFAULT_CONFIG.mapId).toBe('fixed-31x31-v1');
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(10);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, powerMode: 'boost' });

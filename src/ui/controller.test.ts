@@ -11,7 +11,8 @@ vi.mock('phaser', () => ({
 
 import type { CheckpointPositionCandidate, CheckpointState, FacilityState, GameAction, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
-import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderNoiseEventLog, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
+import { createAgentObservation } from '../agent/observation';
+import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
@@ -125,19 +126,19 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.3.3-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.4.0-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.3.3以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.0');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.0以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.1');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.3.3 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.0');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.0 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.1');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 5');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 5');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.1.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 6');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.1.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 6');
   });
 
   it('projects all checkpoint roles and branch fallback fields', () => {
@@ -309,9 +310,46 @@ describe('controller view models', () => {
     expect(english).toContain('Starting stock');
   });
 
-  it('has bilingual v1.2.7 recovery, infection, range, production, power, and policy help', () => {
+  it('renders v1.4.1 carried Military Goods, attack, and Emergency Movement facts bilingually', () => {
+    const state = new GameEngine(141).getState();
+    const unit = createAgentObservation(state).units.find((candidate) => candidate.type === 'nationalGuard')!;
+    for (const locale of ['ja', 'en'] as const) {
+      const details = renderUnitMilitaryGoodsDetails(unit, locale, state.config.units.nationalGuard.militaryGoodsShortageAttackMultiplier);
+      expect(details).toContain('data-unit-military-goods="true"');
+      expect(details).toContain(`${unit.currentMilitaryGoods}/${unit.maxMilitaryGoods}`);
+      expect(details).toContain(String(unit.emergencyMovementPoints));
+      expect(details).toContain(createTranslator(locale)('unitStoresLostOnDestruction'));
+      expect(details).toContain(createTranslator(locale)('guardRangeTwoMilitaryGoodsRule'));
+
+      const attack = renderAttackPreview({
+        targetUnitId: 'zombie-visible',
+        distance: 1,
+        militaryGoodsCost: 0,
+        projectedMilitaryGoodsAfterAttack: 0,
+        effectiveAttack: 1,
+        projectedDamageBeforeTerrain: 1,
+        projectedDamageAfterTerrain: 1,
+      }, locale, 5);
+      expect(attack).toContain(createTranslator(locale)('damageBeforeTerrain'));
+      expect(attack).toContain(createTranslator(locale)('damageAfterTerrain'));
+      expect(attack).toContain(createTranslator(locale)('militaryGoodsWeakAttackWarning'));
+    }
+  });
+
+  it('renders the new Military Goods forecast totals and per-Unit sequence', () => {
+    const forecast = forecastEndTurn(new GameEngine(142).getState()).militaryGoods;
+    const html = renderMilitaryGoodsForecast(forecast, 'en');
+    expect(html).toContain('data-forecast-resource="militaryGoods"');
+    expect(html).toContain('Unfilled refill demand');
+    expect(html).toContain('After suppression');
+    expect(html).toContain('data-military-unit=');
+    expect(html).not.toContain('Maintenance required');
+  });
+
+  it('has bilingual recovery, carried logistics, Emergency Movement, production, power, and policy help', () => {
     const keys = [
       'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPolicy',
+      'tipMilitaryGoods', 'tipEmergencyMovement', 'carriedMilitaryGoods', 'emergencyMovement',
       'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'recoveryTiming', 'effectiveRange', 'projectedSuppression', 'powerRequirement', 'projectedPower', 'lastPowerSupplied', 'productionMultiplier', 'policyTradeoff', 'migratedSaveNotice', 'migrationSaveError',
     ];
     for (const key of keys) {

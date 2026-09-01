@@ -5,7 +5,7 @@ import { createInitialState, createUnit } from '../core/state';
 import { compactArtifactObservation, createAgentObservation, restoreArtifactObservation } from './observation';
 import { createAgentGame } from './game';
 
-describe('Agent Observation 2.0.0 rule projections', () => {
+describe('Agent Observation 3.0.0 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -14,7 +14,8 @@ describe('Agent Observation 2.0.0 rule projections', () => {
     guard.hp = 30;
     farm.infected = 4;
     farm.operationalStatus = 'infected';
-    state.resources.militarySupplyAvailable = false;
+    guard.currentMilitaryGoods = 1;
+    state.resources.militaryGoods = 1;
 
     const observation = createAgentObservation(state);
     const publicGuard = observation.units.find((unit) => unit.id === guard.id)!;
@@ -22,11 +23,14 @@ describe('Agent Observation 2.0.0 rule projections', () => {
     expect(publicGuard).toMatchObject({
       baseRange: 2,
       effectiveRange: 1,
-      rangeModifierReason: 'military_supply_shortage',
+      rangeModifierReason: 'carried_military_goods_shortage',
+      currentMilitaryGoods: 1,
+      maxMilitaryGoods: 20,
       recoveryClassIfTurnEndsNow: 'combat',
       recoveryRateIfTurnEndsNow: 0.1,
       recoveryBaseAmountIfTurnEndsNow: 5,
       suppressionAvailableIfTurnEndsNow: true,
+      suppressionStatusIfTurnEndsNow: 'suppression',
       suppressionTargetId: farm.id,
     });
     expect(publicGuard.suppressionCivilianDamage).toBe(5);
@@ -46,6 +50,120 @@ describe('Agent Observation 2.0.0 rule projections', () => {
       requiredPowerCapacity: 5,
       stoppedReason: 'infection',
     });
+  });
+
+  it('publishes carried Military Goods and exact legal Attack previews by distance', () => {
+    const state = createInitialState(142, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
+    guard.currentMilitaryGoods = 2;
+    state.units.push(createUnit(state, 'zombie-range-2', 'zombie', { q: 18, r: 15 }));
+
+    const publicGuard = createAgentObservation(state).units.find((unit) => unit.id === guard.id)!;
+    expect(publicGuard).toMatchObject({
+      currentMilitaryGoods: 2,
+      maxMilitaryGoods: 20,
+      fixedMilitaryGoodsUpkeepPerTurn: 1,
+      attackMilitaryGoodsCostByRange: { 1: 1, 2: 2 },
+      suppressionMilitaryGoodsCost: 1,
+    });
+    expect(publicGuard.attackPreviews).toEqual([
+      expect.objectContaining({
+        targetUnitId: 'zombie-range-2',
+        distance: 2,
+        militaryGoodsCost: 2,
+        projectedMilitaryGoodsAfterAttack: 0,
+        effectiveAttack: 10,
+      }),
+    ]);
+    expect(publicGuard.attackPreviews[0]!.projectedDamageBeforeTerrain).toBe(10);
+    expect(publicGuard.attackPreviews[0]!.projectedDamageAfterTerrain).toBeGreaterThan(0);
+
+    guard.currentMilitaryGoods = 1;
+    const shortGuard = createAgentObservation(state).units.find((unit) => unit.id === guard.id)!;
+    expect(shortGuard).toMatchObject({
+      effectiveRange: 1,
+      rangeModifierReason: 'carried_military_goods_shortage',
+      attackPreviews: [],
+    });
+  });
+
+  it('publishes fixed consumption, refill, and post-refill suppression Military Goods projections', () => {
+    const state = createInitialState(143, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
+    const police = state.units.find((unit) => unit.type === 'police')!;
+    const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
+    guard.position = { q: 0, r: 0 };
+    guard.currentMilitaryGoods = guard.maxMilitaryGoods;
+    police.position = { ...farm.position };
+    police.currentMilitaryGoods = 0;
+    farm.infected = 2;
+    state.resources.militaryGoods = 1;
+
+    const observation = createAgentObservation(state);
+    const publicGuard = observation.units.find((unit) => unit.id === guard.id)!;
+    const publicPolice = observation.units.find((unit) => unit.id === police.id)!;
+    expect(publicGuard).toMatchObject({
+      projectedMilitaryGoodsAfterFixedConsumption: 19,
+      projectedMilitaryGoodsAfterRefill: 19,
+      projectedMilitaryGoodsAfterSuppression: 19,
+      suppressionStatusIfTurnEndsNow: 'none',
+    });
+    expect(publicPolice).toMatchObject({
+      projectedMilitaryGoodsAfterFixedConsumption: 0,
+      projectedMilitaryGoodsAfterRefill: 1,
+      projectedMilitaryGoodsAfterSuppression: 0,
+      suppressionAvailableIfTurnEndsNow: true,
+      suppressionStatusIfTurnEndsNow: 'suppression',
+    });
+    expect(observation.endTurnForecast.militaryGoods).toMatchObject({
+      startingStock: 1,
+      projectedTotalRefilled: 1,
+      totalUnfilledRefillDemand: 5,
+      projectedEndingStock: 0,
+    });
+    expect(observation.endTurnForecast.militaryGoods.units.find((unit) => unit.unitId === police.id)).toMatchObject({
+      refillDemand: 5,
+      projectedRefillAmount: 1,
+      unfilledRefillDemand: 4,
+      afterRefill: 1,
+      suppressionStatus: 'suppression',
+      afterSuppression: 0,
+    });
+  });
+
+  it('publishes Fuel-zero Emergency Move mode and effective-MP limits', () => {
+    const state = createInitialState(144, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const police = state.units.find((unit) => unit.id === 'police-1')!;
+    const guard = state.units.find((unit) => unit.id === 'national-guard-1')!;
+    police.currentFuel = 0;
+    guard.currentFuel = 0;
+
+    const observation = createAgentObservation(state);
+    const publicPolice = observation.units.find((unit) => unit.id === police.id)!;
+    const publicGuard = observation.units.find((unit) => unit.id === guard.id)!;
+    expect(publicPolice).toMatchObject({
+      emergencyMovementPoints: 3,
+      emergencyMovementAvailable: true,
+      currentFuel: 0,
+    });
+    expect(publicPolice.fuelCostByLegalMove).toContainEqual(expect.objectContaining({
+      destination: { q: 11, r: 15 },
+      movementMode: 'emergency',
+      effectiveMovementCost: 3,
+      fuelCost: 0,
+      projectedFuelAfterMove: 0,
+    }));
+    expect(publicPolice.fuelCostByLegalMove.every((move) =>
+      move.movementMode === 'emergency' && move.effectiveMovementCost <= publicPolice.emergencyMovementPoints,
+    )).toBe(true);
+    expect(publicGuard).toMatchObject({ emergencyMovementPoints: 2, emergencyMovementAvailable: true });
+    expect(publicGuard.fuelCostByLegalMove).toContainEqual(expect.objectContaining({
+      destination: { q: 18, r: 15 },
+      movementMode: 'emergency',
+      effectiveMovementCost: 2,
+      fuelCost: 0,
+    }));
+    expect(publicGuard.fuelCostByLegalMove.every((move) => move.effectiveMovementCost <= 2)).toBe(true);
   });
 
   it('returns deterministic detached JSON without private state', () => {

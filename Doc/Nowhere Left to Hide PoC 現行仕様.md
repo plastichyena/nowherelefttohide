@@ -3,9 +3,10 @@
 ## PoC 現行仕様
 
 - ステータス: 現行正本
-- 現行Version: v1.4.0
+- 現行Version: v1.4.1
 - 基準日: 2026-08-31
-- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.4.0 アップデート要件 確定版.md`
+- 実装照合日: 2026-09-01
+- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.4.1 アップデート要件 確定版.md`
 
 本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。過去の要件定義・仕様書・反映済みアップデート文書は`Doc/archive/`へ保管し、現行判断には使用しない。
 
@@ -33,7 +34,7 @@
 
 ## 2.1 必須
 
-- 15×15固定ヘックスマップ
+- 31×31固定ヘックスマップ、17恒久施設、4方向の道路支線とHorde入口
 - 固定Terrain、重み付き移動、Urban／Forest防御
 - Human Unit・管理施設を合成したVisionとFog of War
 - PCおよびスマートフォン縦向き
@@ -54,13 +55,14 @@
 - 共通Runnerを使う決定的なRandom Test AgentとBalanced Agent
 - 同一Seed比較、Metrics、Replay／Failure Artifact、JSON／CSV出力を持つBatch Simulation CLI
 - 通常UI・保存領域と分離したDeveloper / Browser Bridge
+- 外部AIが複数プロセスで継続できるAI Portable Session、Public Decision Log、Checkpoint、分岐、Artifact
 - Unit Test、不変条件試験、複数Seed自動完走試験
 - GitHub Actionsによるテスト、ビルド、GitHub Pages公開
 
 ## 2.2 対象外
 
 - ランダムマップ、Terrain自動生成、LOS／高低差／視界遮蔽、Waterを使う標準Map
-- Replay UI、外部LLM Agent、`balanced`以外の組み込みStrategy
+- Replay UI、外部LLM自体の同梱、`balanced`以外の組み込みStrategy
 - AI観戦、AI思考表示、After Action Report、Browser BridgeからのBatch実行
 - 強化学習、Minimax、MCTS、人間より強いAIの保証
 - リアルタイム操作、大量個体描画、複雑な基地建築
@@ -154,15 +156,15 @@ UI / Phaser / Test Agent
 
 - 初回ガイドで移動、攻撃、人口配置、ターン終了を説明する。
 - 日本語・英語の常設ヘルプを提供する。
-- 人口は盤面上の所在地から消せないこと、施設撤収時の帰還、都市過密、編成拠点制限、v1.3.2以前のセーブ非互換を説明する。
+- 人口は盤面上の所在地から消せないこと、施設撤収時の帰還、都市過密、編成拠点制限、v1.4.0以前のセーブ非互換を説明する。
 - 道路別の次回到着、未管理時の素通りリスク、都市のソフトキャップ超過受入を表示する。
 - 補給オーバーレイは常設切替を持ち、新設・移設、検問所選択、労働者配置で自動表示する。補給範囲、セクター境界、検問所半径、候補の将来範囲、建設を妨げるZombieを盤面上で識別できる。
 - Farm、Civilian Factory、Military FactoryはBottom SheetからPower Supply ON/OFFを切り替え、現在配置とTurn-start Fuelに基づく次回EndTurnの予測給電、倍率、基本出力、予測出力、未給電理由、直前EndTurnの実績給電を区別して表示する。
 - 都市はRequired Powerの予測給電と人口由来Civilian Goods出力を表示する。停電時も人口保持、移住、編成、所有、補給、感染、防衛が利用可能であることを停止表示と混同しない。
 - 資源不足予測は警告するが、人口0敗北が確定しない限り無視してEndTurnできる。
-- ユニットBottom Sheetは補給状態、次のプレイヤーターン開始時の回復区分・率・基礎量・成立条件、基本射程と実効射程、駐留による感染封じ込めと自動鎮圧見込みを表示する。
+- ユニットBottom Sheetは補給状態、次のプレイヤーターン開始時の回復区分・率・基礎量・成立条件、携行軍需品の現在量／最大量、固定消費、補充・鎮圧後予測、距離別攻撃Cost、基本射程と実効射程、駐留による感染封じ込めと自動鎮圧見込みを表示する。Fuel 0時はEmergency Movementの上限、利用可否、Legal Moveごとの通常／Emergency区分と実効MPを表示する。
 - 施設Bottom Sheetは上限、1人あたりと現在見込みの入出力、Power Mode、要求電力・発電量、予測／実績給電、停止理由、感染・陥落時の生産損失を表示する。検問所は現在／審査中方針、残り時間と3方針の交換関係を表示する。
-- ヘルプは回復10%／20%／0%、駐留封じ込めと自動鎮圧、警察と州兵の民間被害差、州兵の軍需不足時射程、発電停止の波及、厳格方針の合格率50%を日本語・英語で説明する。
+- ヘルプは回復10%／20%／0%、駐留封じ込めと自動鎮圧、警察と州兵の民間被害差、Unit別携行軍需品、距離別Cost、軍需0の最低攻撃、州兵距離2の必要量、Fuel 0時Emergency Movement、発電停止の波及、厳格方針の合格率50%を日本語・英語で説明する。
 - 新規ゲームのHorde設定はPeriodic初回・増加・FinalのHorde Zombie／Normal Zombieを分けた6入力とし、標準値`2 / 0 / 1 / 1 / 7 / 5`を表示する。不正な合計0またはNormal ZombieだけのCompositionでは開始しない。
 - Help／Board LegendはHorde Zombie HP 20とNormal Zombie HP 10、Targeting差、Mixed Horde Marker、Periodic初回／増加／Final Compositionを現在Configから日英で説明する。
 - Checkpoint建設・移設・Active化中は全支線道路タイル／Postの合法／不合法をAction種別ごとに区別し、不合法候補の選択時にCore Reason Codeの日英文言をBottom Sheet内へ表示する。Stateまたは選択候補が変わった場合は古い理由を残さない。
@@ -172,7 +174,7 @@ UI / Phaser / Test Agent
 
 ## 5.6 盤面Asset・Layer・Board Legend
 
-- Runtime盤面画像は`public/assets/board/`配下の256×256 px透過PNGとし、Plain／Forest／Mountain、Road／Urban、Police／National Guard／Zombie／Horde Zombie、Capital／City／Farm／Civilian Factory／Military Factory／Refinery／Power Plant／Checkpoint、施設・Checkpoint・Horde状態Overlayを収録する。WaterはPNGを持たず既存描画へFallbackする。
+- Runtime盤面画像は`public/assets/board/`配下の256×256 px透過PNGとし、Plain／Forest／Mountain、Road／Urban、Police／National Guard／Zombie／Horde Zombie、Capital／City／Farm／Civilian Factory／Military Factory／Refinery／Power Plant／Wind Power Plant／Checkpoint／Simple Farm／Civilian Drone Base、施設・Checkpoint・Horde状態Overlayを収録する。WaterはPNGを持たず既存描画へFallbackする。
 - 通常Zombieは承認済みの3体Group、Horde Zombieは同画風の12体密集Swarmとする。両AssetのComic-paintedな傷・血痕は許容するが、写実的またはこれ以上GraphicなGoreと死体表現は使用しない。
 - TypeScriptのUI専用Asset RegistryをPathとCore Typeの唯一の対応表とし、Game Core、GameState、Save、Observation、ReplayへAsset Path、読込状態、LOD、表示Marker、Help開閉状態を含めない。BoardとBoard Legendは同じRegistryと状態Mappingを使用する。
 - Runtime PNG合計は3 MiB以下とし、生成・後加工・出所・第三者Asset不使用・再生成方法を`public/assets/board/ASSET_MANIFEST.md`へ記録する。App VersionまたはBuild IDをURLへ付与してCache Bustingする。
@@ -180,7 +182,7 @@ UI / Phaser / Test Agent
 - 描画順は`Terrain → Road → Urban → Facility Base → Facility State → Fog暗転 → Unit → 動的Overlay`とする。視界外でもTerrain、Road、Urban、施設、Checkpointを暗転して識別可能にし、Enemy Unitは描画しない。自軍Unitと選択・移動・攻撃・HP・感染・停止予測・Vision・Supply・Horde方向等の操作情報はFogより上に置く。
 - Roadは単一透過Assetを隣接する道路Hexの方向へ回転・合成して連続させ、形状別PNGを持たない。施設とUnitが同じHexにある場合は施設を中央、Unitを右下へOffsetし、双方を識別可能にする。
 - Camera Zoomが`0.75`未満ではPNGの細部を省いたLODへ切り替え、最小Zoom`0.55`でも陣営、通常Zombie／Horde／Final、主要施設状態を色とSilhouetteで区別する。LODは旧`P / G / Z / H / F`固定文字へ戻さず、閾値と表示状態をGameStateへ保存しない。
-- Help内に折りたたみ可能な`盤面アイコン / Board Legend`を設け、Terrain、Road／Urban、4 Unit、Periodic／Final Horde、8施設、一般施設とCheckpointの複合状態、通常Zoom／LOD、動的Overlay、Config由来のRule値を日本語・英語で説明する。進行中は現在GameState Config、GameStateがない場合は標準Configを表示する。Player向けLegendには強制Fallback表示を含めない。
+- Help内に折りたたみ可能な`盤面アイコン / Board Legend`を設け、Terrain、Road／Urban、4 Unit、Periodic／Final Horde、11施設Type、一般施設とCheckpointの複合状態、通常Zoom／LOD、動的Overlay、Config由来のRule値を日本語・英語で説明する。進行中は現在GameState Config、GameStateがない場合は標準Configを表示する。Player向けLegendには強制Fallback表示を含めない。
 - 上部電力HUDは`requiredPowerDemand + industrialBoostDemand`を分子、`availableGenerationCapacity`を分母とする`予測需要量 / 利用可能供給量`で表示する。日本語Labelは`電力 需要/供給`、英語Labelは`Power Demand/Available`とし、TooltipとAccessible Nameで需要、供給、Core Forecastの不足量を名前付きで伝える。`electricity.shortage > 0`の場合だけ不足状態とし、`0/0`を安全に表示する。実消費量とは呼ばない。
 
 ---
@@ -195,13 +197,14 @@ UI / Phaser / Test Agent
 - Seed、疑似乱数状態、ターン、Final Horde発生Turn、フェーズ
 - マップID、基礎Terrain、タイル、道路／Urban Overlay、施設
 - 道路支線ID、道路ヘックス、州都への接続、支線ごとの次回到着ターン、ターン内操作状態、`activeCheckpointId`、重複しない`standbyCheckpointIds`、支線所有の`currentPolicy`
-- 施設の所有、確保順、操作可能ターン、稼働、陥落、感染
+- 施設の所有、恒久／建設物区分、確保・建設順、操作可能ターン、Power Supply、`operational`／`building`／`disabled`／`recovering`等の状態、陥落、感染
 - 産業施設のPower Supply ON/OFFと直前EndTurnの実績給電
 - 都市別住民、生産施設別労働者、ユニット人口
 - ターン開始時の全所有都市の供給順位・受入順位と人口操作資格
-- 5資源、電力Capacity、軍需供給状態
-- ユニット、HP、位置、行動・攻撃権
+- 4備蓄資源と当Turn電力Capacity
+- ユニット、HP、位置、行動・攻撃権、`currentFuel`、`maxFuel`、`currentMilitaryGoods`、`maxMilitaryGoods`
 - Checkpointの物理状態、支線、避難民、審査中、配置待ち合格者、感染者、審査中方針、残り時間。RoleはCheckpointへ重複保存せず、支線のActive／Standby参照から`active`／`standby`／`dormant`を導出する。
+- 次のCheckpoint／Constructible Facility／Unit／Event番号
 - Horde Warning、Final Spawn Group／状態、Zombie内部のHorde継承TargetとNoise Target記憶、直近イベント、累積統計、Victory進捗、勝敗
 
 人口合計等の導出値は正データから再計算し、重複する可変の正データを持たない。
@@ -219,6 +222,7 @@ UI / Phaser / Test Agent
 - SetCheckpointPolicy
 - SetPowerSupply
 - BuildCheckpoint
+- BuildConstructibleFacility
 - RelocateCheckpoint
 - ActivateCheckpoint
 - ProduceUnit
@@ -248,6 +252,7 @@ interface HeadlessGame {
   getState(): Readonly<GameState>;
   getLegalActions(): GameAction[];
   getCheckpointPositionCandidates(): CheckpointPositionCandidate[];
+  getConstructibleFacilityPositionCandidates(facilityType: ConstructibleFacilityType): ConstructibleFacilityPositionCandidate[];
   step(action: GameAction): StepResult;
   isGameOver(): boolean;
   getResult(): GameResult | null;
@@ -260,23 +265,23 @@ interface HeadlessGame {
 
 ## 6.5 Version境界
 
-- App / Release Versionは`1.4.0`とする。
-- Game Rules / GameState / Config Versionは`2.0.0`、Fixed Map IDは`fixed-31x31-v1`とする。
-- Save Format Versionは`5`、Artifact Schemaは`2.0.0`とする。v1.3.3以前のSave／Replay／Artifactは変換しない。
-- Agent API / Observation API / Browser Bridge APIは`2.0.0`、Balanced Agentは`4.0.0`、Random Agentは`2.0.0`とする。
+- App / Release Versionは`1.4.1`とする。
+- Game Rules / GameState / Config Versionは`2.1.0`、Fixed Map IDは`fixed-31x31-v1`とする。
+- Save Format Versionは`6`、Artifact Schemaは`2.1.0`、Checkpoint Schemaは`1.0.0`、Session Schemaは`1.0.0`とする。v1.4.0以前のSave／Replay／Artifact／Sessionは変換しない。
+- Agent API / Observation API / Browser Bridge APIは`3.0.0`、Balanced Agentは`4.1.0`、Random Agentは`2.1.0`とする。
 - Agent、Observation、Browser Bridgeは個別のSemVerを持ち、Build IDはCIではGit commit SHA、ローカルではSHAとdirty状態または`local-unknown`を記録する。
 - Build IDは乱数とゲーム結果へ影響させない。
-- App Versionは表示ReleaseのMetadataであり、Game Rules、Save Format、Artifact Schemaが一致するデータをApp Version差だけで拒否しない。v1.3.2以前のGameStateはGame Rules Version不一致のため変換せず拒否する。
+- App Versionは表示ReleaseのMetadataであり、Game Rules、Save Format、Artifact Schemaが一致するデータをApp Version差だけで拒否しない。v1.4.0以前のGameStateはGame Rules Version不一致のため変換せず拒否する。
 
 ## 6.6 Agent ObservationとAgentGame
 
-Agent向け正式入力はGameStateではなく、JSON互換の`AgentObservation`とする。API／Game Rules Version、Turn、Phase、静的マップ、公開中の資源・人口・施設・部隊・ゾンビ・Checkpoint、Horde、EndTurn Forecast、勝敗に加え、初期補給半径、道路支線と次回到着、Active／Standby／Dormant／Remnant／Ruined／AbandonedのRole、構造上のFallback可否、支線Policy、決定的な補給圏タイル、施設・都市・ユニットの補給状態、支線ごとのターン内操作済み状態、Core生成の全道路Checkpoint位置別候補を含む。
+Agent向け正式入力はGameStateではなく、JSON互換の`AgentObservation`とする。API／Game Rules Version、Turn、Phase、静的マップ、公開中の資源・人口・施設・部隊・ゾンビ・Checkpoint、Horde、EndTurn Forecast、Strategic Forecast、勝敗に加え、初期補給半径、道路支線と次回到着、Active／Standby／Dormant／Remnant／Ruined／AbandonedのRole、構造上のFallback可否、支線Policy、決定的な補給圏タイル、施設・都市・ユニットの補給状態、支線ごとのターン内操作済み状態、Core生成の全Checkpoint／Constructible Facility位置別候補を含む。
 
-- 人間ユニットは基本／実効射程と軍需不足理由、EndTurn時点の回復区分・率・基礎量・時点・生存／補給条件、感染封じ込め能力、自動鎮圧力・民間被害・対象を返す。予測は攻撃後10%、待機・移動後20%、補給外0%とCore判定に一致させる。
-- 施設は所有・状態・補給・人口・上限に加え、1人あたり入出力、Power Mode、需要、Power Supply ON/OFF、予測要求・給電・理由、直前実績、基本／予測生産と倍率、停止理由、感染・陥落時に失う現在生産、封じ込め・鎮圧予測を返す。
-- ForecastはFood／Military Goodsの開始備蓄、予測生産、維持必要量、終了備蓄、維持不足を返す。Civilian Goodsは市民維持とMilitary Factory入力を、Fuelは給電希望、実使用、Turn-start Fuel不足、当ターンRefinery生産を、電力は物理Capacity、Fuel制限Capacity、3段階の需要と実割当、未給電施設と理由を分離する。
+- 人間ユニットは基本／実効射程と携行軍需不足理由、`currentMilitaryGoods`／`maxMilitaryGoods`、固定消費、距離別Combat Cost、補充・鎮圧後予測、Legal Attack別の消費・残量・実効攻撃・Terrain軽減前後Damageを返す。さらに`currentFuel`／`maxFuel`、Legal Move別Fuel Cost・移動後Fuel・`normal`／`emergency`・実効MP、Supply状態、EndTurn補給需要／予測量、回復区分・率・基礎量・成立条件、感染封じ込め能力、自動鎮圧力・民間被害・対象を返す。
+- 施設は所有・恒久／建設物・状態・補給・人口・上限に加え、1人あたり入出力、Power Mode、需要、Power Supply ON/OFF、予測要求・給電・理由、直前実績、基本／予測生産と倍率、停止理由、感染・陥落時に失う現在生産、Vision、Zombie Target Value、封じ込め・鎮圧予測を返す。
+- ForecastはFoodの開始備蓄、予測生産、維持必要量、終了備蓄、維持不足を返す。Military Goodsは開始備蓄、生産、Unit ID順の固定消費・補充・未充足・鎮圧、終了備蓄を国家集計とUnit別に返す。Civilian Goodsは市民維持とMilitary Factory入力を分離する。FuelはWind、Power Plant需要／実使用、発電後Fuel、Unit補給需要／実績、合計不足、Refinery生産、終了備蓄を分離し、電力はWindを含む供給Capacity、5段階の需要と実割当、未給電施設と理由を返す。
 - Checkpointは物理status、導出Role、3人口プール、感染、残り時間、補給提供、封じ込め・鎮圧予測を返す。Activeだけが到着・新規審査・Supply・Visionを提供する。方針の静的な率と時間は`getApiInfo()`へ置く。
-- Checkpoint候補は`actionType`、`branchId`、必要時の`checkpointId`、`position`、`legal`、`reasonCode`を安定順で返す。候補、合法手、実Actionは同じCore Validationを使用し、Hidden Enemyの存在・位置・IDを候補差分から漏らさない。
+- Checkpoint候補は`actionType`、`branchId`、必要時の`checkpointId`、`position`、`legal`、`reasonCode`、Projected Supply Effectを安定順で返す。Constructible候補は全Mapの安定座標順でType別合法性と最初のCore Reasonを返す。候補、合法手、実Actionは同じCore Validationを使用し、Hidden Enemyの存在・位置・IDを候補差分から漏らさない。
 - PRNG内部状態、将来乱数、出現前Horde規模、デバッグ専用値を含めない。
 - Map Terrain、Road／Urban属性、実効移動コスト、防御補正、各Hexの`visibleToPlayer`を返す。Enemy配列は現在Visibleな`zombie`／`hordeZombie`だけを含める。
 - HordeはWarning種別・方向・残りTurn・発生Turn・Final Horde状態、Victoryは3条件の真偽値を返す。Enemy内部Target、継承記憶、Noise Target、Spawn Group、Hidden位置・ID・個体数を返さない。
@@ -301,23 +306,24 @@ interface AgentGame {
 
 ## 6.7 組み込みAgentと統一Runner
 
-- `random`と`balanced`は同じAgentGame、Runner、安全上限、Metrics、Artifact形式を使用する。
+- `random`と`balanced`は同じAgentGame、Runner、安全上限、Metrics、Artifact形式を使用する。各Decisionは非公開思考過程ではなく、優先目標、理由コード、上位候補を500 Unicode code point以下で要約した`decisionSummary`を公開する。
 - Random Agentの選択乱数はGameEngineから独立したSeed付き乱数とする。
-- Balanced Agent Versionは`3.1.0`とする。独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
+- Balanced Agent Versionは`4.0.0`とする。独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
 - Visibleな通常Zombie／Horde Zombie、Terrain Movement Cost、Urban／Forest防御、Vision Coverage、Horde警告、Checkpoint Role／Fallback深度、公開Noise Class、Final Horde後の3条件を評価する。Supply内Zombie未排除かつVisible Enemyがいない場合はHidden脅威を前提に探索・巡回する。
-- Balancedは即時敗北回避、施設接触拒否、感染鎮圧、Horde防衛、軍需備蓄、食料・民需品・燃料・電力、州都人口バッファ、過密、生産冗長性を含む施設確保、部隊編成と損傷、全支線のActive Checkpoint確立、状況に応じた後方Standby、支線方針、有益なActionがない場合のEndTurnを評価する。`checkpoint_supply_zombie_blocked`はCheckpoint戦略の放棄理由にせず、解消可能な阻害Zombieの除去またはSupply条件改善を再評価する。
+- BalancedはGuaranteed Defeat回避をHard Priorityとし、施設接触拒否、施設／Checkpoint Queue感染の鎮圧、Horde防衛、軍需備蓄、食料・民需品・燃料・電力、州都人口バッファ、過密、生産冗長性を含む施設確保、部隊編成と損傷、全支線のActive Checkpoint確立、状況に応じた後方Standby、支線方針、有益なActionがない場合のEndTurnを評価する。州全体感染時はStrict方針を加点し、Normal／Pass Throughを減点する。
+- Food単一障害点ではSimple Farm、Horde方向・Fog・給電余力ではCivilian Drone Base、CheckpointではProjected Supply Effect、前線ではQueue Pressureを評価する。Move距離、Unit Type別Fuel Cost、移動後Fuel、Supply内補給見込みを評価し、Horde緊急防衛を除いてSupply外で移動不能になる進出を減点する。`checkpoint_supply_zombie_blocked`はCheckpoint戦略の放棄理由にしない。
 - 所有中かつ健全民間人口がいる施設に対し、各Zombieが現在接触中か、次のZombie Turnに移動力内から接触可能かを公開Observationだけで予測する。州都、単一供給源、軍需工場、健全民間人口の多い施設を高脅威として扱う。
 - National Guardは射程2と対Zombie確殺を利用する接触拒否火力として扱い、接触脅威への攻撃、安全な射撃位置、Horde方向側の所有施設防衛を優先する。Horde入口へ直接進出すること自体は目的にしない。
 - Policeは感染鎮圧用として温存し、通常の前線移動・攻撃を抑制する。ただし州都への接触を他の手段で防げない場合は防衛へ参加できる。
 - 複数Zombieが次の敵行動で到達できる位置への移動・攻撃を露出として減点し、低HP Unitの危険接近を抑制する。
 - 未管理道路の流入リスク、Checkpointの新設・方針・Active化・前進・後退、Build／Relocateが同Hexに共存する場合の異なる効果、補給圏を考慮した施設価値・労働者・編成・回復、Checkpoint跡と荒廃地点の防衛・鎮圧・再前進を評価する。全支線を常に3重化するHard Ruleにはしない。
-- 軍需品は現在のUnit人口から3ターン分の維持費と編成用バッファを評価し、供給停止前に軍需工場の確保・稼働を進める。National Guardが1隊だけで、軍需品・人口・生産基盤を維持できる場合は2隊目を編成する。
+- 軍需品はUnit別携行量、固定消費、距離別Combat Cost、補充不足、鎮圧需要、編成用バッファを評価し、供給停止前に軍需工場の確保・稼働を進める。National Guardが1隊だけで、軍需品・人口・生産基盤を維持できる場合は2隊目を編成する。
 - Food／Civilian Goods／Military Goodsは当ターン生産後の最終収支、Fuelは翌ターンの発電備蓄として評価する。Required都市、産業ブースト、物理発電CapacityとFuel不足、Civilian Goodsの市民維持不足とMilitary Factory入力不足を区別し、労働者再配置とSetPowerSupplyを評価する。
 - 州都の健全民間人口は平時15人、州都への接触脅威がある場合20人を目標バッファとする。これを下回る人口配置・編成を減点し、安全都市からの帰還を評価する。
 - Farm、Civilian Factory、Refinery、Power Plant、Military Factoryの単一依存を検出し、黒字時でも代替施設の確保と適量稼働を評価する。労働者は最大投入ではなく、不足解消、冗長性、入力資源、州都人口を考慮した目標人数へ近づける。
 - 同一ターン内で同じ施設の労働者数や検問所方針を繰り返し変更しないようAction Family単位の反復抑制を行う。接触脅威や感染が残っていても、対応可能なUnit Actionがなければ不要な内政Actionを挟まずEndTurnできる。
 - 評価重みと閾値をデータとして分離し、Decisionごとに優先目標、選択Actionと点数、上位候補、理由コードを機械可読Traceとして残す。文章上の思考過程は保存しない。
-- `effectiveRange`、軍需不足、負傷部隊の補給圏への後退、戦闘回復と休養回復の比較、駐留封じ込めと自動鎮圧、州兵の鎮圧時民間被害、電力・生産波及、人口・感染・防衛に応じた検問所方針を評価する。Traceは回復、後退、鎮圧、射程、電力、方針の理由コードを持つ。
+- `effectiveRange`、携行軍需不足、距離別Combat Cost、Fuel 0時Emergency Movementによる補給圏帰還、負傷部隊の後退、戦闘回復と休養回復の比較、駐留封じ込めと自動鎮圧、州兵の鎮圧時民間被害、電力・生産波及、人口・感染・防衛に応じた検問所方針を評価する。Traceは回復、後退、鎮圧、射程、軍需、Emergency Movement、電力、方針の理由コードを持つ。
 - 非緊急のForest上Zombieへの非致死Attackを下げ、Urban Defenseを維持し、Plainへ誘導できるWait／Repositionを候補に残す。Capital、Active Checkpoint、重要Facility、民間人口への即時Threat、今TurnのOverrun、Final Horde収束はTerrain／Noise Penaltyより優先する。
 - AttackのNoise Riskは、攻撃Unit自身のVision内にいるVisible Normal Zombie数と公開Classだけから近似する。内部RadiusやZombie Target Memoryを推測・使用しない。Urban Defense上ではNoiseを理由に過剰にAttackを避けない。
 - Runnerは1ターン、1ゲーム、最大ターンの安全上限をGameConfigと別管理し、上限、例外、不変条件違反、不正Action、Agent停止を技術的失敗として扱う。ゲーム内敗北は正常完遂である。
@@ -327,9 +333,10 @@ interface AgentGame {
 
 `npm run sim -- --agent=balanced --games=1000 --seed=1 --out=output/simulations/run-name`相当のCLIを提供する。Agent、Seed集合、完全Configまたは検証済みoverride、Runner上限、出力先、fail-fastを指定でき、Random／Balancedを同一Seed・標準Configで比較できる。
 
-- 正本JSON、固定列UTF-8 CSV、成功・敗北を含むゲーム単位Replay Artifact、技術的失敗時のFailure Artifactを出力する。
+- 通常モードは正本`run.json`、固定列UTF-8 `games.csv`、成功・敗北を含むゲーム単位Replay Artifact、技術的失敗時のFailure Artifactを出力する。
+- `--summary-only`は行動とMetricsを通常モードと同一に保ちつつ、`run.json`／`games.csv`だけを出力し、ゲーム単位の完全Replay Artifactを作らない。Traceは初期・最終のコンパクトな記録だけで、固定MapやAction列を持たずReplay入力には使用できない。
 - 既存出力を既定で上書きせず、明示指定時だけ許可する。
-- Artifactは各Version、Build ID、Map、Seed、Config、Agent、受理Action列、不正試行、Result、Metrics、Balanced Traceを持つ。
+- Artifactは各Version、Build ID、Map、Seed、Config、Agent、受理Action列、不正試行、Result、Metrics、Public Decision Logを持つ。Session ArtifactはSession ID、親Session／CheckpointのlineageとDecision hash chainを加える。
 - Failure Artifactは直前Observation、エラー、Decision番号と、ローカル／CIデバッグ用途の直前・直後GameStateを追加できる。
 - ReplayはAction列を再実行し、最終Result、Action数、Observationの不一致理由を報告する。
 
@@ -343,48 +350,67 @@ interface AgentGame {
 
 ## 7.1 マップ
 
-- 15×15固定ヘックス。道路、16施設、4方向のHorde侵入口、道路支線、初期Unit座標は従来どおり固定し、TerrainをSeed生成しない。
-- 中央都市圏と東西南北へ延びる主要道路
-- 基礎Terrainは`plain`、`forest`、`mountain`、`water`。Road、Facility、Capital、City、Checkpointは別Overlay／属性とし、Terrainと同じenumへ格納しない。
-- 以下にないHexはPlainとし、標準MapにWaterは置かない。
-
-Forest（49 Hex）:
+- Map IDは`fixed-31x31-v1`、寸法は31×31、有効座標は`q=0..30`、`r=0..30`とする。Capitalは`(15,15)`、Horde EntranceはNorth `(15,0)`、East `(30,15)`、South `(15,30)`、West `(0,15)`とする。
+- RoadはCapital Junctionを含む`q=15`の全Hexと`r=15`の全Hexから成り、North／East／South／Westの4支線はCapitalから各Entranceまで15 Hexとする。Entranceと恒久FacilityのRoad Hexも支線へ含めるが、Facility HexはCheckpoint候補外とする。
+- 基礎Terrainは`plain`、`forest`、`mountain`、`water`。Road、Urban、Facility、CheckpointはOverlay／属性として分離する。標準MapにWaterは置かず、Random MapやSeedによるTerrain生成も行わない。
+- 180度回転を`R(q,r) = (30-q, 30-r)`とする。Mountainは次のSeed集合とその`R`像、Forestは次のSeed集合とその`R`像から生成する。
 
 ```text
-(3,4) (4,4) (4,5) (3,5) (4,6) (5,6) (5,4) (3,6)
-(9,2) (10,2) (9,3) (10,3) (11,4) (9,4) (10,4) (12,4)
-(2,9) (3,9) (3,10) (4,10) (4,11) (5,10) (5,11) (2,10)
-(9,9) (10,9) (11,9) (9,10) (10,10) (11,10) (10,11) (11,11) (12,10)
-(7,2) (12,7) (7,12) (2,7)
-(5,2) (6,2) (6,3) (12,5) (13,5) (12,6)
-(1,8) (2,8) (3,8) (6,12) (6,13) (5,12)
+Mountain seed
+r=3:  q=8..10
+r=4:  q=7..10, q=20..22
+r=5:  q=7..9,  q=21..23
+r=6:  q=6..8,  q=22..24
+
+Forest seed
+r=1:  q=2..6,  q=24..28
+r=2:  q=2..7,  q=23..28
+r=3:  q=3..6,  q=24..28
+r=4:  q=2..5,  q=24..27
+r=5:  q=3..6,  q=25..28
+r=6:  q=2..5,  q=25..28
+r=7:  q=3..7,  q=23..27
+r=8:  q=3..6,  q=24..27
+r=10: q=4..8
+r=11: q=3..8
+r=12: q=4..8
+r=13: q=5..9
+r=14: q=4..8
 ```
 
-Mountain（32 Hex）:
+- Mountainを先、Forestを後に配置し、重複時はMountainを優先する。その後、Roadと恒久Facilityの座標をPlainへ戻し、残りもPlainとする。最終内訳はPlain 720、Forest 197、Mountain 44の全961 Hexである。
+- 進入先の実効Costを消費し、開始Hexは消費しない。Plain 1、Forest 2、Mountain 3、Waterは進入不能とする。RoadまたはUrban Hexは基礎Terrainに関係なくCost 1とする。
+- Human、通常Zombie、Horde Zombieは同じ決定的な重み付き最短経路を使い、同Cost経路は安定座標順で決める。
+- Urban Hex上のGround Unitは被通常Combat Damage×0.5、Forest上の通常／Horde Zombieは×0.5。Urbanを優先し、重複しない。RoadはForest防御を消さない。Terrain防御は通常攻撃、反撃、迎撃にだけ適用する。
+- Police／National GuardのVisionは5、通常／Horde Zombieは3。Visionは距離以内でTerrainに遮られない。Capital、所有・未陥落施設とActive CheckpointはVision 1を提供する。Standby、Dormant、Remnant、Ruined、AbandonedはVisionを提供しない。
+- Player VisibilityはHuman Unit、Capital、Player所有施設、Active Checkpoint、給電中Civilian Drone Baseの和集合とし、UIとAgent Observationは同じ純粋関数を使う。Terrain、Road、施設・Checkpoint位置と公開済み状態、自軍、Supply、Horde Warning、Final Horde状態、Victory進捗はVisibility外でも既知とする。
+- Visibility外Enemyの位置・個体情報・Target・移動・正確なSpawn位置は公開せず、Last Known Positionも保持しない。公開移動計画ではHidden EnemyのHexを空きとして扱い、実移動で占有Hexへ進入しようとした場合は直前Hexで止まり、実進入Hex数分のFuelだけを消費する。
 
-```text
-(1,1) (2,1) (1,2) (2,2) (3,2) (1,3) (2,3)
-(12,1) (13,1) (11,2) (12,2) (13,2) (12,3) (13,3)
-(1,11) (2,11) (1,12) (2,12) (3,12) (1,13) (2,13)
-(12,11) (13,11) (11,12) (12,12) (13,12) (12,13) (13,13)
-(7,1) (13,7) (7,13) (1,7)
-```
+恒久Facilityは17施設とし、座標と初期状態を次へ固定する。
 
-- 進入先の実効Costを消費し、開始Hexは消費しない。Plain 1、Forest 2、Mountain 3、Waterは進入不能とする。
-- RoadまたはUrban Hexは基礎Terrainに関係なくCost 1とする。Human、通常Zombie、Horde Zombieは同じ決定的な重み付き最短経路を使い、同Cost経路は安定座標順で決める。
-- Urban Hex上のGround Unitは被通常Combat Damage×0.5、Forest上の通常／Horde Zombieは×0.5。Urbanを優先し、重複しない。RoadはForest防御を消さない。
-- Urbanは全施設と、稼働・非稼働・跡・荒廃・放棄を含む全Checkpoint Hexで、所有・状態に依存しない。Terrain防御は通常攻撃、反撃、迎撃に適用し、感染・不足・鎮圧等には適用しない。
-- Police／National GuardのVisionは5、通常／Horde Zombieは3。Visionは距離以内でTerrainに遮られない。Capitalは初期Supply Radius、所有・未陥落施設とActive CheckpointだけがVision 1を提供する。Standby、Dormant、Remnant、Ruined、AbandonedはVisionを提供しない。
-- Player VisibilityはHuman Unit、Capital、Player所有施設、Active Checkpointの和集合とし、UIとAgent Observationは同じ純粋関数を使う。Terrain、Road、施設・Checkpoint位置と公開済み状態、自軍、Supply、Horde Warning、Final Horde状態、Victory進捗はVisibility外でも既知とする。
-- Visibility外Enemyの位置・個体情報・Target・移動・正確なSpawn位置はUI、ログ、Observation、Legal Actions、StepResult、Bridge、公開Eventへ出さず、Last Known Positionも保持しない。
-- 公開移動計画ではHidden EnemyのHexを空きとして扱う。実移動で占有Hexへ進入しようとした場合は直前Hexで止まり、移動済みにしてVisibilityを再計算する。Checkpoint新設・移設・Active化のPlayer Action阻害判定にはVisible Enemyだけを使う。ただしAutomatic Fallbackの候補除外はGame Truth上のZombie存在で判定し、その理由を公開しない。
+| ID | Type | 座標 | 初期状態 |
+|---|---|---:|---|
+| `capital` | Capital | `(15,15)` | owned |
+| `city-1` | City | `(15,8)` | disconnected |
+| `city-2` | City | `(22,15)` | disconnected |
+| `city-3` | City | `(15,22)` | disconnected |
+| `city-4` | City | `(8,15)` | disconnected |
+| `farm-1` | Farm | `(13,15)` | owned |
+| `farm-2` | Farm | `(14,4)` | disconnected |
+| `farm-3` | Farm | `(16,26)` | disconnected |
+| `civilian-factory-1` | Civilian Factory | `(17,15)` | owned |
+| `civilian-factory-2` | Civilian Factory | `(25,16)` | disconnected |
+| `military-factory-1` | Military Factory | `(26,15)` | disconnected |
+| `military-factory-2` | Military Factory | `(11,15)` | disconnected |
+| `refinery-1` | Refinery | `(15,13)` | owned |
+| `refinery-2` | Refinery | `(14,6)` | disconnected |
+| `power-plant-1` | Power Plant | `(15,17)` | owned |
+| `power-plant-2` | Power Plant | `(16,24)` | disconnected |
+| `wind-power-plant-1` | Wind Power Plant | `(16,14)` | owned |
 
-施設は合計16。
-
-- 州都1、地方都市4
-- 農場3、民需工場2、軍需工場2、製油所2、発電所2
-
-開始時所有は州都、農場1、民需工場1、製油所1、発電所1。残りは連絡途絶状態とする。
+- 初期所有FacilityはSupply Radius 5内にある。`military-factory-2`は初期未確保だが初期Supply内にあり、ほかの未確保恒久施設は複数がSupply外にある。
+- 全恒久FacilityはUrban Overlayを持ち、Road座標上ではRoad Overlayも維持する。全恒久Facility座標の基礎TerrainはPlainとする。
+- 4支線、Sector、Supply、Map Query、UI、Observation、Save、Replay、Testは同じ固定Map定義を使う。初期Supply内に静的な建設可能Plain Hexを最低12、各支線のSupply半径6..15の各拡張帯にRoad外Plain Hexを最低2確保する。
 
 ## 7.2 人口上限
 
@@ -404,16 +430,12 @@ Mountain（32 Hex）:
 - 製油所1に10
 - 発電所1に3
 
-初期未配置人口は存在しない。警察1隊（人口5）と州兵1隊（人口10）を別に配置する。
+Wind Power PlantはWorker 0固定である。初期未配置人口は存在しない。Police 1隊（人口5）を`(14,15)`、National Guard 1隊（人口10）を`(16,15)`へ配置する。
 
-初期ゾンビは4駒、位置は次のとおり。
-
-- `(4, 4)`
-- `(11, 3)`
-- `(3, 11)`
-- `(11, 10)`
-
-最寄りの初期所有施設まで最低4ヘックスとし、移動力3の初回ゾンビターンでは施設へ到達できない。
+- 初期資源はFood 230、Civilian Goods 230、Military Goods 75、State Fuel 92とする。
+- 初期PoliceのUnit Fuelは12、National Guardは22の満タンとし、State Fuel 92から差し引かない。
+- 初期Normal Zombieは`(9,9)`、`(21,21)`、`(21,9)`、`(9,21)`、`(15,6)`、`(15,24)`の6体とする。
+- 初期Zombieは3組の180度回転対称配置で、最寄りの初期所有Facilityまで最低4 Hexを確保する。Movement 3の最初のZombie Turnでは初期所有Facilityへ到達できない。
 
 ## 7.4 連絡途絶施設
 
@@ -430,12 +452,14 @@ Mountain（32 Hex）:
 
 | ユニット | HP | Attack | Move | Range | Vision | 人口 |
 |---|---:|---:|---:|---:|---:|---:|
-| 警察 | 25 | 5 | 5 | 1 | 5 | 5 |
-| 州兵 | 50 | 10 | 5 | 2 | 5 | 10 |
+| 警察 | 25 | 5 | 10 | 1 | 5 | 5 |
+| 州兵 | 50 | 10 | 10 | 2 | 5 | 10 |
 | 通常Zombie | 10 | 5 | 3 | 1 | 3 | — |
 | Horde Zombie | 20 | 5 | 3 | 1 | 3 | — |
 
 すべてConfig化する。
+
+Policeは`maxFuel = 12`、National Guardは`maxFuel = 22`のUnit固有Fuel Poolを持つ。さらにPoliceは`maxMilitaryGoods = 5`、National Guardは`maxMilitaryGoods = 20`のUnit固有携行軍需品を持ち、初期Unitは満載で開始して国家備蓄を追加消費しない。
 
 ## 8.2 行動
 
@@ -444,7 +468,16 @@ Mountain（32 Hex）:
 - 攻撃後は移動できず、攻撃または待機で行動を確定する。
 - 1タイルに存在できるユニット駒は敵味方を問わず1つ。施設はタイル属性である。
 
-## 8.3 戦闘・迎撃
+## 8.3 移動Fuel
+
+- 経路合法性は進入Terrain Costの累積`<= 10`で判定するが、Fuel CostはTerrain Costでなく実際に進入したHex数を使う。
+- PoliceのFuel Costは距離0で0、1..5 Hexで1、6 Hex以降は1 Hexごとに1増加する。式は`distance <= 5 ? 1 : 1 + (distance - 5)`とする。
+- National GuardのFuel Costは距離0で0、1..5 Hexで1、6 Hex以降は1 Hexごとに2増加する。式は`distance <= 5 ? 1 : 1 + 2 * (distance - 5)`とする。
+- Move開始時に予定経路のFuelを保有しないActionは拒否する。Hidden Enemyで途中停止した場合は実進入Hex数から再計算する。
+- Attack、Wait、Counterattack、Interception、自動鎮圧はFuelを消費しない。死亡Unitの残FuelはState Fuelへ戻さない。
+- `currentFuel = 0`のHuman UnitだけはEmergency Movementを利用できる。通常のMovement Budget 10に代えてPolice 3 MP、National Guard 2 MPを上限とし、Terrain Costを累積する。Emergency MoveはFuelを消費せず、移動後もFuel 0のまま、通常移動と同様に行動権と移動状態を更新する。Fuelが1以上ならEmergency候補を出さない。
+
+## 8.4 戦闘・迎撃
 
 - 攻撃側が先にAttack分のダメージを与える。
 - 生存した防御側が、射程内かつ攻撃権ありの場合だけ反撃する。
@@ -453,12 +486,13 @@ Mountain（32 Hex）:
 - 生存していれば攻撃または待機できる。
 - HPを0未満にせず、死亡ユニットを盤面と合法手から除外する。
 - 防御側HexのTerrain防御を攻撃、反撃、迎撃へ適用し、軽減前後Damageと防御源をEvent／Metricsへ残す。
+- Human Unitが行う通常攻撃、反撃、迎撃は、命中処理の直前に距離別の携行Military Goodsを確認・消費する。Police距離1、National Guard距離1は1を消費し、不足0なら消費0・Attackを基礎値の20%（Police 1、National Guard 2）へ弱体化する。National Guard距離2は2を必要とし、0または1なら全Combat種別で不成立とする。消費順序と結果は通常攻撃、反撃、迎撃で共通とし、死亡Unitの残軍需は国家備蓄へ戻さない。
 
-## 8.4 自然回復
+## 8.5 自然回復
 
 警察・州兵は次のプレイヤーターン開始時、判定時に補給圏内で生存していれば1回だけ自然回復する。通常攻撃・反撃・迎撃・自動鎮圧を行った場合は最大HPの10%、移動のみ・待機・移動後待機・未行動の場合は20%、補給圏外は0%とする。標準端数処理は各ユニット個別の切り上げで、Configの`combatRate`、`restRate`、`rounding`に従う。HP上限を超えず、ゾンビは回復しない。移動済みでも休養回復を妨げず、補給判定は回復時点で再評価する。
 
-## 8.5 追加編成
+## 8.6 追加編成
 
 - 警察は操作可能な州都・地方都市で予約できる。
 - 州兵は操作可能な州都だけで予約できる。
@@ -468,6 +502,8 @@ Mountain（32 Hex）:
 - 人口はターン開始時の供給順位で都市から徴用する。
 - 最後の健全民間人口を使う編成は拒否する。
 - 初期コストは警察が人口5・民需品10・軍需品10、州兵が人口10・民需品20・軍需品25。
+- 完成Unitは`currentFuel = 0`で生成し、直後にState Fuelから同時完成UnitのID昇順1 Fuel単位Round Robinで有償補給する。不足時は部分補給とし、そのPlayer Turnから保有Fuelで支払えるMoveを実行できる。
+- 完成Unitは編成Cost以外に国家備蓄を消費せず、`currentMilitaryGoods = maxMilitaryGoods`の満載で生成する。
 
 ---
 
@@ -530,27 +566,29 @@ Mountain（32 Hex）:
 
 ## 10.2 同ターン生産と備蓄原則
 
-- EndTurn開始時の人口・Unit人口・過密からFood、Civilian Goods、Military Goodsの維持必要量を先に固定する。Food不足死亡で同ターンのCivilian Goods必要量を減らさない。
+- EndTurn開始時の人口・Unit・過密からFood、Civilian Goods、Unit別Military Goods固定消費を先に固定する。Food不足死亡で同ターンのCivilian Goods必要量を減らさない。
 - 当ターン生産したFood、Civilian Goods、Military Goodsは同ターンの維持消費へ使用できる。
 - 当ターン生産した資源は別工程の生産入力へ使用できない。当ターンRefinery生産Fuelは次ターンから発電へ、当ターン生産Civilian Goodsは次ターンからMilitary Factory入力へ使用できる。
 - 同ターンCivilian Goods増産で市民維持用予約が減った場合は、余ったTurn-start Civilian GoodsをMilitary Factory入力へ回せる。Turn-start Civilian Goodsが0なら同ターン増産だけでMilitary Factoryを稼働できない。
 
 ## 10.3 電力利用区分
 
-- `required`: CapitalとCity。健全民間人口1人以上なら施設単位で電力5を要求し、無給電では人口由来Civilian Goods生産だけが0になる。人口保持、避難民受入、移住、編成、所有、補給、感染、防衛は維持する。
+- `required`: Capital、City、Simple Farm、Civilian Drone Base。Capital／Cityは健全民間人口1人以上、Constructible FacilityはWorker 1人以上かつPower Supply ONなら施設単位で電力5を要求する。
+- Capital／Cityは無給電でも人口保持、避難民受入、移住、編成、所有、補給、感染、防衛を維持し、人口由来Civilian Goods生産だけが0になる。Simple Farmは無給電でFood生産0、Civilian Drone Baseは無給電でVision 0となる。
 - `boost`: Farm、Civilian Factory、Military Factory。労働者1人以上でPower SupplyがONなら電力5の割当候補となり、給電時は稼働労働者分の生産を2倍、無給電またはOFFでは基本生産を行う。電力不足だけで停止しない。
-- `none`: Refinery、Power Plant、Checkpoint。電力供給の影響を受けない。
+- `none`: Refinery、Power Plant、Wind Power Plant、Checkpoint。電力供給の影響を受けない。
 - 未確保、陥落、人口／労働者0の施設は需要を持たない。5未満の部分給電は行わない。
-- Power Supply ON/OFFは所有中・安全・操作解禁済みのboost施設に対する`SetPowerSupply`でだけ変更し、既定、確保、復旧、旧Save移行時はONとする。Actionは資源・人口・Unit行動権も共通Player Action上限も消費せず、同一Player Phase中に何度でも変更でき、受理直後にForecastを更新する。
+- Power Supply ON/OFFは所有中・安全・操作解禁済みのboost施設とConstructible Facilityに対する`SetPowerSupply`でだけ変更し、既定、確保、復旧時はONとする。Actionは資源・人口・Unit行動権も共通Player Action上限も消費せず、同一Player Phase中に何度でも変更でき、受理直後にForecastを更新する。
 
-## 10.4 発電と3段階割当
+## 10.4 発電、5段階割当、Unit補給
 
-- Power Plantの物理発電Capacityは全所有・非感染・非陥落発電所の`workers × 10`を州全体で合算する。
-- 発電にはTurn-start Fuelだけを使い、`Fuel 1 → Electricity 5`とする。実際に施設へ割り当てた5電力ごとにFuel 1を消費し、余剰CapacityへFuelを消費しない。
-- 利用可能電力は`min(物理発電Capacity, Turn-start Fuel × 5)`を5単位へ切り下げる。
-- 第1段階はRequired都市、第2段階はPower Supply ONのFarm／Civilian Factory、第3段階はTurn-start Civilian Goods入力を1人分以上確保したPower Supply ONのMilitary Factoryへ割り当てる。
+- 稼働中Wind Power PlantはFuel不要の固定Electricity 15を先に供給する。Power Plantの物理発電Capacityは全所有・非感染・非陥落発電所の`workers × 10`を州全体で合算する。
+- Windで足りない実割当5 ElectricityごとにTurn-start State Fuel 1を消費する。利用可能電力は`operationalWindCapacity + min(powerPlantPhysicalCapacity, turnStartFuel × 5)`で、余剰CapacityへFuelを消費しない。
+- 電力は、(1) Capital／City、(2) Simple Farm、(3) 恒久Farm／Civilian Factory、(4) Turn-start Civilian Goods入力を1人分以上確保したMilitary Factory、(5) Civilian Drone Baseの順で割り当てる。
 - 各段階内は確保時期が古い施設、同順位は`facilityId`昇順とする。未給電理由は物理Capacity不足、Turn-start Fuel不足、同段階の順位負け、Power Supply OFF、人口／労働者0または非対象、Military Factory入力なしを区別する。
 - 複数発電所のCapacityと電力は州全体で共有し、送電線、地域別停電、蓄電、発電所ごとのFuel在庫は扱わない。
+- 発電Fuel消費後、施設生産前に残るState Fuelから、判定時点で生存かつSupply内のHuman Unitを補給する。`maxFuel - currentFuel`を需要とし、Unit ID昇順の1 Fuel単位Round Robinで満タンUnitを飛ばして配分する。Supply外Unitは補給しない。
+- 当TurnのRefinery生産Fuelは発電にもUnit補給にも使わず、Ending Stockへ加えて次Turnから利用する。ForecastとEndTurnは同じ純粋計算経路を使う。
 
 ## 10.5 Civilian Goods予約と経済処理順
 
@@ -564,13 +602,13 @@ productionInputAvailable
 = max(0, startingStock - maintenanceReservation)
 ```
 
-経済処理は、維持必要量固定、発電上限計算、Required給電、Farm／Civilian Factory給電、生産見込み、維持予約、Military Factory入力割当、Military Factory給電、実割当Fuel消費、生産、生産物追加、Food／Civilian Goods／Military Goods維持消費、不足被害の順とする。ForecastとEndTurnは同じ純粋計算経路を使う。
+経済処理は、維持必要量固定、Wind供給確定、Power需要とPower Plant物理Capacity確定、5段階給電、実割当分の発電Fuel消費、残FuelによるSupply内Unit補給、施設生産、生産物追加、Food／Civilian Goods維持消費、Unit ID昇順の携行Military Goods固定消費・補充・自動鎮圧、不足被害の順とする。Civilian Goodsの維持予約はMilitary Factory入力より優先し、ForecastとEndTurnは同じ純粋計算経路を使う。
 
 ## 10.6 通常消費
 
 - 食料: 都市住民＋生産施設労働者＋警察人口＋州兵人口と同数
 - 民需品: 同上
-- 軍需品: 警察人口＋州兵人口と同数
+- 軍需品は民間人口やUnit人口による州全体維持消費を持たない。Supply内の生存Human UnitをUnit ID昇順に処理し、Police 0、National Guard 1の固定消費を携行量から差し引いた後、国家備蓄から各Unitの最大量まで1単位Round Robinで補充する。Supply外Unitは固定消費も補充も行わない。
 - 検問所の3健常者プールと感染者は消費しない。
 - Civilian Goodsの`productionInputShortage`はMilitary Factory減産理由であり、市民死亡へ変換しない。`maintenanceShortage`だけを不足被害へ使う。
 
@@ -597,7 +635,34 @@ productionInputAvailable
 - 次に、確保順が新しい生産施設から減らし、同順は`facilityId`昇順とする。
 - 個別施設が0人になっても感染による0でなければ陥落しない。
 - 健全民間人口合計0で即時敗北する。
-- 軍需品が1でも不足すると全州兵の射程を1へ下げ、供給回復後の次回判定で2へ戻す。
+- 軍需品不足は民間人口損失を起こさない。全州一括の軍需供給状態や一括射程低下は持たず、各Unitの現在携行量とCombat距離から実効射程・攻撃力をその都度導出する。
+
+## 10.9 Wind Power Plant
+
+- 初期所有のWind Power Plant 1基はWorker 0固定で、稼働中はFuelを消費せずElectricity 15とVision 1を提供する。Supply Sourceにはならない。
+- `healthyPopulation = 0`と`zombieTargetValue = 5`を分離し、Target Valueを人口、消費、過密、人口0敗北へ加算しない。
+- ZombieがWind HexでZombie Turnを終了すると感染でなく`disabled`になり、発電とVisionを失う。Human UnitがZombie排除後に進入すると`recovering`となり、次Player Turn開始時に`operational`へ戻る。
+- 感染者Pool、陥落時Zombie生成、破壊・再建はなく、恒久Facilityとして残る。
+
+## 10.10 Constructible Facility
+
+- 建設可能TypeはSimple FarmとCivilian Drone Base。Type別上限は`ceil(roadBranchCount / 2)`で、標準4支線Mapでは各2基とする。建設中、operational、empty、disabled、recoveringを数え、感染陥落で消滅した施設は数えない。
+- `BuildConstructibleFacility`はPlayer Supply内の基礎PlainかつRoad、Urban、Horde EntranceのないHexを対象とする。Facility、Checkpoint、Player Unit、Visible ZombieがいるHexは不合法とし、Hidden Zombieは候補、合法性、Reason Codeへ反映しない。
+- Hidden Zombieが実在するHexへのActionは受理して一時同居を許し、次Zombie Turn終了時に通常の占有・感染処理を行う。
+- Simple FarmはCivilian Goods 15、Civilian Drone Baseは25を受理時に消費し、共通Player Action 1回を消費する。不正ActionはState、Resource、Action回数、PRNGを変更しない。
+- 建設Turnは無人・非稼働でWorker配置、Power需要、生産、Visionを持たず、次Player Turn開始時に操作可能となる。移設、売却、任意撤去Actionは持たず、Supply Sourceにもならない。
+- Supply外になってもWorker、所有、状態を維持し、配置済みWorkerと給電があれば機能を継続する。Supply外では増員を禁止し、減員と都市への帰還を許可する。
+- Simple FarmはWorker 0..10、Required Power 5、給電時Food 5／worker、無給電時0を生産し、Zombie Target Valueは健全Worker数とする。
+- Civilian Drone BaseはWorker 0..5、Required Power 5、給電時Vision Radius `workers × 2`、無給電時0とし、Zombie Target Valueは健全Worker数とする。
+- Zombie占有時、Workerがいれば通常施設と同じ感染・陥落を処理し、感染で健全Workerが0になると施設を消滅させNormal Zombie 2体を生成する。空施設は`disabled`、Human Unit再確保で`recovering`、次Player TurnにWorker 0・Power Supply ONの`operational`へ戻る。
+
+## 10.11 Strategic Forecast
+
+- CoreはFood、Civilian Goods、Military Goods、Fuel、Electricityごとに、現在不足、寄与Facility、最大寄与Facility、最大寄与量、その1施設を仮想喪失した場合の不足量とSingle Point of Failureを純粋計算する。
+- 現在の公開状態のままEndTurnした経済処理でFood、続いてCivilian Goods不足を適用し、健全民間人口0が確定する場合はGuaranteed Defeatを返す。Zombie行動、Hidden Zombie、潜伏感染、避難民乱数、将来Horde接触は含めない。
+- CheckpointのBuild／Relocate／Activate候補は現在・予測支線半径、新規Supply／Supply喪失Hex数とFacility ID、Facility差分、新規Constructible建設可能Hex数を同じCore Validationから返す。Visible Zombieだけを阻害へ使う。
+- Checkpoint Queue Pressureは`waiting + screening + approved`を人数、screening capacityを容量とし、0は`none`、1..capacityは`low`、capacity超..2倍は`medium`、2倍超は`high`とする。将来到着・潜伏感染の乱数は公開しない。
+- Forecastと候補QueryはState、Resource、Action回数、PRNGを変更せず、UI、Observation、Balanced Agentが同じ結果を使う。
 
 ---
 
@@ -627,6 +692,7 @@ infected += spread
 - 通常攻撃・反撃・迎撃で攻撃権を消費していなければターン終了時に自動鎮圧し、攻撃権を消費する。待機または移動だけなら攻撃権が残るため自動鎮圧できる。
 - 警察はAttack相当を減らす。
 - 州兵はAttack相当を減らす一方、`ceil(Attack × 0.5)`の民間人被害を出す。
+- 自動鎮圧はUnit別Military Goods固定消費と補充の後に行う。Police／National Guardとも携行軍需1を消費し、保有0なら感染加算を止める封じ込めだけを行って感染者数を減らさず、攻撃権も消費しない。1以上なら1を消費して通常の鎮圧を行う。
 - 即時`SuppressInfection`は公開Action、合法手、Human UI、Agent API、Bridgeから除去する。直接入力も状態とRNGを変えず拒否する。
 
 ## 11.3 陥落
@@ -752,8 +818,8 @@ Final Horde生成後、次をすべて満たした瞬間に`stateSecured`で勝�
 PLAYER TURN START
   自然回復
   攻撃権・行動権回復
-  予約ユニット完成
-  新規確保・復旧施設の操作解禁
+  予約ユニット完成・有償commissioning Fuel補給・携行軍需満載
+  新規確保・復旧・建設施設の操作解禁、Wind／Constructible Recovery完了
   都市供給・受入順位スナップショット作成
   配置待ち合格者の自動配置
   敗北条件確認
@@ -762,28 +828,33 @@ PLAYER / DOMESTIC ACTION
   移動・迎撃・攻撃・待機・施設確保
   労働者配置・撤収・都市間移住
   Power Supply ON/OFF
-  支線Policy・Checkpoint新設／移設／Active化・ユニット編成予約
+  支線Policy・Checkpoint新設／移設／Active化
+  Constructible Facility建設・ユニット編成予約
         ↓
 END TURN VALIDATION
   資源・電力・過密予測と警告
         ↓
 ECONOMY
   EndTurn開始時の維持必要量＋過密追加消費を固定
-  Turn-start Fuelと物理発電Capacityを決定
-  Required都市 → Farm／Civilian Factory → 入力確保済みMilitary Factoryへ給電
+  Turn-start Fuel、Wind供給、物理発電Capacityを決定
+  Capital／City → Simple Farm → Farm／Civilian Factory
+    → 入力確保済みMilitary Factory → Civilian Drone Baseへ給電
   Civilian Goods維持予約・Military Factory入力配分
-  実割当分のFuel消費
-  生産物追加
-  Food → Civilian Goods → Military Goods維持消費
-  不足被害・軍需供給更新・敗北確認
+  Wind不足分の実割当だけ発電Fuel消費
+  残FuelからSupply内Human UnitをID順Round Robin補給
+  生産物追加（Refinery Fuelは次Turnから利用）
+  Food → Civilian Goods維持消費
+  Unit ID順の携行Military Goods固定消費 → 国家備蓄からRound Robin補充
+  携行軍需を使う自動鎮圧
+  不足被害・敗北確認
         ↓
 REFUGEES
   直前のActive失陥があればFallback済みのRole／Supplyを使用
   到着・審査・合格・自動配置または配置待ち
   潜伏感染・敗北確認
         ↓
-INTERNAL INFECTION / SUPPRESSION
-  鎮圧・内部感染・Checkpoint Active失陥時の即時Fallback・復旧・敗北確認
+INTERNAL INFECTION
+  鎮圧後の残存感染による内部感染・Checkpoint Active失陥時の即時Fallback・復旧・敗北確認
         ↓
 ZOMBIE TURN / INFECTION
   Phase開始時Target Snapshot（Visible > Horde継承 > Noise > Idle）
@@ -798,6 +869,16 @@ ZOMBIE TURN / INFECTION
 
 各サブフェーズ内の順序は決定的にする。即時敗北成立後は残り処理を行わない。
 
+## 14.1 AI Portable Session
+
+- AI Portableは長時間の外部AIプレイをプロセス境界で継続するSession層を提供し、`new`、`status`、`step`、`save-checkpoint`、`list-checkpoints`、`load-checkpoint`、`artifact`の7コマンドをJSON CLIとして公開する。
+- `step`は既存`GameAction`と1～500 Unicode code pointの`decisionSummary`だけを受け取り、1回につき1 ActionをGameEngineへ渡す。入力形式不正はDecision番号を付けず、合法性拒否は番号、Error、Action、公開前後Observation、公開Eventを持つDecisionとして記録する。
+- Active SessionはPrivate State、Public State、Public Decision Logを分離する。Private Stateだけが完全GameStateとRNGを保持し、公開CLI出力、Trace、Checkpoint metadata、ArtifactへHidden Enemy、内部Target、RNG state、完全な非公開Configを含めない。
+- 各Decisionは前Decision hashを含むcanonical JSONのSHA-256でchain化する。State、Trace、metadata、Version、Build ID、Map、公開Configの不一致・破損を状態不変で拒否し、Active破損時に暗黙の巻き戻しをしない。
+- 更新は新しいimmutable generationへPrivate/Public StateとDecisionを書き、最後にActive commitを確定する。Session単位の排他lockを使い、同時更新は状態不変で拒否し、同一hostで終了済みPIDのlockだけをstaleとして回収する。
+- 既定で5完了Turnごと、手動要求時、Game Over時にCheckpointを作る。Checkpoint Schemaは`1.0.0`。`load-checkpoint`は新Session IDへ分岐し、親Session IDと親Checkpoint IDをlineageへ保持して親を変更しない。
+- `.git`を含まないPortable PackageでもWorkflowから注入したfull commit SHAをBuild IDとGit Commitとして固定し、別BuildのSession／Checkpointを拒否する。
+
 ---
 
 # 15. 保存・復元
@@ -807,10 +888,11 @@ ZOMBIE TURN / INFECTION
 - 同内容をJSONファイルで入出力できる。
 - Version不一致、破損、不正Config、不変条件違反を検出し、現在状態へ適用しない。
 - ロード後は保存時Configを使う。
-- v1.4.0はGame Rules / GameState / Config `2.0.0`、Fixed Map `fixed-31x31-v1`、Save Format `5`を使う。
-- v1.3.3以前の自動保存、セーブコード、JSON Save、Replay、Artifactを一律で変換しない。Version不一致は現在Stateを変更せず、日本語・英語の理由付きで拒否する。旧データを自動変換、削除、上書きしない。新規ゲームはSave Format 5の新Saveキー／Version境界を使う。
-- Save 5は31×31 Map、Unit Fuel、Wind、Constructible Facility、Strategic Forecast、複数PostのBranch参照、支線Policy、Zombie Noise Target、Noise Config、v1.4.0統計を完全に検証する。不正Config、不変条件違反、破損も現在Stateへ適用しない。
-- v1.4.0 ArtifactはTerrain Map、Vision Config、Unit Fuel、Constructible Facility、Forecast、Zombie Type、Unit Type別Horde Composition、Horde Spawn Group、Horde／Noise Target決定・伝播、Noise Pulse、Final Horde、Victoryを決定的に再現可能にする。Player-facing ReplayにはFoWを適用し、Browser BridgeのArtifactへ内部情報を含めない。Browser Bridge ArtifactのConfigは公開情報だけを含む。ローカル／CI Runnerの検証用完全Artifactだけが`verificationEvents`、完全Config、Internal Event列を保持し、Replay時に一致確認する。
+- v1.4.1はGame Rules / GameState / Config `2.1.0`、Fixed Map `fixed-31x31-v1`、Save Format `6`を使う。
+- v1.4.0以前の自動保存、セーブコード、JSON Save、Replay、Artifact、Sessionを一律で変換しない。Version不一致は現在Stateを変更せず、日本語・英語の理由付きで拒否する。旧データを自動変換、削除、上書きしない。新規ゲームはSave Format 6の新Saveキー／Version境界を使う。
+- Save 6は31×31 Map、Unit Fuelと携行Military Goods、Unit Config標準最大量との一致、Wind、Constructible Facility、Forecastの元State、複数PostのBranch参照、支線Policy、Zombie Noise Target、Noise Config、v1.4.1統計を完全に検証する。Emergency Movement、Forecast、Supply、Vision、上限、Queue Pressure等の導出値は保存せず再計算する。
+- Artifact Schema 2.1.0は固定Map情報をゲーム単位で1回だけ保存し、Turn Observation Traceでは`mapId`から参照してTerrain、Road、恒久Facility座標を重複させない。動的な所有、感染、Power、Constructible Facility、Unit、Enemy、Visibility、Public Decision Log、Session lineage、軍需・Emergency MetricsはTrace／Artifactへ残し、Replay Loaderが完全Observationを再構成する。
+- Player-facing ReplayにはFoWを適用し、Browser BridgeのArtifactへ内部情報を含めない。Browser Bridge ArtifactのConfigは公開情報だけを含む。ローカル／CI Runnerの完全な検証Artifactだけが`verificationEvents`、完全Config、Internal Event列を保持し、Replay時に一致確認する。Live ObservationとBrowser Bridgeは完全Observationを返し、参照差分形式へ変更しない。
 
 ---
 
@@ -846,10 +928,19 @@ Agentゲーム単位Metricsは、各Version、Build ID、Map、Seed、Config、A
 - Final Horde生成／撃破／全滅、通常／Horde Zombie撃破、最大Visible Zombie、Final Horde後Turn数、Supply内Zombie／感染Clear Turn、Victory Turn
 - Periodic Horde Zombie生成数、Periodic Normal Zombie生成数、Final Horde Zombie生成数、Final Normal Zombie生成数。`finalHordeSpawned`と`finalHordeKilled`はFinal Groupの両Unit Typeを合算する。
 - Terrain別進入、Urban／Forest防御適用回数と防止Damage、通常Zombie Idle、Horde Target継承／解除、Noise Pulse総数、Police／National Guard Pulse数
+- Map幅／高さ、Human Unit Type別移動Hex数・最大移動距離・6 Hex以上の長距離移動
+- Unit Type別Fuel消費・補給・commissioning Fuel、Supply外終了Turn、Fuel不足で移動不能となったUnit、Power／UnitへのState Fuel支出、Fuel不足Turn
+- Unit Type別の携行Military Goods固定消費、通常攻撃／反撃／迎撃／自動鎮圧消費、補充量、未充足補充量、撃破時喪失量、軍需0弱体攻撃回数、National Guardの距離1／距離2攻撃回数と消費量、国家軍需補充不足Turn
+- Unit Type別Emergency Movement回数、Emergency移動Hex数、消費MP、Emergency MovementによるSupply内帰還回数
+- Wind発電量・停止Turn・Overrun・Recovery
+- Simple Farm／Civilian Drone Baseの建設・破壊、Simple Farm Food生産、最大Drone Vision、Constructible Overrun、建設拒否Reason
+- Guaranteed Defeat警告／無視、Resource別Single Point of Failure Turn、Supply増加なしCheckpoint移動、Queue Pressure Class別Turn
 - 完全な検証Metricsには`normalZombiesNoiseTargeted`、`noiseTargetsReached`、`noiseTargetsOverriddenByHorde`、`noiseTargetsOverriddenByVisiblePopulation`も含める。これらのHidden Enemy状態を推測し得る値はActive Game Observation、Production終了結果、公開Event、Browser Bridge Artifactから除く。
 - 最終食料、民需品、軍需品、燃料
 
 Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値の平均・中央値・最小・最大・p10・p90、Game Over理由、Action／優先目標件数、同一Seed差分を持つ。
+
+Session Metricsはゲーム成績と分離し、Active Session復帰、手動／定期／最終Checkpoint作成、分岐Session作成、hash／Version／Build／破損による拒否、不合法Decision、入力形式拒否の回数を記録する。Hidden Enemyを推測できる値はSession Metricsへ含めない。
 
 ---
 
@@ -861,7 +952,7 @@ Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値
 - 施設確保、操作解禁ターン、感染、鎮圧、陥落、復旧
 - 人口供給・受入順位、配置、撤収、都市間移住、編成
 - ソフトキャップ、都市生産上限、過密追加消費
-- 5資源、同ターン維持利用と生産入力への連鎖禁止、3段階給電、発電Fuel、産業ブースト、都市停電、不足被害
+- 5資源、同ターン維持利用と生産入力への連鎖禁止、Wind先行の5段階給電、発電Fuel、Unit補給、産業ブースト、都市停電、不足被害
 - SetPowerSupplyの合法条件、行動上限非消費、同一Phase中の反復、即時Forecast更新、不正時State／RNG不変
 - Civilian Goods維持予約とMilitary Factory入力不足、Fuel希望／実使用／不足、物理Capacity不足の分離、ForecastとEndTurn実績一致
 - Active／Remnant Checkpointの3プール、支線Policy、合格、配置、2種類の感染順、陥落
@@ -881,13 +972,21 @@ Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値
 - Police Radius 4／National Guard Radius 5のNoise境界、Terrain非減衰、通常Combat 1回1Pulse、移動後Attack／Zombie Attack／InterceptionのCenter、Counterattack二重Pulseなし、Horde免疫、複数Pulseで最初のNoise保持、到達・Horde／Visible上書き、Phase Snapshot後Noiseの次Phase適用
 - Production UI／Agent API／公開Event／終了結果／Browser Bridge ArtifactがNoise Classだけを公開し、正確Radius、反応Hidden ZombieのID／数、Noise Target、Hidden Noise Metricsを漏らさないこと。Development Buildの読み取り専用診断だけが正確なCenter／Radius／範囲／反応／Targetを確認できること。
 - Periodic／Final Hordeの規模・Timing・次Turn行動、Turn 31以降継続、3 Victory条件、Supply縮小、Defeat優先
-- 勝利・即時敗北、Save Format 5保存・復元、v1.3.3以前のSave／Replay／Artifact拒否
+- 勝利・即時敗北、Save Format 6保存・復元、v1.4.0以前のSave／Replay／Artifact拒否
 - UI数値入力とスライダー同期
+- 31×31固定Map、17恒久Facility、初期Unit／Zombie 6体、Terrain生成順、4支線距離15、建設用Plain候補
+- Movement Budget 10、Type別Fuel表、Fuel不足拒否、Hidden Enemy途中停止、発電後Round Robin補給、新Unit有償補給、死亡時Fuel喪失
+- Police 5／National Guard 20の初期・新規Unit携行軍需、固定消費、Unit ID順Round Robin補充、未充足、距離別通常攻撃／反撃／迎撃Cost、軍需0弱体、州兵距離2拒否、鎮圧／封じ込め、死亡時喪失、Forecastと実績一致
+- Fuel 0でだけ使えるPolice 3 MP／National Guard 2 MPのEmergency Movement、Terrain実効Cost、Hidden Enemy途中停止、補給圏帰還、Fuel非消費、Save／Replay再導出
+- WindのFuel不要発電、Vision、Disable／Recoveryと、Constructible Facilityの候補、費用、上限、建設Turn、Power、Supply喪失、感染／消滅／Recovery
+- Simple FarmのWorker／Power／Food、Civilian Drone BaseのWorker／Power／Vision、Strategic Forecast、Queue Pressure境界、Query純粋性とHidden情報非漏洩
+- 建設中／disabled／recoveringのFacilityへ`AssignWorkers`をLegal Actionsとして列挙せず、直接Actionも状態不変で拒否すること
 - 全Asset Registry Pathの実File、PNG Decode、256×256 px、透過、3 MiB上限、Water非収録、Type／状態Mapping、BoardとLegendのRegistry同一性
 - 一般施設とCheckpointの複合状態、現在停止と停止予測、Periodic／Final Horde Marker、Road接続方向、施設・Unit Offset
 - 全Asset成功と個別Missing／Decode／Texture登録失敗のFallback、成功Assetの維持、Loading完了、Fallback中の操作継続とState／RNG不変
 - Fog外の既知情報暗転とEnemy非表示、Layer順、Zoom`0.75`境界と最小`0.55`のLOD、日英Board Legend、現在／標準Config、電力HUDの需要／供給・Tooltip・Accessible Name・`0/0`
-- v1.4.0の同一Config、Map、Seed、Action列についてUnit Fuel、Constructible Facility、Forecast、Unit Type別Composition、Unit ID、配置、Horde／Noise Target、Combat Noise、Checkpoint候補・Fallback、最終Result、主要MetricsのReplay一致を確認する。
+- v1.4.1の同一Config、Map、Seed、Action列についてUnit Fuel・携行Military Goods・Emergency Movement、Constructible Facility、Forecast、Unit Type別Composition、Unit ID、配置、Horde／Noise Target、Combat Noise、Checkpoint候補・Fallback、最終Result、主要MetricsのReplay一致を確認する。
+- Sessionの連続実行、Active復帰、複数地点Checkpoint分岐でObservation、Legal Actions、公開Event、RNG結果、Decision番号、最終State hash、Artifact、Replayを一致させる。更新中断点、排他lock、stale lock、個別改変、hash chain、Version／Build／Map／Config不一致、Active破損、分岐親不変、Game Over最終Checkpoint、FoW非漏洩を試験する。
 
 ## 17.2 不変条件
 
@@ -903,6 +1002,8 @@ ScreeningRefugees >= 0
 ApprovedRefugees >= 0
 Infected >= 0
 Resources >= 0
+0 <= UnitCurrentMilitaryGoods <= UnitMaxMilitaryGoods
+UnitMaxMilitaryGoods == UnitConfigMaxMilitaryGoods
 ```
 
 加えて:
@@ -919,6 +1020,7 @@ Resources >= 0
 - 各支線のActiveは最大1、`activeCheckpointId`と`standbyCheckpointIds`は重複せず、Standbyは同支線のoperational Postだけを参照する。Active＋StandbyはConfig上限以下であり、Remnant／Ruined／AbandonedはActive／Standbyにならない。
 - Activeだけが新規Arrival、Supply、Visionを提供し、Role変更、Fallback、Supply再計算、Event生成はGameEngine内で原子的かつ決定的に行う。`noiseTarget`はNormal Zombieだけが持ち、Horde Zombieは持たない。
 - 補給圏とセクターは同じ純粋関数から導出し、Human UI、Headless、Agent、Browser Bridgeで判定を分岐させない。
+- Zombieの携行Military Goodsは常に0とし、Emergency Movement利用可否は保存せずConfigと`currentFuel`から導出する。
 
 ## 17.3 Random Test Agent
 
@@ -933,13 +1035,13 @@ Resources >= 0
 - ObservationがJSON互換、非共有、決定的で、取得時にStateを変更せず、非公開情報を含まないことを試験する。
 - 回復・鎮圧・実効射程・部分稼働生産・電力予測がCoreの合法手と実処理に一致し、`getApiInfo()`がAgentGameとBridgeで同じ静的契約を返すことを試験する。
 - Legal Actionsがすべて受理され、一覧外ActionでStateとRNGが変わらず、AgentStepResultにGameStateを含まないことを試験する。
-- Balancedの即時敗北、施設接触拒否、National Guardの実効射程、Police温存、戦闘／休養回復、補給圏への後退、自動鎮圧、民間被害、同ターン最終収支、Fuel備蓄、Required Power、産業ブースト、Military Factory入力、州都人口、感染、Horde、過密、冗長化、拡張、編成、道路流入、補給、支線Policy・Checkpoint新設／Standby／Activate／Relocate／Fallback防衛・後退、EndTurnの固定Scenarioを意図ベースで試験する。
+- Balancedの即時敗北、施設接触拒否、National Guardの実効射程と距離別携行軍需、Police温存、戦闘／休養回復、Emergency Movementによる補給圏帰還、負傷部隊の後退、自動鎮圧／封じ込め、民間被害、同ターン最終収支、Fuel備蓄、Required Power、産業ブースト、Military Factory入力、州都人口、感染、Horde、過密、冗長化、拡張、編成、道路流入、補給、支線Policy・Checkpoint新設／Standby／Activate／Relocate／Fallback防衛・後退、EndTurnの固定Scenarioを意図ベースで試験する。
 - Balancedが`checkpoint_supply_zombie_blocked`でもCheckpoint Goalを放棄せず、Non-urgent Forest Hordeへの非致死Attackを抑え、Urbanから不要に離れず、Plainへ誘えるWaitを残し、公開`medium` ClassとUnit Vision内のVisible Normal ZombieだけでNoise Riskを評価し、即時Capital ThreatではTerrain／Noise Penaltyより防衛を優先することを試験する。
 - 標準Configの固定Seed 1～100でRandomとBalancedが技術的失敗なく完遂する。特定の勝率や生存ターンは合否条件にしない。
-- Random／Balancedの同一Seed比較、決定性、JSON／CSV／ゲーム単位Artifact、失敗継続、fail-fast、Replay一致を試験する。
+- Random／Balancedの同一Seed比較、決定性、JSON／CSV／通常モードのゲーム単位Artifact、`--summary-only`のコンパクト出力、失敗継続、fail-fast、Replay一致を試験する。
 - Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
 - 公開Pagesではブラウザ操作可能な外部Agentを使い、API発見、不正Action訂正、Game Over、Result／Artifact取得とReplayを手動E2E確認する。勝利は合格条件にしない。
-- リリース前に標準ConfigのBalancedを固定Seed 1～300で完遂し、直前安定版基準と主要Metricsを比較して重大なバランス異常がないことを確認する。Pages成功後に独立したPortable Package Workflowを成功させ、Commit SHA・App・Node Version入りZIPをBundled NodeだけでSmoke Testする。
+- リリース前に標準ConfigのBalancedを固定Seed 1～300で完遂する。CIでは`1..100`、`101..200`、`201..300`の3並列Jobに分け、直前安定版基準と主要Metricsを比較して重大なバランス異常がないことを確認する。Pages成功後に独立したPortable Package Workflowを成功させ、Commit SHA・App・Node Version入りZIPをBundled NodeだけでSmoke Testする。
 
 ---
 
@@ -947,21 +1049,21 @@ Resources >= 0
 
 1. PC ChromeでFinal Horde後の勝利または敗北までTurn上限なくプレイできる。
 2. iPhone Safari・Android Chrome相当の縦向きで主要操作と3状態パネルを利用できる。
-3. 15×15盤面のパン・ズーム、戦闘、ゾンビAI、施設確保・感染・復旧が機能する。
+3. 31×31盤面のパン・ズーム、戦闘、ゾンビAI、17恒久施設の確保・感染・復旧が機能する。
 4. 所在地を持つ人口の配置・撤収・都市間移住・編成が機能し、人口保存則を満たす。
 5. 都市ソフトキャップ、生産上限、過密追加消費と予測が機能する。
-6. 5資源、3段階給電、産業ブースト、都市停電、Military Factory部分入力、不足被害が機能する。
+6. 5資源、Wind先行の5段階給電、発電後Unit補給、産業ブースト、都市停電、Military Factory部分入力、不足被害が機能する。
 7. 道路別自然流入、Active／Remnant Checkpointの3プール、支線Policy、配置待ち、潜伏感染が機能する。
 8. Unit Type別に増加するMixed Periodic Horde、7/5のFinal Horde、方向予告、Turn 31以降と3条件Victoryが機能する。
 9. 日本語・英語Help、Board Legend、Checkpoint Role／FallbackとNoise Class、候補のInline Reason、終了統計を表示する。
-10. Save Format 5の自動保存、セーブコード、JSON保存・復元と、v1.3.3以前の状態不変な拒否が機能する。
+10. Save Format 6の自動保存、セーブコード、JSON保存・復元と、v1.4.0以前の状態不変な拒否が機能する。
 11. Headless、主要Unit Test、不変条件試験、最低100ゲームのRandom Testが成功する。
 12. 許諾的ライセンスだけを使用し、GitHub Actionsでテスト・ビルド・Pages公開が可能である。
 13. AgentObservationとAgentGameが非公開GameStateを渡さず、合法手とstepだけで進行できる。
-14. Balanced v3.1が公開情報だけを使って決定的に動作し、Checkpoint Network／Fallback、Terrain、公開Noise Class、Vision、FoW、Horde、Victoryと既存経済・感染・補給Scenarioを扱い、RandomとともにSeed 1～100の技術的失敗なし完遂を満たす。
-15. 統一RunnerとBatch CLIが同一Seed比較、Metrics、JSON／CSV、Replay／Failure Artifactを生成し再生できる。
+14. Balanced 4.1.0が公開情報だけを使って決定的に動作し、Strategic Forecast、Unit携行Military Goods、Emergency Movement、Fuel、Constructible Facility、Checkpoint Network／Fallback、Terrain、公開Noise Class、Vision、FoW、Horde、Victoryと既存経済・感染・補給Scenarioを扱い、Random 2.1.0とともにSeed 1～100の技術的失敗なし完遂を満たす。
+15. 統一RunnerとBatch CLIが同一Seed比較、Metrics、JSON／CSVを生成し、通常モードではReplay／Failure Artifactを生成・再生できる。`--summary-only`は完全Replayを省略する。
 16. Production Buildで通常UI・保存と分離した`window.NLTH`とAPI説明を利用できる。
-17. App `1.4.0`、Game Rules / GameState / Config `2.0.0`、Map `fixed-31x31-v1`、Save Format `5`、Agent / Observation / Browser Bridge / Artifact Schema `2.0.0`のVersion境界が整合し、v1.3.3以前のSave／Replay／Artifactを状態変更なしで拒否する。
+17. App `1.4.1`、Game Rules / GameState / Config `2.1.0`、Map `fixed-31x31-v1`、Save Format `6`、Agent / Observation / Browser Bridge `3.0.0`、Artifact Schema `2.1.0`、Checkpoint／Session Schema `1.0.0`のVersion境界が整合し、v1.4.0以前のSave／Replay／Artifact／Sessionを状態変更なしで拒否する。
 18. 補給オーバーレイ、新設・移設・Active化の全道路／Post候補、Role／Fallback、合法／不合法表示、Inline Reason、将来範囲、Visible阻害ZombieをHuman UIで確認できる。
 19. 生産施設上限30、10%／20%自然回復、感染封じ込めと自動鎮圧がHuman UIとAgent Observationで同じCore予測を表示する。
 20. Balanced Seed 1～300、Portable Package Smoke、外部AIによるGame Over・Artifact・Replay E2Eを完遂する。
@@ -978,930 +1080,16 @@ Resources >= 0
 31. 4つのUnit Type別Spawn Metrics、Final Horde全体Metrics、Checkpoint Role／Fallback／Noise Metrics、Core Checkpoint候補がSave後の再導出、Observation、Bridge、Artifact、Replay、CSVで一貫する。Hidden Noise Metricsは完全な検証Artifact／CSVだけに含める。
 32. Active失陥直後に州都側のStandby、次にDormantへ自動Fallbackし、Arrivalより前にSupplyが再計算される。Standby不在時もDormantが第二線として機能し、前線側のPostは自動昇格しない。
 33. Human Unitが参加する通常Combatは1回だけNoise Pulseを出し、Normal Zombieだけが決定的に反応する。Production経路は両Human Unitを`medium`と公開し、開発Buildだけが正確なNoise診断を表示する。
+34. Human UnitがMovement 10とType別Fuel Poolを使い、Windを先に使った発電後の残FuelからSupply内Unitへ決定的に補給される。
+35. Wind Power PlantがFuelなしElectricity 15、Vision 1、Zombie Target Value 5、Disable／Recoveryで動作し、人口・消費・敗北判定へ混入しない。
+36. Simple FarmとCivilian Drone BaseがSupply内Plainへ建設でき、費用、Type別上限、Build Turn、Power、人口、Supply喪失、感染、消滅、Recoveryが仕様どおり動く。
+37. Strategic ForecastがSingle Point of Failure、Guaranteed Defeat、Checkpoint Projected Supply Effect、Queue Pressureを公開情報だけから返す。
+38. UI、Agent、Headless、Browser BridgeがUnit Fuel、Constructible候補、Power、Forecastについて同じGameAction、Validation、純粋Queryを使用する。
+39. Save、Replay、ArtifactがUnit Fuel、Wind、Constructible Facilityを決定的に再現し、Artifact内の固定Map重複を削減する。
+40. Wind、Simple Farm、Civilian Drone Baseの通常Zoom／LOD Asset、個別Fallback、Board Legend、日英Helpが実装される。
+41. Police 5／National Guard 20の携行Military Goods、固定消費、距離別Combat Cost、軍需0弱体、Supply内Round Robin補充、補充後鎮圧、撃破時喪失がCore、UI、Observation、Artifact、Replay、Metricsで一致する。
+42. Fuel 0時だけのPolice 3 MP／National Guard 2 MP Emergency MovementがTerrain Cost、Hidden Enemy停止、補給圏帰還を含めCore、UI、Observation、Balanced、Replay、Metricsで一致する。
+43. AI Portableの7 Sessionコマンド、Public Decision Log、SHA-256 hash chain、原子的Active更新、排他lock、5 Turn／手動／最終Checkpoint、分岐lineage、破損・Version／Build拒否、FoW境界が機能する。
+44. GitHub Pages上のUIと`window.NLTH`を実ブラウザで確認し、Pages成功後のAI Portable ZIPがBundled NodeだけでSession smokeを完遂する。時間のかかるRelease Validation Workflowはv1.4.1 commitに対して起動される。
 
 ---
-
-# 19. v1.4.0 統合仕様
-
-本章はv1.4.0で確定・実装・検証した変更仕様を漏れなく統合したものであり、前章までの記述と競合する場合は本章を優先する。本章に変更記載のない既存ルールは前章までの記述を維持する。
-
-# 3. Version境界
-
-| 契約 | v1.4.0 |
-|---|---|
-| App / Release | `1.4.0` |
-| Game Rules / GameState / Config | `2.0.0` |
-| Fixed Map ID | `fixed-31x31-v1` |
-| Save Format | `5` |
-| Agent API / Observation API / Browser Bridge API | `2.0.0` |
-| Artifact Schema | `2.0.0` |
-| Balanced Agent | `4.0.0` |
-| Random Agent | `2.0.0` |
-
-- v1.3.3以前のSave、Replay、Artifactは変換しない。
-- Version不一致は現在State、保存領域、PRNGを変更せず理由付きで拒否する。
-- Build IDは現行どおり結果と乱数へ影響させない。
-
----
-
-# 4. スコープ
-
-## 4.1 追加・変更するもの
-
-- 31×31固定Mapと新しい固定Map ID
-- 初期Zombie 6体
-- Human Unit Movement Budget 10
-- Unit固有Fuel Pool、移動Fuel、補給
-- Wind Power Plant
-- Constructible Facility共通Rule
-- Simple Farm
-- Civilian Drone Base
-- Strategic Forecastと警告
-- Fuel、建設、Forecastに対応するHuman UI、Agent、Balanced Agent、Metrics、Replay、Save、Help
-- Artifact内の固定Map重複削減
-
-## 4.2 今回変更しないもの
-
-- Random Map、LOS、高低差、視界遮蔽
-- Zombie／Horde ZombieのMovement、Combat性能、Target優先順位、Noise Rule
-- Periodic Horde Cycle 5、Final Horde Turn 30、標準Composition
-- 既存人口、感染、Checkpoint Fallback、Victory／Defeatの基本Rule
-- 既存4支線の考え方
-- Live Agent ObservationとProduction Browser Bridgeが自己完結した完全Observationを返す境界
-- State Delta Replay
-
----
-
-# 5. 固定Map
-
-## 5.1 寸法・中心・入口
-
-- Mapは`31×31`、有効座標は`x=0..30`、`y=0..30`とする。
-- Capitalは`(15,15)`とする。
-- Horde EntranceはNorth `(15,0)`、East `(30,15)`、South `(15,30)`、West `(0,15)`とする。
-- Road BranchはNorth、East、South、Westの4支線とする。
-- Standard MapにWaterは配置しない。列挙されない基礎TerrainはPlainとする。
-- Random MapとSeedによるTerrain生成は行わない。
-
-## 5.2 Road
-
-Capital Junction `(15,15)`をRoad Overlayとし、各支線を次で固定する。
-
-```text
-North: (15,y), y=0..14
-East:  (x,15), x=16..30
-South: (15,y), y=16..30
-West:  (x,15), x=0..14
-```
-
-- Entranceと恒久FacilityがあるRoad Hexも支線構造へ含めるが、Facility HexはCheckpoint候補外とする。
-- Sectorは現行の最寄り支線Ruleで決定し、同距離は複数Sectorへ属する。
-- Active Checkpointの支線半径は現行どおり`max(initialSupplyRadius, CapitalからActiveまでの距離)`とする。
-
-## 5.3 恒久Facility座標
-
-恒久Facilityは17施設とし、次へ固定する。
-
-| ID | Type | 座標 | 初期状態 |
-|---|---|---:|---|
-| `capital` | Capital | `(15,15)` | owned |
-| `city-1` | City | `(15,8)` | disconnected |
-| `city-2` | City | `(22,15)` | disconnected |
-| `city-3` | City | `(15,22)` | disconnected |
-| `city-4` | City | `(8,15)` | disconnected |
-| `farm-1` | Farm | `(13,15)` | owned |
-| `farm-2` | Farm | `(14,4)` | disconnected |
-| `farm-3` | Farm | `(16,26)` | disconnected |
-| `civilian-factory-1` | Civilian Factory | `(17,15)` | owned |
-| `civilian-factory-2` | Civilian Factory | `(25,16)` | disconnected |
-| `military-factory-1` | Military Factory | `(26,15)` | disconnected |
-| `military-factory-2` | Military Factory | `(11,15)` | disconnected |
-| `refinery-1` | Refinery | `(15,13)` | owned |
-| `refinery-2` | Refinery | `(14,6)` | disconnected |
-| `power-plant-1` | Power Plant | `(15,17)` | owned |
-| `power-plant-2` | Power Plant | `(16,24)` | disconnected |
-| `wind-power-plant-1` | Wind Power Plant | `(16,14)` | owned |
-
-- 初期所有Facilityはすべて初期Supply Radius内とする。
-- 初期未確保のMilitary Factoryを最低1つ初期Supply Radius内に配置する。
-- 各恒久Facility座標の基礎TerrainはPlainとする。
-- Facilityは現行どおりUrban Overlayを持つ。Road座標上の恒久FacilityはRoad Overlayも維持する。
-
-## 5.4 初期Unit・Zombie座標
-
-| 対象 | 座標 |
-|---|---:|
-| Police | `(14,15)` |
-| National Guard | `(16,15)` |
-| Normal Zombie 1 | `(9,9)` |
-| Normal Zombie 2 | `(21,21)` |
-| Normal Zombie 3 | `(21,9)` |
-| Normal Zombie 4 | `(9,21)` |
-| Normal Zombie 5 | `(15,6)` |
-| Normal Zombie 6 | `(15,24)` |
-
-- 初期Zombieは3組の180度回転対称配置とする。
-- 初期ZombieはNormal Zombie 6体で、初期所有Facilityまで最低4 Hexを確保する。
-- Zombie Movementは現行値のため、最初のZombie Turnに初期所有Facilityへ到達できないことをMap Testで保証する。
-
-## 5.5 Terrain座標
-
-180度回転を`R(x,y) = (30-x, 30-y)`とする。範囲`x=a..b, y=c`は同じ`y`上の両端を含む全座標を表す。
-
-Mountainは、次のSeed集合とその`R`像の和集合とする。
-
-```text
-y=3:  x=8..10
-y=4:  x=7..10, x=20..22
-y=5:  x=7..9,  x=21..23
-y=6:  x=6..8,  x=22..24
-```
-
-Forestは、次のSeed集合とその`R`像の和集合とする。
-
-```text
-y=1:  x=2..6,   x=24..28
-y=2:  x=2..7,   x=23..28
-y=3:  x=3..6,   x=24..28
-y=4:  x=2..5,   x=24..27
-y=5:  x=3..6,   x=25..28
-y=6:  x=2..5,   x=25..28
-y=7:  x=3..7,   x=23..27
-y=8:  x=3..6,   x=24..27
-y=10: x=4..8
-y=11: x=3..8
-y=12: x=4..8
-y=13: x=5..9
-y=14: x=4..8
-```
-
-Terrain集合の確定順は次とする。
-
-1. Mountain Seedと`R`像を配置する。
-2. Forest Seedと`R`像を配置する。
-3. MountainとForestが重複した場合はMountainを優先する。
-4. Road、Capital、恒久Facilityの全座標を両集合から除外してPlain基礎Terrainにする。
-5. その他をPlainとする。
-
-## 5.6 Map不変条件
-
-- Capital、Entrance、恒久Facility、初期Unitは重複しない。ただしRoad／UrbanはOverlayとして共存できる。
-- Mountain、Forest、Plainの各集合は相互排他的で、全961 Hexを一度だけ被覆する。
-- 4支線はCapitalへ接続し、各Entranceまで途切れない。
-- 各支線のEntranceからCapitalまでのRoad距離は15とする。
-- ゲーム開始時のSupply内に、施設、Road、Unitを除いた静的な建設可能Plain Hexを最低12個確保する。
-- 各支線のSupply半径6..15の各拡張帯に、Road外Plain Hexを最低2個確保する。
-- Map Query、UI、Observation、Save、Replay、Testは同じMap定義を使用する。
-
----
-
-# 6. 初期状態
-
-- 初期民間人口100人、Police 1隊、National Guard 1隊を維持する。
-- 人口配置はCapital 41、Farm 23、Civilian Factory 23、Refinery 10、Power Plant 3を維持する。
-- Wind Power PlantはWorker 0固定のため人口を再配分しない。
-- 初期資源はFood 230、Civilian Goods 230、Military Goods 75、State Fuel 92とする。
-- 初期Police／National GuardのUnit Fuel Poolは満タンとし、そのFuelをState Fuel 92から差し引かない。
-- Capitalの初期Supply Radiusは5 Hexとする。
-
----
-
-# 7. Human Unit MovementとFuel
-
-## 7.1 Movement Budget
-
-- Police、National Guardの標準Movement Budgetは10とする。
-- 経路合法性は現行どおり進入Terrain Costの累積`<= 10`で判定する。
-- Fuel CostはTerrain Costでなく、実際に進入したHex数を使う。
-- 移動しない場合はFuelを消費しない。Attack、Wait、Counterattack、Interception、自動鎮圧はFuelを消費しない。
-
-## 7.2 Fuel Cost
-
-Police:
-
-```text
-distance = 0    -> 0
-distance = 1..5 -> 1
-distance >= 6   -> 1 + (distance - 5)
-```
-
-National Guard:
-
-```text
-distance = 0    -> 0
-distance = 1..5 -> 1
-distance >= 6   -> 1 + 2 * (distance - 5)
-```
-
-| Hex数 | Police | National Guard |
-|---:|---:|---:|
-| 1..5 | 1 | 1 |
-| 6 | 2 | 3 |
-| 7 | 3 | 5 |
-| 8 | 4 | 7 |
-| 9 | 5 | 9 |
-| 10 | 6 | 11 |
-
-- Police `maxFuel = 12`、National Guard `maxFuel = 22`とする。
-- Move開始時に予定経路のFuelを保有しないActionは拒否する。
-- Hidden Enemyによって経路途中で停止した場合は、実際に進入したHex数からFuel Costを再計算して消費する。
-- Unit死亡時の残Fuelは失われ、State Fuelへ返還しない。
-
-## 7.3 EndTurn Refuel
-
-- Player EndTurnのEconomy処理で、発電Fuel割当後、施設生産前にUnit補給を行う。
-- 補給判定時点で生存し、Player Supply Network内にいるHuman Unitだけが対象となる。
-- `refillDemand = maxFuel - currentFuel`とし、補給実績分だけState Fuelを消費する。
-- Supply外Unitは補給しない。
-- State Fuel不足時はUnit ID昇順の1 Fuel単位Round Robinで、満タンUnitを飛ばしながらFuelが尽きるまで配分する。
-- 当TurnのRefinery生産Fuelは発電にもUnit補給にも使わず、次Turnから利用可能とする。
-- ForecastとEndTurnは同じ純粋計算経路を使用する。
-
-## 7.4 新規編成Unit
-
-- 初期配置以外のUnitは完成時に`currentFuel = 0`で生成し、直後にState Fuelから最大容量まで補給を試みる。
-- 同時完成時は新UnitをUnit ID昇順の1 Fuel単位Round Robinで補給する。
-- 補給実績分だけState Fuelを消費し、不足時は部分補給とする。
-- 完成UnitはそのPlayer Turnから、保有Fuelで支払える合法Moveを実行できる。
-- 無料の完成時Fuelを生成しない。
-
----
-
-# 8. Fuelと発電
-
-## 8.1 処理順
-
-EndTurnのFuel関連順序を次へ固定する。
-
-```text
-Turn-start State Fuel確定
--> Wind供給量確定
--> Power需要とPower Plant物理Capacity確定
--> Windを先に電力需要へ割当
--> 不足分だけPower PlantでFuel発電
--> 発電実績分のState Fuel消費
--> 残FuelからSupply内UnitをRefuel
--> Facility生産
--> Refinery生産FuelをEnding Stockへ追加
-```
-
-## 8.2 発電式
-
-```text
-availablePower
-= operationalWindCapacity
- + min(powerPlantPhysicalCapacity, turnStartFuel * 5)
-```
-
-- Wind電力を需要へ先に割り当てる。
-- Windで満たせない実割当5 ElectricityごとにState Fuel 1を消費する。
-- 余剰Power Plant CapacityへFuelを消費しない。
-- 当Turn Refinery生産FuelはEnding Stockへ入るが、当TurnのPowerとUnit Refuelへ入れない。
-
-## 8.3 Fuel Forecast
-
-最低限、次を区別する。
-
-```text
-turnStartFuel
-windPowerAvailable
-powerPlantPhysicalCapacity
-projectedPowerFuelDemand
-projectedPowerFuelUsed
-fuelAfterPower
-projectedUnitRefillDemand
-projectedUnitFuelRefilled
-projectedTotalFuelDemand
-projectedRefineryProduction
-projectedEndingFuel
-powerFuelShortage
-unitRefillFuelShortage
-totalFuelShortage
-```
-
----
-
-# 9. Wind Power Plant
-
-- 初期所有Facilityとして1基を追加する。
-- Workerは0固定で、割当・撤収を拒否する。
-- 稼働中はFuel消費なしでElectricity 15を提供する。
-- 稼働中は通常所有Facilityと同じVision 1を提供する。
-- Supply Sourceにはならない。
-- `healthyPopulation = 0`、`zombieTargetValue = 5`を分離する。
-- Zombie Target Valueは人口、消費、過密、Defeat判定へ加算しない。
-
-状態遷移:
-
-```text
-operational
--> zombie occupied / disabled
--> human recapture
--> recovering
--> next Player Turn operational
-```
-
-- ZombieがWind HexでZombie Turnを終了すると感染処理でなく`disabled`にする。
-- `disabled`と`recovering`では発電0、Vision 0とする。
-- Human UnitがHex上のZombieを排除して進入すると`recovering`にする。
-- 再確保した次Player Turn開始時に`operational`へ戻す。
-- 感染者Pool、通常Facilityの感染者下限、陥落時追加Zombieを作らない。
-- Windは破壊・再建対象にせず、常に恒久Facilityとして残る。
-
----
-
-# 10. Constructible Facility共通Rule
-
-## 10.1 Typeと上限
-
-対象TypeはSimple FarmとCivilian Drone Baseとする。
-
-```text
-limitPerType = ceil(roadBranchCount / 2)
-```
-
-- 4支線MapではSimple Farm最大2、Civilian Drone Base最大2とする。
-- 上限はTypeごとに独立する。
-- 建設中、operational、empty、disabled、recoveringは上限に数える。
-- 感染陥落で消滅した施設は上限に数えない。
-- 上限は現在存在数から導出し、累計建設数では制限しない。
-
-## 10.2 Build条件
-
-- 新Action `BuildConstructibleFacility`は`facilityType`と`position`を受ける。
-- Player Supply Network内だけで建設できる。
-- 基礎TerrainがPlainで、Road Overlay、Urban Overlay、Horde EntranceのないHexだけを候補とする。
-- Facility、Checkpoint、Player Unit、Visible ZombieがいるHexへ建設できない。
-- Hidden Zombieは候補、合法性、Reason Codeへ反映しない。
-- Hidden Zombieが実在するHexへのActionは受理し、一時的な同居を許す。次のZombie Turn終了時に通常の占有・感染処理を行う。
-- Simple FarmはCivilian Goods 15、Civilian Drone BaseはCivilian Goods 25を受理時に即時消費する。
-- 建設1回は共通Player Action 1を消費する。Type別・支線別の追加回数制限は設けない。
-- Action上限と資源が許せば同Turnに複数建設できる。
-- 不正ActionはState、Resource、Action回数、PRNGを変更しない。
-
-## 10.3 建設・操作解禁
-
-- 受理時にFacilityを生成し、建設Turnは無人・非稼働とする。
-- 建設TurnはWorker配置、Power需要、生産、Visionを持たない。
-- 次Player Turn開始時に操作可能となり、Worker配置とPower Supply ONが有効になる。
-- 移設、売却、任意撤去Actionは導入しない。
-- Constructible Facility自身はSupply Sourceにならない。
-
-## 10.4 Supply喪失
-
-- Supply外になってもWorker、所有、状態を維持する。
-- 配置済みWorkerと給電があれば生産またはVisionを継続する。
-- Supply外ではWorker増員を禁止し、減員・都市への帰還を許可する。
-- Supply内へ戻った時点から、通常の安全・操作可能条件を満たせば同じPlayer Turnに増員できる。
-- Supply喪失だけでdisabled、recovering、破壊にしない。
-
-## 10.5 Power Supply
-
-- 両Typeは`SetPowerSupply`でON/OFFできる。
-- 建設解禁時とRecovery完了時の既定値はONとする。
-- 切替はResource、Unit行動権、共通Player Actionを消費せず、Forecastを即時更新する。
-- OFF、無人、建設Turn、disabled、recoveringではPower需要を持たない。
-- 5 Electricity未満の部分給電はしない。
-
-Power割当順位:
-
-```text
-1. Capital / City
-2. Simple Farm
-3. 恒久Farm / Civilian Factory
-4. Military Factory
-5. Civilian Drone Base
-```
-
-- 同区分内は確保・建設が古い順、同順位はFacility ID昇順とする。
-- Windを含む利用可能電力をこの順で割り当てる。
-
-## 10.6 人口Rule
-
-- Workerは既存生産施設と同じ人口移動経路で都市から配置し、撤収時は都市へ戻す。
-- Worker 1人はFood 1、Civilian Goods 1を毎Turn消費する。
-- 健全Workerは州全体の健全民間人口と人口0 Defeat判定へ含める。
-- 配置元／帰還先都市の人口、都市生産、過密へ通常どおり影響する。
-- Constructible Facility自身には都市SoftCapと過密を持たない。
-- 手動撤収または資源不足でWorker 0になっても施設は消滅せず、emptyになる。
-
-## 10.7 Infection・Destroy
-
-- Worker 1人以上では通常の有人Facilityと同じ感染進行、駐留封じ込め、自動鎮圧を使用する。
-- 感染によって健全Workerが0になった時だけ施設を即時消滅させる。
-- 施設と内部感染者Poolを同時に除去し、Ruined Facilityを残さない。
-- Constructible Facility用の感染者下限を作らない。
-- 通常施設陥落と同じ配置RuleでNormal Zombie 2体を周辺へ生成する。
-- 元HexはRoad／UrbanのないPlainへ戻り、新規Build候補になれる。
-
-Worker 0でZombieに占有された場合:
-
-1. Zombieが施設HexでZombie Turnを終了すると`disabled`になる。
-2. 感染者、追加Zombie、施設消滅は発生しない。
-3. Zombie排除後にHuman Unitが進入すると`recovering`になる。
-4. 次Player Turn開始時に`operational empty`へ戻る。
-5. disabled／recoveringではWorker配置、Power需要、生産、Visionを停止する。
-6. 所有とType別上限消費を維持する。
-
----
-
-# 11. Simple Farm
-
-- Worker Capacityは10とする。
-- Required Powerは5とする。
-- 給電時だけWorker 1人あたりFood 5／Turnを生産する。
-- 最大生産はFood 50／Turnとする。
-- 無給電、Power Supply OFF、Worker 0、建設Turn、disabled、recoveringでは生産0とする。
-- 恒久FarmのPower Boost Ruleを流用せず、Required Power型として扱う。
-- `zombieTargetValue = healthyWorkers`とする。
-
----
-
-# 12. Civilian Drone Base
-
-- Worker Capacityは5とする。
-- Required Powerは5とする。
-- Supplyを提供しない。
-- 給電中のVision Radiusは`healthyWorkers * 2`とする。
-
-| Worker | Vision Radius |
-|---:|---:|
-| 0 | 0 |
-| 1 | 2 |
-| 2 | 4 |
-| 3 | 6 |
-| 4 | 8 |
-| 5 | 10 |
-
-- Visionは既存Shared Visibility Unionへ加える。
-- 無給電、Power Supply OFF、Worker 0、建設Turn、disabled、recoveringではVision 0とする。
-- 固定の施設Zombie Target Valueを持たず、`zombieTargetValue = healthyWorkers`とする。
-- 空のDrone BaseをZombie誘導用の人口Targetにしない。
-
----
-
-# 13. Zombie Target Value
-
-- 実人口とZombie Target評価を別のCore値として扱う。
-- `zombieTargetValue`をAgent Observation、Facility UI、Help、`getApiInfo()`へ公開する。
-- Windは5、Simple FarmとDrone Baseは健全Worker数を返す。
-- Defeat、Population、Consumption、Overcrowdingは実人口だけを使用する。
-- Zombie AIのTarget候補以外の既存優先順位を変更しない。
-
----
-
-# 14. Strategic Forecast
-
-Strategic ForecastはHidden情報を追加せず、現在の公開StateとConfigから純粋かつ決定的に導出する。UI、Observation、Balanced Agentは同じCore結果を使用する。
-
-## 14.1 Critical Resource Dependency
-
-Food、Civilian Goods、Military Goods、Fuel、Electricityごとに次を返す。
-
-- currentProductionまたはcurrentSupply
-- currentDemand
-- Facility別寄与量と構成比
-- largestContributorFacilityId
-- largestContributor喪失後のprojectedSupply
-- largestContributor喪失後のshortage
-- `singlePointOfFailure`
-- `currentlyShort`
-
-`singlePointOfFailure`は次が両方成立する場合だけtrueとする。
-
-```text
-現在Forecastでは不足しない
-かつ
-最大寄与Facilityを1つ失ったForecastでは不足する
-```
-
-- 備蓄を含む次EndTurn Forecastで不足しない場合は警告を出さないが、構成比は常に公開する。
-- すでに不足中の場合は`currentlyShort`を使い、Single Point of Failureと混同しない。
-- 仮想喪失計算は対象Facilityだけを非稼働にした純粋計算とし、StateとPRNGを変更しない。
-
-## 14.2 Guaranteed Defeat Forecast
-
-- 現在の公開状態のままEndTurnした際の経済処理だけを対象とする。
-- Food不足、続いてCivilian Goods不足を現行順で適用し、健全民間人口0が確定する場合にtrueとする。
-- 原因Resource、各不足量、予測健全民間人口、Defeat Reasonを返す。
-- Zombie行動、Hidden Zombie、潜伏感染、避難民乱数、将来Horde接触を含めない。
-- 通常不足Warningより上位のCritical Warningとして表示する。
-- Balanced Agentは対応可能なDomestic ActionをImmediate Combat Opportunityより優先する。ただし現在Actionで回避不能な場合は不正なAction Loopを作らない。
-
-## 14.3 Checkpoint Projected Supply Effect
-
-Build／Relocate／Activateの各Checkpoint Candidateへ最低限次を追加する。
-
-```text
-currentBranchRadius
-projectedBranchRadius
-newlySuppliedHexCount
-newlyUnsuppliedHexCount
-newlySuppliedFacilityIds
-newlyUnsuppliedFacilityIds
-suppliedFacilityDelta
-newlyBuildableConstructibleHexCount
-```
-
-- 合法性、Reason Code、Supply差分は同じCore ValidationとSupply導出を使用する。
-- Visible Zombieだけを阻害へ使い、Hidden Enemyの存在、位置、IDを差分から漏らさない。
-- Candidate Actionを仮適用する純粋計算とし、StateとPRNGを変更しない。
-
-## 14.4 Queue Pressure
-
-```text
-queuePeople = waiting + screening + approved
-capacity = screeningCapacity
-
-none:   queuePeople == 0
-low:    0 < queuePeople <= capacity
-medium: capacity < queuePeople <= capacity * 2
-high:   queuePeople > capacity * 2
-```
-
-Checkpoint Branch Observationは次を返す。
-
-- waiting、screening、approvedとqueuePeople
-- screeningCapacity
-- currentPolicyとcurrentPolicyTurns
-- `estimatedScreeningThroughput = capacity / max(1, currentPolicyTurns)`
-- arrivalIntervalMin／Max
-- arrivalPeopleMin／Max
-- queuePressureClass
-
-- 将来到着乱数と潜伏感染乱数を公開しない。
-- 標準Capacity 10では1..10がlow、11..20がmedium、21以上がhighとなる。
-
----
-
-# 15. Agent Observation・API
-
-## 15.1 Unit
-
-最低限、次を追加する。
-
-```text
-currentFuel
-maxFuel
-fuelCostByLegalMove
-projectedFuelAfterMove
-inSupply
-projectedRefillDemandIfTurnEndsNow
-projectedRefillAmountIfTurnEndsNow
-```
-
-- Legal MoveごとのFuel CostはCore Pathと同じ経路を使う。
-- Fuel不足MoveをLegal Actionsへ含めない。
-
-## 15.2 Facility
-
-- Wind、Simple Farm、Civilian Drone BaseのTypeと状態
-- Constructible Facilityのbuild／disabled／recovering状態
-- Worker Capacity、Required Power、Power Supply、予測／実績給電
-- Food OutputまたはVision Radius
-- `zombieTargetValue`と実人口
-- Supply状態と増員可否
-
-## 15.3 Static Rules
-
-`getApiInfo()`へ次を追加する。
-
-- Unit Type別Movement、maxFuel、Fuel Cost式
-- Refuel時点、Supply条件、State Fuel不足時Round Robin
-- Wind優先発電とPower／Unit Fuel順
-- Wind状態、Vision、Zombie Target Rule
-- Constructible Facility Build条件、費用、上限式、状態遷移
-- Simple Farm Worker／Power／Production
-- Drone Worker／Power／Vision
-- Strategic Forecast SchemaとQueue Pressure閾値
-
----
-
-# 16. Balanced Agent 4.0.0
-
-- Guaranteed Defeat回避をHard Priorityとし、回避可能な内政ActionをImmediate Combat Opportunityより優先する。
-- Resource別Single Point of Failureと現在不足を区別する。
-- Food単一障害点があり建設可能ならSimple Farmを候補化する。
-- Move距離とUnit Type別Fuel Cost、Move後残Fuel、Supply内補給見込みを評価する。
-- National Guardの6 Hex以上をPoliceより高い長距離展開Costとして扱う。
-- Supply外で次Turnに移動不能となる進出を減点し、Horde緊急防衛は上書き可能とする。
-- Horde Warning方向、Fog、給電余力を考慮してDrone Baseを評価する。
-- Guaranteed Defeat、Food、Fuel、Defenseを犠牲にしてDroneを建設・給電しない。
-- CheckpointはProjected Supply Effectを評価し、半径増加0、供給Facility増加0、建設可能Hex増加0の前進を低Priorityにする。
-- Queue Pressure highを前線人口Riskとして扱い、Policy変更、処理待ち、防衛を評価する。
-- 公開ObservationとLegal Actionsだけを使用し、Hidden情報を推測しない。
-- 同一Stateでは安定Action Keyにより決定的なActionを選ぶ。
-
-Random Agentは新しいLegal Actionsと共通Runnerを使用し、GameStateを直接参照しない。
-
----
-
-# 17. Human UI・Help
-
-## 17.1 Unit Fuel
-
-Unit Bottom SheetとMove確認へ次を表示する。
-
-- Current／Max Fuel
-- 選択中MoveのFuel Cost
-- Move後Fuel
-- EndTurn補給需要と予測補給量
-- Supply外またはState Fuel不足による未補給理由
-
-## 17.2 Fuel HUD・Forecast
-
-- Wind供給、Power Plant発電Fuel需要／実使用、Unit補給需要／実績、合計需要、Refinery生産、予測終了Fuelを分離する。
-- 発電がUnit補給より先であること、当Turn Refinery生産を当Turn補給へ使えないことをHelpで説明する。
-
-## 17.3 Build Mode
-
-- Simple Farm／Civilian Drone Baseを選ぶBuild Modeを追加する。
-- Core Candidate Queryが全Mapの候補とReason Codeを安定座標順で返す。
-- 合法Plain Hexを強調し、不合法候補ではSupply外、Terrain、Road、Urban、Entrance、既存Object、Visible Zombie、上限、資源、Action上限等の最初のCore Reasonを日英表示する。
-- State、Type、候補位置が変わった場合は古いReasonを残さない。
-- Hidden Zombieを候補差分から漏らさない。
-
-## 17.4 Facility UI
-
-- Windは発電15、Fuel 0、Vision 1、Zombie Target 5、disabled／recoveringを表示する。
-- Simple Farmは費用、上限、Worker、Required Power、Food 5／worker、予測生産、Supply、状態を表示する。
-- Droneは費用、上限、Worker、Required Power、現在／最大Vision、Supply、状態を表示する。
-- Power Supply ON/OFFと給電順位を説明する。
-- Build Turn、disabled、recovering、無給電、Supply外の差を同じ「停止」だけで表現しない。
-
-## 17.5 Strategic Warning
-
-強い順に次の階層とする。
-
-```text
-Critical: Guaranteed Defeat
-High: current Resource shortage / high Queue Pressure
-Warning: Single Point of Failure / Fuel shortage / no-gain Checkpoint move
-Info: low / medium Queue Pressure and normal Forecast
-```
-
-- 警告の正データはCore Forecastだけとし、UI独自計算を作らない。
-- Mobile 390×844でCritical Warning、Horde Warning、Turn、資源を折りたたみ領域だけへ隠さない。
-
-## 17.6 Asset・Legend
-
-- Wind、Simple Farm、Civilian Drone Baseの通常Zoom／LOD AssetとFallbackをUI専用Asset Registryへ追加する。
-- Board Legend、盤面、Helpは同じRegistryとCore状態Mappingを使用する。
-- Runtime PNG合計3 MiB以下の現行上限を維持する。
-- Asset Path、Load状態、LODはGameState、Save、Observation、Replayへ含めない。
-
----
-
-# 18. GameAction・Core境界
-
-最低限、次を追加または拡張する。
-
-```text
-Move                 // Fuel検証・消費
-SetPowerSupply       // Constructible Facility対応
-BuildConstructibleFacility
-AssignWorkers        // Constructible Facility対応
-EndTurn              // Wind -> Power Fuel -> Unit Refuel -> Production
-```
-
-- UI、Agent、Headlessは同じGameActionをGameEngineへ渡す。
-- UI独自のFuel、Build、Power、Forecast合法性を持たない。
-- Candidate Query、`getLegalActions()`、実Actionは同じCore Validationを使う。
-- Forecast QueryはState、Resource、Action回数、PRNGを変更しない。
-- Game CoreへPhaser、DOM、Asset Path、UI状態を入れない。
-
----
-
-# 19. Save・Replay・Artifact
-
-- Map ID、Unit Fuel、Wind状態、Constructible Facility、Power Supply、Build／Recovery時点、Strategic Forecastの元StateをSaveする。
-- Forecast、Supply、Vision、上限、Queue Pressure等の導出値は正データから再計算し、重複する可変正データにしない。
-- 同一Version、Config、Map、Seed、Action列からUnit Fuel、Fuel配分、発電、施設状態、Vision、Supply、結果を一致させる。
-
-Artifact Schema 2.0.0では次を行う。
-
-- 固定Map情報をゲーム単位で1回だけ保存する。
-- TurnごとのObservation Traceは`mapId`で固定Mapを参照し、Terrain、Road、恒久Facility座標を重複保存しない。
-- 所有、感染、Power、Constructible Facility、Unit、Enemy、Visibility等の動的情報はTraceへ残す。
-- Replay Loaderはゲーム単位固定MapとTurn動的情報から検証可能なObservationを再構成する。
-- Live Agent ObservationとBrowser Bridgeは完全Observationを返し、参照差分形式へ変更しない。
-- State Delta Replayはv1.4.0対象外とする。
-
----
-
-# 20. Metrics
-
-最低限、次を追加する。
-
-## Map・Mobility
-
-- mapWidth／mapHeight
-- humanHexesMovedByType
-- maxSingleMoveDistanceByType
-- longMoves6PlusByType
-
-## Fuel
-
-- unitFuelConsumedByType
-- unitFuelRefilledByType
-- commissioningFuelByType
-- turnsUnitsEndedOutOfSupplyByType
-- unitsUnableToMoveForFuel
-- stateFuelSpentOnPower
-- stateFuelSpentOnUnits
-- fuelShortageTurns
-
-## Wind
-
-- windPowerGenerated
-- windDisabledTurns
-- windOverruns
-- windRecoveries
-
-## Constructible Facility
-
-- simpleFarmsBuilt／Destroyed
-- simpleFarmFoodProduced
-- droneBasesBuilt／Destroyed
-- maxDroneVisionRadius
-- constructibleFacilityOverruns
-- constructibleBuildRejectedByReason
-
-## Strategic Readability
-
-- guaranteedDefeatWarnings／Ignored
-- resourceSinglePointFailureTurnsByResource
-- checkpointMovesWithNoSupplyGain
-- checkpointQueuePressureTurnsByClass
-
-- Hidden Enemyを推測できるMetricsは現行の完全検証Artifact境界を維持し、Production Observation、公開Event、Browser Bridge Artifactへ出さない。
-
----
-
-# 21. Test要件
-
-## 21.1 Map
-
-- 31×31、Capital、4 Entrance、Road、17恒久Facility、初期Unit、初期Zombie 6体の座標
-- Terrain生成順、180度回転集合、重複なし、Waterなし
-- 4支線接続、距離15、Sector決定性
-- 初期所有FacilityがSupply 5内、外部Facilityが複数Supply外
-- 初期Zombie安全距離と初回Turn未到達
-- Constructible用Plain候補数
-
-## 21.2 Movement・Fuel
-
-- Movement Budget 10とTerrain Cost
-- Hex数基準のPolice／National Guard Fuel表
-- Fuel不足拒否とState／PRNG不変
-- Hidden Enemy途中停止時の実移動Fuel
-- Supply内EndTurn補給、Supply外補給なし
-- Unit ID昇順Round Robin
-- Power優先、Unit補給後の残Fuel
-- 当Turn Refinery生産利用禁止
-- 新Unitの有償・部分補給
-- Unit死亡時Fuel喪失
-- Save／Replay一致
-
-## 21.3 Wind
-
-- Worker割当拒否
-- Fuel 0で15 Electricity
-- Wind優先割当と不足分だけFuel消費
-- Vision 1、Supply Sourceでない
-- Zombie Target 5が人口・Defeat・Consumptionへ入らない
-- Zombie占有、再確保、次Player Turn復旧
-
-## 21.4 Constructible Facility
-
-- Plain、Roadなし、Supply内、費用、上限、Action消費
-- Hidden Zombie非漏洩と同居後処理
-- Build Turn操作不可、次Turn解禁
-- Power Supplyと確定割当順位
-- Supply外の増員拒否、減員・既存機能継続
-- Type別上限と消滅後再建
-- 手動／不足人口0では残存、感染人口0では消滅
-- 感染者Pool除去とNormal Zombie 2体生成
-- Empty占有、disabled、recovering、復旧
-
-## 21.5 Simple Farm
-
-- Worker 0..10
-- Power 5全量給電
-- Food 5／worker、最大50
-- 無給電0
-- Zombie Targetと実人口一致
-
-## 21.6 Drone Base
-
-- Worker 0..5
-- Vision `workers * 2`
-- PowerなしVision 0
-- Shared Visibility反映
-- Supply Sourceにならない
-- 空施設Zombie Target 0
-
-## 21.7 Forecast・公平性
-
-- Resource Dependencyと仮想最大Facility喪失
-- Single Point of FailureとcurrentlyShortの分離
-- Guaranteed DefeatのFood／Civilian Goods順
-- Zombie、潜伏感染、将来乱数をGuaranteed Defeatへ含めない
-- Checkpoint Projected Supply Effect
-- Queue Pressure境界0／10／11／20／21
-- UI、Observation、Balanced AgentのCore結果一致
-- QueryによるState／PRNG不変
-- Hidden Enemy情報非漏洩
-
-## 21.8 Artifact
-
-- 固定Mapがゲーム単位で1回だけ保存される。
-- Turn Traceから固定Map重複が除かれる。
-- Replay再構成とLive Observationの意味が一致する。
-- Schema不一致を状態変更なしで拒否する。
-
----
-
-# 22. Simulation・Playtest
-
-## 22.1 感度分析
-
-次の全12組合せをRandom／Balancedの同一Seed 1..100で比較する。
-
-| 軸 | 値 |
-|---|---|
-| Police／Guard maxFuel | `12／22`, `6／11` |
-| Simple Farm Food／worker | `5`, `10` |
-| Final Horde Turn | `30`, `35`, `40` |
-
-標準Configは`12／22`、Food 5、Final Turn 30とする。
-
-主要観測:
-
-- 勝率、Game Over Reason、Final Turn
-- Food、Fuel、Civilian Goods不足
-- Single Point of Failure継続Turn
-- Simple Farm／Drone建設率
-- Unit Fuel切れ、長距離移動、Supply外Turn
-- Power／Unit別Fuel消費
-- Checkpoint Supply拡張量とno-gain移動
-- Horde Spawnから接触までのTurn
-- Unit Loss、Civilian Loss
-
-## 22.2 合否とRelease確認
-
-- 技術的失敗0、決定性、Replay一致、Hidden情報非漏洩を必須とする。
-- 特定勝率を機械的な合否条件にしない。
-- 重大な破綻が見つかった場合は、確定要件を黙って変更せず、要件変更として記録して再検証する。
-- Release前に標準ConfigのBalancedを固定Seed 1..300で完遂する。
-- Random／Balancedの標準固定Seed 1..100をUnit／Invariant Testと別に完遂する。
-
----
-
-# 23. 実装順
-
-1. Version、型、Config、固定Map、Map Test
-2. Unit Fuel、Wind、経済ForecastのCore実装
-3. Constructible Facility共通State／Action／Validation
-4. Simple Farm、Drone、感染・Recovery
-5. Strategic ForecastとCheckpoint Candidate拡張
-6. Observation、API、Save、Replay、Artifact Schema
-7. Balanced／Random AgentとMetrics
-8. Human UI、Asset、日英Help／Legend
-9. Unit／Invariant／Browser Test、感度Simulation
-10. Release前Seed 1..300、Build、Pages、Portable Package
-11. 確定要件を現行仕様へ反映し、実装・Help・Testとの整合確認
-
-Game Core境界、共有型、経済処理順、統合、競合解消、最終検証は分割実装しても単一の責任範囲として扱う。
-
----
-
-# 24. 完成条件
-
-1. Appが`1.4.0`、内部契約が本書のVersion表と一致する。
-2. 31×31固定Mapが座標付録と一致し、4支線、17施設、初期Zombie 6体を持つ。
-3. Human UnitがMovement 10とType別Fuelを使い、発電後の残Fuelから決定的に補給される。
-4. WindがFuelなし15 Electricity、Vision 1、Zombie Target 5、Disable／Recoveryで動作する。
-5. Simple FarmとDrone BaseがSupply内Plainへ建設でき、費用、上限、Power、人口、感染、消滅、Recoveryが確定Ruleどおり動く。
-6. FuelとPower ForecastがWind、発電、Unit補給、Refinery生産を分離し、EndTurn実績と一致する。
-7. Strategic ForecastがSingle Point of Failure、Guaranteed Defeat、Projected Supply、Queue Pressureを公開情報だけから返す。
-8. UI、Agent、Headless、Browser Bridgeが同じGameAction、Validation、Forecastを使用する。
-9. Save、Replay、ArtifactがVersion境界と決定性を満たし、固定Map重複を削減する。
-10. Balanced Agent 4.0.0が経済敗北、冗長化、Fuel、Drone、Supply効果を公開Observationだけから評価する。
-11. Mobile／Desktop UI、日英Help、Board Legend、Asset Fallbackが新要素を説明・操作できる。
-12. 全Unit Test、不変条件試験、Browser Smoke、Seed Simulation、Build、Pages、Portable Packageが成功する。
-13. 実装完了後に本書が現行仕様へ漏れなく反映され、旧文書がarchiveへ整理される。
-
----
-
-# 25. 設計意図
-
-Wind、Fuel、Checkpoint、Simple Farm、Drone、Forecastを独立した追加機能にしない。
-
-- Windが発電用Fuelを解放する。
-- 解放したFuelでUnitを長距離展開する。
-- Checkpoint前進でSupplyとPlain建設可能域を拡張する。
-- Droneで前方を確認し、Simple FarmでFood単一障害点へ備える。
-- Forecastによって、戦闘上優勢でも国家が崩壊する状態をPlayerとAgentが同じ公開情報から理解する。
-
-この連鎖が一つのLogistics Systemとして機能することをv1.4.0の成功基準とする。

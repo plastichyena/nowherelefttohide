@@ -34,15 +34,16 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.4.0';
-export const GAME_RULES_VERSION = '2.0.0';
-export const SAVE_FORMAT_VERSION = '5';
-export const AGENT_API_VERSION = '2.0.0';
-export const OBSERVATION_API_VERSION = '2.0.0';
-export const BRIDGE_API_VERSION = '2.0.0';
-export const BALANCED_AGENT_VERSION = '4.0.0';
-export const RANDOM_AGENT_VERSION = '2.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '2.0.0';
+export const APP_VERSION = '1.4.1';
+export const GAME_RULES_VERSION = '2.1.0';
+export const SAVE_FORMAT_VERSION = '6';
+export const AGENT_API_VERSION = '3.0.0';
+export const OBSERVATION_API_VERSION = '3.0.0';
+export const BRIDGE_API_VERSION = '3.0.0';
+export const BALANCED_AGENT_VERSION = '4.1.0';
+export const RANDOM_AGENT_VERSION = '2.1.0';
+export const ARTIFACT_SCHEMA_VERSION = '2.1.0';
+export const CHECKPOINT_SCHEMA_VERSION = '1.0.0';
 
 export interface AgentMapTileObservation {
   q: number;
@@ -175,7 +176,7 @@ export interface AgentUnitObservation {
   range: number;
   baseRange: number;
   effectiveRange: number;
-  rangeModifierReason: 'military_supply_shortage' | null;
+  rangeModifierReason: 'carried_military_goods_shortage' | null;
   population: number;
   actionState: UnitActionState;
   canAttack: boolean;
@@ -183,14 +184,35 @@ export interface AgentUnitObservation {
   inSupply: boolean;
   currentFuel: number;
   maxFuel: number;
+  currentMilitaryGoods: number;
+  maxMilitaryGoods: number;
+  fixedMilitaryGoodsUpkeepPerTurn: number;
+  attackMilitaryGoodsCostByRange: Record<number, number>;
+  suppressionMilitaryGoodsCost: number;
+  emergencyMovementPoints: number;
+  emergencyMovementAvailable: boolean;
   /** Exact Core previews for every currently legal Move of this Unit. */
   fuelCostByLegalMove: Array<{
     destination: HexCoord;
     fuelCost: number;
     projectedFuelAfterMove: number;
+    movementMode: 'normal' | 'emergency';
+    effectiveMovementCost: number;
+  }>;
+  attackPreviews: Array<{
+    targetUnitId: string;
+    distance: number;
+    militaryGoodsCost: number;
+    projectedMilitaryGoodsAfterAttack: number;
+    effectiveAttack: number;
+    projectedDamageBeforeTerrain: number;
+    projectedDamageAfterTerrain: number;
   }>;
   projectedRefillDemandIfTurnEndsNow: number;
   projectedRefillAmountIfTurnEndsNow: number;
+  projectedMilitaryGoodsAfterFixedConsumption: number;
+  projectedMilitaryGoodsAfterRefill: number;
+  projectedMilitaryGoodsAfterSuppression: number;
   recoveryClassIfTurnEndsNow: UnitRecoveryClass | null;
   recoveryRateIfTurnEndsNow: number;
   recoveryBaseAmountIfTurnEndsNow: number;
@@ -203,6 +225,7 @@ export interface AgentUnitObservation {
   suppressionPower: number;
   suppressionCivilianDamage: number;
   suppressionAvailableIfTurnEndsNow: boolean;
+  suppressionStatusIfTurnEndsNow: 'suppression' | 'containment_only' | 'none';
   suppressionTargetId: string | null;
 }
 
@@ -270,9 +293,7 @@ export interface AgentApiInfo {
       nationalGuardSuppression: number;
       nationalGuardCivilianDamageFormula: string;
     };
-    ranges: Record<'police' | 'nationalGuard' | 'zombie' | 'hordeZombie', { baseRange: number }> & {
-      nationalGuardMilitarySupplyShortageRange: number;
-    };
+    ranges: Record<'police' | 'nationalGuard' | 'zombie' | 'hordeZombie', { baseRange: number }>;
     terrain: {
       movementCost: Record<BaseTerrain, number | null>;
       damageMultiplier: {
@@ -357,6 +378,20 @@ export interface AgentApiInfo {
       refuelTiming: 'after_power_before_production';
       refuelRequiresSupply: true;
       shortageAllocation: 'unit_id_ascending_round_robin';
+      emergencyMovementPointsByType: Record<'police' | 'nationalGuard', number>;
+      emergencyMovementTrigger: 'current_fuel_zero';
+      emergencyMovementUsesEffectiveMovementCost: true;
+    };
+    unitMilitaryGoods: {
+      maxByType: Record<'police' | 'nationalGuard', number>;
+      fixedUpkeepByType: Record<'police' | 'nationalGuard', number>;
+      attackCostByRange: Record<'police' | 'nationalGuard', Record<number, number>>;
+      suppressionCostByType: Record<'police' | 'nationalGuard', number>;
+      shortageAttackMultiplierByType: Record<'police' | 'nationalGuard', number>;
+      refillTiming: 'after_military_factory_production_before_suppression';
+      refillRequiresSupply: true;
+      shortageAllocation: 'unit_id_ascending_round_robin';
+      destroyedUnitReturnsCarriedGoods: false;
     };
     constructibleFacilities: {
       types: Array<'simpleFarm' | 'civilianDroneBase'>;
@@ -586,11 +621,15 @@ export interface AgentDecisionTrace {
   selectedScore: number;
   topCandidates: AgentCandidateScore[];
   reasonCodes: string[];
+  /** Short public rationale; never private chain-of-thought. */
+  decisionSummary: string;
 }
 
 export interface AgentDecision {
   action: GameAction;
-  trace?: Omit<AgentDecisionTrace, 'turn' | 'decision'>;
+  trace?: Omit<AgentDecisionTrace, 'turn' | 'decision' | 'decisionSummary'> & {
+    decisionSummary?: string;
+  };
 }
 
 export interface GameAgent {
@@ -616,8 +655,10 @@ export interface AgentRunArtifact {
   acceptedActions: GameAction[];
   invalidAttempts: InvalidActionAttempt[];
   decisionTrace: AgentDecisionTrace[];
+  /** Present for a Session artifact; absent for a standalone run. */
+  sessionLineage?: { parentSessionId: string | null; parentCheckpointId: string | null };
   result: AgentGameResult | null;
-  /** Static map projection stored once per game by Artifact Schema 2.0.0. */
+  /** Static map projection stored once per game by Artifact Schema 2.1.0. */
   fixedMap?: AgentMapObservation;
   /** Dynamic public observations at reset and after each accepted action. */
   observationTrace?: AgentArtifactObservation[];
@@ -629,7 +670,7 @@ export interface AgentRunArtifact {
 }
 
 /**
- * Artifact Schema 2.0.0 stores topology once and keeps only dynamic map
+ * Artifact Schema 2.1.0 stores topology once and keeps only dynamic map
  * visibility in each trace entry.  Live observations remain complete.
  */
 export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {

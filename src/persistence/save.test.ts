@@ -71,8 +71,8 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.4.0 Save Format 5', () => {
-  it('round-trips a detached complete Save Format 5 GameState through code and JSON', () => {
+describe('v1.4.1 Save Format 6', () => {
+  it('round-trips a detached complete Save Format 6 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -80,7 +80,7 @@ describe('v1.4.0 Save Format 5', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 5,
+      formatVersion: 6,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-31x31-v1',
       seed: 77,
@@ -93,15 +93,15 @@ describe('v1.4.0 Save Format 5', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('writes the v1.4.0 version boundaries', () => {
+  it('writes the v1.4.1 version boundaries', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(5);
-    expect(envelope.gameVersion).toBe('2.0.0');
-    expect(config.version).toBe('2.0.0');
+    expect(envelope.formatVersion).toBe(6);
+    expect(envelope.gameVersion).toBe('2.1.0');
+    expect(config.version).toBe('2.1.0');
     expect(config.mapId).toBe('fixed-31x31-v1');
     expect((state.map as Record<string, unknown>).width).toBe(31);
     expect((state.map as Record<string, unknown>).height).toBe(31);
@@ -199,7 +199,7 @@ describe('v1.4.0 Save Format 5', () => {
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
     expect(result.errors.join(' ')).toMatch(/format version|incompatible|1\.2\.7/i);
-    expect(result.errors.join(' ')).toContain('v1.3.3 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toContain('v1.4.0 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 

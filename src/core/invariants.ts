@@ -301,8 +301,21 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (!isNonNegativeInteger(unit.currentFuel) || !isNonNegativeInteger(unit.maxFuel) || unit.currentFuel > unit.maxFuel) {
       errors.push(`Unit ${unit.id} has invalid Fuel`);
     }
+    if (!isNonNegativeInteger(unit.currentMilitaryGoods)
+      || !isNonNegativeInteger(unit.maxMilitaryGoods)
+      || unit.currentMilitaryGoods > unit.maxMilitaryGoods) {
+      errors.push(`Unit ${unit.id} has invalid carried Military Goods`);
+    }
+    const configuredUnit = state.config.units[unit.type];
+    if (configuredUnit && unit.maxMilitaryGoods !== configuredUnit.maxMilitaryGoods) {
+      errors.push(`Unit ${unit.id} maxMilitaryGoods does not match Config`);
+    }
     if ((unit.type === 'zombie' || unit.type === 'hordeZombie') && (unit.currentFuel !== 0 || unit.maxFuel !== 0)) {
       errors.push(`Zombie unit ${unit.id} cannot store Fuel`);
+    }
+    if ((unit.type === 'zombie' || unit.type === 'hordeZombie')
+      && (unit.currentMilitaryGoods !== 0 || unit.maxMilitaryGoods !== 0)) {
+      errors.push(`Zombie unit ${unit.id} cannot store Military Goods`);
     }
     if (!['police', 'nationalGuard', 'zombie', 'hordeZombie'].includes(unit.type)) {
       errors.push(`Unit ${unit.id} has an invalid type`);

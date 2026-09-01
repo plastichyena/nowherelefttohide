@@ -17,7 +17,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '2.0.0';
+export const GAME_VERSION = '2.1.0';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -92,6 +92,8 @@ export function createUnit(
     population: stats.population,
     currentFuel: type === 'police' || type === 'nationalGuard' ? stats.maxFuel : 0,
     maxFuel: stats.maxFuel,
+    currentMilitaryGoods: type === 'police' || type === 'nationalGuard' ? stats.maxMilitaryGoods : 0,
+    maxMilitaryGoods: stats.maxMilitaryGoods,
     actionState,
     canAttack: true,
     canMove: type !== 'zombie' && type !== 'hordeZombie',
@@ -399,7 +401,6 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       fuel: resources.fuel,
       electricityCapacity: 0,
       electricityRequired: 0,
-      militarySupplyAvailable: true,
     },
     units: [
       createUnit({ config: stateConfig }, 'police-1', 'police', { ...FIXED_INITIAL_UNIT_POSITIONS.police }),
