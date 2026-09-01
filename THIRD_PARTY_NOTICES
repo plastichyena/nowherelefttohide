@@ -5,8 +5,9 @@ Project: Nowhere Left to Hide
 This inventory was checked against `package-lock.json` (lockfileVersion 3) on
 2026-08-25. It covers all 107 non-root `node_modules/*` entries recorded by
 the lockfile, including optional platform packages. No package entry was
-missing a license field. The project itself does not currently claim a
-separate public license.
+missing a license field. Project-authored software is licensed separately under
+`LICENSE` and `ADDITIONAL_PERMISSIONS.md`, while covered project visual assets
+are described in `ASSETS_LICENSE.md`; this file applies to third-party material.
 
 The current Windows checkout materializes 57 package directories. Four of
 those packages (`@esbuild/win32-x64`, `@rollup/rollup-win32-x64-gnu`,
