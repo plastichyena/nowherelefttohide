@@ -49,6 +49,17 @@ jobs:
         env:
           VITE_BUILD_ID: ${{ github.sha }}
 
+      - name: Include license notices in Pages bundle
+        run: |
+          cp LICENSE dist/LICENSE
+          cp ADDITIONAL_PERMISSIONS.md dist/ADDITIONAL_PERMISSIONS.md
+          cp ASSETS_LICENSE.md dist/ASSETS_LICENSE.md
+          cp THIRD_PARTY_NOTICES dist/THIRD_PARTY_NOTICES
+          test -f dist/LICENSE
+          test -f dist/ADDITIONAL_PERMISSIONS.md
+          test -f dist/ASSETS_LICENSE.md
+          test -f dist/THIRD_PARTY_NOTICES
+
       # This smoke intentionally has no browser-driver dependency: it checks
       # the generated Pages artifact and its public bridge contract.
       - name: Smoke test Browser Bridge in production bundle
