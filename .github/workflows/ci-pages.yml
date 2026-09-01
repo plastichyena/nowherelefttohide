@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck, tests, agents, bridge smoke, and build
+    name: Typecheck, unit tests, bridge smoke, and build
     runs-on: ubuntu-latest
     timeout-minutes: 240
     permissions:
@@ -39,33 +39,10 @@ jobs:
         run: npm run typecheck
 
       - name: Run unit and invariant tests
-        run: npm test
-
-      # Keep this command explicit so a missing Random Agent smoke script fails
-      # CI instead of silently skipping the required 100-game run.
-      - name: Run 100 seeded Random Agent games
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --summary-only --out=output/simulations/random-smoke --overwrite
-
-      - name: Upload Random Agent failure artifact
-        if: failure() && hashFiles('output/simulations/random-smoke/**') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: random-agent-failures-${{ github.run_id }}
-          path: output/simulations/random-smoke
-          if-no-files-found: ignore
-
-      # Keep this command explicit so a missing Balanced Agent smoke script
-      # fails CI instead of skipping the required fixed-seed 100-game run.
-      - name: Run 100 seeded Balanced Agent games
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --summary-only --out=output/simulations/balanced-smoke --overwrite
-
-      - name: Upload Balanced Agent failure artifact
-        if: failure() && hashFiles('output/simulations/balanced-smoke/**') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: balanced-agent-failures-${{ github.run_id }}
-          path: output/simulations/balanced-smoke
-          if-no-files-found: ignore
+        # The 30-seed regression file is covered by the stricter 1..100 matrix
+        # below. Keeping it out of this job prevents slow seeds from timing out
+        # while preserving the exact fixed-seed release gate.
+        run: npx --no-install vitest run --exclude src/agent/balancedAgent.batch.test.ts
 
       - name: Build production bundle
         run: npm run build
@@ -89,10 +66,44 @@ jobs:
         with:
           path: dist
 
+  agent-seeds:
+    name: ${{ matrix.agent }} seeds from ${{ matrix.seed }} (10 games)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        agent: [random, balanced]
+        seed: [1, 11, 21, 31, 41, 51, 61, 71, 81, 91]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run 10 fixed-seed games
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=${{ matrix.agent }} --games=10 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/${{ matrix.agent }}-${{ matrix.seed }} --overwrite
+
+      - name: Upload failure artifact
+        if: failure() && hashFiles('output/simulations/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.agent }}-agent-failures-${{ matrix.seed }}-${{ github.run_id }}
+          path: output/simulations
+          if-no-files-found: ignore
+
   deploy:
     name: Deploy to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: verify
+    needs: [verify, agent-seeds]
     runs-on: ubuntu-latest
     permissions:
       pages: write
