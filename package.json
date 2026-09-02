@@ -1,6 +1,6 @@
 {
   "name": "nowhere-left-to-hide",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "private": true,
   "description": "Nowhere Left to Hide - a mobile-first hex strategy game PoC",
   "type": "module",
@@ -13,6 +13,7 @@
     "test:random": "vite-node --script src/agent/sim-cli.ts --agent=random --out=output/simulations/random-smoke --overwrite",
     "test:balanced": "vite-node --script src/agent/sim-cli.ts --agent=balanced --out=output/simulations/balanced-smoke --overwrite",
     "test:browser-bridge": "vite-node --script src/testing/browser-bridge-smoke.ts",
+    "test:external-ai-e2e": "vite-node --script src/testing/external-ai-e2e.ts",
     "session": "vite-node --script src/session/session-cli.ts",
     "sim": "vite-node --script src/agent/sim-cli.ts",
     "typecheck": "tsc --noEmit"

@@ -16,7 +16,7 @@ import { hexKey, hexWithinBounds } from './hex';
  * identifier here rather than deriving it from caller config: map validation
  * and save loading must reject a different fixed-map contract.
  */
-export const FIXED_MAP_ID = 'fixed-31x31-v1' as const;
+export const FIXED_MAP_ID = 'fixed-31x31-v2' as const;
 export const FIXED_MAP_WIDTH = 31 as const;
 export const FIXED_MAP_HEIGHT = 31 as const;
 export const FIXED_FACILITY_COUNT = 17 as const;
@@ -36,6 +36,12 @@ export const FIXED_INITIAL_ZOMBIE_POSITIONS = [
   { q: 9, r: 21 },
   { q: 15, r: 6 },
   { q: 15, r: 24 },
+  { q: 16, r: 2 },
+  { q: 28, r: 2 },
+  { q: 28, r: 14 },
+  { q: 14, r: 28 },
+  { q: 2, r: 28 },
+  { q: 2, r: 16 },
 ] as const;
 
 export const STARTING_FACILITY_IDS = [
@@ -620,17 +626,28 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     }
   }
 
-  if (!Array.isArray(map?.initialZombiePositions) || map.initialZombiePositions.length !== 6) {
-    errors.push('map must contain six initial zombie positions');
+  if (!Array.isArray(map?.initialZombiePositions) || map.initialZombiePositions.length !== 12) {
+    errors.push('map must contain twelve initial zombie positions');
   }
   const mapFacilityKeys = new Set((map?.facilities ?? []).map((facility) => hexKey(facility.position)));
-  for (const position of map?.initialZombiePositions ?? []) {
+  const initialZombieKeys = new Set<string>();
+  const initialHumanKeys = new Set(Object.values(FIXED_INITIAL_UNIT_POSITIONS).map((position) => hexKey(position)));
+  for (const [index, position] of (map?.initialZombiePositions ?? []).entries()) {
+    const key = hexKey(position);
     if (!hexWithinBounds(position, FIXED_MAP_WIDTH, FIXED_MAP_HEIGHT)) {
       errors.push(`initial zombie outside bounds: ${hexKey(position)}`);
     }
-    if (mapFacilityKeys.has(hexKey(position))) {
-      errors.push(`initial zombie overlaps facility: ${hexKey(position)}`);
+    if (initialZombieKeys.has(key)) errors.push(`duplicate initial zombie position: ${key}`);
+    initialZombieKeys.add(key);
+    if (mapFacilityKeys.has(key)) {
+      errors.push(`initial zombie overlaps facility: ${key}`);
     }
+    // v1.4.3 preserves the first six v1.4.2 coordinates verbatim. Two of those
+    // legacy positions are on the unchanged north/south road; the six newly
+    // appended positions must satisfy the stricter non-road placement rule.
+    if (index >= 6 && map && isRoad(map, position)) errors.push(`initial zombie overlaps road: ${key}`);
+    if (reserveKeys.has(key)) errors.push(`initial zombie overlaps Horde Spawn Reserve: ${key}`);
+    if (initialHumanKeys.has(key)) errors.push(`initial zombie overlaps initial Human Unit: ${key}`);
   }
 
   const expectedFacilityIds = new Set(FIXED_FACILITY_IDS);

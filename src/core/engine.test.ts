@@ -34,6 +34,8 @@ describe('GameEngine', () => {
     expect(first.map.initialZombiePositions).toEqual([
       { q: 9, r: 9 }, { q: 21, r: 21 }, { q: 21, r: 9 },
       { q: 9, r: 21 }, { q: 15, r: 6 }, { q: 15, r: 24 },
+      { q: 16, r: 2 }, { q: 28, r: 2 }, { q: 28, r: 14 },
+      { q: 14, r: 28 }, { q: 2, r: 28 }, { q: 2, r: 16 },
     ]);
     expect(first.units.filter((unit) => unit.isPlayerUnit)).toHaveLength(2);
     expect(validateInvariants(first)).toEqual({ valid: true, errors: [] });

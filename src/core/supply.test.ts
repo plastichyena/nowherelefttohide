@@ -172,7 +172,7 @@ describe('road branches and supply network', () => {
     expect(engine.getState().units.find((unit) => unit.id === police.id)!.hp).toBe(10);
   });
 
-  it('ruins an empty occupied checkpoint, permits only an inner retreat, and abandons the old site', () => {
+  it('ruins an empty occupied checkpoint and allows a forward replacement once the Zombie is cleared', () => {
     const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, horde: singleFinalWave(4) });
     const engine = new GameEngine(5, config);
     expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 9 } }).error).toBeNull();
@@ -190,9 +190,8 @@ describe('road branches and supply network', () => {
     const cleared = engine.getState() as GameState;
     cleared.units = cleared.units.filter((unit) => unit.type !== 'zombie');
     expect(engine.step({ type: 'LoadSnapshot', snapshot: cleared }).error).toBeNull();
-    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 1 } }).error?.code)
-      .toBe('checkpoint_abandoned_forward_block');
-    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 10 } }).error).toBeNull();
-    expect(engine.getState().checkpoints.find((candidate) => candidate.id === checkpoint.id)!.status).toBe('abandoned');
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 1 } }).error).toBeNull();
+    expect(engine.getState().roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId)
+      .not.toBe(checkpoint.id);
   });
 });

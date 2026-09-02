@@ -6,7 +6,7 @@ import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.4.2');
+    expect(APP_VERSION).toBe('1.4.3');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -68,14 +68,14 @@ describe('AgentGame public boundary', () => {
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.4.2 API, checkpoint candidates, logistics rules, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
+  it('describes the v1.4.3 API, checkpoint candidates, logistics rules, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('7');
+    expect(info.saveFormatVersion).toBe('8');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
@@ -100,15 +100,15 @@ describe('AgentGame public boundary', () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
-    expect(info.rules.map).toMatchObject({ id: 'fixed-31x31-v1', width: 31, height: 31 });
+    expect(info.rules.map).toMatchObject({ id: 'fixed-31x31-v2', width: 31, height: 31 });
     expect(info.rules.map.hordeSpawnReserve).toHaveLength(120);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 50 });
     expect(info.rules.horde.waves).toEqual([
-      expect.objectContaining({ index: 1, turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 1 }, final: false }),
-      expect.objectContaining({ index: 2, turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 2 }, final: false }),
-      expect.objectContaining({ index: 3, turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 4 }, final: false }),
-      expect.objectContaining({ index: 4, turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 4 }, final: false }),
-      expect.objectContaining({ index: 5, turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 5 }, final: true }),
+      expect.objectContaining({ index: 1, turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 3 }, final: false }),
+      expect.objectContaining({ index: 2, turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 4 }, final: false }),
+      expect.objectContaining({ index: 3, turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 6 }, final: false }),
+      expect.objectContaining({ index: 4, turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 6 }, final: false }),
+      expect.objectContaining({ index: 5, turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, final: true }),
     ]);
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',
@@ -134,7 +134,7 @@ describe('AgentGame public boundary', () => {
     expect(info.rules.noise).toEqual({
       classes: ['small', 'medium', 'large', 'extraLarge'],
       policeClass: 'medium',
-      nationalGuardClass: 'medium',
+      nationalGuardClass: 'large',
       distance: 'hex',
       terrainAttenuation: false,
       normalZombieAffected: true,
@@ -176,6 +176,7 @@ describe('AgentGame public boundary', () => {
       'noiseTargetsReached',
       'noiseTargetsOverriddenByHorde',
       'noiseTargetsOverriddenByVisiblePopulation',
+      'aerialDiscoveriesInGroundBlockedArea',
     ]) expect(result.statistics).not.toHaveProperty(key);
   });
 
@@ -189,8 +190,8 @@ describe('AgentGame public boundary', () => {
     expect(game.getRunArtifact().artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(game.getRunArtifact().appVersion).toBe(APP_VERSION);
     expect(game.getRunArtifact().invalidAttempts).toHaveLength(1);
-    expect(game.getRunArtifact().config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'medium' } });
-    expect(game.getRunArtifact().metrics?.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'medium' } });
+    expect(game.getRunArtifact().config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'large' } });
+    expect(game.getRunArtifact().metrics?.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'large' } });
     expect(JSON.stringify(game.getRunArtifact())).not.toContain('"police":4');
     expect(() => game.reset({ seed: 10, configOverrides: { unknown: 1 } as never })).toThrow(/Unknown field/);
     expect(game.getObservation()).toEqual(before);

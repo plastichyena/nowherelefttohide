@@ -66,7 +66,7 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '3.0.0';
+  schemaVersion: '4.0.0';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -314,7 +314,7 @@ function createSimulationReport(
     aggregate[agent] = aggregateMetrics(rows);
   }
   return {
-    schemaVersion: '3.0.0',
+    schemaVersion: '4.0.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -384,6 +384,19 @@ const CSV_COLUMNS: readonly string[] = [
   'normalZombieIdleCount', 'hordeTargetInheritedCount', 'hordeTargetClearedCount',
   'noisePulsesEmitted', 'policeNoisePulses', 'nationalGuardNoisePulses', 'normalZombiesNoiseTargeted',
   'noiseTargetsReached', 'noiseTargetsOverriddenByHorde', 'noiseTargetsOverriddenByVisiblePopulation',
+  'initialNormalZombies', 'combatNoise.medium', 'combatNoise.large',
+  'fallenSitesTriggeredByNoise', 'noiseRespawnAttempts', 'noiseRespawnZombiesSpawned',
+  'noiseImmediateInfections', 'noiseChainOverruns',
+  'policeNoiseImmediateInfections', 'nationalGuardNoiseImmediateInfections',
+  'policeNoiseChainOverruns', 'nationalGuardNoiseChainOverruns',
+  'groundVisionPotentialHexes', 'groundVisionVisibleHexes', 'groundVisionBlockedHexes',
+  'maxGroundVisionBlockedHexes', 'averageGroundVisionBlockedHexes',
+  'civilianDroneBasesBuilt', 'maxCivilianDroneVisionRadius', 'aerialDiscoveriesInGroundBlockedArea',
+  'infectedPopulationAtFall', 'requestedSiteZombieSpawns', 'actualSiteZombieSpawns',
+  'fallSiteZombieSpawns', 'noiseSiteZombieSpawns', 'maxSixZombieSpawnResolutions',
+  'infectedPopulationConvertedToZombies', 'unspawnedInfectedPopulation', 'immediateInfectionsFromSpawn',
+  'chainOverruns', 'maximumOverrunChainLength',
+  'constructibleInfectedDeaths', 'earlyFacilityLosses', 'earlyCheckpointLosses',
   'finalFood', 'finalCivilianGoods', 'finalMilitaryGoods', 'finalFuel',
   'mapWidth', 'mapHeight',
   'humanHexesMoved.police', 'humanHexesMoved.nationalGuard',
@@ -505,6 +518,20 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.noisePulsesEmitted, game.policeNoisePulses, game.nationalGuardNoisePulses,
       game.normalZombiesNoiseTargeted, game.noiseTargetsReached, game.noiseTargetsOverriddenByHorde,
       game.noiseTargetsOverriddenByVisiblePopulation,
+      game.initialNormalZombies, game.combatNoiseByClass.medium, game.combatNoiseByClass.large,
+      game.fallenSitesTriggeredByNoise, game.noiseRespawnAttempts, game.noiseRespawnZombiesSpawned,
+      game.noiseImmediateInfections, game.noiseChainOverruns,
+      game.policeNoiseImmediateInfections, game.nationalGuardNoiseImmediateInfections,
+      game.policeNoiseChainOverruns, game.nationalGuardNoiseChainOverruns,
+      game.groundVisionPotentialHexes, game.groundVisionVisibleHexes, game.groundVisionBlockedHexes,
+      game.maxGroundVisionBlockedHexes, game.averageGroundVisionBlockedHexes,
+      game.civilianDroneBasesBuilt, game.maxCivilianDroneVisionRadius, game.aerialDiscoveriesInGroundBlockedArea,
+      game.infectedPopulationAtFall, game.requestedSiteZombieSpawns, game.actualSiteZombieSpawns,
+      game.fallSiteZombieSpawns, game.noiseSiteZombieSpawns, game.maxSixZombieSpawnResolutions,
+      game.infectedPopulationConvertedToZombies, game.unspawnedInfectedPopulation,
+      game.immediateInfectionsFromSpawn, game.chainOverruns, game.maximumOverrunChainLength,
+      game.constructibleInfectedDeaths,
+      game.earlyFacilityLosses, game.earlyCheckpointLosses,
       game.finalFood, game.finalCivilianGoods,
       game.finalMilitaryGoods, game.finalFuel,
       game.mapWidth, game.mapHeight,

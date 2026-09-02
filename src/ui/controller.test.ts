@@ -9,10 +9,10 @@ vi.mock('phaser', () => ({
   },
 }));
 
-import type { CheckpointPositionCandidate, CheckpointState, FacilityState, GameAction, GameState, UnitState } from '../core/types';
+import type { CheckpointPositionCandidate, CheckpointState, FacilityState, GameAction, GameEvent, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
 import { createAgentObservation } from '../agent/observation';
-import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
+import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
@@ -27,6 +27,20 @@ function testUnit(id: string, q: number, r: number, isPlayerUnit = true): Partia
 
 function testFacility(id: string, q: number, r: number): Partial<FacilityState> {
   return { id, position: { q, r } };
+}
+
+function siteEvent(
+  id: string,
+  type: Extract<GameEvent['type'], `site_${string}`>,
+  payload: Record<string, unknown>,
+): GameEvent {
+  return {
+    id,
+    turn: 2,
+    phase: 'zombie',
+    type,
+    payload: payload as GameEvent['payload'],
+  };
 }
 
 describe('controller view models', () => {
@@ -126,19 +140,90 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.4.1-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.4.2-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.1以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.2');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.2以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.3');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.1 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.2');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.2 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.3');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.2.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 7');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.2.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 7');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.3.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 8');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.3.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 8');
+  });
+
+  it('projects public site events without hidden spawn details', () => {
+    const event = siteEvent('event-spawn', 'site_zombies_spawned', {
+      siteKind: 'facility',
+      siteId: 'farm-1',
+      siteType: 'farm',
+      q: 3,
+      r: 4,
+      cause: 'infection_fall',
+      requestedSpawnCount: 6,
+      actualSpawnCount: 2,
+      remainingInfected: 1,
+      chainOriginEventId: 'event-root',
+      source: 'zombie-hidden',
+      spawnedUnitIds: ['zombie-hidden'],
+      spawnedPositions: [{ q: 9, r: 9 }],
+      radius: 8,
+      affectedZombieIds: ['zombie-hidden'],
+    });
+    const view = projectImportantEvent(event);
+    expect(view).not.toBeNull();
+    expect(view).toMatchObject({
+      id: 'event-spawn',
+      siteKind: 'facility',
+      siteId: 'farm-1',
+      siteType: 'farm',
+      position: { q: 3, r: 4 },
+      actualSpawnCount: 2,
+      requestedSpawnCount: 6,
+      remainingInfected: 1,
+      chainOriginEventId: 'event-root',
+    });
+    const rendered = renderImportantEventHistory([event], 'en');
+    expect(rendered).toContain('farm-1');
+    expect(rendered).toContain('Spawned (actual/requested) 2/6');
+    expect(rendered).toContain('Cause Infection fall');
+    expect(rendered).toContain('Chain root event-root');
+    expect(rendered).not.toContain('zombie-hidden');
+    expect(rendered).not.toContain('spawnedUnitIds');
+    expect(rendered).not.toContain('radius');
+  });
+
+  it('keeps only the newest 50 site events and aggregates one chain Toast', () => {
+    const events = Array.from({ length: 51 }, (_, index) => siteEvent(`event-${index}`, 'site_fallen', {
+      siteKind: 'facility',
+      siteId: `farm-${index}`,
+      siteType: 'farm',
+      q: index,
+      r: index + 1,
+      cause: 'infection_fall',
+      infectedAtFall: 5,
+      requestedSpawnCount: 1,
+      actualSpawnCount: 1,
+      remainingInfected: 0,
+      chainOriginEventId: null,
+      chainDepth: 0,
+    }));
+    const history = importantEventViewModels(events, 50);
+    expect(history).toHaveLength(50);
+    expect(history[0]?.id).toBe('event-1');
+    expect(renderImportantEventHistory(events, 'en')).not.toContain('farm-0');
+
+    const chainEvents = [
+      siteEvent('chain-a', 'site_chain_fallen', { siteKind: 'facility', siteId: 'farm-a', siteType: 'farm', q: 1, r: 1, chainOriginEventId: 'chain-root', chainDepth: 1 }),
+      siteEvent('chain-b', 'site_chain_fallen', { siteKind: 'checkpoint', siteId: 'checkpoint-b', siteType: 'active', q: 2, r: 2, chainOriginEventId: 'chain-root', chainDepth: 2 }),
+    ].map((event) => projectImportantEvent(event)!);
+    const toast = importantEventToastText(chainEvents, 'en');
+    expect(toast).toContain('2 sites');
+    expect(toast).toContain('chain infection/falls aggregated');
+    expect(toast).not.toContain('chain-a');
   });
 
   it('projects all checkpoint roles and branch fallback fields', () => {
@@ -197,7 +282,7 @@ describe('controller view models', () => {
 
   it('keeps Noise Class public while isolating exact diagnostics to the debug helper', () => {
     expect(noiseClassForUnit('police')).toBe('medium');
-    expect(noiseClassForUnit('nationalGuard')).toBe('medium');
+    expect(noiseClassForUnit('nationalGuard')).toBe('large');
     expect(noiseClassForUnit('zombie')).toBeNull();
     const publicLog = renderNoiseEventLog({
       events: [{
@@ -363,8 +448,8 @@ describe('controller view models', () => {
       'finalWaveTurn', 'finalHordeWarning', 'spawnTurn', 'hordeStatusNotStarted', 'hordeSchedule', 'nextWave', 'directionCount', 'directions', 'composition', 'finalWave',
       'terrain', 'baseTerrain', 'terrainPlain', 'terrainForest', 'terrainMountain', 'terrainWater',
       'roadOverlay', 'urbanOverlay', 'effectiveMovementCost', 'defenseSource', 'damageMultiplier',
-      'vision', 'visible', 'hidden', 'victoryProgress', 'finalHordeDefeated',
-      'suppliedAreaZombieClear', 'suppliedAreaInfectionClear', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory',
+      'vision', 'visible', 'hidden', 'visionMode', 'visionGround', 'visionAerial', 'terrainLosBlocking', 'visionGroundRule', 'visionAerialRule', 'victoryProgress', 'finalHordeDefeated',
+      'suppliedAreaZombieClear', 'suppliedAreaInfectionClear', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipVictory',
       'finalHordeSpawned', 'finalHordeKilled', 'normalZombiesKilled', 'hordeZombiesKilled', 'victoryTurn',
     ];
     for (const key of keys) {
@@ -394,7 +479,7 @@ describe('controller view models', () => {
       'checkpointRole.remnant', 'checkpointRole.ruined', 'checkpointRole.abandoned',
       'activateCheckpoint', 'activateCheckpointHint', 'branchPolicy', 'buildCandidate',
       'relocateCandidate', 'sameHexActions', 'tipCheckpointFallback', 'noise', 'noiseClass',
-      'noiseClassMedium', 'noiseCombatHint', 'noiseLog', 'noiseEmitted', 'noiseCenter', 'tipNoise',
+      'noiseClassMedium', 'noiseClassLarge', 'noiseCombatHint', 'noiseLog', 'noiseEmitted', 'noiseCenter', 'importantEventHistory', 'importantEventHistoryHint', 'importantEventToastPrefix', 'importantEventInfectionStarted', 'importantEventSiteFallen', 'importantEventChainFallen', 'importantEventZombiesSpawned', 'importantEventImmediateInfection', 'importantEventNoiseRespawn', 'infectedAmount', 'infectedAtFall', 'spawnCount', 'remainingInfected', 'remainingHealthy', 'constructibleInfectedDeaths', 'chainRoot', 'eventCause', 'eventCauseLatentInfection', 'eventCauseInfectionFall', 'eventCauseZombieOccupation', 'eventCauseEmptyZombieOccupation', 'eventCauseSpawnOccupation', 'eventCauseCombatNoise', 'tipNoise',
       'checkpointPreparedPostLimitReached', 'checkpointStandbyRequiresRearPosition', 'checkpointNotActivatable',
     ];
     for (const key of keys) {
@@ -471,6 +556,10 @@ describe('controller view models', () => {
     expect(english).toContain('data-legend-section="dynamic"');
     expect(english).toContain('Secured + stopped');
     expect(english).toContain('Forest Movement Cost');
+    expect(english).toContain('Capital Ground Vision');
+    expect(english).toContain('Ground Vision blocking Terrain');
+    expect(english).toContain('Aerial Vision');
+    expect(english).toContain('One Normal Zombie is requested per 5 infected people');
     expect(english).toContain('Wave 1');
     expect(english).toContain('Spawn Reserve');
     expect(english).toContain('Screening Batch Capacity');

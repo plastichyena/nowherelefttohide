@@ -81,7 +81,7 @@ jobs:
     name: Deploy to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Long fixed-seed release batches live in the separately dispatched
-    # v1.4.2 Release Validation workflow and never delay Pages or AI Portable.
+    # v1.4.3 Release Validation workflow and never delay Pages or AI Portable.
     needs: verify
     runs-on: ubuntu-latest
     permissions:

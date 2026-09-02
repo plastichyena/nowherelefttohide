@@ -214,6 +214,45 @@ export interface GameMetrics {
   noiseTargetsReached: number;
   noiseTargetsOverriddenByHorde: number;
   noiseTargetsOverriddenByVisiblePopulation: number;
+  /** v1.4.3 LOS, site-fall, chain, and fallen-site Noise metrics. */
+  initialNormalZombies: number;
+  combatNoiseByClass: Record<'medium' | 'large', number>;
+  fallenSitesTriggeredByNoise: number;
+  noiseRespawnAttempts: number;
+  noiseRespawnZombiesSpawned: number;
+  noiseImmediateInfections: number;
+  noiseChainOverruns: number;
+  policeNoiseImmediateInfections: number;
+  nationalGuardNoiseImmediateInfections: number;
+  policeNoiseChainOverruns: number;
+  nationalGuardNoiseChainOverruns: number;
+  groundVisionPotentialHexes: number;
+  groundVisionVisibleHexes: number;
+  groundVisionBlockedHexes: number;
+  maxGroundVisionBlockedHexes: number;
+  averageGroundVisionBlockedHexes: number;
+  civilianDroneBasesBuilt: number;
+  maxCivilianDroneVisionRadius: number;
+  /** Verification-only; production results and Browser Bridge artifacts omit it. */
+  aerialDiscoveriesInGroundBlockedArea: number;
+  siteFirstInfectionsByType: Record<string, number>;
+  siteFallsByType: Record<string, number>;
+  siteZombieOccupancyDestructionsByType: Record<string, number>;
+  infectedPopulationAtFall: number;
+  requestedSiteZombieSpawns: number;
+  actualSiteZombieSpawns: number;
+  fallSiteZombieSpawns: number;
+  noiseSiteZombieSpawns: number;
+  maxSixZombieSpawnResolutions: number;
+  infectedPopulationConvertedToZombies: number;
+  unspawnedInfectedPopulation: number;
+  immediateInfectionsFromSpawn: number;
+  chainOverruns: number;
+  maximumOverrunChainLength: number;
+  chainOriginsByType: Record<string, number>;
+  constructibleInfectedDeaths: number;
+  earlyFacilityLosses: number;
+  earlyCheckpointLosses: number;
   finalFood: number;
   finalCivilianGoods: number;
   finalMilitaryGoods: number;
@@ -624,6 +663,79 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     statistics,
     'noiseTargetsOverriddenByVisiblePopulation',
   ) ?? 0;
+  const combatNoiseByClass: Record<'medium' | 'large', number> = { medium: 0, large: 0 };
+  for (const event of events.filter((candidate) => candidate.type === 'noise_emitted')) {
+    if (event.payload.noiseClass === 'medium' || event.payload.noiseClass === 'large') {
+      combatNoiseByClass[event.payload.noiseClass] += 1;
+    }
+  }
+  const siteResolutionEvents = events.filter((event) =>
+    event.type === 'site_fallen' || event.type === 'site_chain_fallen' || event.type === 'site_noise_respawn',
+  );
+  const countSiteEventsByType = (
+    types: readonly string[],
+    predicate: (event: AgentPublicEvent) => boolean = () => true,
+  ): Record<string, number> => {
+    const counts: Record<string, number> = {};
+    for (const event of events.filter((candidate) => types.includes(candidate.type) && predicate(candidate))) {
+      const key = `${String(event.payload.siteKind ?? 'unknown')}:${String(event.payload.siteType ?? 'unknown')}`;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  };
+  const siteFirstInfectionsByType = countSiteEventsByType(['site_infection_started']);
+  const zombieOccupationCauses = new Set(['zombie_occupation', 'empty_zombie_occupation', 'spawn_immediate_occupation']);
+  const siteFallsByType = countSiteEventsByType(
+    ['site_fallen', 'site_chain_fallen'],
+    (event) => !zombieOccupationCauses.has(String(event.payload.cause ?? '')),
+  );
+  const siteZombieOccupancyDestructionsByType = countSiteEventsByType(
+    ['site_fallen', 'site_chain_fallen'],
+    (event) => zombieOccupationCauses.has(String(event.payload.cause ?? '')),
+  );
+  const eventById = new Map(events.map((event) => [event.id, event] as const));
+  const noiseSourceForEvent = (event: AgentPublicEvent): HumanUnitType | null => {
+    const direct = event.payload.sourceUnitType;
+    if (direct === 'police' || direct === 'nationalGuard') return direct;
+    const rootId = typeof event.payload.chainOriginEventId === 'string' ? event.payload.chainOriginEventId : null;
+    const rootSource = rootId ? eventById.get(rootId)?.payload.sourceUnitType : null;
+    return rootSource === 'police' || rootSource === 'nationalGuard' ? rootSource : null;
+  };
+  const noiseImmediateEvents = events.filter(
+    (event) => event.type === 'site_immediate_infection' && noiseSourceForEvent(event) !== null,
+  );
+  const noiseChainEvents = events.filter(
+    (event) => event.type === 'site_chain_fallen' && noiseSourceForEvent(event) !== null,
+  );
+  const chainOriginsByType: Record<string, number> = {};
+  for (const event of events.filter((candidate) => candidate.type === 'site_chain_fallen')) {
+    const rootId = typeof event.payload.chainOriginEventId === 'string' ? event.payload.chainOriginEventId : null;
+    const root = rootId ? eventById.get(rootId) : undefined;
+    const origin = root
+      ? `${String(root.payload.siteKind ?? 'unknown')}:${String(root.payload.siteType ?? 'unknown')}`
+      : 'unknown';
+    chainOriginsByType[origin] = (chainOriginsByType[origin] ?? 0) + 1;
+  }
+  const groundVisionSamples = statisticNumber(statistics, 'groundVisionSamples') ?? 0;
+  const cumulativeGroundVisionBlockedHexes = statisticNumber(statistics, 'cumulativeGroundVisionBlockedHexes') ?? 0;
+  const infectedPopulationAtFall = siteResolutionEvents.reduce(
+    (total, event) => total + eventPayloadNumber(event, 'infectedAtFall'),
+    0,
+  );
+  const requestedSiteZombieSpawns = siteResolutionEvents.reduce(
+    (total, event) => total + eventPayloadNumber(event, 'requestedSpawnCount'),
+    0,
+  );
+  const actualSiteZombieSpawns = siteResolutionEvents.reduce(
+    (total, event) => total + eventPayloadNumber(event, 'actualSpawnCount'),
+    0,
+  );
+  const fallSiteZombieSpawns = siteResolutionEvents
+    .filter((event) => event.type !== 'site_noise_respawn')
+    .reduce((total, event) => total + eventPayloadNumber(event, 'actualSpawnCount'), 0);
+  const noiseSiteZombieSpawns = siteResolutionEvents
+    .filter((event) => event.type === 'site_noise_respawn')
+    .reduce((total, event) => total + eventPayloadNumber(event, 'actualSpawnCount'), 0);
   const productionFacilities = observations.flatMap((observation) => observation.facilities.filter(
     (facility) => facility.type !== 'capital' && facility.type !== 'city',
   ));
@@ -1197,6 +1309,60 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     noiseTargetsReached,
     noiseTargetsOverriddenByHorde,
     noiseTargetsOverriddenByVisiblePopulation,
+    initialNormalZombies: statisticNumber(statistics, 'initialNormalZombies') ?? input.config.economy.initialZombieCount,
+    combatNoiseByClass,
+    fallenSitesTriggeredByNoise: statisticNumber(statistics, 'fallenSitesTriggeredByNoise')
+      ?? siteResolutionEvents.filter((event) => event.type === 'site_noise_respawn').length,
+    noiseRespawnAttempts: statisticNumber(statistics, 'noiseRespawnAttempts')
+      ?? siteResolutionEvents.filter((event) => event.type === 'site_noise_respawn').length,
+    noiseRespawnZombiesSpawned: statisticNumber(statistics, 'noiseRespawnZombiesSpawned') ?? noiseSiteZombieSpawns,
+    noiseImmediateInfections: noiseImmediateEvents.length,
+    noiseChainOverruns: noiseChainEvents.length,
+    policeNoiseImmediateInfections: noiseImmediateEvents.filter((event) => noiseSourceForEvent(event) === 'police').length,
+    nationalGuardNoiseImmediateInfections: noiseImmediateEvents.filter((event) => noiseSourceForEvent(event) === 'nationalGuard').length,
+    policeNoiseChainOverruns: noiseChainEvents.filter((event) => noiseSourceForEvent(event) === 'police').length,
+    nationalGuardNoiseChainOverruns: noiseChainEvents.filter((event) => noiseSourceForEvent(event) === 'nationalGuard').length,
+    groundVisionPotentialHexes: statisticNumber(statistics, 'groundVisionPotentialHexes') ?? 0,
+    groundVisionVisibleHexes: statisticNumber(statistics, 'groundVisionVisibleHexes') ?? 0,
+    groundVisionBlockedHexes: statisticNumber(statistics, 'groundVisionBlockedHexes') ?? 0,
+    maxGroundVisionBlockedHexes: statisticNumber(statistics, 'maxGroundVisionBlockedHexes') ?? 0,
+    averageGroundVisionBlockedHexes: groundVisionSamples > 0
+      ? cumulativeGroundVisionBlockedHexes / groundVisionSamples
+      : 0,
+    civilianDroneBasesBuilt: statisticNumber(statistics, 'civilianDroneBasesBuilt') ?? constructed('civilianDroneBase'),
+    maxCivilianDroneVisionRadius: statisticNumber(statistics, 'maxCivilianDroneVisionRadius') ?? maxDroneVisionRadius,
+    aerialDiscoveriesInGroundBlockedArea: statisticNumber(statistics, 'aerialDiscoveriesInGroundBlockedArea') ?? 0,
+    siteFirstInfectionsByType,
+    siteFallsByType,
+    siteZombieOccupancyDestructionsByType,
+    infectedPopulationAtFall,
+    requestedSiteZombieSpawns,
+    actualSiteZombieSpawns,
+    fallSiteZombieSpawns,
+    noiseSiteZombieSpawns,
+    maxSixZombieSpawnResolutions: siteResolutionEvents.filter(
+      (event) => eventPayloadNumber(event, 'actualSpawnCount') === input.config.infection.maxZombieSpawnPerResolution,
+    ).length,
+    infectedPopulationConvertedToZombies: statisticNumber(statistics, 'infectedPopulationConvertedToZombies') ?? 0,
+    unspawnedInfectedPopulation: statisticNumber(statistics, 'unspawnedInfectedPopulation') ?? 0,
+    immediateInfectionsFromSpawn: statisticNumber(statistics, 'immediateInfectionsFromSpawn')
+      ?? events.filter((event) => event.type === 'site_immediate_infection').length,
+    chainOverruns: statisticNumber(statistics, 'chainOverruns') ?? eventCount('site_chain_fallen'),
+    maximumOverrunChainLength: statisticNumber(statistics, 'maximumOverrunChainLength')
+      ?? Math.max(...events.filter((event) => event.type === 'site_chain_fallen').map((event) => eventPayloadNumber(event, 'chainDepth')), 0),
+    chainOriginsByType,
+    constructibleInfectedDeaths: statisticNumber(statistics, 'constructibleInfectedDeaths') ?? siteResolutionEvents.reduce(
+      (total, event) => total + eventPayloadNumber(event, 'constructibleInfectedDeaths'),
+      0,
+    ),
+    earlyFacilityLosses: events.filter(
+      (event) => (event.type === 'site_fallen' || event.type === 'site_chain_fallen')
+        && event.turn < 5 && event.payload.siteKind === 'facility',
+    ).length,
+    earlyCheckpointLosses: events.filter(
+      (event) => (event.type === 'site_fallen' || event.type === 'site_chain_fallen')
+        && event.turn < 5 && event.payload.siteKind === 'checkpoint',
+    ).length,
     finalFood: numberOrZero(finalObservation.resources.food),
     finalCivilianGoods: numberOrZero(finalObservation.resources.civilianGoods),
     finalMilitaryGoods: numberOrZero(finalObservation.resources.militaryGoods),
@@ -1434,6 +1600,38 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'noiseTargetsReached',
   'noiseTargetsOverriddenByHorde',
   'noiseTargetsOverriddenByVisiblePopulation',
+  'initialNormalZombies',
+  'fallenSitesTriggeredByNoise',
+  'noiseRespawnAttempts',
+  'noiseRespawnZombiesSpawned',
+  'noiseImmediateInfections',
+  'noiseChainOverruns',
+  'policeNoiseImmediateInfections',
+  'nationalGuardNoiseImmediateInfections',
+  'policeNoiseChainOverruns',
+  'nationalGuardNoiseChainOverruns',
+  'groundVisionPotentialHexes',
+  'groundVisionVisibleHexes',
+  'groundVisionBlockedHexes',
+  'maxGroundVisionBlockedHexes',
+  'averageGroundVisionBlockedHexes',
+  'civilianDroneBasesBuilt',
+  'maxCivilianDroneVisionRadius',
+  'aerialDiscoveriesInGroundBlockedArea',
+  'infectedPopulationAtFall',
+  'requestedSiteZombieSpawns',
+  'actualSiteZombieSpawns',
+  'fallSiteZombieSpawns',
+  'noiseSiteZombieSpawns',
+  'maxSixZombieSpawnResolutions',
+  'infectedPopulationConvertedToZombies',
+  'unspawnedInfectedPopulation',
+  'immediateInfectionsFromSpawn',
+  'chainOverruns',
+  'maximumOverrunChainLength',
+  'constructibleInfectedDeaths',
+  'earlyFacilityLosses',
+  'earlyCheckpointLosses',
   'finalFood',
   'finalCivilianGoods',
   'finalMilitaryGoods',

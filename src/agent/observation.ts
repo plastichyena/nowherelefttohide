@@ -39,11 +39,42 @@ import {
   type AgentArtifactObservation,
   type AgentMapObservation,
   type AgentObservation,
+  type AgentPublicEvent,
   type AgentUnitObservation,
 } from './types';
 
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+const IMPORTANT_SITE_EVENT_TYPES = new Set([
+  'site_infection_started',
+  'site_fallen',
+  'site_chain_fallen',
+  'site_zombies_spawned',
+  'site_immediate_infection',
+  'site_noise_respawn',
+]);
+
+const IMPORTANT_SITE_EVENT_FIELDS = new Set([
+  'siteKind', 'siteId', 'siteType', 'q', 'r', 'cause', 'amount',
+  'infectedAtFall', 'requestedSpawnCount', 'actualSpawnCount',
+  'remainingInfected', 'remainingHealthy', 'infected',
+  'constructibleInfectedDeaths', 'chainOriginEventId', 'chainDepth',
+  'sourceUnitType',
+]);
+
+/** Public site history never includes generated Zombie IDs or exact Spawn hexes. */
+function importantSiteEvents(state: Readonly<GameState>): AgentPublicEvent[] {
+  return state.events
+    .filter((event) => IMPORTANT_SITE_EVENT_TYPES.has(event.type))
+    .slice(-50)
+    .map((event) => ({
+      ...event,
+      payload: Object.fromEntries(
+        Object.entries(event.payload).filter(([field]) => IMPORTANT_SITE_EVENT_FIELDS.has(field)),
+      ),
+    })) as AgentPublicEvent[];
 }
 
 function publicResult(result: GameResult | null): AgentGameResult | null {
@@ -116,6 +147,8 @@ function publicUnit(
     unitType: unit.type,
     position: { ...unit.position },
     vision: unit.vision,
+    visionMode: 'ground',
+    terrainLosBlocking: unit.isPlayerUnit,
     positionTerrain: positionTile?.terrain ?? 'plain',
     effectiveMovementCostAtPosition: effectiveMovementCost(state, unit.position),
     terrainDefenseSource: defense.source,
@@ -337,13 +370,15 @@ export function createAgentObservation(
         recoveryOperationalTurn: facility.recoveryOperationalTurn,
         vision: facility.owner === 'player' && facility.status !== 'ruined' && !unavailableForOperation
           ? facility.type === 'capital'
-            ? state.config.checkpoint.initialSupplyRadius
+            ? state.config.vision.capital
             : facility.type === 'civilianDroneBase'
               ? facility.workers > 0 && facility.powerSupplyEnabled && facility.lastPowerSupplied === true
                 ? facility.workers * 2
                 : 0
               : state.config.vision.ownedFacility
           : 0,
+        visionMode: facility.type === 'civilianDroneBase' ? 'aerial' as const : 'ground' as const,
+        terrainLosBlocking: facility.type !== 'civilianDroneBase',
         healthyPopulation: facility.workers,
         zombieTargetValue: facilityZombieTargetValue(state, facility),
         infectedPopulation: facility.infected,
@@ -475,6 +510,8 @@ export function createAgentObservation(
           position: { ...checkpoint.position },
           direction: checkpoint.direction,
           vision: role === 'active' ? state.config.vision.operationalCheckpoint : 0,
+          visionMode: 'ground' as const,
+          terrainLosBlocking: true as const,
           status: checkpoint.status,
           role,
           waiting: checkpoint.waiting,
@@ -507,6 +544,7 @@ export function createAgentObservation(
           projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
         };
       }),
+    importantSiteEvents: importantSiteEvents(state),
     checkpointPositionCandidates: projectionCache.checkpointPositionCandidates ?? getCheckpointPositionCandidates(state),
     constructibleFacilityPositionCandidates: (['simpleFarm', 'civilianDroneBase'] as const)
       .flatMap((facilityType) => getConstructibleFacilityPositionCandidates(state, facilityType))
@@ -547,7 +585,7 @@ export function createAgentObservation(
   } satisfies AgentObservation as unknown as JsonValue) as unknown as AgentObservation;
 }
 
-/** Remove fixed topology from one Artifact Schema 3.0.0 trace entry. */
+/** Remove fixed topology from one Artifact Schema 4.0.0 trace entry. */
 export function compactArtifactObservation(observation: AgentObservation): AgentArtifactObservation {
   const copy = cloneJson(observation);
   const { map, ...dynamic } = copy;

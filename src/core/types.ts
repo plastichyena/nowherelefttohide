@@ -382,8 +382,14 @@ export type GameEventType =
   | 'refugees_screened'
   | 'latent_infection'
   | 'infection_spread'
+  | 'site_infection_started'
   | 'infection_suppressed'
   | 'facility_overrun'
+  | 'site_fallen'
+  | 'site_zombies_spawned'
+  | 'site_immediate_infection'
+  | 'site_chain_fallen'
+  | 'site_noise_respawn'
   | 'facility_recovered'
   | 'checkpoint_built'
   | 'checkpoint_relocated'
@@ -403,6 +409,7 @@ export type GameEventType =
   | 'terrain_defense_applied'
   | 'enemy_spotted'
   | 'enemy_lost'
+  | 'aerial_enemy_discovered'
   | 'zombie_idle'
   | 'horde_target_inherited'
   | 'horde_target_cleared'
@@ -489,6 +496,25 @@ export interface GameStatistics {
   noiseTargetsReached: number;
   noiseTargetsOverriddenByHorde: number;
   noiseTargetsOverriddenByVisiblePopulation: number;
+  initialNormalZombies: number;
+  fallenSitesTriggeredByNoise: number;
+  noiseRespawnAttempts: number;
+  noiseRespawnZombiesSpawned: number;
+  infectedPopulationConvertedToZombies: number;
+  unspawnedInfectedPopulation: number;
+  immediateInfectionsFromSpawn: number;
+  chainOverruns: number;
+  maximumOverrunChainLength: number;
+  constructibleInfectedDeaths: number;
+  groundVisionPotentialHexes: number;
+  groundVisionVisibleHexes: number;
+  groundVisionBlockedHexes: number;
+  maxGroundVisionBlockedHexes: number;
+  cumulativeGroundVisionBlockedHexes: number;
+  groundVisionSamples: number;
+  civilianDroneBasesBuilt: number;
+  maxCivilianDroneVisionRadius: number;
+  aerialDiscoveriesInGroundBlockedArea: number;
 }
 
 export interface GameResult {
@@ -871,6 +897,7 @@ export interface TerrainConfig {
 }
 
 export interface VisionConfig {
+  capital: number;
   ownedFacility: number;
   operationalCheckpoint: number;
 }
@@ -894,8 +921,10 @@ export interface RefugeeConfig {
 export interface InfectionConfig {
   facilitySpreadPerTurn: number;
   fallBackInfectionRate: number;
-  fallBackCapacityRate: number;
-  fallBackCapacityRounding: 'ceil' | 'floor';
+  zombieSpawnPopulationPerUnit: number;
+  maxZombieSpawnPerResolution: number;
+  zombieSpawnRadius: number;
+  noiseRespawnEnabled: boolean;
   policeSuppression: number;
   nationalGuardSuppression: number;
   nationalGuardCivilianDamageRate: number;

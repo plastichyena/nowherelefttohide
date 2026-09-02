@@ -7,6 +7,39 @@ import { runAgentGame } from './runner';
 import type { AgentPublicEvent } from './types';
 
 describe('Agent Metrics', () => {
+  it('separates infection falls from direct and chained zombie-occupancy destruction by site type', () => {
+    const state = createInitialState(1, createDefaultConfig());
+    const observation = createAgentObservation(state);
+    const event = (id: string, type: AgentPublicEvent['type'], siteType: string, cause: string): AgentPublicEvent => ({
+      id,
+      turn: 1,
+      phase: 'player',
+      type,
+      payload: { siteKind: 'facility', siteType, cause },
+    });
+    const metrics = collectGameMetrics({
+      initialObservation: observation,
+      finalObservation: observation,
+      actions: [],
+      events: [
+        event('fall-infection', 'site_fallen', 'farm', 'infection_fall'),
+        event('fall-occupied', 'site_fallen', 'city', 'zombie_occupation'),
+        event('chain-occupied', 'site_chain_fallen', 'refinery', 'spawn_immediate_occupation'),
+      ],
+      result: null,
+      agent: { id: 'metrics-test', version: '1' },
+      config: state.config,
+      buildId: 'metrics-test',
+      seed: 1,
+    });
+
+    expect(metrics.siteFallsByType).toEqual({ 'facility:farm': 1 });
+    expect(metrics.siteZombieOccupancyDestructionsByType).toEqual({
+      'facility:city': 1,
+      'facility:refinery': 1,
+    });
+  });
+
   it('collects required game-level values and deterministic action counts', () => {
     const config = createDefaultConfig({
       maxActionsPerTurn: 4,
@@ -21,7 +54,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('4.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('5.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -44,6 +77,18 @@ describe('Agent Metrics', () => {
       'terrainEntriesByType', 'urbanDefenseApplications', 'urbanDefenseDamagePrevented',
       'forestDefenseApplications', 'forestDefenseDamagePrevented', 'normalZombieIdleCount',
       'hordeTargetInheritedCount', 'hordeTargetClearedCount',
+      'initialNormalZombies', 'combatNoiseByClass', 'fallenSitesTriggeredByNoise',
+      'noiseRespawnAttempts', 'noiseRespawnZombiesSpawned', 'noiseImmediateInfections',
+      'noiseChainOverruns', 'groundVisionPotentialHexes', 'groundVisionVisibleHexes',
+      'groundVisionBlockedHexes', 'maxGroundVisionBlockedHexes', 'averageGroundVisionBlockedHexes',
+      'civilianDroneBasesBuilt', 'maxCivilianDroneVisionRadius',
+      'aerialDiscoveriesInGroundBlockedArea', 'siteFirstInfectionsByType', 'siteFallsByType',
+      'siteZombieOccupancyDestructionsByType', 'infectedPopulationAtFall',
+      'requestedSiteZombieSpawns', 'actualSiteZombieSpawns', 'fallSiteZombieSpawns',
+      'noiseSiteZombieSpawns', 'maxSixZombieSpawnResolutions',
+      'infectedPopulationConvertedToZombies', 'unspawnedInfectedPopulation',
+      'immediateInfectionsFromSpawn', 'chainOverruns', 'maximumOverrunChainLength',
+      'chainOriginsByType', 'constructibleInfectedDeaths', 'earlyFacilityLosses', 'earlyCheckpointLosses',
       'mapWidth', 'mapHeight', 'humanHexesMovedByType', 'maxSingleMoveDistanceByType',
       'longMoves6PlusByType', 'unitFuelConsumedByType', 'unitFuelRefilledByType',
       'stateFuelSpentOnPower', 'stateFuelSpentOnUnits', 'windPowerGenerated',
@@ -71,6 +116,7 @@ describe('Agent Metrics', () => {
       'noiseTargetsReached',
       'noiseTargetsOverriddenByHorde',
       'noiseTargetsOverriddenByVisiblePopulation',
+      'aerialDiscoveriesInGroundBlockedArea',
     ]) {
       expect(run.metrics).toHaveProperty(hiddenNoiseMetric);
       expect(run.result!.statistics).not.toHaveProperty(hiddenNoiseMetric);

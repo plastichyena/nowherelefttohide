@@ -3,7 +3,7 @@ import { forecastFacilityProduction } from '../core/engine';
 import { HEX_DIRECTION_ORDER, hexDistance, hexKey, hexNeighbor } from '../core/hex';
 import { deriveCheckpointRole, getSectorBranchIds } from '../core/supply';
 import { effectiveMovementCost, isUrbanHex } from '../core/terrain';
-import { getPlayerVisibleTileKeys } from '../core/visibility';
+import { getPlayerVisionCoverage, getPlayerVisibleTileKeys, type VisionCoverage } from '../core/visibility';
 import type {
   CardinalDirection,
   CheckpointState,
@@ -48,7 +48,9 @@ export interface BoardRenderState {
   /** Fixed outer-ring Spawn Reserve keys; defaults to the static map field. */
   spawnReserveTileKeys?: readonly string[];
   visibilityOverlay?: boolean;
-  selectedVision?: { origin: HexCoord; radius: number } | null;
+  /** Core-derived visibility decomposition used by Fog and Vision overlays. */
+  visionCoverage?: VisionCoverage;
+  selectedVision?: BoardVisionSelection | null;
   supplyOverlay?: boolean;
   suppliedTileKeys?: readonly string[];
   checkpointLegalPreviewPositions?: readonly HexCoord[];
@@ -60,6 +62,37 @@ export interface BoardRenderState {
   constructibleFacilityLegalPreviewPositions?: readonly HexCoord[];
   constructibleFacilityInvalidPreviewPositions?: readonly HexCoord[];
   constructibleFacilityPreviewSelected?: HexCoord | null;
+}
+
+/**
+ * The selected source metadata is deliberately paired with Core-returned
+ * tile sets.  The Phaser adapter must never derive LOS from origin/radius.
+ */
+export interface BoardVisionSelection {
+  origin: HexCoord;
+  radius: number;
+  visionMode: 'ground' | 'aerial';
+  terrainLosBlocking: boolean;
+  visibleTileKeys: ReadonlySet<string>;
+  potentialTileKeys: ReadonlySet<string>;
+  blockedTileKeys: ReadonlySet<string>;
+}
+
+export type VisionOverlayState = 'none' | 'ground-potential' | 'ground-visible' | 'ground-blocked' | 'aerial-visible';
+
+/** Pure classification helper for tests and non-Phaser consumers. */
+export function visionOverlayState(
+  selectedVision: BoardVisionSelection | null | undefined,
+  tileKey: string,
+): VisionOverlayState {
+  if (!selectedVision) return 'none';
+  if (selectedVision.visionMode === 'aerial') {
+    return selectedVision.visibleTileKeys.has(tileKey) ? 'aerial-visible' : 'none';
+  }
+  if (selectedVision.blockedTileKeys.has(tileKey)) return 'ground-blocked';
+  if (selectedVision.visibleTileKeys.has(tileKey)) return 'ground-visible';
+  if (selectedVision.potentialTileKeys.has(tileKey)) return 'ground-potential';
+  return 'none';
 }
 
 export type BoardAssetFailureKind = 'missing' | 'load' | 'decode' | 'texture-registration';
@@ -533,6 +566,21 @@ export class HexBoardScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Center the camera on a public site coordinate selected from the event
+   * history.  Site coordinates are public; this method never accepts or
+   * resolves a hidden spawned-unit coordinate.
+   */
+  public focusHex(position: HexCoord): void {
+    if (!this.current || !this.cameras?.main) return;
+    const tile = this.current.state.map.tiles.find((candidate) => sameHex(candidate, position));
+    if (!tile) return;
+    const center = this.hexToWorld(this.current.state, tile);
+    this.cameras.main.centerOn(center.x, center.y);
+    this.cameraInitialized = true;
+    this.invokeViewChange();
+  }
+
   private invokeViewChange(): void {
     try {
       this.callbacks.onViewChange?.();
@@ -919,7 +967,11 @@ export class HexBoardScene extends Phaser.Scene {
     const selected = render.selectedPosition;
     const hordeDirections = [...new Set(render.hordeDirections ?? [])];
     const hordeWarningType = render.hordeWarningType ?? 'periodic';
-    const visibleTileKeys = getPlayerVisibleTileKeys(state);
+    // The visibility union is computed by Core.  Keep the fallback for
+    // callers that construct a minimal BoardRenderState in isolation, but do
+    // not derive LOS in this Phaser adapter.
+    const visionCoverage = render.visionCoverage ?? getPlayerVisionCoverage(state);
+    const visibleTileKeys = visionCoverage.visible ?? getPlayerVisibleTileKeys(state);
     const selectedVision = render.selectedVision ?? null;
     const hordeRouteKeys = new Set(hordeWarningTileKeys(state.map, hordeDirections));
     const hordeEntranceKeys = new Set(
@@ -1116,7 +1168,7 @@ export class HexBoardScene extends Phaser.Scene {
     isSpawnReserve: boolean,
     hordeTarget: { x: number; y: number } | null,
     hordeWarningType: 'periodic' | 'final' | 'none',
-    selectedVision: { origin: HexCoord; radius: number } | null,
+    selectedVision: BoardVisionSelection | null,
     render: BoardRenderState,
     suppliedTiles: ReadonlySet<string>,
     checkpointLegalPreview: ReadonlySet<string>,
@@ -1168,9 +1220,29 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.strokePoints(this.hexPoints(center), true);
       if (isHordeEntrance && hordeTarget) this.drawHordeEntranceArrow(center, hordeTarget, warningColor);
     }
-    if (selectedVision && hexDistance(selectedVision.origin, tile) <= selectedVision.radius) {
-      this.graphics.lineStyle(2, 0x8be8ff, 0.7);
-      this.graphics.strokeCircle(center.x, center.y, HEX_SIZE * 0.74);
+    const visionState = visionOverlayState(selectedVision, key);
+    if (visionState !== 'none') {
+      const points = this.hexPoints(center);
+      if (visionState === 'ground-blocked') {
+        // Keep the blocker boundary legible over Fog without revealing the
+        // terrain or any hidden unit behind it.
+        this.graphics.fillStyle(0x02070b, 0.18);
+        this.graphics.fillPoints(points, true);
+        this.graphics.lineStyle(2, 0x253541, 0.95);
+      } else if (visionState === 'ground-visible') {
+        this.graphics.fillStyle(0x77d6d1, 0.045);
+        this.graphics.fillPoints(points, true);
+        this.graphics.lineStyle(2, 0x8be8ff, 0.78);
+      } else if (visionState === 'ground-potential') {
+        this.graphics.lineStyle(1, 0x52606b, 0.62);
+      } else {
+        // Aerial coverage is intentionally blue and filled differently from
+        // Ground LOS so the two public visibility modes are distinguishable.
+        this.graphics.fillStyle(0x6699e8, 0.09);
+        this.graphics.fillPoints(points, true);
+        this.graphics.lineStyle(2, 0x9fc5ff, 0.86);
+      }
+      this.graphics.strokePoints(points, true);
     }
     if (isLegal) this.drawMarker(this.graphics, center, 0x54d7ff, 0.26);
     if (isPath) this.drawMarker(this.graphics, center, 0xffcf66, 0.16);

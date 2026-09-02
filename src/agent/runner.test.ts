@@ -62,7 +62,7 @@ describe('unified Agent Runner', () => {
     expect(missingAppMetadataReplay.error?.code).toBe('artifact_invalid');
   }, 90_000);
 
-  it('rejects pre-v1.4.2 artifacts before creating a v1.4.2 replay session', () => {
+  it('rejects pre-v1.4.3 artifacts before creating a v1.4.3 replay session', () => {
     const config = createDefaultConfig({ horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] } });
     const run = runAgentGame(2, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 3 } });
     const oldArtifact = {

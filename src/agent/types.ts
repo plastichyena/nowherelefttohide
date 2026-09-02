@@ -34,15 +34,15 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.4.2';
-export const GAME_RULES_VERSION = '2.2.0';
-export const SAVE_FORMAT_VERSION = '7';
-export const AGENT_API_VERSION = '4.0.0';
-export const OBSERVATION_API_VERSION = '4.0.0';
-export const BRIDGE_API_VERSION = '4.0.0';
-export const BALANCED_AGENT_VERSION = '4.2.0';
+export const APP_VERSION = '1.4.3';
+export const GAME_RULES_VERSION = '2.3.0';
+export const SAVE_FORMAT_VERSION = '8';
+export const AGENT_API_VERSION = '5.0.0';
+export const OBSERVATION_API_VERSION = '5.0.0';
+export const BRIDGE_API_VERSION = '5.0.0';
+export const BALANCED_AGENT_VERSION = '4.3.0';
 export const RANDOM_AGENT_VERSION = '2.2.0';
-export const ARTIFACT_SCHEMA_VERSION = '3.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '4.0.0';
 export const CHECKPOINT_SCHEMA_VERSION = '1.0.0';
 
 export interface AgentMapTileObservation {
@@ -118,6 +118,8 @@ export interface AgentFacilityObservation {
   recoveryOperationalTurn: number | null;
   /** Vision radius contributed by this facility at the current state. */
   vision: number;
+  visionMode: 'ground' | 'aerial';
+  terrainLosBlocking: boolean;
   healthyPopulation: number;
   /** Zombie targeting value is deliberately distinct from real population. */
   zombieTargetValue: number;
@@ -168,6 +170,8 @@ export interface AgentUnitObservation {
   unitType: UnitType;
   position: HexCoord;
   vision: number;
+  visionMode: 'ground' | 'aerial';
+  terrainLosBlocking: boolean;
   positionTerrain: BaseTerrain;
   effectiveMovementCostAtPosition: number | null;
   terrainDefenseSource: TerrainDefenseSource;
@@ -240,6 +244,8 @@ export interface AgentCheckpointObservation {
   direction: CardinalDirection;
   /** Vision radius contributed by an operational checkpoint. */
   vision?: number;
+  visionMode?: 'ground';
+  terrainLosBlocking?: true;
   status: 'operational' | 'remnant' | 'ruined' | 'abandoned';
   role: CheckpointRole;
   waiting: number;
@@ -296,6 +302,10 @@ export interface AgentApiInfo {
       policeSuppression: number;
       nationalGuardSuppression: number;
       nationalGuardCivilianDamageFormula: string;
+      zombieSpawnPopulationPerUnit: number;
+      maxZombieSpawnPerResolution: number;
+      zombieSpawnRadius: number;
+      noiseRespawnEnabled: boolean;
     };
     ranges: Record<'police' | 'nationalGuard' | 'zombie' | 'hordeZombie', { baseRange: number }>;
     terrain: {
@@ -314,7 +324,12 @@ export interface AgentApiInfo {
       ownedFacility: number;
       operationalCheckpoint: number;
       distance: 'hex';
-      terrainBlocks: false;
+      terrainBlocks: boolean;
+      groundBlockingTerrain: BaseTerrain[];
+      firstBlockingHexVisible: true;
+      zombieVisionTerrainLosBlocking: false;
+      combatNoiseTerrainLosBlocking: false;
+      attackLineTerrainLosBlocking: false;
       sources: string[];
     };
     fogOfWar: {
@@ -528,6 +543,24 @@ export interface AgentGameResult {
     noisePulsesEmitted: number;
     policeNoisePulses: number;
     nationalGuardNoisePulses: number;
+    initialNormalZombies: number;
+    fallenSitesTriggeredByNoise: number;
+    noiseRespawnAttempts: number;
+    noiseRespawnZombiesSpawned: number;
+    infectedPopulationConvertedToZombies: number;
+    unspawnedInfectedPopulation: number;
+    immediateInfectionsFromSpawn: number;
+    chainOverruns: number;
+    maximumOverrunChainLength: number;
+    constructibleInfectedDeaths: number;
+    groundVisionPotentialHexes: number;
+    groundVisionVisibleHexes: number;
+    groundVisionBlockedHexes: number;
+    maxGroundVisionBlockedHexes: number;
+    cumulativeGroundVisionBlockedHexes: number;
+    groundVisionSamples: number;
+    civilianDroneBasesBuilt: number;
+    maxCivilianDroneVisionRadius: number;
   };
 }
 
@@ -553,6 +586,8 @@ export interface AgentObservation {
   units: AgentUnitObservation[];
   zombies: AgentUnitObservation[];
   checkpoints: AgentCheckpointObservation[];
+  /** Last 50 public site infection/fall/spawn events, including off-screen sites. */
+  importantSiteEvents: AgentPublicEvent[];
   checkpointPositionCandidates: CheckpointPositionCandidate[];
   constructibleFacilityPositionCandidates: ConstructibleFacilityPositionCandidate[];
   roadBranches: AgentRoadBranchObservation[];
@@ -688,7 +723,7 @@ export interface AgentRunArtifact {
   /** Present for a Session artifact; absent for a standalone run. */
   sessionLineage?: { parentSessionId: string | null; parentCheckpointId: string | null };
   result: AgentGameResult | null;
-  /** Static map projection stored once per game by Artifact Schema 3.0.0. */
+  /** Static map projection stored once per game by Artifact Schema 4.0.0. */
   fixedMap?: AgentMapObservation;
   /** Dynamic public observations at reset and after each accepted action. */
   observationTrace?: AgentArtifactObservation[];
@@ -700,7 +735,7 @@ export interface AgentRunArtifact {
 }
 
 /**
- * Artifact Schema 3.0.0 stores topology once and keeps only dynamic map
+ * Artifact Schema 4.0.0 stores topology once and keeps only dynamic map
  * visibility in each trace entry.  Live observations remain complete.
  */
 export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {
@@ -718,6 +753,7 @@ export const HIDDEN_NOISE_METRIC_KEYS = [
   'noiseTargetsReached',
   'noiseTargetsOverriddenByHorde',
   'noiseTargetsOverriddenByVisiblePopulation',
+  'aerialDiscoveriesInGroundBlockedArea',
 ] as const;
 
 export type HiddenNoiseMetricKey = typeof HIDDEN_NOISE_METRIC_KEYS[number];

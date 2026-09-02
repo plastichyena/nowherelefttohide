@@ -118,12 +118,13 @@ describe('Developer / Browser Bridge', () => {
       'noiseTargetsReached',
       'noiseTargetsOverriddenByHorde',
       'noiseTargetsOverriddenByVisiblePopulation',
+      'aerialDiscoveriesInGroundBlockedArea',
     ]) expect(artifact.metrics).not.toHaveProperty(hiddenNoiseMetric);
-    expect(artifact.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'medium' } });
-    expect(artifact.metrics!.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'medium' } });
+    expect(artifact.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'large' } });
+    expect(artifact.metrics!.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'large' } });
     const encodedArtifact = JSON.stringify(artifact);
     expect(encodedArtifact).not.toContain('"police":4');
-    expect(encodedArtifact).not.toContain('"nationalGuard":5');
+    expect(encodedArtifact).not.toContain('"nationalGuard":8');
     expect(encodedArtifact).not.toContain('"artifactType"');
     expect('verificationEvents' in artifact).toBe(false);
     artifact.config.horde.waves[0]!.turn = 1;

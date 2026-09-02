@@ -3,7 +3,7 @@ import { hexKey } from './hex';
 import { createFixedMap, FIXED_INITIAL_UNIT_POSITIONS } from './map';
 import { SeededRng } from './rng';
 import { getBranchSupplyRadius, isHexSupplied } from './supply';
-import { getVisibleEnemyUnits } from './visibility';
+import { getPlayerVisionCoverage, getVisibleEnemyUnits } from './visibility';
 import type {
   CardinalDirection,
   CheckpointState,
@@ -17,7 +17,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '2.2.0';
+export const GAME_VERSION = '2.3.0';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -213,7 +213,8 @@ export function populationLedgerTotal(state: GameState): number {
       total + checkpoint.waiting + checkpoint.screening + checkpoint.approved + checkpoint.infected,
     0,
   );
-  return facilities + units + reservedUnits + checkpoints + state.population.cumulativeDeaths;
+  return facilities + units + reservedUnits + checkpoints + state.population.cumulativeDeaths
+    + state.statistics.infectedPopulationConvertedToZombies;
 }
 
 export function createCityPopulationSnapshot(state: GameState): void {
@@ -336,7 +337,7 @@ function selectWarningDirections(rng: SeededRng, count: number): CardinalDirecti
  */
 export function createInitialState(seed: number, config: GameConfig): GameState {
   assertValidGameConfig(config);
-  if (config.mapId !== 'fixed-31x31-v1') {
+  if (config.mapId !== 'fixed-31x31-v2') {
     throw new Error(`Unsupported map id: ${config.mapId}`);
   }
   if (!Number.isSafeInteger(seed)) {
@@ -513,12 +514,41 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       noiseTargetsReached: 0,
       noiseTargetsOverriddenByHorde: 0,
       noiseTargetsOverriddenByVisiblePopulation: 0,
+      initialNormalZombies: stateConfig.economy.initialZombieCount,
+      fallenSitesTriggeredByNoise: 0,
+      noiseRespawnAttempts: 0,
+      noiseRespawnZombiesSpawned: 0,
+      infectedPopulationConvertedToZombies: 0,
+      unspawnedInfectedPopulation: 0,
+      immediateInfectionsFromSpawn: 0,
+      chainOverruns: 0,
+      maximumOverrunChainLength: 0,
+      constructibleInfectedDeaths: 0,
+      groundVisionPotentialHexes: 0,
+      groundVisionVisibleHexes: 0,
+      groundVisionBlockedHexes: 0,
+      maxGroundVisionBlockedHexes: 0,
+      cumulativeGroundVisionBlockedHexes: 0,
+      groundVisionSamples: 0,
+      civilianDroneBasesBuilt: 0,
+      maxCivilianDroneVisionRadius: 0,
+      aerialDiscoveriesInGroundBlockedArea: 0,
     },
     gameOver: false,
     result: null,
   };
   synchronizePopulation(state);
   state.population.initialPopulation = populationLedgerTotal(state);
+  const coverage = getPlayerVisionCoverage(state);
+  state.statistics.groundVisionPotentialHexes = coverage.groundPotential.size;
+  state.statistics.groundVisionVisibleHexes = coverage.groundVisible.size;
+  state.statistics.groundVisionBlockedHexes = coverage.groundBlocked.size;
+  state.statistics.maxGroundVisionBlockedHexes = coverage.groundBlocked.size;
+  state.statistics.cumulativeGroundVisionBlockedHexes = coverage.groundBlocked.size;
+  state.statistics.groundVisionSamples = 1;
+  state.statistics.aerialDiscoveriesInGroundBlockedArea = state.units.filter((unit) =>
+    !unit.isPlayerUnit && coverage.groundBlocked.has(hexKey(unit.position)) && coverage.aerialVisible.has(hexKey(unit.position)),
+  ).length;
   createCityPopulationSnapshot(state);
   return state;
 }

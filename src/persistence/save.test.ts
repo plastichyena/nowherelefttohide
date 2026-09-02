@@ -71,8 +71,8 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.4.2 Save Format 7', () => {
-  it('round-trips a detached complete Save Format 7 GameState through code and JSON', () => {
+describe('v1.4.3 Save Format 8', () => {
+  it('round-trips a detached complete Save Format 8 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -80,9 +80,9 @@ describe('v1.4.2 Save Format 7', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 7,
+      formatVersion: 8,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-31x31-v1',
+      mapId: 'fixed-31x31-v2',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -93,16 +93,16 @@ describe('v1.4.2 Save Format 7', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('writes the v1.4.2 version boundaries', () => {
+  it('writes the v1.4.3 version boundaries and complete v1.4.3 Config / Statistics / Event state', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(7);
-    expect(envelope.gameVersion).toBe('2.2.0');
-    expect(config.version).toBe('2.2.0');
-    expect(config.mapId).toBe('fixed-31x31-v1');
+    expect(envelope.formatVersion).toBe(8);
+    expect(envelope.gameVersion).toBe('2.3.0');
+    expect(config.version).toBe('2.3.0');
+    expect(config.mapId).toBe('fixed-31x31-v2');
     expect((state.map as Record<string, unknown>).width).toBe(31);
     expect((state.map as Record<string, unknown>).height).toBe(31);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
@@ -110,23 +110,43 @@ describe('v1.4.2 Save Format 7', () => {
     expect(state).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('finalHordeTurn');
+    expect(config).toMatchObject({
+      economy: { initialZombieCount: 12 },
+      infection: {
+        zombieSpawnPopulationPerUnit: 5,
+        maxZombieSpawnPerResolution: 6,
+        zombieSpawnRadius: 1,
+        noiseRespawnEnabled: true,
+      },
+      noise: { publicClass: { police: 'medium', nationalGuard: 'large' } },
+    });
+    expect((state.map as Record<string, unknown>).initialZombiePositions).toHaveLength(12);
+    expect(state.statistics).toMatchObject({
+      initialNormalZombies: 12,
+      noiseRespawnAttempts: 0,
+      infectedPopulationConvertedToZombies: 0,
+      groundVisionBlockedHexes: 0,
+      civilianDroneBasesBuilt: 0,
+    });
   });
 
-  it('requires the Wave Config, Horde State, and Horde Spawn Reserve shape introduced by Save Format 7', () => {
+  it('requires the Wave Config, Horde State, Horde Spawn Reserve, and v1.4.3 Statistics shape', () => {
     const envelope = exportedEnvelope(initialState(17));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
     const horde = state.horde as Record<string, unknown>;
     const map = state.map as Record<string, unknown>;
     delete (config.horde as Record<string, unknown>).warningLeadTurns;
+    (config.infection as Record<string, unknown>).fallBackCapacityRate = 0.5;
     delete horde.warningDirections;
     delete horde.spawnGroupIdsByWave;
     delete map.hordeSpawnReserve;
     delete ((map.tiles as Array<Record<string, unknown>>)[0]!).playerOccupancyAllowed;
+    delete (state.statistics as Record<string, unknown>).noiseRespawnAttempts;
 
     const result = importSaveJson(JSON.stringify(resign(envelope)));
     expect(result.valid).toBe(false);
-    expect(result.errors.join(' ')).toMatch(/warningLeadTurns|warningDirections|spawnGroupIdsByWave|hordeSpawnReserve|playerOccupancyAllowed/i);
+    expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|hordeSpawnReserve|playerOccupancyAllowed|noiseRespawnAttempts/i);
   });
 
   it('rejects a Player Unit on the static Horde Spawn Reserve without changing the live state', () => {
@@ -164,6 +184,41 @@ describe('v1.4.2 Save Format 7', () => {
     expect(state.statistics).toMatchObject({ finalHordeZombiesSpawned: 1, finalNormalZombiesSpawned: 1 });
     expect(state.statistics.terrainEntriesByType).toEqual({ plain: 0, forest: 0, mountain: 0, water: 0 });
     expect(decodeSaveCode(encodeSaveCode(state)).state).toEqual(state);
+  });
+
+  it('preserves v1.4.3 overrun Event payloads and derived Statistics without adding UI-only state', () => {
+    const state = initialState(51);
+    state.events.push({
+      id: 'event-999',
+      turn: state.turn,
+      phase: 'infection',
+      type: 'facility_overrun',
+      payload: {
+        siteKind: 'facility',
+        siteId: 'farm-1',
+        cause: 'infection_fall',
+        infectedAtFall: 15,
+        requestedSpawnCount: 3,
+        actualSpawnCount: 2,
+        remainingInfected: 5,
+        chainDepth: 1,
+      },
+    });
+    state.statistics.noiseRespawnAttempts = 2;
+    state.statistics.noiseRespawnZombiesSpawned = 3;
+    state.statistics.groundVisionBlockedHexes = 8;
+    state.statistics.civilianDroneBasesBuilt = 1;
+
+    const loaded = decodeSaveCode(encodeSaveCode(state));
+    expect(loaded.valid).toBe(true);
+    expect(loaded.state?.events).toEqual(state.events);
+    expect(loaded.state?.statistics).toMatchObject({
+      noiseRespawnAttempts: 2,
+      noiseRespawnZombiesSpawned: 3,
+      groundVisionBlockedHexes: 8,
+      civilianDroneBasesBuilt: 1,
+    });
+    expect(loaded.state).not.toHaveProperty('toastHistory');
   });
 
   it('persists Unit Fuel and Wind / Constructible Facility state without derived Forecast fields', () => {
@@ -216,33 +271,35 @@ describe('v1.4.2 Save Format 7', () => {
     const current = initialState(18);
     const before = clone(current);
     const legacy = exportedEnvelope(current);
-    legacy.formatVersion = 6;
-    legacy.gameVersion = '2.1.0';
+    legacy.formatVersion = 7;
+    legacy.gameVersion = '2.2.0';
     const legacyState = legacy.state as Record<string, unknown>;
-    legacyState.gameVersion = '2.1.0';
-    (legacyState.config as Record<string, unknown>).version = '2.1.0';
+    legacyState.gameVersion = '2.2.0';
+    legacyState.mapId = 'fixed-31x31-v1';
+    (legacyState.config as Record<string, unknown>).version = '2.2.0';
+    (legacyState.config as Record<string, unknown>).mapId = 'fixed-31x31-v1';
 
     const result = decodeSaveCode(codeForEnvelope(legacy));
     expect(result.valid).toBe(false);
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
-    expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.1\.0/i);
-    expect(result.errors.join(' ')).toContain('v1.4.1 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.2\.0/i);
+    expect(result.errors.join(' ')).toContain('v1.4.2 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Save Format 7', () => {
+  it('rejects a stale state/config version even when the envelope has Save Format 8', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
-    state.gameVersion = '1.4.0';
-    (state.config as Record<string, unknown>).version = '1.4.0';
+    state.gameVersion = '2.2.0';
+    (state.config as Record<string, unknown>).version = '2.2.0';
     const result = importSaveJson(JSON.stringify(resign(envelope)));
 
     expect(result).toMatchObject({ valid: false, state: null, envelope: null });
     expect(result.errors.join(' ')).toMatch(/incompatible/i);
   });
 
-  it('rejects a partial v1.4 schema rather than treating it as a migration candidate', () => {
+  it('rejects a partial v1.4.3 schema rather than treating it as a migration candidate', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     delete (state.horde as Record<string, unknown>).finalHordeStatus;
@@ -269,11 +326,11 @@ describe('v1.4.2 Save Format 7', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v7 autosave key and never rewrites or removes a v6 legacy key', () => {
+  it('uses the v8 autosave key and never rewrites or removes a v7 legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
-    legacy.formatVersion = 6;
-    legacy.gameVersion = '2.1.0';
+    legacy.formatVersion = 7;
+    legacy.gameVersion = '2.2.0';
     storage.setItem(LEGACY_AUTOSAVE_KEY, codeForEnvelope(legacy));
     const beforeLegacy = storage.getItem(LEGACY_AUTOSAVE_KEY);
     const store = new AutoSaveStore({ storage });

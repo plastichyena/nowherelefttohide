@@ -23,9 +23,9 @@ const key = ({ q, r }: { q: number; r: number }) => `${q},${r}`;
 const at = (q: number, r: number) => FIXED_MAP.tiles.find((tile) => tile.q === q && tile.r === r);
 const rotate = ({ q, r }: { q: number; r: number }) => ({ q: 30 - q, r: 30 - r });
 
-describe('v1.4.0 fixed map', () => {
+describe('v1.4.3 fixed map', () => {
   it('uses the 31x31 fixed map contract and covers every hex exactly once', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-31x31-v1');
+    expect(FIXED_MAP_ID).toBe('fixed-31x31-v2');
     expect(FIXED_MAP.width).toBe(FIXED_MAP_WIDTH);
     expect(FIXED_MAP.height).toBe(FIXED_MAP_HEIGHT);
     expect(FIXED_MAP.tiles).toHaveLength(31 * 31);
@@ -154,7 +154,7 @@ describe('v1.4.0 fixed map', () => {
     });
   });
 
-  it('publishes canonical initial Unit positions and six safe Normal Zombie positions', () => {
+  it('publishes canonical initial Unit positions and twelve safe Normal Zombie positions', () => {
     expect(FIXED_INITIAL_UNIT_POSITIONS).toEqual({
       police: { q: 14, r: 15 },
       nationalGuard: { q: 16, r: 15 },
@@ -166,10 +166,40 @@ describe('v1.4.0 fixed map', () => {
       { q: 9, r: 21 },
       { q: 15, r: 6 },
       { q: 15, r: 24 },
+      { q: 16, r: 2 },
+      { q: 28, r: 2 },
+      { q: 28, r: 14 },
+      { q: 14, r: 28 },
+      { q: 2, r: 28 },
+      { q: 2, r: 16 },
     ]);
+    expect(FIXED_INITIAL_ZOMBIE_POSITIONS).toHaveLength(12);
     expect(FIXED_MAP.initialZombiePositions).toEqual(FIXED_INITIAL_ZOMBIE_POSITIONS);
     const ownedFacilities = FIXED_MAP.facilities.filter((facility) => facility.startingOwned);
     const ownedKeys = new Set(ownedFacilities.map((facility) => hexKey(facility.position)));
+    const occupiedStaticKeys = new Set([
+      ...FIXED_MAP.facilities.map((facility) => hexKey(facility.position)),
+      ...FIXED_MAP.roadTiles.map(hexKey),
+      ...FIXED_MAP.hordeSpawnReserve.map(hexKey),
+      ...Object.values(FIXED_INITIAL_UNIT_POSITIONS).map(hexKey),
+    ]);
+    const capital = { q: 15, r: 15 };
+    const appended = FIXED_INITIAL_ZOMBIE_POSITIONS.slice(6);
+    expect(appended.every((position) => hexDistance(position, capital) === 13)).toBe(true);
+    expect(appended).toEqual([
+      { q: 16, r: 2 }, { q: 28, r: 2 }, { q: 28, r: 14 },
+      { q: 14, r: 28 }, { q: 2, r: 28 }, { q: 2, r: 16 },
+    ]);
+    for (const position of appended) {
+      expect(occupiedStaticKeys.has(hexKey(position))).toBe(false);
+      expect(at(position.q, position.r)).toMatchObject({ road: false, facilityId: null });
+    }
+    expect(appended.map((position) => hexKey(position))).toEqual([
+      '16,2', '28,2', '28,14', '14,28', '2,28', '2,16',
+    ]);
+    expect(appended[0]).toEqual(rotate(appended[3]!));
+    expect(appended[1]).toEqual(rotate(appended[4]!));
+    expect(appended[2]).toEqual(rotate(appended[5]!));
     for (const zombie of FIXED_MAP.initialZombiePositions) {
       expect(ownedKeys.has(hexKey(zombie))).toBe(false);
       expect(Math.min(...ownedFacilities.map((facility) => hexDistance(zombie, facility.position)))).toBeGreaterThanOrEqual(4);

@@ -116,6 +116,24 @@ const INTERNAL_EVENT_TYPES = new Set([
   'noise_targeted',
   'noise_target_reached',
   'noise_target_overridden',
+  'aerial_enemy_discovered',
+]);
+
+const SITE_PUBLIC_EVENT_TYPES = new Set([
+  'site_infection_started',
+  'site_fallen',
+  'site_chain_fallen',
+  'site_zombies_spawned',
+  'site_immediate_infection',
+  'site_noise_respawn',
+]);
+
+const SITE_PUBLIC_EVENT_FIELDS = new Set([
+  'siteKind', 'siteId', 'siteType', 'q', 'r', 'cause', 'amount',
+  'infectedAtFall', 'requestedSpawnCount', 'actualSpawnCount',
+  'remainingInfected', 'remainingHealthy', 'infected',
+  'constructibleInfectedDeaths', 'chainOriginEventId', 'chainDepth',
+  'sourceUnitType',
 ]);
 
 function publicEvents(
@@ -138,6 +156,11 @@ function publicEvents(
     .filter((event) => !INTERNAL_EVENT_TYPES.has(event.type))
     .map((event) => {
       let payload = cloneJson(event.payload) as JsonObject;
+      if (SITE_PUBLIC_EVENT_TYPES.has(event.type)) {
+        payload = Object.fromEntries(
+          Object.entries(payload).filter(([field]) => SITE_PUBLIC_EVENT_FIELDS.has(field)),
+        ) as JsonObject;
+      }
       if (event.type === 'noise_emitted') {
         payload = Object.fromEntries(
           ['sourceUnitId', 'sourceUnitType', 'q', 'r', 'noiseClass']
@@ -162,7 +185,11 @@ function publicEvents(
       if (typeof payload.source === 'string' && enemyById.has(payload.source) && !visibleEnemyIds.has(payload.source)) {
         delete payload.source;
       }
-      if (typeof payload.q === 'number' && typeof payload.r === 'number' && !visibleTiles.has(hexKey({ q: payload.q, r: payload.r }))) {
+      if (
+        !SITE_PUBLIC_EVENT_TYPES.has(event.type) &&
+        typeof payload.q === 'number' && typeof payload.r === 'number' &&
+        !visibleTiles.has(hexKey({ q: payload.q, r: payload.r }))
+      ) {
         delete payload.q;
         delete payload.r;
       }

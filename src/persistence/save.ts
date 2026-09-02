@@ -10,22 +10,23 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.4.2 saves. */
+/** The sole game-rules version accepted by v1.4.3 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 7;
-/** v1.4.2 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v7';
+export const SAVE_FORMAT_VERSION = 8;
+/** v1.4.3 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v8';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v6';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v7';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v6',
   'nowhere-left-to-hide:auto-save:v5',
   'nowhere-left-to-hide:auto-save:v4',
   'nowhere-left-to-hide:auto-save:v3',
   'nowhere-left-to-hide:auto-save:v2',
 ] as const;
-/** Deprecated metadata exports. They are never migration targets in v1.4. */
+/** Deprecated metadata exports. They are never migration targets in v1.4.3. */
 export const V125_GAME_VERSION = '1.2.0';
 export const V126_GAME_VERSION = '1.2.1';
 export const LEGACY_GAME_VERSION = V125_GAME_VERSION;
@@ -205,6 +206,25 @@ const STATISTIC_INTEGER_FIELDS = [
   'noiseTargetsReached',
   'noiseTargetsOverriddenByHorde',
   'noiseTargetsOverriddenByVisiblePopulation',
+  'initialNormalZombies',
+  'fallenSitesTriggeredByNoise',
+  'noiseRespawnAttempts',
+  'noiseRespawnZombiesSpawned',
+  'infectedPopulationConvertedToZombies',
+  'unspawnedInfectedPopulation',
+  'immediateInfectionsFromSpawn',
+  'chainOverruns',
+  'maximumOverrunChainLength',
+  'constructibleInfectedDeaths',
+  'groundVisionPotentialHexes',
+  'groundVisionVisibleHexes',
+  'groundVisionBlockedHexes',
+  'maxGroundVisionBlockedHexes',
+  'cumulativeGroundVisionBlockedHexes',
+  'groundVisionSamples',
+  'civilianDroneBasesBuilt',
+  'maxCivilianDroneVisionRadius',
+  'aerialDiscoveriesInGroundBlockedArea',
 ] as const;
 const STATISTIC_NULLABLE_FIELDS = [
   'suppliedAreaZombieClearTurn',
@@ -375,7 +395,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.4.1 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.4.2 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -467,12 +487,12 @@ function hasCanonicalDirectionOrder(directions: unknown[]): boolean {
 }
 
 /**
- * Reject obsolete or partial v1.4.2 container shapes before casting. The core
+ * Reject obsolete or partial v1.4.3 container shapes before casting. The core
  * invariant checker performs relational validation; this guard makes the Wave
  * schedule, reserved map perimeter, and warning state an explicit save
  * boundary instead of silently accepting a partial snapshot.
  */
-function validateV14Shape(state: Record<string, unknown>, errors: string[]): void {
+function validateV143Shape(state: Record<string, unknown>, errors: string[]): void {
   requireFields(errors, state, 'state', REQUIRED_STATE_FIELDS);
   if (hasOwn(state, 'maxTurns')) errors.push('state.maxTurns is obsolete; use state.finalHordeTurn');
   if (state.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(state.gameVersion, 'state.gameVersion'));
@@ -522,6 +542,19 @@ function validateV14Shape(state: Record<string, unknown>, errors: string[]): voi
     if (config.version !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(config.version, 'state.config.version'));
     if (config.mapId !== FIXED_MAP_ID) errors.push(`state.config.mapId must be ${FIXED_MAP_ID}`);
     validateHordeConfigShape(config.horde, state.finalHordeTurn, errors);
+    const infection = config.infection;
+    if (!isRecord(infection)) {
+      errors.push('state.config.infection must be an object');
+    } else {
+      // Save Format 8 deliberately has no conversion path for the old
+      // fallback-capacity tuning.  Reject a hand-edited v1.4.2-shaped
+      // container even when its outer version strings were forged as current.
+      for (const retiredField of ['fallBackCapacityRate', 'fallBackCapacityRounding']) {
+        if (hasOwn(infection, retiredField)) {
+          errors.push(`state.config.infection.${retiredField} is obsolete in Game Rules ${CURRENT_GAME_VERSION}`);
+        }
+      }
+    }
   }
 
   const map = state.map;
@@ -922,7 +955,7 @@ function validateStatisticsShape(value: unknown, errors: string[], path: string)
 function validateStateForSave(state: GameState): string[] {
   const errors: string[] = [];
   const raw = state as unknown as Record<string, unknown>;
-  validateV14Shape(raw, errors);
+  validateV143Shape(raw, errors);
   if (raw.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(raw.gameVersion, 'state.gameVersion'));
   const config = isRecord(raw.config) ? raw.config : null;
   const map = isRecord(raw.map) ? raw.map : null;
@@ -956,7 +989,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.1以前 / v1.4.1 and earlier saves cannot be loaded or converted; Save Format 6 or below is rejected without conversion, deletion, or overwrite`);
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.2以前 / v1.4.2 and earlier saves cannot be loaded or converted; Save Format 7 or below is rejected without conversion, deletion, or overwrite`);
   }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (value.mapId !== FIXED_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID}`);
@@ -995,14 +1028,14 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   return { valid: true, errors: [], state: clone(state), envelope };
 }
 
-/** Create a checksummed, URL-safe v1.4.2 Save Format 7 code. */
+/** Create a checksummed, URL-safe v1.4.3 Save Format 8 code. */
 export function encodeSaveCode(state: GameState): string {
   const errors = validateStateForSave(state);
   if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
   return toBase64Url(gzipSync(strToU8(canonicalJson(makeEnvelope(state))), { level: 9 }));
 }
 
-/** Decode and validate a v1.4.2 save code without changing caller-owned state. */
+/** Decode and validate a v1.4.3 save code without changing caller-owned state. */
 export function decodeSaveCode(code: string): SaveValidationResult {
   if (typeof code !== 'string' || code.trim().length === 0) return reject(['Save code is empty']);
   try {
@@ -1092,7 +1125,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the v1.4.2/v7 key; legacy data is deliberately preserved. */
+  /** Clears only the v1.4.3/v8 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

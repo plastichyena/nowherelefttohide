@@ -5,22 +5,23 @@ import {
   validateGameConfig,
 } from './config';
 
-describe('GameConfig', () => {
+describe('v1.4.3 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('2.2.0');
-    expect(DEFAULT_CONFIG.mapId).toBe('fixed-31x31-v1');
+    expect(DEFAULT_CONFIG.version).toBe('2.3.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('fixed-31x31-v2');
+    expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(12);
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(10);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, outputs: { food: 10 }, powerMode: 'required' });
     expect(DEFAULT_CONFIG.facilities.refinery.production).toMatchObject({ outputs: { fuel: 5 }, powerMode: 'required', powerCapacity: 5 });
     expect(DEFAULT_CONFIG.facilities.simpleFarm.production).toMatchObject({ outputs: { food: 5 }, powerMode: 'none', powerCapacity: 0 });
     expect(DEFAULT_CONFIG.horde.warningLeadTurns).toBe(2);
     expect(DEFAULT_CONFIG.horde.waves).toEqual([
-      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 1 }, final: false },
-      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 2 }, final: false },
-      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 4 }, final: false },
-      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 4 }, final: false },
-      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 5 }, final: true },
+      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 3 }, final: false },
+      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 4 }, final: false },
+      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 6 }, final: false },
+      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 6 }, final: false },
+      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, final: true },
     ]);
     expect(DEFAULT_CONFIG.terrain).toEqual({
       movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
@@ -41,9 +42,16 @@ describe('GameConfig', () => {
     });
     expect(DEFAULT_CONFIG.noise).toEqual({
       police: 4,
-      nationalGuard: 5,
-      publicClass: { police: 'medium', nationalGuard: 'medium' },
+      nationalGuard: 8,
+      publicClass: { police: 'medium', nationalGuard: 'large' },
     });
+    expect(DEFAULT_CONFIG.infection).toMatchObject({
+      zombieSpawnPopulationPerUnit: 5,
+      maxZombieSpawnPerResolution: 6,
+      zombieSpawnRadius: 1,
+      noiseRespawnEnabled: true,
+    });
+    expect(DEFAULT_CONFIG.vision).toEqual({ capital: 5, ownedFacility: 1, operationalCheckpoint: 1 });
     expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, attack: 5, movement: 10, range: 1, vision: 5, population: 5, maxFuel: 12 });
     expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, attack: 10, movement: 10, range: 2, population: 10, maxFuel: 22 });
     expect(DEFAULT_CONFIG.naturalRecovery).toEqual({ combatRate: 0.1, restRate: 0.2, rounding: 'ceil' });
@@ -92,7 +100,40 @@ describe('GameConfig', () => {
     expect(DEFAULT_CONFIG.economy.initialResources.food).toBe(230);
 
     config.horde.waves[4]!.compositionPerDirection.zombie = 99;
-    expect(DEFAULT_CONFIG.horde.waves[4]!.compositionPerDirection.zombie).toBe(5);
+    expect(DEFAULT_CONFIG.horde.waves[4]!.compositionPerDirection.zombie).toBe(7);
+  });
+
+  it('accepts zero initial Zombies but rejects more than the twelve fixed positions', () => {
+    expect(validateGameConfig(createDefaultConfig({ economy: { initialZombieCount: 0 } }))).toEqual({
+      valid: true,
+      errors: [],
+    });
+    const tooMany = createDefaultConfig({ economy: { initialZombieCount: 13 } });
+    expect(validateGameConfig(tooMany)).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining(['economy.initialZombieCount cannot exceed the twelve fixed-map positions']),
+    });
+  });
+
+  it('validates the v1.4.3 infection Spawn and Capital Vision fields', () => {
+    const invalid = createDefaultConfig({
+      infection: {
+        zombieSpawnPopulationPerUnit: 0,
+        maxZombieSpawnPerResolution: 0,
+        zombieSpawnRadius: 0,
+        noiseRespawnEnabled: 'yes' as unknown as boolean,
+      },
+      vision: { capital: -1 },
+    });
+    const result = validateGameConfig(invalid);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      'infection.zombieSpawnPopulationPerUnit must be an integer >= 1',
+      'infection.maxZombieSpawnPerResolution must be an integer >= 1',
+      'infection.zombieSpawnRadius must be an integer >= 1',
+      'infection.noiseRespawnEnabled must be boolean',
+      'vision.capital must be an integer >= 0',
+    ]));
   });
 
   it('validates every Horde composition component and rejects unusable groups', () => {

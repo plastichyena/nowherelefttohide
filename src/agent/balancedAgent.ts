@@ -317,9 +317,19 @@ function scoreAction(
       const visibleNormalNearAttacker = observation.zombies.filter((zombie) =>
         zombie.type === 'zombie' && hexDistance(attacker.position, zombie.position) <= attacker.vision,
       ).length;
+      const noiseClassMultiplier = attacker.type === 'nationalGuard' ? 2 : 1;
       if (visibleNormalNearAttacker > 0) {
-        score -= visibleNormalNearAttacker * weights.noiseRisk;
-        reasonCodes.push('PUBLIC_MEDIUM_NOISE_RISK');
+        score -= visibleNormalNearAttacker * weights.noiseRisk * noiseClassMultiplier;
+        reasonCodes.push(attacker.type === 'nationalGuard' ? 'PUBLIC_LARGE_NOISE_RISK' : 'PUBLIC_MEDIUM_NOISE_RISK');
+      }
+      const fallenInfectedSites = observation.facilities.filter((facility) =>
+        facility.status === 'ruined' && facility.infectedPopulation >= 5,
+      ).length + observation.checkpoints.filter((checkpoint) =>
+        (checkpoint.status === 'ruined' || checkpoint.status === 'remnant') && checkpoint.infected >= 5,
+      ).length;
+      if (fallenInfectedSites > 0 && !urgentCombat) {
+        score -= Math.min(4, fallenInfectedSites) * weights.noiseRisk * noiseClassMultiplier;
+        reasonCodes.push('FALLEN_SITE_NOISE_RESPAWN_RISK');
       }
       if (attacker.terrainDefenseSource === 'urban') {
         score += weights.urbanHold;

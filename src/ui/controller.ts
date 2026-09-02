@@ -17,7 +17,7 @@ import {
   getSuppliedTileKeys,
   isHexSupplied,
 } from '../core/supply';
-import { getPlayerVisibleTileKeys } from '../core/visibility';
+import { getAerialVisibleTileKeys, getGroundVisionCoverageFrom, getPlayerVisionCoverage, getPlayerVisibleTileKeys } from '../core/visibility';
 import Phaser from 'phaser';
 import type {
   CardinalDirection,
@@ -31,6 +31,7 @@ import type {
   FacilityState,
   GameAction,
   GameConfig,
+  GameEvent,
   GamePhase,
   GameResult,
   GameState,
@@ -60,7 +61,7 @@ import {
   projectCityTransfer,
   workerAssignmentBounds,
 } from './actions';
-import { createBoardGame, type BoardAssetWarning, type BoardRenderState, type HexBoardScene } from './board';
+import { createBoardGame, type BoardAssetWarning, type BoardRenderState, type BoardVisionSelection, type HexBoardScene } from './board';
 import {
   createTranslator,
   getInitialLocale,
@@ -306,7 +307,9 @@ export type NoiseClass = 'small' | 'medium' | 'large' | 'extraLarge';
 
 /** Production-safe class mapping. Exact Core radii never cross this helper. */
 export function noiseClassForUnit(unitType: string): NoiseClass | null {
-  return unitType === 'police' || unitType === 'nationalGuard' ? 'medium' : null;
+  if (unitType === 'police') return 'medium';
+  if (unitType === 'nationalGuard') return 'large';
+  return null;
 }
 
 /**
@@ -343,6 +346,231 @@ export function renderNoiseEventLog(
     return `<li><strong>${escapeHtml(t('noiseEmitted'))}</strong><span>${escapeHtml(source)} · ${escapeHtml(t('noiseClass'))}: ${escapeHtml(classLabel)} · ${escapeHtml(t('noiseCenter'))}: ${escapeHtml(center)}</span></li>`;
   }).join('');
   return `<section class="noise-log" data-noise-log="true"><h3>${escapeHtml(t('noiseLog'))}</h3><ul>${rows}</ul><p class="muted">${escapeHtml(t('noiseCombatHint'))}</p></section>`;
+}
+
+export type ImportantEventType = Extract<GameEvent['type'],
+  | 'site_infection_started'
+  | 'site_fallen'
+  | 'site_chain_fallen'
+  | 'site_zombies_spawned'
+  | 'site_immediate_infection'
+  | 'site_noise_respawn'>;
+
+/** Public, UI-safe projection for the six site lifecycle events. */
+export interface ImportantEventViewModel {
+  id: string;
+  turn: number;
+  phase: GamePhase;
+  type: ImportantEventType;
+  siteKind: 'facility' | 'checkpoint';
+  siteId: string;
+  siteType: string;
+  position: HexCoord;
+  cause: string | null;
+  amount: number | null;
+  infectedAtFall: number | null;
+  requestedSpawnCount: number | null;
+  actualSpawnCount: number | null;
+  remainingInfected: number | null;
+  remainingHealthy: number | null;
+  infected: number | null;
+  constructibleInfectedDeaths: number | null;
+  chainOriginEventId: string | null;
+  chainDepth: number | null;
+}
+
+const IMPORTANT_EVENT_TYPES = new Set<ImportantEventType>([
+  'site_infection_started',
+  'site_fallen',
+  'site_chain_fallen',
+  'site_zombies_spawned',
+  'site_immediate_infection',
+  'site_noise_respawn',
+]);
+
+/**
+ * Convert a Core event to the small public subset the Human UI needs.  In
+ * particular, this never forwards raw payloads, spawnedUnitIds,
+ * spawnedPositions, Noise radius, or affected Zombie IDs.
+ */
+export function projectImportantEvent(
+  event: Pick<GameEvent, 'id' | 'turn' | 'phase' | 'type' | 'payload'>,
+): ImportantEventViewModel | null {
+  if (!IMPORTANT_EVENT_TYPES.has(event.type as ImportantEventType)) return null;
+  const payload = unknownRecord(event.payload);
+  const siteKind = payload.siteKind === 'facility' || payload.siteKind === 'checkpoint'
+    ? payload.siteKind
+    : null;
+  const siteId = typeof payload.siteId === 'string' && payload.siteId.length > 0
+    ? payload.siteId.slice(0, 256)
+    : null;
+  const siteType = typeof payload.siteType === 'string' && payload.siteType.length > 0
+    ? payload.siteType.slice(0, 128)
+    : null;
+  const q = typeof payload.q === 'number' && Number.isSafeInteger(payload.q) ? payload.q : null;
+  const r = typeof payload.r === 'number' && Number.isSafeInteger(payload.r) ? payload.r : null;
+  if (!siteKind || !siteId || !siteType || q === null || r === null || typeof event.id !== 'string') return null;
+  const nonNegative = (value: unknown): number | null => (
+    typeof value === 'number' && Number.isFinite(value) && value >= 0
+      ? Math.trunc(value)
+      : null
+  );
+  const chainOriginEventId = payload.chainOriginEventId === null
+    ? null
+    : typeof payload.chainOriginEventId === 'string' && payload.chainOriginEventId.length > 0
+      ? payload.chainOriginEventId.slice(0, 256)
+      : null;
+  return {
+    id: event.id.slice(0, 256),
+    turn: Number.isSafeInteger(event.turn) ? event.turn : 0,
+    phase: event.phase,
+    type: event.type as ImportantEventType,
+    siteKind,
+    siteId,
+    siteType,
+    position: { q, r },
+    cause: typeof payload.cause === 'string' ? payload.cause.slice(0, 128) : null,
+    amount: nonNegative(payload.amount),
+    infectedAtFall: nonNegative(payload.infectedAtFall),
+    requestedSpawnCount: nonNegative(payload.requestedSpawnCount),
+    actualSpawnCount: nonNegative(payload.actualSpawnCount),
+    remainingInfected: nonNegative(payload.remainingInfected),
+    remainingHealthy: nonNegative(payload.remainingHealthy),
+    infected: nonNegative(payload.infected),
+    constructibleInfectedDeaths: nonNegative(payload.constructibleInfectedDeaths),
+    chainOriginEventId,
+    chainDepth: nonNegative(payload.chainDepth),
+  };
+}
+
+/** Return the newest bounded site-event history without exposing raw payloads. */
+export function importantEventViewModels(
+  events: readonly GameEvent[],
+  limit = 50,
+): ImportantEventViewModel[] {
+  const safeLimit = Number.isFinite(limit) ? Math.max(0, Math.trunc(limit)) : 0;
+  if (safeLimit === 0) return [];
+  return events
+    .map((event) => projectImportantEvent(event))
+    .filter((event): event is ImportantEventViewModel => event !== null)
+    .slice(-safeLimit);
+}
+
+function importantEventLabelKey(type: ImportantEventType): string {
+  return type === 'site_infection_started'
+    ? 'importantEventInfectionStarted'
+    : type === 'site_fallen'
+      ? 'importantEventSiteFallen'
+      : type === 'site_chain_fallen'
+        ? 'importantEventChainFallen'
+        : type === 'site_zombies_spawned'
+          ? 'importantEventZombiesSpawned'
+          : type === 'site_immediate_infection'
+            ? 'importantEventImmediateInfection'
+            : 'importantEventNoiseRespawn';
+}
+
+function importantEventTargetLabel(event: ImportantEventViewModel, locale: Locale): string {
+  const target = event.siteKind === 'checkpoint'
+    ? createTranslator(locale)('checkpoint')
+    : facilityLabel(event.siteType, locale);
+  return `${target} · ${event.siteId}`;
+}
+
+function importantEventSiteKey(event: ImportantEventViewModel): string {
+  return `${event.siteKind}:${event.siteId}`;
+}
+
+function siteInfectedBeforeEvent(state: Readonly<GameState>, event: ImportantEventViewModel): number {
+  if (event.siteKind === 'facility') {
+    return state.facilities.find((facility) => facility.id === event.siteId)?.infected ?? 0;
+  }
+  return state.checkpoints.find((checkpoint) => checkpoint.id === event.siteId)?.infected ?? 0;
+}
+
+function importantEventCauseLabel(cause: string, locale: Locale): string {
+  const t = createTranslator(locale);
+  const labels: Record<string, string> = {
+    latent_infection: t('eventCauseLatentInfection'),
+    infection_fall: t('eventCauseInfectionFall'),
+    zombie_occupation: t('eventCauseZombieOccupation'),
+    empty_zombie_occupation: t('eventCauseEmptyZombieOccupation'),
+    spawn_immediate_occupation: t('eventCauseSpawnOccupation'),
+    combat_noise: t('eventCauseCombatNoise'),
+  };
+  return labels[cause] ?? cause;
+}
+
+/** Format one public event for both the history and a single-site Toast. */
+export function formatImportantEvent(event: ImportantEventViewModel, locale: Locale): string {
+  const t = createTranslator(locale);
+  const details: string[] = [
+    `${t('turn')} ${event.turn}`,
+    importantEventTargetLabel(event, locale),
+    `${event.position.q},${event.position.r}`,
+  ];
+  if (event.amount !== null) details.push(`${t('infectedAmount')} ${event.amount}`);
+  if (event.infectedAtFall !== null) details.push(`${t('infectedAtFall')} ${event.infectedAtFall}`);
+  if (event.cause) details.push(`${t('eventCause')} ${importantEventCauseLabel(event.cause, locale)}`);
+  if (event.requestedSpawnCount !== null || event.actualSpawnCount !== null) {
+    details.push(`${t('spawnCount')} ${event.actualSpawnCount ?? 0}/${event.requestedSpawnCount ?? event.actualSpawnCount ?? 0}`);
+  }
+  if (event.remainingInfected !== null) details.push(`${t('remainingInfected')} ${event.remainingInfected}`);
+  if (event.remainingHealthy !== null) details.push(`${t('remainingHealthy')} ${event.remainingHealthy}`);
+  if (event.infected !== null) details.push(`${t('infected')} ${event.infected}`);
+  if (event.constructibleInfectedDeaths !== null && event.constructibleInfectedDeaths > 0) {
+    details.push(`${t('constructibleInfectedDeaths')} ${event.constructibleInfectedDeaths}`);
+  }
+  if (event.chainOriginEventId) details.push(`${t('chainRoot')} ${event.chainOriginEventId}`);
+  return `${t(importantEventLabelKey(event.type))} · ${details.join(' · ')}`;
+}
+
+/**
+ * Aggregate all new important events from one atomic resolution.  A chain is
+ * keyed by Core's chainOriginEventId; no UI timing or infection scan is used.
+ */
+export function importantEventToastText(
+  events: readonly ImportantEventViewModel[],
+  locale: Locale,
+): string | null {
+  if (events.length === 0) return null;
+  const sites = new Set(events.map((event) => `${event.siteKind}:${event.siteId}`));
+  const chainSites = new Map<string, Set<string>>();
+  for (const event of events) {
+    if (event.chainOriginEventId === null) continue;
+    const groupSites = chainSites.get(event.chainOriginEventId) ?? new Set<string>();
+    groupSites.add(importantEventSiteKey(event));
+    chainSites.set(event.chainOriginEventId, groupSites);
+  }
+  const t = createTranslator(locale);
+  // A normal fall commonly emits both a fall and a spawn event for one site;
+  // keep that single-site Toast detailed.  Aggregate only a chain that spans
+  // multiple sites, as required by the public rule.
+  if ([...chainSites.values()].some((groupSites) => groupSites.size > 1)) {
+    const chainCount = events.filter((event) => event.type === 'site_chain_fallen').length;
+    return `${t('importantEventToastPrefix')} · ${sites.size} ${t('importantEventSiteUnit')}${chainCount > 0 ? ` · ${t('importantEventChainToast')}` : ''}`;
+  }
+  return `${t('importantEventToastPrefix')} · ${formatImportantEvent(events[events.length - 1]!, locale)}`;
+}
+
+/** Render at most 50 public site events; each item can pan to its public site. */
+export function renderImportantEventHistory(
+  events: readonly GameEvent[],
+  locale: Locale,
+  limit = 50,
+): string {
+  const t = createTranslator(locale);
+  const history = importantEventViewModels(events, limit);
+  if (history.length === 0) {
+    return `<section class="important-event-history" data-important-event-history="true"><div class="section-heading"><h3>${escapeHtml(t('importantEventHistory'))}</h3></div><p class="muted">${escapeHtml(t('importantEventHistoryEmpty'))}</p></section>`;
+  }
+  const rows = history.map((event) => {
+    const chain = event.chainOriginEventId
+      ? ` data-chain-origin-event-id="${escapeHtml(event.chainOriginEventId)}"`
+      : '';
+    return `<li data-important-event-type="${escapeHtml(event.type)}"><button class="important-event-item" data-action="focus-important-event" data-important-event-id="${escapeHtml(event.id)}" data-site-kind="${escapeHtml(event.siteKind)}" data-site-id="${escapeHtml(event.siteId)}" data-q="${event.position.q}" data-r="${event.position.r}"${chain} aria-label="${escapeHtml(formatImportantEvent(event, locale))}"><span class="important-event-marker" aria-hidden="true">${event.type === 'site_noise_respawn' ? '◌' : event.type === 'site_chain_fallen' ? '↝' : '!'}</span><span>${escapeHtml(formatImportantEvent(event, locale))}</span></button></li>`;
+  }).join('');
+  return `<section class="important-event-history" data-important-event-history="true" aria-labelledby="important-event-history-heading"><div class="section-heading"><h3 id="important-event-history-heading">${escapeHtml(t('importantEventHistory'))}</h3><span class="status-chip">${history.length}/50</span></div><ol>${rows}</ol><p class="muted">${escapeHtml(t('importantEventHistoryHint'))}</p></section>`;
 }
 
 /** Localize Core-owned candidate results without duplicating checkpoint rules in the UI. */
@@ -823,6 +1051,9 @@ function configLegendEntries(
   add('forestDefenseMultiplier', t('legendForestDefenseMultiplier'), `×${config.terrain.damageMultiplier.forestZombie}`);
   add('ownedFacilityVision', t('legendOwnedFacilityVision'), String(config.vision.ownedFacility));
   add('operationalCheckpointVision', t('legendOperationalCheckpointVision'), String(config.vision.operationalCheckpoint));
+  add('capitalVision', t('legendCapitalVision'), String(config.vision.capital));
+  add('groundVisionBlocking', t('legendGroundVisionBlocking'), `${t('forest')} / ${t('mountain')}`);
+  add('aerialVision', t('legendAerialVision'), t('visionAerialLegend'));
 
   for (const key of LEGEND_UNITS) {
     const unit = config.units[key];
@@ -883,7 +1114,7 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
   const fallback: Record<string, [string, string]> = {
     plain: ['Movement Costは下のConfig数値。特別な防御補正なし。', 'Movement Cost comes from the Config values below. No special defense modifier.'],
     forest: ['Movement Costは下のConfig数値。Forest上のZombieにはForest防御が適用されます。', 'Movement Cost comes from the Config values below. Zombies receive Forest defense on Forest tiles.'],
-    mountain: ['Movement Costは下のConfig数値。', 'Movement Cost comes from the Config values below.'],
+    mountain: ['Movement Costは下のConfig数値。Ground VisionではForestと同じく遮蔽Terrainです。', 'Movement Cost comes from the Config values below. It blocks Ground Vision like Forest.'],
     road: ['基礎TerrainではないOverlay。実効移動Costは1です。', 'An overlay, not base Terrain. Effective movement Cost is 1.'],
     urban: ['基礎TerrainではないOverlay。実効移動Costは1で、Urban防御が適用されます。', 'An overlay, not base Terrain. Effective movement Cost is 1 and Urban defense applies.'],
     police: ['感染鎮圧と治安活動を担います。自動鎮圧時の民間被害はありません。', 'Handles infection suppression and security. Automatic suppression causes no civilian damage.'],
@@ -892,7 +1123,7 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
     hordeZombie: ['高HPでCapitalをStrategic TargetにするHorde中核。所属に応じたHorde Markerと併記します。', 'A high-HP Horde core that uses the Capital as a strategic target, shown with its Horde marker.'],
     periodic: ['Horde ZombieとNormal Zombieが混在できる周期集団。MarkerはUnit Typeではなく所属を示します。', 'A periodic group that may mix Horde and Normal Zombies. Its marker shows membership, not Unit Type.'],
     final: ['Final Spawn Group所属を示すMarker。Normal Zombieも含め、Group全滅がVictory条件の一つです。', 'Marks Final Spawn Group membership. Every member, including Normal Zombies, must be defeated for Victory.'],
-    capital: ['州都。人口の基点、編成、初期Supplyを担います。', 'The capital anchors population, recruitment, and initial Supply.'],
+    capital: ['州都。人口の基点、編成、初期Supply、Capital Ground Visionを担います。', 'The capital anchors population, recruitment, initial Supply, and Capital Ground Vision.'],
     city: ['地方都市。人口を受け入れ、警察編成と民需品生産を担います。', 'A regional city that receives population, produces Police, and supports civilian goods.'],
     farm: ['食料を生産する施設。Required電力が不足すると生産が停止します。', 'Produces Food. Production stops when Required power is unavailable.'],
     civilianFactory: ['民需品を生産する施設。Required電力が不足すると生産が停止します。', 'Produces Civilian Goods. Production stops when Required power is unavailable.'],
@@ -931,7 +1162,7 @@ function legendSections(
     legendCompositeEntry(registry, 'ruinedInfected', locale === 'ja' ? '荒廃 + 感染' : 'Ruined + infected', locale === 'ja' ? '荒廃Overlayと感染Overlayを併記します。' : 'Shows ruined and infected overlays together.', [['facilityState', 'ruined'], ['facilityState', 'infected']], '×☣'),
   );
   const checkpointStates = ['operational', 'abandoned', 'remnant', 'ruined', 'infected'].map((key) => legendAssetEntry(registry, 'checkpointState', key, t(key), legendDescription(key, locale, t), key === 'operational' ? '●' : key === 'abandoned' ? '◌' : key === 'remnant' ? '◍' : key === 'infected' ? '☣' : '×'));
-  const dynamic = ['selected', 'legalDestination', 'path', 'attackTarget', 'hp', 'infected', 'stopped', 'projected', 'vision', 'fogOfWar', 'supply', 'hordeDirections', 'spawnReserve'].map((key) => legendAssetEntry(registry, 'dynamicOverlay', key, t(`legendOverlay.${key}`), t(`legendOverlayDescription.${key}`), key === 'selected' ? '◎' : key === 'path' ? '→' : key === 'attackTarget' ? '✦' : key === 'hp' ? '▰' : key === 'infected' ? '☣' : key === 'vision' ? '◌' : key === 'fogOfWar' ? '░' : key === 'supply' ? '▧' : key === 'hordeDirections' ? '↝' : key === 'spawnReserve' ? 'R' : '·'));
+  const dynamic = ['selected', 'legalDestination', 'path', 'attackTarget', 'hp', 'infected', 'stopped', 'projected', 'vision', 'visionGround', 'visionBlocked', 'visionAerial', 'fogOfWar', 'supply', 'hordeDirections', 'spawnReserve'].map((key) => legendAssetEntry(registry, 'dynamicOverlay', key, t(`legendOverlay.${key}`), t(`legendOverlayDescription.${key}`), key === 'selected' ? '◎' : key === 'path' ? '→' : key === 'attackTarget' ? '✦' : key === 'hp' ? '▰' : key === 'infected' ? '☣' : key === 'vision' || key === 'visionGround' ? '◌' : key === 'visionBlocked' ? '▒' : key === 'visionAerial' ? '◇' : key === 'fogOfWar' ? '░' : key === 'supply' ? '▧' : key === 'hordeDirections' ? '↝' : key === 'spawnReserve' ? 'R' : '·'));
   const configRows = configLegendEntries(config, locale);
   return [
     { key: 'terrain', title: t('legendTerrain'), entries: terrain },
@@ -978,7 +1209,7 @@ export function renderBoardLegend(
   const view = boardLegendViewModel(config, locale, registry);
   const source = view.configSource === 'current' ? t('legendConfigCurrent') : t('legendConfigStandard');
   const sections = view.sections.map((section) => `<section class="board-legend-section" data-legend-section="${escapeHtml(section.key)}"><h4>${escapeHtml(section.title)}</h4><ul class="board-legend-list">${section.entries.map((entry) => `<li class="board-legend-entry" data-legend-key="${escapeHtml(entry.key)}">${legendImage(entry)}<span class="board-legend-copy"><strong>${escapeHtml(entry.label)}</strong><span>${escapeHtml(entry.description)}</span></span>${entry.key === 'config' ? `<b class="board-legend-value">${escapeHtml(entry.description)}</b>` : ''}</li>`).join('')}</ul></section>`).join('');
-  return `<div class="board-legend" data-board-legend="true"><h3 class="board-legend-heading">${escapeHtml(t('legendTitle'))}</h3><p class="board-legend-source"><strong>${escapeHtml(t('legendConfigSource'))}</strong>: ${escapeHtml(source)}</p><p class="muted">${escapeHtml(t('legendIntro'))}</p>${sections}<section class="board-legend-rules"><h4>${escapeHtml(t('legendRules'))}</h4><p>${escapeHtml(t('legendTerrainRule'))}</p><p>${escapeHtml(t('legendOverlayRule'))}</p><p>${escapeHtml(t('legendUnitRule'))}</p><p>${escapeHtml(t('legendHordeRule'))}</p><p>${escapeHtml(t('legendStateRule'))}</p><p>${escapeHtml(t('legendPowerRule'))}</p><p>${escapeHtml(t('legendFogRule'))}</p><p>${escapeHtml(t('legendDynamicRule'))}</p><p>${escapeHtml(t('spawnReserveRule'))}</p><p>${escapeHtml(t('checkpointCapacityRule'))}</p></section></div>`;
+  return `<div class="board-legend" data-board-legend="true"><h3 class="board-legend-heading">${escapeHtml(t('legendTitle'))}</h3><p class="board-legend-source"><strong>${escapeHtml(t('legendConfigSource'))}</strong>: ${escapeHtml(source)}</p><p class="muted">${escapeHtml(t('legendIntro'))}</p>${sections}<section class="board-legend-rules"><h4>${escapeHtml(t('legendRules'))}</h4><p>${escapeHtml(t('legendTerrainRule'))}</p><p>${escapeHtml(t('legendOverlayRule'))}</p><p>${escapeHtml(t('legendUnitRule'))}</p><p>${escapeHtml(t('legendHordeRule'))}</p><p>${escapeHtml(t('legendStateRule'))}</p><p>${escapeHtml(t('legendPowerRule'))}</p><p>${escapeHtml(t('legendFogRule'))}</p><p>${escapeHtml(t('legendDynamicRule'))}</p><p>${escapeHtml(t('legendInfectionRule'))}</p><p>${escapeHtml(t('spawnReserveRule'))}</p><p>${escapeHtml(t('checkpointCapacityRule'))}</p></section></div>`;
 }
 
 export function loadValidationError(
@@ -1500,6 +1731,8 @@ export class GameUiController {
   private supplyOverlay = false;
   private lastSaveCode: string | null = null;
   private toastMessage: string | null = null;
+  /** Event IDs already surfaced as a Toast in this UI session. */
+  private readonly notifiedEventIds = new Set<string>();
   private guideShown = false;
   private sheetPointerY: number | null = null;
   private sheetDragged = false;
@@ -1540,6 +1773,7 @@ export class GameUiController {
     this.constructiblePreviewTarget = null;
     this.constructiblePlacementMessage = null;
     this.supplyOverlay = false;
+    this.notifiedEventIds.clear();
     this.destroyBoard();
     const t = this.translator();
     const canContinue = this.store.hasSave();
@@ -1648,6 +1882,8 @@ export class GameUiController {
       this.constructiblePreviewTarget = null;
       this.constructiblePlacementMessage = null;
       this.supplyOverlay = false;
+      this.notifiedEventIds.clear();
+      for (const event of this.state.events ?? []) this.notifiedEventIds.add(event.id);
       this.guideShown = !this.hasSeenGuide();
       this.renderGame();
       this.autosave();
@@ -1828,6 +2064,7 @@ export class GameUiController {
       case 'toggle-language': this.locale = toggleLocale(this.locale); persistLocale(this.locale); this.checkpointPlacementMessage = null; this.constructiblePlacementMessage = null; this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
       case 'title': this.showTitle(); break;
       case 'help': this.showHelp(); break;
+      case 'focus-important-event': this.focusImportantEvent(element); break;
       case 'toggle-supply': this.supplyOverlay = !this.supplyOverlay; this.updateView(); break;
       case 'sheet-toggle': this.toggleSheet(); break;
       case 'unit-mode-move': this.enterUnitActionMode('move'); break;
@@ -2057,6 +2294,7 @@ export class GameUiController {
       hordeDirections: this.state.horde.warningType === 'none' ? [] : this.state.horde.warningDirections,
       hordeWarningType: this.state.horde.warningType,
       visibilityOverlay: true,
+      visionCoverage: getPlayerVisionCoverage(this.state),
       selectedVision: this.selectedVision(),
       supplyOverlay: supplyContext,
       suppliedTileKeys,
@@ -2125,26 +2363,58 @@ export class GameUiController {
     };
   }
 
-  private selectedVision(): { origin: HexCoord; radius: number } | null {
+  private selectedVision(): BoardVisionSelection | null {
     if (!this.state || !this.selection) return null;
+    const coverage = getPlayerVisionCoverage(this.state);
+    const selection = (
+      origin: HexCoord,
+      radius: number,
+      visionMode: BoardVisionSelection['visionMode'],
+      terrainLosBlocking: boolean,
+    ): BoardVisionSelection | null => {
+      if (!Number.isFinite(radius) || radius <= 0) return null;
+      // These sets are produced by Core.  In particular, the UI does not
+      // recreate a radius ring or trace hexLine for Ground LOS.
+      const ground = visionMode === 'ground'
+        ? getGroundVisionCoverageFrom(this.state!, origin, radius)
+        : null;
+      const aerial = ground ? null : getAerialVisibleTileKeys(this.state!, origin, radius);
+      const visibleTileKeys = ground?.visible ?? aerial!;
+      const potentialTileKeys = ground?.potential ?? aerial!;
+      const blockedTileKeys = ground?.blocked ?? new Set<string>();
+      return {
+        origin: { ...origin },
+        radius: Math.max(0, Math.trunc(radius)),
+        visionMode,
+        terrainLosBlocking,
+        visibleTileKeys,
+        potentialTileKeys,
+        blockedTileKeys,
+      };
+    };
     if (this.selection.kind === 'unit') {
       const unit = findUnit(this.state, this.selection.id);
-      return unit && unit.isPlayerUnit ? { origin: { ...unit.position }, radius: unit.vision } : null;
+      return unit && unit.isPlayerUnit
+        ? selection(unit.position, unit.vision, 'ground', true)
+        : null;
     }
     if (this.selection.kind === 'facility') {
       const facility = this.state.facilities.find((candidate) => candidate.id === this.selection?.id);
       if (!facility || facility.owner !== 'player' || facility.status === 'ruined') return null;
       const publicFacility = createAgentObservation(this.state).facilities.find((candidate) => candidate.id === facility.id);
-      return {
-        origin: { ...facility.position },
-        radius: publicFacility?.vision ?? (facility.type === 'capital'
-          ? this.state.config.checkpoint.initialSupplyRadius
-          : this.state.config.vision.ownedFacility),
-      };
+      const visionMode = publicFacility?.visionMode ?? (facility.type === 'civilianDroneBase' ? 'aerial' : 'ground');
+      const terrainLosBlocking = publicFacility?.terrainLosBlocking ?? visionMode === 'ground';
+      const radius = publicFacility?.vision ?? (facility.type === 'capital'
+        ? this.state.config.vision.capital
+        : facility.type === 'civilianDroneBase'
+          ? facility.workers * 2
+          : this.state.config.vision.ownedFacility);
+      return selection(facility.position, radius, visionMode, terrainLosBlocking);
     }
     const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === this.selection?.id);
+    const publicCheckpoint = createAgentObservation(this.state).checkpoints.find((candidate) => candidate.id === checkpoint?.id);
     return checkpoint?.status === 'operational'
-      ? { origin: { ...checkpoint.position }, radius: this.state.config.vision.operationalCheckpoint }
+      ? selection(checkpoint.position, publicCheckpoint?.vision ?? 0, 'ground', true)
       : null;
   }
 
@@ -2980,17 +3250,62 @@ export class GameUiController {
       this.showToast(reason ?? this.translator()('invalidAction'));
       return false;
     }
+    const previousState = this.state;
     const result = this.engine.step(action);
     if (result.error) {
       this.showToast(localizeActionError(result.error.code, this.locale));
       return false;
     }
     this.state = result.state;
+    this.notifyImportantEvents(result.events ?? [], previousState);
     this.checkpointPlacementMessage = null;
     this.autosave();
     this.updateView();
     if (result.gameOver && result.result) this.showStatistics(result.result);
     return true;
+  }
+
+  private notifyImportantEvents(events: readonly GameEvent[], previousState: Readonly<GameState>): void {
+    const fresh = events
+      .map((event) => projectImportantEvent(event))
+      .filter((event): event is ImportantEventViewModel => event !== null)
+      .filter((event) => !this.notifiedEventIds.has(event.id));
+    for (const event of fresh) this.notifiedEventIds.add(event.id);
+    const startedSites = new Set(
+      fresh
+        .filter((event) => event.type === 'site_infection_started')
+        .map((event) => importantEventSiteKey(event)),
+    );
+    const toastEvents = fresh.filter((event) => (
+      event.type !== 'site_immediate_infection' ||
+      (!startedSites.has(importantEventSiteKey(event)) && siteInfectedBeforeEvent(previousState, event) <= 0)
+    ));
+    const message = importantEventToastText(toastEvents, this.locale);
+    if (message) this.showToast(message);
+  }
+
+  private focusImportantEvent(element: HTMLElement): void {
+    if (!this.state) return;
+    const q = Number(element.dataset.q);
+    const r = Number(element.dataset.r);
+    if (!Number.isSafeInteger(q) || !Number.isSafeInteger(r)) return;
+    const position = { q, r };
+    this.boardScene?.focusHex(position);
+    const siteKind = element.dataset.siteKind;
+    const siteId = element.dataset.siteId;
+    if (siteKind === 'facility' && siteId && this.state.facilities.some((facility) => facility.id === siteId)) {
+      this.selection = { kind: 'facility', id: siteId };
+    } else if (siteKind === 'checkpoint' && siteId && this.state.checkpoints.some((checkpoint) => checkpoint.id === siteId)) {
+      this.selection = { kind: 'checkpoint', id: siteId };
+    } else {
+      this.selection = null;
+    }
+    this.navMode = 'map';
+    this.unitActionMode = null;
+    this.pendingMove = null;
+    this.pendingAttackTargetId = null;
+    this.sheetState = 'standard';
+    this.updateView();
   }
 
   private autosave(): void {
@@ -3029,6 +3344,9 @@ export class GameUiController {
       this.constructiblePreviewTarget = null;
       this.constructiblePlacementMessage = null;
       this.lastSaveCode = null;
+      // Loading restores the history but must not replay old event Toasts.
+      this.notifiedEventIds.clear();
+      for (const event of this.state.events ?? []) this.notifiedEventIds.add(event.id);
       this.renderGame();
       if (shouldAutosaveAfterLoad(migrated)) this.autosave();
       else this.showToast(this.translator()('migratedSaveNotice'));
@@ -3118,7 +3436,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
@@ -3339,7 +3657,7 @@ export class GameUiController {
       const forecast = forecastEndTurn(this.state);
       title.textContent = prompt;
       summary.textContent = stateSummary(this.state, this.locale);
-      body.innerHTML = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl>${renderStrategicWarnings(observation, this.locale)}${renderEndTurnForecast(forecast, this.locale)}<p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>`;
+      body.innerHTML = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl>${renderStrategicWarnings(observation, this.locale)}${renderEndTurnForecast(forecast, this.locale)}<p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>${renderImportantEventHistory(this.state.events ?? [], this.locale, 50)}`;
       return;
     }
     if (this.selection.kind === 'unit') {
@@ -3434,7 +3752,7 @@ export class GameUiController {
       : '';
     const recruitment = `<section class="recruitment-editor"><h3>${escapeHtml(t('population'))}</h3><p class="muted">${escapeHtml(city ? t('tipRecruitment') : t('recruitmentDisabled'))}</p><div class="action-row"><button class="secondary-button" data-action="produce-police">${escapeHtml(t('producePolice'))}</button><button class="secondary-button" data-action="produce-guard">${escapeHtml(t('produceGuard'))}</button></div><p class="warning-text" data-recruitment-reason="police" hidden></p><p class="warning-text" data-recruitment-reason="nationalGuard" hidden></p></section>`;
     const checkpoint = this.state.checkpoints.find((candidate) => candidate.position.q === facility.position.q && candidate.position.r === facility.position.r);
-    body.innerHTML = `${this.renderTerrainDetails(publicTile, publicFacility?.vision ?? 0)}${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text">${escapeHtml(t('powerNotSupplied'))}: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${workerEditor}${cityTransfer}${recruitment}${checkpoint ? `<section class="checkpoint-editor"><h3>${escapeHtml(t('checkpoint'))}</h3><p class="muted">${escapeHtml(t('waiting'))}: ${checkpoint.waiting} · ${escapeHtml(t('screening'))}: ${checkpoint.screening} · ${escapeHtml(t('approved'))}: ${checkpoint.approved} · ${escapeHtml(t('infected'))}: ${checkpoint.infected}</p></section>` : ''}<div class="action-row"><button class="secondary-button" data-action="build-checkpoint">${escapeHtml(t('buildCheckpoint'))}</button></div>`;
+    body.innerHTML = `${this.renderTerrainDetails(publicTile, publicFacility?.vision ?? 0, publicFacility)}${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text">${escapeHtml(t('powerNotSupplied'))}: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${workerEditor}${cityTransfer}${recruitment}${checkpoint ? `<section class="checkpoint-editor"><h3>${escapeHtml(t('checkpoint'))}</h3><p class="muted">${escapeHtml(t('waiting'))}: ${checkpoint.waiting} · ${escapeHtml(t('screening'))}: ${checkpoint.screening} · ${escapeHtml(t('approved'))}: ${checkpoint.approved} · ${escapeHtml(t('infected'))}: ${checkpoint.infected}</p></section>` : ''}<div class="action-row"><button class="secondary-button" data-action="build-checkpoint">${escapeHtml(t('buildCheckpoint'))}</button></div>`;
     body.insertAdjacentHTML('beforeend', this.renderFacilityForecast(publicFacility));
     this.updateTransferPreview();
     this.updateRecruitmentReasons();
@@ -3531,7 +3849,7 @@ export class GameUiController {
   private renderTerrainDetails(
     tile: AgentMapTileObservation | undefined,
     vision: number,
-    unit?: Pick<AgentUnitObservation, 'terrainDefenseSource' | 'terrainDamageMultiplier'>,
+    source?: Partial<Pick<AgentUnitObservation, 'terrainDefenseSource' | 'terrainDamageMultiplier' | 'visionMode' | 'terrainLosBlocking'>>,
   ): string {
     if (!tile) return '';
     const t = this.translator();
@@ -3539,12 +3857,21 @@ export class GameUiController {
       tile.road ? t('roadOverlay') : null,
       tile.urban ? t('urbanOverlay') : null,
     ].filter((value): value is string => Boolean(value));
-    const defenseSource = unit?.terrainDefenseSource ?? tile.terrainDefenseSource;
-    const damageMultiplier = unit?.terrainDamageMultiplier ?? tile.terrainDamageMultiplier;
+    const defenseSource = source?.terrainDefenseSource ?? tile.terrainDefenseSource;
+    const damageMultiplier = source?.terrainDamageMultiplier ?? tile.terrainDamageMultiplier;
     const movementCost = tile.effectiveMovementCost === null ? t('blocked') : String(tile.effectiveMovementCost);
     const visibility = tile.visibleToPlayer ? t('visible') : t('hidden');
     const occupancy = tile.playerOccupancyAllowed ? t('playerOccupancyAllowed') : t('playerOccupancyForbidden');
-    return `<section class="terrain-detail terrain-forecast${tile.playerOccupancyAllowed ? '' : ' spawn-reserve-detail'}" data-terrain="${escapeHtml(tile.terrain)}"><div class="section-heading"><h3>${escapeHtml(t('terrain'))}</h3><span class="status-chip">${escapeHtml(visibility)}</span></div><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('baseTerrain'))}</dt><dd>${escapeHtml(terrainLabel(tile.terrain, this.locale))}</dd></div><div><dt>${escapeHtml(t('roadOverlay'))} / ${escapeHtml(t('urbanOverlay'))}</dt><dd>${escapeHtml(overlays.join(' · ') || t('none'))}</dd></div><div><dt>${escapeHtml(t('effectiveMovementCost'))}</dt><dd>${escapeHtml(movementCost)}</dd></div><div><dt>${escapeHtml(t('defenseSource'))}</dt><dd>${escapeHtml(terrainDefenseLabel(defenseSource, this.locale))}</dd></div><div><dt>${escapeHtml(t('damageMultiplier'))}</dt><dd>×${escapeHtml(String(damageMultiplier))}</dd></div><div><dt>${escapeHtml(t('vision'))}</dt><dd>${escapeHtml(String(Math.max(0, vision)))}</dd></div><div><dt>${escapeHtml(t('playerOccupancyAllowed'))}</dt><dd>${escapeHtml(occupancy)}</dd></div></dl>${tile.playerOccupancyAllowed ? '' : `<p class="warning-text">${escapeHtml(t('spawnReserveReason'))}</p>`}</section>`;
+    const visionMode = source?.visionMode;
+    const visionRule = visionMode === 'aerial'
+      ? t('visionAerialRule')
+      : visionMode === 'ground'
+        ? t('visionGroundRule')
+        : '';
+    const visionDetails = visionMode
+      ? `<div><dt>${escapeHtml(t('visionMode'))}</dt><dd>${escapeHtml(visionMode === 'aerial' ? t('visionAerial') : t('visionGround'))}</dd></div><div><dt>${escapeHtml(t('terrainLosBlocking'))}</dt><dd>${escapeHtml(source?.terrainLosBlocking ? t('yes') : t('no'))}</dd></div>`
+      : '';
+    return `<section class="terrain-detail terrain-forecast${tile.playerOccupancyAllowed ? '' : ' spawn-reserve-detail'}" data-terrain="${escapeHtml(tile.terrain)}"><div class="section-heading"><h3>${escapeHtml(t('terrain'))}</h3><span class="status-chip">${escapeHtml(visibility)}</span></div><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('baseTerrain'))}</dt><dd>${escapeHtml(terrainLabel(tile.terrain, this.locale))}</dd></div><div><dt>${escapeHtml(t('roadOverlay'))} / ${escapeHtml(t('urbanOverlay'))}</dt><dd>${escapeHtml(overlays.join(' · ') || t('none'))}</dd></div><div><dt>${escapeHtml(t('effectiveMovementCost'))}</dt><dd>${escapeHtml(movementCost)}</dd></div><div><dt>${escapeHtml(t('defenseSource'))}</dt><dd>${escapeHtml(terrainDefenseLabel(defenseSource, this.locale))}</dd></div><div><dt>${escapeHtml(t('damageMultiplier'))}</dt><dd>×${escapeHtml(String(damageMultiplier))}</dd></div><div><dt>${escapeHtml(t('vision'))}</dt><dd>${escapeHtml(String(Math.max(0, vision)))}</dd></div>${visionDetails}<div><dt>${escapeHtml(t('playerOccupancyAllowed'))}</dt><dd>${escapeHtml(occupancy)}</dd></div></dl>${visionRule ? `<p class="muted">${escapeHtml(visionRule)}</p>` : ''}${tile.playerOccupancyAllowed ? '' : `<p class="warning-text">${escapeHtml(t('spawnReserveReason'))}</p>`}</section>`;
   }
 
   private renderFacilityForecast(publicFacility: AgentFacilityObservation | undefined): string {
@@ -3669,7 +3996,7 @@ export class GameUiController {
     const infectionSection = checkpoint.infected > 0
       ? '<section class="infection-forecast"><h3>' + escapeHtml(t('infectionForecast')) + '</h3><p class="' + (publicCheckpoint?.infectionContained ? 'is-contained' : 'warning-text') + '">' + escapeHtml(publicCheckpoint?.infectionContained ? t('infectionContained') : t('infectionNotContained')) + '</p><p class="muted">' + escapeHtml(t('automaticSuppression')) + ': ' + String(publicCheckpoint?.projectedSuppression ?? 0) + '</p>' + ((publicCheckpoint?.projectedCivilianDamage ?? 0) > 0 ? '<p class="warning-text">' + escapeHtml(t('projectedCivilianDamage')) + ': ' + String(publicCheckpoint?.projectedCivilianDamage) + '</p>' : '<p class="muted">' + escapeHtml(t('noCivilianDamage')) + '</p>') + '</section>'
       : '';
-    body.innerHTML = this.renderTerrainDetails(publicTile, publicCheckpoint?.vision ?? 0) + '<section class="checkpoint-card checkpoint-status-' + escapeHtml(checkpoint.status) + '" data-checkpoint-id="' + escapeHtml(checkpoint.id) + '" data-checkpoint-role="' + escapeHtml(role) + '" data-checkpoint-status="' + escapeHtml(checkpoint.status) + '"><div class="checkpoint-heading"><strong>' +
+    body.innerHTML = this.renderTerrainDetails(publicTile, publicCheckpoint?.vision ?? 0, publicCheckpoint) + '<section class="checkpoint-card checkpoint-status-' + escapeHtml(checkpoint.status) + '" data-checkpoint-id="' + escapeHtml(checkpoint.id) + '" data-checkpoint-role="' + escapeHtml(role) + '" data-checkpoint-status="' + escapeHtml(checkpoint.status) + '"><div class="checkpoint-heading"><strong>' +
       escapeHtml(t('checkpointStatus')) + ': ' + escapeHtml(roleLabel) + ' · ' + escapeHtml(statusLabel) + '</strong><span class="status-chip ' + (supplied ? 'is-supplied' : 'is-out-of-supply') +
       '">' + escapeHtml(supplied ? t('supplied') : t('outOfSupply')) + '</span></div><dl class="location-grid"><div><dt>' +
       escapeHtml(t('branch')) + '</dt><dd>' + escapeHtml(branchText) + '</dd></div><div><dt>' + escapeHtml(t('nextArrival')) +

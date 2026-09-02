@@ -46,6 +46,9 @@ export function validateInvariants(state: GameState): InvariantResult {
   if (!config.valid) {
     errors.push(...config.errors.map((error) => `config: ${error}`));
   }
+  if (state.gameVersion !== state.config.version) {
+    errors.push('State game version must match config version');
+  }
   if (state.map.id !== state.mapId || state.map.id !== state.config.mapId) {
     errors.push('State map id must match config and map');
   }
@@ -193,6 +196,25 @@ export function validateInvariants(state: GameState): InvariantResult {
     'noiseTargetsReached',
     'noiseTargetsOverriddenByHorde',
     'noiseTargetsOverriddenByVisiblePopulation',
+    'initialNormalZombies',
+    'fallenSitesTriggeredByNoise',
+    'noiseRespawnAttempts',
+    'noiseRespawnZombiesSpawned',
+    'infectedPopulationConvertedToZombies',
+    'unspawnedInfectedPopulation',
+    'immediateInfectionsFromSpawn',
+    'chainOverruns',
+    'maximumOverrunChainLength',
+    'constructibleInfectedDeaths',
+    'groundVisionPotentialHexes',
+    'groundVisionVisibleHexes',
+    'groundVisionBlockedHexes',
+    'maxGroundVisionBlockedHexes',
+    'cumulativeGroundVisionBlockedHexes',
+    'groundVisionSamples',
+    'civilianDroneBasesBuilt',
+    'maxCivilianDroneVisionRadius',
+    'aerialDiscoveriesInGroundBlockedArea',
   ] as const) {
     if (!isNonNegativeInteger(state.statistics[field])) {
       errors.push(`Statistic ${field} must be a non-negative integer`);

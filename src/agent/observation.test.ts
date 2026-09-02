@@ -5,7 +5,7 @@ import { createInitialState, createUnit } from '../core/state';
 import { compactArtifactObservation, createAgentObservation, restoreArtifactObservation } from './observation';
 import { createAgentGame } from './game';
 
-describe('Agent Observation 4.0.0 rule projections', () => {
+describe('Agent Observation 5.0.0 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -335,6 +335,32 @@ describe('Agent Observation 4.0.0 rule projections', () => {
     expect(observation.constructibleFacilityPositionCandidates).toHaveLength(31 * 31 * 2);
     expect(observation.roadBranches.every((branch) => branch.currentPolicyTurns === 2)).toBe(true);
     expect(observation.checkpoints.every((checkpoint) => checkpoint.queuePressureClass === 'none' || checkpoint.queuePeople > 0)).toBe(true);
+  });
+
+  it('includes off-screen public site history without generated Zombie identities or Spawn hexes', () => {
+    const state = createInitialState(143, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    state.events.push({
+      id: 'event-site-history',
+      turn: 3,
+      phase: 'infection',
+      type: 'site_zombies_spawned',
+      payload: {
+        siteKind: 'facility', siteId: 'farm-1', siteType: 'farm', q: 2, r: 5,
+        cause: 'infection_fall', requestedSpawnCount: 2, actualSpawnCount: 1,
+        remainingInfected: 5, chainOriginEventId: 'event-root',
+        spawnedUnitIds: ['zombie-secret'], spawnedPositions: [{ q: 1, r: 5 }],
+      },
+    });
+    const observation = createAgentObservation(state);
+    expect(observation.importantSiteEvents).toEqual([expect.objectContaining({
+      id: 'event-site-history',
+      payload: expect.objectContaining({
+        siteId: 'farm-1', siteType: 'farm', q: 2, r: 5,
+        requestedSpawnCount: 2, actualSpawnCount: 1, remainingInfected: 5,
+      }),
+    })]);
+    expect(JSON.stringify(observation.importantSiteEvents)).not.toContain('zombie-secret');
+    expect(observation.importantSiteEvents[0]!.payload).not.toHaveProperty('spawnedPositions');
   });
 
   it('stores map topology once and restores complete Artifact observations', () => {

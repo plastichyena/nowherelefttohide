@@ -93,7 +93,7 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const config = safeConfig({
       checkpoint: { initialSupplyRadius: 0 },
       units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
-      vision: { ownedFacility: 0, operationalCheckpoint: 0 },
+      vision: { capital: 0, ownedFacility: 0, operationalCheckpoint: 0 },
     });
     const engine = new GameEngine(1403, config);
     const snapshot = cloneState(engine.getState());
@@ -101,7 +101,7 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const guard = snapshot.units.find((unit) => unit.type === 'nationalGuard')!;
     guard.position = { q: 1, r: 1 };
     police.currentFuel = 12;
-    const hidden = createUnit(snapshot, 'hidden-fuel-blocker', 'zombie', { q: 19, r: 15 });
+    const hidden = createUnit(snapshot, 'hidden-fuel-blocker', 'zombie', { q: 21, r: 15 });
     hidden.movement = 0;
     hidden.attack = 0;
     hidden.vision = 0;

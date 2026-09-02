@@ -3,6 +3,7 @@ import { createDefaultConfig } from './config';
 import { deriveVictoryProgress, GameEngine } from './engine';
 import { hexDistance, hexKey } from './hex';
 import { createUnit } from './state';
+import { isGroundVisibleFrom } from './visibility';
 import { singleFinalWave } from './testConfig';
 import type { BaseTerrain, GameState, HexCoord, UnitState } from './types';
 
@@ -38,7 +39,8 @@ function findCombatArena(
       tile.playerOccupancyAllowed &&
       tile.facilityId === null &&
       !excluded.has(tile.key) &&
-      hexDistance({ q: tile.q, r: tile.r }, target) === 2,
+      hexDistance({ q: tile.q, r: tile.r }, target) === 2 &&
+      isGroundVisibleFrom(state, { q: tile.q, r: tile.r }, target, 2),
     );
     if (attackerTile) return { attacker: { q: attackerTile.q, r: attackerTile.r }, target };
   }
@@ -131,7 +133,7 @@ describe('v1.4 Horde composition and combat', () => {
     const finalIds = engine.getState().horde.finalSpawnGroupIds;
     const finalGroup = engine.getState().units.filter((unit) => unit.spawnGroupId !== null && finalIds.includes(unit.spawnGroupId));
     expect(finalIds).toHaveLength(4);
-    expect(finalGroup).toHaveLength(36);
+    expect(finalGroup).toHaveLength(44);
     const finalProgress = cloneState(engine.getState());
     finalProgress.units = finalProgress.units.filter((unit) => !unit.spawnGroupId || !finalIds.includes(unit.spawnGroupId) || unit.id === finalGroup[0]!.id);
     expect(deriveVictoryProgress(finalProgress).finalHordeDefeated).toBe(false);
@@ -141,13 +143,13 @@ describe('v1.4 Horde composition and combat', () => {
       type: 'horde_spawned',
       payload: expect.objectContaining({ hordeKind: 'final', waveIndex: 5, directions: ['north', 'east', 'south', 'west'] }),
     }));
-    expect(engine.getState().horde).toMatchObject({ finalSpawnedCount: 36, totalSpawned: 71 });
+    expect(engine.getState().horde).toMatchObject({ finalSpawnedCount: 44, totalSpawned: 93 });
     expect(engine.getState().statistics).toMatchObject({
       periodicHordeZombiesSpawned: 14,
-      periodicNormalZombiesSpawned: 21,
+      periodicNormalZombiesSpawned: 35,
       finalHordeZombiesSpawned: 16,
-      finalNormalZombiesSpawned: 20,
-      finalHordeSpawned: 36,
+      finalNormalZombiesSpawned: 28,
+      finalHordeSpawned: 44,
     });
   }, 45_000);
 

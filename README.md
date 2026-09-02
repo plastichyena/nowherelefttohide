@@ -29,7 +29,7 @@
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 - 1回のAI応答をまたいで継続できるActive Session、Public Decision Log、履歴Checkpoint、分岐Session、7コマンドCLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.4.2の実装目標となった確定要件は [`Doc/Nowhere Left to Hide PoC v1.4.2 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.4.2%20アップデート要件%20確定版.md) です。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.4.3の実装目標は [`Doc/Nowhere Left to Hide PoC v1.4.3 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.4.3%20アップデート要件%20確定版.md) です。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## ローカルで起動する
 
@@ -61,7 +61,7 @@ Open https://plastichyena.github.io/nowherelefttohide/ and use the documented wi
 
 公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・Checkpoint候補Schema／Reason Code・生産/電力の静的ルールを返します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
 
-v1.4.2ではHuman UIとAgentが同じVisibility、Forecast、Checkpoint／Constructible候補Queryを使います。ObservationはUnit Fuelと携行軍需品、距離別Attack Cost／予想Damage、通常／Emergency Move、施設状態、`required`／`none`のPower Mode、Active／Standby／Dormant、構造上のFallback可否、Projected Supply Effect、全Action種別の候補とReason Codeを返します。Hordeは次WaveのTurn・方向数・方向別Composition・Finalフラグ、Warning開始後の全方向を公開しますが、Warning前の方向、Spawn Group、Hidden Enemyの位置・個体数は公開しません。外周120 HexのHorde Spawn ReserveはPlayer Unit・Player施設・Checkpointの進入／配置を禁止し、Reserve内のZombieへの攻撃は許可します。Combat NoiseはCenter、Unit Type、公開Classだけを返し、正確なRadius、Hidden Enemyの反応数・ID・Targetは公開しません。
+v1.4.3ではHuman UIとAgentが同じCore Visibilityを使い、Ground VisionはForest／Mountainで遮蔽され、Civilian Drone BaseのAerial Visionは遮蔽を無視します。ObservationはGround／Aerial種別と最新50件の重要Site Eventを返します。初期Normal Zombieは固定12体、固定WaveはNormal 63／Horde 30（Final 28／16）です。実感染者5人ごとに最大6体のNormal Zombieが陥落拠点の隣接Hexへ生成され、生成直後の占有感染、FIFO連鎖、Combat Noiseによる陥落拠点再Spawnまで1 Action内で解決します。Policeは`medium`、National Guardは`large`だけを公開し、正確なRadius、Hidden Enemyの反応数・ID・Target・非可視Spawn位置は公開しません。
 
 ## Agent Simulation CLI
 
@@ -76,7 +76,7 @@ npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random,balanced
 
 ## AI Session CLI
 
-Session CLIは、外部AIがプロセスや1回の応答をまたいで同じゲームを安全に続けるための永続入口です。通常のSave Format 7とは分離したSessionディレクトリに、Actionごとに更新するActive状態、公開`trace.ndjson`、既定5完了Turnごとの履歴Checkpointを保存します。AIの意思決定に使えるのはCLIが返す公開Observation、Legal Actions、Step結果、公開Event、自身のPublic Decision Logだけで、Private Checkpoint内の完全GameStateやRNG、Hidden情報は再開専用です。
+Session CLIは、外部AIがプロセスや1回の応答をまたいで同じゲームを安全に続けるための永続入口です。通常のSave Format 8とは分離したSessionディレクトリに、Actionごとに更新するActive状態、公開`trace.ndjson`、既定5完了Turnごとの履歴Checkpointを保存します。AIの意思決定に使えるのはCLIが返す公開Observation、Legal Actions、Step結果、公開Event、自身のPublic Decision Logだけで、Private Checkpoint内の完全GameStateやRNG、Hidden情報は再開専用です。
 
 ローカルリポジトリでは次のように実行します。
 
@@ -103,7 +103,7 @@ GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロード�
 ./run-session.sh status --session=my-game
 ```
 
-WorkflowはBundled Nodeだけで上記7つのSessionコマンドとBuilt-in Agent 1ゲームをSmoke Testします。外部AIへ渡す主要入口、Active復帰、Decision Log、Checkpoint分岐と公開APIだけを使うプレイ手順は[`PLAY_WITH_AI.md`](PLAY_WITH_AI.md)を参照してください。
+WorkflowはBundled Nodeだけで上記7つのSessionコマンド、Built-in Agent 1ゲーム、公開Observation／Legal Actionsだけを使う外部AI Seed 1のGame Over・Action列再実行・公開Artifact一致をSmoke Testします。外部AIへ渡す主要入口、Active復帰、Decision Log、Checkpoint分岐と公開APIだけを使うプレイ手順は[`PLAY_WITH_AI.md`](PLAY_WITH_AI.md)を参照してください。
 
 ## 操作
 
@@ -119,7 +119,7 @@ WorkflowはBundled Nodeだけで上記7つのSessionコマンドとBuilt-in Agen
 
 ## 目的と敗北条件
 
-Turn 50に4方向からHorde Zombie 16体とNormal Zombie 20体の合計36体からなるFinal Hordeが発生し、ゲームはTurn 51以降も勝敗まで続きます。Final Spawn Group全36体の全滅、現在のSupply Network内Zombie 0、同範囲内感染者0の3条件をすべて満たした瞬間に勝利します。次のいずれかが成立した時点で即敗北です。
+Turn 50に4方向からHorde Zombie 16体とNormal Zombie 28体の合計44体からなるFinal Hordeが発生し、ゲームはTurn 51以降も勝敗まで続きます。Final Spawn Group全44体の全滅、現在のSupply Network内Zombie 0、同範囲内感染者0の3条件をすべて満たした瞬間に勝利します。次のいずれかが成立した時点で即敗北です。
 
 1. 州都が陥落する
 2. 所有中の州都・地方都市・生産施設にいる健全民間人口の合計が0になる
@@ -140,7 +140,7 @@ Turn 50に4方向からHorde Zombie 16体とNormal Zombie 20体の合計36体か
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Build・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.4.2`、Game Rules / GameState / Configは `2.2.0`、Fixed Mapは `fixed-31x31-v1`、Agent / Observation / Browser Bridge APIは `4.0.0`、Artifact Schemaは `3.0.0`、Checkpoint／Session Schemaは`1.0.0`、Balanced Agentは`4.2.0`、Random Agentは`2.2.0`です。App Versionだけの差では、他のVersionが一致するデータを拒否しません。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Build・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.4.3`、Game Rules / GameState / Configは `2.3.0`、Fixed Mapは `fixed-31x31-v2`、Agent / Observation / Browser Bridge APIは `5.0.0`、Artifact Schemaは `4.0.0`、Checkpoint／Session Schemaは`1.0.0`、Balanced Agentは`4.3.0`、Random Agentは`2.2.0`です。App Versionだけの差では、他のVersionが一致するデータを拒否しません。
 
 ## CoreとHeadless API
 
@@ -165,7 +165,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。セーブコードはVersion、Config、Map ID、Seed、完全なGameState、チェックサムを含むJSONをgzip圧縮し、Base64URLへ変換します。同じ内容をJSONファイルとしても書き出し／読み込みできます。Version不一致、破損、不正Config、不変条件違反のデータは現在状態へ適用しません。App／Release `1.4.2`、Game Rules／State／Config `2.2.0`、Save Format `7`を使用します。Save 7は外周Reserve、Tile占有可否、Wave進行、Warning方向、Fuel、携行軍需品、Required／none電力を検証し、Emergency Movement、Forecast、Supply、Vision、Queue Pressure等の導出値は復元時に再計算します。v1.4.1以前の保存データ、Replay、Artifactは変換せず、現在状態を変更しないまま理由付きで拒否します。旧データを自動変換・削除・上書きしません。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。App／Release `1.4.3`、Game Rules／State／Config `2.3.0`、Save Format `8`と新しいAutosave Namespaceを使用します。Save 8はFixed Map v2、感染者Pool、陥落／連鎖Event、LOS Statistics、PRNG、Config完全コピーを検証し、導出値は復元時に再計算します。v1.4.2以前のSave、Replay、Artifact、Session、Checkpointは変換せず、現在状態と元データを変更しないままVersion不一致として拒否します。
 
 ## テスト
 
@@ -174,7 +174,7 @@ npm run typecheck
 npm test
 npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --summary-only --out=output/simulations/random-smoke --overwrite
 npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --summary-only --out=output/simulations/balanced-smoke --overwrite
-npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=300 --seed=1 --summary-only --out=output/simulations/v1.4.2-balanced-300 --overwrite
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=300 --seed=1 --summary-only --out=output/simulations/v1.4.3-balanced-300 --overwrite
 npm run build
 npm run test:browser-bridge
 ```
@@ -183,9 +183,9 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 
 リリース前にはRandomの標準Config固定Seed 1～100、Balancedの標準Config固定Seed 1～300を完遂します。Balanced 300はSeed `1..100`、`101..200`、`201..300`の3並列Jobに分けます。Fuel、Simple Farm、Required電力、固定Wave、Checkpoint、Emergency Movement、携行軍需品、Session再開のMetricsを記録し、技術的失敗、決定性違反、Replay／Checkpoint不一致、FoW漏洩を0件にします。時間のかかるRelease Workflowは実装とJob dispatchの確認を行い、全Jobの完了待ちは不要です。
 
-`test:random`と`test:balanced`は標準ConfigのSeed群を共通Batch CLIで実行します。CIでは各100ゲームに加え、Observation境界、Replay、Production Bridge smokeを検証します。
+`test:random`と`test:balanced`は標準ConfigのSeed群を共通Batch CLIで実行します。通常CIはUnit／Invariant、Observation境界、Replay、Production Bridge smokeを検証し、固定Seed Batchは手動Release検証へ分離します。
 
-`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.4.2手動Release検証として、Fuel 2水準×Simple Farm Food 2水準の感度Batchと標準Balanced 300ゲームを実行します。Balanced検証はSeed `1..100`、`101..200`、`201..300`の3並列Jobに分け、各ReportをArtifactへ保存します。
+`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.4.3手動Release検証として、v1.4.2同Seed／同上限の基準Batch、v1.4.3感度Batch、標準Random 100ゲーム、標準Balanced 300ゲームを実行します。Balanced検証はSeed `1..100`、`101..200`、`201..300`の3並列Jobに分け、比較可能なJSON／CSV ReportをArtifactへ保存します。
 
 ## GitHub ActionsとPages
 
@@ -194,16 +194,14 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 1. Node.js 22をセットアップ
 2. `npm ci`（lockfile固定）
 3. `npm run typecheck`
-4. `npm test`
-5. Random Agent標準Config Seed `1..100`の固定Seed Batch
-6. Balanced Agent標準Config Seed `1..100`、`101..200`、`201..300`の3分割固定Seed Batch
-7. `npm run build`
-8. `npm run test:browser-bridge`
-9. `main`へのpush時だけGitHub Pagesへデプロイ
+4. 長時間Batchを除くUnit／Invariant Test
+5. `npm run build`
+6. `npm run test:browser-bridge`
+7. `main`へのpush時だけGitHub Pagesへデプロイ
 
 Workflowは`actions/configure-pages`でPagesの有効化を要求し、相対asset URLで生成した`dist`を公開します。リポジトリ/組織ポリシーが自動有効化を拒否した場合だけ、Pages設定のSourceを「GitHub Actions」に変更してください。
 
-Pages公開後は実ブラウザでゲームURLを開き、Consoleへ `window.NLTH.getApiInfo()`、`reset({seed: 1})`、`getObservation()`、`getLegalActions()`、一覧内Actionの`step()`、不正Actionの拒否、`isGameOver()`、`getResult()`、`getRunArtifact()`を順に実行します。`appVersion` 1.4.2、各4.0.0 API、Artifact 3.0.0、Reserve／Wave／Warning方向、`verificationEvents`非公開を確認し、勝敗にかかわらずGame Over到達と公開Artifact取得を合格とします。
+Pages公開後は実ブラウザでゲームURLを開き、`window.NLTH`をSeed 1でGame Overまで実行します。`appVersion` 1.4.3、各5.0.0 API、Artifact 4.0.0、Map v2、Ground／Aerial Vision、重要Site Event、`verificationEvents`とHidden Spawn情報の非公開、Action列Replay一致を確認します。勝利は合格条件ではありません。
 
 ## 実機確認条件と既知の問題
 

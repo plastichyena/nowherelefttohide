@@ -14,8 +14,8 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '2.2.0';
-export const DEFAULT_MAP_ID = 'fixed-31x31-v1';
+export const CONFIG_VERSION = '2.3.0';
+export const DEFAULT_MAP_ID = 'fixed-31x31-v2';
 
 const facilityIds: FacilityId[] = [
   'capital',
@@ -172,7 +172,7 @@ const defaultEconomy: EconomyConfig = {
   populationConsumption: { food: 1, civilianGoods: 1 },
   initialResources,
   initialWorkersByFacility,
-  initialZombieCount: 6,
+  initialZombieCount: 12,
 };
 
 const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopulationConfig> =
@@ -212,11 +212,11 @@ export const DEFAULT_CONFIG: GameConfig = {
   horde: {
     warningLeadTurns: 2,
     waves: [
-      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 1 }, final: false },
-      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 2 }, final: false },
-      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 4 }, final: false },
-      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 4 }, final: false },
-      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 5 }, final: true },
+      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 3 }, final: false },
+      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 4 }, final: false },
+      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 6 }, final: false },
+      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 6 }, final: false },
+      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, final: true },
     ],
   },
   refugees: {
@@ -249,8 +249,10 @@ export const DEFAULT_CONFIG: GameConfig = {
   infection: {
     facilitySpreadPerTurn: 1,
     fallBackInfectionRate: 0.5,
-    fallBackCapacityRate: 0.5,
-    fallBackCapacityRounding: 'ceil',
+    zombieSpawnPopulationPerUnit: 5,
+    maxZombieSpawnPerResolution: 6,
+    zombieSpawnRadius: 1,
+    noiseRespawnEnabled: true,
     policeSuppression: 5,
     nationalGuardSuppression: 10,
     nationalGuardCivilianDamageRate: 0.5,
@@ -267,14 +269,15 @@ export const DEFAULT_CONFIG: GameConfig = {
   },
   noise: {
     police: 4,
-    nationalGuard: 5,
-    publicClass: { police: 'medium', nationalGuard: 'medium' },
+    nationalGuard: 8,
+    publicClass: { police: 'medium', nationalGuard: 'large' },
   },
   terrain: {
     movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
     damageMultiplier: { urban: 0.5, forestZombie: 0.5 },
   },
   vision: {
+    capital: 5,
     ownedFacility: 1,
     operationalCheckpoint: 1,
   },
@@ -356,7 +359,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('mapId must be a non-empty string');
   }
   if (Object.prototype.hasOwnProperty.call(config as unknown as Record<string, unknown>, 'finalHordeTurn')) {
-    errors.push('finalHordeTurn is not part of Game Rules 2.2.0; derive it from the Final Wave');
+    errors.push('finalHordeTurn is not part of Game Rules 2.3.0; derive it from the Final Wave');
   }
   requireInteger(errors, config.maxActionsPerTurn, 'maxActionsPerTurn', 1);
 
@@ -532,8 +535,8 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('economy is required');
   } else {
     requireInteger(errors, economy.initialZombieCount, 'economy.initialZombieCount', 0);
-    if (economy.initialZombieCount > 6) {
-      errors.push('economy.initialZombieCount cannot exceed the six fixed-map positions');
+    if (economy.initialZombieCount > 12) {
+      errors.push('economy.initialZombieCount cannot exceed the twelve fixed-map positions');
     }
     const stock = economy.initialResources;
     if (!stock || typeof stock !== 'object') {
@@ -554,7 +557,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   } else {
     for (const retiredField of ['cycle', 'periodicInitial', 'periodicIncrement', 'warningStartTurn', 'spawnOnlyBeforeFinalTurn', 'finalComposition']) {
       if (Object.prototype.hasOwnProperty.call(horde as unknown as Record<string, unknown>, retiredField)) {
-        errors.push(`horde.${retiredField} is not supported by Game Rules 2.2.0`);
+        errors.push(`horde.${retiredField} is not supported by Game Rules 2.3.0`);
       }
     }
     requireInteger(errors, horde.warningLeadTurns, 'horde.warningLeadTurns', 1);
@@ -608,14 +611,15 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     requireInteger(errors, infection.facilitySpreadPerTurn, 'infection.facilitySpreadPerTurn', 0);
     requireInteger(errors, infection.policeSuppression, 'infection.policeSuppression', 0);
     requireInteger(errors, infection.nationalGuardSuppression, 'infection.nationalGuardSuppression', 0);
-    for (const key of ['fallBackInfectionRate', 'fallBackCapacityRate', 'nationalGuardCivilianDamageRate'] as const) {
+    for (const key of ['fallBackInfectionRate', 'nationalGuardCivilianDamageRate'] as const) {
       if (!Number.isFinite(infection[key]) || infection[key] < 0 || infection[key] > 1) {
         errors.push(`infection.${key} must be between 0 and 1`);
       }
     }
-    if (infection.fallBackCapacityRounding !== 'ceil' && infection.fallBackCapacityRounding !== 'floor') {
-      errors.push('infection.fallBackCapacityRounding must be ceil or floor');
-    }
+    requireInteger(errors, infection.zombieSpawnPopulationPerUnit, 'infection.zombieSpawnPopulationPerUnit', 1);
+    requireInteger(errors, infection.maxZombieSpawnPerResolution, 'infection.maxZombieSpawnPerResolution', 1);
+    requireInteger(errors, infection.zombieSpawnRadius, 'infection.zombieSpawnRadius', 1);
+    if (typeof infection.noiseRespawnEnabled !== 'boolean') errors.push('infection.noiseRespawnEnabled must be boolean');
   }
 
   const checkpoint = config.checkpoint;
@@ -670,6 +674,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (!vision || typeof vision !== 'object') {
     errors.push('vision is required');
   } else {
+    requireInteger(errors, vision.capital, 'vision.capital', 0);
     requireInteger(errors, vision.ownedFacility, 'vision.ownedFacility', 0);
     requireInteger(errors, vision.operationalCheckpoint, 'vision.operationalCheckpoint', 0);
   }

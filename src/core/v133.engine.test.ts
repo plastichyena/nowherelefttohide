@@ -417,12 +417,12 @@ describe('v1.4 Checkpoint Role / Fallback / Supply', () => {
 describe('v1.4 Combat Noise / Priority / FoW', () => {
   it.each([
     ['police', { q: 19, r: 15 }, { q: 20, r: 15 }] as const,
-    ['nationalGuard', { q: 20, r: 15 }, { q: 21, r: 15 }] as const,
-  ])('uses the internal %s Radius boundary while publishing only medium Noise Class', (unitType, inside, outside) => {
+    ['nationalGuard', { q: 23, r: 15 }, { q: 24, r: 15 }] as const,
+  ])('uses the internal %s Radius boundary while publishing only its public Noise Class', (unitType, inside, outside) => {
     const scenario = makeNoiseScenario(unitType, inside);
     const stateBefore = scenario.engine.getState();
-    expect(stateBefore.config.noise[unitType]).toBe(unitType === 'police' ? 4 : 5);
-    expect(stateBefore.config.noise.publicClass[unitType]).toBe('medium');
+    expect(stateBefore.config.noise[unitType]).toBe(unitType === 'police' ? 4 : 8);
+    expect(stateBefore.config.noise.publicClass[unitType]).toBe(unitType === 'police' ? 'medium' : 'large');
     // Use a second isolated scenario for the outside boundary so the first pulse cannot target it.
     const outsideScenario = makeNoiseScenario(unitType, outside);
     const outsideState = cloneState(outsideScenario.engine.getState());
@@ -445,7 +445,7 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
         sourceUnitType: unitType,
         q: 15,
         r: 15,
-        noiseClass: 'medium',
+        noiseClass: unitType === 'police' ? 'medium' : 'large',
       }),
     });
     expect(noise?.payload).not.toHaveProperty('radius');

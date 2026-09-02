@@ -24,6 +24,7 @@ import {
   roadTextureRotations,
   spawnReserveTileKeys,
   supplyBoundaryEdges,
+  visionOverlayState,
 } from './board';
 import { createFixedMap } from '../core/map';
 
@@ -142,5 +143,31 @@ describe('Phaser board asset boundary helpers', () => {
     expect(edges).toHaveLength(10);
     expect(edges).not.toContainEqual({ tileKey: '7,7', direction: 'east' });
     expect(edges).not.toContainEqual({ tileKey: '8,7', direction: 'west' });
+  });
+
+  it('classifies Core Ground and Aerial vision overlays without deriving LOS', () => {
+    const ground = {
+      origin: { q: 0, r: 0 },
+      radius: 5,
+      visionMode: 'ground' as const,
+      terrainLosBlocking: true,
+      visibleTileKeys: new Set(['1,1']),
+      potentialTileKeys: new Set(['1,1', '2,2']),
+      blockedTileKeys: new Set(['2,2']),
+    };
+    expect(visionOverlayState(ground, '1,1')).toBe('ground-visible');
+    expect(visionOverlayState(ground, '2,2')).toBe('ground-blocked');
+    expect(visionOverlayState(ground, '3,3')).toBe('none');
+
+    const aerial = {
+      ...ground,
+      visionMode: 'aerial' as const,
+      terrainLosBlocking: false,
+      visibleTileKeys: new Set(['2,2']),
+      potentialTileKeys: new Set(['2,2']),
+      blockedTileKeys: new Set<string>(),
+    };
+    expect(visionOverlayState(aerial, '2,2')).toBe('aerial-visible');
+    expect(visionOverlayState(aerial, '1,1')).toBe('none');
   });
 });

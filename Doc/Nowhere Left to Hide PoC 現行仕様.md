@@ -3,10 +3,10 @@
 ## PoC 現行仕様
 
 - ステータス: 現行正本
-- 現行Version: v1.4.2
+- 現行Version: v1.4.3
 - 基準日: 2026-09-02
 - 実装照合日: 2026-09-02
-- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.4.2 アップデート要件 確定版.md`
+- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.4.3 アップデート要件 確定版.md`
 
 本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。過去の要件定義・仕様書・反映済みアップデート文書は`Doc/archive/`へ保管し、現行判断には使用しない。
 
@@ -61,7 +61,7 @@
 
 ## 2.2 対象外
 
-- ランダムマップ、Terrain自動生成、LOS／高低差／視界遮蔽、Waterを使う標準Map
+- ランダムマップ、Terrain自動生成、高低差、Waterを使う標準Map
 - Replay UI、外部LLM自体の同梱、`balanced`以外の組み込みStrategy
 - AI観戦、AI思考表示、After Action Report、Browser BridgeからのBatch実行
 - 強化学習、Minimax、MCTS、人間より強いAIの保証
@@ -156,7 +156,7 @@ UI / Phaser / Test Agent
 
 - 初回ガイドで移動、攻撃、人口配置、ターン終了を説明する。
 - 日本語・英語の常設ヘルプを提供する。
-- 人口は盤面上の所在地から消せないこと、施設撤収時の帰還、都市過密、編成拠点制限、v1.4.1以前のセーブ非互換を説明する。
+- 人口は盤面上の所在地から消せないこと、施設撤収時の帰還、都市過密、編成拠点制限、v1.4.2以前のセーブ非互換を説明する。
 - 道路別の次回到着、未管理時の素通りリスク、都市のソフトキャップ超過受入を表示する。
 - 補給オーバーレイは常設切替を持ち、新設・移設、検問所選択、労働者配置で自動表示する。補給範囲、セクター境界、検問所半径、候補の将来範囲、建設を妨げるZombieを盤面上で識別できる。
 - Farm、Civilian Factory、Military Factory、Refinery、Civilian Drone BaseはBottom SheetからPower Supply ON/OFFを切り替え、現在配置とTurn-start Fuelに基づく次回EndTurnの予測要求・給電、基本出力、予測出力、停止理由、直前EndTurnの実績給電を区別して表示する。Required施設は未給電またはOFFなら対象生産・機能を停止する。
@@ -170,7 +170,9 @@ UI / Phaser / Test Agent
 - 外周のHorde Spawn Reserveを常時OverlayとLegendで識別し、Player Unitの進入・通過・配置、CheckpointのBuild／Relocate／Activate、Constructible FacilityのBuildは禁止だが、Reserve内ZombieへのAttack、Counterattack、Interception、Damageは可能であることを説明する。
 - Checkpoint建設・移設・Active化中は全支線道路タイル／Postの合法／不合法をAction種別ごとに区別し、不合法候補の選択時にCore Reason Codeの日英文言をBottom Sheet内へ表示する。Stateまたは選択候補が変わった場合は古い理由を残さない。
 - 支線パネルはActive／Standby／Dormant、Fallback可否、支線Policy、準備済みPost数を表示する。Active失陥時には州都側のStandby、次にDormantへ即時Fallbackし、前線とSupplyが後退することを説明する。
-- Unit詳細、Help、Combat LogはPolice／National Guardとも公開Noise Class `medium`、NoiseがNormal Zombieだけへ作用すること、およびTarget優先順位を表示する。正確なNoise Radius、反応数、対象ID、ZombieのNoise TargetはProduction UIへ出さない。
+- Unit詳細、Help、Combat LogはPoliceを公開Noise Class `medium`、National Guardを`large`として、NoiseがNormal Zombieと条件を満たす陥落拠点へ作用すること、およびTarget優先順位を表示する。正確なNoise Radius、反応数、対象ID、ZombieのNoise TargetはProduction UIへ出さない。
+- Help／Board LegendはGround LOS、Forest／Mountainの最初の遮蔽Hex、Aerial Vision、実感染者5人ごとの隣接Spawn、最大6体、即時占有、FIFO連鎖、Noise再Spawnを現在Configから日英で説明する。
+- UIはCore Eventから最新50件の重要イベント履歴を再構築し、陥落拠点ID／Type／座標、感染者数、Requested／Actual Spawn、残存感染者、原因、連鎖起点を表示する。新規イベントはToast表示し、複数拠点Chainだけを集約する。Load直後に過去Toastを再表示しない。
 - 開発BuildだけはCoreが提供する読み取り専用診断を使い、Noise Center、正確なRadius、範囲Hex、反応したNormal Zombie、内部Noise Targetをオーバーレイで確認できる。Production Build、Save、Replay、Agent API、Browser Bridgeには含めず、表示がState、RNG、Action列へ影響してはならない。
 
 ## 5.6 盤面Asset・Layer・Board Legend
@@ -266,13 +268,13 @@ interface HeadlessGame {
 
 ## 6.5 Version境界
 
-- App / Release Versionは`1.4.2`とする。
-- Game Rules / GameState / Config Versionは`2.2.0`、Fixed Map IDは`fixed-31x31-v1`とする。
-- Save Format Versionは`7`、Artifact Schemaは`3.0.0`、Checkpoint Schemaは`1.0.0`、Session Schemaは`1.0.0`とする。v1.4.1以前のSave／Replay／Artifact／Sessionは変換しない。
-- Agent API / Observation API / Browser Bridge APIは`4.0.0`、Balanced Agentは`4.2.0`、Random Agentは`2.2.0`とする。
+- App / Release Versionは`1.4.3`とする。
+- Game Rules / GameState / Config Versionは`2.3.0`、Fixed Map IDは`fixed-31x31-v2`とする。
+- Save Format Versionは`8`、Artifact Schemaは`4.0.0`、Checkpoint Schemaは`1.0.0`、Session Schemaは`1.0.0`とする。v1.4.2以前のSave／Replay／Artifact／Session／Checkpointは変換しない。
+- Agent API / Observation API / Browser Bridge APIは`5.0.0`、Balanced Agentは`4.3.0`、Random Agentは`2.2.0`とする。
 - Agent、Observation、Browser Bridgeは個別のSemVerを持ち、Build IDはCIではGit commit SHA、ローカルではSHAとdirty状態または`local-unknown`を記録する。
 - Build IDは乱数とゲーム結果へ影響させない。
-- App Versionは表示ReleaseのMetadataであり、Game Rules、Save Format、Artifact Schemaが一致するデータをApp Version差だけで拒否しない。v1.4.1以前のGameStateはGame Rules Version不一致のため変換せず拒否する。
+- App Versionは表示ReleaseのMetadataであり、Game Rules、Save Format、Artifact Schemaが一致するデータをApp Version差だけで拒否しない。v1.4.2以前のGameStateはGame Rules Version不一致のため変換せず拒否する。
 
 ## 6.6 Agent ObservationとAgentGame
 
@@ -309,7 +311,7 @@ interface AgentGame {
 
 - `random`と`balanced`は同じAgentGame、Runner、安全上限、Metrics、Artifact形式を使用する。各Decisionは非公開思考過程ではなく、優先目標、理由コード、上位候補を500 Unicode code point以下で要約した`decisionSummary`を公開する。
 - Random Agentの選択乱数はGameEngineから独立したSeed付き乱数とする。
-- Balanced Agent Versionは`4.2.0`、Random Agent Versionは`2.2.0`とする。Balancedは独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
+- Balanced Agent Versionは`4.3.0`、Random Agent Versionは`2.2.0`とする。Balancedは独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
 - Visibleな通常Zombie／Horde Zombie、Terrain Movement Cost、Urban／Forest防御、Vision Coverage、Horde警告、Checkpoint Role／Fallback深度、公開Noise Class、Final Horde後の3条件を評価する。Supply内Zombie未排除かつVisible Enemyがいない場合はHidden脅威を前提に探索・巡回する。
 - BalancedはGuaranteed Defeat回避をHard Priorityとし、施設接触拒否、施設／Checkpoint Queue感染の鎮圧、Horde防衛、軍需備蓄、食料・民需品・燃料・電力、州都人口バッファ、過密、生産冗長性を含む施設確保、部隊編成と損傷、全支線のActive Checkpoint確立、状況に応じた後方Standby、支線方針、有益なActionがない場合のEndTurnを評価する。州全体感染時はStrict方針を加点し、Normal／Pass Throughを減点する。
 - Food単一障害点ではSimple Farm、Horde方向・Fog・給電余力ではCivilian Drone Base、CheckpointではProjected Supply Effect、前線ではQueue Pressureを評価する。Move距離、Unit Type別Fuel Cost、移動後Fuel、Supply内補給見込みを評価し、Horde緊急防衛を除いてSupply外で移動不能になる進出を減点する。Horde Spawn Reserveへ移動・配置するActionを生成せず、Reserve内のVisible Zombieへの合法Attackは評価する。`checkpoint_supply_zombie_blocked`はCheckpoint戦略の放棄理由にしない。
@@ -351,7 +353,7 @@ interface AgentGame {
 
 ## 7.1 マップ
 
-- Map IDは`fixed-31x31-v1`、寸法は31×31、有効座標は`q=0..30`、`r=0..30`とする。Capitalは`(15,15)`、Horde EntranceはNorth `(15,0)`、East `(30,15)`、South `(15,30)`、West `(0,15)`とする。
+- Map IDは`fixed-31x31-v2`、寸法は31×31、有効座標は`q=0..30`、`r=0..30`とする。Capitalは`(15,15)`、Horde EntranceはNorth `(15,0)`、East `(30,15)`、South `(15,30)`、West `(0,15)`とする。
 - 外周1 Hex、すなわち`q = 0 | 30`または`r = 0 | 30`の重複を除く120 Hexを、公開の静的Map Rule `hordeSpawnReserve`とする。各Tileは`playerOccupancyAllowed`を持ち、Reserveではfalse、その他ではtrueである。
 - RoadはCapital Junctionを含む`q=15`の全Hexと`r=15`の全Hexから成り、North／East／South／Westの4支線はCapitalから各Entranceまで15 Hexとする。Entranceと恒久FacilityのRoad Hexも支線へ含めるが、Facility HexはCheckpoint候補外とする。
 - 基礎Terrainは`plain`、`forest`、`mountain`、`water`。Road、Urban、Facility、CheckpointはOverlay／属性として分離する。標準MapにWaterは置かず、Random MapやSeedによるTerrain生成も行わない。
@@ -385,8 +387,9 @@ r=14: q=4..8
 - Human、通常Zombie、Horde Zombieは同じ決定的な重み付き最短経路を使い、同Cost経路は安定座標順で決める。
 - Player UnitはReserveへ進入、通過、停止、初期・完成・復帰配置できない。CheckpointのBuild／Relocate／ActivateとConstructible FacilityのBuildもReserveを拒否する。候補、Pathfinding、Legal Actions、Save validation、不変条件は同じMap RuleとReason Codeを使い、拒否はState、Resource、Action回数、RNGを変更しない。Zombie／Horde ZombieのSpawn、移動、停止、およびReserve内ZombieへのAttack、Counterattack、Interception、Damageは許可する。
 - Urban Hex上のGround Unitは被通常Combat Damage×0.5、Forest上の通常／Horde Zombieは×0.5。Urbanを優先し、重複しない。RoadはForest防御を消さない。Terrain防御は通常攻撃、反撃、迎撃にだけ適用する。
-- Police／National GuardのVisionは5、通常／Horde Zombieは3。Visionは距離以内でTerrainに遮られない。Capital、所有・未陥落施設とActive CheckpointはVision 1を提供する。Standby、Dormant、Remnant、Ruined、AbandonedはVisionを提供しない。
-- Player VisibilityはHuman Unit、Capital、Player所有施設、Active Checkpoint、給電中Civilian Drone Baseの和集合とし、UIとAgent Observationは同じ純粋関数を使う。Terrain、Road、施設・Checkpoint位置と公開済み状態、自軍、Supply、Horde Warning、Final Horde状態、Victory進捗はVisibility外でも既知とする。
+- Police／National GuardのGround Visionは5、通常／Horde Zombieは3。CapitalのGround Visionは5、所有・未陥落施設とActive CheckpointはGround Vision 1を提供する。Standby、Dormant、Remnant、Ruined、AbandonedはVisionを提供しない。
+- Ground LOSはCoreの決定的`hexLine()`を使う。Forest／Mountainは最初の遮蔽Hex自体を可視とし、それより先を遮る。Source自身のTerrainは遮蔽せず、Road／Urbanでも基礎Terrainを使う。給電中Civilian Drone BaseのAerial VisionはTerrain遮蔽を無視する。
+- Player Visibilityは全Ground SourceのLOS集合とAerial Vision集合の和とし、UI、Agent Observation、合法手、Event公開境界は同じ純粋関数を使う。Terrain、Road、施設・Checkpoint位置と公開済み状態、自軍、Supply、Horde Warning、Final Horde状態、Victory進捗はVisibility外でも既知とする。
 - Visibility外Enemyの位置・個体情報・Target・移動・正確なSpawn位置は公開せず、Last Known Positionも保持しない。公開移動計画ではHidden EnemyのHexを空きとして扱い、実移動で占有Hexへ進入しようとした場合は直前Hexで止まり、実進入Hex数分のFuelだけを消費する。
 
 恒久Facilityは17施設とし、座標と初期状態を次へ固定する。
@@ -437,8 +440,8 @@ Wind Power PlantはWorker 0固定である。初期未配置人口は存在し�
 
 - 初期資源はFood 230、Civilian Goods 230、Military Goods 75、State Fuel 92とする。
 - 初期PoliceのUnit Fuelは12、National Guardは22の満タンとし、State Fuel 92から差し引かない。
-- 初期Normal Zombieは`(9,9)`、`(21,21)`、`(21,9)`、`(9,21)`、`(15,6)`、`(15,24)`の6体とする。
-- 初期Zombieは3組の180度回転対称配置で、最寄りの初期所有Facilityまで最低4 Hexを確保する。Movement 3の最初のZombie Turnでは初期所有Facilityへ到達できない。
+- 初期Normal Zombieは`(9,9)`、`(21,21)`、`(21,9)`、`(9,21)`、`(15,6)`、`(15,24)`、`(16,2)`、`(28,2)`、`(28,14)`、`(14,28)`、`(2,28)`、`(2,16)`の12体とする。
+- 先頭6座標はv1.4.2から順序を含めて維持し、追加6座標は州都から距離13の対向3組で、Facility、Road、Urban、Reserve、初期Unitと重複しない。初期配置はPRNGを消費せず、`spawnGroupId`と`hordeKind`は`null`である。
 
 ## 7.4 連絡途絶施設
 
@@ -660,7 +663,7 @@ productionInputAvailable
 - Supply外になってもWorker、所有、状態を維持し、配置済みWorkerと給電があれば機能を継続する。Supply外では増員を禁止し、減員と都市への帰還を許可する。
 - Simple FarmはWorker 0..10、Power Mode `none`、Power Demand 0で常時Food 5 / workerを生産し、Power Supply切替を持たない。Zombie Target Valueは健全Worker数とする。
 - Civilian Drone BaseはWorker 0..5、Required Power 5、給電時Vision Radius `workers × 2`、無給電時0とし、Zombie Target Valueは健全Worker数とする。
-- Zombie占有時、Workerがいれば通常施設と同じ感染・陥落を処理し、感染で健全Workerが0になると施設を消滅させNormal Zombie 2体を生成する。空施設は`disabled`、Human Unit再確保で`recovering`、次Player TurnにWorker 0・Power Supply ONの`operational`へ戻る。
+- Zombie占有時、Workerがいれば通常施設と同じ感染・陥落を処理し、感染で健全Workerが0になると実感染者数に基づく共通Spawn処理後に施設を消滅させる。生成成功分を除く残存感染者は建物消滅に伴う死亡として計上する。空施設は`disabled`、Human Unit再確保で`recovering`、次Player TurnにWorker 0・Power Supply ONの`operational`へ戻る。
 
 ## 10.11 Strategic Forecast
 
@@ -705,10 +708,14 @@ infected += spread
 
 - 感染処理で健常人口0になった場合だけ陥落する。
 - 通常施設は荒廃感染施設、検問所は荒廃検問所となる。
-- 陥落時感染者は現在値とCapacityの50%の大きい方を基準とする。
-- 標準生産施設のCapacity 30では新規陥落時の感染者下限を15とする。
-- 陥落時にゾンビ2体を生成し、隣接空き、距離2、距離3の順で最寄りへ置く。同距離はSeed付き乱数。
-- 州都陥落時はイベント処理後に即敗北する。
+- 陥落時点の実感染者数だけを使い、Capacity補正や潜在感染者の自動加算は行わない。
+- 標準Configは感染者5人につきNormal Zombie 1体、1解決最大6体、Spawn Radius 1、Noise再Spawn有効とする。要求数は`min(6, floor(currentInfected / 5))`、実生成数は要求数と隣接空き候補数の小さい方である。
+- 候補は拠点からHex Distance 1、Map内、Unit不在、Normal Zombieが進入可能な基礎TerrainのHexに限る。Facility、Checkpoint、Road、Urban、Horde Spawn Reserve上は候補にできる。座標順へ正規化してSeed付きPRNGで選び、距離2以上は探索しない。
+- 実際に生成できた1体につき感染者5人だけを減らす。配置不能はTechnical Failureにせず、恒久Facility／Checkpointには未変換感染者を残す。感染者0の空Checkpoint破壊では生成しない。
+- Simple Farm／Civilian Drone Baseは共通Spawn後に消滅し、残存感染者を死亡として計上して0にする。Wind Power Plantは感染者由来Spawnの対象外である。
+- 生成Zombieは同じZombie Phase中に移動、通常Attack、Targetingを行わず、次回Zombie Phaseから通常行動する。ただし生成先のFacility／Checkpointへは生成直後に占有処理を1回行う。
+- 即時占有で別拠点が陥落した場合は同じ共通式で生成を連鎖させる。生成Unit ID順のFIFOキューで各Unitを1回だけ処理し、新規生成Unitを末尾へ追加する。Action全体は原子的かつ同一Seedで決定的に解決する。
+- 州都陥落時は共通Spawn、即時占有、連鎖、Event、Metricsをすべて処理した後に即敗北する。
 
 ## 11.4 復旧
 
@@ -790,14 +797,15 @@ Zombie陣営を`zombie`と`hordeZombie`へ分ける。Combat、感染、占有�
 - 複数Horde候補はHex Distance、同距離ならUnit ID昇順で選ぶ。
 - Visible Populationを発見した通常ZombieはNoise Targetを破棄し、そのPopulationを見失っても旧Noise地点へ再開しない。Horde ZombieはVisible TargetをVision外まで記憶しない。CapitalはHordeだけが常時知るStrategic Anchorとする。
 - Player Unitが参加する通常Combatの開始時、Human UnitがいるHexをCenterとしてNoise Pulseを1回発生させる。Player Attack、Zombie／Horde Attack、Interception、同Combat内のCounterattackが対象で、Counterattackによる二重Pulseは発生させない。Moveのみ、Wait、感染鎮圧、Resource Shortage、Infection Spread、Facility Overrun自体は発生させない。
-- 内部RadiusはPolice 4、National Guard 5のHex Distanceで、Terrain、Road、Forest、Mountain、Urbanは遮蔽・減衰しない。Centerと同一Hexでなく、Radius内で、継承Target／Noise Target／Visible Population Targetを持たないNormal Zombieだけが最初のPulseをNoise Targetとして記憶する。複数Pulseは既存Noise Targetを上書きしない。
+- 内部RadiusはPolice 4、National Guard 8のHex Distanceで、Terrain、Road、Forest、Mountain、Urbanは遮蔽・減衰しない。Centerと同一Hexでなく、Radius内で、継承Target／Noise Target／Visible Population Targetを持たないNormal Zombieだけが最初のPulseをNoise Targetとして記憶する。複数Pulseは既存Noise Targetを上書きしない。
 - Noise Target到達時は記憶をclearする。Zombie Phase開始時の全Horde、全Normal ZombieのTarget Snapshotを先に確定し、Snapshot作成後のCombat NoiseはそのPhaseのDecisionを遡及変更せず、次のSnapshotで有効にする。
-- Publicな`noise_emitted` EventはCenter、source Unit ID／Type、Noise Classだけを持つ。正確なRadius、反応数、反応Zombie ID、Noise TargetはInternal Event／Verification Artifact／開発診断だけに残し、Production UI、Observation、公開Event、終了結果、Browser Bridge Artifactへ出さない。公開ClassはPolice／National Guardとも`medium`である。
+- Noise Pulse範囲内にある感染者5人以上の陥落済み恒久FacilityとRuined／Remnant Checkpointは、Combat全体の解決直後にID昇順（同一IDはFacility優先）で11.3と同じ隣接Spawnを試みる。未陥落拠点、Wind、消滅Constructibleは対象外で、成功1体につき感染者5人を減らし、残れば後のPulseで再試行できる。生成Unitには即時占有とFIFO連鎖を適用し、その後にDefeat／Victoryを判定する。
+- Publicな`noise_emitted` EventはCenter、source Unit ID／Type、Noise Classだけを持つ。正確なRadius、反応数、反応Zombie ID、Noise TargetはInternal Event／Verification Artifact／開発診断だけに残し、Production UI、Observation、公開Event、終了結果、Browser Bridge Artifactへ出さない。公開ClassはPoliceが`medium`、National Guardが`large`である。実際の拠点再Spawn結果からRadiusを間接推測できることは許容する。
 
 ## 13.2 Horde
 
 - Configは`warningLeadTurns`と、`turn`、`directionCount: 1 | 2 | 3 | 4`、方向別`compositionPerDirection`、`final`からなる昇順の`waves`を持つ。Waveは1件以上、各Compositionは合計1体以上、Normal Zombieを含むならHorde Zombieも1体以上、Final Waveは最後の1件だけである。不正Configは新規開始、Load、Session ResumeでStateとRNGを変更せず拒否する。
-- 標準ScheduleはWarning Lead 2で、Turn 5はRandom 1方向に各H2/N1、Turn 10はRandom 2方向に各H1/N2、Turn 20はRandom 1方向に各H4/N4、Turn 35はRandom 3方向に各H2/N4、Turn 50はNorth / East / South / West全4方向に各H4/N5をSpawnする。総数はHorde Zombie 30、Normal Zombie 41、計71である。Turn 50の4方向WaveだけがFinal Waveである。
+- 標準ScheduleはWarning Lead 2で、Turn 5はRandom 1方向に各H2/N3、Turn 10はRandom 2方向に各H1/N4、Turn 20はRandom 1方向に各H4/N6、Turn 35はRandom 3方向に各H2/N6、Turn 50はNorth / East / South / West全4方向に各H4/N7をSpawnする。Wave合計は順に5、10、10、24、44体、全体ではHorde Zombie 30、Normal Zombie 63、計93である。Turn 50の4方向WaveだけがFinal Waveである。
 - WarningはPlayer Turn Startの`spawnTurn - warningLeadTurns`で始める。`directionCount < 4`はWarning開始時にSeed付きRNGで重複なしに抽選し、`directionCount = 4`はRNGを消費せず全方向とする。方向配列と処理順はNorth / East / South / Westの固定順へ正規化し、Warning済み方向はGameStateへ保存してSpawn、Load、Resume、Checkpoint分岐後に再抽選しない。Warning前の方向は空配列で、未警告Waveの方向を公開しない。
 - 同一Waveの全方向・全個体はZombie Phase後の同一Horde Phaseで原子的にSpawnする。各方向は`wave-{index}-{direction}`の独立Spawn Group IDを持ち、Group内のHorde ZombieとNormal Zombieは同じGroup IDと`periodic | final` Horde kindを持つ。配置不能なら部分Spawn、Wave進行、Unit ID、Statistics、Events、RNGを更新せず、診断可能なTechnical FailureとしてActionをCommitしない。生成した個体は次Turnから行動する。
 - Horde Stateは次Wave index／Spawn Turn、Warning方向、last Spawn Turn、Warning種別、Wave別Spawn済みindexとGroup ID、Final Group ID配列、`notStarted | active | defeated`を保存する。次Waveのindex、Spawn Turn、残りTurn、方向数、方向別Composition、Final flagはWarning前から公開し、Warning後は全方向を公開する。Spawn Hex、非可視個体ID・位置、内部Targetは公開しない。
@@ -807,7 +815,7 @@ Zombie陣営を`zombie`と`hordeZombie`へ分ける。Combat、感染、占有�
 
 Final Horde生成後、次をすべて満たした瞬間に`stateSecured`で勝利する。
 
-1. Final Waveの4 Spawn Groupに属するHorde ZombieとNormal Zombie全36体がSupply内外を問わず死亡している。
+1. Final Waveの4 Spawn Groupに属するHorde ZombieとNormal Zombie全44体がSupply内外を問わず死亡している。
 2. 現在のPlayer Supply Network内に通常／Horde Zombieがいない。
 3. 現在のSupply内にある全Facility／Checkpoint状態の感染者合計が0である。所有、連絡途絶、陥落、荒廃、放棄、Remnantを問わない。
 
@@ -893,19 +901,19 @@ ZOMBIE TURN / INFECTION
 - 同内容をJSONファイルで入出力できる。
 - Version不一致、破損、不正Config、不変条件違反を検出し、現在状態へ適用しない。
 - ロード後は保存時Configを使う。
-- v1.4.2はGame Rules / GameState / Config `2.2.0`、Fixed Map `fixed-31x31-v1`、Save Format `7`を使う。
-- v1.4.1以前の自動保存、セーブコード、JSON Save、Replay、Artifact、Sessionを一律で変換しない。Version不一致は現在Stateを変更せず、日本語・英語の理由付きで拒否する。旧データを自動変換、削除、上書きしない。新規ゲームはSave Format 7のautosave key `nowhere-left-to-hide:auto-save:v7`を使い、旧keyは読み取り確認だけを行って上書き・削除しない。
-- Save 7は31×31 Map、外周120 Hexの`hordeSpawnReserve`、各Tileの`playerOccupancyAllowed`、Unit Fuelと携行Military Goods、Unit Config標準最大量との一致、Wind、Constructible Facility、Required / none電力、Wave Config、Warning方向、Wave進行、方向別Spawn Group ID、Final Group ID、RNG、複数PostのBranch参照、支線Policy、Zombie Noise Target、Queue Pressureを完全に検証する。Reserve内のPlayer UnitまたはPlayer配置物を持つStateを拒否する。Emergency Movement、Forecast、Supply、Vision、上限、Queue Pressure等の導出値は保存せず再計算する。
-- Artifact Schema 3.0.0は固定Map情報をゲーム単位で1回だけ保存し、Turn Observation Traceでは`mapId`から参照してTerrain、Road、恒久Facility座標を重複させない。動的な所有、感染、Power、Constructible Facility、Unit、Enemy、Visibility、Wave Warning、Public Decision Log、Session lineage、軍需・Emergency MetricsはTrace／Artifactへ残し、Replay Loaderが完全Observationを再構成する。
+- v1.4.3はGame Rules / GameState / Config `2.3.0`、Fixed Map `fixed-31x31-v2`、Save Format `8`を使う。
+- v1.4.2以前の自動保存、セーブコード、JSON Save、Replay、Artifact、Sessionを一律で変換しない。Version不一致は現在Stateを変更せず、日本語・英語の理由付きで拒否する。旧データを自動変換、削除、上書きしない。新規ゲームはSave Format 8のautosave key `nowhere-left-to-hide:auto-save:v8`を使い、旧keyは読み取り確認だけを行って上書き・削除しない。
+- Save 8は31×31 Map、初期Normal Zombie 12体、外周120 Hexの`hordeSpawnReserve`、各Tileの`playerOccupancyAllowed`、Unit Fuelと携行Military Goods、Unit Config標準最大量との一致、Wind、Constructible Facility、Required / none電力、Wave Config、Warning方向、Wave進行、方向別Spawn Group ID、Final Group ID、RNG、複数PostのBranch参照、支線Policy、Zombie Noise Target、拠点感染者Pool、陥落／Noise Spawn結果、Event列、Queue Pressureを完全に検証する。Reserve内のPlayer UnitまたはPlayer配置物を持つStateを拒否する。Emergency Movement、Forecast、Supply、Ground／Aerial Visibility、上限、Queue Pressure、重要イベント履歴等の導出値は保存せず再計算する。
+- Artifact Schema 4.0.0は固定Map情報をゲーム単位で1回だけ保存し、Turn Observation Traceでは`mapId`から参照してTerrain、Road、恒久Facility座標を重複させない。動的な所有、感染、Power、Constructible Facility、Unit、Enemy、Visibility、Wave Warning、公開重要拠点Event、Public Decision Log、Session lineage、軍需・Emergency・LOS・感染連鎖MetricsはTrace／Artifactへ残し、Replay Loaderが完全Observationを再構成する。
 - Player-facing ReplayにはFoWを適用し、Browser BridgeのArtifactへ内部情報を含めない。Browser Bridge ArtifactのConfigは公開情報だけを含む。ローカル／CI Runnerの完全な検証Artifactだけが`verificationEvents`、完全Config、Internal Event列を保持し、Replay時に一致確認する。Live ObservationとBrowser Bridgeは完全Observationを返し、参照差分形式へ変更しない。
 
 ---
 
 # 16. Event・統計
 
-移動、戦闘、施設確保、人口配置・移住・徴用、資源生産・消費・不足、道路別避難民到着・未管理素通り、感染、鎮圧、陥落、復旧、ユニット自然回復、Checkpoint新設・移設・Role変更・Active化・Fallback・Remnant化・消滅・荒廃・後退・放棄、補給範囲拡張・縮小・補給理由の拒否、Horde、Game Overを理由付きEventとして保持する。`horde_warning`はWave番号、Spawn Turn、Final flag、抽選済み全方向、方向別予定Compositionを公開し、`horde_spawned`はWave番号、全方向、Group ID、Type別Spawn数を扱う。自然回復EventはUnit ID／Type、回復前後HP、基礎量、実回復量、区分、率、補給状態を持つ。ユニット撃破Eventは撃破直前位置と補給状態を持つ。Terrain防御の軽減前後Damage、Enemy発見／喪失、Zombie Idle、Horde Target継承／解除、Noise Target付与・到達・上書き、Final Horde進捗、Victory条件変化をInternal Eventへ追加し、公開EventはFoW境界を通す。
+移動、戦闘、施設確保、人口配置・移住・徴用、資源生産・消費・不足、道路別避難民到着・未管理素通り、感染、鎮圧、陥落、復旧、ユニット自然回復、Checkpoint新設・移設・Role変更・Active化・Fallback・Remnant化・消滅・荒廃・後退・放棄、補給範囲拡張・縮小・補給理由の拒否、Horde、Game Overを理由付きEventとして保持する。`horde_warning`はWave番号、Spawn Turn、Final flag、抽選済み全方向、方向別予定Compositionを公開し、`horde_spawned`はWave番号、全方向、Group ID、Type別Spawn数を扱う。自然回復EventはUnit ID／Type、回復前後HP、基礎量、実回復量、区分、率、補給状態を持つ。ユニット撃破Eventは撃破直前位置と補給状態を持つ。初回感染、感染／占有陥落、陥落／Noise由来Spawn、即時感染、連鎖陥落はSite Kind／Type／座標、陥落時感染者数、要求／実生成数、残存感染者数、Constructible残存感染者死亡数、Chain起点を型付きEventとして保持する。Terrain防御の軽減前後Damage、Enemy発見／喪失、Zombie Idle、Horde Target継承／解除、Noise Target付与・到達・上書き、Final Horde進捗、Victory条件変化をInternal Eventへ追加し、公開EventはFoW境界を通す。
 
-`noise_emitted`の公開PayloadはCombat Center、source Unit ID／Type、Noise Classだけを持つ。InternalなNoise Target／到達／上書きEventはHidden EnemyのIDや状態を含み得るため、Production UI、Agent Observation、Browser Bridge、公開終了結果へ出さない。
+`noise_emitted`の公開PayloadはCombat Center、source Unit ID／Type、Noise Classだけを持つ。拠点Eventは視界外でも対象、座標、実生成数、残存感染者数、連鎖起点を公開する一方、生成Zombieの個体ID、配置Hex、Targetを除く。Agent ObservationとUIはこの公開Eventから最新50件の重要イベント履歴を再構築する。InternalなNoise Target／到達／上書きEventはHidden EnemyのIDや状態を含み得るため、Production UI、Agent Observation、Browser Bridge、公開終了結果へ出さない。
 
 終了統計:
 
@@ -931,8 +939,10 @@ Agentゲーム単位Metricsは、各Version、Build ID、Map、Seed、Config、A
 - Active Checkpointの方針別branch-turn比率と、方針別Batch開始人数・完了人数・平均Queue、Capacity利用率、推定Throughput、Queue Pressure Turn
 - Zombie撃破、Horde迎撃
 - Wave別Spawn Turn、選択Direction、方向別Spawn／撃破数、Wave別撃破数、最終個体撃破Turn、Final Horde生成／撃破／全滅、通常／Horde Zombie撃破、最大Visible Zombie、Final Horde後Turn数、Supply内Zombie／感染Clear Turn、Victory Turn
-- Periodic Horde Zombie生成数、Periodic Normal Zombie生成数、Final Horde Zombie生成数、Final Normal Zombie生成数。標準ScheduleではH30 / N41 / Total71、Final Waveは36である。`finalHordeSpawned`と`finalHordeKilled`はFinal Groupの両Unit Typeを合算する。
-- Terrain別進入、Urban／Forest防御適用回数と防止Damage、通常Zombie Idle、Horde Target継承／解除、Noise Pulse総数、Police／National Guard Pulse数
+- 初期Normal Zombie数、Periodic Horde Zombie生成数、Periodic Normal Zombie生成数、Final Horde Zombie生成数、Final Normal Zombie生成数。標準Scheduleでは初期12、Wave H30 / N63 / Total93、Final WaveはH16 / N28 / Total44である。`finalHordeSpawned`と`finalHordeKilled`はFinal Groupの両Unit Typeを合算する。
+- Terrain別進入、Urban／Forest防御適用回数と防止Damage、通常Zombie Idle、Horde Target継承／解除、Noise Pulse総数、Police／National Guard Pulse数、Noise Class別Combat数、Noise反応陥落拠点数、再Spawn試行／実生成数、未生成感染者数、Noise起点即時感染／連鎖陥落と発生Unit Type別内訳
+- Ground Visionの遮蔽前Potential／遮蔽後Visible／Blocked Hex、Blocked最大・Turn平均、Civilian Drone Base建設数と最大Vision Radius、Aerial VisionがGround遮蔽範囲で新たに発見したEnemy数。Aerial Enemy発見数はVerification／Batch専用とする。
+- Site Kind／Type別の初回感染、感染陥落、Zombie占有破壊、陥落時実感染者数、Requested／Actual Spawn、陥落／Noise由来Normal Zombie、最大6体Spawn、未生成感染者、即時感染、連鎖陥落数・最大長・起点、感染者からZombieへの変換人口、Constructible残存感染者死亡、Turn 5以前の拠点損失
 - Map幅／高さ、Human Unit Type別移動Hex数・最大移動距離・6 Hex以上の長距離移動
 - Unit Type別Fuel消費・補給・commissioning Fuel、Supply外終了Turn、Fuel不足で移動不能となったUnit、Power／UnitへのState Fuel支出、Fuel不足Turn
 - Unit Type別の携行Military Goods固定消費、通常攻撃／反撃／迎撃／自動鎮圧消費、補充量、未充足補充量、撃破時喪失量、軍需0弱体攻撃回数、National Guardの距離1／距離2攻撃回数と消費量、国家軍需補充不足Turn
@@ -940,7 +950,7 @@ Agentゲーム単位Metricsは、各Version、Build ID、Map、Seed、Config、A
 - Wind発電量・停止Turn・Overrun・Recovery
 - Simple Farm／Civilian Drone Baseの建設・破壊、Simple Farm Food生産、最大Drone Vision、Constructible Overrun、建設拒否Reason
 - Guaranteed Defeat警告／無視、Resource別Single Point of Failure Turn、Supply増加なしCheckpoint移動、Queue Pressure Class別Turn
-- 完全な検証Metricsには`normalZombiesNoiseTargeted`、`noiseTargetsReached`、`noiseTargetsOverriddenByHorde`、`noiseTargetsOverriddenByVisiblePopulation`も含める。これらのHidden Enemy状態を推測し得る値はActive Game Observation、Production終了結果、公開Event、Browser Bridge Artifactから除く。
+- 完全な検証Metricsには`normalZombiesNoiseTargeted`、`noiseTargetsReached`、`noiseTargetsOverriddenByHorde`、`noiseTargetsOverriddenByVisiblePopulation`、Aerial VisionによるEnemy発見数も含める。これらのHidden Enemy状態を推測し得る値はActive Game Observation、Production終了結果、公開Event、Browser Bridge Artifactから除く。
 - 最終食料、民需品、軍需品、燃料
 
 Agent別集約は実行・完遂・技術的失敗・勝敗・勝率、主要値の平均・中央値・最小・最大・p10・p90、Game Over理由、Action／優先目標件数、同一Seed差分を持つ。
@@ -968,18 +978,20 @@ Session Metricsはゲーム成績と分離し、Active Session復帰、手動／
 - Checkpoint全道路／Post候補の安定順、候補Reasonと実Action一致、Build／Relocate／Activateの同Hex共存、複数理由の優先順、失敗時State／資源／Action回数／PRNG不変
 - 外周120 HexのHorde Spawn Reserve、Player Unit Move／Path／初期・完成配置、Checkpoint／Constructible候補・Actionの拒否、State／Resource／Action回数／RNG不変、Zombie Spawn／移動／停止とReserve内Attack／Counterattack／Interception／Damageを試験する。
 - Wave Config validation、Turn 5 / 10 / 20 / 35 / 50の方向数と方向別H/N Composition、Warning 2 Turn前開始、同Wave内の重複なし・Wave間重複可、固定方角順、4方向WaveのRNG非消費を試験する。
-- Warning開始、Spawn直前・直後のSave Round Trip、Session Resume、Checkpoint分岐、Replayで方向、Wave進行、Group ID、RNGが一致することを試験する。Wave全方向の原子的Spawn、配置不能時のTechnical Failureと非Commit、Final 4 Group全36体の撃破判定、H30 / N41 / Total71 Metricsを試験する。
+- Warning開始、Spawn直前・直後のSave Round Trip、Session Resume、Checkpoint分岐、Replayで方向、Wave進行、Group ID、RNGが一致することを試験する。Wave全方向の原子的Spawn、配置不能時のTechnical Failureと非Commit、Final 4 Group全44体の撃破判定、H30 / N63 / Total93 Metricsを試験する。
 - 固定Terrain数・座標・Overlay、重み付き移動、Road／Urban Cost、Water不可、同Cost決定性
 - Urban／Forest防御の攻撃・反撃・迎撃と非Combat Damage非適用
-- Unit／施設Vision和集合、境界距離、Visibility更新、UI／Observation／Legal Actions／EventのFoW、Hidden移動停止とCheckpoint公平性
+- Ground Unit／Capital／通常Facility／CheckpointのVision和集合、`hexLine()`のForest／Mountain遮蔽、Blocking Hex自身の可視、複数遮蔽物、盤端、Aerial Vision非遮蔽、Visibility更新、UI Overlay／Observation／Legal Actions／EventのFoW、Hidden移動停止とCheckpoint公平性
 - Checkpoint候補のHuman UI合法／不合法表示、日英Inline Reason、State更新時の理由消去、Observation／Bridge／Artifact一致、Hidden Enemy非漏洩
 - 通常Zombie Idle／Horde継承／Noise記憶／解除、HordeのCapital指向、Target伝播方向、`Visible > Horde継承 > Noise > Idle`、複数Horde決定性、Snapshot順序
-- Police Radius 4／National Guard Radius 5のNoise境界、Terrain非減衰、通常Combat 1回1Pulse、移動後Attack／Zombie Attack／InterceptionのCenter、Counterattack二重Pulseなし、Horde免疫、複数Pulseで最初のNoise保持、到達・Horde／Visible上書き、Phase Snapshot後Noiseの次Phase適用
+- Police Radius 4／National Guard Radius 8のNoise境界、Terrain非減衰、通常Combat 1回1Pulse、移動後Attack／Zombie Attack／InterceptionのCenter、Counterattack二重Pulseなし、Horde免疫、複数Pulseで最初のNoise保持、到達・Horde／Visible上書き、Phase Snapshot後Noiseの次Phase適用
+- 実感染者0～4／5／30以上、最大6体、隣接空き不足、Distance 2不使用、Checkpoint共通化、Constructible消滅、Wind除外、生成Unitの同Phase行動禁止と即時占有、Unit ID順FIFO連鎖、州都連鎖敗北を試験する。
+- Combat Noiseによる陥落拠点のID安定順再Spawn、未生成感染者保持、後続Pulse再試行、即時感染／連鎖、Hidden Spawn個体情報の非公開、最新50件の重要イベント履歴とToast集約を試験する。
 - Production UI／Agent API／公開Event／終了結果／Browser Bridge ArtifactがNoise Classだけを公開し、正確Radius、反応Hidden ZombieのID／数、Noise Target、Hidden Noise Metricsを漏らさないこと。Development Buildの読み取り専用診断だけが正確なCenter／Radius／範囲／反応／Targetを確認できること。
 - Scheduled Waveの規模・Timing・次Turn行動、Turn 50後の継続、3 Victory条件、Supply縮小、Defeat優先
-- 勝利・即時敗北、Save Format 7保存・復元、v1.4.1以前のSave／Replay／Artifact拒否
+- 勝利・即時敗北、Save Format 8保存・復元、v1.4.2以前のSave／Replay／Artifact拒否
 - UI数値入力とスライダー同期
-- 31×31固定Map、17恒久Facility、初期Unit／Zombie 6体、Terrain生成順、4支線距離15、建設用Plain候補
+- 31×31固定Map、17恒久Facility、初期Unit、初期Normal Zombie 12体の固定座標・順序・非重複・PRNG非消費、Terrain生成順、4支線距離15、建設用Plain候補
 - Movement Budget 10、Type別Fuel表、Fuel不足拒否、Hidden Enemy途中停止、発電後Round Robin補給、新Unit有償補給、死亡時Fuel喪失
 - Police 5／National Guard 20の初期・新規Unit携行軍需、固定消費、Unit ID順Round Robin補充、未充足、距離別通常攻撃／反撃／迎撃Cost、軍需0弱体、州兵距離2拒否、鎮圧／封じ込め、死亡時喪失、Forecastと実績一致
 - Fuel 0でだけ使えるPolice 3 MP／National Guard 2 MPのEmergency Movement、Terrain実効Cost、Hidden Enemy途中停止、補給圏帰還、Fuel非消費、Save／Replay再導出
@@ -990,7 +1002,7 @@ Session Metricsはゲーム成績と分離し、Active Session復帰、手動／
 - 一般施設とCheckpointの複合状態、現在停止と停止予測、Periodic／Final Horde Marker、Road接続方向、施設・Unit Offset
 - 全Asset成功と個別Missing／Decode／Texture登録失敗のFallback、成功Assetの維持、Loading完了、Fallback中の操作継続とState／RNG不変
 - Fog外の既知情報暗転とEnemy非表示、Layer順、Zoom`0.75`境界と最小`0.55`のLOD、日英Board Legend、現在／標準Config、電力HUDの需要／供給・Tooltip・Accessible Name・`0/0`
-- v1.4.2の同一Config、Map、Seed、Action列についてUnit Fuel・携行Military Goods・Emergency Movement、Constructible Facility、Required電力、固定Wave、Warning方向、Spawn Group、Unit ID、配置、Horde／Noise Target、Combat Noise、Checkpoint候補・Fallback、最終Result、主要MetricsのReplay一致を確認する。
+- v1.4.3の同一Config、Map、Seed、Action列についてUnit Fuel・携行Military Goods・Emergency Movement、Constructible Facility、Required電力、固定Wave、Warning方向、Spawn Group、Unit ID、配置、Ground／Aerial Visibility、Horde／Noise Target、Combat Noise、感染陥落Spawn、FIFO連鎖、Checkpoint候補・Fallback、最終Result、主要MetricsのReplay一致を確認する。
 - Sessionの連続実行、Active復帰、複数地点Checkpoint分岐でObservation、Legal Actions、公開Event、RNG結果、Decision番号、最終State hash、Artifact、Replayを一致させる。更新中断点、排他lock、stale lock、個別改変、hash chain、Version／Build／Map／Config不一致、Active破損、分岐親不変、Game Over最終Checkpoint、FoW非漏洩を試験する。
 
 ## 17.2 不変条件
@@ -1061,16 +1073,16 @@ UnitMaxMilitaryGoods == UnitConfigMaxMilitaryGoods
 5. 都市ソフトキャップ、生産上限、過密追加消費と予測が機能する。
 6. 5資源、Wind先行の5段階給電、発電後Unit補給、Required / none電力、都市停電、Military Factory入力、不足被害が機能する。
 7. 道路別自然流入、Active／Remnant Checkpointの3プール、支線Policy、配置待ち、潜伏感染が機能する。
-8. Turn 5 / 10 / 20 / 35 / 50の固定Multi-direction Wave、全方向Warning、Final 4 Group・36体、Turn 50以降と3条件Victoryが機能する。
+8. Turn 5 / 10 / 20 / 35 / 50の固定Multi-direction Wave、全方向Warning、H30／N63／計93体、Final 4 Group・44体、Turn 50以降と3条件Victoryが機能する。
 9. 日本語・英語Help、Board Legend、Checkpoint Role／FallbackとNoise Class、候補のInline Reason、終了統計を表示する。
-10. Save Format 7のautosave v7、セーブコード、JSON保存・復元と、v1.4.1以前の状態不変な拒否が機能する。
+10. Save Format 8のautosave v8、セーブコード、JSON保存・復元と、v1.4.2以前の状態不変な拒否が機能する。
 11. Headless、主要Unit Test、不変条件試験、最低100ゲームのRandom Testが成功する。
 12. 許諾的ライセンスだけを使用し、GitHub Actionsでテスト・ビルド・Pages公開が可能である。
 13. AgentObservationとAgentGameが非公開GameStateを渡さず、合法手とstepだけで進行できる。
-14. Balanced 4.2.0が公開情報だけを使って決定的に動作し、Strategic Forecast、Unit携行Military Goods、Emergency Movement、Fuel、Required電力、Constructible Facility、Checkpoint Network／Fallback、Reserve、Terrain、公開Noise Class、Vision、FoW、複数方向Horde、Victoryと既存経済・感染・補給Scenarioを扱い、Random 2.2.0とともにSeed 1～100の技術的失敗なし完遂を満たす。
+14. Balanced 4.3.0が公開情報だけを使って決定的に動作し、Strategic Forecast、Unit携行Military Goods、Emergency Movement、Fuel、Required電力、Constructible Facility、Checkpoint Network／Fallback、Reserve、Terrain、Police `medium`／National Guard `large`、Ground LOS、Aerial Vision、実感染者Spawn、陥落拠点Noise再Spawn、Vision、FoW、複数方向Horde、Victoryと既存経済・感染・補給Scenarioを扱い、Random 2.2.0とともにSeed 1～100の技術的失敗なし完遂を満たす。
 15. 統一RunnerとBatch CLIが同一Seed比較、Metrics、JSON／CSVを生成し、通常モードではReplay／Failure Artifactを生成・再生できる。`--summary-only`は完全Replayを省略する。
 16. Production Buildで通常UI・保存と分離した`window.NLTH`とAPI説明を利用できる。
-17. App `1.4.2`、Game Rules / GameState / Config `2.2.0`、Map `fixed-31x31-v1`、Save Format `7`、Agent / Observation / Browser Bridge `4.0.0`、Artifact Schema `3.0.0`、Checkpoint／Session Schema `1.0.0`のVersion境界が整合し、v1.4.1以前のSave／Replay／Artifact／Sessionを状態変更なしで拒否する。
+17. App `1.4.3`、Game Rules / GameState / Config `2.3.0`、Map `fixed-31x31-v2`、Save Format `8`、Agent / Observation / Browser Bridge `5.0.0`、Artifact Schema `4.0.0`、Checkpoint／Session Schema `1.0.0`のVersion境界が整合し、v1.4.2以前のSave／Replay／Artifact／Sessionを状態変更なしで拒否する。
 18. 補給オーバーレイ、新設・移設・Active化の全道路／Post候補、Role／Fallback、合法／不合法表示、Inline Reason、将来範囲、Visible阻害ZombieをHuman UIで確認できる。
 19. 生産施設上限30、10%／20%自然回復、感染封じ込めと自動鎮圧がHuman UIとAgent Observationで同じCore予測を表示する。
 20. Balanced Seed 1～300、Portable Package Smoke、外部AIによるGame Over・Artifact・Replay E2Eを完遂する。
@@ -1078,7 +1090,7 @@ UnitMaxMilitaryGoods == UnitConfigMaxMilitaryGoods
 22. 当ターン生産Food／Civilian Goods／Military Goodsを維持へ使用し、別工程入力へ連鎖させず、Civilian Goods維持予約と各Forecast内訳が実EndTurn結果へ一致する。
 23. 固定Terrain、重み付きPathfinding、Urban／Forest防御、Vision／FoWがHuman UI、Core、Agent、Replayで同じ判定を使う。
 24. Hidden Enemyの位置・ID・Target・Spawn座標、Noise Target、正確Noise Radius、Noise反応ID／数が公開経路から漏れず、公開移動候補、Checkpoint候補／Reason、Fallback可否、Production Artifactから推測できない。
-25. Final 4 GroupのNormal Zombieを含む全36体全滅、現在Supply内Zombie 0、現在Supply内感染者0の進捗を公開し、条件成立時に即時勝利する。
+25. Final 4 GroupのNormal Zombieを含む全44体全滅、現在Supply内Zombie 0、現在Supply内感染者0の進捗を公開し、条件成立時に即時勝利する。
 26. Waterを除く256×256 px盤面PNG、UI専用Asset Registry、一括Preload、個別Fallback、Road接続、Fog Layer、施設・Unit Offset、Zoom`0.75`未満のLODが機能し、Runtime PNG合計が3 MiB以下である。
 27. Help内Board Legendが盤面と同じRegistryを使い、日英でAsset、複合状態、LOD、動的Overlay、Mixed Horde Marker、現在または標準ConfigのCompositionとRule値を説明する。
 28. 上部電力HUDが次回EndTurnの`予測需要量 / 利用可能供給量`を表示し、Core Forecastだけで不足を判定してTooltipとAccessible Nameへ同じ意味を伝える。
@@ -1086,7 +1098,7 @@ UnitMaxMilitaryGoods == UnitConfigMaxMilitaryGoods
 30. Unit選択、明示的Move／Attack Mode、対象近傍Confirm／Cancel、Unit近傍WaitがMobileで完結し、キャンセル階層、画面端配置、Desktop操作、Core／Replay／Agent API境界を維持する。
 31. Wave／方向別Spawn Metrics、Final Horde全体Metrics、Power／Checkpoint Capacity／Fallback／Noise Metrics、Core Checkpoint候補がSave後の再導出、Observation、Bridge、Artifact、Replay、CSVで一貫する。Hidden Noise Metricsは完全な検証Artifact／CSVだけに含める。
 32. Active失陥直後に州都側のStandby、次にDormantへ自動Fallbackし、Arrivalより前にSupplyが再計算される。Standby不在時もDormantが第二線として機能し、前線側のPostは自動昇格しない。
-33. Human Unitが参加する通常Combatは1回だけNoise Pulseを出し、Normal Zombieだけが決定的に反応する。Production経路は両Human Unitを`medium`と公開し、開発Buildだけが正確なNoise診断を表示する。
+33. Human Unitが参加する通常Combatは1回だけNoise Pulseを出し、Normal Zombieと感染者を残す陥落拠点だけが決定的に反応する。Production経路はPoliceを`medium`、National Guardを`large`と公開し、開発Buildだけが正確なZombie Noise診断を表示する。
 34. Human UnitがMovement 10とType別Fuel Poolを使い、Windを先に使った発電後の残FuelからSupply内Unitへ決定的に補給される。
 35. Wind Power PlantがFuelなしElectricity 15、Vision 1、Zombie Target Value 5、Disable／Recoveryで動作し、人口・消費・敗北判定へ混入しない。
 36. Simple FarmとCivilian Drone BaseがSupply内Plainへ建設でき、費用、Type別上限、Build Turn、Power、人口、Supply喪失、感染、消滅、Recoveryが仕様どおり動く。
@@ -1097,6 +1109,8 @@ UnitMaxMilitaryGoods == UnitConfigMaxMilitaryGoods
 41. Police 5／National Guard 20の携行Military Goods、固定消費、距離別Combat Cost、軍需0弱体、Supply内Round Robin補充、補充後鎮圧、撃破時喪失がCore、UI、Observation、Artifact、Replay、Metricsで一致する。
 42. Fuel 0時だけのPolice 3 MP／National Guard 2 MP Emergency MovementがTerrain Cost、Hidden Enemy停止、補給圏帰還を含めCore、UI、Observation、Balanced、Replay、Metricsで一致する。
 43. AI Portableの7 Sessionコマンド、Public Decision Log、SHA-256 hash chain、原子的Active更新、排他lock、5 Turn／手動／最終Checkpoint、分岐lineage、破損・Version／Build拒否、FoW境界が機能する。
-44. GitHub Pages上のUIと`window.NLTH`を実ブラウザで確認し、Pages成功後のAI Portable ZIPがBundled NodeだけでSession smokeを完遂する。時間のかかるRelease Validation Workflowはv1.4.2 commitに対して起動される。
+44. GitHub Pages上のUIと`window.NLTH`を実ブラウザで確認し、Pages成功後のAI Portable ZIPがBundled NodeだけでSession smokeを完遂する。時間のかかるRelease Validation Workflowはv1.4.3 commitに対して起動される。
+45. 初期Normal Zombie 12体、Ground LOSとCapital Vision 5、Aerial Vision、実感染者5人単位の隣接Spawn、FIFO連鎖、陥落拠点Noise再SpawnがCore、UI、Observation、Save、Replay、Artifact、Metricsで一致する。
+46. 初回感染、陥落、Noise流出を日英Toastと最新50件の重要イベント履歴へ表示し、視界外拠点EventからHidden Zombie ID／配置Hexを漏らさない。
 
 ---

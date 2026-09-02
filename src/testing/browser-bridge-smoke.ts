@@ -100,7 +100,7 @@ function run(): void {
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
   for (const marker of [
-    '1.4.2', '2.2.0', '3.0.0', '4.0.0', 'fixed-31x31-v1', 'SetPowerSupply',
+    '1.4.3', '2.3.0', '4.0.0', '5.0.0', 'fixed-31x31-v2', 'SetPowerSupply',
     'BuildConstructibleFacility', 'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',
     'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates',
     'constructibleFacilityPositionCandidates', 'strategicForecast', 'queuePressureClass',
@@ -115,9 +115,10 @@ function run(): void {
     'screeningCapacity', 'powerModes', 'requiredPowerCapacity', 'standardOutputRule',
     'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression',
     'visibleToPlayer', 'finalHordeStatus', 'powerResourceLossByResource', 'checkpointCapacityUtilization',
-    'hordeWaves',
+    'hordeWaves', 'visionMode', 'terrainLosBlocking', 'site_zombies_spawned',
+    'groundVisionBlockedHexes', 'infectedPopulationConvertedToZombies',
   ]) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.4.2 schema marker: ${marker}`);
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.4.3 schema marker: ${marker}`);
   }
   // Compatibility validation may legitimately retain the names of removed
   // fields so an old Config can be rejected with a useful reason. Only flag
@@ -132,7 +133,7 @@ function run(): void {
     ['powerMode:boost', /(?:["']?powerMode["']?\s*:\s*["']boost["'])/u],
   ];
   for (const [forbidden, pattern] of forbiddenPublicFieldPatterns) {
-    if (pattern.test(bundle)) fail(`removed v1.4.2 public field remains in production bundle: ${forbidden}`);
+    if (pattern.test(bundle)) fail(`removed pre-v1.4.3 public field remains in production bundle: ${forbidden}`);
   }
   const productionCodeAndStyles = filesUnder(dist)
     .filter((path) => path.endsWith('.js') || path.endsWith('.css'))

@@ -6,7 +6,7 @@ import { findNearestOpenTiles, findReachablePaths, findShortestPath, pathMovemen
 import { SeededRng } from './rng';
 import { deriveUnitRecovery } from './recovery';
 import { effectiveMovementCost, terrainAdjustedDamage } from './terrain';
-import { canUnitSee, getPlayerVisibleTileKeys, getVisibleEnemyUnits, isVisibleToPlayer } from './visibility';
+import { canUnitSee, getPlayerVisionCoverage, getPlayerVisibleTileKeys, getVisibleEnemyUnits, isVisibleToPlayer } from './visibility';
 import {
   getBlockingZombiesForCheckpoint,
   activeCheckpointForBranch,
@@ -143,15 +143,17 @@ function cloneEvents(events: GameEvent[]): GameEvent[] {
   return JSON.parse(JSON.stringify(events)) as GameEvent[];
 }
 
-function emit(state: GameState, type: GameEventType, payload: JsonObject): void {
-  state.events.push({
+function emit(state: GameState, type: GameEventType, payload: JsonObject): GameEvent {
+  const event: GameEvent = {
     id: `event-${state.nextEventNumber}`,
     turn: state.turn,
     phase: state.phase,
     type,
     payload,
-  });
+  };
+  state.events.push(event);
   state.nextEventNumber += 1;
+  return event;
 }
 
 function saveRng(state: GameState, rng: SeededRng): void {
@@ -425,6 +427,7 @@ function resolveCombat(
   attacker: UnitState,
   defender: UnitState,
   kind: 'attack' | 'interception',
+  rng: SeededRng = SeededRng.fromState(state.rngState),
 ): void {
   if (!state.units.some((unit) => unit.id === attacker.id) || !state.units.some((unit) => unit.id === defender.id)) {
     return;
@@ -433,7 +436,7 @@ function resolveCombat(
   const attackProjection = forecastUnitCombatAtDistance(state, attacker, attackDistance);
   if (!attackProjection.canAttack) return;
   const human = attacker.isPlayerUnit ? attacker : defender.isPlayerUnit ? defender : null;
-  if (human) emitCombatNoise(state, human, { ...human.position });
+  const noise = human ? emitCombatNoise(state, human, { ...human.position }) : null;
   markAttacked(attacker, kind === 'interception');
   if (attacker.isPlayerUnit) attacker.currentMilitaryGoods = attackProjection.projectedMilitaryGoodsAfterAttack;
   emit(state, kind === 'interception' ? 'interception' : 'attack', {
@@ -449,6 +452,7 @@ function resolveCombat(
   }
   dealDamage(state, defender, attackProjection.effectiveAttack, attacker.id, kind);
   if (!state.units.some((unit) => unit.id === defender.id)) {
+    if (noise) resolveFallenSiteNoiseRespawns(state, noise.sourceUnitType, noise.center, rng);
     return;
   }
   const counterDistance = hexDistance(defender.position, attacker.position);
@@ -467,6 +471,7 @@ function resolveCombat(
     });
     dealDamage(state, attacker, counterProjection.effectiveAttack, defender.id, 'counterattack');
   }
+  if (noise) resolveFallenSiteNoiseRespawns(state, noise.sourceUnitType, noise.center, rng);
 }
 
 function interceptorsAt(state: GameState, mover: UnitState, position: HexCoord): UnitState[] {
@@ -519,6 +524,7 @@ function applyMovement(
   path: HexCoord[],
   movementBudget: number,
   movementMode: 'normal' | 'emergency' = 'normal',
+  rng: SeededRng = SeededRng.fromState(state.rngState),
 ): { reached: HexCoord; interception: UnitState | null } {
   let reached = { ...mover.position };
   let interception: UnitState | null = null;
@@ -540,7 +546,7 @@ function applyMovement(
     const interceptor = candidates[0];
     if (interceptor) {
       interception = interceptor;
-      resolveCombat(state, interceptor, mover, 'interception');
+      resolveCombat(state, interceptor, mover, 'interception', rng);
       break;
     }
   }
@@ -839,9 +845,13 @@ function establishLatentInfectionInState(
   if (candidates.length === 0) return;
   const target = rng.pick(candidates);
   const converted = Math.min(target.workers, latentInfected);
+  const wasInfected = target.infected > 0;
   target.workers -= converted;
   target.infected += converted;
   target.operationalStatus = 'infected';
+  if (converted > 0 && !wasInfected) {
+    markSiteInfectionStarted(state, 'facility', target.id, target.type, target.position, converted, 'latent_infection');
+  }
   emit(state, 'latent_infection', { checkpointId, facilityId: target.id, infected: converted });
 }
 
@@ -904,8 +914,10 @@ function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rn
       latentInfected,
       ['approved', 'screening', 'waiting'],
     );
+    const wasInfected = checkpoint.infected > 0;
     checkpoint.infected += converted;
     if (converted > 0) {
+      if (!wasInfected) markSiteInfectionStarted(state, 'checkpoint', checkpoint.id, deriveCheckpointRole(state, checkpoint), checkpoint.position, converted, 'latent_infection');
       emit(state, 'latent_infection', { checkpointId: checkpoint.id, infected: converted, pool: 'checkpoint' });
     }
     if (totalCheckpointPeople(checkpoint) === 0 && checkpoint.infected > 0) {
@@ -1836,7 +1848,135 @@ function spawnHordeComposition(
   return [...hordeUnits, ...normalUnits];
 }
 
-function overrunFacility(state: GameState, facility: FacilityState, rng: SeededRng): void {
+interface SpawnOccupancyEntry {
+  unitId: string;
+  chainRootEventId: string;
+  chainDepth: number;
+}
+
+interface SiteSpawnDescriptor {
+  siteKind: 'facility' | 'checkpoint';
+  siteId: string;
+  siteType: string;
+  position: HexCoord;
+  currentInfected: number;
+  constructibleDestroyed?: boolean;
+}
+
+function eligibleAdjacentZombieSpawnPositions(state: Readonly<GameState>, origin: HexCoord): HexCoord[] {
+  const occupied = occupiedKeys(state as GameState);
+  return hexNeighbors(origin)
+    .filter((position) => hexWithinBounds(position, state.map.width, state.map.height))
+    .filter((position) => !occupied.has(hexKey(position)))
+    .filter((position) => {
+      const tile = getTile(state.map, position);
+      return tile !== undefined && state.config.terrain.movementCost[tile.terrain] !== null;
+    })
+    .sort((left, right) => left.q - right.q || left.r - right.r);
+}
+
+function createSiteSpawnedZombie(state: GameState, position: HexCoord): UnitState {
+  let id = `zombie-${state.nextUnitNumber}`;
+  while (state.units.some((unit) => unit.id === id)) {
+    state.nextUnitNumber += 1;
+    id = `zombie-${state.nextUnitNumber}`;
+  }
+  state.nextUnitNumber += 1;
+  const unit = createUnit(state, id, 'zombie', position);
+  unit.canMove = false;
+  unit.canAttack = false;
+  state.units.push(unit);
+  return unit;
+}
+
+function resolveSiteZombieSpawn(
+  state: GameState,
+  site: SiteSpawnDescriptor,
+  rng: SeededRng,
+  eventType: 'site_fallen' | 'site_chain_fallen' | 'site_noise_respawn',
+  cause: string,
+  queue: SpawnOccupancyEntry[],
+  chainRootEventId: string | null,
+  chainDepth: number,
+  originUnitType: HumanUnitType | null = null,
+): { remainingInfected: number; actualSpawnCount: number; eventId: string } {
+  const perUnit = state.config.infection.zombieSpawnPopulationPerUnit;
+  const requestedSpawnCount = Math.min(
+    state.config.infection.maxZombieSpawnPerResolution,
+    Math.floor(site.currentInfected / perUnit),
+  );
+  let available = eligibleAdjacentZombieSpawnPositions(state, site.position);
+  const actualSpawnCount = Math.min(requestedSpawnCount, available.length);
+  const remainingInfected = site.currentInfected - actualSpawnCount * perUnit;
+  const constructibleInfectedDeaths = site.constructibleDestroyed ? remainingInfected : 0;
+  const primaryEvent = emit(state, eventType, {
+    siteKind: site.siteKind,
+    siteId: site.siteId,
+    siteType: site.siteType,
+    q: site.position.q,
+    r: site.position.r,
+    cause,
+    infectedAtFall: site.currentInfected,
+    requestedSpawnCount,
+    actualSpawnCount,
+    remainingInfected: site.constructibleDestroyed ? 0 : remainingInfected,
+    constructibleInfectedDeaths,
+    chainOriginEventId: chainRootEventId,
+    chainDepth,
+    sourceUnitType: originUnitType,
+  });
+  const rootEventId = chainRootEventId ?? primaryEvent.id;
+  const spawned: UnitState[] = [];
+  for (let index = 0; index < actualSpawnCount; index += 1) {
+    const position = available.length > 1 ? rng.pick(available) : available[0]!;
+    available = available.filter((candidate) => hexKey(candidate) !== hexKey(position));
+    const unit = createSiteSpawnedZombie(state, position);
+    spawned.push(unit);
+    queue.push({ unitId: unit.id, chainRootEventId: rootEventId, chainDepth });
+  }
+  if (spawned.length > 0) {
+    emit(state, 'site_zombies_spawned', {
+      siteKind: site.siteKind,
+      siteId: site.siteId,
+      siteType: site.siteType,
+      q: site.position.q,
+      r: site.position.r,
+      cause,
+      requestedSpawnCount,
+      actualSpawnCount,
+      remainingInfected: site.constructibleDestroyed ? 0 : remainingInfected,
+      chainOriginEventId: rootEventId,
+      sourceUnitType: originUnitType,
+      spawnedUnitIds: spawned.map((unit) => unit.id),
+      spawnedPositions: spawned.map((unit) => ({ q: unit.position.q, r: unit.position.r })),
+    });
+  }
+  state.statistics.infectedPopulationConvertedToZombies += actualSpawnCount * perUnit;
+  state.statistics.unspawnedInfectedPopulation += Math.max(0, requestedSpawnCount - actualSpawnCount) * perUnit;
+  if (site.constructibleDestroyed) {
+    state.statistics.constructibleInfectedDeaths += constructibleInfectedDeaths;
+  }
+  if (eventType === 'site_noise_respawn') {
+    state.statistics.fallenSitesTriggeredByNoise += 1;
+    state.statistics.noiseRespawnAttempts += 1;
+    state.statistics.noiseRespawnZombiesSpawned += actualSpawnCount;
+  }
+  if (eventType === 'site_chain_fallen') {
+    state.statistics.chainOverruns += 1;
+    state.statistics.maximumOverrunChainLength = Math.max(state.statistics.maximumOverrunChainLength, chainDepth);
+  }
+  return { remainingInfected, actualSpawnCount, eventId: primaryEvent.id };
+}
+
+function fallFacility(
+  state: GameState,
+  facility: FacilityState,
+  rng: SeededRng,
+  queue: SpawnOccupancyEntry[],
+  cause: string,
+  chainRootEventId: string | null,
+  chainDepth: number,
+): void {
   if (facility.type === 'windPowerPlant') {
     facility.operationalStatus = 'disabled';
     facility.infected = 0;
@@ -1844,15 +1984,34 @@ function overrunFacility(state: GameState, facility: FacilityState, rng: SeededR
     emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type });
     return;
   }
+  if (facility.status === 'ruined') return;
+  const infectedAtFall = facility.infected;
   if (facility.constructible) {
-    const infectedRemoved = facility.infected;
-    state.population.cumulativeDeaths += infectedRemoved;
+    const result = resolveSiteZombieSpawn(
+      state,
+      {
+        siteKind: 'facility', siteId: facility.id, siteType: facility.type,
+        position: facility.position, currentInfected: infectedAtFall, constructibleDestroyed: true,
+      },
+      rng,
+      chainRootEventId ? 'site_chain_fallen' : 'site_fallen',
+      cause,
+      queue,
+      chainRootEventId,
+      chainDepth,
+    );
+    state.population.cumulativeDeaths += result.remainingInfected;
     state.facilities.splice(state.facilities.findIndex((candidate) => candidate.id === facility.id), 1);
-    emit(state, 'facility_overrun', { facilityId: facility.id, constructibleDestroyed: true, infectedRemoved });
-    spawnZombies(state, facility.position, state.config.facilities[facility.type].overrunSpawnCount, rng, 'constructible_facility_overrun');
-    return;
-  }
-  if (facility.status === 'ruined') {
+    emit(state, 'facility_overrun', {
+      facilityId: facility.id,
+      constructibleDestroyed: true,
+      infectedAtFall,
+      requestedSpawnCount: Math.min(state.config.infection.maxZombieSpawnPerResolution, Math.floor(infectedAtFall / state.config.infection.zombieSpawnPopulationPerUnit)),
+      actualSpawnCount: result.actualSpawnCount,
+      remainingInfected: 0,
+      constructibleInfectedDeaths: result.remainingInfected,
+      chainOriginEventId: chainRootEventId,
+    });
     return;
   }
   facility.status = 'ruined';
@@ -1860,15 +2019,33 @@ function overrunFacility(state: GameState, facility: FacilityState, rng: SeededR
   // unit claims the site again after its internal infection reaches zero.
   facility.owner = 'none';
   facility.operationalStatus = 'ruined';
-  const capacityFallback = facility.workerCapacity * state.config.infection.fallBackCapacityRate;
-  const rounded = state.config.infection.fallBackCapacityRounding === 'ceil' ? Math.ceil(capacityFallback) : Math.floor(capacityFallback);
-  const previousInfected = facility.infected;
-  facility.infected = Math.max(facility.infected, rounded);
-  const discoveredInfected = facility.infected - previousInfected;
-  state.population.cumulativeDiscoveredInfected += discoveredInfected;
   facility.workers = 0;
-  emit(state, 'facility_overrun', { facilityId: facility.id, discoveredInfected });
-  spawnZombies(state, facility.position, state.config.facilities[facility.type].overrunSpawnCount, rng, 'facility_overrun');
+  const result = resolveSiteZombieSpawn(
+    state,
+    { siteKind: 'facility', siteId: facility.id, siteType: facility.type, position: facility.position, currentInfected: infectedAtFall },
+    rng,
+    chainRootEventId ? 'site_chain_fallen' : 'site_fallen',
+    cause,
+    queue,
+    chainRootEventId,
+    chainDepth,
+  );
+  facility.infected = result.remainingInfected;
+  emit(state, 'facility_overrun', {
+    facilityId: facility.id,
+    infectedAtFall,
+    requestedSpawnCount: Math.min(state.config.infection.maxZombieSpawnPerResolution, Math.floor(infectedAtFall / state.config.infection.zombieSpawnPopulationPerUnit)),
+    actualSpawnCount: result.actualSpawnCount,
+    remainingInfected: result.remainingInfected,
+    constructibleInfectedDeaths: 0,
+    chainOriginEventId: chainRootEventId,
+  });
+}
+
+function overrunFacility(state: GameState, facility: FacilityState, rng: SeededRng, cause = 'infection_fall'): void {
+  const queue: SpawnOccupancyEntry[] = [];
+  fallFacility(state, facility, rng, queue, cause, null, 0);
+  processSpawnOccupancyQueue(state, rng, queue);
 }
 
 function checkpointBranchIndex(state: Readonly<GameState>, branchId: string, position: HexCoord): number {
@@ -1932,10 +2109,19 @@ function resolveCheckpointFallback(
   return replacement;
 }
 
-function overrunCheckpoint(state: GameState, checkpoint: CheckpointState, rng: SeededRng): void {
+function fallCheckpoint(
+  state: GameState,
+  checkpoint: CheckpointState,
+  rng: SeededRng,
+  queue: SpawnOccupancyEntry[],
+  cause: string,
+  chainRootEventId: string | null,
+  chainDepth: number,
+): void {
   if (checkpoint.overrunProcessed || checkpoint.status === 'abandoned') {
     return;
   }
+  const infectedAtFall = checkpoint.infected;
   const previousRole = deriveCheckpointRole(state, checkpoint);
   const wasOperational = checkpoint.status === 'operational';
   const wasActive = previousRole === 'active';
@@ -1951,26 +2137,137 @@ function overrunCheckpoint(state: GameState, checkpoint: CheckpointState, rng: S
       resolveCheckpointFallback(state, checkpoint.branchId ?? checkpoint.direction, checkpoint);
     }
   }
-  const previousInfected = checkpoint.infected;
-  checkpoint.infected = Math.max(
-    checkpoint.infected,
-    Math.ceil(state.config.refugees.screeningCapacity * state.config.infection.fallBackCapacityRate),
-  );
-  const discoveredInfected = checkpoint.infected - previousInfected;
-  state.population.cumulativeDiscoveredInfected += discoveredInfected;
   checkpoint.waiting = 0;
   checkpoint.screening = 0;
   checkpoint.approved = 0;
   checkpoint.remainingTurns = 0;
+  const result = resolveSiteZombieSpawn(
+    state,
+    {
+      siteKind: 'checkpoint',
+      siteId: checkpoint.id,
+      siteType: previousRole,
+      position: checkpoint.position,
+      currentInfected: infectedAtFall,
+    },
+    rng,
+    chainRootEventId ? 'site_chain_fallen' : 'site_fallen',
+    cause,
+    queue,
+    chainRootEventId,
+    chainDepth,
+  );
+  checkpoint.infected = result.remainingInfected;
   emit(state, 'facility_overrun', {
     checkpointId: checkpoint.id,
     branchId: checkpoint.branchId ?? checkpoint.direction,
-    discoveredInfected,
+    infectedAtFall,
+    requestedSpawnCount: Math.min(state.config.infection.maxZombieSpawnPerResolution, Math.floor(infectedAtFall / state.config.infection.zombieSpawnPopulationPerUnit)),
+    actualSpawnCount: result.actualSpawnCount,
+    remainingInfected: result.remainingInfected,
+    constructibleInfectedDeaths: 0,
+    chainOriginEventId: chainRootEventId,
     previousStatus: wasOperational ? 'operational' : checkpoint.status,
   });
-  spawnZombies(state, checkpoint.position, state.config.facilities.capital.overrunSpawnCount, rng, 'checkpoint_overrun');
   if (wasActive) {
     emitSupplyChanged(state, checkpoint.branchId ?? checkpoint.direction, beforeSupply, 'checkpoint_ruined');
+  }
+}
+
+function overrunCheckpoint(state: GameState, checkpoint: CheckpointState, rng: SeededRng, cause = 'infection_fall'): void {
+  const queue: SpawnOccupancyEntry[] = [];
+  fallCheckpoint(state, checkpoint, rng, queue, cause, null, 0);
+  processSpawnOccupancyQueue(state, rng, queue);
+}
+
+function markSiteInfectionStarted(
+  state: GameState,
+  siteKind: 'facility' | 'checkpoint',
+  siteId: string,
+  siteType: string,
+  position: HexCoord,
+  amount: number,
+  source: string,
+  chainRootEventId: string | null = null,
+): void {
+  emit(state, 'site_infection_started', {
+    siteKind,
+    siteId,
+    siteType,
+    q: position.q,
+    r: position.r,
+    amount,
+    source,
+    chainOriginEventId: chainRootEventId,
+  });
+}
+
+function applyGeneratedZombieOccupancy(
+  state: GameState,
+  zombie: UnitState,
+  rng: SeededRng,
+  queue: SpawnOccupancyEntry[],
+  chainRootEventId: string,
+  chainDepth: number,
+): void {
+  const facility = getFacilityAt(state, zombie.position);
+  if (facility && facility.status !== 'ruined') {
+    if (facility.type === 'windPowerPlant' || (facility.constructible && facility.workers === 0)) {
+      facility.operationalStatus = 'disabled';
+      facility.infected = 0;
+      emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type, source: zombie.id, immediateSpawnOccupation: true });
+    } else {
+      const wasInfected = facility.infected > 0;
+      const converted = Math.min(zombie.attack, facility.workers);
+      facility.workers -= converted;
+      facility.infected += converted;
+      if (converted > 0) {
+        facility.operationalStatus = 'infected';
+        state.statistics.civilianLosses += converted;
+        state.statistics.infectionLosses += converted;
+        state.statistics.immediateInfectionsFromSpawn += 1;
+        if (!wasInfected) markSiteInfectionStarted(state, 'facility', facility.id, facility.type, facility.position, converted, zombie.id, chainRootEventId);
+        emit(state, 'site_immediate_infection', {
+          siteKind: 'facility', siteId: facility.id, siteType: facility.type,
+          q: facility.position.q, r: facility.position.r, amount: converted,
+          remainingHealthy: facility.workers, infected: facility.infected,
+          chainOriginEventId: chainRootEventId,
+        });
+      }
+      if (facility.workers === 0 && (converted > 0 || facility.infected > 0)) {
+        fallFacility(state, facility, rng, queue, 'spawn_immediate_occupation', chainRootEventId, chainDepth + 1);
+      }
+    }
+  }
+  const checkpoint = getCheckpointAt(state, zombie.position);
+  if (checkpoint && ['operational', 'remnant'].includes(checkpoint.status)) {
+    const wasInfected = checkpoint.infected > 0;
+    const converted = removeCheckpointPeople(checkpoint, zombie.attack);
+    checkpoint.infected += converted;
+    if (converted > 0) {
+      state.statistics.civilianLosses += converted;
+      state.statistics.infectionLosses += converted;
+      state.statistics.immediateInfectionsFromSpawn += 1;
+      if (!wasInfected) markSiteInfectionStarted(state, 'checkpoint', checkpoint.id, deriveCheckpointRole(state, checkpoint), checkpoint.position, converted, zombie.id, chainRootEventId);
+      emit(state, 'site_immediate_infection', {
+        siteKind: 'checkpoint', siteId: checkpoint.id, siteType: deriveCheckpointRole(state, checkpoint),
+        q: checkpoint.position.q, r: checkpoint.position.r, amount: converted,
+        remainingHealthy: totalCheckpointPeople(checkpoint), infected: checkpoint.infected,
+        chainOriginEventId: chainRootEventId,
+      });
+    }
+    if (totalCheckpointPeople(checkpoint) === 0 && (checkpoint.status === 'operational' || checkpoint.infected > 0)) {
+      fallCheckpoint(state, checkpoint, rng, queue, 'spawn_immediate_occupation', chainRootEventId, chainDepth + 1);
+    }
+  }
+}
+
+function processSpawnOccupancyQueue(state: GameState, rng: SeededRng, queue: SpawnOccupancyEntry[]): void {
+  while (queue.length > 0) {
+    const entry = queue.shift()!;
+    const zombie = state.units.find((unit) => unit.id === entry.unitId);
+    if (!zombie) continue;
+    applyGeneratedZombieOccupancy(state, zombie, rng, queue, entry.chainRootEventId, entry.chainDepth);
   }
 }
 
@@ -2230,8 +2527,13 @@ function hasVisiblePopulationTarget(state: GameState, zombie: UnitState): boolea
   );
 }
 
-function emitCombatNoise(state: GameState, source: UnitState, center: HexCoord): void {
-  if (source.type !== 'police' && source.type !== 'nationalGuard') return;
+interface CombatNoiseResolution {
+  sourceUnitType: HumanUnitType;
+  center: HexCoord;
+}
+
+function emitCombatNoise(state: GameState, source: UnitState, center: HexCoord): CombatNoiseResolution | null {
+  if (source.type !== 'police' && source.type !== 'nationalGuard') return null;
   const radius = state.config.noise[source.type];
   const noiseClass = state.config.noise.publicClass[source.type];
   const affected: string[] = [];
@@ -2266,6 +2568,68 @@ function emitCombatNoise(state: GameState, source: UnitState, center: HexCoord):
       affectedZombieIds: affected,
       affectedCount: affected.length,
     });
+  }
+  return { sourceUnitType: source.type, center: { ...center } };
+}
+
+function resolveFallenSiteNoiseRespawns(
+  state: GameState,
+  sourceUnitType: HumanUnitType,
+  center: HexCoord,
+  rng: SeededRng,
+): void {
+  if (!state.config.infection.noiseRespawnEnabled) return;
+  const radius = state.config.noise[sourceUnitType];
+  const minimum = state.config.infection.zombieSpawnPopulationPerUnit;
+  const sites: Array<
+    | { kind: 'facility'; id: string; facility: FacilityState }
+    | { kind: 'checkpoint'; id: string; checkpoint: CheckpointState }
+  > = [
+    ...state.facilities
+      .filter((facility) => facility.status === 'ruined' && !facility.constructible && facility.type !== 'windPowerPlant' && facility.infected >= minimum)
+      .map((facility) => ({ kind: 'facility' as const, id: facility.id, facility })),
+    ...state.checkpoints
+      .filter((checkpoint) => ['ruined', 'remnant'].includes(checkpoint.status) && checkpoint.infected >= minimum)
+      .map((checkpoint) => ({ kind: 'checkpoint' as const, id: checkpoint.id, checkpoint })),
+  ].filter((site) => hexDistance(site.kind === 'facility' ? site.facility.position : site.checkpoint.position, center) <= radius)
+    .sort((left, right) => left.id.localeCompare(right.id) || (left.kind === right.kind ? 0 : left.kind === 'facility' ? -1 : 1));
+
+  for (const site of sites) {
+    const queue: SpawnOccupancyEntry[] = [];
+    if (site.kind === 'facility') {
+      const result = resolveSiteZombieSpawn(
+        state,
+        {
+          siteKind: 'facility', siteId: site.facility.id, siteType: site.facility.type,
+          position: site.facility.position, currentInfected: site.facility.infected,
+        },
+        rng,
+        'site_noise_respawn',
+        'combat_noise',
+        queue,
+        null,
+        0,
+        sourceUnitType,
+      );
+      site.facility.infected = result.remainingInfected;
+    } else {
+      const result = resolveSiteZombieSpawn(
+        state,
+        {
+          siteKind: 'checkpoint', siteId: site.checkpoint.id, siteType: deriveCheckpointRole(state, site.checkpoint),
+          position: site.checkpoint.position, currentInfected: site.checkpoint.infected,
+        },
+        rng,
+        'site_noise_respawn',
+        'combat_noise',
+        queue,
+        null,
+        0,
+        sourceUnitType,
+      );
+      site.checkpoint.infected = result.remainingInfected;
+    }
+    processSpawnOccupancyQueue(state, rng, queue);
   }
 }
 
@@ -2368,6 +2732,10 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
   for (const zombieId of zombieIds) {
     const zombie = getUnit(state, zombieId);
     if (!zombie) continue;
+    // Site-spawned Zombies are created with both action flags disabled. They
+    // can occupy/infect their spawn hex immediately, but do not receive a
+    // normal Zombie action until startPlayerTurn arms them for the next cycle.
+    if (!zombie.canMove && !zombie.canAttack) continue;
     const decision = decisions.get(zombieId) ?? {
       target: null,
       reason: 'idle' as const,
@@ -2403,7 +2771,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
     }
     const immediateTarget = zombie.canAttack ? nearestAttackableHuman(state, zombie) : null;
     if (immediateTarget) {
-      resolveCombat(state, zombie, immediateTarget, 'attack');
+      resolveCombat(state, zombie, immediateTarget, 'attack', rng);
       continue;
     }
     if (!decision.target) {
@@ -2417,7 +2785,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
     const route = targetPath(state, zombie, target);
     const path = route?.path ?? null;
     if (path && path.length > 1) {
-      applyMovement(state, zombie, path, zombie.movement);
+      applyMovement(state, zombie, path, zombie.movement, 'normal', rng);
     }
     const survivor = getUnit(state, zombieId);
     if (
@@ -2433,7 +2801,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
     }
     const afterMoveTarget = survivor?.canAttack ? nearestAttackableHuman(state, survivor) : null;
     if (survivor && afterMoveTarget) {
-      resolveCombat(state, survivor, afterMoveTarget, 'attack');
+      resolveCombat(state, survivor, afterMoveTarget, 'attack', rng);
     }
     if (checkImmediateDefeat(state)) return;
   }
@@ -2454,32 +2822,36 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
         facility.infected = 0;
         emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type, source: zombie.id });
       } else if (facility.status !== 'ruined') {
+        const wasInfected = facility.infected > 0;
         const converted = Math.min(zombie.attack, facility.workers);
         facility.workers -= converted;
         facility.infected += converted;
         if (converted > 0) facility.operationalStatus = 'infected';
         if (converted > 0) {
+          if (!wasInfected) markSiteInfectionStarted(state, 'facility', facility.id, facility.type, facility.position, converted, zombie.id);
           state.statistics.civilianLosses += converted;
           state.statistics.infectionLosses += converted;
           emit(state, 'infection_spread', { facilityId: facility.id, amount: converted, source: zombie.id });
         }
         if (facility.workers === 0 && (converted > 0 || facility.infected > 0)) {
-          overrunFacility(state, facility, rng);
+          overrunFacility(state, facility, rng, converted > 0 ? 'zombie_occupation' : 'infection_fall');
         }
       }
     }
     const checkpoint = getCheckpointAt(state, zombie.position);
     if (checkpoint && ['operational', 'remnant'].includes(checkpoint.status)) {
+      const wasInfected = checkpoint.infected > 0;
       const converted = removeCheckpointPeople(checkpoint, zombie.attack);
       checkpoint.infected += converted;
       if (converted > 0) {
+        if (!wasInfected) markSiteInfectionStarted(state, 'checkpoint', checkpoint.id, deriveCheckpointRole(state, checkpoint), checkpoint.position, converted, zombie.id);
         state.statistics.civilianLosses += converted;
         state.statistics.infectionLosses += converted;
         emit(state, 'infection_spread', { checkpointId: checkpoint.id, amount: converted, source: zombie.id });
       }
       // An empty operational checkpoint is still destroyed by zombie occupation.
       if (totalCheckpointPeople(checkpoint) === 0 && (checkpoint.status === 'operational' || checkpoint.infected > 0)) {
-        overrunCheckpoint(state, checkpoint, rng);
+        overrunCheckpoint(state, checkpoint, rng, converted > 0 ? 'zombie_occupation' : 'empty_zombie_occupation');
       }
     }
     if (checkImmediateDefeat(state)) return;
@@ -2784,6 +3156,30 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
   placeApprovedRefugees(state);
   resolveCheckpointRemnants(state);
   synchronizePopulation(state);
+  const coverage = getPlayerVisionCoverage(state);
+  state.statistics.groundVisionPotentialHexes = coverage.groundPotential.size;
+  state.statistics.groundVisionVisibleHexes = coverage.groundVisible.size;
+  state.statistics.groundVisionBlockedHexes = coverage.groundBlocked.size;
+  state.statistics.maxGroundVisionBlockedHexes = Math.max(state.statistics.maxGroundVisionBlockedHexes, coverage.groundBlocked.size);
+  state.statistics.cumulativeGroundVisionBlockedHexes += coverage.groundBlocked.size;
+  state.statistics.groundVisionSamples += 1;
+  state.statistics.maxCivilianDroneVisionRadius = Math.max(
+    state.statistics.maxCivilianDroneVisionRadius,
+    ...state.facilities.filter((facility) => facility.type === 'civilianDroneBase').map((facility) => facility.workers * 2),
+  );
+  const previouslyDiscovered = new Set(state.events
+    .filter((event) => event.type === 'aerial_enemy_discovered' && typeof event.payload.unitId === 'string')
+    .map((event) => event.payload.unitId as string));
+  const aerialDiscoveries = state.units.filter((unit) =>
+    !unit.isPlayerUnit
+      && !previouslyDiscovered.has(unit.id)
+      && coverage.groundBlocked.has(hexKey(unit.position))
+      && coverage.aerialVisible.has(hexKey(unit.position)),
+  );
+  for (const unit of aerialDiscoveries) {
+    emit(state, 'aerial_enemy_discovered', { unitId: unit.id });
+  }
+  state.statistics.aerialDiscoveriesInGroundBlockedArea += aerialDiscoveries.length;
   checkImmediateGameEnd(state);
   saveRng(state, rng);
 }
@@ -3416,7 +3812,7 @@ function produceUnit(state: GameState, action: Extract<GameAction, { type: 'Prod
   return null;
 }
 
-function move(state: GameState, action: MoveAction): ActionError | null {
+function move(state: GameState, action: MoveAction, rng: SeededRng = SeededRng.fromState(state.rngState)): ActionError | null {
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   const result = getMovePath(state, action);
@@ -3424,13 +3820,13 @@ function move(state: GameState, action: MoveAction): ActionError | null {
   const movementBudget = result.movementMode === 'emergency'
     ? state.config.units[result.unit.type as HumanUnitType].emergencyMovementPoints
     : result.unit.movement;
-  applyMovement(state, result.unit, result.path, movementBudget, result.movementMode);
+  applyMovement(state, result.unit, result.path, movementBudget, result.movementMode, rng);
   state.actionsTakenThisTurn += 1;
   synchronizePopulation(state);
   return null;
 }
 
-function attack(state: GameState, action: AttackAction): ActionError | null {
+function attack(state: GameState, action: AttackAction, rng: SeededRng = SeededRng.fromState(state.rngState)): ActionError | null {
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   const attacker = getUnit(state, action.attackerId);
@@ -3444,7 +3840,7 @@ function attack(state: GameState, action: AttackAction): ActionError | null {
   }
   attacker.actionState = 'acted';
   attacker.canMove = false;
-  resolveCombat(state, attacker, target, 'attack');
+  resolveCombat(state, attacker, target, 'attack', rng);
   state.actionsTakenThisTurn += 1;
   synchronizePopulation(state);
   return null;
@@ -3596,6 +3992,7 @@ function buildConstructibleFacility(
     recoveryOperationalTurn: null,
   };
   state.facilities.push(facility);
+  if (action.facilityType === 'civilianDroneBase') state.statistics.civilianDroneBasesBuilt += 1;
   state.resources.civilianGoods -= config.buildCivilianGoods;
   state.actionsTakenThisTurn += 1;
   emit(state, 'constructible_built', {
@@ -4041,8 +4438,8 @@ export class GameEngine implements HeadlessGame {
     if (action.type === 'EndTurn') {
       if (!isPlayerPhase(candidate)) actionError = error(action, 'wrong_phase', 'Turn can only end during the player phase');
       else actionError = endTurn(candidate, rng);
-    } else if (action.type === 'Move') actionError = move(candidate, action);
-    else if (action.type === 'Attack') actionError = attack(candidate, action);
+    } else if (action.type === 'Move') actionError = move(candidate, action, rng);
+    else if (action.type === 'Attack') actionError = attack(candidate, action, rng);
     else if (action.type === 'Wait') actionError = wait(candidate, action);
     else if (action.type === 'AssignWorkers') actionError = assignWorkers(candidate, action);
     else if (action.type === 'TransferPopulation') actionError = transferPopulation(candidate, action);
