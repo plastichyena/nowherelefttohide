@@ -383,6 +383,9 @@ export interface AgentApiInfo {
       roles: CheckpointRole[];
       activePerBranchLimit: 1;
       preparedPostLimit: number;
+      screeningCapacity: number;
+      estimatedScreeningThroughputByPolicy: Record<CheckpointPolicy, number>;
+      queuePressureThresholds: Record<'none' | 'low' | 'medium' | 'high', { min: number; max: number | null }>;
       policyOwner: 'road_branch';
       fallbackPriority: string[];
       standbyProvidesArrivalSupplyVision: false;

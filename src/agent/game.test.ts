@@ -116,9 +116,18 @@ describe('AgentGame public boundary', () => {
       fairPlay: { hiddenEnemiesBlock: false, blockerUnitIdsPublic: false },
     });
     expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('checkpoint_supply_zombie_blocked');
+    expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('horde_spawn_reserve');
     expect(info.rules.checkpoint).toMatchObject({
       activePerBranchLimit: 1,
       preparedPostLimit: 3,
+      screeningCapacity: 20,
+      estimatedScreeningThroughputByPolicy: { passThrough: 20, normal: 10, strict: 4 },
+      queuePressureThresholds: {
+        none: { min: 0, max: 0 },
+        low: { min: 1, max: 20 },
+        medium: { min: 21, max: 40 },
+        high: { min: 41, max: null },
+      },
       policyOwner: 'road_branch',
       fallbackPriority: ['capital_side_standby', 'capital_side_dormant'],
     });
