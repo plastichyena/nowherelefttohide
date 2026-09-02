@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
+import { singleFinalWave } from './testConfig';
 import { deriveVictoryProgress, GameEngine } from './engine';
 import { hexKey, hexNeighbors } from './hex';
 import { createUnit } from './state';
@@ -28,8 +29,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
 
   it('spawns the Final Horde after its configured zombie phase and lets it act next turn', () => {
     const config = createDefaultConfig({
-      finalHordeTurn: 1,
-      horde: { finalComposition: { hordeZombie: 1, zombie: 0 } },
+      horde: singleFinalWave(1),
     });
     const engine = new GameEngine(3, config);
     const spawn = engine.step({ type: 'EndTurn' });
@@ -50,8 +50,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
 
   it('wins immediately after an accepted action when all three current-supply conditions are met', () => {
     const config = createDefaultConfig({
-      finalHordeTurn: 1,
-      horde: { finalComposition: { hordeZombie: 1, zombie: 0 } },
+      horde: singleFinalWave(1),
     });
     const engine = new GameEngine(11, config);
     engine.step({ type: 'EndTurn' });
@@ -95,7 +94,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
     zombie.canAttack = false;
     police.position = { q: 19, r: 15 };
     const guard = editable.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.position = { q: 0, r: 0 };
+    guard.position = { q: 1, r: 1 };
     guard.vision = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: editable }).error).toBeNull();
 
@@ -117,7 +116,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
     zombie.canAttack = true;
     police.position = { q: 19, r: 15 };
     const guard = editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard');
-    guard.position = { q: 0, r: 0 };
+    guard.position = { q: 1, r: 1 };
     guard.vision = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: editable }).error).toBeNull();
     expect(engine.getLegalActions()).toContainEqual({ type: 'Move', unitId: police.id, destination: { q: 21, r: 15 } });
@@ -130,7 +129,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
   });
 
   it('snapshots Horde targets and propagates only their target coordinate to normal zombies', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 30 });
+    const config = createDefaultConfig({ horde: singleFinalWave(30) });
     const engine = new GameEngine(13, config);
     const editable = JSON.parse(JSON.stringify(engine.getState()));
     editable.units = editable.units.filter((unit: { isPlayerUnit: boolean }) => unit.isPlayerUnit);
@@ -138,8 +137,8 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
     normal.vision = 1;
     const horde = createUnit(editable, 'horde-test', 'hordeZombie', { q: 14, r: 13 });
     horde.vision = 0;
-    editable.units.find((unit: { type: string }) => unit.type === 'police')!.position = { q: 0, r: 0 };
-    editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard')!.position = { q: 30, r: 30 };
+    editable.units.find((unit: { type: string }) => unit.type === 'police')!.position = { q: 1, r: 1 };
+    editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard')!.position = { q: 29, r: 29 };
     editable.units.find((unit: { type: string }) => unit.type === 'police')!.vision = 0;
     editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard')!.vision = 0;
     horde.spawnGroupId = 'periodic-test';
@@ -160,7 +159,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
     editable.units = editable.units.filter((unit: { isPlayerUnit: boolean }) => unit.isPlayerUnit);
     editable.units.push(createUnit(editable, 'zombie-hidden', 'zombie', { q: 15, r: 1 }));
     expect(engine.step({ type: 'LoadSnapshot', snapshot: editable }).error).toBeNull();
-    const action = { type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 0 } } as const;
+    const action = { type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 1 } } as const;
     expect(engine.getLegalActions()).toContainEqual(action);
     expect(engine.step(action).error).toBeNull();
   });

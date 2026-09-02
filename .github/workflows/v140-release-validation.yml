@@ -1,4 +1,4 @@
-name: v1.4.1 Release Validation
+name: v1.4.2 Release Validation
 
 on:
   workflow_dispatch:
@@ -7,12 +7,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: v141-release-validation-${{ github.ref }}
+  group: v142-release-validation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   sensitivity:
-    name: ${{ matrix.agent }} fuel-${{ matrix.fuel }} farm-${{ matrix.farmFood }} horde-${{ matrix.finalTurn }}
+    name: ${{ matrix.agent }} fuel-${{ matrix.fuel }} farm-${{ matrix.farmFood }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -21,7 +21,6 @@ jobs:
         agent: [random, balanced]
         fuel: [standard, half]
         farmFood: [5, 10]
-        finalTurn: [30, 35, 40]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -41,7 +40,6 @@ jobs:
           AGENT: ${{ matrix.agent }}
           FUEL: ${{ matrix.fuel }}
           FARM_FOOD: ${{ matrix.farmFood }}
-          FINAL_TURN: ${{ matrix.finalTurn }}
         run: |
           set -euo pipefail
           if [[ "${FUEL}" == "half" ]]; then
@@ -52,38 +50,44 @@ jobs:
             GUARD_FUEL=22
           fi
           export POLICE_FUEL GUARD_FUEL
-          CONFIG_JSON="$(node -e 'console.log(JSON.stringify({units:{police:{maxFuel:Number(process.env.POLICE_FUEL)},nationalGuard:{maxFuel:Number(process.env.GUARD_FUEL)}},facilities:{simpleFarm:{production:{outputs:{food:Number(process.env.FARM_FOOD)}}}},finalHordeTurn:Number(process.env.FINAL_TURN)}))')"
+          CONFIG_JSON="$(node -e 'console.log(JSON.stringify({units:{police:{maxFuel:Number(process.env.POLICE_FUEL)},nationalGuard:{maxFuel:Number(process.env.GUARD_FUEL)}},facilities:{simpleFarm:{production:{outputs:{food:Number(process.env.FARM_FOOD)},powerMode:"none",powerCapacity:0,requiresPower:false}}}}))')"
           npx --no-install vite-node --script src/agent/sim-cli.ts \
             --agent="${AGENT}" \
             --games=100 \
             --seed=1 \
             --summary-only \
             --config-json="${CONFIG_JSON}" \
-            --out="output/simulations/v141-${AGENT}-${FUEL}-farm${FARM_FOOD}-horde${FINAL_TURN}" \
+            --out="output/simulations/v142-${AGENT}-${FUEL}-farm${FARM_FOOD}" \
             --overwrite
 
       - name: Upload sensitivity report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v141-${{ matrix.agent }}-${{ matrix.fuel }}-farm${{ matrix.farmFood }}-horde${{ matrix.finalTurn }}
-          path: output/simulations/v141-*
+          name: v142-${{ matrix.agent }}-${{ matrix.fuel }}-farm${{ matrix.farmFood }}
+          path: output/simulations/v142-*
           if-no-files-found: error
           retention-days: 30
 
-  balanced-300:
-    name: Balanced standard seeds ${{ matrix.seed }}-${{ matrix.endSeed }}
+  standard-seeds:
+    name: ${{ matrix.agent }} standard seeds ${{ matrix.seed }}-${{ matrix.endSeed }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         include:
-          - seed: 1
+          - agent: random
+            seed: 1
             endSeed: 100
-          - seed: 101
+          - agent: balanced
+            seed: 1
+            endSeed: 100
+          - agent: balanced
+            seed: 101
             endSeed: 200
-          - seed: 201
+          - agent: balanced
+            seed: 201
             endSeed: 300
     steps:
       - name: Check out repository
@@ -99,13 +103,13 @@ jobs:
         run: npm ci
 
       - name: Run release batch
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/v141-balanced-release-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=${{ matrix.agent }} --games=100 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/v142-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
 
       - name: Upload release report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v141-balanced-release-${{ matrix.seed }}-${{ matrix.endSeed }}
-          path: output/simulations/v141-balanced-release-${{ matrix.seed }}-${{ matrix.endSeed }}
+          name: v142-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
+          path: output/simulations/v142-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
           if-no-files-found: error
           retention-days: 30

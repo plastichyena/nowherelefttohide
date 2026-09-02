@@ -244,6 +244,7 @@ function createTiles(roads: Set<string>): HexTile[] {
         movementCost: terrain === 'forest' ? 2 : terrain === 'mountain' ? 3 : 1,
         facilityId: null,
         hordeEntranceDirections: [],
+        playerOccupancyAllowed: q !== 0 && q !== FIXED_MAP_WIDTH - 1 && r !== 0 && r !== FIXED_MAP_HEIGHT - 1,
       });
     }
   }
@@ -336,6 +337,9 @@ function buildFixedMap(
   const facilities = createFacilities(capacities);
   const hordeEntrances = createEntrances();
   const roadBranches = createRoadBranches();
+  const hordeSpawnReserve = tiles
+    .filter((tile) => !tile.playerOccupancyAllowed)
+    .map((tile) => coord(tile.q, tile.r));
 
   const tileByKey = new Map(tiles.map((tile) => [tile.key, tile]));
   for (const facility of facilities) {
@@ -359,6 +363,7 @@ function buildFixedMap(
     roadTiles: sortedCoordinates(roads),
     facilities,
     hordeEntrances,
+    hordeSpawnReserve,
     roadBranches,
     initialZombiePositions: FIXED_INITIAL_ZOMBIE_POSITIONS.map((position) => ({ ...position })),
   };
@@ -425,6 +430,16 @@ export function isRoad(map: FixedMap, position: HexCoord): boolean {
   return getTile(map, position)?.road === true;
 }
 
+/** Static public Map Rule shared by movement, placement, UI, and Agent APIs. */
+export function isHordeSpawnReserve(map: FixedMap, position: HexCoord): boolean {
+  const key = hexKey(position);
+  return map.hordeSpawnReserve.some((candidate) => hexKey(candidate) === key);
+}
+
+export function canPlayerOccupyHex(map: FixedMap, position: HexCoord): boolean {
+  return getTile(map, position) !== undefined && !isHordeSpawnReserve(map, position);
+}
+
 export interface FixedMapValidationResult {
   valid: boolean;
   errors: string[];
@@ -476,6 +491,9 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     if (!hexWithinBounds(tile, FIXED_MAP_WIDTH, FIXED_MAP_HEIGHT)) {
       errors.push(`tile outside bounds: ${tile.key}`);
     }
+    if (typeof tile.playerOccupancyAllowed !== 'boolean') {
+      errors.push(`tile ${tile.key} must declare playerOccupancyAllowed`);
+    }
     if (seenTiles.has(tile.key)) errors.push(`duplicate tile: ${tile.key}`);
     seenTiles.add(tile.key);
     const expectedCost =
@@ -494,6 +512,17 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     }
     if (tile.facilityId !== null && tile.terrain !== 'plain') {
       errors.push(`facility base terrain must be plain: ${tile.key}`);
+    }
+  }
+  const reserve = Array.isArray(map?.hordeSpawnReserve) ? map.hordeSpawnReserve : [];
+  const reserveKeys = new Set(reserve.map(hexKey));
+  if (reserve.length !== 120 || reserveKeys.size !== 120) {
+    errors.push('map must contain the 120 unique outer-ring Horde Spawn Reserve hexes');
+  }
+  for (const tile of map?.tiles ?? []) {
+    const expectedReserve = tile.q === 0 || tile.q === FIXED_MAP_WIDTH - 1 || tile.r === 0 || tile.r === FIXED_MAP_HEIGHT - 1;
+    if (reserveKeys.has(tile.key) !== expectedReserve || tile.playerOccupancyAllowed === expectedReserve) {
+      errors.push(`tile ${tile.key} has inconsistent Horde Spawn Reserve metadata`);
     }
   }
 

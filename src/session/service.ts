@@ -427,7 +427,7 @@ export class SessionService {
 
   private assertDescriptorCompatible(descriptor: SessionDescriptor): void {
     for (const field of [
-      'appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion',
+      'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion',
       'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit', 'mapId',
     ] as const) {
       if (descriptor[field] !== this.identity[field]) {

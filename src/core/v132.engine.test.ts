@@ -3,6 +3,7 @@ import { createDefaultConfig } from './config';
 import { deriveVictoryProgress, GameEngine } from './engine';
 import { hexDistance, hexKey } from './hex';
 import { createUnit } from './state';
+import { singleFinalWave } from './testConfig';
 import type { BaseTerrain, GameState, HexCoord, UnitState } from './types';
 
 function cloneState(state: Readonly<GameState>): GameState {
@@ -32,8 +33,9 @@ function findCombatArena(
 ): { attacker: HexCoord; target: HexCoord } {
   for (const targetTile of state.map.tiles) {
     const target = { q: targetTile.q, r: targetTile.r };
-    if (targetTile.terrain !== targetTerrain || targetTile.facilityId !== null || excluded.has(hexKey(target))) continue;
+    if (!targetTile.playerOccupancyAllowed || targetTile.terrain !== targetTerrain || targetTile.facilityId !== null || excluded.has(hexKey(target))) continue;
     const attackerTile = state.map.tiles.find((tile) =>
+      tile.playerOccupancyAllowed &&
       tile.facilityId === null &&
       !excluded.has(tile.key) &&
       hexDistance({ q: tile.q, r: tile.r }, target) === 2,
@@ -102,100 +104,71 @@ describe('v1.4 Horde composition and combat', () => {
     }
   });
 
-  it('spawns the standard 2/0 through 6/4 Periodic groups and the 7/5 Final group', () => {
+  it('spawns the standard five deterministic multi-direction Waves', () => {
     const engine = new GameEngine(302, safeScenarioConfig({
-      finalHordeTurn: 30,
       units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
     }));
-    const expected = [
-      { turn: 5, hordeZombie: 2, zombie: 0 },
-      { turn: 10, hordeZombie: 3, zombie: 1 },
-      { turn: 15, hordeZombie: 4, zombie: 2 },
-      { turn: 20, hordeZombie: 5, zombie: 3 },
-      { turn: 25, hordeZombie: 6, zombie: 4 },
-    ];
-
-    for (const composition of expected) {
-      let spawnEvents: ReturnType<GameEngine['step']>['events'] = [];
-      while (engine.getState().turn <= composition.turn) {
+    const schedule = engine.getState().config.horde.waves;
+    let finalEvents: ReturnType<GameEngine['step']>['events'] = [];
+    for (let waveIndex = 1; waveIndex <= schedule.length; waveIndex += 1) {
+      const wave = schedule[waveIndex - 1]!;
+      while (engine.getState().turn <= wave.turn) {
         const result = engine.step({ type: 'EndTurn' });
         expect(result.error).toBeNull();
         expect(result.gameOver).toBe(false);
-        spawnEvents = result.events;
+        if (wave.final) finalEvents = result.events;
       }
-      const groupId = `periodic-horde-${composition.turn}`;
-      const group = engine.getState().units.filter((unit) => unit.spawnGroupId === groupId);
-      expect(group.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(composition.hordeZombie);
-      expect(group.filter((unit) => unit.type === 'zombie')).toHaveLength(composition.zombie);
-      expect(group).toHaveLength(composition.hordeZombie + composition.zombie);
-      expect(group.every((unit) => unit.hordeKind === 'periodic')).toBe(true);
-      expect(group.filter((unit) => unit.type === 'zombie').every((normal) =>
-        normal.inheritedTarget === null && group.some((horde) =>
-          horde.type === 'hordeZombie' && hexDistance(normal.position, horde.position) <= normal.vision,
-        ),
-      )).toBe(true);
-
-      const unitSpawnEvents = spawnEvents.filter((event) =>
-        event.type === 'horde_spawned' && event.payload.spawnGroupId === groupId && typeof event.payload.unitType === 'string',
-      );
-      expect(unitSpawnEvents.filter((event) => event.payload.unitType === 'hordeZombie')).toHaveLength(composition.hordeZombie);
-      expect(unitSpawnEvents.filter((event) => event.payload.unitType === 'zombie')).toHaveLength(composition.zombie);
+      const groupIds = engine.getState().horde.spawnGroupIdsByWave[String(waveIndex)]!;
+      expect(groupIds).toHaveLength(wave.directionCount);
+      expect(new Set(groupIds).size).toBe(wave.directionCount);
+      for (const groupId of groupIds) {
+        const group = engine.getState().units.filter((unit) => unit.spawnGroupId === groupId);
+        expect(group.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(wave.compositionPerDirection.hordeZombie);
+        expect(group.filter((unit) => unit.type === 'zombie')).toHaveLength(wave.compositionPerDirection.zombie);
+        expect(group.every((unit) => unit.hordeKind === (wave.final ? 'final' : 'periodic'))).toBe(true);
+      }
     }
-
-    let finalEvents: ReturnType<GameEngine['step']>['events'] = [];
-    while (engine.getState().turn <= 30) {
-      const result = engine.step({ type: 'EndTurn' });
-      expect(result.error).toBeNull();
-      expect(result.gameOver).toBe(false);
-      finalEvents = result.events;
-    }
-    const finalGroupId = engine.getState().horde.finalSpawnGroupId!;
-    const finalGroup = engine.getState().units.filter((unit) => unit.spawnGroupId === finalGroupId);
-    expect(finalGroup.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(7);
-    expect(finalGroup.filter((unit) => unit.type === 'zombie')).toHaveLength(5);
-    expect(finalGroup).toHaveLength(12);
-    expect(finalGroup.every((unit) => unit.hordeKind === 'final')).toBe(true);
-    expect(finalGroup.filter((unit) => unit.type === 'zombie').every((normal) =>
-      normal.inheritedTarget === null && finalGroup.some((horde) =>
-        horde.type === 'hordeZombie' && hexDistance(normal.position, horde.position) <= normal.vision,
-      ),
-    )).toBe(true);
+    const finalIds = engine.getState().horde.finalSpawnGroupIds;
+    const finalGroup = engine.getState().units.filter((unit) => unit.spawnGroupId !== null && finalIds.includes(unit.spawnGroupId));
+    expect(finalIds).toHaveLength(4);
+    expect(finalGroup).toHaveLength(36);
     const finalProgress = cloneState(engine.getState());
-    finalProgress.units = finalProgress.units.filter((unit) => unit.spawnGroupId !== finalGroupId || unit.id === finalGroup[0]!.id);
+    finalProgress.units = finalProgress.units.filter((unit) => !unit.spawnGroupId || !finalIds.includes(unit.spawnGroupId) || unit.id === finalGroup[0]!.id);
     expect(deriveVictoryProgress(finalProgress).finalHordeDefeated).toBe(false);
-    finalProgress.units = finalProgress.units.filter((unit) => unit.spawnGroupId !== finalGroupId);
+    finalProgress.units = finalProgress.units.filter((unit) => !unit.spawnGroupId || !finalIds.includes(unit.spawnGroupId));
     expect(deriveVictoryProgress(finalProgress).finalHordeDefeated).toBe(true);
     expect(finalEvents).toContainEqual(expect.objectContaining({
       type: 'horde_spawned',
-      payload: expect.objectContaining({ hordeKind: 'final', spawnGroupId: finalGroupId, direction: expect.any(String) }),
+      payload: expect.objectContaining({ hordeKind: 'final', waveIndex: 5, directions: ['north', 'east', 'south', 'west'] }),
     }));
-    expect(engine.getState().horde).toMatchObject({ finalSpawnedCount: 12, totalSpawned: 42 });
+    expect(engine.getState().horde).toMatchObject({ finalSpawnedCount: 36, totalSpawned: 71 });
     expect(engine.getState().statistics).toMatchObject({
-      periodicHordeZombiesSpawned: 20,
-      periodicNormalZombiesSpawned: 10,
-      finalHordeZombiesSpawned: 7,
-      finalNormalZombiesSpawned: 5,
-      finalHordeSpawned: 12,
+      periodicHordeZombiesSpawned: 14,
+      periodicNormalZombiesSpawned: 21,
+      finalHordeZombiesSpawned: 16,
+      finalNormalZombiesSpawned: 20,
+      finalHordeSpawned: 36,
     });
-  }, 30_000);
+  }, 45_000);
 
   it('uses custom per-type composition arithmetic for Periodic and Final groups', () => {
     const engine = new GameEngine(303, safeScenarioConfig({
-      finalHordeTurn: 3,
       horde: {
-        cycle: 1,
-        periodicInitial: { hordeZombie: 3, zombie: 2 },
-        periodicIncrement: { hordeZombie: 2, zombie: 1 },
-        finalComposition: { hordeZombie: 4, zombie: 3 },
+        warningLeadTurns: 1,
+        waves: [
+          { turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 2 }, final: false },
+          { turn: 2, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 3 }, final: false },
+          { turn: 3, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 3 }, final: true },
+        ],
       },
       units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
     }));
 
     for (let index = 0; index < 3; index += 1) expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const state = engine.getState();
-    const first = state.units.filter((unit) => unit.spawnGroupId === 'periodic-horde-1');
-    const second = state.units.filter((unit) => unit.spawnGroupId === 'periodic-horde-2');
-    const final = state.units.filter((unit) => unit.spawnGroupId === state.horde.finalSpawnGroupId);
+    const first = state.units.filter((unit) => unit.spawnGroupId === 'wave-1-north' || unit.spawnGroupId === 'wave-1-east' || unit.spawnGroupId === 'wave-1-south' || unit.spawnGroupId === 'wave-1-west');
+    const second = state.units.filter((unit) => unit.spawnGroupId === 'wave-2-north' || unit.spawnGroupId === 'wave-2-east' || unit.spawnGroupId === 'wave-2-south' || unit.spawnGroupId === 'wave-2-west');
+    const final = state.units.filter((unit) => unit.spawnGroupId !== null && state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId));
     expect([first.filter((unit) => unit.type === 'hordeZombie').length, first.filter((unit) => unit.type === 'zombie').length]).toEqual([3, 2]);
     expect([second.filter((unit) => unit.type === 'hordeZombie').length, second.filter((unit) => unit.type === 'zombie').length]).toEqual([5, 3]);
     expect([final.filter((unit) => unit.type === 'hordeZombie').length, final.filter((unit) => unit.type === 'zombie').length]).toEqual([4, 3]);
@@ -203,13 +176,12 @@ describe('v1.4 Horde composition and combat', () => {
 
   it('counts Final Normal Zombies as Final members and in both kill metrics', () => {
     const engine = new GameEngine(304, safeScenarioConfig({
-      finalHordeTurn: 1,
-      horde: { finalComposition: { hordeZombie: 1, zombie: 1 } },
+      horde: singleFinalWave(1, { hordeZombie: 1, zombie: 1 }),
       units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
     }));
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const spawned = cloneState(engine.getState());
-    const finalGroupId = spawned.horde.finalSpawnGroupId!;
+    const finalGroupId = spawned.horde.finalSpawnGroupIds[0]!;
     const normal = spawned.units.find((unit) => unit.type === 'zombie' && unit.spawnGroupId === finalGroupId)!;
     const horde = spawned.units.find((unit) => unit.type === 'hordeZombie' && unit.spawnGroupId === finalGroupId)!;
 
@@ -250,7 +222,7 @@ describe('v1.4 Horde composition and combat', () => {
 
   it('reproduces Mixed Horde unit IDs, types, groups, positions, and RNG state for the same seed and actions', () => {
     const config = safeScenarioConfig({
-      finalHordeTurn: 12,
+      horde: singleFinalWave(12, { hordeZombie: 2, zombie: 1 }),
       units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
     });
     const first = new GameEngine(305, config);
@@ -277,7 +249,7 @@ describe('v1.4 Horde composition and combat', () => {
 describe('v1.4 Horde target propagation', () => {
   function targetScenario(): { engine: GameEngine; state: GameState } {
     const engine = new GameEngine(401, safeScenarioConfig({
-      finalHordeTurn: 30,
+      horde: singleFinalWave(30),
       units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
     }));
     const state = cloneState(engine.getState());

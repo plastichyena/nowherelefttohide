@@ -147,8 +147,8 @@ function publicEvents(
       }
       if (event.type === 'horde_spawned') {
         for (const field of [
-          'units', 'unit', 'spawnedUnits', 'position', 'positions', 'spawnGroupId', 'groupId',
-          'count', 'hordeZombieCount', 'normalZombieCount', 'hordeZombies', 'normalZombies',
+          'units', 'unit', 'spawnedUnits', 'position', 'positions', 'spawnGroupId', 'spawnGroupIds', 'groupId',
+          'hordeZombies', 'normalZombies',
         ] as const) delete payload[field];
       }
       const spawnedEnemyId = event.type === 'horde_spawned' && typeof payload.zombieId === 'string'

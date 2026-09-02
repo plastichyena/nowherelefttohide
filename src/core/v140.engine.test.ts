@@ -15,14 +15,14 @@ import { hexDistance, hexKey } from './hex';
 import { createCityPopulationSnapshot, createInitialState, createUnit, facilityZombieTargetValue, synchronizePopulation } from './state';
 import { getPlayerVisibleTileKeys } from './visibility';
 import { isHexSupplied } from './supply';
+import { singleFinalWave } from './testConfig';
 import type { GameConfig, GameState, HexCoord } from './types';
 
 const CENTER: HexCoord = { q: 15, r: 15 };
 
 function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): GameConfig {
   return createDefaultConfig({
-    finalHordeTurn: 100,
-    horde: { cycle: 100 },
+    horde: singleFinalWave(100),
     economy: {
       initialZombieCount: 0,
       initialResources: {
@@ -80,7 +80,7 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const snapshot = cloneState(engine.getState());
     const police = snapshot.units.find((unit) => unit.type === 'police')!;
     const guard = snapshot.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.position = { q: 0, r: 0 };
+    guard.position = { q: 1, r: 1 };
     police.currentFuel = 1;
     loadScenario(engine, snapshot);
     const before = engine.getState();
@@ -99,7 +99,7 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const snapshot = cloneState(engine.getState());
     const police = snapshot.units.find((unit) => unit.type === 'police')!;
     const guard = snapshot.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.position = { q: 0, r: 0 };
+    guard.position = { q: 1, r: 1 };
     police.currentFuel = 12;
     const hidden = createUnit(snapshot, 'hidden-fuel-blocker', 'zombie', { q: 19, r: 15 });
     hidden.movement = 0;
@@ -140,7 +140,7 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const guard = snapshot.units.find((unit) => unit.type === 'nationalGuard')!;
     police.currentFuel = 10;
     guard.currentFuel = 20;
-    guard.position = { q: 0, r: 0 };
+    guard.position = { q: 1, r: 1 };
     loadScenario(engine, snapshot);
     const before = engine.getState();
     const forecast = forecastEndTurn(before);
@@ -208,10 +208,9 @@ describe('v1.4 Wind Power Plant', () => {
     facilityAt(snapshot, 'capital').workers -= 1;
     loadScenario(engine, snapshot);
     const forecast = forecastEndTurn(engine.getState());
-    expect(forecast.electricity.requiredPowerDemand).toBe(10);
-    expect(forecast.electricity.industrialBoostDemand).toBe(10);
+    expect(forecast.electricity.requiredPowerDemand).toBe(25);
     expect(forecast.fuel.windPowerAvailable).toBe(15);
-    expect(forecast.fuel.projectedPowerFuelDemand).toBe(1);
+    expect(forecast.fuel.projectedPowerFuelDemand).toBe(2);
     expect(forecast.fuel.projectedPowerFuelUsed).toBe(1);
   });
 
@@ -271,7 +270,7 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
       workers: 0,
       builtTurn: before.turn,
       populationOperationalTurn: before.turn + 1,
-      powerSupplyEnabled: true,
+      powerSupplyEnabled: false,
     });
     expect(engine.getState().resources.civilianGoods).toBe(before.resources.civilianGoods - 15);
     expect(engine.getState().actionsTakenThisTurn).toBe(before.actionsTakenThisTurn + 1);
@@ -300,7 +299,7 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
     expect(engine.getState().facilities.filter((facility) => facility.constructible && facility.type === 'civilianDroneBase')).toHaveLength(1);
   });
 
-  it('runs Simple Farm at Food 5 per Worker only when fully powered and reports Worker target value', () => {
+  it('runs Simple Farm at Food 5 per Worker without Electricity and reports Worker target value', () => {
     const engine = new GameEngine(1422, safeConfig());
     const position = firstBuildable(engine, 'simpleFarm');
     expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position }).error).toBeNull();
@@ -309,13 +308,11 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
     expect(engine.step({ type: 'AssignWorkers', facilityId: farm.id, workers: 10 }).error).toBeNull();
     const staffed = engine.getState();
     const projection = forecastFacilityProduction(staffed).find((entry) => entry.facilityId === farm.id)!;
-    expect(projection).toMatchObject({ operatingWorkers: 10, projectedPowerSupplied: true, outputs: { food: 50 } });
+    expect(projection).toMatchObject({ operatingWorkers: 10, powerMode: 'none', projectedPowerSupplied: false, outputs: { food: 50 } });
     expect(facilityZombieTargetValue(staffed, facilityAt(staffed, farm.id))).toBe(10);
-    const beforeToggle = staffed.actionsTakenThisTurn;
-    expect(engine.step({ type: 'SetPowerSupply', facilityId: farm.id, enabled: false }).error).toBeNull();
-    expect(engine.getState().actionsTakenThisTurn).toBe(beforeToggle);
-    expect(forecastFacilityProduction(engine.getState()).find((entry) => entry.facilityId === farm.id)?.outputs).toEqual({});
-    expect(engine.step({ type: 'SetPowerSupply', facilityId: farm.id, enabled: true }).error).toBeNull();
+    const beforeToggle = engine.getState();
+    expect(engine.step({ type: 'SetPowerSupply', facilityId: farm.id, enabled: true }).error?.code).toBe('power_supply_not_applicable');
+    expect(engine.getState()).toEqual(beforeToggle);
     expect(forecastFacilityProduction(engine.getState()).find((entry) => entry.facilityId === farm.id)?.outputs).toEqual({ food: 50 });
   });
 
@@ -388,13 +385,13 @@ describe('v1.4 Strategic Forecast and Queue Pressure', () => {
     expect(deriveStrategicForecast(hidden).guaranteedDefeat).toEqual(civilianGoods);
   });
 
-  it('uses the exact Queue Pressure boundaries 0 / 10 / 11 / 20 / 21', () => {
-    expect(getQueuePressureClass(0, 10)).toBe('none');
-    expect(getQueuePressureClass(1, 10)).toBe('low');
-    expect(getQueuePressureClass(10, 10)).toBe('low');
-    expect(getQueuePressureClass(11, 10)).toBe('medium');
-    expect(getQueuePressureClass(20, 10)).toBe('medium');
-    expect(getQueuePressureClass(21, 10)).toBe('high');
+  it('uses the exact Queue Pressure boundaries 0 / 20 / 21 / 40 / 41', () => {
+    expect(getQueuePressureClass(0, 20)).toBe('none');
+    expect(getQueuePressureClass(1, 20)).toBe('low');
+    expect(getQueuePressureClass(20, 20)).toBe('low');
+    expect(getQueuePressureClass(21, 20)).toBe('medium');
+    expect(getQueuePressureClass(40, 20)).toBe('medium');
+    expect(getQueuePressureClass(41, 20)).toBe('high');
   });
 
   it('keeps Forecast and Candidate Queries pure, detached, and deterministic', () => {

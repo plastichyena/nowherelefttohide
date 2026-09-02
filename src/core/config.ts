@@ -14,7 +14,7 @@ import type {
   UnitType,
 } from './types';
 
-export const CONFIG_VERSION = '2.1.0';
+export const CONFIG_VERSION = '2.2.0';
 export const DEFAULT_MAP_ID = 'fixed-31x31-v1';
 
 const facilityIds: FacilityId[] = [
@@ -93,25 +93,25 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
   },
   farm: {
     workerCapacity: 30,
-    production: production(emptyInputs(), { food: 5 }, 'boost', 5),
+    production: production(emptyInputs(), { food: 10 }, 'required', 5),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   civilianFactory: {
     workerCapacity: 30,
-    production: production(emptyInputs(), { civilianGoods: 5 }, 'boost', 5),
+    production: production(emptyInputs(), { civilianGoods: 10 }, 'required', 5),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   militaryFactory: {
     workerCapacity: 30,
-    production: production({ civilianGoods: 1 }, { militaryGoods: 2 }, 'boost', 5),
+    production: production({ civilianGoods: 1 }, { militaryGoods: 4 }, 'required', 5),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   refinery: {
     workerCapacity: 30,
-    production: production(emptyInputs(), { fuel: 5 }, 'none'),
+    production: production(emptyInputs(), { fuel: 5 }, 'required', 5),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
@@ -129,7 +129,7 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
   },
   simpleFarm: {
     workerCapacity: 10,
-    production: production(emptyInputs(), { food: 5 }, 'required', 5),
+    production: production(emptyInputs(), { food: 5 }, 'none'),
     overrunSpawnCount: 2,
     buildCivilianGoods: 15, visionRadius: 1, zombieTargetValue: 0,
   },
@@ -199,7 +199,6 @@ const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopula
 export const DEFAULT_CONFIG: GameConfig = {
   version: CONFIG_VERSION,
   mapId: DEFAULT_MAP_ID,
-  finalHordeTurn: 30,
   maxActionsPerTurn: 100,
   units: defaultUnitConfig,
   facilities: defaultFacilityConfig,
@@ -211,19 +210,21 @@ export const DEFAULT_CONFIG: GameConfig = {
     rounding: 'ceil',
   },
   horde: {
-    cycle: 5,
-    periodicInitial: { hordeZombie: 2, zombie: 0 },
-    periodicIncrement: { hordeZombie: 1, zombie: 1 },
-    warningStartTurn: 1,
-    spawnOnlyBeforeFinalTurn: true,
-    finalComposition: { hordeZombie: 7, zombie: 5 },
+    warningLeadTurns: 2,
+    waves: [
+      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 1 }, final: false },
+      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 2 }, final: false },
+      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 4 }, final: false },
+      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 4 }, final: false },
+      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 5 }, final: true },
+    ],
   },
   refugees: {
     arrivalIntervalMin: 2,
     arrivalIntervalMax: 4,
     arrivalPeopleMin: 5,
     arrivalPeopleMax: 10,
-    screeningCapacity: 10,
+    screeningCapacity: 20,
     policies: {
       passThrough: {
         turns: 0,
@@ -354,7 +355,9 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (typeof config.mapId !== 'string' || config.mapId.length === 0) {
     errors.push('mapId must be a non-empty string');
   }
-  requireInteger(errors, config.finalHordeTurn, 'finalHordeTurn', 1);
+  if (Object.prototype.hasOwnProperty.call(config as unknown as Record<string, unknown>, 'finalHordeTurn')) {
+    errors.push('finalHordeTurn is not part of Game Rules 2.2.0; derive it from the Final Wave');
+  }
   requireInteger(errors, config.maxActionsPerTurn, 'maxActionsPerTurn', 1);
 
   const unitTypes: UnitType[] = ['police', 'nationalGuard', 'zombie', 'hordeZombie'];
@@ -431,14 +434,12 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     requireInteger(errors, facility.production.powerCapacity, `facilities.${type}.production.powerCapacity`, 0);
     requireInteger(errors, facility.production.powerGeneration, `facilities.${type}.production.powerGeneration`, 0);
     requireInteger(errors, facility.production.fixedPowerGeneration, `facilities.${type}.production.fixedPowerGeneration`, 0);
-    if (!['required', 'boost', 'none'].includes(facility.production.powerMode)) {
-      errors.push(`facilities.${type}.production.powerMode must be required, boost, or none`);
+    if (!['required', 'none'].includes(facility.production.powerMode)) {
+      errors.push(`facilities.${type}.production.powerMode must be required or none`);
     }
-    const expectedPowerMode = type === 'capital' || type === 'city' || type === 'simpleFarm' || type === 'civilianDroneBase'
+    const expectedPowerMode = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(type)
       ? 'required'
-      : ['farm', 'civilianFactory', 'militaryFactory'].includes(type)
-        ? 'boost'
-        : 'none';
+      : 'none';
     if (facility.production.powerMode !== expectedPowerMode) {
       errors.push(`facilities.${type}.production.powerMode must be ${expectedPowerMode}`);
     }
@@ -551,9 +552,13 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (!horde || typeof horde !== 'object') {
     errors.push('horde is required');
   } else {
-    requireInteger(errors, horde.cycle, 'horde.cycle', 1);
-    requireInteger(errors, horde.warningStartTurn, 'horde.warningStartTurn', 1);
-    const validateComposition = (composition: typeof horde.periodicInitial, path: string): void => {
+    for (const retiredField of ['cycle', 'periodicInitial', 'periodicIncrement', 'warningStartTurn', 'spawnOnlyBeforeFinalTurn', 'finalComposition']) {
+      if (Object.prototype.hasOwnProperty.call(horde as unknown as Record<string, unknown>, retiredField)) {
+        errors.push(`horde.${retiredField} is not supported by Game Rules 2.2.0`);
+      }
+    }
+    requireInteger(errors, horde.warningLeadTurns, 'horde.warningLeadTurns', 1);
+    const validateComposition = (composition: GameConfig['horde']['waves'][number]['compositionPerDirection'], path: string): void => {
       if (!composition || typeof composition !== 'object') {
         errors.push(`${path} is required`);
         return;
@@ -567,16 +572,32 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
         }
       }
     };
-    validateComposition(horde.periodicInitial, 'horde.periodicInitial');
-    if (!horde.periodicIncrement || typeof horde.periodicIncrement !== 'object') {
-      errors.push('horde.periodicIncrement is required');
+    if (!Array.isArray(horde.waves) || horde.waves.length === 0) {
+      errors.push('horde.waves must contain at least one wave');
     } else {
-      requireInteger(errors, horde.periodicIncrement.hordeZombie, 'horde.periodicIncrement.hordeZombie', 0);
-      requireInteger(errors, horde.periodicIncrement.zombie, 'horde.periodicIncrement.zombie', 0);
-    }
-    validateComposition(horde.finalComposition, 'horde.finalComposition');
-    if (typeof horde.spawnOnlyBeforeFinalTurn !== 'boolean') {
-      errors.push('horde.spawnOnlyBeforeFinalTurn must be boolean');
+      let previousTurn = 0;
+      let finalCount = 0;
+      horde.waves.forEach((wave, index) => {
+        const path = `horde.waves.${index}`;
+        requireInteger(errors, wave?.turn, `${path}.turn`, 1);
+        requireInteger(errors, wave?.directionCount, `${path}.directionCount`, 1);
+        if (Number.isInteger(wave?.directionCount) && (wave.directionCount < 1 || wave.directionCount > 4)) {
+          errors.push(`${path}.directionCount must be between 1 and 4`);
+        }
+        validateComposition(wave?.compositionPerDirection, `${path}.compositionPerDirection`);
+        if (typeof wave?.final !== 'boolean') errors.push(`${path}.final must be boolean`);
+        if (wave?.final === true) finalCount += 1;
+        if (Number.isInteger(wave?.turn) && wave.turn <= previousTurn) {
+          errors.push(`${path}.turn must be strictly increasing`);
+        }
+        if (Number.isInteger(wave?.turn)) previousTurn = wave.turn;
+        if (wave?.final === true && index !== horde.waves.length - 1) {
+          errors.push(`${path}.final is only allowed on the last wave`);
+        }
+      });
+      if (finalCount !== 1 || horde.waves.at(-1)?.final !== true) {
+        errors.push('horde.waves must contain exactly one Final Wave at the end');
+      }
     }
   }
 

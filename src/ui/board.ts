@@ -42,8 +42,11 @@ export interface BoardRenderState {
   legalDestinations?: readonly HexCoord[];
   attackTargetIds?: readonly string[];
   pendingPath?: readonly HexCoord[];
-  hordeDirection?: CardinalDirection | null;
+  /** All entrances warned for the next configured wave. */
+  hordeDirections?: readonly CardinalDirection[];
   hordeWarningType?: 'periodic' | 'final' | 'none';
+  /** Fixed outer-ring Spawn Reserve keys; defaults to the static map field. */
+  spawnReserveTileKeys?: readonly string[];
   visibilityOverlay?: boolean;
   selectedVision?: { origin: HexCoord; radius: number } | null;
   supplyOverlay?: boolean;
@@ -280,12 +283,27 @@ export function roadTextureRotations(directions: readonly HexDirection[]): reado
 
 export const getRoadTextureRotations = roadTextureRotations;
 
-/** Limit a Horde warning to the warned capital-outward road branch. */
-export function hordeWarningTileKeys(map: Readonly<FixedMap>, direction: CardinalDirection): readonly string[] {
-  const branch = map.roadBranches.find((candidate) => candidate.direction === direction);
-  if (branch) return branch.roadTiles.map((position) => hexKey(position));
-  const entrance = map.hordeEntrances.find((candidate) => candidate.direction === direction);
-  return entrance ? [hexKey(entrance.tile)] : [];
+/** Limit a Horde warning to the warned capital-outward road branches. */
+export function hordeWarningTileKeys(
+  map: Readonly<FixedMap>,
+  directions: readonly CardinalDirection[],
+): readonly string[] {
+  const keys = new Set<string>();
+  for (const direction of directions) {
+    const branch = map.roadBranches.find((candidate) => candidate.direction === direction);
+    if (branch) {
+      for (const position of branch.roadTiles) keys.add(hexKey(position));
+      continue;
+    }
+    const entrance = map.hordeEntrances.find((candidate) => candidate.direction === direction);
+    if (entrance) keys.add(hexKey(entrance.tile));
+  }
+  return [...keys];
+}
+
+/** Public static overlay for the fixed outer-edge Horde Spawn Reserve. */
+export function spawnReserveTileKeys(map: Readonly<FixedMap>): readonly string[] {
+  return map.tiles.filter((tile) => tile.playerOccupancyAllowed === false).map((tile) => hexKey(tile));
 }
 
 export interface SupplyBoundaryEdge {
@@ -899,15 +917,17 @@ export class HexBoardScene extends Phaser.Scene {
     const selectedConstructiblePreview = render.constructibleFacilityPreviewSelected ? hexKey(render.constructibleFacilityPreviewSelected) : null;
     const blockedZombies = new Set(render.blockedZombieIds ?? []);
     const selected = render.selectedPosition;
-    const hordeDirection = render.hordeDirection ?? null;
+    const hordeDirections = [...new Set(render.hordeDirections ?? [])];
     const hordeWarningType = render.hordeWarningType ?? 'periodic';
     const visibleTileKeys = getPlayerVisibleTileKeys(state);
     const selectedVision = render.selectedVision ?? null;
-    const hordeRouteKeys = new Set(hordeDirection ? hordeWarningTileKeys(state.map, hordeDirection) : []);
-    const hordeEntrance = hordeDirection
-      ? state.map.hordeEntrances.find((candidate) => candidate.direction === hordeDirection)
-      : undefined;
-    const hordeEntranceKey = hordeEntrance ? hexKey(hordeEntrance.tile) : null;
+    const hordeRouteKeys = new Set(hordeWarningTileKeys(state.map, hordeDirections));
+    const hordeEntranceKeys = new Set(
+      state.map.hordeEntrances
+        .filter((candidate) => hordeDirections.includes(candidate.direction))
+        .map((candidate) => hexKey(candidate.tile)),
+    );
+    const reserveKeys = new Set(render.spawnReserveTileKeys ?? spawnReserveTileKeys(state.map));
     const capital = state.facilities.find((facility) => facility.type === 'capital');
     const hordeTarget = capital ? this.hexToWorld(state, capital.position) : null;
     const productionByFacility = this.productionMap(state);
@@ -965,7 +985,7 @@ export class HexBoardScene extends Phaser.Scene {
       const facility = facilitiesByTile.get(key);
       const checkpoint = checkpointsByTile.get(key);
       const tileSelected = selected ? sameHex(selected, tile) : false;
-      this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKey === key, hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview, constructibleLegalPreview, constructibleInvalidPreview, selectedConstructiblePreview);
+      this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKeys.has(key), reserveKeys.has(key), hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview, constructibleLegalPreview, constructibleInvalidPreview, selectedConstructiblePreview);
       if (facility) this.drawFacilityDynamic(facility, productionByFacility.get(facility.id), center, tileSelected, render, suppliedTiles, key, t);
       if (checkpoint) this.drawCheckpointDynamic(state, checkpoint, center);
       const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
@@ -1093,6 +1113,7 @@ export class HexBoardScene extends Phaser.Scene {
     isPath: boolean,
     isHordeRoute: boolean,
     isHordeEntrance: boolean,
+    isSpawnReserve: boolean,
     hordeTarget: { x: number; y: number } | null,
     hordeWarningType: 'periodic' | 'final' | 'none',
     selectedVision: { origin: HexCoord; radius: number } | null,
@@ -1105,6 +1126,24 @@ export class HexBoardScene extends Phaser.Scene {
     constructibleInvalidPreview: ReadonlySet<string>,
     selectedConstructiblePreview: string | null,
   ): void {
+    if (isSpawnReserve) {
+      // Spawn Reserve is public static map information and must remain visible
+      // even when Fog of War dims the rest of the tile.  The inset hatch keeps
+      // the outer 120 Hexes legible without hiding Terrain or other markers.
+      const points = this.hexPoints(center);
+      this.graphics.fillStyle(0x8b4c76, 0.2);
+      this.graphics.fillPoints(points, true);
+      this.graphics.lineStyle(2, 0xd5799d, 0.72);
+      this.graphics.strokePoints(points, true);
+      this.graphics.lineStyle(1, 0xd5799d, 0.42);
+      this.graphics.beginPath();
+      this.graphics.moveTo(center.x - HEX_SIZE * 0.55, center.y - HEX_SIZE * 0.16);
+      this.graphics.lineTo(center.x - HEX_SIZE * 0.16, center.y - HEX_SIZE * 0.55);
+      this.graphics.moveTo(center.x + HEX_SIZE * 0.16, center.y + HEX_SIZE * 0.55);
+      this.graphics.lineTo(center.x + HEX_SIZE * 0.55, center.y + HEX_SIZE * 0.16);
+      this.graphics.strokePath();
+      this.addLabel(`spawn-reserve:${key}`, 'R', center.x, center.y, '#f0b6d1', 8, true);
+    }
     if (render.supplyOverlay && (suppliedTiles.has(tile.key) || suppliedTiles.has(key))) {
       this.graphics.fillStyle(0x38a9a4, 0.1);
       this.graphics.fillPoints(this.hexPoints(center), true);

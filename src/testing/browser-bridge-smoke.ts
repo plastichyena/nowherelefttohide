@@ -99,8 +99,40 @@ function run(): void {
     if (!bundle.includes(method)) fail(`production bundle does not contain bridge method marker: ${method}`);
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
-  for (const marker of ['1.4.1', '2.1.0', '3.0.0', 'fixed-31x31-v1', 'SetPowerSupply', 'BuildConstructibleFacility', 'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches', 'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates', 'constructibleFacilityPositionCandidates', 'strategicForecast', 'queuePressureClass', 'currentFuel', 'currentMilitaryGoods', 'maxMilitaryGoods', 'fixedMilitaryGoodsUpkeepPerTurn', 'attackMilitaryGoodsCostByRange', 'suppressionMilitaryGoodsCost', 'projectedRefillAmountIfTurnEndsNow', 'projectedMilitaryGoodsAfterFixedConsumption', 'projectedMilitaryGoodsAfterRefill', 'projectedMilitaryGoodsAfterSuppression', 'emergencyMovementPoints', 'emergencyMovementAvailable', 'movementMode', 'effectiveMovementCost', 'attackPreviews', 'projectedMilitaryGoodsAfterAttack', 'effectiveAttack', 'projectedDamageBeforeTerrain', 'projectedDamageAfterTerrain', 'zombieTargetValue', 'noiseClass', 'periodicInitial', 'finalComposition', 'periodicHordeZombiesSpawned', 'artifactSchemaVersion', 'fixedMap', 'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression', 'visibleToPlayer', 'finalHordeStatus']) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.4.1 schema marker: ${marker}`);
+  for (const marker of [
+    '1.4.2', '2.2.0', '3.0.0', '4.0.0', 'fixed-31x31-v1', 'SetPowerSupply',
+    'BuildConstructibleFacility', 'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',
+    'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates',
+    'constructibleFacilityPositionCandidates', 'strategicForecast', 'queuePressureClass',
+    'currentFuel', 'currentMilitaryGoods', 'maxMilitaryGoods', 'fixedMilitaryGoodsUpkeepPerTurn',
+    'attackMilitaryGoodsCostByRange', 'suppressionMilitaryGoodsCost', 'projectedRefillAmountIfTurnEndsNow',
+    'projectedMilitaryGoodsAfterFixedConsumption', 'projectedMilitaryGoodsAfterRefill',
+    'projectedMilitaryGoodsAfterSuppression', 'emergencyMovementPoints', 'emergencyMovementAvailable',
+    'movementMode', 'effectiveMovementCost', 'attackPreviews', 'projectedMilitaryGoodsAfterAttack',
+    'effectiveAttack', 'projectedDamageBeforeTerrain', 'projectedDamageAfterTerrain', 'zombieTargetValue',
+    'noiseClass', 'artifactSchemaVersion', 'fixedMap', 'hordeSpawnReserve', 'playerOccupancyAllowed',
+    'warningLeadTurns', 'waves', 'warningDirections', 'nextWaveIndex', 'compositionPerDirection',
+    'screeningCapacity', 'powerModes', 'requiredPowerCapacity', 'standardOutputRule',
+    'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression',
+    'visibleToPlayer', 'finalHordeStatus', 'powerResourceLossByResource', 'checkpointCapacityUtilization',
+    'hordeWaves',
+  ]) {
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.4.2 schema marker: ${marker}`);
+  }
+  // Compatibility validation may legitimately retain the names of removed
+  // fields so an old Config can be rejected with a useful reason. Only flag
+  // a removed field when it appears as a serialized/public property (or as a
+  // Boost value), not when it is mentioned by that compatibility guard.
+  const forbiddenPublicFieldPatterns: Array<[string, RegExp]> = [
+    ['periodicInitial', /(?:["']periodicInitial["']|\.periodicInitial)\s*:/u],
+    ['periodicIncrement', /(?:["']periodicIncrement["']|\.periodicIncrement)\s*:/u],
+    ['finalComposition', /(?:["']finalComposition["']|\.finalComposition)\s*:/u],
+    ['industrialBoostDemand', /(?:["']industrialBoostDemand["']|\.industrialBoostDemand)\s*:/u],
+    ['industrialBoostAllocated', /(?:["']industrialBoostAllocated["']|\.industrialBoostAllocated)\s*:/u],
+    ['powerMode:boost', /(?:["']?powerMode["']?\s*:\s*["']boost["'])/u],
+  ];
+  for (const [forbidden, pattern] of forbiddenPublicFieldPatterns) {
+    if (pattern.test(bundle)) fail(`removed v1.4.2 public field remains in production bundle: ${forbidden}`);
   }
   const productionCodeAndStyles = filesUnder(dist)
     .filter((path) => path.endsWith('.js') || path.endsWith('.css'))

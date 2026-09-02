@@ -28,6 +28,13 @@ export const RUN_JSON_FILE = 'run.json';
 export const GAMES_CSV_FILE = 'games.csv';
 export const ARTIFACT_DIRECTORY = 'games';
 
+const CSV_FACILITY_TYPES = [
+  'capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery',
+  'powerPlant', 'windPowerPlant', 'civilianDroneBase', 'simpleFarm',
+] as const;
+const CSV_DIRECTIONS = ['north', 'east', 'south', 'west'] as const;
+const CSV_WAVE_INDICES = [1, 2, 3, 4, 5] as const;
+
 export interface ParsedSimulationArguments {
   agents: AgentStrategyId[];
   games: number;
@@ -59,7 +66,7 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '2.1.0';
+  schemaVersion: '3.0.0';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -307,7 +314,7 @@ function createSimulationReport(
     aggregate[agent] = aggregateMetrics(rows);
   }
   return {
-    schemaVersion: '2.1.0',
+    schemaVersion: '3.0.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -412,6 +419,29 @@ const CSV_COLUMNS: readonly string[] = [
   'resourceSinglePointFailureTurns.electricity',
   'checkpointQueuePressureTurns.none', 'checkpointQueuePressureTurns.low',
   'checkpointQueuePressureTurns.medium', 'checkpointQueuePressureTurns.high',
+  ...CSV_FACILITY_TYPES.flatMap((type) => [
+    `power.${type}.requested`, `power.${type}.supplied`, `power.${type}.unavailable`, `power.${type}.off`,
+  ]),
+  ...CSV_FACILITY_TYPES.map((type) => `powerRequestedTurns.${type}`),
+  ...CSV_FACILITY_TYPES.map((type) => `powerSuppliedTurns.${type}`),
+  ...CSV_FACILITY_TYPES.map((type) => `powerUnavailableTurns.${type}`),
+  ...CSV_FACILITY_TYPES.map((type) => `powerSupplyOffTurns.${type}`),
+  'powerResourceLoss.food', 'powerResourceLoss.civilianGoods', 'powerResourceLoss.militaryGoods', 'powerResourceLoss.fuel',
+  'refineryPowerOutageTurns', 'refineryOutageNextTurnFuelShortageTurns', 'simpleFarmFoodShortageAvoidanceTurns',
+  'checkpointBatchStarts.passThrough', 'checkpointBatchStarts.normal', 'checkpointBatchStarts.strict',
+  'checkpointBatchCompletions.passThrough', 'checkpointBatchCompletions.normal', 'checkpointBatchCompletions.strict',
+  'checkpointAverageQueue', 'checkpointCapacityUtilization', 'checkpointEstimatedThroughput',
+  ...CSV_DIRECTIONS.flatMap((direction) => [
+    `hordeDirectionSpawn.${direction}.hordeZombie`, `hordeDirectionSpawn.${direction}.normalZombie`,
+    `hordeDirectionKill.${direction}.hordeZombie`, `hordeDirectionKill.${direction}.normalZombie`,
+  ]),
+  ...CSV_WAVE_INDICES.flatMap((index) => [
+    `hordeWave.${index}.spawnTurn`, `hordeWave.${index}.directions`, `hordeWave.${index}.final`,
+    `hordeWave.${index}.hordeZombieSpawned`, `hordeWave.${index}.normalZombieSpawned`,
+    `hordeWave.${index}.hordeZombieKilled`, `hordeWave.${index}.normalZombieKilled`,
+  ]),
+  'hordeFinalWaveSpawnTotal', 'hordeFinalWaveKillTotal', 'hordeFinalDefeatedTurn',
+  'hordeTurnsAfterFinal', 'hordeMultiFrontCheckpointLosses', 'hordeMultiFrontFallbacks',
   ...ACTION_TYPES.map((type) => `action.${type}`),
   ...PRIORITY_GOALS.map((goal) => `goal.${goal}`),
 ];
@@ -511,9 +541,57 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.resourceSinglePointFailureTurnsByResource.militaryGoods ?? 0,
       game.resourceSinglePointFailureTurnsByResource.fuel ?? 0,
       game.resourceSinglePointFailureTurnsByResource.electricity ?? 0,
-      game.checkpointQueuePressureTurnsByClass.none, game.checkpointQueuePressureTurnsByClass.low,
-      game.checkpointQueuePressureTurnsByClass.medium, game.checkpointQueuePressureTurnsByClass.high,
-      ...ACTION_TYPES.map((type) => game.actionCounts[type] ?? 0),
+       game.checkpointQueuePressureTurnsByClass.none, game.checkpointQueuePressureTurnsByClass.low,
+       game.checkpointQueuePressureTurnsByClass.medium, game.checkpointQueuePressureTurnsByClass.high,
+       ...CSV_FACILITY_TYPES.flatMap((type) => {
+         const metric = game.powerTurnsByFacilityType[type] ?? { requested: 0, supplied: 0, unavailable: 0, off: 0 };
+         return [metric.requested, metric.supplied, metric.unavailable, metric.off];
+       }),
+       ...CSV_FACILITY_TYPES.map((type) => game.powerRequestedTurnsByFacilityType[type] ?? 0),
+       ...CSV_FACILITY_TYPES.map((type) => game.powerSuppliedTurnsByFacilityType[type] ?? 0),
+       ...CSV_FACILITY_TYPES.map((type) => game.powerUnavailableTurnsByFacilityType[type] ?? 0),
+       ...CSV_FACILITY_TYPES.map((type) => game.powerSupplyOffTurnsByFacilityType[type] ?? 0),
+       game.powerResourceLossByResource.food ?? 0,
+       game.powerResourceLossByResource.civilianGoods ?? 0,
+       game.powerResourceLossByResource.militaryGoods ?? 0,
+       game.powerResourceLossByResource.fuel ?? 0,
+       game.refineryPowerOutageTurns,
+       game.refineryOutageNextTurnFuelShortageTurns,
+       game.simpleFarmFoodShortageAvoidanceTurns,
+       game.checkpointBatchStartsByPolicy.passThrough ?? 0,
+       game.checkpointBatchStartsByPolicy.normal ?? 0,
+       game.checkpointBatchStartsByPolicy.strict ?? 0,
+       game.checkpointBatchCompletionsByPolicy.passThrough ?? 0,
+       game.checkpointBatchCompletionsByPolicy.normal ?? 0,
+       game.checkpointBatchCompletionsByPolicy.strict ?? 0,
+       game.checkpointAverageQueue,
+       game.checkpointCapacityUtilization,
+       game.checkpointEstimatedThroughput,
+       ...CSV_DIRECTIONS.flatMap((direction) => [
+         game.hordeDirectionSpawnCounts[direction]?.hordeZombie ?? 0,
+         game.hordeDirectionSpawnCounts[direction]?.normalZombie ?? 0,
+         game.hordeDirectionKillCounts[direction]?.hordeZombie ?? 0,
+         game.hordeDirectionKillCounts[direction]?.normalZombie ?? 0,
+       ]),
+       ...CSV_WAVE_INDICES.flatMap((index) => {
+         const wave = game.hordeWaves.find((candidate) => candidate.index === index);
+         return [
+           wave?.spawnTurn ?? '',
+           wave ? JSON.stringify(wave.directions) : '',
+           wave?.final ?? '',
+           wave?.hordeZombieSpawned ?? 0,
+           wave?.normalZombieSpawned ?? 0,
+           wave?.hordeZombieKilled ?? 0,
+           wave?.normalZombieKilled ?? 0,
+         ];
+       }),
+       game.hordeFinalWaveSpawnTotal,
+       game.hordeFinalWaveKillTotal,
+       game.hordeFinalDefeatedTurn,
+       game.hordeTurnsAfterFinal,
+       game.hordeMultiFrontCheckpointLosses,
+       game.hordeMultiFrontFallbacks,
+       ...ACTION_TYPES.map((type) => game.actionCounts[type] ?? 0),
       ...PRIORITY_GOALS.map((goal) => game.priorityGoalCounts[goal] ?? 0),
     ];
     rows.push(values.map(csvCell).join(','));

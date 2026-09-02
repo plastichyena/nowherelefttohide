@@ -3,6 +3,7 @@ import { createDefaultConfig } from './config';
 import { GameEngine } from './engine';
 import { deriveUnitRecovery } from './recovery';
 import { createInitialState, populationLedgerTotal, synchronizePopulation } from './state';
+import { singleFinalWave } from './testConfig';
 
 function rebalance(state: ReturnType<typeof createInitialState>): void {
   synchronizePopulation(state);
@@ -11,7 +12,7 @@ function rebalance(state: ReturnType<typeof createInitialState>): void {
 
 function recoveryEngine(seed = 301): GameEngine {
   return new GameEngine(seed, createDefaultConfig({
-    finalHordeTurn: 4,
+    horde: singleFinalWave(4),
     economy: {
       initialZombieCount: 0,
       initialResources: { food: 10_000, civilianGoods: 10_000, militaryGoods: 10_000, fuel: 10_000 },
@@ -69,7 +70,7 @@ describe('v1.2.6 unit recovery and automatic suppression', () => {
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     const police = snapshot.units.find((unit) => unit.id === 'police-1')!;
     const guard = snapshot.units.find((unit) => unit.id === 'national-guard-1')!;
-    police.position = { q: 0, r: 0 };
+    police.position = { q: 1, r: 1 };
     police.hp = 10;
     guard.hp = guard.maxHp - 2;
     rebalance(snapshot);

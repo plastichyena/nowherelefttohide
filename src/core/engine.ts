@@ -1,7 +1,7 @@
 import { createDefaultConfig, HUMAN_UNIT_TYPES } from './config';
 import { hexDistance, hexKey, hexNeighbors, hexWithinBounds } from './hex';
 import { assertInvariants, validateInvariants } from './invariants';
-import { getHordeEntrance, getTile } from './map';
+import { canPlayerOccupyHex, getHordeEntrance, getTile, isHordeSpawnReserve } from './map';
 import { findNearestOpenTiles, findReachablePaths, findShortestPath, pathMovementCost } from './path';
 import { SeededRng } from './rng';
 import { deriveUnitRecovery } from './recovery';
@@ -110,7 +110,8 @@ export interface FacilityProductionProjection {
   inputs: Partial<Record<ResourceType, number>>;
   outputs: Partial<Record<ResourceType, number>>;
   powerGeneration: number;
-  powerMode: 'required' | 'boost' | 'none';
+  powerMode: 'required' | 'none';
+  requiredPowerCapacity: number;
   powerSupplyEnabled: boolean;
   projectedPowerRequested: boolean;
   projectedPowerSupplied: boolean;
@@ -524,6 +525,7 @@ function applyMovement(
   const traversed: HexCoord[] = [];
   let spent = 0;
   for (const position of path.slice(1)) {
+    if (mover.isPlayerUnit && !canPlayerOccupyHex(state.map, position)) break;
     const cost = effectiveMovementCost(state, position);
     if (cost === null || spent + cost > movementBudget) break;
     const occupant = getUnitAt(state, position);
@@ -586,6 +588,9 @@ function getMovePath(state: GameState, action: MoveAction): {
   if (!hexWithinBounds(action.destination, state.map.width, state.map.height)) {
     return error(action, 'outside_map', 'Destination is outside the map');
   }
+  if (isHordeSpawnReserve(state.map, action.destination)) {
+    return error(action, 'horde_spawn_reserve', 'Player units cannot enter or cross the Horde Spawn Reserve');
+  }
   const visible = getPlayerVisibleTileKeys(state);
   const destinationUnit = getUnitAt(state, action.destination);
   if (destinationUnit && (destinationUnit.isPlayerUnit || visible.has(hexKey(destinationUnit.position)))) {
@@ -601,7 +606,7 @@ function getMovePath(state: GameState, action: MoveAction): {
     unit.position,
     action.destination,
     publicBlocked,
-    (position) => effectiveMovementCost(state, position),
+    (position) => canPlayerOccupyHex(state.map, position) ? effectiveMovementCost(state, position) : null,
   );
   if (!path) {
     return error(action, 'no_path', 'No path is available');
@@ -637,7 +642,7 @@ function reachableMovePaths(state: GameState, unit: UnitState) {
     unit.position,
     movementBudget,
     blocked,
-    (position) => effectiveMovementCost(state, position),
+    (position) => canPlayerOccupyHex(state.map, position) ? effectiveMovementCost(state, position) : null,
   ).filter((entry) => movementMode === 'emergency' || unit.currentFuel >= unitMoveFuelCost(unit.type as HumanUnitType, entry.path.length - 1));
 }
 
@@ -1058,6 +1063,7 @@ function emptyFacilityProjection(
     outputs: {},
     powerGeneration: 0,
     powerMode: 'none',
+    requiredPowerCapacity: 0,
     powerSupplyEnabled: false,
     projectedPowerRequested: false,
     projectedPowerSupplied: false,
@@ -1209,34 +1215,26 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     return allocated;
   };
 
-  const requiredTargets = facilities.filter(
-    (facility) => isOwned(facility) && isCityFacility(facility) && facility.workers > 0,
+  const cityTargets = facilities.filter(
+    (facility) => isOwned(facility) && isCityFacility(facility) && facility.workers > 0 && canProduce(facility),
   );
-  const requiredPowerDemand = requiredTargets.reduce(
+  let requiredPowerDemand = cityTargets.reduce(
     (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
     0,
   );
-  const requiredPowerAllocated = allocate(requiredTargets);
-
-  const simpleFarmTargets = facilities.filter(
-    (facility) =>
-      isOwned(facility) &&
-      facility.type === 'simpleFarm' &&
-      facility.workers > 0 &&
-      facility.powerSupplyEnabled &&
-      facility.operationalStatus === 'operational',
-  );
-  const simpleFarmPowerAllocated = allocate(simpleFarmTargets);
+  let requiredPowerAllocated = allocate(cityTargets);
 
   const maintenanceTargets = facilities.filter(
     (facility) =>
-      isOwned(facility) &&
-      facility.workers > 0 &&
+      canProduce(facility) &&
       ['farm', 'civilianFactory'].includes(facility.type) &&
-      facility.powerSupplyEnabled &&
-      facility.operationalStatus === 'operational',
+      facility.powerSupplyEnabled,
   );
-  const maintenancePowerAllocated = allocate(maintenanceTargets);
+  requiredPowerDemand += maintenanceTargets.reduce(
+    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
+    0,
+  );
+  requiredPowerAllocated += allocate(maintenanceTargets);
 
   const staffed = (facility: FacilityState) => isCityFacility(facility)
     ? Math.min(facility.workers, state.config.facilities[facility.type].workerCapacity)
@@ -1247,14 +1245,13 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     const perWorker = rule.outputs.civilianGoods ?? 0;
     if (perWorker <= 0 || facility.type === 'militaryFactory') return total;
     if (rule.powerMode === 'required' && !supplied.has(facility.id)) return total;
-    const multiplier = rule.powerMode === 'boost' && supplied.has(facility.id) ? 2 : 1;
-    return total + staffed(facility) * perWorker * multiplier;
+    return total + staffed(facility) * perWorker;
   }, 0);
   const maintenanceReservation = Math.max(0, maintenance.civilianGoods - preliminaryCivilianProduction);
   let civilianInputAvailable = Math.max(0, state.resources.civilianGoods - maintenanceReservation);
   const militaryInputWorkers = new Map<string, number>();
   const militaryFacilities = facilities.filter(
-    (facility) => facility.type === 'militaryFactory' && canProduce(facility),
+    (facility) => facility.type === 'militaryFactory' && canProduce(facility) && facility.powerSupplyEnabled,
   );
   for (const facility of militaryFacilities) {
     const perWorker = state.config.facilities.militaryFactory.production.inputs.civilianGoods ?? 0;
@@ -1265,9 +1262,22 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     civilianInputAvailable -= workers * perWorker;
   }
   const militaryTargets = militaryFacilities.filter(
-    (facility) => facility.powerSupplyEnabled && (militaryInputWorkers.get(facility.id) ?? 0) > 0,
+    (facility) => (militaryInputWorkers.get(facility.id) ?? 0) > 0,
   );
-  const militaryPowerAllocated = allocate(militaryTargets);
+  requiredPowerDemand += militaryTargets.reduce(
+    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
+    0,
+  );
+  requiredPowerAllocated += allocate(militaryTargets);
+
+  const refineryTargets = facilities.filter(
+    (facility) => canProduce(facility) && facility.type === 'refinery' && facility.powerSupplyEnabled,
+  );
+  requiredPowerDemand += refineryTargets.reduce(
+    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
+    0,
+  );
+  requiredPowerAllocated += allocate(refineryTargets);
 
   const droneTargets = facilities.filter(
     (facility) =>
@@ -1277,35 +1287,43 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       facility.powerSupplyEnabled &&
       facility.operationalStatus === 'operational',
   );
-  const dronePowerAllocated = allocate(droneTargets);
+  requiredPowerDemand += droneTargets.reduce(
+    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
+    0,
+  );
+  requiredPowerAllocated += allocate(droneTargets);
 
   const projections = facilities.map((facility): FacilityProductionProjection => {
     const rule = state.config.facilities[facility.type].production;
     const eligible = isOwned(facility) && facility.workers > 0;
     let projectedPowerReason: PowerSupplyReason = reasons.get(facility.id) ?? 'not_applicable';
     let projectedPowerRequested = requested.has(facility.id);
-    if (rule.powerMode === 'boost' && !facility.powerSupplyEnabled) projectedPowerReason = 'power_supply_off';
+    const toggleable = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
+    if (rule.powerMode === 'required' && toggleable && !facility.powerSupplyEnabled) projectedPowerReason = 'power_supply_off';
     else if (!eligible && rule.powerMode !== 'none') projectedPowerReason = facility.workers <= 0 ? 'no_population' : 'not_eligible';
     else if (facility.type === 'militaryFactory' && canProduce(facility) && (militaryInputWorkers.get(facility.id) ?? 0) === 0) {
       projectedPowerReason = 'production_input_unavailable';
       projectedPowerRequested = false;
     }
     const projectedPowerSupplied = supplied.has(facility.id);
-    const productionMultiplier = rule.powerMode === 'boost' && projectedPowerSupplied ? 2 : 1;
-    const operatingWorkers = !canProduce(facility)
+    const productionMultiplier = 1;
+    const potentialOperatingWorkers = !canProduce(facility)
       ? 0
       : facility.type === 'militaryFactory'
         ? militaryInputWorkers.get(facility.id) ?? 0
         : staffed(facility);
+    const operatingWorkers = rule.powerMode === 'required' && !projectedPowerSupplied
+      ? 0
+      : potentialOperatingWorkers;
     const baseOutputs = Object.fromEntries(
-      Object.entries(rule.outputs).map(([resource, amount]) => [resource, amount * operatingWorkers]),
+      Object.entries(rule.outputs).map(([resource, amount]) => [resource, amount * potentialOperatingWorkers]),
     ) as Partial<Record<ResourceType, number>>;
     const outputs = rule.powerMode === 'required' && !projectedPowerSupplied
       ? {}
       : Object.fromEntries(
         Object.entries(baseOutputs).map(([resource, amount]) => [resource, (amount ?? 0) * productionMultiplier]),
       ) as Partial<Record<ResourceType, number>>;
-    const inputs = facility.type === 'militaryFactory'
+    const inputs = facility.type === 'militaryFactory' && projectedPowerSupplied
       ? { civilianGoods: (rule.inputs.civilianGoods ?? 0) * operatingWorkers }
       : {};
     const stoppedReason = !canProduce(facility)
@@ -1326,6 +1344,7 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
           ? rule.fixedPowerGeneration
           : 0,
       powerMode: rule.powerMode,
+      requiredPowerCapacity: rule.powerMode === 'required' ? rule.powerCapacity : 0,
       powerSupplyEnabled: facility.powerSupplyEnabled,
       projectedPowerRequested,
       projectedPowerSupplied,
@@ -1348,13 +1367,8 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     (total, projection) => total + (projection.inputs.civilianGoods ?? 0),
     0,
   );
-  const industrialBoostDemand = [...simpleFarmTargets, ...maintenanceTargets, ...militaryTargets, ...droneTargets].reduce(
-    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
-    0,
-  );
-  const industrialBoostAllocated = simpleFarmPowerAllocated + maintenancePowerAllocated + militaryPowerAllocated + dronePowerAllocated;
-  const totalPowerDemand = requiredPowerDemand + industrialBoostDemand;
-  const totalPowerAllocated = requiredPowerAllocated + industrialBoostAllocated;
+  const totalPowerDemand = requiredPowerDemand;
+  const totalPowerAllocated = requiredPowerAllocated;
   const generationFuelDemand = Math.max(0, totalPowerDemand - windPowerAvailable) / 5;
   const projectedFuelUsed = Math.max(0, totalPowerAllocated - windPowerAvailable) / 5;
   const fuelAfterPower = Math.max(0, state.resources.fuel - projectedFuelUsed);
@@ -1464,13 +1478,11 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
         fuelLimitedGenerationCapacity,
         availableGenerationCapacity,
         requiredPowerDemand,
-        industrialBoostDemand,
         requiredPowerAllocated,
-        industrialBoostAllocated,
         unpoweredFacilities,
         capacity: physicalGenerationCapacity,
         required: totalPowerDemand,
-        shortage: Math.max(0, totalPowerDemand - requiredPowerAllocated - industrialBoostAllocated),
+        shortage: Math.max(0, totalPowerDemand - requiredPowerAllocated),
       },
     },
   };
@@ -1612,7 +1624,7 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
 
   for (const projection of plan.facilities) {
     const facility = getFacilityState(state, projection.facilityId)!;
-    if (projection.powerMode === 'required' || projection.powerMode === 'boost') {
+    if (projection.powerMode === 'required') {
       facility.lastPowerSupplied = projection.projectedPowerSupplied;
     }
     if (!['building', 'disabled', 'recovering'].includes(facility.operationalStatus)) {
@@ -2475,87 +2487,116 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
   synchronizePopulation(state);
 }
 
-function processHorde(state: GameState, rng: SeededRng): void {
+const CANONICAL_HORDE_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
+
+function selectHordeDirections(rng: SeededRng, count: number): CardinalDirection[] {
+  if (count === 4) return [...CANONICAL_HORDE_DIRECTIONS];
+  const remaining = [...CANONICAL_HORDE_DIRECTIONS];
+  const selected: CardinalDirection[] = [];
+  while (selected.length < count) {
+    const direction = rng.pick(remaining);
+    selected.push(direction);
+    remaining.splice(remaining.indexOf(direction), 1);
+  }
+  return CANONICAL_HORDE_DIRECTIONS.filter((direction) => selected.includes(direction));
+}
+
+function beginHordeWarningIfDue(state: GameState, rng: SeededRng): void {
+  if (state.horde.nextWaveIndex === null || state.horde.warningDirections.length > 0) return;
+  const wave = state.config.horde.waves[state.horde.nextWaveIndex - 1];
+  if (!wave || state.turn < wave.turn - state.config.horde.warningLeadTurns) return;
+  state.horde.warningDirections = selectHordeDirections(rng, wave.directionCount);
+  state.horde.warningType = wave.final ? 'final' : 'periodic';
+  emit(state, 'horde_warning', {
+    waveIndex: state.horde.nextWaveIndex,
+    spawnTurn: wave.turn,
+    final: wave.final,
+    directions: [...state.horde.warningDirections],
+    compositionPerDirection: { ...wave.compositionPerDirection },
+  });
+}
+
+function processHorde(state: GameState, rng: SeededRng): ActionError | null {
   const due = state.horde.nextSpawnTurn !== null && state.turn === state.horde.nextSpawnTurn;
   if (!due) {
     state.horde.turnsRemaining = Math.max(0, (state.horde.nextSpawnTurn ?? state.turn) - state.turn);
-    return;
+    return null;
   }
-  const entrance = getHordeEntrance(state.map, state.horde.nextDirection);
-  if (state.turn === state.finalHordeTurn) {
-    const groupId = `final-horde-${state.turn}`;
-    const composition = state.config.horde.finalComposition;
-    const spawned = entrance
-      ? spawnHordeComposition(state, entrance.tile, composition, rng, 'final_horde', groupId, 'final')
-      : [];
-    const hordeZombieCount = spawned.filter((unit) => unit.type === 'hordeZombie').length;
-    const zombieCount = spawned.filter((unit) => unit.type === 'zombie').length;
-    const count = spawned.length;
-    state.horde.finalSpawnGroupId = groupId;
+  const waveIndex = state.horde.nextWaveIndex;
+  const wave = waveIndex === null ? null : state.config.horde.waves[waveIndex - 1];
+  if (waveIndex === null || !wave || state.horde.warningDirections.length !== wave.directionCount) {
+    return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', 'Horde Wave warning directions are incomplete');
+  }
+  const kind = wave.final ? 'final' as const : 'periodic' as const;
+  const allSpawned: UnitState[] = [];
+  const groupIds: string[] = [];
+  for (const direction of state.horde.warningDirections) {
+    const entrance = getHordeEntrance(state.map, direction);
+    if (!entrance) {
+      return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', `Missing Horde entrance for ${direction}`);
+    }
+    const groupId = `wave-${waveIndex}-${direction}`;
+    const spawned = spawnHordeComposition(
+      state,
+      entrance.tile,
+      wave.compositionPerDirection,
+      rng,
+      wave.final ? 'final_horde' : 'periodic_horde',
+      groupId,
+      kind,
+    );
+    const expected = wave.compositionPerDirection.hordeZombie + wave.compositionPerDirection.zombie;
+    if (spawned.length !== expected) {
+      return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', `Wave ${waveIndex} could not place every unit for ${direction}`);
+    }
+    groupIds.push(groupId);
+    allSpawned.push(...spawned);
+  }
+  const hordeZombieCount = allSpawned.filter((unit) => unit.type === 'hordeZombie').length;
+  const zombieCount = allSpawned.filter((unit) => unit.type === 'zombie').length;
+  const count = allSpawned.length;
+  state.horde.spawnedWaveIndices.push(waveIndex);
+  state.horde.spawnGroupIdsByWave[String(waveIndex)] = groupIds;
+  state.horde.totalSpawned += count;
+  state.horde.lastSpawnTurn = state.turn;
+  if (wave.final) {
+    state.horde.finalSpawnGroupIds = [...groupIds];
     state.horde.finalSpawnedCount = count;
     state.horde.finalHordeStatus = 'active';
-    state.horde.nextSpawnTurn = null;
-    state.horde.turnsRemaining = 0;
-    state.horde.warningType = 'none';
-    state.horde.lastSpawnTurn = state.turn;
     state.statistics.finalHordeSpawned = count;
     state.statistics.finalHordeZombiesSpawned += hordeZombieCount;
     state.statistics.finalNormalZombiesSpawned += zombieCount;
-    state.horde.totalSpawned += count;
-    emit(state, 'horde_spawned', {
-      hordeKind: 'final',
-      direction: entrance?.direction ?? state.horde.nextDirection,
-      spawnGroupId: groupId,
-      hordeZombieCount,
-      normalZombieCount: zombieCount,
-      units: spawned.map((unit) => ({
-        unitId: unit.id,
-        unitType: unit.type,
-        spawnGroupId: groupId,
-        hordeKind: 'final',
-        q: unit.position.q,
-        r: unit.position.r,
-      })),
-    });
-    return;
+  } else {
+    state.statistics.periodicHordeZombiesSpawned += hordeZombieCount;
+    state.statistics.periodicNormalZombiesSpawned += zombieCount;
   }
-  if (state.turn > state.finalHordeTurn) return;
-  const composition = {
-    hordeZombie: state.config.horde.periodicInitial.hordeZombie + state.horde.spawnedCount * state.config.horde.periodicIncrement.hordeZombie,
-    zombie: state.config.horde.periodicInitial.zombie + state.horde.spawnedCount * state.config.horde.periodicIncrement.zombie,
-  };
-  const groupId = `periodic-horde-${state.turn}`;
-  const spawned = entrance
-    ? spawnHordeComposition(state, entrance.tile, composition, rng, 'periodic_horde', groupId, 'periodic')
-    : [];
-  const hordeZombieCount = spawned.filter((unit) => unit.type === 'hordeZombie').length;
-  const zombieCount = spawned.filter((unit) => unit.type === 'zombie').length;
-  const count = spawned.length;
-  state.horde.spawnedCount += 1;
-  state.horde.totalSpawned += count;
-  state.statistics.periodicHordeZombiesSpawned += hordeZombieCount;
-  state.statistics.periodicNormalZombiesSpawned += zombieCount;
-  state.horde.lastSpawnTurn = state.turn;
-  state.horde.nextDirection = rng.pick(['north', 'east', 'south', 'west'] as const);
-  const nextPeriodic = state.turn + state.config.horde.cycle;
-  state.horde.nextSpawnTurn = nextPeriodic < state.finalHordeTurn ? nextPeriodic : state.finalHordeTurn;
-  state.horde.warningType = state.horde.nextSpawnTurn === state.finalHordeTurn ? 'final' : 'periodic';
-  state.horde.turnsRemaining = state.horde.nextSpawnTurn - state.turn;
   emit(state, 'horde_spawned', {
-    hordeKind: 'periodic',
-    direction: entrance?.direction ?? 'north',
-    spawnGroupId: groupId,
+    hordeKind: kind,
+    waveIndex,
+    spawnTurn: wave.turn,
+    final: wave.final,
+    directions: [...state.horde.warningDirections],
+    compositionPerDirection: { ...wave.compositionPerDirection },
+    spawnGroupIds: [...groupIds],
     hordeZombieCount,
     normalZombieCount: zombieCount,
-    units: spawned.map((unit) => ({
+    units: allSpawned.map((unit) => ({
       unitId: unit.id,
       unitType: unit.type,
-      spawnGroupId: groupId,
-      hordeKind: 'periodic',
+      spawnGroupId: unit.spawnGroupId,
+      hordeKind: kind,
       q: unit.position.q,
       r: unit.position.r,
     })),
   });
+  const nextWave = state.config.horde.waves[waveIndex];
+  state.horde.nextWaveIndex = nextWave ? waveIndex + 1 : null;
+  state.horde.nextSpawnTurn = nextWave?.turn ?? null;
+  state.horde.turnsRemaining = nextWave ? Math.max(0, nextWave.turn - state.turn) : 0;
+  state.horde.warningDirections = [];
+  state.horde.warningType = 'none';
+  beginHordeWarningIfDue(state, rng);
+  return null;
 }
 
 function finishGame(state: GameState, outcome: 'won' | 'lost', reason: GameOverReason): void {
@@ -2590,9 +2631,9 @@ export interface VictoryProgress {
 export function deriveVictoryProgress(state: Readonly<GameState>): VictoryProgress {
   const supplied = new Set(getSuppliedTileKeys(state));
   const finalHordeDefeated =
-    state.horde.finalSpawnGroupId !== null &&
+    state.horde.finalSpawnGroupIds.length > 0 &&
     !state.units.some(
-      (unit) => unit.spawnGroupId === state.horde.finalSpawnGroupId,
+      (unit) => unit.spawnGroupId !== null && state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId),
     );
   const suppliedAreaZombieClear = !state.units.some(
     (unit) =>
@@ -2655,12 +2696,13 @@ function checkImmediateGameEnd(state: GameState): boolean {
 }
 
 function startPlayerTurn(state: GameState, rng: SeededRng): void {
+  beginHordeWarningIfDue(state, rng);
   for (const branch of state.roadBranches) branch.checkpointActionsThisTurn = 0;
   for (const facility of state.facilities) {
     if (facility.operationalStatus === 'building' && facility.builtTurn !== null && facility.builtTurn < state.turn) {
       facility.operationalStatus = facility.workers > 0 ? 'operational' : 'stopped';
       facility.populationOperationalTurn = state.turn;
-      facility.powerSupplyEnabled = true;
+      facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
     } else if (
       facility.operationalStatus === 'recovering' &&
       facility.recoveryOperationalTurn !== null &&
@@ -2668,7 +2710,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
     ) {
       facility.operationalStatus = facility.type === 'windPowerPlant' || facility.workers > 0 ? 'operational' : 'stopped';
       facility.populationOperationalTurn = state.turn;
-      facility.powerSupplyEnabled = facility.constructible === true;
+      facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
       facility.recoveryOperationalTurn = null;
     }
   }
@@ -2715,7 +2757,8 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
       state.pendingUnitProductions.push(order);
       continue;
     }
-    const nearestPositions = findNearestOpenTiles(state.map, city.position, occupiedKeys(state));
+    const nearestPositions = findNearestOpenTiles(state.map, city.position, occupiedKeys(state))
+      .filter((position) => canPlayerOccupyHex(state.map, position));
     const position = nearestPositions.length > 1 ? rng.pick(nearestPositions) : nearestPositions[0];
     if (!position) {
       state.pendingUnitProductions.push(order);
@@ -2745,33 +2788,35 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
   saveRng(state, rng);
 }
 
-function endTurn(state: GameState, rng: SeededRng): void {
+function endTurn(state: GameState, rng: SeededRng): ActionError | null {
   state.phase = 'economy';
   processEconomy(state);
-  if (checkImmediateGameEnd(state)) return;
+  if (checkImmediateGameEnd(state)) return null;
   state.phase = 'refugees';
   processRefugees(state, rng);
   synchronizePopulation(state);
-  if (checkImmediateGameEnd(state)) return;
+  if (checkImmediateGameEnd(state)) return null;
   state.phase = 'infection';
   processInternalInfection(state, rng);
-  if (checkImmediateGameEnd(state)) return;
+  if (checkImmediateGameEnd(state)) return null;
   state.phase = 'zombie';
   processZombieTurn(state, rng);
-  if (checkImmediateGameEnd(state)) return;
+  if (checkImmediateGameEnd(state)) return null;
   processZombieInfection(state, rng);
-  if (checkImmediateGameEnd(state)) return;
+  if (checkImmediateGameEnd(state)) return null;
   state.phase = 'horde';
-  processHorde(state, rng);
-  if (checkImmediateGameEnd(state)) return;
+  const hordeError = processHorde(state, rng);
+  if (hordeError) return hordeError;
+  if (checkImmediateGameEnd(state)) return null;
   state.turn += 1;
   if (state.turn > state.finalHordeTurn) state.statistics.turnsAfterFinalHorde += 1;
   state.actionsTakenThisTurn = 0;
   state.phase = 'player';
   state.horde.turnsRemaining = state.horde.nextSpawnTurn === null
     ? 0
-    : Math.max(0, state.horde.nextSpawnTurn - (state.turn - 1));
+    : Math.max(0, state.horde.nextSpawnTurn - state.turn);
   startPlayerTurn(state, rng);
+  return null;
 }
 
 function playerActionBudgetError(state: Readonly<GameState>, action: GameAction): ActionError | null {
@@ -2898,6 +2943,9 @@ function validateCheckpointDestination(
   visibleZombies?: readonly UnitState[],
 ): ActionError | null {
   const tile = getTile(state.map, action.position);
+  if (isHordeSpawnReserve(state.map, action.position)) {
+    return error(action, 'horde_spawn_reserve', 'Player checkpoints cannot occupy the Horde Spawn Reserve');
+  }
   if (
     !tile?.road ||
     tile.facilityId ||
@@ -3275,7 +3323,7 @@ function setCheckpointPolicy(state: GameState, action: Extract<GameAction, { typ
 function setPowerSupply(state: GameState, action: Extract<GameAction, { type: 'SetPowerSupply' }>): ActionError | null {
   if (!isPlayerPhase(state)) return error(action, 'wrong_phase', 'Actions are only accepted during the player phase');
   const facility = getFacilityState(state, action.facilityId);
-  if (!facility || !['farm', 'civilianFactory', 'militaryFactory', 'simpleFarm', 'civilianDroneBase'].includes(facility.type)) {
+  if (!facility || !['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type)) {
     return error(action, 'power_supply_not_applicable', 'Power Supply can only be changed for a supported facility');
   }
   if (
@@ -3455,6 +3503,9 @@ function validateConstructibleFacilityAction(
   if (!hexWithinBounds(action.position, state.map.width, state.map.height)) {
     return error(action, 'outside_map', 'Position is outside the map');
   }
+  if (isHordeSpawnReserve(state.map, action.position)) {
+    return error(action, 'horde_spawn_reserve', 'Player facilities cannot occupy the Horde Spawn Reserve');
+  }
   if (!(context ? context.suppliedKeys.has(hexKey(action.position)) : isHexSupplied(state, action.position))) {
     return error(action, 'constructible_out_of_supply', 'Constructible facilities must be built inside the Supply Network');
   }
@@ -3538,7 +3589,7 @@ function buildConstructibleFacility(
     securedOrder,
     lastAssignedOrder: state.nextAssignmentOrder++,
     populationOperationalTurn: state.turn + 1,
-    powerSupplyEnabled: true,
+    powerSupplyEnabled: action.facilityType !== 'simpleFarm',
     lastPowerSupplied: null,
     constructible: true,
     builtTurn: state.turn,
@@ -3612,6 +3663,7 @@ function staticConstructibleEligibleHexKeys(state: Readonly<GameState>): Set<str
   return new Set(state.map.tiles
     .filter((tile) =>
       tile.terrain === 'plain' &&
+      tile.playerOccupancyAllowed &&
       !tile.road &&
       tile.hordeEntranceDirections.length === 0 &&
       !facilityKeys.has(tile.key) &&
@@ -3833,7 +3885,7 @@ export class GameEngine implements HeadlessGame {
           facility.status === 'owned' &&
           facility.infected === 0 &&
           facility.populationOperationalTurn <= this.state.turn &&
-          ['farm', 'civilianFactory', 'militaryFactory', 'simpleFarm', 'civilianDroneBase'].includes(facility.type) &&
+          ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type) &&
           !['building', 'disabled', 'recovering'].includes(facility.operationalStatus)
         ) {
           actions.push({ type: 'SetPowerSupply', facilityId: facility.id, enabled: !facility.powerSupplyEnabled });
@@ -3881,7 +3933,7 @@ export class GameEngine implements HeadlessGame {
         ) actions.push({ type: 'AssignWorkers', facilityId: facility.id, workers });
       }
       if (
-        ['farm', 'civilianFactory', 'militaryFactory', 'simpleFarm', 'civilianDroneBase'].includes(facility.type) &&
+        ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type) &&
         !['building', 'disabled', 'recovering'].includes(facility.operationalStatus)
       ) {
         actions.push({ type: 'SetPowerSupply', facilityId: facility.id, enabled: !facility.powerSupplyEnabled });
@@ -3988,7 +4040,7 @@ export class GameEngine implements HeadlessGame {
     let actionError: ActionError | null = null;
     if (action.type === 'EndTurn') {
       if (!isPlayerPhase(candidate)) actionError = error(action, 'wrong_phase', 'Turn can only end during the player phase');
-      else endTurn(candidate, rng);
+      else actionError = endTurn(candidate, rng);
     } else if (action.type === 'Move') actionError = move(candidate, action);
     else if (action.type === 'Attack') actionError = attack(candidate, action);
     else if (action.type === 'Wait') actionError = wait(candidate, action);

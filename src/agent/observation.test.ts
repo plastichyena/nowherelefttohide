@@ -5,7 +5,7 @@ import { createInitialState, createUnit } from '../core/state';
 import { compactArtifactObservation, createAgentObservation, restoreArtifactObservation } from './observation';
 import { createAgentGame } from './game';
 
-describe('Agent Observation 3.0.0 rule projections', () => {
+describe('Agent Observation 4.0.0 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -43,9 +43,9 @@ describe('Agent Observation 3.0.0 rule projections', () => {
     });
     expect(publicFarm.production).toMatchObject({
       inputsPerWorker: {},
-      outputsPerWorker: { food: 5 },
-      requiresPower: false,
-      powerMode: 'boost',
+      outputsPerWorker: { food: 10 },
+      requiresPower: true,
+      powerMode: 'required',
       powerSupplyEnabled: true,
       requiredPowerCapacity: 5,
       stoppedReason: 'infection',
@@ -179,7 +179,7 @@ describe('Agent Observation 3.0.0 rule projections', () => {
     expect(createAgentObservation(state)).toEqual(second);
   });
 
-  it('reports unpowered boost industry at base output instead of stopped', () => {
+  it('reports unpowered required industry as stopped with zero projected output', () => {
     const state = createInitialState(128, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
     const powerPlant = state.facilities.find((facility) => facility.id === 'power-plant-1')!;
@@ -191,18 +191,19 @@ describe('Agent Observation 3.0.0 rule projections', () => {
     const publicFarm = createAgentObservation(state).facilities.find((facility) => facility.id === farm.id)!;
     expect(publicFarm.production).toMatchObject({
       estimatedInputConsumption: {},
-      estimatedOutput: { food: 60 },
+      estimatedOutput: {},
       estimatedPowerGeneration: 0,
       projectedInputLossIfInfectedOrOverrun: {},
-      projectedOutputLossIfInfectedOrOverrun: { food: 60 },
+      projectedOutputLossIfInfectedOrOverrun: {},
       projectedPowerLossIfInfectedOrOverrun: 0,
       projectedPowerSupplied: false,
+      projectedPowerReason: expect.any(String),
       projectedProductionMultiplier: 1,
-      stoppedReason: null,
+      stoppedReason: 'power_unavailable',
     });
   });
 
-  it('keeps Farm production independent from Fuel while exposing the power-fuel shortage', () => {
+  it('stops Farm production when Fuel-limited power is unavailable', () => {
     const state = createInitialState(129, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
     const wind = state.facilities.find((facility) => facility.type === 'windPowerPlant')!;
@@ -212,12 +213,12 @@ describe('Agent Observation 3.0.0 rule projections', () => {
     const publicFarm = createAgentObservation(state).facilities.find((facility) => facility.id === farm.id)!;
     expect(publicFarm.production).toMatchObject({
       estimatedInputConsumption: {},
-      estimatedOutput: { food: 115 },
-      stoppedReason: null,
+      estimatedOutput: {},
+      stoppedReason: 'power_unavailable',
       projectedPowerSupplied: false,
       projectedPowerReason: 'fuel_shortage',
       projectedInputLossIfInfectedOrOverrun: {},
-      projectedOutputLossIfInfectedOrOverrun: { food: 115 },
+      projectedOutputLossIfInfectedOrOverrun: {},
     });
   });
 
@@ -245,7 +246,7 @@ describe('Agent Observation 3.0.0 rule projections', () => {
       .map((unit) => unit.id)
       .filter((id) => !observation.zombies.some((unit) => unit.id === id));
 
-    expect(observation.finalHordeTurn).toBe(30);
+    expect(observation.finalHordeTurn).toBe(50);
     expect(observation.map.tiles).toHaveLength(961);
     expect(observation.map.tiles.filter((tile) => tile.terrain === 'forest')).toHaveLength(197);
     expect(observation.map.tiles.filter((tile) => tile.terrain === 'mountain')).toHaveLength(44);
@@ -276,8 +277,10 @@ describe('Agent Observation 3.0.0 rule projections', () => {
     expect(hiddenEnemyIds.length).toBeGreaterThan(0);
     expect(observation.zombies.map((unit) => unit.id)).not.toEqual(expect.arrayContaining(hiddenEnemyIds));
     expect(observation.horde).toMatchObject({
-      warningType: 'periodic',
-      warningDirection: observation.horde.direction,
+      warningType: 'none',
+      warningDirections: [],
+      nextWaveIndex: 1,
+      nextWave: expect.objectContaining({ index: 1, spawnTurn: 5, directionCount: 1 }),
       spawnTurn: 5,
       finalHordeStatus: 'notStarted',
     });

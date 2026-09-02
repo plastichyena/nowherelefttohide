@@ -158,7 +158,7 @@ describe('Balanced Agent scenario intentions', () => {
 
   it('positions National Guard at a frontline facility when Horde arrival is imminent', () => {
     const unit = observation.units[0]!;
-    const entrance = observation.map.tiles.find((tile) => tile.hordeEntranceDirections.includes(observation.horde.direction))!;
+    const entrance = observation.map.tiles.find((tile) => tile.hordeEntranceDirections.length > 0)!;
     const frontline = observation.facilities
       .filter((facility) => facility.owner === 'player' && facility.healthyPopulation > 0)
       .sort((left, right) =>
@@ -169,6 +169,8 @@ describe('Balanced Agent scenario intentions', () => {
       { type: 'EndTurn' },
     ], (value) => {
       value.horde.turnsRemaining = 1;
+      value.horde.warningType = 'periodic';
+      value.horde.warningDirections = [...entrance.hordeEntranceDirections];
       value.zombies = [];
       value.units.find((candidate) => candidate.id === unit.id)!.position = { q: 7, r: 7 };
     });

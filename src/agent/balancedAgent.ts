@@ -169,8 +169,9 @@ function facilityResourceValue(type: FacilityType, observation: AgentObservation
 }
 
 function hordeEntrancePositions(observation: AgentObservation): HexCoord[] {
+  const warningDirections = new Set(observation.horde.warningDirections);
   return observation.map.tiles
-    .filter((tile) => tile.hordeEntranceDirections.includes(observation.horde.warningDirection))
+    .filter((tile) => tile.hordeEntranceDirections.some((direction) => warningDirections.has(direction)))
     .map((tile) => ({ q: tile.q, r: tile.r }));
 }
 
@@ -452,7 +453,7 @@ function scoreAction(
           observation.horde.warningType !== 'none' || observation.zombies.length === 0
         ) ? 18 : 20;
         if (maintenanceEmergency > 0) reasonCodes.push('ENABLE_POWER_FOR_EMERGENCY_PRODUCTION');
-        else reasonCodes.push('ENABLE_INDUSTRIAL_POWER_BOOST');
+        else reasonCodes.push('ENABLE_REQUIRED_POWER');
       } else if (!facility.production.projectedPowerSupplied && observation.endTurnForecast.electricity.shortage > 0) {
         score += 15;
         reasonCodes.push('REDIRECT_SCARCE_POWER');

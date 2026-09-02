@@ -6,7 +6,7 @@ import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.4.1');
+    expect(APP_VERSION).toBe('1.4.2');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -20,7 +20,7 @@ describe('AgentGame public boundary', () => {
     expect(encoded).not.toContain('spawnedCount');
     expect(first.map.tiles).toHaveLength(961);
     expect(first).not.toHaveProperty('maxTurns');
-    expect(first.finalHordeTurn).toBe(30);
+    expect(first.finalHordeTurn).toBe(50);
     expect(first.apiVersion).toBe(OBSERVATION_API_VERSION);
     expect(first.roadBranches).toHaveLength(4);
     expect(first.checkpointPositionCandidates).toHaveLength(60);
@@ -43,14 +43,19 @@ describe('AgentGame public boundary', () => {
     expect(first.map.tiles.every((tile) =>
       typeof tile.terrain === 'string' &&
       typeof tile.road === 'boolean' &&
-      typeof tile.visibleToPlayer === 'boolean',
+      typeof tile.visibleToPlayer === 'boolean' &&
+      typeof tile.playerOccupancyAllowed === 'boolean',
     )).toBe(true);
+    expect(first.map.hordeSpawnReserve).toHaveLength(120);
     expect(first.zombies.every((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')).toBe(true);
     // The fixed v1.4 initial Zombies are outside initial shared vision; only
     // visible enemies may enter the public Observation.
     expect(first.zombies).toHaveLength(0);
     expect(first.horde).toMatchObject({
-      warningType: 'periodic',
+      warningType: 'none',
+      warningDirections: [],
+      nextWaveIndex: 1,
+      nextWave: { index: 1, spawnTurn: 5, directionCount: 1, final: false },
       spawnTurn: 5,
       finalHordeStatus: 'notStarted',
     });
@@ -63,14 +68,14 @@ describe('AgentGame public boundary', () => {
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.4.1 API, checkpoint candidates, logistics rules, Noise rules, and Horde composition from the same adapter boundary', () => {
+  it('describes the v1.4.2 API, checkpoint candidates, logistics rules, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('6');
+    expect(info.saveFormatVersion).toBe('7');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
@@ -95,11 +100,16 @@ describe('AgentGame public boundary', () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
-    expect(info.rules.horde).toMatchObject({
-      periodicInitial: { hordeZombie: 2, zombie: 0 },
-      periodicIncrement: { hordeZombie: 1, zombie: 1 },
-      finalComposition: { hordeZombie: 7, zombie: 5 },
-    });
+    expect(info.rules.map).toMatchObject({ id: 'fixed-31x31-v1', width: 31, height: 31 });
+    expect(info.rules.map.hordeSpawnReserve).toHaveLength(120);
+    expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 50 });
+    expect(info.rules.horde.waves).toEqual([
+      expect.objectContaining({ index: 1, turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 1 }, final: false }),
+      expect.objectContaining({ index: 2, turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 2 }, final: false }),
+      expect.objectContaining({ index: 3, turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 4 }, final: false }),
+      expect.objectContaining({ index: 4, turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 4 }, final: false }),
+      expect.objectContaining({ index: 5, turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 5 }, final: true }),
+    ]);
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',
       includesIllegalCandidates: true,
@@ -199,14 +209,16 @@ describe('AgentGame public boundary', () => {
     }
   });
 
-  it('publishes one direction-only Horde event instead of leaking hidden spawn count or identity', () => {
+  it('publishes fixed-wave Horde facts without leaking spawn identity or coordinates', () => {
     const game = createAgentGame();
     game.reset({
       seed: 21,
       configOverrides: {
-        finalHordeTurn: 1,
+        horde: {
+          warningLeadTurns: 1,
+          waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 3 }, final: true }],
+        },
         economy: { initialZombieCount: 0 },
-        horde: { finalComposition: { hordeZombie: 1, zombie: 3 } },
         units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       },
     });
@@ -215,10 +227,13 @@ describe('AgentGame public boundary', () => {
     expect(result.observation.zombies).toHaveLength(0);
     const hordeEvents = result.events.filter((event) => event.type === 'horde_spawned');
     expect(hordeEvents).toHaveLength(1);
-    expect(hordeEvents[0]!.payload).toMatchObject({ hordeKind: 'final', direction: expect.any(String) });
+    expect(hordeEvents[0]!.payload).toMatchObject({
+      hordeKind: 'final', waveIndex: 1, spawnTurn: 1, final: true,
+      directions: expect.any(Array), compositionPerDirection: { hordeZombie: 1, zombie: 3 },
+      hordeZombieCount: 1, normalZombieCount: 3,
+    });
     for (const hiddenField of [
-      'zombieId', 'q', 'r', 'count', 'spawnGroupId', 'units', 'position',
-      'hordeZombieCount', 'normalZombieCount',
+      'zombieId', 'q', 'r', 'spawnGroupId', 'spawnGroupIds', 'units', 'position',
     ]) {
       expect(hordeEvents[0]!.payload).not.toHaveProperty(hiddenField);
     }

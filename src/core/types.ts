@@ -103,7 +103,7 @@ export type GameOverReason =
 
 export type ResourceType = 'food' | 'civilianGoods' | 'militaryGoods' | 'fuel';
 
-export type PowerMode = 'required' | 'boost' | 'none';
+export type PowerMode = 'required' | 'none';
 
 export type PowerSupplyReason =
   | 'supplied'
@@ -138,6 +138,8 @@ export interface HexTile {
   movementCost: number | null;
   facilityId: FacilityId | null;
   hordeEntranceDirections: CardinalDirection[];
+  /** Static public rule: player pieces and structures may not occupy this tile. */
+  playerOccupancyAllowed: boolean;
 }
 
 export interface HordeEntrance {
@@ -176,6 +178,8 @@ export interface FixedMap {
   roadTiles: HexCoord[];
   facilities: FacilityDefinition[];
   hordeEntrances: HordeEntrance[];
+  /** Public static reserve used by every player-placement validator. */
+  hordeSpawnReserve: HexCoord[];
   roadBranches: RoadBranchDefinition[];
   initialZombiePositions: HexCoord[];
 }
@@ -344,15 +348,19 @@ export interface UnitProductionOrder {
 }
 
 export interface HordeState {
-  spawnedCount: number;
+  /** One-based index of the next configured wave, or null after the Final Wave. */
+  nextWaveIndex: number | null;
   totalSpawned: number;
-  nextDirection: CardinalDirection;
+  /** Directions selected for the currently warned wave, in canonical order. */
+  warningDirections: CardinalDirection[];
   turnsRemaining: number;
   nextSpawnTurn: number | null;
   lastSpawnTurn: number | null;
   warningType: 'periodic' | 'final' | 'none';
+  spawnedWaveIndices: number[];
+  spawnGroupIdsByWave: Record<string, string[]>;
   finalHordeStatus: 'notStarted' | 'active' | 'defeated';
-  finalSpawnGroupId: string | null;
+  finalSpawnGroupIds: string[];
   finalSpawnedCount: number;
 }
 
@@ -404,6 +412,7 @@ export type GameEventType =
   | 'noise_target_overridden'
   | 'victory_progress_changed'
   | 'horde_spawned'
+  | 'horde_warning'
   | 'game_over';
 
 export interface GameEvent {
@@ -614,9 +623,7 @@ export interface EndTurnForecast {
     fuelLimitedGenerationCapacity: number;
     availableGenerationCapacity: number;
     requiredPowerDemand: number;
-    industrialBoostDemand: number;
     requiredPowerAllocated: number;
-    industrialBoostAllocated: number;
     unpoweredFacilities: UnpoweredFacilityForecast[];
     /** Compatibility aliases used by the existing compact HUD. */
     capacity: number;
@@ -843,13 +850,16 @@ export interface HordeComposition {
   zombie: number;
 }
 
+export interface HordeWaveConfig {
+  turn: number;
+  directionCount: 1 | 2 | 3 | 4;
+  compositionPerDirection: HordeComposition;
+  final: boolean;
+}
+
 export interface HordeConfig {
-  cycle: number;
-  periodicInitial: HordeComposition;
-  periodicIncrement: HordeComposition;
-  warningStartTurn: number;
-  spawnOnlyBeforeFinalTurn: boolean;
-  finalComposition: HordeComposition;
+  warningLeadTurns: number;
+  waves: HordeWaveConfig[];
 }
 
 export interface TerrainConfig {
@@ -945,7 +955,6 @@ export interface NaturalRecoveryConfig {
 export interface GameConfig {
   version: string;
   mapId: string;
-  finalHordeTurn: number;
   maxActionsPerTurn: number;
   units: Record<UnitType, UnitConfig>;
   facilities: Record<FacilityType, FacilityConfig>;

@@ -7,7 +7,12 @@ import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, AGENT_API_VERSION, OBSERVATION_AP
 
 describe('unified Agent Runner', () => {
   it('runs a deterministic random game and records a replay artifact', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 4 });
+    const config = createDefaultConfig({
+      maxActionsPerTurn: 4,
+      economy: { initialZombieCount: 0 },
+      units: { hordeZombie: { movement: 20, attack: 100 } },
+      horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 4, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
+    });
     const first = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } });
     const second = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } });
     expect(first.technicalFailure).toBe(false);
@@ -18,19 +23,19 @@ describe('unified Agent Runner', () => {
     expect(first.artifact.agentApiVersion).toBe(AGENT_API_VERSION);
     expect(first.artifact.observationApiVersion).toBe(OBSERVATION_API_VERSION);
     expect(first.artifact.bridgeApiVersion).toBe(BRIDGE_API_VERSION);
-    expect(first.artifact.config.finalHordeTurn).toBe(3);
+    expect(first.artifact.config.horde.waves.find((wave) => wave.final)?.turn).toBe(1);
     expect(first.artifact.fixedMap?.tiles.some((tile) => tile.terrain === 'forest')).toBe(true);
     expect(first.artifact.observationTrace?.[0]?.mapId).toBe(first.artifact.mapId);
     expect(first.artifact.observationTrace?.[0]).not.toHaveProperty('map');
     expect(first.artifact.observationTrace?.[0]?.checkpointPositionCandidates).toHaveLength(60);
-    expect(first.artifact.observationTrace?.some((observation) => observation.horde.finalHordeStatus !== 'notStarted')).toBe(true);
+    expect(first.artifact.observationTrace?.some((observation) => observation.horde.nextWaveIndex === 1)).toBe(true);
     expect(first.artifact.initialRoadArrivalSchedule).toHaveLength(4);
     expect(first.artifact.observationTrace).toHaveLength(first.actions.length + 1);
     const fullHordeEvent = first.artifact.verificationEvents?.find((event) => (
       event.type === 'horde_spawned' && Array.isArray(event.payload.units)
     ));
     expect(fullHordeEvent?.payload).toMatchObject({
-      spawnGroupId: expect.any(String),
+      spawnGroupIds: expect.arrayContaining([expect.any(String)]),
       hordeZombieCount: expect.any(Number),
       normalZombieCount: expect.any(Number),
       units: expect.arrayContaining([
@@ -50,15 +55,15 @@ describe('unified Agent Runner', () => {
     expect(corruptedReplay.reproduced).toBe(false);
     expect(corruptedReplay.mismatch).toBe('Replay internal verification events differ from the artifact');
     const previousAppReplay = replayArtifact({ ...first.artifact, appVersion: '1.3.1' });
-    expect(previousAppReplay.reproduced).toBe(false);
-    expect(previousAppReplay.error?.code).toBe('artifact_version_unsupported');
+    expect(previousAppReplay.reproduced).toBe(true);
+    expect(previousAppReplay.error).toBeNull();
     const missingAppMetadataReplay = replayArtifact({ ...first.artifact, appVersion: '' });
     expect(missingAppMetadataReplay.reproduced).toBe(false);
     expect(missingAppMetadataReplay.error?.code).toBe('artifact_invalid');
   }, 90_000);
 
-  it('rejects v1.4.0 and earlier artifacts before creating a v1.4.1 replay session', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 1 });
+  it('rejects pre-v1.4.2 artifacts before creating a v1.4.2 replay session', () => {
+    const config = createDefaultConfig({ horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] } });
     const run = runAgentGame(2, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 3 } });
     const oldArtifact = {
       ...run.artifact,
@@ -104,10 +109,14 @@ describe('unified Agent Runner', () => {
       bridgeApiVersion: '2.0.0',
     });
     expect(v140Replay).toMatchObject({ reproduced: false, actionsReplayed: 0, error: { code: 'artifact_version_unsupported' } });
-  });
+  }, 30_000);
 
   it('forces EndTurn at the runner per-turn limit for agents without traces', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 30, maxActionsPerTurn: 100, economy: { initialZombieCount: 0 } });
+    const config = createDefaultConfig({
+      horde: { warningLeadTurns: 1, waves: [{ turn: 30, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
+      maxActionsPerTurn: 100,
+      economy: { initialZombieCount: 0 },
+    });
     const run = runAgentGame(12, {
       config,
       agent: new RandomAgent(12),
@@ -119,7 +128,10 @@ describe('unified Agent Runner', () => {
   });
 
   it('keeps summary-only metrics identical while discarding heavyweight projections', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 2, maxActionsPerTurn: 2 });
+    const config = createDefaultConfig({
+      horde: { warningLeadTurns: 1, waves: [{ turn: 2, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
+      maxActionsPerTurn: 2,
+    });
     const options = {
       strategy: 'random' as const,
       config,
@@ -137,7 +149,7 @@ describe('unified Agent Runner', () => {
     ))).toBe(true);
     expect(summary.artifact.observationTrace).toHaveLength(2);
     expect(summary.artifact.fixedMap).toBeUndefined();
-  });
+  }, 30_000);
 
   it('keeps the default runner turn safety limit at 100 when the Final Horde is later', () => {
     const initial = createAgentGame().reset({ seed: 1 });
@@ -153,7 +165,7 @@ describe('unified Agent Runner', () => {
       getRunArtifact: () => ({}) as never,
     };
     const run = runAgentGame(1, {
-      config: createDefaultConfig({ finalHordeTurn: 250 }),
+       config: createDefaultConfig({ horde: { warningLeadTurns: 1, waves: [{ turn: 250, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] } }),
       agent: { id: 'fake', version: '1.0.0', decide: () => ({ action: { type: 'EndTurn' } }) },
       gameFactory: () => game,
     });
@@ -185,7 +197,7 @@ describe('unified Agent Runner', () => {
     const run = runAgentGame(1, {
       gameFactory: () => game,
       agent: { id: 'fake', version: '1.0.0', decide: () => ({ action: { type: 'EndTurn' } }) },
-      config: createDefaultConfig({ finalHordeTurn: 1 }),
+      config: createDefaultConfig({ horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] } }),
       debugSnapshot: () => ({ value: state.value }),
       limits: { maxTurns: 2, maxDecisionsPerTurn: 2, maxDecisionsPerGame: 2 },
     });

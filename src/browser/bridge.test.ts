@@ -126,9 +126,9 @@ describe('Developer / Browser Bridge', () => {
     expect(encodedArtifact).not.toContain('"nationalGuard":5');
     expect(encodedArtifact).not.toContain('"artifactType"');
     expect('verificationEvents' in artifact).toBe(false);
-    artifact.config.finalHordeTurn = 1;
+    artifact.config.horde.waves[0]!.turn = 1;
     artifact.acceptedActions.push({ type: 'EndTurn' });
-    expect(api.getRunArtifact().config.finalHordeTurn).not.toBe(1);
+    expect(api.getRunArtifact().config.horde.waves[0]!.turn).not.toBe(1);
     expect(api.getRunArtifact().acceptedActions.length).toBe(0);
   });
 

@@ -34,15 +34,15 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.4.1';
-export const GAME_RULES_VERSION = '2.1.0';
-export const SAVE_FORMAT_VERSION = '6';
-export const AGENT_API_VERSION = '3.0.0';
-export const OBSERVATION_API_VERSION = '3.0.0';
-export const BRIDGE_API_VERSION = '3.0.0';
-export const BALANCED_AGENT_VERSION = '4.1.0';
-export const RANDOM_AGENT_VERSION = '2.1.0';
-export const ARTIFACT_SCHEMA_VERSION = '2.1.0';
+export const APP_VERSION = '1.4.2';
+export const GAME_RULES_VERSION = '2.2.0';
+export const SAVE_FORMAT_VERSION = '7';
+export const AGENT_API_VERSION = '4.0.0';
+export const OBSERVATION_API_VERSION = '4.0.0';
+export const BRIDGE_API_VERSION = '4.0.0';
+export const BALANCED_AGENT_VERSION = '4.2.0';
+export const RANDOM_AGENT_VERSION = '2.2.0';
+export const ARTIFACT_SCHEMA_VERSION = '3.0.0';
 export const CHECKPOINT_SCHEMA_VERSION = '1.0.0';
 
 export interface AgentMapTileObservation {
@@ -61,6 +61,8 @@ export interface AgentMapTileObservation {
   terrainDamageMultiplier: number;
   visibleToPlayer: boolean;
   hordeEntranceDirections: CardinalDirection[];
+  /** Static Map Rule: Player units and Player-owned placements may occupy this Hex. */
+  playerOccupancyAllowed: boolean;
 }
 
 export interface AgentMapObservation {
@@ -69,6 +71,8 @@ export interface AgentMapObservation {
   height: number;
   coordinateSystem: 'axial-q-r';
   tiles: AgentMapTileObservation[];
+  /** Static outer-ring Horde Spawn Reserve, duplicated for direct consumers. */
+  hordeSpawnReserve: HexCoord[];
 }
 
 export interface AgentRoadBranchObservation {
@@ -321,14 +325,27 @@ export interface AgentApiInfo {
       hiddenEnemySpawnCoordinatePublic: false;
       hiddenEnemyCountPublic: false;
     };
+    map: {
+      id: string;
+      width: number;
+      height: number;
+      coordinateSystem: 'axial-q-r';
+      hordeSpawnReserve: HexCoord[];
+      playerOccupancyRule: string;
+    };
     horde: {
-      cycle: number;
-      periodicInitial: HordeComposition;
-      periodicIncrement: HordeComposition;
-      warningStartTurn: number;
-      spawnOnlyBeforeFinalTurn: boolean;
+      warningLeadTurns: number;
+      waves: Array<{
+        index: number;
+        turn: number;
+        directionCount: number;
+        compositionPerDirection: HordeComposition;
+        final: boolean;
+      }>;
       finalHordeTurn: number;
-      finalComposition: HordeComposition;
+      finalHordeTurnRule: string;
+      warningDirectionRule: string;
+      warningDirectionsPublicAfter: 'warning_start';
     };
     victory: {
       requiresFinalHorde: true;
@@ -425,8 +442,12 @@ export interface AgentApiInfo {
       poweredFacilitiesConsumeFixedCapacityWhenOperating: true;
       fuelPerFiveElectricity: number;
       facilityPowerUnit: number;
-      industrialPoweredMultiplier: number;
-      industrialUnpoweredMultiplier: number;
+      powerModes: PowerMode[];
+      standardOutputRule: {
+        requiredPowered: 'base';
+        requiredUnpowered: 0;
+        nonePowered: 'base';
+      };
       unpoweredCityCivilianGoodsOutputIsZero: true;
       sameTurnProductionCanCoverMaintenance: true;
       sameTurnProductionCanCoverProductionInputs: false;
@@ -535,11 +556,17 @@ export interface AgentObservation {
   supply: AgentSupplyObservation;
   horde: {
     warningType: 'periodic' | 'final' | 'none';
-    warningDirection: CardinalDirection;
+    warningDirections: CardinalDirection[];
+    nextWaveIndex: number | null;
+    nextWave: {
+      index: number;
+      spawnTurn: number;
+      directionCount: number;
+      compositionPerDirection: HordeComposition;
+      final: boolean;
+    } | null;
     spawnTurn: number | null;
     finalHordeStatus: 'notStarted' | 'active' | 'defeated';
-    /** Established aliases retained for clients that consumed v1.3 Horde data. */
-    direction: CardinalDirection;
     turnsRemaining: number;
     nextSpawnTurn: number | null;
   };
@@ -658,7 +685,7 @@ export interface AgentRunArtifact {
   /** Present for a Session artifact; absent for a standalone run. */
   sessionLineage?: { parentSessionId: string | null; parentCheckpointId: string | null };
   result: AgentGameResult | null;
-  /** Static map projection stored once per game by Artifact Schema 2.1.0. */
+  /** Static map projection stored once per game by Artifact Schema 3.0.0. */
   fixedMap?: AgentMapObservation;
   /** Dynamic public observations at reset and after each accepted action. */
   observationTrace?: AgentArtifactObservation[];
@@ -670,7 +697,7 @@ export interface AgentRunArtifact {
 }
 
 /**
- * Artifact Schema 2.1.0 stores topology once and keeps only dynamic map
+ * Artifact Schema 3.0.0 stores topology once and keeps only dynamic map
  * visibility in each trace entry.  Live observations remain complete.
  */
 export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {

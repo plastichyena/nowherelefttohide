@@ -8,7 +8,12 @@ import type { AgentPublicEvent } from './types';
 
 describe('Agent Metrics', () => {
   it('collects required game-level values and deterministic action counts', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 4 });
+    const config = createDefaultConfig({
+      maxActionsPerTurn: 4,
+      economy: { initialZombieCount: 0 },
+      units: { hordeZombie: { movement: 20, attack: 100 } },
+      horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 4, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
+    });
     const run = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } });
     expect(run.failure).toBeNull();
     expect(run.technicalFailure).toBe(false);
@@ -16,7 +21,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('3.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('4.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -52,6 +57,14 @@ describe('Agent Metrics', () => {
       'nationalGuardMilitaryGoodsConsumedByRange', 'militaryGoodsRefillShortageTurns',
       'emergencyMovesByType', 'emergencyMovementHexesByType',
       'emergencyMovementPointsByType', 'emergencyReturnsToSupplyByType',
+      'powerTurnsByFacilityType', 'powerRequestedTurnsByFacilityType', 'powerSuppliedTurnsByFacilityType',
+      'powerUnavailableTurnsByFacilityType', 'powerSupplyOffTurnsByFacilityType', 'powerResourceLossByResource',
+      'refineryPowerOutageTurns', 'refineryOutageNextTurnFuelShortageTurns', 'simpleFarmFoodShortageAvoidanceTurns',
+      'checkpointBatchStartsByPolicy', 'checkpointBatchCompletionsByPolicy', 'checkpointAverageQueue',
+      'checkpointCapacityUtilization', 'checkpointEstimatedThroughput', 'hordeWaves',
+      'hordeDirectionSpawnCounts', 'hordeDirectionKillCounts', 'hordeFinalWaveSpawnTotal',
+      'hordeFinalWaveKillTotal', 'hordeFinalDefeatedTurn', 'hordeTurnsAfterFinal',
+      'hordeMultiFrontCheckpointLosses', 'hordeMultiFrontFallbacks',
     ]) expect(run.metrics).toHaveProperty(key);
     for (const hiddenNoiseMetric of [
       'normalZombiesNoiseTargeted',
@@ -73,7 +86,10 @@ describe('Agent Metrics', () => {
   }, 20_000);
 
   it('keeps branch, policy, checkpoint, and supply metrics in the public result', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
+    const config = createDefaultConfig({
+      maxActionsPerTurn: 1,
+      horde: { warningLeadTurns: 1, waves: [{ turn: 3, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
+    });
     const run = runAgentGame(4, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 } });
     expect(Object.keys(run.metrics.refugeesScreenedByPolicy).sort()).toEqual(['normal', 'passThrough', 'strict']);
     expect(run.metrics.checkpointsBuilt).toBeGreaterThanOrEqual(0);
@@ -82,7 +98,7 @@ describe('Agent Metrics', () => {
   }, 10_000);
 
   it('counts policy branch-turns from the Active post only', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 1 });
+    const config = createDefaultConfig({ maxActionsPerTurn: 1 });
     const run = runAgentGame(4, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 10 } });
     const observation = structuredClone(run.initialObservation!);
     const baseCheckpoint = {
@@ -94,7 +110,7 @@ describe('Agent Metrics', () => {
       screening: 0,
       approved: 0,
       queuePeople: 0,
-      screeningCapacity: 10,
+       screeningCapacity: 20,
       estimatedScreeningThroughput: 5,
       arrivalIntervalMin: 2,
       arrivalIntervalMax: 4,
@@ -204,7 +220,12 @@ describe('Agent Metrics', () => {
   });
 
   it('aggregates averages, percentiles, outcomes, and action totals', () => {
-    const config = createDefaultConfig({ finalHordeTurn: 3, maxActionsPerTurn: 4 });
+    const config = createDefaultConfig({
+      maxActionsPerTurn: 4,
+      economy: { initialZombieCount: 0 },
+      units: { hordeZombie: { movement: 20, attack: 100 } },
+      horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 4, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
+    });
     const first = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } }).metrics;
     const second = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } }).metrics;
     const aggregate = aggregateMetrics([first, second]);

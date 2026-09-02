@@ -103,10 +103,10 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .horde-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
 .horde-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .horde-heading span { flex: 0 0 auto; color: #fff0be; font-size: 0.72rem; font-weight: 700; }
-.horde-facts { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px !important; align-items: stretch !important; }
+.horde-facts { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px !important; align-items: stretch !important; }
 .horde-facts > span { display: flex; min-width: 0; flex-direction: column; gap: 1px; padding: 3px 6px; border: 1px solid #72592d; border-radius: 6px; background: #3b301d; }
 .horde-facts small { color: #d3ba7d; font-size: 0.6rem; }
-.horde-facts b { overflow: hidden; color: #fff2bf; font-size: 0.76rem; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.horde-facts b { overflow: hidden; color: #fff2bf; font-size: 0.76rem; font-variant-numeric: tabular-nums; text-overflow: ellipsis; overflow-wrap: anywhere; }
 .horde-card[data-horde-state="final"] { background: #3a211d; border-color: #a85b44; color: #ffb394; }
 .horde-card[data-horde-state="final"] .horde-facts > span { border-color: #87503f; background: #482820; }
 .horde-card[data-horde-state="final"] .horde-facts small { color: #e8a891; }
@@ -168,6 +168,7 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .preview-card { margin-bottom: 8px; padding: 10px; border: 1px solid #89703d; border-radius: 10px; background: #302819; color: #f7dfa0; }.preview-card p { margin: 6px 0; font-size: 0.78rem; }.preview-card p span { color: #fff5ce; }.risk-low { color: #9ee0ae; }.risk-medium { color: #f1d578; }.risk-high, .risk-unknown { color: var(--danger); }
 .facility-editor { display: flex; align-items: end; gap: 10px; margin-bottom: 8px; }.facility-editor label { display: flex; flex: 1; flex-direction: column; gap: 5px; color: var(--muted); font-size: 0.76rem; }.facility-editor output { align-self: end; color: #edf9fa; font-size: 0.82rem; }.facility-editor input[type="range"] { width: 100%; accent-color: var(--primary); }.facility-editor select, .population-editor select { width: 100%; min-height: 44px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 9px; background: #0c1a22; color: #edf9fa; }.warning-text { margin: 8px 0; color: var(--danger); font-size: 0.82rem; }
 .location-card, .population-editor, .recruitment-editor, .checkpoint-card { margin-bottom: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: #0c1b24; }
+.spawn-reserve-detail { border-color: #8b4c76; background: #211a27; }
 .forecast-card { margin: 10px 0; padding: 9px 10px; border: 1px solid #6d5a32; border-radius: 9px; background: #282319; }
 .forecast-card h3 { margin: 0 0 5px; color: var(--warning); }
 .population-overview h3, .population-editor h3, .recruitment-editor h3, .checkpoint-card h3, .location-card h3 { margin: 10px 0 6px; }
@@ -186,10 +187,11 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .bottom-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; min-height: calc(58px + var(--safe-bottom)); padding: 5px 8px var(--safe-bottom); background: #0a1821; border-top: 1px solid var(--line); z-index: 6; }.bottom-nav button { display: flex; min-width: 44px; min-inline-size: 0; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden; background: transparent; color: var(--muted); border-color: transparent; font-size: 1rem; }.bottom-nav button span { overflow: hidden; max-width: 100%; font-size: 0.63rem; text-overflow: ellipsis; white-space: nowrap; }.bottom-nav button.active { background: #173642; color: var(--primary); border-color: #2b6574; }.bottom-nav .nav-end { background: #27584e; color: #bcefd0; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: max(20px, var(--safe-top)) 16px max(20px, var(--safe-bottom)); background: #02070bcc; }.modal-card { position: relative; width: min(100%, 460px); max-height: 100%; overflow: auto; padding: 26px 22px; border: 1px solid #35606e; border-radius: 16px; background: #10232d; box-shadow: 0 20px 70px #0008; }.modal-card p { color: var(--muted); line-height: 1.65; }.floating-card { max-height: min(90vh, 600px); }.modal-close { position: absolute; top: 12px; right: 12px; }.settings-form { display: grid; gap: 12px; }.settings-form label, .modal-card > label { display: grid; gap: 6px; color: var(--muted); font-size: 0.8rem; }.settings-form input, .modal-card textarea, .modal-card input[type="file"] { width: 100%; min-height: 44px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; background: #0a1821; color: #edf9fa; }.modal-card textarea { min-height: 120px; resize: vertical; font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }.modal-card hr { margin: 18px 0; border: 0; border-top: 1px solid var(--line); }.guide-card { text-align: center; }.guide-card .primary-button { width: 100%; }
-.composition-settings { min-width: 0; margin: 4px 0; padding: 12px; border: 1px solid #35606e; border-radius: 10px; }
-.composition-settings legend { padding: 0 6px; color: #d8f8e8; font-size: 0.82rem; font-weight: 800; }
-.composition-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.composition-hint { margin: 10px 0 0 !important; font-size: 0.72rem; }
+.fixed-horde-schedule { min-width: 0; margin: 4px 0; padding: 12px; border: 1px solid #72592d; border-radius: 10px; background: #211d15; }
+.fixed-horde-schedule h3 { margin: 0 0 5px; color: #f3d682; font-size: 0.84rem; }
+.fixed-horde-schedule p { margin: 4px 0 7px; }
+.fixed-horde-schedule ul { display: grid; gap: 5px; margin: 0; padding-left: 1.2rem; color: #e8d9aa; font-size: 0.73rem; line-height: 1.35; }
+.fixed-horde-schedule li strong { color: #fff2bf; }
 .board-loading { position: absolute; inset: 50% auto auto 50%; z-index: 4; min-width: min(80%, 280px); padding: 10px 14px; border: 1px solid #35606e; border-radius: 10px; background: #0c1b24e8; color: #d8f8e8; font-size: 0.78rem; text-align: center; transform: translate(-50%, -50%); }
 .board-loading[hidden] { display: none; }
 .board-legend-disclosure { margin: 16px 0; border: 1px solid #35606e; border-radius: 10px; background: #0c1b24; }
@@ -315,7 +317,7 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .policy-list strong { color: #edf9fa; }
 
 @media (max-width: 560px) {
-  .composition-grid { grid-template-columns: 1fr; }
+  .horde-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .branch-flow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .top-hud { grid-template-columns: minmax(0, 1fr) max-content 44px 44px; grid-template-rows: minmax(31px, 1fr) minmax(31px, 1fr); column-gap: 6px; row-gap: 0; min-height: 78px; }
   .hud-brand { grid-row: 1 / span 2; grid-column: 1; min-width: 0; gap: 4px; font-size: 0.68rem; overflow: visible; text-overflow: clip; }

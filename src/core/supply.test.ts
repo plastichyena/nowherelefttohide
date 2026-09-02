@@ -3,6 +3,7 @@ import { createDefaultConfig } from './config';
 import { GameEngine, validateAction } from './engine';
 import { hexDistance } from './hex';
 import { createUnit } from './state';
+import { singleFinalWave } from './testConfig';
 import type { GameState } from './types';
 import {
   getBlockingZombiesForCheckpoint,
@@ -123,13 +124,13 @@ describe('road branches and supply network', () => {
       type: 'RelocateCheckpoint',
       checkpointId: active.id,
       branchId: 'north',
-      position: { q: 15, r: 0 },
+      position: { q: 15, r: 1 },
     }).error?.code).toBe('checkpoint_branch_action_limit');
   });
 
   it('processes all unmanaged road arrivals immediately without hidden checkpoint pools', () => {
     const config = createDefaultConfig({
-      finalHordeTurn: 3,
+      horde: singleFinalWave(3),
       economy: { initialZombieCount: 0 },
       refugees: {
         arrivalIntervalMin: 1,
@@ -150,7 +151,7 @@ describe('road branches and supply network', () => {
   });
 
   it('allows existing out-of-supply production but rejects worker increases and natural recovery', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, finalHordeTurn: 3 });
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, horde: singleFinalWave(3) });
     const engine = new GameEngine(4, config);
     const snapshot = engine.getState();
     const power = snapshot.facilities.find((facility) => facility.id === 'power-plant-2')!;
@@ -162,7 +163,7 @@ describe('road branches and supply network', () => {
     snapshot.population.facilityWorkers.push({ facilityId: power.id, workers: 0 });
     snapshot.population.facilityWorkers.sort((a, b) => a.facilityId.localeCompare(b.facilityId));
     const police = snapshot.units.find((unit) => unit.type === 'police')!;
-    police.position = { q: 0, r: 0 };
+    police.position = { q: 1, r: 1 };
     police.hp = 10;
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'AssignWorkers', facilityId: power.id, workers: 1 }).error?.code)
@@ -172,7 +173,7 @@ describe('road branches and supply network', () => {
   });
 
   it('ruins an empty occupied checkpoint, permits only an inner retreat, and abandons the old site', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, finalHordeTurn: 4 });
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, horde: singleFinalWave(4) });
     const engine = new GameEngine(5, config);
     expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 9 } }).error).toBeNull();
     const occupied = engine.getState();
@@ -189,7 +190,7 @@ describe('road branches and supply network', () => {
     const cleared = engine.getState() as GameState;
     cleared.units = cleared.units.filter((unit) => unit.type !== 'zombie');
     expect(engine.step({ type: 'LoadSnapshot', snapshot: cleared }).error).toBeNull();
-    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 0 } }).error?.code)
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 1 } }).error?.code)
       .toBe('checkpoint_abandoned_forward_block');
     expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 10 } }).error).toBeNull();
     expect(engine.getState().checkpoints.find((candidate) => candidate.id === checkpoint.id)!.status).toBe('abandoned');

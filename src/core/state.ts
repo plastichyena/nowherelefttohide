@@ -17,7 +17,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '2.1.0';
+export const GAME_VERSION = '2.2.0';
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -274,7 +274,7 @@ function facilityStateFromDefinition(
     securedOrder,
     lastAssignedOrder: securedOrder ?? 0,
     populationOperationalTurn: owned ? 1 : Number.MAX_SAFE_INTEGER,
-    powerSupplyEnabled: ['farm', 'civilianFactory', 'militaryFactory', 'simpleFarm', 'civilianDroneBase'].includes(definition.type),
+    powerSupplyEnabled: ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(definition.type),
     lastPowerSupplied: null,
     constructible: false,
     builtTurn: null,
@@ -315,8 +315,18 @@ function resolveInitialFacilityPopulation(
   };
 }
 
-function directionFromRng(rng: SeededRng): CardinalDirection {
-  return rng.pick(['north', 'east', 'south', 'west'] as const);
+const CANONICAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
+
+function selectWarningDirections(rng: SeededRng, count: number): CardinalDirection[] {
+  if (count === 4) return [...CANONICAL_DIRECTIONS];
+  const remaining = [...CANONICAL_DIRECTIONS];
+  const selected: CardinalDirection[] = [];
+  while (selected.length < count) {
+    const direction = rng.pick(remaining);
+    selected.push(direction);
+    remaining.splice(remaining.indexOf(direction), 1);
+  }
+  return CANONICAL_DIRECTIONS.filter((direction) => selected.includes(direction));
 }
 
 /**
@@ -334,6 +344,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   }
 
   const stateConfig = cloneConfig(config);
+  const firstWave = stateConfig.horde.waves[0]!;
+  const finalWave = stateConfig.horde.waves.at(-1)!;
   const map = createFixedMap(
     Object.fromEntries(
       Object.entries(config.facilities).map(([type, facility]) => [type, facility.workerCapacity]),
@@ -368,7 +380,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     seed,
     rngState: rng.snapshot(),
     turn: 1,
-    finalHordeTurn: stateConfig.finalHordeTurn,
+    finalHordeTurn: finalWave.turn,
     actionsTakenThisTurn: 0,
     phase: 'player',
     mapId: map.id,
@@ -418,15 +430,21 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     nextEventNumber: 1,
     nextAssignmentOrder: securedOrder + 1,
     horde: {
-      spawnedCount: 0,
+      nextWaveIndex: 1,
       totalSpawned: 0,
-      nextDirection: directionFromRng(rng),
-      turnsRemaining: Math.min(stateConfig.horde.cycle, stateConfig.finalHordeTurn),
-      nextSpawnTurn: Math.min(stateConfig.horde.cycle, stateConfig.finalHordeTurn),
+      warningDirections: firstWave.turn - stateConfig.horde.warningLeadTurns <= 1
+        ? selectWarningDirections(rng, firstWave.directionCount)
+        : [],
+      turnsRemaining: Math.max(0, firstWave.turn - 1),
+      nextSpawnTurn: firstWave.turn,
       lastSpawnTurn: null,
-      warningType: stateConfig.finalHordeTurn <= stateConfig.horde.cycle ? 'final' : 'periodic',
+      warningType: firstWave.turn - stateConfig.horde.warningLeadTurns <= 1
+        ? firstWave.final ? 'final' : 'periodic'
+        : 'none',
+      spawnedWaveIndices: [],
+      spawnGroupIdsByWave: {},
       finalHordeStatus: 'notStarted',
-      finalSpawnGroupId: null,
+      finalSpawnGroupIds: [],
       finalSpawnedCount: 0,
     },
     events: [],

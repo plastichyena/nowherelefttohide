@@ -368,11 +368,11 @@ export function createAgentObservation(
           inputsPerWorker: cloneJson(rule.inputs),
           outputsPerWorker: cloneJson(rule.outputs),
           requiresPower: rule.requiresPower,
-          requiredPowerCapacity: rule.powerCapacity,
+          requiredPowerCapacity: rule.powerMode === 'required' ? rule.powerCapacity : 0,
           powerGenerationPerWorker: rule.powerGeneration,
           powerMode: rule.powerMode,
-          powerDemand: rule.powerCapacity,
-          powerSupplyEnabled: facility.powerSupplyEnabled,
+          powerDemand: rule.powerMode === 'required' ? rule.powerCapacity : 0,
+          powerSupplyEnabled: rule.powerMode === 'required' && facility.powerSupplyEnabled,
           projectedPowerRequested: productionProjection?.projectedPowerRequested ?? false,
           projectedPowerSupplied: productionProjection?.projectedPowerSupplied ?? false,
           projectedPowerReason: productionProjection?.projectedPowerReason ?? 'not_applicable',
@@ -402,11 +402,12 @@ export function createAgentObservation(
   const publicFinalHordeStatus = victory.finalHordeDefeated
     ? 'defeated' as const
     : state.horde.finalHordeStatus;
-  // Before a spawn this is the warned future turn. Once the Final Horde has
-  // spawned, nextSpawnTurn is null, so retain the actual public spawn turn.
-  const publicSpawnTurn = state.horde.warningType === 'none'
-    ? state.horde.lastSpawnTurn
-    : state.horde.nextSpawnTurn;
+  const nextWave = state.horde.nextWaveIndex === null
+    ? null
+    : state.config.horde.waves[state.horde.nextWaveIndex - 1] ?? null;
+  // The schedule turn is public even before a warning starts. The selected
+  // directions remain private until the warning event/observation is active.
+  const publicSpawnTurn = nextWave?.turn ?? state.horde.lastSpawnTurn;
   return cloneJson({
     apiVersion: OBSERVATION_API_VERSION,
     gameRulesVersion: state.gameVersion,
@@ -436,10 +437,12 @@ export function createAgentObservation(
             effectiveMovementCost: movementCost,
             terrainDefenseSource: defense.source,
             terrainDamageMultiplier: defense.multiplier,
-            visibleToPlayer: visibleTileKeys.has(tile.key),
-            hordeEntranceDirections: [...tile.hordeEntranceDirections].sort(),
-          };
-        }),
+             visibleToPlayer: visibleTileKeys.has(tile.key),
+             hordeEntranceDirections: [...tile.hordeEntranceDirections].sort(),
+             playerOccupancyAllowed: tile.playerOccupancyAllowed,
+           };
+         }),
+       hordeSpawnReserve: state.map.hordeSpawnReserve.map((position) => ({ ...position })),
     },
     resources: cloneJson(state.resources),
     population: {
@@ -519,10 +522,17 @@ export function createAgentObservation(
     },
     horde: {
       warningType: state.horde.warningType,
-      warningDirection: state.horde.nextDirection,
+      warningDirections: [...state.horde.warningDirections],
+      nextWaveIndex: state.horde.nextWaveIndex,
+      nextWave: nextWave ? {
+        index: state.horde.nextWaveIndex!,
+        spawnTurn: nextWave.turn,
+        directionCount: nextWave.directionCount,
+        compositionPerDirection: cloneJson(nextWave.compositionPerDirection),
+        final: nextWave.final,
+      } : null,
       spawnTurn: publicSpawnTurn,
       finalHordeStatus: publicFinalHordeStatus,
-      direction: state.horde.nextDirection,
       turnsRemaining: state.horde.turnsRemaining,
       nextSpawnTurn: state.horde.nextSpawnTurn,
     },
@@ -537,7 +547,7 @@ export function createAgentObservation(
   } satisfies AgentObservation as unknown as JsonValue) as unknown as AgentObservation;
 }
 
-/** Remove fixed topology from one Artifact Schema 2.1.0 trace entry. */
+/** Remove fixed topology from one Artifact Schema 3.0.0 trace entry. */
 export function compactArtifactObservation(observation: AgentObservation): AgentArtifactObservation {
   const copy = cloneJson(observation);
   const { map, ...dynamic } = copy;

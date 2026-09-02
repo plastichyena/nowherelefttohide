@@ -10,7 +10,18 @@ import type {
   AgentPublicRunArtifact,
   AgentStepResult,
 } from '../agent/types';
+import {
+  AGENT_API_VERSION,
+  APP_VERSION,
+  ARTIFACT_SCHEMA_VERSION,
+  BRIDGE_API_VERSION,
+  GAME_RULES_VERSION,
+  OBSERVATION_API_VERSION,
+} from '../agent/types';
+import { DEFAULT_MAP_ID } from '../core/config';
 import type { GameAction, JsonValue } from '../core/types';
+import { SAVE_FORMAT_VERSION } from '../persistence/save';
+import { createAgentSessionGameFactory } from './agent-adapter';
 import { executeSessionCommand } from './session-cli';
 import { SessionService } from './service';
 import { SessionStore } from './store';
@@ -34,16 +45,16 @@ function tempRoot(name: string): string {
 
 function identity(): SessionVersionIdentity {
   return {
-    appVersion: '1.4.1',
-    gameRulesVersion: '2.1.0',
-    saveFormatVersion: 6,
-    artifactSchemaVersion: '2.1.0',
-    agentApiVersion: '3.0.0',
-    observationApiVersion: '3.0.0',
-    bridgeApiVersion: '3.0.0',
+    appVersion: APP_VERSION,
+    gameRulesVersion: GAME_RULES_VERSION,
+    saveFormatVersion: SAVE_FORMAT_VERSION,
+    artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
+    agentApiVersion: AGENT_API_VERSION,
+    observationApiVersion: OBSERVATION_API_VERSION,
+    bridgeApiVersion: BRIDGE_API_VERSION,
     buildId: 'test-build',
     gitCommit: 'a'.repeat(40),
-    mapId: 'fixed-31x31-v1',
+    mapId: DEFAULT_MAP_ID,
   };
 }
 
@@ -58,6 +69,7 @@ const observationTemplate = (() => {
       height: 1,
       coordinateSystem: value.map.coordinateSystem,
       tiles: [],
+      hordeSpawnReserve: [],
     },
     roadBranches: [],
     facilities: [],
@@ -148,6 +160,10 @@ function service(root: string, gameOverAt = 999, store?: SessionStore): SessionS
   return new SessionService(store ?? new SessionStore(root), fakeFactory(gameOverAt), identity());
 }
 
+function agentService(root: string): SessionService {
+  return new SessionService(new SessionStore(root), createAgentSessionGameFactory('test-build'), identity());
+}
+
 describe('Session hash and input boundaries', () => {
   it('uses canonical SHA-256 and validates safe identifiers and Unicode summaries', () => {
     expect(sha256Text('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
@@ -160,6 +176,49 @@ describe('Session hash and input boundaries', () => {
 });
 
 describe('AI Portable Session lifecycle', () => {
+  it('restores Wave warnings, Spawn Groups, and RNG exactly through real Agent Session Resume and Checkpoint branching', () => {
+    const root = tempRoot('real-wave-resume');
+    const api = agentService(root);
+    api.newSession({ sessionId: 'real-wave-resume', seed: 71, checkpointInterval: 99 });
+
+    api.step('real-wave-resume', { action: { type: 'EndTurn' }, decisionSummary: 'advance to turn two' });
+    api.step('real-wave-resume', { action: { type: 'EndTurn' }, decisionSummary: 'start first warning' });
+    const warned = api.status('real-wave-resume');
+    expect(warned.observation.horde).toMatchObject({
+      warningType: 'periodic',
+      warningDirections: expect.any(Array),
+      nextWaveIndex: 1,
+      nextSpawnTurn: 5,
+    });
+    expect(warned.observation.horde.warningDirections).toHaveLength(1);
+
+    for (let index = 0; index < 4; index += 1) {
+      const privateState = api.store.load('real-wave-resume').privateState as unknown as {
+        horde: { spawnGroupIdsByWave: Record<string, string[]> };
+      };
+      if (privateState.horde.spawnGroupIdsByWave['1']) break;
+      api.step('real-wave-resume', { action: { type: 'EndTurn' }, decisionSummary: `advance to first Wave ${index}` });
+    }
+    const beforeCheckpoint = api.store.load('real-wave-resume').privateState as unknown as {
+      horde: { warningDirections: string[]; spawnGroupIdsByWave: Record<string, string[]> };
+      rngState: unknown;
+    };
+    expect(beforeCheckpoint.horde.spawnGroupIdsByWave['1']).toHaveLength(1);
+    const checkpoint = api.saveCheckpoint('real-wave-resume');
+
+    const resumed = api.status('real-wave-resume');
+    const afterResume = api.store.load('real-wave-resume').privateState as unknown as typeof beforeCheckpoint;
+    expect(afterResume.horde).toEqual(beforeCheckpoint.horde);
+    expect(afterResume.rngState).toEqual(beforeCheckpoint.rngState);
+    expect(resumed.observation.horde.warningDirections).toEqual(beforeCheckpoint.horde.warningDirections);
+
+    const child = api.loadCheckpoint('real-wave-resume', checkpoint.checkpointId, 'real-wave-child');
+    const childState = api.store.load('real-wave-child').privateState as unknown as typeof beforeCheckpoint;
+    expect(childState.horde).toEqual(beforeCheckpoint.horde);
+    expect(childState.rngState).toEqual(beforeCheckpoint.rngState);
+    expect(child.observation.horde.warningDirections).toEqual(beforeCheckpoint.horde.warningDirections);
+  }, 20_000);
+
   it('round-trips Active state, records rejected Decisions, and leaves malformed input unnumbered', () => {
     const root = tempRoot('roundtrip');
     const api = service(root);
@@ -275,6 +334,13 @@ describe('AI Portable Session lifecycle', () => {
     const otherIdentity = { ...identity(), buildId: 'different-build' };
     const incompatible = new SessionService(new SessionStore(versionRoot), fakeFactory(), otherIdentity);
     expect(() => incompatible.status('build-mismatch')).toThrow(/buildId/u);
+
+    const appVersionOnly = new SessionService(
+      new SessionStore(versionRoot),
+      fakeFactory(),
+      { ...identity(), appVersion: '9.9.9' },
+    );
+    expect(appVersionOnly.status('build-mismatch').session.appVersion).toBe(APP_VERSION);
   });
 
   it('rejects concurrent locks and recovers only a definitely dead local PID lock', () => {

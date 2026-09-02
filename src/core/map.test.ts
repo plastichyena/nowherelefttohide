@@ -13,7 +13,9 @@ import {
   FIXED_MAP_WIDTH,
   FIXED_MOUNTAIN_COORDINATES,
   FIXED_MOUNTAIN_SEED_COORDINATES,
+  canPlayerOccupyHex,
   createFixedMap,
+  isHordeSpawnReserve,
   validateFixedMap,
 } from './map';
 
@@ -89,6 +91,25 @@ describe('v1.4.0 fixed map', () => {
       { q: 15, r: 30 },
       { q: 0, r: 15 },
     ]);
+  });
+
+  it('publishes the 120-hex outer ring as the Horde Spawn Reserve', () => {
+    expect(FIXED_MAP.hordeSpawnReserve).toHaveLength(120);
+    expect(new Set(FIXED_MAP.hordeSpawnReserve.map(key)).size).toBe(120);
+    for (const tile of FIXED_MAP.tiles) {
+      const expected = tile.q === 0 || tile.q === 30 || tile.r === 0 || tile.r === 30;
+      expect(isHordeSpawnReserve(FIXED_MAP, tile)).toBe(expected);
+      expect(tile.playerOccupancyAllowed).toBe(!expected);
+    }
+  });
+
+  it('uses the map Reserve collection as the single occupancy rule source', () => {
+    const replaced = createFixedMap();
+    replaced.hordeSpawnReserve = [{ q: 15, r: 15 }];
+    expect(isHordeSpawnReserve(replaced, { q: 15, r: 15 })).toBe(true);
+    expect(canPlayerOccupyHex(replaced, { q: 15, r: 15 })).toBe(false);
+    expect(isHordeSpawnReserve(replaced, { q: 15, r: 0 })).toBe(false);
+    expect(canPlayerOccupyHex(replaced, { q: 15, r: 0 })).toBe(true);
   });
 
   it('contains the 17 permanent facilities at the specified coordinates', () => {

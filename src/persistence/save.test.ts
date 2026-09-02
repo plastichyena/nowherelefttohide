@@ -71,8 +71,8 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.4.1 Save Format 6', () => {
-  it('round-trips a detached complete Save Format 6 GameState through code and JSON', () => {
+describe('v1.4.2 Save Format 7', () => {
+  it('round-trips a detached complete Save Format 7 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -80,7 +80,7 @@ describe('v1.4.1 Save Format 6', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 6,
+      formatVersion: 7,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-31x31-v1',
       seed: 77,
@@ -93,29 +93,64 @@ describe('v1.4.1 Save Format 6', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('writes the v1.4.1 version boundaries', () => {
+  it('writes the v1.4.2 version boundaries', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(6);
-    expect(envelope.gameVersion).toBe('2.1.0');
-    expect(config.version).toBe('2.1.0');
+    expect(envelope.formatVersion).toBe(7);
+    expect(envelope.gameVersion).toBe('2.2.0');
+    expect(config.version).toBe('2.2.0');
     expect(config.mapId).toBe('fixed-31x31-v1');
     expect((state.map as Record<string, unknown>).width).toBe(31);
     expect((state.map as Record<string, unknown>).height).toBe(31);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
-    expect(state).toHaveProperty('finalHordeTurn', 30);
+    expect(state).toHaveProperty('finalHordeTurn', 50);
     expect(state).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('maxTurns');
+    expect(config).not.toHaveProperty('finalHordeTurn');
+  });
+
+  it('requires the Wave Config, Horde State, and Horde Spawn Reserve shape introduced by Save Format 7', () => {
+    const envelope = exportedEnvelope(initialState(17));
+    const state = envelope.state as Record<string, unknown>;
+    const config = state.config as Record<string, unknown>;
+    const horde = state.horde as Record<string, unknown>;
+    const map = state.map as Record<string, unknown>;
+    delete (config.horde as Record<string, unknown>).warningLeadTurns;
+    delete horde.warningDirections;
+    delete horde.spawnGroupIdsByWave;
+    delete map.hordeSpawnReserve;
+    delete ((map.tiles as Array<Record<string, unknown>>)[0]!).playerOccupancyAllowed;
+
+    const result = importSaveJson(JSON.stringify(resign(envelope)));
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/warningLeadTurns|warningDirections|spawnGroupIdsByWave|hordeSpawnReserve|playerOccupancyAllowed/i);
+  });
+
+  it('rejects a Player Unit on the static Horde Spawn Reserve without changing the live state', () => {
+    const current = initialState(83);
+    const before = clone(current);
+    const envelope = exportedEnvelope(current);
+    const state = envelope.state as Record<string, unknown>;
+    const units = state.units as Array<Record<string, unknown>>;
+    (units[0]!.position as Record<string, unknown>).q = 30;
+    (units[0]!.position as Record<string, unknown>).r = 30;
+
+    const result = importSaveJson(JSON.stringify(resign(envelope)));
+    expect(result).toMatchObject({ valid: false, state: null, envelope: null });
+    expect(result.errors.join(' ')).toMatch(/Horde Spawn Reserve|player.*occupy/i);
+    expect(current).toEqual(before);
   });
 
   it('preserves terrain, Horde Zombie target state, Final Horde group, and Victory fields', () => {
     const config = createDefaultConfig({
-      finalHordeTurn: 1,
       economy: { initialZombieCount: 0 },
-      horde: { cycle: 1, finalComposition: { hordeZombie: 1, zombie: 1 } },
+      horde: {
+        warningLeadTurns: 1,
+        waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 1 }, final: true }],
+      },
     });
     const engine = new GameEngine(16, config);
     const endTurn = engine.step({ type: 'EndTurn' });
@@ -123,7 +158,7 @@ describe('v1.4.1 Save Format 6', () => {
     const state = clone(endTurn.state);
     const finalHorde = state.units.filter((unit) => unit.hordeKind === 'final');
     expect(finalHorde).toHaveLength(2);
-    expect(finalHorde.every((unit) => unit.hordeKind === 'final' && unit.spawnGroupId === state.horde.finalSpawnGroupId)).toBe(true);
+    expect(finalHorde.every((unit) => unit.hordeKind === 'final' && state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId!))).toBe(true);
     expect(state.horde).toMatchObject({ finalHordeStatus: 'active', finalSpawnedCount: 2 });
     expect(state.statistics).toHaveProperty('finalHordeSpawned', 2);
     expect(state.statistics).toMatchObject({ finalHordeZombiesSpawned: 1, finalNormalZombiesSpawned: 1 });
@@ -159,17 +194,10 @@ describe('v1.4.1 Save Format 6', () => {
     expect(loaded.state).not.toHaveProperty('forecast');
   });
 
-  it('accepts 31x31 boundary coordinates and rejects coordinates outside the fixed map', () => {
+  it('rejects coordinates outside the fixed map', () => {
     const envelope = exportedEnvelope(initialState(83));
     const state = envelope.state as Record<string, unknown>;
     const units = state.units as Array<Record<string, unknown>>;
-    (units[0]!.position as Record<string, unknown>).q = 30;
-    (units[0]!.position as Record<string, unknown>).r = 30;
-    // This is only a coordinate-shape check, so keep the state checksum valid
-    // while allowing the relational invariant to report any other mismatch.
-    const boundaryResult = importSaveJson(JSON.stringify(resign(envelope)));
-    expect(boundaryResult.errors.join(' ')).not.toMatch(/outside|in-bounds/i);
-
     (units[0]!.position as Record<string, unknown>).q = 31;
     const outsideResult = importSaveJson(JSON.stringify(resign(envelope)));
     expect(outsideResult.valid).toBe(false);
@@ -188,22 +216,22 @@ describe('v1.4.1 Save Format 6', () => {
     const current = initialState(18);
     const before = clone(current);
     const legacy = exportedEnvelope(current);
-    legacy.formatVersion = 3;
-    legacy.gameVersion = '1.4.1';
+    legacy.formatVersion = 6;
+    legacy.gameVersion = '2.1.0';
     const legacyState = legacy.state as Record<string, unknown>;
-    legacyState.gameVersion = '1.4.1';
-    (legacyState.config as Record<string, unknown>).version = '1.4.1';
+    legacyState.gameVersion = '2.1.0';
+    (legacyState.config as Record<string, unknown>).version = '2.1.0';
 
     const result = decodeSaveCode(codeForEnvelope(legacy));
     expect(result.valid).toBe(false);
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
-    expect(result.errors.join(' ')).toMatch(/format version|incompatible|1\.2\.7/i);
-    expect(result.errors.join(' ')).toContain('v1.4.0 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.1\.0/i);
+    expect(result.errors.join(' ')).toContain('v1.4.1 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Format 5', () => {
+  it('rejects a stale state/config version even when the envelope has Save Format 7', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     state.gameVersion = '1.4.0';
@@ -241,11 +269,11 @@ describe('v1.4.1 Save Format 6', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v5 autosave key and never rewrites or removes a legacy key', () => {
+  it('uses the v7 autosave key and never rewrites or removes a v6 legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
-    legacy.formatVersion = 3;
-    legacy.gameVersion = '1.4.1';
+    legacy.formatVersion = 6;
+    legacy.gameVersion = '2.1.0';
     storage.setItem(LEGACY_AUTOSAVE_KEY, codeForEnvelope(legacy));
     const beforeLegacy = storage.getItem(LEGACY_AUTOSAVE_KEY);
     const store = new AutoSaveStore({ storage });

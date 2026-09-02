@@ -1,6 +1,6 @@
 import { validateGameConfig } from './config';
 import { hexKey, hexWithinBounds } from './hex';
-import { isRoad, validateFixedMap } from './map';
+import { isHordeSpawnReserve, isRoad, validateFixedMap } from './map';
 import { civilianWorkerCount, isCityFacility, populationLedgerTotal, resourceConsumerPopulation } from './state';
 import type { GameState } from './types';
 
@@ -58,15 +58,22 @@ export function validateInvariants(state: GameState): InvariantResult {
   if (!isNonNegativeInteger(state.turn) || state.turn < 1) {
     errors.push('Turn must be a positive integer');
   }
-  if (state.finalHordeTurn !== state.config.finalHordeTurn) {
-    errors.push('State finalHordeTurn must match config.finalHordeTurn');
+  const finalWave = state.config.horde.waves.at(-1);
+  if (!finalWave || state.finalHordeTurn !== finalWave.turn) {
+    errors.push('State finalHordeTurn must match the configured Final Wave');
   }
   const cardinalDirections = ['north', 'east', 'south', 'west'];
-  if (!cardinalDirections.includes(state.horde.nextDirection)) {
-    errors.push('Horde nextDirection is invalid');
+  if (!Array.isArray(state.horde.warningDirections)
+    || new Set(state.horde.warningDirections).size !== state.horde.warningDirections.length
+    || state.horde.warningDirections.some((direction) => !cardinalDirections.includes(direction))) {
+    errors.push('Horde warningDirections are invalid');
   }
-  for (const field of ['spawnedCount', 'totalSpawned', 'turnsRemaining', 'finalSpawnedCount'] as const) {
+  for (const field of ['totalSpawned', 'turnsRemaining', 'finalSpawnedCount'] as const) {
     if (!isNonNegativeInteger(state.horde[field])) errors.push(`Horde ${field} must be a non-negative integer`);
+  }
+  if (state.horde.nextWaveIndex !== null
+    && (!Number.isInteger(state.horde.nextWaveIndex) || state.horde.nextWaveIndex < 1 || state.horde.nextWaveIndex > state.config.horde.waves.length)) {
+    errors.push('Horde nextWaveIndex is invalid');
   }
   for (const field of ['nextSpawnTurn', 'lastSpawnTurn'] as const) {
     const value = state.horde[field];
@@ -75,11 +82,11 @@ export function validateInvariants(state: GameState): InvariantResult {
   if (!['periodic', 'final', 'none'].includes(state.horde.warningType)) errors.push('Horde warningType is invalid');
   if (!['notStarted', 'active', 'defeated'].includes(state.horde.finalHordeStatus)) errors.push('Final Horde status is invalid');
   if (state.horde.finalHordeStatus === 'notStarted') {
-    if (state.horde.finalSpawnGroupId !== null || state.horde.finalSpawnedCount !== 0) {
-      errors.push('An unstarted Final Horde cannot have a spawn group');
+    if (state.horde.finalSpawnGroupIds.length !== 0 || state.horde.finalSpawnedCount !== 0) {
+      errors.push('An unstarted Final Horde cannot have spawn groups');
     }
-  } else if (typeof state.horde.finalSpawnGroupId !== 'string' || state.horde.finalSpawnGroupId.length === 0 || state.horde.finalSpawnedCount < 1) {
-    errors.push('An active or defeated Final Horde requires a spawn group and count');
+  } else if (!Array.isArray(state.horde.finalSpawnGroupIds) || state.horde.finalSpawnGroupIds.length === 0 || state.horde.finalSpawnedCount < 1) {
+    errors.push('An active or defeated Final Horde requires spawn groups and a count');
   }
   if (state.horde.warningType === 'final' && state.horde.nextSpawnTurn !== state.finalHordeTurn) {
     errors.push('Final Horde warning must point to finalHordeTurn');
@@ -87,8 +94,14 @@ export function validateInvariants(state: GameState): InvariantResult {
   if (state.horde.warningType === 'periodic' && (state.horde.nextSpawnTurn === null || state.horde.nextSpawnTurn >= state.finalHordeTurn)) {
     errors.push('Periodic Horde warning must point before finalHordeTurn');
   }
-  if (state.horde.warningType === 'none' && state.horde.nextSpawnTurn !== null) {
-    errors.push('A state without a Horde warning cannot have a next spawn turn');
+  if (state.horde.warningType === 'none' && state.horde.warningDirections.length !== 0) {
+    errors.push('A state without a Horde warning cannot expose directions');
+  }
+  if (state.horde.warningType !== 'none') {
+    const wave = state.horde.nextWaveIndex === null ? undefined : state.config.horde.waves[state.horde.nextWaveIndex - 1];
+    if (!wave || state.horde.warningDirections.length !== wave.directionCount) {
+      errors.push('A warned Horde Wave must expose every selected direction');
+    }
   }
   for (const field of [
     'cityResidents',
@@ -239,6 +252,9 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (!hexWithinBounds(facility.position, state.map.width, state.map.height)) {
       errors.push(`Facility ${facility.id} is outside the map`);
     }
+    if ((facility.constructible || facility.owner === 'player') && isHordeSpawnReserve(state.map, facility.position)) {
+      errors.push(`Player facility ${facility.id} cannot occupy the Horde Spawn Reserve`);
+    }
     if (facility.constructible && !['simpleFarm', 'civilianDroneBase'].includes(facility.type)) {
       errors.push(`Facility ${facility.id} has an invalid constructible type`);
     }
@@ -257,8 +273,8 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (facility.lastPowerSupplied !== null && typeof facility.lastPowerSupplied !== 'boolean') {
       errors.push(`Facility ${facility.id} has an invalid last Power Supply result`);
     }
-    if (!['farm', 'civilianFactory', 'militaryFactory', 'simpleFarm', 'civilianDroneBase'].includes(facility.type) && facility.powerSupplyEnabled) {
-      errors.push(`Facility ${facility.id} cannot request industrial boost power`);
+    if (!['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type) && facility.powerSupplyEnabled) {
+      errors.push(`Facility ${facility.id} cannot request switchable power`);
     }
     if (facility.status === 'unowned' && facility.owner !== 'none') {
       errors.push(`Unowned facility ${facility.id} must not have a player owner`);
@@ -322,6 +338,9 @@ export function validateInvariants(state: GameState): InvariantResult {
     }
     const shouldBePlayerUnit = unit.type === 'police' || unit.type === 'nationalGuard';
     if (unit.isPlayerUnit !== shouldBePlayerUnit) errors.push(`Unit ${unit.id} has an invalid faction`);
+    if (unit.isPlayerUnit && isHordeSpawnReserve(state.map, unit.position)) {
+      errors.push(`Player unit ${unit.id} cannot occupy the Horde Spawn Reserve`);
+    }
     if (!isNonNegativeInteger(unit.vision)) errors.push(`Unit ${unit.id} has invalid vision`);
     if (unit.inheritedTarget && !hexWithinBounds(unit.inheritedTarget, state.map.width, state.map.height)) {
       errors.push(`Unit ${unit.id} has an invalid inherited target`);
@@ -337,7 +356,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       const hasKind = ['periodic', 'final'].includes(unit.hordeKind ?? '');
       const hasGroup = typeof unit.spawnGroupId === 'string' && unit.spawnGroupId.length > 0;
       if (hasKind !== hasGroup) errors.push(`Normal Zombie ${unit.id} must have both Horde kind and spawn group, or neither`);
-      if (unit.hordeKind === 'final' && unit.spawnGroupId !== state.horde.finalSpawnGroupId) {
+      if (unit.hordeKind === 'final' && !state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId ?? '')) {
         errors.push(`Final Normal Zombie ${unit.id} must use the active Final Horde group`);
       }
     } else if (unit.type === 'hordeZombie') {
@@ -345,7 +364,7 @@ export function validateInvariants(state: GameState): InvariantResult {
         errors.push(`Horde Zombie ${unit.id} requires Horde kind and spawn group`);
       }
       if (unit.inheritedTarget !== null || unit.noiseTarget !== null) errors.push(`Horde Zombie ${unit.id} cannot retain an internal target`);
-      if (unit.hordeKind === 'final' && unit.spawnGroupId !== state.horde.finalSpawnGroupId) {
+      if (unit.hordeKind === 'final' && !state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId ?? '')) {
         errors.push(`Final Horde Zombie ${unit.id} must use the active Final Horde group`);
       }
     } else if (unit.inheritedTarget !== null || unit.noiseTarget !== null || unit.hordeKind !== null || unit.spawnGroupId !== null) {
@@ -354,7 +373,7 @@ export function validateInvariants(state: GameState): InvariantResult {
   }
 
   const remainingFinalHorde = state.units.filter(
-    (unit) => unit.spawnGroupId === state.horde.finalSpawnGroupId,
+    (unit) => unit.spawnGroupId !== null && state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId),
   ).length;
   if (state.horde.finalHordeStatus === 'active' && remainingFinalHorde === 0) {
     errors.push('An active Final Horde must have at least one surviving member');
@@ -375,6 +394,9 @@ export function validateInvariants(state: GameState): InvariantResult {
     checkpointIds.add(checkpoint.id);
     if (!isRoad(state.map, checkpoint.position)) {
       errors.push(`Checkpoint ${checkpoint.id} is not on a road`);
+    }
+    if (isHordeSpawnReserve(state.map, checkpoint.position)) {
+      errors.push(`Checkpoint ${checkpoint.id} cannot occupy the Horde Spawn Reserve`);
     }
     for (const field of ['waiting', 'screening', 'approved', 'remainingTurns', 'infected'] as const) {
       if (!isNonNegativeInteger(checkpoint[field])) {

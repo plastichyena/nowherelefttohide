@@ -22,6 +22,7 @@ import {
   hordeWarningTileKeys,
   projectWorldToScreen,
   roadTextureRotations,
+  spawnReserveTileKeys,
   supplyBoundaryEdges,
 } from './board';
 import { createFixedMap } from '../core/map';
@@ -77,11 +78,33 @@ describe('Phaser board asset boundary helpers', () => {
     const branch = map.roadBranches.find((candidate) => candidate.direction === direction)!;
     const oppositeDirection = { east: 'west', west: 'east', north: 'south', south: 'north' }[direction];
     const oppositeBranch = map.roadBranches.find((candidate) => candidate.direction === oppositeDirection)!;
-    const keys = hordeWarningTileKeys(map, direction);
+    const keys = hordeWarningTileKeys(map, [direction]);
 
     expect(keys).toContain(`${branch.entrance.q},${branch.entrance.r}`);
     expect(keys).not.toContain(`${branch.capitalConnection.q},${branch.capitalConnection.r}`);
     expect(keys).not.toContain(`${oppositeBranch.entrance.q},${oppositeBranch.entrance.r}`);
+  });
+
+  it('combines multiple warned Horde branches without leaking the capital tile', () => {
+    const map = createFixedMap();
+    const directions = ['north', 'east'] as const;
+    const keys = hordeWarningTileKeys(map, directions);
+    const north = map.roadBranches.find((candidate) => candidate.direction === 'north')!;
+    const east = map.roadBranches.find((candidate) => candidate.direction === 'east')!;
+    expect(keys).toEqual(expect.arrayContaining([
+      `${north.entrance.q},${north.entrance.r}`,
+      `${east.entrance.q},${east.entrance.r}`,
+    ]));
+    expect(keys).not.toContain(`${north.capitalConnection.q},${north.capitalConnection.r}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('exposes exactly the fixed outer Spawn Reserve tiles', () => {
+    const map = createFixedMap();
+    const reserve = spawnReserveTileKeys(map);
+    expect(reserve).toHaveLength(120);
+    expect(new Set(reserve).size).toBe(120);
+    expect(map.tiles.filter((tile) => tile.playerOccupancyAllowed === false).map((tile) => tile.key)).toEqual(reserve);
   });
 
   it('derives Supply outlines only from supplied-to-unsupplied edges', () => {

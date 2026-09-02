@@ -22,38 +22,31 @@ function disableWindInEngine(engine: GameEngine): void {
   expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
 }
 
-describe('v1.4 economy and power grid', () => {
-  it('uses Fuel only for actual power allocations and doubles powered maintenance industry', () => {
+describe('v1.4.2 economy and required power grid', () => {
+  it('uses Fuel only for actual required-power allocations', () => {
     const engine = new GameEngine(127, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     disableWindInEngine(engine);
     const forecast = forecastEndTurn(engine.getState());
     expect(forecast.electricity).toMatchObject({
       physicalGenerationCapacity: 30,
-      requiredPowerDemand: 5,
-      industrialBoostDemand: 10,
-      requiredPowerAllocated: 5,
-      industrialBoostAllocated: 10,
+      requiredPowerDemand: 20,
+      requiredPowerAllocated: 20,
     });
-    expect(forecast.fuel).toMatchObject({ generationFuelDemand: 3, projectedFuelUsed: 3 });
+    expect(forecast.fuel).toMatchObject({ generationFuelDemand: 4, projectedFuelUsed: 4 });
     expect(forecast.food).toMatchObject({ projectedProduction: 230, maintenanceRequired: 115, shortage: 0 });
     expect(forecast.civilianGoods.projectedProduction).toBe(271);
   });
 
-  it('lets same-turn maintenance goods cover maintenance but never chains refinery Fuel into generation', () => {
+  it('never chains same-turn Refinery Fuel into generation or Unit refill', () => {
     const engine = new GameEngine(128, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const state = editableState(engine);
-    disableWind(state);
-    state.resources.food = 0;
-    state.resources.civilianGoods = 0;
-    state.resources.militaryGoods = 0;
-    state.resources.fuel = 0;
+    state.resources.fuel = 1;
+    state.units.filter((unit) => unit.isPlayerUnit).forEach((unit) => { unit.currentFuel = 0; });
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
 
     const forecast = forecastEndTurn(engine.getState());
-    expect(forecast.electricity.availableGenerationCapacity).toBe(0);
-    expect(forecast.food).toMatchObject({ projectedProduction: 115, shortage: 0, endingStock: 0 });
-    expect(forecast.civilianGoods).toMatchObject({ projectedProduction: 115, maintenanceShortage: 0 });
-    expect(forecast.fuel).toMatchObject({ projectedFuelUsed: 0, projectedProduction: 50, endingStock: 50 });
+    expect(forecast.electricity.availableGenerationCapacity).toBe(20);
+    expect(forecast.fuel).toMatchObject({ projectedFuelUsed: 1, projectedProduction: 50, projectedUnitFuelRefilled: 0, endingStock: 50 });
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.getState().resources.fuel).toBe(50);
   });
@@ -99,14 +92,14 @@ describe('v1.4 economy and power grid', () => {
     expect(projections.find((facility) => facility.facilityId === 'civilian-factory-1')?.projectedPowerSupplied).toBe(false);
   });
 
-  it('changes industrial boost requests only through SetPowerSupply and refreshes forecast immediately', () => {
+  it('changes required power requests only through SetPowerSupply and refreshes forecast immediately', () => {
     const engine = new GameEngine(131, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     disableWindInEngine(engine);
     const before = forecastEndTurn(engine.getState());
-    expect(before.electricity.industrialBoostDemand).toBe(10);
+    expect(before.electricity.requiredPowerDemand).toBe(20);
     const result = engine.step({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false });
     expect(result.error).toBeNull();
-    expect(forecastEndTurn(engine.getState()).electricity.industrialBoostDemand).toBe(5);
+    expect(forecastEndTurn(engine.getState()).electricity.requiredPowerDemand).toBe(15);
     const rejected = engine.step({ type: 'SetPowerSupply', facilityId: 'capital', enabled: false });
     expect(rejected.error?.code).toBe('power_supply_not_applicable');
   });
@@ -123,6 +116,31 @@ describe('v1.4 economy and power grid', () => {
     expect(engine.getState().actionsTakenThisTurn).toBe(state.config.maxActionsPerTurn);
     expect(engine.step({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: true }).error).toBeNull();
     expect(engine.getState().actionsTakenThisTurn).toBe(state.config.maxActionsPerTurn);
+  });
+
+  it('keeps Simple Farm power-free while allowing Refinery power switching', () => {
+    const engine = new GameEngine(13115, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = editableState(engine);
+    const simple = JSON.parse(JSON.stringify(state.facilities.find((facility) => facility.id === 'farm-2')!)) as GameState['facilities'][number];
+    simple.id = 'simple-farm-test';
+    simple.type = 'simpleFarm';
+    simple.constructible = true;
+    simple.owner = 'player';
+    simple.status = 'owned';
+    simple.operationalStatus = 'operational';
+    simple.workers = 4;
+    simple.workerCapacity = 10;
+    simple.powerSupplyEnabled = false;
+    simple.position = { q: 12, r: 14 };
+    state.facilities.push(simple);
+    state.facilities.find((facility) => facility.id === 'capital')!.workers -= 4;
+    synchronizePopulation(state);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
+    const projection = forecastFacilityProduction(engine.getState()).find((item) => item.facilityId === simple.id)!;
+    expect(projection).toMatchObject({ powerMode: 'none', requiredPowerCapacity: 0, projectedPowerRequested: false, outputs: { food: 20 } });
+    expect(engine.step({ type: 'SetPowerSupply', facilityId: simple.id, enabled: true }).error?.code).toBe('power_supply_not_applicable');
+    expect(engine.step({ type: 'SetPowerSupply', facilityId: 'refinery-1', enabled: false }).error).toBeNull();
+    expect(forecastFacilityProduction(engine.getState()).find((item) => item.facilityId === 'refinery-1')).toMatchObject({ outputs: {}, projectedPowerReason: 'power_supply_off' });
   });
 
   it('records unmet power reasons in End Turn events even when a facility did not request power', () => {

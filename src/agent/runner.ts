@@ -259,6 +259,10 @@ function placeholderArtifact(
   };
 }
 
+function finalHordeTurnFromConfig(config: GameConfig): number {
+  return config.horde.waves.find((wave) => wave.final)?.turn ?? 0;
+}
+
 function enrichArtifact(
   source: AgentPublicRunArtifact | AgentRunArtifact | null,
   fallback: AgentRunArtifact,
@@ -605,9 +609,9 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       apiVersion: OBSERVATION_API_VERSION,
       gameRulesVersion: config.version,
       turn: 0,
-      finalHordeTurn: config.finalHordeTurn,
+      finalHordeTurn: finalHordeTurnFromConfig(config),
       phase: 'gameOver',
-      map: { id: config.mapId, width: 15, height: 15, coordinateSystem: 'axial-q-r', tiles: [] },
+      map: { id: config.mapId, width: 31, height: 31, coordinateSystem: 'axial-q-r', tiles: [], hordeSpawnReserve: [] },
       roadBranches: [],
       supply: { initialRadius: config.checkpoint.initialSupplyRadius, suppliedTileKeys: [], branchRadii: [] },
       resources: { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0, electricityCapacity: 0, electricityRequired: 0 },
@@ -615,10 +619,11 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       facilities: [], units: [], zombies: [], checkpoints: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [],
       horde: {
         warningType: 'none',
-        warningDirection: 'north',
+        warningDirections: [],
+        nextWaveIndex: null,
+        nextWave: null,
         spawnTurn: null,
         finalHordeStatus: 'notStarted',
-        direction: 'north',
         turnsRemaining: 0,
         nextSpawnTurn: null,
       },
@@ -645,7 +650,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
           units: [],
         },
         fuel: { startingStock: 0, projectedProduction: 0, maintenanceRequired: 0, endingStock: 0, available: 0, productionInputRequired: 0, required: 0, shortage: 0, turnStartFuel: 0, windPowerAvailable: 0, powerPlantPhysicalCapacity: 0, projectedPowerFuelDemand: 0, projectedPowerFuelUsed: 0, fuelAfterPower: 0, projectedUnitRefillDemand: 0, projectedUnitFuelRefilled: 0, projectedTotalFuelDemand: 0, projectedRefineryProduction: 0, projectedEndingFuel: 0, powerFuelShortage: 0, unitRefillFuelShortage: 0, totalFuelShortage: 0, generationFuelDemand: 0, projectedFuelUsed: 0, generationFuelShortage: 0 },
-        electricity: { physicalGenerationCapacity: 0, fuelLimitedGenerationCapacity: 0, availableGenerationCapacity: 0, requiredPowerDemand: 0, industrialBoostDemand: 0, requiredPowerAllocated: 0, industrialBoostAllocated: 0, unpoweredFacilities: [], capacity: 0, required: 0, shortage: 0 },
+        electricity: { physicalGenerationCapacity: 0, fuelLimitedGenerationCapacity: 0, availableGenerationCapacity: 0, requiredPowerDemand: 0, requiredPowerAllocated: 0, unpoweredFacilities: [], capacity: 0, required: 0, shortage: 0 },
       },
       strategicForecast: {
         resources: {
@@ -790,7 +795,6 @@ function artifactValidationError(artifact: AgentRunArtifact): AgentActionError |
     return publicActionError('artifact_invalid', 'Replay artifact appVersion metadata must be a non-empty string');
   }
   const versions: Array<[string, unknown, string]> = [
-    ['appVersion', artifact.appVersion, APP_VERSION],
     ['artifactSchemaVersion', artifact.artifactSchemaVersion, ARTIFACT_SCHEMA_VERSION],
     ['gameRulesVersion', artifact.gameRulesVersion, GAME_RULES_VERSION],
     ['agentApiVersion', artifact.agentApiVersion, AGENT_API_VERSION],

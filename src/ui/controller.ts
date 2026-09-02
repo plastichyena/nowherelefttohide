@@ -503,16 +503,15 @@ export function phaseIndicatorViewModel(phase: GamePhase, locale: Locale): Phase
 
 /**
  * The compact power pill is deliberately derived from the public forecast in
- * one place.  The numerator is demand (Required plus Industrial Boost), while
- * the denominator is the generation that is actually available this turn.
- * In particular, this helper does not infer shortage from those two numbers:
- * `electricity.shortage` remains the Core's source of truth.
+ * one place.  The numerator is Required demand and the denominator is the
+ * generation that is actually available this turn.  In particular, this
+ * helper does not infer shortage from those two numbers: `electricity.shortage`
+ * remains the Core's source of truth.
  */
 export interface PowerHudViewModel {
   demand: number;
   available: number;
   requiredAllocated: number;
-  industrialBoostAllocated: number;
   shortage: number;
   display: string;
   label: string;
@@ -525,9 +524,7 @@ export type PowerHudForecast = Readonly<Pick<
   EndTurnForecast['electricity'],
   | 'availableGenerationCapacity'
   | 'requiredPowerDemand'
-  | 'industrialBoostDemand'
   | 'requiredPowerAllocated'
-  | 'industrialBoostAllocated'
   | 'shortage'
 >>;
 
@@ -536,7 +533,7 @@ export function powerHudViewModel(
   locale: Locale,
 ): PowerHudViewModel {
   const t = createTranslator(locale);
-  const demand = electricity.requiredPowerDemand + electricity.industrialBoostDemand;
+  const demand = electricity.requiredPowerDemand;
   const available = electricity.availableGenerationCapacity;
   const isShortage = electricity.shortage > 0;
   const shortage = electricity.shortage;
@@ -545,13 +542,12 @@ export function powerHudViewModel(
     ? `${label}。${t('projectedPowerDemand')} ${demand}、${t('availablePowerSupply')} ${available}、${t('powerHudAccessibleShortage')} ${shortage}`
     : `${label}: ${t('projectedPowerDemand')} ${demand}, ${t('availablePowerSupply')} ${available}, ${t('powerHudAccessibleShortage')} ${shortage}`;
   const tooltip = locale === 'ja'
-    ? `${t('projectedPowerDemand')}: ${demand} · ${t('availablePowerSupply')}: ${available} · ${t('requiredPowerAllocated')}: ${electricity.requiredPowerAllocated} · ${t('industrialBoostAllocated')}: ${electricity.industrialBoostAllocated} · ${t('shortage')}: ${shortage}`
-    : `${t('projectedPowerDemand')}: ${demand} · ${t('availablePowerSupply')}: ${available} · ${t('requiredPowerAllocated')}: ${electricity.requiredPowerAllocated} · ${t('industrialBoostAllocated')}: ${electricity.industrialBoostAllocated} · ${t('shortage')}: ${shortage}`;
+    ? `${t('projectedPowerDemand')}: ${demand} · ${t('availablePowerSupply')}: ${available} · ${t('requiredPowerAllocated')}: ${electricity.requiredPowerAllocated} · ${t('shortage')}: ${shortage}`
+    : `${t('projectedPowerDemand')}: ${demand} · ${t('availablePowerSupply')}: ${available} · ${t('requiredPowerAllocated')}: ${electricity.requiredPowerAllocated} · ${t('shortage')}: ${shortage}`;
   return {
     demand,
     available,
     requiredAllocated: electricity.requiredPowerAllocated,
-    industrialBoostAllocated: electricity.industrialBoostAllocated,
     shortage,
     display: `${demand}/${available}`,
     label,
@@ -853,15 +849,17 @@ function configLegendEntries(
     add(`militaryGoods.${key}`, `${unitLabel(key, locale)} · ${t('carriedMilitaryGoods')}`, `${t('max')} ${unit.maxMilitaryGoods} · ${t('fixedConsumption')} ${unit.fixedMilitaryGoodsUpkeepPerTurn} · ${t('attackCostByDistance')} ${attackCosts} · ${t('suppression')} ${unit.suppressionMilitaryGoodsCost} · ${t('emergencyMovement')} ${unit.emergencyMovementPoints} MP`);
   }
   add('maxActionsPerTurn', t('maxActionsPerTurn'), String(config.maxActionsPerTurn));
-  add('finalHordeTurn', t('finalHordeTurn'), String(config.finalHordeTurn));
-  add('hordeCycle', t('hordeCycle'), String(config.horde.cycle));
-  add('hordeWarningStart', t('hordeWarningStart'), String(config.horde.warningStartTurn));
-  add('periodicInitialHordeZombies', t('periodicInitialHordeZombies'), String(config.horde.periodicInitial.hordeZombie));
-  add('periodicInitialNormalZombies', t('periodicInitialNormalZombies'), String(config.horde.periodicInitial.zombie));
-  add('periodicIncrementHordeZombies', t('periodicIncrementHordeZombies'), String(config.horde.periodicIncrement.hordeZombie));
-  add('periodicIncrementNormalZombies', t('periodicIncrementNormalZombies'), String(config.horde.periodicIncrement.zombie));
-  add('finalHordeZombies', t('finalHordeZombies'), String(config.horde.finalComposition.hordeZombie));
-  add('finalNormalZombies', t('finalNormalZombies'), String(config.horde.finalComposition.zombie));
+  add('hordeWarningLeadTurns', t('hordeWarningLeadTurns'), String(config.horde.warningLeadTurns));
+  config.horde.waves.forEach((wave, index) => {
+    const composition = `${t('hordeZombie')} ${wave.compositionPerDirection.hordeZombie} / ${unitLabel('zombie', locale)} ${wave.compositionPerDirection.zombie}`;
+    const waveKind = wave.final ? t('finalHorde') : t('periodicHorde');
+    add(
+      `hordeWave.${index + 1}`,
+      `${t('wave')} ${index + 1}`,
+      `${waveKind} · ${t('spawnTurn')} ${wave.turn} · ${t('directionCount')} ${wave.directionCount} · ${t('composition')} ${composition}`,
+    );
+  });
+  add('spawnReserve', t('spawnReserve'), `${t('spawnReserveTileCount')} 120 · ${t('spawnReserveReason')}`);
   add('initialSupplyRadius', t('initialSupplyRadius'), String(config.checkpoint.initialSupplyRadius));
   add('checkpointMaxPerDirection', t('checkpointMaxPerDirection'), String(config.checkpoint.maxPreparedPostsPerDirection));
   add('checkpointConstructionCost', t('checkpointConstructionCost'), String(config.checkpoint.constructionCivilianGoods));
@@ -896,12 +894,13 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
     final: ['Final Spawn Group所属を示すMarker。Normal Zombieも含め、Group全滅がVictory条件の一つです。', 'Marks Final Spawn Group membership. Every member, including Normal Zombies, must be defeated for Victory.'],
     capital: ['州都。人口の基点、編成、初期Supplyを担います。', 'The capital anchors population, recruitment, and initial Supply.'],
     city: ['地方都市。人口を受け入れ、警察編成と民需品生産を担います。', 'A regional city that receives population, produces Police, and supports civilian goods.'],
-    farm: ['食料を生産する産業施設。Power Supplyで出力がBoostされます。', 'Produces Food. Power Supply boosts its output.'],
-    civilianFactory: ['民需品を生産する産業施設。Power Supplyで出力がBoostされます。', 'Produces Civilian Goods. Power Supply boosts its output.'],
-    militaryFactory: ['軍需品を生産する産業施設。入力とPower Supplyで出力が決まります。', 'Produces Military Goods. Output depends on inputs and Power Supply.'],
-    refinery: ['Fuelを生産する施設。発電のFuel入力を支えます。', 'Produces Fuel for generation.'],
+    farm: ['食料を生産する施設。Required電力が不足すると生産が停止します。', 'Produces Food. Production stops when Required power is unavailable.'],
+    civilianFactory: ['民需品を生産する施設。Required電力が不足すると生産が停止します。', 'Produces Civilian Goods. Production stops when Required power is unavailable.'],
+    militaryFactory: ['軍需品を生産する施設。入力とRequired電力が必要です。', 'Produces Military Goods. Inputs and Required power are needed.'],
+    refinery: ['Fuelを生産するRequired電力施設。', 'Produces Fuel and requires Required power.'],
     powerPlant: ['電力Capacityを発電する施設。Turn-start Fuelの制限を受けます。', 'Generates power Capacity and is limited by Turn-start Fuel.'],
-    checkpoint: ['道路上の避難民を待機・審査・合格の3プールで管理します。', 'Manages road refugees through waiting, screening, and approved pools.'],
+    checkpoint: ['道路上の避難民を待機・審査・合格の3プールで管理します。1回の審査枠は20人です。', 'Manages road refugees through waiting, screening, and approved pools. Each batch screens up to 20 people.'],
+    spawnReserve: ['盤面外周120 HexのSpawn Reserve。Player Unit・Facility・Checkpointは配置できませんが、Playerの攻撃とHordeのSpawn・Damageは可能です。', 'The outer 120-Hex Spawn Reserve. Player Units, Facilities, and Checkpoints cannot occupy it; Player attacks and Horde Spawn/damage remain allowed.'],
     unowned: ['未確保。人口操作や生産はできません。', 'Unsecured. Population actions and production are unavailable.'],
     owned: ['確保済み。安全と操作可能Turnの条件を満たせば利用できます。', 'Secured. Available when safe and past its operational turn.'],
     stopped: ['現在停止。状態Markerで停止理由を示します。', 'Currently stopped. The state marker identifies the reason.'],
@@ -932,7 +931,7 @@ function legendSections(
     legendCompositeEntry(registry, 'ruinedInfected', locale === 'ja' ? '荒廃 + 感染' : 'Ruined + infected', locale === 'ja' ? '荒廃Overlayと感染Overlayを併記します。' : 'Shows ruined and infected overlays together.', [['facilityState', 'ruined'], ['facilityState', 'infected']], '×☣'),
   );
   const checkpointStates = ['operational', 'abandoned', 'remnant', 'ruined', 'infected'].map((key) => legendAssetEntry(registry, 'checkpointState', key, t(key), legendDescription(key, locale, t), key === 'operational' ? '●' : key === 'abandoned' ? '◌' : key === 'remnant' ? '◍' : key === 'infected' ? '☣' : '×'));
-  const dynamic = ['selected', 'legalDestination', 'path', 'attackTarget', 'hp', 'infected', 'stopped', 'projected', 'vision', 'fogOfWar', 'supply', 'hordeDirection'].map((key) => legendAssetEntry(registry, 'dynamicOverlay', key, t(`legendOverlay.${key}`), t(`legendOverlayDescription.${key}`), key === 'selected' ? '◎' : key === 'path' ? '→' : key === 'attackTarget' ? '✦' : key === 'hp' ? '▰' : key === 'infected' ? '☣' : key === 'vision' ? '◌' : key === 'fogOfWar' ? '░' : key === 'supply' ? '▧' : key === 'hordeDirection' ? '↝' : '·'));
+  const dynamic = ['selected', 'legalDestination', 'path', 'attackTarget', 'hp', 'infected', 'stopped', 'projected', 'vision', 'fogOfWar', 'supply', 'hordeDirections', 'spawnReserve'].map((key) => legendAssetEntry(registry, 'dynamicOverlay', key, t(`legendOverlay.${key}`), t(`legendOverlayDescription.${key}`), key === 'selected' ? '◎' : key === 'path' ? '→' : key === 'attackTarget' ? '✦' : key === 'hp' ? '▰' : key === 'infected' ? '☣' : key === 'vision' ? '◌' : key === 'fogOfWar' ? '░' : key === 'supply' ? '▧' : key === 'hordeDirections' ? '↝' : key === 'spawnReserve' ? 'R' : '·'));
   const configRows = configLegendEntries(config, locale);
   return [
     { key: 'terrain', title: t('legendTerrain'), entries: terrain },
@@ -979,7 +978,7 @@ export function renderBoardLegend(
   const view = boardLegendViewModel(config, locale, registry);
   const source = view.configSource === 'current' ? t('legendConfigCurrent') : t('legendConfigStandard');
   const sections = view.sections.map((section) => `<section class="board-legend-section" data-legend-section="${escapeHtml(section.key)}"><h4>${escapeHtml(section.title)}</h4><ul class="board-legend-list">${section.entries.map((entry) => `<li class="board-legend-entry" data-legend-key="${escapeHtml(entry.key)}">${legendImage(entry)}<span class="board-legend-copy"><strong>${escapeHtml(entry.label)}</strong><span>${escapeHtml(entry.description)}</span></span>${entry.key === 'config' ? `<b class="board-legend-value">${escapeHtml(entry.description)}</b>` : ''}</li>`).join('')}</ul></section>`).join('');
-  return `<div class="board-legend" data-board-legend="true"><h3 class="board-legend-heading">${escapeHtml(t('legendTitle'))}</h3><p class="board-legend-source"><strong>${escapeHtml(t('legendConfigSource'))}</strong>: ${escapeHtml(source)}</p><p class="muted">${escapeHtml(t('legendIntro'))}</p>${sections}<section class="board-legend-rules"><h4>${escapeHtml(t('legendRules'))}</h4><p>${escapeHtml(t('legendTerrainRule'))}</p><p>${escapeHtml(t('legendOverlayRule'))}</p><p>${escapeHtml(t('legendUnitRule'))}</p><p>${escapeHtml(t('legendHordeRule'))}</p><p>${escapeHtml(t('legendStateRule'))}</p><p>${escapeHtml(t('legendPowerRule'))}</p><p>${escapeHtml(t('legendFogRule'))}</p><p>${escapeHtml(t('legendDynamicRule'))}</p></section></div>`;
+  return `<div class="board-legend" data-board-legend="true"><h3 class="board-legend-heading">${escapeHtml(t('legendTitle'))}</h3><p class="board-legend-source"><strong>${escapeHtml(t('legendConfigSource'))}</strong>: ${escapeHtml(source)}</p><p class="muted">${escapeHtml(t('legendIntro'))}</p>${sections}<section class="board-legend-rules"><h4>${escapeHtml(t('legendRules'))}</h4><p>${escapeHtml(t('legendTerrainRule'))}</p><p>${escapeHtml(t('legendOverlayRule'))}</p><p>${escapeHtml(t('legendUnitRule'))}</p><p>${escapeHtml(t('legendHordeRule'))}</p><p>${escapeHtml(t('legendStateRule'))}</p><p>${escapeHtml(t('legendPowerRule'))}</p><p>${escapeHtml(t('legendFogRule'))}</p><p>${escapeHtml(t('legendDynamicRule'))}</p><p>${escapeHtml(t('spawnReserveRule'))}</p><p>${escapeHtml(t('checkpointCapacityRule'))}</p></section></div>`;
 }
 
 export function loadValidationError(
@@ -1040,6 +1039,33 @@ function hordeStatusLabel(status: 'notStarted' | 'active' | 'defeated', locale: 
   if (status === 'active') return t('hordeStatusActive');
   if (status === 'defeated') return t('hordeStatusDefeated');
   return t('hordeStatusNotStarted');
+}
+
+function finalWaveTurn(config: Readonly<GameConfig>): number | null {
+  return config.horde.waves.length > 0
+    ? config.horde.waves[config.horde.waves.length - 1]!.turn
+    : null;
+}
+
+function hordeWaveForIndex(config: Readonly<GameConfig>, nextWaveIndex: number | null): GameConfig['horde']['waves'][number] | undefined {
+  if (nextWaveIndex === null || nextWaveIndex < 1) return undefined;
+  return config.horde.waves[nextWaveIndex - 1];
+}
+
+type AgentNextWave = NonNullable<AgentObservation['horde']['nextWave']>;
+
+function hordeCompositionLabel(
+  wave: GameConfig['horde']['waves'][number] | AgentNextWave | undefined,
+  locale: Locale,
+): string {
+  if (!wave) return createTranslator(locale)('none');
+  const t = createTranslator(locale);
+  return `${t('hordeZombie')} ${wave.compositionPerDirection.hordeZombie} / ${unitLabel('zombie', locale)} ${wave.compositionPerDirection.zombie}`;
+}
+
+function hordeWaveSpawnTurn(wave: GameConfig['horde']['waves'][number] | AgentNextWave | undefined): number | null {
+  if (!wave) return null;
+  return 'spawnTurn' in wave ? wave.spawnTurn : wave.turn;
 }
 
 function terrainLabel(terrain: AgentMapTileObservation['terrain'], locale: Locale): string {
@@ -1112,7 +1138,7 @@ export function selectionShowsSupplyOverlay(
 }
 
 function isPowerSupplyFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return facility.type === 'farm' || facility.type === 'civilianFactory' || facility.type === 'militaryFactory' || facility.type === 'simpleFarm' || facility.type === 'civilianDroneBase';
+  return facility.type === 'farm' || facility.type === 'civilianFactory' || facility.type === 'militaryFactory' || facility.type === 'refinery' || facility.type === 'civilianDroneBase';
 }
 
 function formatPercent(value: number, locale: Locale): string {
@@ -1143,7 +1169,6 @@ function formatResourceAmounts(
 function powerModeLabel(mode: AgentFacilityObservation['production']['powerMode'], locale: Locale): string {
   const t = createTranslator(locale);
   if (mode === 'required') return t('powerModeRequired');
-  if (mode === 'boost') return t('powerModeBoost');
   return t('powerModeNone');
 }
 
@@ -1253,7 +1278,7 @@ export function renderEndTurnForecast(forecast: EndTurnForecast, locale: Locale)
   const unpowered = electricity.unpoweredFacilities.length > 0
     ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredFacilities'))}</strong>: ${electricity.unpoweredFacilities.map((entry) => `${escapeHtml(entry.facilityId)} · ${escapeHtml(powerReasonLabel(entry.reason, locale))}`).join(' / ')}</p>`
     : `<p class="muted">${escapeHtml(t('unpoweredFacilities'))}: ${escapeHtml(t('none'))}</p>`;
-  return `<section class="forecast-card end-turn-forecast"><h3>${escapeHtml(t('endTurnForecast'))}</h3><p class="muted">${escapeHtml(t('overcrowding'))}: ${escapeHtml(formatPercent(forecast.overcrowding.cities.reduce((total, city) => total + city.excess / Math.max(1, city.softCap), 0), locale))} · ${escapeHtml(t('additionalFood'))} ${forecast.overcrowding.additionalFood} · ${escapeHtml(t('additionalCivilianGoods'))} ${forecast.overcrowding.additionalCivilianGoods}</p>${forecastResourceCard('food', forecast.food, locale)}${forecastResourceCard('civilianGoods', forecast.civilianGoods, locale)}${renderMilitaryGoodsForecast(forecast.militaryGoods, locale)}${forecastResourceCard('fuel', forecast.fuel, locale)}<section class="forecast-card power-forecast"><h4>${escapeHtml(t('electricity'))}</h4><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('physicalGenerationCapacity'))}</dt><dd>${electricity.physicalGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('fuelLimitedGenerationCapacity'))}</dt><dd>${electricity.fuelLimitedGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('availableGenerationCapacity'))}</dt><dd>${electricity.availableGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('requiredPowerDemand'))}</dt><dd>${electricity.requiredPowerDemand}</dd></div><div><dt>${escapeHtml(t('industrialBoostDemand'))}</dt><dd>${electricity.industrialBoostDemand}</dd></div><div><dt>${escapeHtml(t('requiredPowerAllocated'))}</dt><dd>${electricity.requiredPowerAllocated}</dd></div><div><dt>${escapeHtml(t('industrialBoostAllocated'))}</dt><dd>${electricity.industrialBoostAllocated}</dd></div><div><dt>${escapeHtml(t('shortage'))}</dt><dd>${electricity.shortage}</dd></div></dl><p class="muted">${escapeHtml(t('powerHudLabel'))}: ${escapeHtml(powerHud.display)}</p>${unpowered}</section></section>`;
+  return `<section class="forecast-card end-turn-forecast"><h3>${escapeHtml(t('endTurnForecast'))}</h3><p class="muted">${escapeHtml(t('overcrowding'))}: ${escapeHtml(formatPercent(forecast.overcrowding.cities.reduce((total, city) => total + city.excess / Math.max(1, city.softCap), 0), locale))} · ${escapeHtml(t('additionalFood'))} ${forecast.overcrowding.additionalFood} · ${escapeHtml(t('additionalCivilianGoods'))} ${forecast.overcrowding.additionalCivilianGoods}</p>${forecastResourceCard('food', forecast.food, locale)}${forecastResourceCard('civilianGoods', forecast.civilianGoods, locale)}${renderMilitaryGoodsForecast(forecast.militaryGoods, locale)}${forecastResourceCard('fuel', forecast.fuel, locale)}<section class="forecast-card power-forecast"><h4>${escapeHtml(t('electricity'))}</h4><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('physicalGenerationCapacity'))}</dt><dd>${electricity.physicalGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('fuelLimitedGenerationCapacity'))}</dt><dd>${electricity.fuelLimitedGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('availableGenerationCapacity'))}</dt><dd>${electricity.availableGenerationCapacity}</dd></div><div><dt>${escapeHtml(t('requiredPowerDemand'))}</dt><dd>${electricity.requiredPowerDemand}</dd></div><div><dt>${escapeHtml(t('requiredPowerAllocated'))}</dt><dd>${electricity.requiredPowerAllocated}</dd></div><div><dt>${escapeHtml(t('shortage'))}</dt><dd>${electricity.shortage}</dd></div></dl><p class="muted">${escapeHtml(t('powerHudLabel'))}: ${escapeHtml(powerHud.display)}</p>${unpowered}</section></section>`;
 }
 
 type AgentAttackPreview = AgentUnitObservation['attackPreviews'][number];
@@ -1385,7 +1410,7 @@ export function localizeActionError(code: string | undefined, locale: Locale): s
     checkpoint_same_position: locale === 'ja' ? '別の道路タイルを選択してください。' : 'Choose a different road tile.',
     unknown_operational_checkpoint: locale === 'ja' ? '移設できる稼働中の検問所を選択してください。' : 'Select an operational checkpoint to relocate.',
     checkpoint_abandoned_forward_block: t('abandonedForwardBlock'),
-    power_supply_not_applicable: locale === 'ja' ? '電力供給を変更できるのはFarm・民需工場・軍需工場だけです。' : 'Power Supply can only be changed for Farms, Civilian Factories, and Military Factories.',
+    power_supply_not_applicable: locale === 'ja' ? '電力供給を変更できるのはFarm・民需工場・軍需工場・Refinery・Civilian Drone Baseです。' : 'Power Supply can only be changed for Farms, Civilian Factories, Military Factories, Refineries, and Civilian Drone Bases.',
     power_supply_unavailable: locale === 'ja' ? '所有中で安全かつ操作可能な産業施設だけ変更できます。' : 'Only an owned, safe, and available industrial facility can change Power Supply.',
     invalid_power_supply: locale === 'ja' ? 'Power SupplyはONまたはOFFで指定してください。' : 'Power Supply must be ON or OFF.',
     insufficient_unit_fuel: locale === 'ja' ? '移動Fuelが不足しています。' : 'The Unit does not have enough Fuel for this move.',
@@ -1397,6 +1422,8 @@ export function localizeActionError(code: string | undefined, locale: Locale): s
     constructible_checkpoint_occupied: locale === 'ja' ? 'CheckpointがあるHexには建設できません。' : 'A Checkpoint already occupies this Hex.',
     constructible_player_unit_occupied: locale === 'ja' ? 'Player UnitがいるHexには建設できません。' : 'A player Unit occupies this Hex.',
     constructible_visible_zombie_occupied: locale === 'ja' ? '視認中ZombieがいるHexには建設できません。' : 'A visible Zombie occupies this Hex.',
+    horde_spawn_reserve: t('spawnReserveReason'),
+    player_occupancy_forbidden: t('spawnReserveReason'),
     constructible_facility_limit_reached: locale === 'ja' ? 'このFacility Typeの建設上限に達しています。' : 'The per-type constructible facility limit has been reached.',
     invalid_constructible_facility_type: locale === 'ja' ? '建設Facility Typeが不正です。' : 'Unknown constructible facility type.',
     outside_map: locale === 'ja' ? '盤面外です。' : 'Position is outside the map.',
@@ -1540,6 +1567,10 @@ export class GameUiController {
   private beginNewGame(): void {
     const t = this.translator();
     const defaults = createDefaultConfig();
+    const schedule = defaults.horde.waves.map((wave, index) => {
+      const composition = `${t('hordeZombie')} ${wave.compositionPerDirection.hordeZombie} / ${unitLabel('zombie', this.locale)} ${wave.compositionPerDirection.zombie}`;
+      return `<li><strong>${escapeHtml(t('wave'))} ${index + 1}</strong> · ${escapeHtml(t('spawnTurn'))} ${wave.turn} · ${escapeHtml(t('directionCount'))} ${wave.directionCount} · ${escapeHtml(composition)}${wave.final ? ` · ${escapeHtml(t('finalWave'))}` : ''}</li>`;
+    }).join('');
     this.root.className = 'app-shell modal-screen';
     this.root.innerHTML = `
       <section class="modal-card" aria-labelledby="new-game-heading">
@@ -1548,22 +1579,12 @@ export class GameUiController {
         <h2 id="new-game-heading">${escapeHtml(t('newGame'))}</h2>
         <form data-form="new-game" class="settings-form">
           <label>${escapeHtml(t('newSeed'))}<input name="seed" type="number" inputmode="numeric" value="${Date.now() % 2147483647}" /></label>
-          <label>${escapeHtml(t('finalHordeTurn'))}<input name="finalHordeTurn" type="number" inputmode="numeric" min="1" max="999" step="1" value="${defaults.finalHordeTurn}" /></label>
-          <label>${escapeHtml(t('hordeCycle'))}<input name="hordeCycle" type="number" inputmode="numeric" min="1" step="1" value="${defaults.horde.cycle}" /></label>
-          <label>${escapeHtml(t('hordeWarningStart'))}<input name="hordeWarningStart" type="number" inputmode="numeric" min="1" step="1" value="${defaults.horde.warningStartTurn}" /></label>
-          <fieldset class="composition-settings"><legend>${escapeHtml(t('hordeComposition'))}</legend><div class="composition-grid">
-            <label>${escapeHtml(t('periodicInitialHordeZombies'))}<input name="periodicInitialHordeZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.periodicInitial.hordeZombie}" /></label>
-            <label>${escapeHtml(t('periodicInitialNormalZombies'))}<input name="periodicInitialNormalZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.periodicInitial.zombie}" /></label>
-            <label>${escapeHtml(t('periodicIncrementHordeZombies'))}<input name="periodicIncrementHordeZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.periodicIncrement.hordeZombie}" /></label>
-            <label>${escapeHtml(t('periodicIncrementNormalZombies'))}<input name="periodicIncrementNormalZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.periodicIncrement.zombie}" /></label>
-            <label>${escapeHtml(t('finalHordeZombies'))}<input name="finalHordeZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.finalComposition.hordeZombie}" /></label>
-            <label>${escapeHtml(t('finalNormalZombies'))}<input name="finalNormalZombies" type="number" inputmode="numeric" min="0" step="1" value="${defaults.horde.finalComposition.zombie}" /></label>
-          </div><p class="muted composition-hint">${escapeHtml(t('hordeCompositionHint'))}</p></fieldset>
+          <section class="fixed-horde-schedule" aria-labelledby="horde-schedule-heading"><h3 id="horde-schedule-heading">${escapeHtml(t('hordeSchedule'))}</h3><p class="muted">${escapeHtml(t('fixedHordeScheduleHint'))}</p><ul>${schedule}</ul></section>
           <label>${escapeHtml(t('refugeeIntervalMin'))}<input name="refugeeIntervalMin" type="number" min="1" value="2" /></label>
           <label>${escapeHtml(t('refugeeIntervalMax'))}<input name="refugeeIntervalMax" type="number" min="1" value="4" /></label>
           <label>${escapeHtml(t('refugeePeopleMin'))}<input name="refugeePeopleMin" type="number" min="1" value="5" /></label>
           <label>${escapeHtml(t('refugeePeopleMax'))}<input name="refugeePeopleMax" type="number" min="1" value="10" /></label>
-          <label>${escapeHtml(t('screeningCapacity'))}<input name="screeningCapacity" type="number" min="1" value="10" /></label>
+          <label>${escapeHtml(t('screeningCapacity'))}<input name="screeningCapacity" type="number" min="1" value="${defaults.refugees.screeningCapacity}" /></label>
           <label>${escapeHtml(t('resourceMultiplier'))}<input name="resourceMultiplier" type="number" min="0.25" max="4" step="0.25" value="1" /></label>
           <label>${escapeHtml(t('infectionMultiplier'))}<input name="infectionMultiplier" type="number" min="0.25" max="4" step="0.25" value="1" /></label>
           <div class="modal-actions"><button class="primary-button" type="submit">${escapeHtml(t('start'))}</button><button class="ghost-button" type="button" data-action="title">${escapeHtml(t('cancel'))}</button></div>
@@ -1579,29 +1600,12 @@ export class GameUiController {
       const refugeePeopleMin = Math.max(1, Math.floor(numberValue(values.get('refugeePeopleMin')?.toString(), 5)));
       const refugeePeopleMax = Math.max(refugeePeopleMin, Math.floor(numberValue(values.get('refugeePeopleMax')?.toString(), 10)));
       const config = createDefaultConfig({
-        finalHordeTurn: Math.max(1, Math.floor(numberValue(values.get('finalHordeTurn')?.toString(), 30))),
-        horde: {
-          cycle: Math.max(1, Math.floor(numberValue(values.get('hordeCycle')?.toString(), 5))),
-          periodicInitial: {
-            hordeZombie: Math.max(0, Math.floor(numberValue(values.get('periodicInitialHordeZombies')?.toString(), 2))),
-            zombie: Math.max(0, Math.floor(numberValue(values.get('periodicInitialNormalZombies')?.toString(), 0))),
-          },
-          periodicIncrement: {
-            hordeZombie: Math.max(0, Math.floor(numberValue(values.get('periodicIncrementHordeZombies')?.toString(), 1))),
-            zombie: Math.max(0, Math.floor(numberValue(values.get('periodicIncrementNormalZombies')?.toString(), 1))),
-          },
-          warningStartTurn: Math.max(1, Math.floor(numberValue(values.get('hordeWarningStart')?.toString(), 1))),
-          finalComposition: {
-            hordeZombie: Math.max(0, Math.floor(numberValue(values.get('finalHordeZombies')?.toString(), 7))),
-            zombie: Math.max(0, Math.floor(numberValue(values.get('finalNormalZombies')?.toString(), 5))),
-          },
-        },
         refugees: {
           arrivalIntervalMin: refugeeIntervalMin,
           arrivalIntervalMax: refugeeIntervalMax,
           arrivalPeopleMin: refugeePeopleMin,
           arrivalPeopleMax: refugeePeopleMax,
-          screeningCapacity: Math.max(1, Math.floor(numberValue(values.get('screeningCapacity')?.toString(), 10))),
+          screeningCapacity: Math.max(1, Math.floor(numberValue(values.get('screeningCapacity')?.toString(), defaults.refugees.screeningCapacity))),
         },
       });
       const resourceMultiplier = Math.min(4, Math.max(0.25, numberValue(values.get('resourceMultiplier')?.toString(), 1)));
@@ -1698,7 +1702,7 @@ export class GameUiController {
         <span class="resource-pill civilian-pill">♙ <b data-bind="healthy-civilians">0</b><small>${escapeHtml(t('healthyCivilians'))}</small></span>
         <span class="resource-pill infected-pill">☣ <b data-bind="infected">0</b><small>${escapeHtml(t('infected'))}</small></span>
       </section>
-      <section class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><div class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></div><div class="horde-facts"><span><small>${escapeHtml(t('direction'))}</small><b data-bind="horde-direction">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span></div></section>
+      <section class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><div class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></div><div class="horde-facts"><span><small>${escapeHtml(t('nextWave'))}</small><b data-bind="horde-wave-index">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('directionCount'))}</small><b data-bind="horde-direction-count">—</b></span><span><small>${escapeHtml(t('directions'))}</small><b data-bind="horde-directions">—</b></span><span><small>${escapeHtml(t('composition'))}</small><b data-bind="horde-composition">—</b></span><span><small>${escapeHtml(t('waveType'))}</small><b data-bind="horde-final">—</b></span></div></section>
       <section class="strategic-critical-strip" data-bind="strategic-critical" data-warning-tier="critical" aria-live="assertive" hidden><strong>${escapeHtml(t('strategicCritical'))}</strong><span data-bind="strategic-critical-text"></span></section>
       <section class="victory-progress" aria-live="polite" aria-label="${escapeHtml(t('victoryProgress'))}"><strong>${escapeHtml(t('victoryProgress'))}</strong><div data-bind="victory-progress"></div></section>
       <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="unit-context-layer" data-unit-context-layer aria-live="polite"></div>${noiseDebugMount}<div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
@@ -1946,6 +1950,19 @@ export class GameUiController {
     const warningType = horde.warningType;
     const finalHordeVisible = warningType === 'final' || horde.finalHordeStatus !== 'notStarted';
     const warningLabel = finalHordeVisible ? this.translator()('finalHordeWarning') : this.translator()('horde');
+    const warnedDirections = warningType === 'none' ? [] : horde.warningDirections;
+    const nextWave = horde.nextWave ?? hordeWaveForIndex(this.state.config, horde.nextWaveIndex);
+    const finalTurn = finalWaveTurn(this.state.config);
+    const nextWaveLabel = horde.nextWaveIndex === null ? '—' : String(horde.nextWaveIndex);
+    const directionCount = nextWave ? String(nextWave.directionCount) : '—';
+    const directionsLabel = warnedDirections.length > 0
+      ? warnedDirections.map((direction) => formatDirection(direction, this.locale)).join(' / ')
+      : '—';
+    const scheduledSpawnTurn = horde.spawnTurn ?? hordeWaveSpawnTurn(nextWave);
+    const composition = hordeCompositionLabel(nextWave, this.locale);
+    const remainingTurns = warningType === 'none' && !finalHordeVisible && scheduledSpawnTurn !== null
+      ? Math.max(0, scheduledSpawnTurn - this.state.turn)
+      : horde.turnsRemaining;
     const phaseIndicator = phaseIndicatorViewModel(this.state.phase, this.locale);
     const phaseDot = this.root.querySelector<HTMLElement>('[data-bind="phase"]');
     if (phaseDot) {
@@ -1959,7 +1976,7 @@ export class GameUiController {
     }
     const bindings: Record<string, string> = {
       turn: String(this.state.turn),
-      'turn-label': `${this.translator()('turn')} · ${this.translator()('finalHordeTurn')} ${observation.finalHordeTurn}`,
+      'turn-label': `${this.translator()('turn')} · ${this.translator()('finalWaveTurn')} ${finalTurn ?? '—'}`,
       population: String(population.total),
       food: String(this.state.resources.food),
       civilianGoods: String(this.state.resources.civilianGoods),
@@ -1968,9 +1985,13 @@ export class GameUiController {
       power: powerHud.display,
       'horde-warning': warningLabel,
       'horde-status': hordeStatusLabel(horde.finalHordeStatus, this.locale),
-      'horde-direction': warningType === 'none' && !finalHordeVisible ? '—' : formatDirection(horde.warningDirection, this.locale),
-      'horde-remaining': warningType === 'none' && !finalHordeVisible ? '—' : String(horde.turnsRemaining),
-      'horde-spawn-turn': horde.spawnTurn === null ? '—' : String(horde.spawnTurn),
+      'horde-wave-index': nextWaveLabel,
+      'horde-direction-count': directionCount,
+      'horde-directions': directionsLabel,
+      'horde-composition': composition,
+      'horde-final': nextWave?.final || finalHordeVisible && horde.nextWaveIndex === null ? t('finalWave') : '—',
+      'horde-remaining': String(remainingTurns),
+      'horde-spawn-turn': scheduledSpawnTurn === null ? '—' : String(scheduledSpawnTurn),
       'healthy-civilians': String(population.healthyCivilians),
       infected: String(population.infected),
     };
@@ -2033,7 +2054,7 @@ export class GameUiController {
       legalDestinations: this.selectedUnitLegalMoves(),
       attackTargetIds: this.selectedUnitAttackTargets(),
       pendingPath: this.pendingMove?.path,
-      hordeDirection: this.state.horde.warningType === 'none' ? null : this.state.horde.nextDirection,
+      hordeDirections: this.state.horde.warningType === 'none' ? [] : this.state.horde.warningDirections,
       hordeWarningType: this.state.horde.warningType,
       visibilityOverlay: true,
       selectedVision: this.selectedVision(),
@@ -3097,7 +3118,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointFallback', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipHorde', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
@@ -3175,6 +3196,7 @@ export class GameUiController {
   private renderBranchFlow(): string {
     if (!this.state) return '';
     const t = this.translator();
+    const observation = createAgentObservation(this.state);
     const branches = [...this.state.map.roadBranches].sort((left, right) => left.id.localeCompare(right.id));
     const supply = deriveSupplySnapshot(this.state);
     const panels = branchPanelViewModel(this.state);
@@ -3184,6 +3206,9 @@ export class GameUiController {
       const checkpoint = panel?.activeCheckpointId
         ? this.state!.checkpoints.find((candidate) => candidate.id === panel.activeCheckpointId)
         : undefined;
+      const publicCheckpoint = checkpoint
+        ? observation.checkpoints.find((candidate) => candidate.id === checkpoint.id)
+        : undefined;
       const policyKey: CheckpointPolicy = panel?.currentPolicy ?? 'passThrough';
       const policy = this.state!.config.refugees.policies[policyKey];
       const remaining = branchState ? Math.max(0, branchState.nextArrivalTurn - this.state!.turn) : 0;
@@ -3191,6 +3216,10 @@ export class GameUiController {
       const destination = checkpoint ? t('checkpoint') + ' · ' + checkpoint.id : t('noCheckpoint');
       const policyText = formatPercent(policy.workerRate, this.locale) + ' / ' + formatPercent(policy.infectionRate, this.locale);
       const radius = supply.branchRadii.find((entry) => entry.branchId === branch.id)?.radius ?? this.state!.config.checkpoint.initialSupplyRadius;
+      const screeningCapacity = publicCheckpoint?.screeningCapacity ?? this.state!.config.refugees.screeningCapacity;
+      const screeningThroughput = publicCheckpoint?.estimatedScreeningThroughput ?? screeningCapacity / Math.max(1, policy.turns);
+      const queuePressure = publicCheckpoint ? queuePressureLabel(publicCheckpoint.queuePressureClass, this.locale) : t('none');
+      const screeningTurns = publicCheckpoint?.currentPolicyTurns ?? policy.turns;
       const candidates = this.checkpointCandidatesForBranch(branch.id);
       const candidateButtons = candidates.map((candidate) => {
         const direction = formatDirection(branch.direction, this.locale);
@@ -3219,6 +3248,9 @@ export class GameUiController {
         escapeHtml(t('nextArrival')) + '</dt><dd>' + escapeHtml(t('arrivalIn')) + ' ' + String(remaining) +
         '</dd></div><div><dt>' + escapeHtml(t('arrivalRange')) + '</dt><dd>' + escapeHtml(range) +
         '</dd></div><div><dt>' + escapeHtml(t('screeningProbability')) + '</dt><dd>' + escapeHtml(policyText) +
+        '</dd></div><div><dt>' + escapeHtml(t('screeningCapacity')) + '</dt><dd>' + String(screeningCapacity) +
+        '</dd></div><div><dt>' + escapeHtml(t('screeningThroughput')) + '</dt><dd>' + String(screeningThroughput) + ' / ' + escapeHtml(t('turn')) +
+        '</dd></div><div><dt>' + escapeHtml(t('policyTurns')) + '</dt><dd>' + String(screeningTurns) + '</dd></div><div><dt>' + escapeHtml(t('queuePressure')) + '</dt><dd>' + escapeHtml(queuePressure) +
         '</dd></div><div><dt>' + escapeHtml(t('supplyRadius')) + '</dt><dd>' + String(radius) +
         '</dd></div></dl>' + roleSummary + (!checkpoint ? '<p class="muted">' + escapeHtml(t('unmanagedPassThrough')) + '</p>' : '') + (candidateButtons ? `<div class="branch-candidate-actions" aria-label="${escapeHtml(t('sameHexActions'))}">${candidateButtons}</div>` : '') + '</article>';
     }).join('');
@@ -3372,7 +3404,7 @@ export class GameUiController {
         const unavailableReason = availableAction ? null : actionReasonFor(this.state!, requested, this.locale) ?? t('invalidAction');
         const currentPower = facility.powerSupplyEnabled ? t('powerOn') : t('powerOff');
         const projectedPower = projectedProduction?.projectedPowerSupplied ? t('powerSupplied') : t('powerNotSupplied');
-        return `<section class="population-editor power-supply-editor" data-power-supply-editor="true"><h3>${escapeHtml(t('powerSupply'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('powerSupply'))}</dt><dd data-power-supply-state="true">${escapeHtml(currentPower)}</dd></div><div><dt>${escapeHtml(t('powerMode'))}</dt><dd>${escapeHtml(powerModeLabel(projectedProduction?.powerMode ?? 'boost', this.locale))}</dd></div><div><dt>${escapeHtml(t('projectedPower'))}</dt><dd data-projected-power="true">${escapeHtml(projectedPower)}</dd></div></dl><button class="secondary-button" data-action="toggle-power-supply" data-facility-id="${escapeHtml(facility.id)}" data-enabled="${String(targetEnabled)}" ${availableAction ? '' : 'disabled'}>${escapeHtml(t('powerSupply'))}: ${escapeHtml(targetEnabled ? t('powerOn') : t('powerOff'))}</button>${unavailableReason ? `<p class="warning-text" data-power-supply-reason="true">${escapeHtml(unavailableReason)}</p>` : '<p class="muted" data-power-supply-reason="true"></p>'}</section>`;
+        return `<section class="population-editor power-supply-editor" data-power-supply-editor="true"><h3>${escapeHtml(t('powerSupply'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('powerSupply'))}</dt><dd data-power-supply-state="true">${escapeHtml(currentPower)}</dd></div><div><dt>${escapeHtml(t('powerMode'))}</dt><dd>${escapeHtml(powerModeLabel(projectedProduction?.powerMode ?? 'none', this.locale))}</dd></div><div><dt>${escapeHtml(t('projectedPower'))}</dt><dd data-projected-power="true">${escapeHtml(projectedPower)}</dd></div></dl><button class="secondary-button" data-action="toggle-power-supply" data-facility-id="${escapeHtml(facility.id)}" data-enabled="${String(targetEnabled)}" ${availableAction ? '' : 'disabled'}>${escapeHtml(t('powerSupply'))}: ${escapeHtml(targetEnabled ? t('powerOn') : t('powerOff'))}</button>${unavailableReason ? `<p class="warning-text" data-power-supply-reason="true">${escapeHtml(unavailableReason)}</p>` : '<p class="muted" data-power-supply-reason="true"></p>'}</section>`;
       })()
       : '';
     const bounds = workerAssignmentBounds(this.state, facility);
@@ -3511,7 +3543,8 @@ export class GameUiController {
     const damageMultiplier = unit?.terrainDamageMultiplier ?? tile.terrainDamageMultiplier;
     const movementCost = tile.effectiveMovementCost === null ? t('blocked') : String(tile.effectiveMovementCost);
     const visibility = tile.visibleToPlayer ? t('visible') : t('hidden');
-    return `<section class="terrain-detail terrain-forecast" data-terrain="${escapeHtml(tile.terrain)}"><div class="section-heading"><h3>${escapeHtml(t('terrain'))}</h3><span class="status-chip">${escapeHtml(visibility)}</span></div><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('baseTerrain'))}</dt><dd>${escapeHtml(terrainLabel(tile.terrain, this.locale))}</dd></div><div><dt>${escapeHtml(t('roadOverlay'))} / ${escapeHtml(t('urbanOverlay'))}</dt><dd>${escapeHtml(overlays.join(' · ') || t('none'))}</dd></div><div><dt>${escapeHtml(t('effectiveMovementCost'))}</dt><dd>${escapeHtml(movementCost)}</dd></div><div><dt>${escapeHtml(t('defenseSource'))}</dt><dd>${escapeHtml(terrainDefenseLabel(defenseSource, this.locale))}</dd></div><div><dt>${escapeHtml(t('damageMultiplier'))}</dt><dd>×${escapeHtml(String(damageMultiplier))}</dd></div><div><dt>${escapeHtml(t('vision'))}</dt><dd>${escapeHtml(String(Math.max(0, vision)))}</dd></div></dl></section>`;
+    const occupancy = tile.playerOccupancyAllowed ? t('playerOccupancyAllowed') : t('playerOccupancyForbidden');
+    return `<section class="terrain-detail terrain-forecast${tile.playerOccupancyAllowed ? '' : ' spawn-reserve-detail'}" data-terrain="${escapeHtml(tile.terrain)}"><div class="section-heading"><h3>${escapeHtml(t('terrain'))}</h3><span class="status-chip">${escapeHtml(visibility)}</span></div><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('baseTerrain'))}</dt><dd>${escapeHtml(terrainLabel(tile.terrain, this.locale))}</dd></div><div><dt>${escapeHtml(t('roadOverlay'))} / ${escapeHtml(t('urbanOverlay'))}</dt><dd>${escapeHtml(overlays.join(' · ') || t('none'))}</dd></div><div><dt>${escapeHtml(t('effectiveMovementCost'))}</dt><dd>${escapeHtml(movementCost)}</dd></div><div><dt>${escapeHtml(t('defenseSource'))}</dt><dd>${escapeHtml(terrainDefenseLabel(defenseSource, this.locale))}</dd></div><div><dt>${escapeHtml(t('damageMultiplier'))}</dt><dd>×${escapeHtml(String(damageMultiplier))}</dd></div><div><dt>${escapeHtml(t('vision'))}</dt><dd>${escapeHtml(String(Math.max(0, vision)))}</dd></div><div><dt>${escapeHtml(t('playerOccupancyAllowed'))}</dt><dd>${escapeHtml(occupancy)}</dd></div></dl>${tile.playerOccupancyAllowed ? '' : `<p class="warning-text">${escapeHtml(t('spawnReserveReason'))}</p>`}</section>`;
   }
 
   private renderFacilityForecast(publicFacility: AgentFacilityObservation | undefined): string {
@@ -3571,9 +3604,9 @@ export class GameUiController {
       ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicFacility.infectionContained ? 'is-contained' : 'warning-text'}">${escapeHtml(publicFacility.infectionContained ? t('infectionContained') : t('infectionNotContained'))}</p><p class="muted">${escapeHtml(t('automaticSuppression'))}: ${publicFacility.projectedSuppression > 0 ? publicFacility.projectedSuppression : t('automaticSuppressionUnavailable')}</p>${publicFacility.projectedCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicFacility.projectedCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}</section>`
       : '';
     const specialRule = type === 'windPowerPlant'
-      ? `<p class="muted">${escapeHtml(t('windPowerGeneration'))}: 15 · ${escapeHtml(t('windFuelCost'))}: 0 · ${escapeHtml(t('windZombieTarget'))}: 5 · ${escapeHtml(t('facilityVision'))}: ${currentVision}</p>`
+      ? `<p class="muted">${escapeHtml(t('windPowerGeneration'))}: 15 · ${escapeHtml(t('windFuelCost'))}: 0 · ${escapeHtml(t('windZombieTarget'))}: 5 · ${escapeHtml(t('facilityVision'))}: ${currentVision} · ${escapeHtml(t('powerMode'))}: ${escapeHtml(t('powerModeNone'))}</p>`
       : type === 'simpleFarm'
-        ? `<p class="muted">${escapeHtml(t('foodPerWorker'))}: 5 · ${escapeHtml(t('powerRequirement'))}: 5 · ${escapeHtml(t('buildCost'))}: ${buildCost}</p>`
+        ? `<p class="muted">${escapeHtml(t('foodPerWorker'))}: 5 · ${escapeHtml(t('powerMode'))}: ${escapeHtml(t('powerModeNone'))} · ${escapeHtml(t('buildCost'))}: ${buildCost}</p>`
         : type === 'civilianDroneBase'
           ? `<p class="muted">${escapeHtml(t('droneVision'))}: ${publicFacility.healthyPopulation} × 2 = ${currentVision} · ${escapeHtml(t('powerRequirement'))}: 5 · ${escapeHtml(t('buildCost'))}: ${buildCost}</p>`
           : '';
@@ -3611,6 +3644,10 @@ export class GameUiController {
       : newPolicyActionAvailable
         ? null
         : actionReasonFor(this.state!, requestedPolicy, this.locale) ?? t('invalidAction');
+    const screeningCapacity = publicCheckpoint?.screeningCapacity ?? this.state?.config.refugees.screeningCapacity ?? 20;
+    const screeningThroughput = publicCheckpoint?.estimatedScreeningThroughput ?? screeningCapacity / Math.max(1, this.state?.config.refugees.policies[branchPolicy].turns ?? 1);
+    const screeningTurns = publicCheckpoint?.currentPolicyTurns ?? this.state?.config.refugees.policies[branchPolicy].turns ?? 0;
+    const checkpointQueuePressure = publicCheckpoint ? queuePressureLabel(publicCheckpoint.queuePressureClass, this.locale) : t('none');
     const newRelocationAvailable = checkpoint.status === 'operational' && this.checkpointCandidates({
       mode: 'relocate',
       checkpointId: checkpoint.id,
@@ -3639,7 +3676,7 @@ export class GameUiController {
       '</dt><dd>' + escapeHtml(arrivalText) + '</dd></div><div><dt>' + escapeHtml(t('waiting')) + '</dt><dd>' + String(checkpoint.waiting) +
       '</dd></div><div><dt>' + escapeHtml(t('screening')) + '</dt><dd>' + String(checkpoint.screening) + '</dd></div><div><dt>' +
       escapeHtml(t('approved')) + '</dt><dd>' + String(checkpoint.approved) + '</dd></div><div><dt>' + escapeHtml(t('infected')) +
-      '</dt><dd>' + String(checkpoint.infected) + '</dd></div><div><dt>' + escapeHtml(t('remainingScreeningTurns')) +
+      '</dt><dd>' + String(checkpoint.infected) + '</dd></div><div><dt>' + escapeHtml(t('screeningCapacity')) + '</dt><dd>' + String(screeningCapacity) + '</dd></div><div><dt>' + escapeHtml(t('screeningThroughput')) + '</dt><dd>' + String(screeningThroughput) + ' / ' + escapeHtml(t('turn')) + '</dd></div><div><dt>' + escapeHtml(t('policyTurns')) + '</dt><dd>' + String(screeningTurns) + '</dd></div><div><dt>' + escapeHtml(t('queuePressure')) + '</dt><dd>' + escapeHtml(checkpointQueuePressure) + '</dd></div><div><dt>' + escapeHtml(t('remainingScreeningTurns')) +
       '</dt><dd>' + String(checkpoint.remainingTurns) + '</dd></div></dl><p class="muted">' + escapeHtml(t('tipCheckpoint')) +
       '</p><p class="checkpoint-role-help"><strong>' + escapeHtml(t('checkpointRole')) + '</strong>: ' + escapeHtml(roleLabel) + '</p><label>' + escapeHtml(t('branchPolicy')) + '<select data-policy="' + escapeHtml(branchId) + '" ' +
        (policyEditable ? '' : 'disabled') + '>' + newPolicyOptions + '</select></label><p class="muted">' + escapeHtml(t('checkpointPolicy')) + ': ' + escapeHtml(t(branchPolicy)) + ' · ' + escapeHtml(t('nextPolicy')) + ': ' + escapeHtml(t(checkpoint.screeningPolicy)) + '</p>' + infectionSection + '<section class="policy-details"><h3>' + escapeHtml(t('policyDetails')) + '</h3><p class="muted">' + escapeHtml(t('policyTradeoff')) + '</p><ul class="policy-list">' + policyDetails + '</ul></section>' +

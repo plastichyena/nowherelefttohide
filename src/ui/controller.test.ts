@@ -126,19 +126,19 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.4.0-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.4.1-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.0以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.1');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.1以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.2');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.0 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.1');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.1 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.2');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.1.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 6');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.1.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 6');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.2.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 7');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.2.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 7');
   });
 
   it('projects all checkpoint roles and branch fallback fields', () => {
@@ -360,7 +360,7 @@ describe('controller view models', () => {
 
   it('has bilingual terrain, visibility, Horde, and victory labels', () => {
     const keys = [
-      'finalHordeTurn', 'finalHordeWarning', 'spawnTurn', 'hordeStatusNotStarted',
+      'finalWaveTurn', 'finalHordeWarning', 'spawnTurn', 'hordeStatusNotStarted', 'hordeSchedule', 'nextWave', 'directionCount', 'directions', 'composition', 'finalWave',
       'terrain', 'baseTerrain', 'terrainPlain', 'terrainForest', 'terrainMountain', 'terrainWater',
       'roadOverlay', 'urbanOverlay', 'effectiveMovementCost', 'defenseSource', 'damageMultiplier',
       'vision', 'visible', 'hidden', 'victoryProgress', 'finalHordeDefeated',
@@ -371,16 +371,14 @@ describe('controller view models', () => {
       expect(createTranslator('ja')(key)).not.toBe(key);
       expect(createTranslator('en')(key)).not.toBe(key);
     }
-    expect(createTranslator('ja')('finalHordeTurn')).toContain('Final Horde');
+    expect(createTranslator('ja')('finalWaveTurn')).toContain('Final Wave');
     expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
   });
 
   it('has bilingual mixed-Horde composition and checkpoint explainability labels', () => {
     const keys = [
-      'hordeComposition', 'periodicInitialHordeZombies', 'periodicInitialNormalZombies',
-      'periodicIncrementHordeZombies', 'periodicIncrementNormalZombies',
-      'finalHordeZombies', 'finalNormalZombies', 'hordeCompositionHint',
-      'checkpointCandidateHint', 'newGameError',
+      'fixedHordeScheduleHint', 'hordeWarningLeadTurns', 'spawnReserve', 'spawnReserveReason',
+      'screeningCapacity', 'screeningThroughput', 'checkpointCapacityRule', 'checkpointCandidateHint', 'newGameError',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);
@@ -423,9 +421,7 @@ describe('controller view models', () => {
       fuelLimitedGenerationCapacity: 20,
       availableGenerationCapacity: 20,
       requiredPowerDemand: 10,
-      industrialBoostDemand: 5,
       requiredPowerAllocated: 10,
-      industrialBoostAllocated: 2,
       unpoweredFacilities: [],
       capacity: 20,
       required: 10,
@@ -433,12 +429,12 @@ describe('controller view models', () => {
     } as const;
     const japanese = powerHudViewModel(electricity, 'ja');
     const english = powerHudViewModel(electricity, 'en');
-    expect(japanese.display).toBe('15/20');
-    expect(english.display).toBe('15/20');
+    expect(japanese.display).toBe('10/20');
+    expect(english.display).toBe('10/20');
     expect(japanese.isShortage).toBe(true);
-    expect(japanese.tooltip).toContain('予測需要量: 15');
+    expect(japanese.tooltip).toContain('予測需要量: 10');
     expect(japanese.tooltip).toContain('不足: 3');
-    expect(english.accessibleName).toContain('Projected demand 15');
+    expect(english.accessibleName).toContain('Projected demand 10');
   });
 
   it('keeps a zero-demand, zero-supply power HUD safe and uses Core shortage only', () => {
@@ -447,9 +443,7 @@ describe('controller view models', () => {
       fuelLimitedGenerationCapacity: 0,
       availableGenerationCapacity: 0,
       requiredPowerDemand: 0,
-      industrialBoostDemand: 0,
       requiredPowerAllocated: 0,
-      industrialBoostAllocated: 0,
       unpoweredFacilities: [],
       capacity: 0,
       required: 0,
@@ -477,10 +471,10 @@ describe('controller view models', () => {
     expect(english).toContain('data-legend-section="dynamic"');
     expect(english).toContain('Secured + stopped');
     expect(english).toContain('Forest Movement Cost');
-    expect(english).toContain('Periodic initial Horde Zombies');
-    expect(english).toContain('Periodic initial Normal Zombies');
-    expect(english).toContain('Final Horde Zombies');
-    expect(english).toContain('Final Normal Zombies');
+    expect(english).toContain('Wave 1');
+    expect(english).toContain('Spawn Reserve');
+    expect(english).toContain('Screening Batch Capacity');
+    expect(english).not.toContain('Industrial boost');
     expect(english).toContain('Mixed-Horde members');
     expect(english).toContain('HP 20');
     expect(renderBoardLegend(null, 'en', ASSET_REGISTRY)).toContain('/assets/board/terrain/terrain_plain.png');

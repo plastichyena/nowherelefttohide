@@ -3,6 +3,7 @@ import { createDefaultConfig } from './config';
 import { deriveCheckpointRole, isHexSupplied } from './supply';
 import { createUnit, synchronizePopulation } from './state';
 import { GameEngine } from './engine';
+import { singleFinalWave } from './testConfig';
 import type {
   BuildCheckpointAction,
   CheckpointState,
@@ -17,8 +18,7 @@ import type {
 /** Keep v1.4.0 scenarios deterministic and independent of normal economy noise. */
 function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): GameConfig {
   return createDefaultConfig({
-    finalHordeTurn: 100,
-    horde: { cycle: 100 },
+    horde: singleFinalWave(100),
     economy: {
       initialZombieCount: 0,
       initialResources: {
@@ -161,7 +161,7 @@ function makeNoiseScenario(
   human.position = { ...center };
   human.vision = 2;
   resetHuman(human);
-  otherHuman.position = { q: 0, r: 0 };
+  otherHuman.position = { q: 1, r: 1 };
   otherHuman.vision = 0;
   resetHuman(otherHuman);
   // Keep this focused combat fixture free of map-seeded Zombies.  The noise
@@ -234,7 +234,7 @@ describe('v1.4 Checkpoint Role / Fallback / Supply', () => {
       police.position = { q: 24, r: 15 };
       police.vision = visible ? 4 : 0;
       const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
-      guard.position = { q: 0, r: 0 };
+      guard.position = { q: 1, r: 1 };
       guard.vision = 0;
       addZombie(state, `zombie-${visible ? 'visible' : 'hidden'}-post`, { q: 28, r: 15 });
       synchronizePopulation(state);
@@ -505,7 +505,7 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
     police.vision = 0;
     resetHuman(police);
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.position = { q: 0, r: 0 };
+    guard.position = { q: 1, r: 1 };
     guard.vision = 0;
     resetHuman(guard);
     const source = addZombie(state, 'zombie-a-noise-source', { q: 16, r: 15 });
@@ -618,7 +618,7 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
     atCenter.position = { q: 18, r: 15 };
     atCenter.noiseTarget = { q: 18, r: 15 };
     // Keep the state legal by moving the police away from the arrival center.
-    arrived.units.find((unit) => unit.id === police.id)!.position = { q: 0, r: 0 };
+    arrived.units.find((unit) => unit.id === police.id)!.position = { q: 1, r: 1 };
     synchronizePopulation(arrived);
     stepOk(engine, { type: 'LoadSnapshot', snapshot: arrived });
     const cleared = endTurn(engine);

@@ -100,6 +100,20 @@ describe('v1.4 position candidates', () => {
     expect(candidates.some((candidate) => candidate.legal)).toBe(true);
     expect(candidates.filter((candidate) => candidate.legal).every((candidate) => candidate.reasonCode === null)).toBe(true);
     expect(candidates.filter((candidate) => !candidate.legal).every((candidate) => candidate.reasonCode !== null)).toBe(true);
+    expect(candidates.filter((candidate) =>
+      candidate.position.q === 0 || candidate.position.q === 30 || candidate.position.r === 0 || candidate.position.r === 30
+    ).every((candidate) => candidate.reasonCode === 'horde_spawn_reserve')).toBe(true);
+  });
+
+  it('rejects Reserve placement with the shared reason without changing resources, actions, or RNG', () => {
+    const engine = new GameEngine(47, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const before = engine.getState();
+    const checkpoint = engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 0 } });
+    expect(checkpoint.error?.code).toBe('horde_spawn_reserve');
+    expect(engine.getState()).toEqual(before);
+    const facility = engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: { q: 0, r: 0 } });
+    expect(facility.error?.code).toBe('horde_spawn_reserve');
+    expect(engine.getState()).toEqual(before);
   });
 
   it('does not expose a hidden Zombie in Constructible candidates and accepts hidden co-location', () => {

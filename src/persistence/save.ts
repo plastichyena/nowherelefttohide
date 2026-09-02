@@ -10,16 +10,17 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.4.1 saves. */
+/** The sole game-rules version accepted by v1.4.2 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 6;
-/** v1.4.1 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v6';
+export const SAVE_FORMAT_VERSION = 7;
+/** v1.4.2 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v7';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v5';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v6';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v5',
   'nowhere-left-to-hide:auto-save:v4',
   'nowhere-left-to-hide:auto-save:v3',
   'nowhere-left-to-hide:auto-save:v2',
@@ -140,6 +141,7 @@ const GAME_EVENT_TYPES = [
   'noise_target_reached',
   'noise_target_overridden',
   'victory_progress_changed',
+  'horde_warning',
   'horde_spawned',
   'game_over',
 ] as const;
@@ -373,7 +375,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.4.0 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.4.1 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -402,11 +404,73 @@ function validateCoordinate(
   }
 }
 
+function validateHordeConfigShape(value: unknown, finalHordeTurn: unknown, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push('state.config.horde must be an object');
+    return;
+  }
+  requireFields(errors, value, 'state.config.horde', ['warningLeadTurns', 'waves']);
+  for (const retiredField of ['cycle', 'periodicInitial', 'periodicIncrement', 'warningStartTurn', 'spawnOnlyBeforeFinalTurn', 'finalComposition']) {
+    if (hasOwn(value, retiredField)) errors.push(`state.config.horde.${retiredField} is obsolete; use horde.waves`);
+  }
+  if (!isInteger(value.warningLeadTurns, 1)) errors.push('state.config.horde.warningLeadTurns is invalid');
+  const waves = value.waves;
+  if (!Array.isArray(waves) || waves.length === 0) {
+    errors.push('state.config.horde.waves must contain at least one Wave');
+    return;
+  }
+
+  let previousTurn = 0;
+  let finalWaveTurn: number | null = null;
+  waves.forEach((wave, index) => {
+    const path = `state.config.horde.waves[${index}]`;
+    if (!isRecord(wave)) {
+      errors.push(`${path} must be an object`);
+      return;
+    }
+    requireFields(errors, wave, path, ['turn', 'directionCount', 'compositionPerDirection', 'final']);
+    if (!isInteger(wave.turn, 1)) errors.push(`${path}.turn is invalid`);
+    if (!isInteger(wave.directionCount, 1) || wave.directionCount > 4) errors.push(`${path}.directionCount is invalid`);
+    if (!isRecord(wave.compositionPerDirection)) {
+      errors.push(`${path}.compositionPerDirection must be an object`);
+    } else {
+      const composition = wave.compositionPerDirection;
+      requireFields(errors, composition, `${path}.compositionPerDirection`, ['hordeZombie', 'zombie']);
+      if (!isInteger(composition.hordeZombie) || !isInteger(composition.zombie)) {
+        errors.push(`${path}.compositionPerDirection is invalid`);
+      } else if (composition.hordeZombie + composition.zombie < 1) {
+        errors.push(`${path}.compositionPerDirection must contain at least one unit`);
+      } else if (composition.zombie > 0 && composition.hordeZombie === 0) {
+        errors.push(`${path}.compositionPerDirection cannot contain Normal Zombies without a Horde Zombie`);
+      }
+    }
+    if (typeof wave.final !== 'boolean') errors.push(`${path}.final is invalid`);
+    if (isInteger(wave.turn, 1) && wave.turn <= previousTurn) errors.push(`${path}.turn must be strictly increasing`);
+    if (isInteger(wave.turn, 1)) previousTurn = wave.turn;
+    if (wave.final === true) {
+      if (index !== waves.length - 1 || finalWaveTurn !== null) errors.push(`${path}.final is invalid`);
+      if (isInteger(wave.turn, 1)) finalWaveTurn = wave.turn;
+    }
+  });
+  if (finalWaveTurn === null) errors.push('state.config.horde.waves must end with one Final Wave');
+  if (finalWaveTurn !== null && finalHordeTurn !== finalWaveTurn) errors.push('state.finalHordeTurn must match the configured Final Wave');
+}
+
+function hasCanonicalDirectionOrder(directions: unknown[]): boolean {
+  let lastIndex = -1;
+  for (const direction of directions) {
+    const index = CARDINAL_DIRECTIONS.indexOf(direction as typeof CARDINAL_DIRECTIONS[number]);
+    if (index < 0 || index <= lastIndex) return false;
+    lastIndex = index;
+  }
+  return true;
+}
+
 /**
- * Reject obsolete or partial v1.4 container shapes before casting. The core
- * invariant checker performs relational validation; this guard makes every
- * v1.4.0 addition (Fuel, Wind, and Constructible Facility state) an explicit
- * save boundary instead of silently accepting a partial snapshot.
+ * Reject obsolete or partial v1.4.2 container shapes before casting. The core
+ * invariant checker performs relational validation; this guard makes the Wave
+ * schedule, reserved map perimeter, and warning state an explicit save
+ * boundary instead of silently accepting a partial snapshot.
  */
 function validateV14Shape(state: Record<string, unknown>, errors: string[]): void {
   requireFields(errors, state, 'state', REQUIRED_STATE_FIELDS);
@@ -438,7 +502,6 @@ function validateV14Shape(state: Record<string, unknown>, errors: string[]): voi
     requireFields(errors, config, 'state.config', [
       'version',
       'mapId',
-      'finalHordeTurn',
       'maxActionsPerTurn',
       'units',
       'facilities',
@@ -454,10 +517,11 @@ function validateV14Shape(state: Record<string, unknown>, errors: string[]): voi
       'terrain',
       'vision',
     ]);
-    if (hasOwn(config, 'maxTurns')) errors.push('state.config.maxTurns is obsolete; use finalHordeTurn');
+    if (hasOwn(config, 'maxTurns')) errors.push('state.config.maxTurns is obsolete; use horde.waves');
+    if (hasOwn(config, 'finalHordeTurn')) errors.push('state.config.finalHordeTurn is obsolete; derive it from the Final Wave');
     if (config.version !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(config.version, 'state.config.version'));
     if (config.mapId !== FIXED_MAP_ID) errors.push(`state.config.mapId must be ${FIXED_MAP_ID}`);
-    if (config.finalHordeTurn !== state.finalHordeTurn) errors.push('state.finalHordeTurn must match state.config.finalHordeTurn');
+    validateHordeConfigShape(config.horde, state.finalHordeTurn, errors);
   }
 
   const map = state.map;
@@ -472,6 +536,7 @@ function validateV14Shape(state: Record<string, unknown>, errors: string[]): voi
       'roadTiles',
       'facilities',
       'hordeEntrances',
+      'hordeSpawnReserve',
       'roadBranches',
       'initialZombiePositions',
     ]);
@@ -486,18 +551,26 @@ function validateV14Shape(state: Record<string, unknown>, errors: string[]): voi
           errors.push(`${path} must be an object`);
           continue;
         }
-        requireFields(errors, tile, path, ['key', 'q', 'r', 'terrain', 'road', 'movementCost', 'facilityId', 'hordeEntranceDirections']);
+        requireFields(errors, tile, path, ['key', 'q', 'r', 'terrain', 'road', 'movementCost', 'facilityId', 'hordeEntranceDirections', 'playerOccupancyAllowed']);
         validateCoordinate(errors, tile, path, FIXED_MAP_WIDTH, FIXED_MAP_HEIGHT);
         if (!BASE_TERRAINS.includes(tile.terrain as typeof BASE_TERRAINS[number])) errors.push(`${path}.terrain is invalid`);
         if (typeof tile.road !== 'boolean') errors.push(`${path}.road is invalid`);
         if (tile.movementCost !== null && !isInteger(tile.movementCost, 1)) errors.push(`${path}.movementCost is invalid`);
         if (tile.facilityId !== null && (typeof tile.facilityId !== 'string' || tile.facilityId.length === 0)) errors.push(`${path}.facilityId is invalid`);
         if (!Array.isArray(tile.hordeEntranceDirections) || tile.hordeEntranceDirections.some((direction) => !CARDINAL_DIRECTIONS.includes(direction as typeof CARDINAL_DIRECTIONS[number]))) errors.push(`${path}.hordeEntranceDirections is invalid`);
+        if (typeof tile.playerOccupancyAllowed !== 'boolean') errors.push(`${path}.playerOccupancyAllowed is invalid`);
       }
     }
     if (!Array.isArray(map.roadTiles)) errors.push('state.map.roadTiles must be an array');
     if (!Array.isArray(map.facilities)) errors.push('state.map.facilities must be an array');
     if (!Array.isArray(map.hordeEntrances)) errors.push('state.map.hordeEntrances must be an array');
+    if (!Array.isArray(map.hordeSpawnReserve)) {
+      errors.push('state.map.hordeSpawnReserve must be an array');
+    } else {
+      for (const [index, position] of map.hordeSpawnReserve.entries()) {
+        validateCoordinate(errors, position, `state.map.hordeSpawnReserve[${index}]`, FIXED_MAP_WIDTH, FIXED_MAP_HEIGHT);
+      }
+    }
     if (!Array.isArray(map.roadBranches)) errors.push('state.map.roadBranches must be an array');
     if (!Array.isArray(map.initialZombiePositions)) errors.push('state.map.initialZombiePositions must be an array');
   }
@@ -753,13 +826,41 @@ function validateV14Shape(state: Record<string, unknown>, errors: string[]): voi
   if (!isRecord(horde)) {
     errors.push('state.horde must be an object');
   } else {
-    requireFields(errors, horde, 'state.horde', ['spawnedCount', 'totalSpawned', 'nextDirection', 'turnsRemaining', 'nextSpawnTurn', 'lastSpawnTurn', 'warningType', 'finalHordeStatus', 'finalSpawnGroupId', 'finalSpawnedCount']);
-    for (const field of ['spawnedCount', 'totalSpawned', 'turnsRemaining', 'finalSpawnedCount'] as const) if (!isInteger(horde[field])) errors.push(`state.horde.${field} is invalid`);
-    if (!CARDINAL_DIRECTIONS.includes(horde.nextDirection as typeof CARDINAL_DIRECTIONS[number])) errors.push('state.horde.nextDirection is invalid');
+    requireFields(errors, horde, 'state.horde', ['nextWaveIndex', 'totalSpawned', 'warningDirections', 'turnsRemaining', 'nextSpawnTurn', 'lastSpawnTurn', 'warningType', 'spawnedWaveIndices', 'spawnGroupIdsByWave', 'finalHordeStatus', 'finalSpawnGroupIds', 'finalSpawnedCount']);
+    for (const retiredField of ['spawnedCount', 'nextDirection', 'finalSpawnGroupId']) {
+      if (hasOwn(horde, retiredField)) errors.push(`state.horde.${retiredField} is obsolete; use Wave Horde state`);
+    }
+    if (horde.nextWaveIndex !== null && !isInteger(horde.nextWaveIndex, 1)) errors.push('state.horde.nextWaveIndex is invalid');
+    for (const field of ['totalSpawned', 'turnsRemaining', 'finalSpawnedCount'] as const) if (!isInteger(horde[field])) errors.push(`state.horde.${field} is invalid`);
+    if (!Array.isArray(horde.warningDirections)
+      || !hasCanonicalDirectionOrder(horde.warningDirections)) {
+      errors.push('state.horde.warningDirections must contain unique canonical directions');
+    }
     for (const field of ['nextSpawnTurn', 'lastSpawnTurn'] as const) if (horde[field] !== null && !isInteger(horde[field], 1)) errors.push(`state.horde.${field} is invalid`);
     if (!HORDE_WARNING_TYPES.includes(horde.warningType as typeof HORDE_WARNING_TYPES[number])) errors.push('state.horde.warningType is invalid');
     if (!FINAL_HORDE_STATUSES.includes(horde.finalHordeStatus as typeof FINAL_HORDE_STATUSES[number])) errors.push('state.horde.finalHordeStatus is invalid');
-    if (horde.finalSpawnGroupId !== null && (typeof horde.finalSpawnGroupId !== 'string' || horde.finalSpawnGroupId.length === 0)) errors.push('state.horde.finalSpawnGroupId is invalid');
+    if (!Array.isArray(horde.spawnedWaveIndices)
+      || horde.spawnedWaveIndices.some((waveIndex) => !isInteger(waveIndex, 1))
+      || new Set(horde.spawnedWaveIndices).size !== horde.spawnedWaveIndices.length) {
+      errors.push('state.horde.spawnedWaveIndices is invalid');
+    }
+    if (!isRecord(horde.spawnGroupIdsByWave)) {
+      errors.push('state.horde.spawnGroupIdsByWave must be an object');
+    } else {
+      for (const [waveIndex, groupIds] of Object.entries(horde.spawnGroupIdsByWave)) {
+        if (!/^\d+$/u.test(waveIndex) || !isInteger(Number(waveIndex), 1)
+          || !Array.isArray(groupIds) || groupIds.length === 0
+          || groupIds.some((groupId) => typeof groupId !== 'string' || groupId.length === 0)
+          || new Set(groupIds).size !== groupIds.length) {
+          errors.push(`state.horde.spawnGroupIdsByWave.${waveIndex} is invalid`);
+        }
+      }
+    }
+    if (!Array.isArray(horde.finalSpawnGroupIds)
+      || horde.finalSpawnGroupIds.some((groupId) => typeof groupId !== 'string' || groupId.length === 0)
+      || new Set(horde.finalSpawnGroupIds).size !== horde.finalSpawnGroupIds.length) {
+      errors.push('state.horde.finalSpawnGroupIds is invalid');
+    }
   }
 
   if (!Array.isArray(state.events)) {
@@ -855,7 +956,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.0以前 / v1.4.0 and earlier saves cannot be loaded or converted; Save Format 5 or below is rejected without conversion, deletion, or overwrite`);
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.1以前 / v1.4.1 and earlier saves cannot be loaded or converted; Save Format 6 or below is rejected without conversion, deletion, or overwrite`);
   }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (value.mapId !== FIXED_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID}`);
@@ -894,14 +995,14 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   return { valid: true, errors: [], state: clone(state), envelope };
 }
 
-/** Create a checksummed, URL-safe v1.4.1 Save Format 6 code. */
+/** Create a checksummed, URL-safe v1.4.2 Save Format 7 code. */
 export function encodeSaveCode(state: GameState): string {
   const errors = validateStateForSave(state);
   if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
   return toBase64Url(gzipSync(strToU8(canonicalJson(makeEnvelope(state))), { level: 9 }));
 }
 
-/** Decode and validate a v1.4.1 save code without changing caller-owned state. */
+/** Decode and validate a v1.4.2 save code without changing caller-owned state. */
 export function decodeSaveCode(code: string): SaveValidationResult {
   if (typeof code !== 'string' || code.trim().length === 0) return reject(['Save code is empty']);
   try {
@@ -991,7 +1092,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the v1.4/v5 key; legacy data is deliberately preserved. */
+  /** Clears only the v1.4.2/v7 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

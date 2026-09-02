@@ -1,4 +1,12 @@
-import type { BaseTerrain, CheckpointPolicy, GameAction, GameConfig, HumanUnitType } from '../core/types';
+import type {
+  BaseTerrain,
+  CardinalDirection,
+  CheckpointPolicy,
+  GameAction,
+  GameConfig,
+  HumanUnitType,
+  ResourceType,
+} from '../core/types';
 import { hexDistance } from '../core/hex';
 import {
   APP_VERSION,
@@ -46,6 +54,25 @@ export const PRIORITY_GOALS = [
 ] as const;
 
 export type MetricOutcome = 'won' | 'lost' | 'technical_failure';
+
+export interface FacilityPowerMetric {
+  requested: number;
+  supplied: number;
+  unavailable: number;
+  off: number;
+}
+
+export interface HordeWaveMetric {
+  index: number;
+  spawnTurn: number;
+  directions: CardinalDirection[];
+  compositionPerDirection: { hordeZombie: number; zombie: number };
+  final: boolean;
+  hordeZombieSpawned: number;
+  normalZombieSpawned: number;
+  hordeZombieKilled: number;
+  normalZombieKilled: number;
+}
 
 export interface MetricFailureInfo {
   code: string;
@@ -238,6 +265,30 @@ export interface GameMetrics {
   emergencyMovementHexesByType: Record<HumanUnitType, number>;
   emergencyMovementPointsByType: Record<HumanUnitType, number>;
   emergencyReturnsToSupplyByType: Record<HumanUnitType, number>;
+  /** v1.4.2 power, checkpoint-capacity, and fixed-wave metrics. */
+  powerTurnsByFacilityType: Record<string, FacilityPowerMetric>;
+  powerRequestedTurnsByFacilityType: Record<string, number>;
+  powerSuppliedTurnsByFacilityType: Record<string, number>;
+  powerUnavailableTurnsByFacilityType: Record<string, number>;
+  powerSupplyOffTurnsByFacilityType: Record<string, number>;
+  powerResourceLossByResource: Record<ResourceType, number>;
+  refineryPowerOutageTurns: number;
+  refineryOutageNextTurnFuelShortageTurns: number;
+  simpleFarmFoodShortageAvoidanceTurns: number;
+  checkpointBatchStartsByPolicy: Record<CheckpointPolicy, number>;
+  checkpointBatchCompletionsByPolicy: Record<CheckpointPolicy, number>;
+  checkpointAverageQueue: number;
+  checkpointCapacityUtilization: number;
+  checkpointEstimatedThroughput: number;
+  hordeWaves: HordeWaveMetric[];
+  hordeDirectionSpawnCounts: Record<CardinalDirection, { hordeZombie: number; normalZombie: number }>;
+  hordeDirectionKillCounts: Record<CardinalDirection, { hordeZombie: number; normalZombie: number }>;
+  hordeFinalWaveSpawnTotal: number;
+  hordeFinalWaveKillTotal: number;
+  hordeFinalDefeatedTurn: number | null;
+  hordeTurnsAfterFinal: number;
+  hordeMultiFrontCheckpointLosses: number;
+  hordeMultiFrontFallbacks: number;
   failure: MetricFailureInfo | null;
 }
 
@@ -329,6 +380,26 @@ function statisticTurn(statistics: unknown, key: string): number | null {
 }
 
 const BASE_TERRAINS: readonly BaseTerrain[] = ['plain', 'forest', 'mountain', 'water'];
+const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
+const RESOURCE_TYPES: readonly ResourceType[] = ['food', 'civilianGoods', 'militaryGoods', 'fuel'];
+const FACILITY_TYPES: readonly string[] = [
+  'capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery',
+  'powerPlant', 'windPowerPlant', 'civilianDroneBase', 'simpleFarm',
+];
+
+function zeroResourceRecord(): Record<ResourceType, number> {
+  return { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0 };
+}
+
+function zeroDirectionMetric(): Record<CardinalDirection, { hordeZombie: number; normalZombie: number }> {
+  return Object.fromEntries(
+    CARDINAL_DIRECTIONS.map((direction) => [direction, { hordeZombie: 0, normalZombie: 0 }]),
+  ) as Record<CardinalDirection, { hordeZombie: number; normalZombie: number }>;
+}
+
+function zeroPowerMetric(): FacilityPowerMetric {
+  return { requested: 0, supplied: 0, unavailable: 0, off: 0 };
+}
 
 function terrainEntriesByType(statistics: unknown): Record<BaseTerrain, number> {
   const fromStatistics = numericRecord(isRecord(statistics) ? statistics.terrainEntriesByType : undefined);
@@ -516,7 +587,9 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     (observation) => observation.horde.finalHordeStatus !== 'notStarted',
   );
   const turnsAfterFinalHorde = statisticNumber(statistics, 'turnsAfterFinalHorde')
-    ?? (finalHordeStarted ? Math.max(0, finalObservation.turn - input.config.finalHordeTurn) : 0);
+    ?? (finalHordeStarted
+      ? Math.max(0, finalObservation.turn - (input.config.horde.waves.find((wave) => wave.final)?.turn ?? finalObservation.turn))
+      : 0);
   const suppliedAreaZombieClearTurn = statisticTurn(statistics, 'suppliedAreaZombieClearTurn')
     ?? firstTurnWhere(turnObservations, (observation) => observation.victory.suppliedAreaZombieClear);
   const suppliedAreaInfectionClearTurn = statisticTurn(statistics, 'suppliedAreaInfectionClearTurn')
@@ -827,6 +900,163 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       candidate.newlyBuildableConstructibleHexCount === 0
       ? 1 : 0);
   }, 0);
+
+  const powerTurnsByFacilityType: Record<string, FacilityPowerMetric> = Object.fromEntries(
+    FACILITY_TYPES.map((type) => [type, zeroPowerMetric()]),
+  );
+  const powerRequestedTurnsByFacilityType: Record<string, number> = makeCountRecord(FACILITY_TYPES);
+  const powerSuppliedTurnsByFacilityType: Record<string, number> = makeCountRecord(FACILITY_TYPES);
+  const powerUnavailableTurnsByFacilityType: Record<string, number> = makeCountRecord(FACILITY_TYPES);
+  const powerSupplyOffTurnsByFacilityType: Record<string, number> = makeCountRecord(FACILITY_TYPES);
+  const powerResourceLossByResource = zeroResourceRecord();
+  const refineryOutageTurns = new Set<number>();
+  let simpleFarmFoodShortageAvoidanceTurns = 0;
+  const checkpointBatchStartsByPolicy: Record<CheckpointPolicy, number> = {
+    passThrough: 0, normal: 0, strict: 0,
+  };
+  const checkpointBatchCompletionsByPolicy: Record<CheckpointPolicy, number> = {
+    passThrough: 0, normal: 0, strict: 0,
+  };
+  let checkpointQueueSamples = 0;
+  let checkpointQueueTotal = 0;
+  let checkpointCapacityUtilizationTotal = 0;
+  let checkpointThroughputTotal = 0;
+  let checkpointThroughputSamples = 0;
+  const previousScreening = new Map<string, number>();
+  for (const observation of observations) {
+    for (const facility of observation.facilities) {
+      const type = facility.type;
+      if (!powerTurnsByFacilityType[type]) powerTurnsByFacilityType[type] = zeroPowerMetric();
+      if (!powerRequestedTurnsByFacilityType[type]) powerRequestedTurnsByFacilityType[type] = 0;
+      if (!powerSuppliedTurnsByFacilityType[type]) powerSuppliedTurnsByFacilityType[type] = 0;
+      if (!powerUnavailableTurnsByFacilityType[type]) powerUnavailableTurnsByFacilityType[type] = 0;
+      if (!powerSupplyOffTurnsByFacilityType[type]) powerSupplyOffTurnsByFacilityType[type] = 0;
+      if (facility.production.powerMode === 'required') {
+        const metric = powerTurnsByFacilityType[type]!;
+        const requested = facility.production.projectedPowerRequested;
+        const supplied = facility.production.projectedPowerSupplied;
+        const off = facility.production.projectedPowerReason === 'power_supply_off'
+          || (!facility.production.powerSupplyEnabled && facility.production.projectedPowerReason !== 'not_applicable');
+        const unavailable = requested && !supplied;
+        if (requested) {
+          metric.requested += 1;
+          powerRequestedTurnsByFacilityType[type] += 1;
+        }
+        if (supplied) {
+          metric.supplied += 1;
+          powerSuppliedTurnsByFacilityType[type] += 1;
+        }
+        if (unavailable) {
+          metric.unavailable += 1;
+          powerUnavailableTurnsByFacilityType[type] += 1;
+        }
+        if (off) {
+          metric.off += 1;
+          powerSupplyOffTurnsByFacilityType[type] += 1;
+        }
+        if ((requested || off) && !supplied) {
+          for (const resource of RESOURCE_TYPES) {
+            powerResourceLossByResource[resource] += numberOrZero(facility.production.baseProduction[resource]);
+          }
+        }
+        if (type === 'refinery' && (requested || off) && !supplied) refineryOutageTurns.add(observation.turn);
+      }
+      if (type === 'simpleFarm' && numberOrZero(facility.production.projectedProduction.food) > 0
+        && observation.endTurnForecast.food.shortage <= 0) {
+        simpleFarmFoodShortageAvoidanceTurns += 1;
+      }
+    }
+    for (const checkpoint of observation.checkpoints) {
+      const queue = Math.max(0, numberOrZero(checkpoint.queuePeople));
+      const capacity = Math.max(0, numberOrZero(checkpoint.screeningCapacity));
+      checkpointQueueSamples += 1;
+      checkpointQueueTotal += queue;
+      checkpointCapacityUtilizationTotal += capacity > 0 ? Math.min(1, queue / capacity) : 0;
+      checkpointThroughputTotal += numberOrZero(checkpoint.estimatedScreeningThroughput);
+      checkpointThroughputSamples += 1;
+      const priorScreening = previousScreening.get(checkpoint.id) ?? 0;
+      if (priorScreening <= 0 && checkpoint.screening > 0) {
+        const policy = checkpoint.currentPolicy;
+        checkpointBatchStartsByPolicy[policy] += checkpoint.screening;
+      }
+      previousScreening.set(checkpoint.id, checkpoint.screening);
+    }
+  }
+  for (const event of events.filter((candidate) => candidate.type === 'refugees_screened')) {
+    const policy = event.payload.policy;
+    if (policy === 'passThrough' || policy === 'normal' || policy === 'strict') {
+      checkpointBatchCompletionsByPolicy[policy] += eventPayloadNumber(event, 'screened');
+    }
+  }
+  const refineryPowerOutageTurns = refineryOutageTurns.size;
+  const refineryOutageNextTurnFuelShortageTurns = [...refineryOutageTurns].filter((turn) => {
+    const next = turnObservations.find((observation) => observation.turn === turn + 1);
+    return next !== undefined && next.endTurnForecast.fuel.totalFuelShortage > 0;
+  }).length;
+  const hordeDirectionSpawnCounts = zeroDirectionMetric();
+  const hordeDirectionKillCounts = zeroDirectionMetric();
+  const hordeSpawnEvents = events.filter((event) =>
+    event.type === 'horde_spawned' && Number.isSafeInteger(event.payload.waveIndex),
+  );
+  const hordeWaves: HordeWaveMetric[] = input.config.horde.waves.map((wave, index) => {
+    const waveIndex = index + 1;
+    const event = hordeSpawnEvents.find((candidate) => candidate.payload.waveIndex === waveIndex);
+    const directions = Array.isArray(event?.payload.directions)
+      ? event!.payload.directions.filter((direction): direction is CardinalDirection => CARDINAL_DIRECTIONS.includes(direction as CardinalDirection))
+      : [];
+    const hordeZombieSpawned = numberOrZero(event?.payload.hordeZombieCount)
+      || (event ? directions.length * wave.compositionPerDirection.hordeZombie : 0);
+    const normalZombieSpawned = numberOrZero(event?.payload.normalZombieCount)
+      || (event ? directions.length * wave.compositionPerDirection.zombie : 0);
+    const hordeZombieKilled = events.filter((candidate) => candidate.type === 'unit_destroyed'
+      && candidate.payload.unitType === 'hordeZombie'
+      && candidate.payload.waveIndex === waveIndex).reduce((total, candidate) => total + 1, 0);
+    const normalZombieKilled = events.filter((candidate) => candidate.type === 'unit_destroyed'
+      && candidate.payload.unitType === 'zombie'
+      && candidate.payload.waveIndex === waveIndex).reduce((total, candidate) => total + 1, 0);
+    for (const direction of directions) {
+      hordeDirectionSpawnCounts[direction].hordeZombie += wave.compositionPerDirection.hordeZombie;
+      hordeDirectionSpawnCounts[direction].normalZombie += wave.compositionPerDirection.zombie;
+    }
+    return {
+      index: waveIndex,
+      spawnTurn: wave.turn,
+      directions,
+      compositionPerDirection: { ...wave.compositionPerDirection },
+      final: wave.final,
+      hordeZombieSpawned,
+      normalZombieSpawned,
+      hordeZombieKilled,
+      normalZombieKilled,
+    };
+  });
+  for (const event of events.filter((candidate) => candidate.type === 'unit_destroyed')) {
+    const direction = event.payload.direction;
+    const unitType = event.payload.unitType;
+    if (!CARDINAL_DIRECTIONS.includes(direction as CardinalDirection)) continue;
+    if (unitType === 'hordeZombie') hordeDirectionKillCounts[direction as CardinalDirection].hordeZombie += 1;
+    if (unitType === 'zombie') hordeDirectionKillCounts[direction as CardinalDirection].normalZombie += 1;
+  }
+  const finalWaveMetric = hordeWaves.find((wave) => wave.final);
+  const hordeFinalWaveSpawnTotal = finalWaveMetric
+    ? finalWaveMetric.hordeZombieSpawned + finalWaveMetric.normalZombieSpawned
+    : finalHordeSpawned;
+  const hordeFinalWaveKillTotal = finalWaveMetric
+    ? finalWaveMetric.hordeZombieKilled + finalWaveMetric.normalZombieKilled
+    : finalHordeKilled;
+  const hordeFinalDefeatedTurn = firstTurnWhere(turnObservations, (observation) => observation.victory.finalHordeDefeated);
+  const multiFrontTurns = new Set(
+    turnObservations
+      .filter((observation) => observation.horde.warningDirections.length > 1 || (observation.horde.nextWave?.directionCount ?? 0) > 1)
+      .map((observation) => observation.turn),
+  );
+  const hordeMultiFrontCheckpointLosses = events.filter((event) =>
+    (event.type === 'checkpoint_removed' || event.type === 'facility_overrun')
+    && multiFrontTurns.has(event.turn),
+  ).length;
+  const hordeMultiFrontFallbacks = events.filter((event) =>
+    event.type === 'checkpoint_fallback' && multiFrontTurns.has(event.turn),
+  ).length;
   const outcome: MetricOutcome = input.failure ? 'technical_failure' : input.result?.outcome ?? 'technical_failure';
   const gameOverReason = input.failure ? null : input.result?.reason ?? null;
 
@@ -1017,6 +1247,29 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     emergencyMovementHexesByType,
     emergencyMovementPointsByType,
     emergencyReturnsToSupplyByType,
+    powerTurnsByFacilityType,
+    powerRequestedTurnsByFacilityType,
+    powerSuppliedTurnsByFacilityType,
+    powerUnavailableTurnsByFacilityType,
+    powerSupplyOffTurnsByFacilityType,
+    powerResourceLossByResource,
+    refineryPowerOutageTurns,
+    refineryOutageNextTurnFuelShortageTurns,
+    simpleFarmFoodShortageAvoidanceTurns,
+    checkpointBatchStartsByPolicy,
+    checkpointBatchCompletionsByPolicy,
+    checkpointAverageQueue: checkpointQueueSamples > 0 ? checkpointQueueTotal / checkpointQueueSamples : 0,
+    checkpointCapacityUtilization: checkpointQueueSamples > 0 ? checkpointCapacityUtilizationTotal / checkpointQueueSamples : 0,
+    checkpointEstimatedThroughput: checkpointThroughputSamples > 0 ? checkpointThroughputTotal / checkpointThroughputSamples : 0,
+    hordeWaves,
+    hordeDirectionSpawnCounts,
+    hordeDirectionKillCounts,
+    hordeFinalWaveSpawnTotal,
+    hordeFinalWaveKillTotal,
+    hordeFinalDefeatedTurn,
+    hordeTurnsAfterFinal: turnsAfterFinalHorde,
+    hordeMultiFrontCheckpointLosses,
+    hordeMultiFrontFallbacks,
     failure: input.failure ? { ...input.failure } : null,
   };
 }
@@ -1205,6 +1458,18 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'guaranteedDefeatWarnings',
   'guaranteedDefeatIgnored',
   'checkpointMovesWithNoSupplyGain',
+  'refineryPowerOutageTurns',
+  'refineryOutageNextTurnFuelShortageTurns',
+  'simpleFarmFoodShortageAvoidanceTurns',
+  'checkpointAverageQueue',
+  'checkpointCapacityUtilization',
+  'checkpointEstimatedThroughput',
+  'hordeFinalWaveSpawnTotal',
+  'hordeFinalWaveKillTotal',
+  'hordeFinalDefeatedTurn',
+  'hordeTurnsAfterFinal',
+  'hordeMultiFrontCheckpointLosses',
+  'hordeMultiFrontFallbacks',
 ];
 
 function percentile(sorted: readonly number[], fraction: number): number {

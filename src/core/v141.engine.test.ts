@@ -10,6 +10,7 @@ import {
 } from './engine';
 import { hexNeighbors, hexWithinBounds } from './hex';
 import { createUnit, populationLedgerTotal, synchronizePopulation } from './state';
+import { singleFinalWave } from './testConfig';
 
 type Snapshot = ReturnType<GameEngine['getState']> extends Readonly<infer State> ? State : never;
 
@@ -24,7 +25,7 @@ function rebalance(state: Snapshot): void {
 
 function quietEngine(seed = 1): GameEngine {
   return new GameEngine(seed, createDefaultConfig({
-    finalHordeTurn: 30,
+    horde: singleFinalWave(30),
     economy: {
       initialZombieCount: 0,
       initialResources: { food: 10_000, civilianGoods: 10_000, militaryGoods: 10_000, fuel: 10_000 },
@@ -200,7 +201,7 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
     const guard = state.units.find((unit) => unit.id === 'national-guard-1')!;
     const police = state.units.find((unit) => unit.id === 'police-1')!;
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
-    guard.position = { q: 0, r: 0 };
+    guard.position = { q: 1, r: 1 };
     guard.currentMilitaryGoods = guard.maxMilitaryGoods;
     police.position = { ...farm.position };
     police.currentMilitaryGoods = 0;
@@ -282,14 +283,14 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
     factory.workers = 1;
     factory.securedOrder = 20;
     factory.populationOperationalTurn = 1;
-    factory.powerSupplyEnabled = false;
+    factory.powerSupplyEnabled = true;
     rebalance(state);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const forecast = forecastEndTurn(engine.getState()).militaryGoods;
-    expect(forecast.projectedProduction).toBe(2);
+    expect(forecast.projectedProduction).toBe(4);
     expect(forecast.units.map((unit) => [unit.unitId, unit.projectedRefillAmount])).toEqual([
-      [guard.id, 1],
-      [police.id, 1],
+      [guard.id, 2],
+      [police.id, 2],
     ]);
     const result = engine.step({ type: 'EndTurn' });
     const producedIndex = result.events.findIndex((event) => event.type === 'resource_produced'
@@ -298,8 +299,8 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
       && event.payload.reason === 'unit_refill');
     expect(producedIndex).toBeGreaterThanOrEqual(0);
     expect(refillIndex).toBeGreaterThan(producedIndex);
-    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(1);
-    expect(result.state.units.find((unit) => unit.id === police.id)?.currentMilitaryGoods).toBe(1);
+    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(2);
+    expect(result.state.units.find((unit) => unit.id === police.id)?.currentMilitaryGoods).toBe(2);
   });
 });
 
