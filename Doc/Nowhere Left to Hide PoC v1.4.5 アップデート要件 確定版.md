@@ -1,4 +1,4 @@
-# Nowhere Left to Hide PoC v1.4.5 アップデート要件 ドラフト
+# Nowhere Left to Hide PoC v1.4.5 アップデート要件 確定版
 
 **Recon-Driven Checkpoint Placement & Human UI Cleanup**
 
@@ -6,9 +6,9 @@
 
 基準バージョン: v1.4.4 / Game Rules 2.4.0
 
-文書状態: Draft — 実装前の仕様整理
+文書状態: Final — 実装目標として確定
 
-| **このドラフトの狙い 経済拡張そのものを罰するのではなく、偵察と安全確認を拡張の前提にする。あわせて、人間向けUIから座標の大量列挙を除去し、情報を「全体状態・盤面状態・選択地点の操作」に分離する。** |
+| **このアップデートの狙い 経済拡張そのものを罰するのではなく、偵察と安全確認を拡張の前提にする。あわせて、人間向けUIから座標の大量列挙を除去し、情報を「全体状態・盤面状態・選択地点の操作」に分離する。** |
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 **要約**
@@ -19,7 +19,9 @@
 
 - 1方向あたりのprepared checkpoint上限を3から5へ変更する（Activeを含む合計5）。
 
-- 偵察必須化に合わせ、初期Civilian Goodsを暫定で+25する。
+- 偵察必須化に合わせ、初期Civilian Goodsを230から255へ増やす。
+
+- FacilityとCheckpointの配置を分離し、施設が存在するヘックスへのCheckpoint新設・移設を禁止する。
 
 - 人間向けUIでは検問所候補座標の一覧を廃止し、内政タブで選択した道路ヘックスに対する局所アクションとして建設を提示する。
 
@@ -58,7 +60,7 @@ v1.4.4の51×51化後は、合法手として供給圏を拡張し、施設を�
 
 - Zombieの基礎性能・感染率・Final Horde構成の弱体化は本アップデートの対象外。
 
-- Balanced Agent等の戦略ロジックを直接修正することは本ドラフトの対象外。
+- Balanced Agent等の戦略ロジックを直接修正することは本アップデートの対象外。新ルール下で既存Agentが技術的失敗なく動作することは確認する。
 
 - Constructible Facilityの全候補表示方式は、今回はCheckpoint UI整理とは切り分ける。
 
@@ -71,34 +73,45 @@ BuildCheckpointおよびRelocateCheckpointの対象座標は、既存の検問�
 1. 対象ヘックスが、指定branchの幹線道路（roadTiles）上にある。
 2. 対象ヘックスが現在のPlayer Visionに含まれている。
 3. 州都側から対象ヘックスまで、同branch上の道路ヘックスが途切れず現在のPlayer Visionに含まれている。
-4. 既存のCheckpoint role / rear-position / Spawn Reserve / occupancy / resource / phase / action-limit等の制約を満たす。
-5. 建設・移設を妨害するZombieが存在する場合、その妨害要因が現在のPlayer Visionで確認でき、かつ確認できる妨害要因が0である。
+4. 対象ヘックスにFacilityが存在しない。恒久／建設可能、所有者、稼働、感染、陥落、建設中、復旧中等の状態を問わず禁止する。
+5. 既存のCheckpoint role / rear-position / Spawn Reserve / occupancy / resource / phase / action-limit等の制約を満たす。
+6. 現行のCheckpoint妨害範囲内に、現在のPlayer Visionで確認できるZombieが0体である。
 
 | **公平性ルール v1.4.5では「隠れたZombieがいるため実行時だけ失敗する」を避ける。Checkpoint placementの妨害判定で建設を拒否できるZombieは、Playerに現在可視な個体に限定する。これにより、合法手の提示と実行結果を一致させる。** |
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 ## 2.2 「州都から対象まで視界が確保」の定義
 
-Draftでは roadBranch.roadTiles が州都側から外側へ並ぶ既存のbranch順序を利用し、対象indexまでの全roadTilesが getPlayerVisibleTileKeys(state) に含まれることを条件とする。
+roadBranch.roadTiles が州都側から外側へ並ぶ既存のbranch順序を利用し、対象indexまでの全roadTilesが getPlayerVisibleTileKeys(state) に含まれることを条件とする。
 
-`targetIndex = branch.roadTiles.indexOf(target)`  
-`routeVisible = branch.roadTiles[0..targetIndex].every(tile => visible.has(hexKey(tile)))`  
-`legal = existingRules && targetVisible && routeVisible && visibleBlockingZombies.length === 0`
+```text
+targetIndex = branch.roadTiles.indexOf(target)
+routeVisible = branch.roadTiles[0..targetIndex].every(tile => visible.has(hexKey(tile)))
+legal = existingRules && targetVisible && routeVisible && visibleBlockingZombies.length === 0
+```
 
-この定義は「一度見たことがある explored」ではなく「現在見えている」を採用する。Drone Baseや部隊配置による継続的なRecon投資を実際の拡張能力へ変換するためである。プレイテストで作業量が過大な場合のみ、route部分をexplored履歴へ緩和する案を代替調整として残す。
+この定義は「一度見たことがある explored」ではなく「現在見えている」を採用する。対象だけでなく経路の全ヘックスが同時にPlayer Visionへ含まれていなければならない。Drone Baseや部隊配置による継続的なRecon投資を実際の拡張能力へ変換するためであり、本要件内ではexplored履歴へ緩和しない。
+
+Actionの基本形式、phase、Game Over、branch存在、対象が当該branchのroadTilesか等の構造的検証を行った後、配置地点に関する複数の不合法理由がある場合はvisibility reasonを優先する。対象自体が未可視なら`checkpoint_target_not_visible`、対象は可視だが州都側からの途中区間に未可視ヘックスがあれば`checkpoint_route_not_visible`とする。経路が可視になるまでは、その先のZombie、Facility、上限、資源等の理由を候補・UIへ露出しない。
 
 ## 2.3 prepared checkpoint上限
 
 config.checkpoint.maxPreparedPostsPerDirection を 3 → 5 に変更する。既存のpreparedPostCountの意味を維持し、Active + Standby の合計上限を5とする。
 
-| **解釈 このドラフトの「5」は Active 1 + reserve最大4 を意味する。もし「Active + reserve 5」を意図する場合は既存config名の意味とずれるため、別フィールドへの変更が必要。** |
+| **解釈 「5」はActive 1基とStandby最大4基を合わせた上限である。Dormantはprepared post数へ含めない。** |
 |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 ## 2.4 初期資源の小幅増加
 
-初期Civilian Goodsを現行値から +25 する。Drone Base 1基分の建設投資を吸収することを主目的とし、Food / Military Goods / Fuelは変更しない。
+初期Civilian Goodsを現行の230から+25し、255とする。Drone Base 1基分の建設投資を吸収することを主目的とし、Food 230 / Military Goods 75 / Fuel 92は変更しない。本要件内で+50への可変調整は行わない。
 
-+25で序盤の偵察投資が依然として重すぎる場合のみ、次の調整候補として+50までをプレイテスト範囲とする。
+## 2.5 FacilityとCheckpointの配置分離
+
+FacilityとCheckpointは独立したタイルを使用する。FacilityStateが存在するヘックスは、BuildCheckpointとRelocateCheckpointの対象外とする。Facilityの状態や所有者による例外は設けない。Constructible Facility側のCheckpoint占有禁止と合わせ、相互の重複配置を認めない。
+
+現行51×51固定マップの4 branchはroadTilesを共有せず、Capital `(25,25)`もbranch roadTilesには含まれないため、1ヘックスからbranchを選択するUIは設けない。選択道路ヘックスからbranchを一意に決定する。
+
+将来、複数の幹線道路が交差するマップを追加する場合、交差点は必ずFacilityタイルとし、CheckpointのBuild／Relocate対象外にする。マップ外へ続く新しい幹線道路だけを避難民流入branchとし、既存幹線道路側のCheckpointを施設陥落時の後退候補とする構造は将来拡張として許容するが、その流入・Fallback仕様自体はv1.4.5の対象外とする。
 
 # 3. 人間向けUI変更
 
@@ -108,11 +121,11 @@ config.checkpoint.maxPreparedPostsPerDirection を 3 → 5 に変更する。既
 
 - 空の道路ヘックス: road selectionとして選択可能。
 
-- 道路上にfacilityがある: facility selectionを優先してよいが、選択タイルのunderlying road candidateを評価し、合法なら同じ建設ボタンを表示する。
+- 道路上にFacilityがある: Facility selectionを優先し、Facility Bottom SheetにはCheckpointのボタンも設置不可理由も表示しない。
 
 - 既存checkpointがある: checkpoint selectionを優先し、新設ボタンは出さない。
 
-- 同一座標が複数branch候補になる場合: 座標一覧には戻さず、合法branchのみの小さなbranch selectorまたは複数のbranch別ボタンを表示する。
+- 現行マップではbranch roadTilesが重複しないため、branch selectorやbranch別複数ボタンは設けない。
 
 ## 3.2 ボタンが出ない場合の説明
 
@@ -135,7 +148,7 @@ config.checkpoint.maxPreparedPostsPerDirection を 3 → 5 に変更する。既
 
 - Buildモード時に盤面へ全candidate markerを描画する方式を廃止する。選択中ヘックスと局所状態だけを強調する。
 
-- RelocateCheckpointは「既存Checkpointを選択 → 移設 → 盤面で移設先を選択」のplacement modeを残してよい。ただしCore側の新しいvisibility gateは適用する。
+- RelocateCheckpointは「既存Checkpointを選択 → 移設 → 盤面で移設先を選択」のplacement modeを維持する。対象branchの合法／不合法候補マーカーは盤面上に維持し、不合法地点を選ぶとCore reasonCodeの理由を表示する。ただし座標テキスト一覧は表示せず、Core側の新しいvisibility gateを適用する。
 
 ## 3.4 電力情報の整理
 
@@ -145,13 +158,19 @@ EndTurn Forecastの electricity.unpoweredFacilities を facilityId + reason の�
 
 - EndTurn Forecast: physical capacity / available capacity / required demand / allocated / shortage を維持。
 
-- 未給電施設: ID一覧は削除し、必要なら件数のみ「未給電見込み: N施設」と表示する。
+- 未給電施設: ID／理由一覧は削除し、件数だけ「未給電見込み: N施設」と表示する。
 
 - 個別Facility sheet: 現行の projectedPowerSupplied / projectedPowerReason の警告を維持する。
 
 ## 3.5 盤面上の未給電マーカー
 
-Required powerを必要とするplayer-owned facilityについて、EndTurn Forecast上で projectedPowerSupplied=false の場合、盤面上に小さな「⚡×」相当のdynamic markerを表示する。専用PNGを追加せず、既存のdynamic label / forecast warning描画で実装可能とする。
+Required Powerのplayer-owned Facilityについて、EndTurn Forecast上で`projectedPowerSupplied=false`の場合、盤面上に小さな文字dynamic marker「⚡×」を表示する。専用PNGは追加しない。
+
+- 現在のPlayer Vision外でも、Player所有施設の行政情報として表示する。
+- Power SupplyをPlayerが明示的にOFFにした施設も対象に含める。
+- Enemy所有または未所有の施設には表示しない。
+- 給電見込みへ戻った時点でマーカーを消す。
+- Facility詳細では`projectedPowerReason`によりOFF、供給不足、Fuel不足等の原因を区別する。
 
 | **表示の意味 電力配分はEndTurn予測を基準にしているため、マーカーの意味は「このターンを終了した場合、必要電力が供給されない見込み」。単なる現在状態と誤認させないよう、tooltip/施設詳細では「未給電見込み」と表記する。** |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -164,7 +183,7 @@ Human UI側で独自にvisibility条件を再実装せず、getCheckpointPositio
 
 ## 4.2 Candidate APIの互換方針
 
-Agent APIでは、既存の「全road tileをcandidateとして返す」形をv1.4.5でも維持してよい。各candidateの legal / reasonCode を新ルールで更新し、AIがなぜ合法でないかを判断できるようにする。Human UIだけが大量列挙をやめる。
+Agent APIでは、既存の「全road tileをcandidateとして返す」形をv1.4.5でも維持する。各candidateの legal / reasonCode を公開情報に基づく新ルールで更新し、AIがなぜ合法でないかを判断できるようにする。Human UIだけが大量列挙をやめる。`getLegalActions()`は従来どおり合法Actionだけを返す。
 
 推奨する追加reasonCode（名称は実装時に既存命名規則へ合わせる）:
 
@@ -172,30 +191,37 @@ Agent APIでは、既存の「全road tileをcandidateとして返す」形をv1
 
 - checkpoint_route_not_visible
 
-- checkpoint_visible_zombie_blocker
+- checkpoint_supply_zombie_blocked（既存codeを再利用）
 
-- checkpoint_prepared_post_limit（既存codeがあれば再利用）
+- checkpoint_prepared_post_limit_reached（既存codeを再利用）
+
+- checkpoint_facility_occupied（新規。名称は実装の既存命名規則に合わせて最終調整可）
 
 候補の理由からhidden Zombie identity・座標・存在を推測できる情報は返さない。routeが可視でない場合は、まずvisibility reasonを返し、その先のhidden occupancy検査結果を露出しない。
 
 ## 4.3 Versioning案
 
-| **項目**                | **Draft**                                                                                                                      |
-|-------------------------|--------------------------------------------------------------------------------------------------------------------------------|
-| APP_VERSION             | 1.4.5                                                                                                                          |
-| GAME_RULES_VERSION      | 2.5.0（Checkpoint legalityと初期経済値が変わるため）                                                                           |
-| SAVE_FORMAT_VERSION     | 9維持を第一候補。新しい永続stateを追加しない場合は変更不要。                                                                   |
-| AGENT / OBSERVATION API | reasonCode追加だけなら6.1.0相当のminor bumpを推奨。schemaを変えない方針なら6.0.0維持も可能だが、意味論変更を明示する方が安全。 |
+| **項目**                            | **v1.4.5確定値**                                                     |
+|-------------------------------------|-----------------------------------------------------------------------|
+| APP_VERSION                         | 1.4.5                                                                 |
+| GAME_RULES_VERSION                  | 2.5.0                                                                 |
+| SAVE_FORMAT_VERSION                 | 9維持                                                                 |
+| AGENT / OBSERVATION / BRIDGE API    | 6.1.0                                                                 |
+| ARTIFACT_SCHEMA_VERSION             | 5.0.0維持                                                             |
+| CHECKPOINT_SCHEMA_VERSION           | 2.0.0維持                                                             |
+| SESSION_SCHEMA_VERSION              | 2.0.0維持                                                             |
+
+新しい永続フィールドやJSON構造は追加しない。v1.4.4以前のSave／Replay／Artifact／Session／Checkpointは暗黙変換せず、Game Rules Version等の不一致として状態を変更せずに拒否する。
 
 # 5. 実装タッチポイント
 
 | **ファイル**           | **変更概要**                                                                                                                  |
 |------------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| src/core/engine.ts     | Checkpoint candidate生成・Build/Relocate validationにvisibility corridorとvisible blocker gateを追加。                        |
+| src/core/engine.ts     | Checkpoint candidate生成・Build/Relocate validationにvisibility corridor、全Facilityタイル禁止、visible blocker gateを追加。 |
 | src/core/visibility.ts | 既存 getPlayerVisibleTileKeys を再利用。必要ならbranch route visibilityのpure helperを追加。                                  |
 | src/core/supply.ts     | 既存 getBlockingZombiesForCheckpoint を再利用する場合、UIだけでなくCore合法判定に使える公平な「visible blockers」境界を定義。 |
 | src/core/config.ts     | maxPreparedPostsPerDirection=5、initial Civilian Goods +25。                                                                  |
-| src/ui/controller.ts   | domestic road selection、局所Buildボタン、candidate一覧削除、EndTurn unpowered一覧削除。                                      |
+| src/ui/controller.ts   | domestic road selection、局所Buildボタン、candidate一覧削除、Facility SheetからCheckpoint操作を分離、EndTurn unpowered一覧を件数化。 |
 | src/ui/board.ts        | Build全candidate marker削除、未給電見込みmarker追加。Relocate previewは維持。                                                 |
 | src/ui/i18n.ts         | visibility / blocker / unpowered marker説明用のja/en文言追加。                                                                |
 | Tests                  | checkpointCandidates / engine / controller / board / i18nの期待値を更新。                                                     |
@@ -206,11 +232,15 @@ Agent APIでは、既存の「全road tileをcandidateとして返す」形をv1
 
 - 州都から対象までのroad corridorがすべてvisibleで、既存条件を満たす場合、BuildCheckpointがlegal=true。
 
-- 可視corridor上（または既存blocker判定範囲内）の可視Zombieが妨害する場合、legal=falseかつvisible blocker reasonを返す。
+- 現行Checkpoint妨害範囲内の可視Zombieが妨害する場合、legal=falseかつ既存のZombie blocker reasonを返す。
 
 - 同じ位置にhidden Zombieだけを追加しても、合法手がhidden情報だけを理由に突然失敗しない。
 
 - BuildとRelocateの実行結果はcandidate.legal / reasonCodeと一致し、失敗時にstate/resources/RNGを変更しない。
+
+- Facilityが存在する道路ヘックスは、その状態・所有者を問わずBuild／Relocateともlegal=falseである。
+
+- Constructible FacilityとCheckpointは相互に同一ヘックスへ配置できない。
 
 - prepared postsは各direction 5まで作成でき、6つ目はCoreで拒否される。
 
@@ -218,11 +248,15 @@ Agent APIでは、既存の「全road tileをcandidateとして返す」形をv1
 
 - 未合法roadを選択した場合、Buildボタンは表示されず、短い理由だけが表示される。
 
+- Facilityタイルを選択した場合、Facility SheetにCheckpoint操作と設置不可理由を表示しない。
+
 - Branch Flow / Checkpoint Build UIにq,r候補一覧が存在しない。
 
-- EndTurn Forecastにunpowered facility ID全件列挙が存在しない。
+- Build時は全候補盤面マーカーを表示せず、選択中道路と局所状態だけを強調する。Relocate時は対象branchの合法／不合法盤面マーカーを表示する。
 
-- 未給電見込みのplayer-owned required-power facilityには盤面markerが表示され、給電されると消える。
+- EndTurn Forecastにunpowered Facility ID／理由一覧が存在せず、「未給電見込み: N施設」だけを表示する。
+
+- 未給電見込みのplayer-owned Required Power Facilityには、視界内外およびPower Supply OFFを問わず盤面上に「⚡×」を表示し、給電見込みになると消える。
 
 - Power HUDと個別Facility forecastは従来どおり不足量・理由を確認できる。
 
@@ -242,23 +276,26 @@ Agent APIでは、既存の「全road tileをcandidateとして返す」形をv1
 
 - Human playで「なぜ置けないか」が盤面と1行理由だけで理解できるか。
 
-- AIが候補座標総当たりではなく、vision拡張 → checkpoint建設の順序を取るか。
+- 既存AIが新しい合法手境界で技術的失敗や同一Actionの無限試行を起こさないか。戦略ロジックの変更は本アップデートに含めない。
 
 - T50 Final Horde到達率。v1.4.4のようなT28以前の経済・感染崩壊がどの程度減るか。
 
-# 8. 未決事項（実装前に固定したい点）
+# 8. 確定事項
 
-| **論点**         | **Draft方針 / 判断待ち**                                                                               |
-|------------------|--------------------------------------------------------------------------------------------------------|
-| Route visibility | Draftは「現在visible」を採用。操作量が過大なら、対象hex=current visible / route=exploredへ緩和するか。 |
-| Initial CG       | Draftは+25。初期Drone Base 1基を事実上補助する量として十分か。                                         |
-| Intersections    | 1 hexが複数branchに属する場合のbranch選択UIを、複数ボタンと小型selectorのどちらにするか。              |
-| Unpowered marker | 「⚡×」の文字markerで開始するか、将来専用overlay assetを追加するか。                                   |
-| Relocation UX    | Coreでは同じvisibility gateを適用しつつ、Human UIのrelocation placement modeは現行方式を維持するか。   |
+- Checkpoint経路はexplored履歴ではなく、州都側から対象まで全区間の現在Player Visionを要求する。
+- 隠れたZombieはCheckpointのBuild／Relocateを妨害しない。現行妨害範囲内の可視Zombieだけを判定する。
+- prepared post上限5はActive + Standbyの合計であり、Dormantを含めない。
+- 初期Civilian Goodsは255で固定する。
+- FacilityとCheckpointは同一タイルへ配置しない。
+- 現行マップではbranchを一意に決定し、branch選択UIを設けない。
+- Build候補の座標一覧と全候補盤面マーカーを廃止し、Relocate候補盤面マーカーは維持する。
+- 未給電見込みは盤面上の「⚡×」とEndTurn Forecastの件数で示す。
+- Relocateの操作順は現行方式を維持する。
+- Core、Human UI、Agent API、実行結果で同じ合法判定とreasonCodeを使用する。
 
 # 9. Repository baseline notes
 
-このドラフトは2026-09-03時点の main を基準に作成した。確認に使用した主な実装箇所:
+この確定要件は2026-09-03時点のmainを基準に作成した。確認に使用した主な実装箇所:
 
 - src/agent/types.ts — v1.4.4 / Game Rules 2.4.0 のversion constants。
 

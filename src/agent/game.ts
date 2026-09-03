@@ -236,6 +236,7 @@ function checkpointCandidateProjectionKey(state: Readonly<GameState>): string {
     gameOver: state.gameOver,
     actionBudgetReached: state.actionsTakenThisTurn >= state.config.maxActionsPerTurn,
     civilianGoods: state.resources.civilianGoods,
+    visibleTiles: [...visibleTiles].sort(),
     facilities: state.facilities
       .map((facility) => [facility.id, facility.position.q, facility.position.r] as const)
       .sort((left, right) => left[0].localeCompare(right[0])),

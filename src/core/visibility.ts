@@ -143,6 +143,29 @@ export function getPlayerVisibleTileKeys(state: Readonly<GameState>): Set<string
   return getPlayerVisionCoverage(state).visible;
 }
 
+/**
+ * Checkpoint expansion requires a currently visible road corridor from the
+ * capital-side end of a branch through the requested destination. The
+ * optional set lets candidate enumeration reuse one visibility projection.
+ */
+export function getCheckpointRouteVisibility(
+  state: Readonly<GameState>,
+  branchId: string,
+  target: HexCoord,
+  visibleTileKeys: ReadonlySet<string> = getPlayerVisibleTileKeys(state),
+): { targetVisible: boolean; routeVisible: boolean } {
+  const branch = state.map.roadBranches.find((candidate) => candidate.id === branchId);
+  const targetIndex = branch?.roadTiles.findIndex((tile) => hexKey(tile) === hexKey(target)) ?? -1;
+  if (!branch || targetIndex < 0) return { targetVisible: false, routeVisible: false };
+  const targetVisible = visibleTileKeys.has(hexKey(target));
+  return {
+    targetVisible,
+    routeVisible: targetVisible && branch.roadTiles
+      .slice(0, targetIndex + 1)
+      .every((tile) => visibleTileKeys.has(hexKey(tile))),
+  };
+}
+
 export function isVisibleToPlayer(state: Readonly<GameState>, position: HexCoord): boolean {
   return getPlayerVisibleTileKeys(state).has(hexKey(position));
 }

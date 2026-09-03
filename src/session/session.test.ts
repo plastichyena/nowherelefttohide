@@ -177,7 +177,7 @@ describe('Session hash and input boundaries', () => {
 });
 
 describe('AI Portable Session lifecycle', () => {
-  it('restores v1.4.4 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
+  it('restores v1.4.5 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
     const root = tempRoot('real-wave-resume');
     const api = agentService(root);
     api.newSession({ sessionId: 'real-wave-resume', seed: 71, checkpointInterval: 99 });
@@ -224,10 +224,10 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '2.4.0',
+      gameVersion: '2.5.0',
       mapId: 'fixed-51x51-v1',
       config: {
-        version: '2.4.0',
+        version: '2.5.0',
         mapId: 'fixed-51x51-v1',
         infection: {
           zombieSpawnPopulationPerUnit: 5,
@@ -389,7 +389,7 @@ describe('AI Portable Session lifecycle', () => {
     expect(appVersionOnly.status('build-mismatch').session.appVersion).toBe(APP_VERSION);
   });
 
-  it('explicitly rejects v1.4.3 Session descriptors and Checkpoints without mutating the current Active state', () => {
+  it('explicitly rejects v1.4.4 Session descriptors and Checkpoints without mutating the current Active state', () => {
     const descriptorRoot = tempRoot('v143-descriptor');
     const currentApi = service(descriptorRoot);
     currentApi.newSession({ sessionId: 'v143-descriptor' });
@@ -399,21 +399,17 @@ describe('AI Portable Session lifecycle', () => {
     const { descriptorIntegrityHash: _descriptorIntegrityHash, ...descriptorWithoutHash } = descriptor;
     const legacyDescriptor = {
       ...descriptorWithoutHash,
-      sessionSchemaVersion: '1.0.0',
-      checkpointSchemaVersion: '1.0.0',
-      gameRulesVersion: '2.3.0',
-      saveFormatVersion: 8,
-      artifactSchemaVersion: '4.0.0',
-      agentApiVersion: '5.0.0',
-      observationApiVersion: '5.0.0',
-      bridgeApiVersion: '5.0.0',
-      mapId: 'fixed-31x31-v2',
+      appVersion: '1.4.4',
+      gameRulesVersion: '2.4.0',
+      agentApiVersion: '6.0.0',
+      observationApiVersion: '6.0.0',
+      bridgeApiVersion: '6.0.0',
     };
     writeFileSync(descriptorPath, JSON.stringify({
       ...legacyDescriptor,
       descriptorIntegrityHash: sha256Json(legacyDescriptor),
     }), 'utf8');
-    expect(() => currentApi.status('v143-descriptor')).toThrow(/session schema|schema/i);
+    expect(() => currentApi.status('v143-descriptor')).toThrow(/gameRulesVersion|version/i);
     // A descriptor version mismatch intentionally prevents every normal
     // SessionStore read. Restore the test fixture only after the rejected
     // read, then prove that Active was never rewritten by it.
@@ -423,7 +419,7 @@ describe('AI Portable Session lifecycle', () => {
     const checkpointRoot = tempRoot('v143-checkpoint');
     const checkpointApi = service(checkpointRoot);
     checkpointApi.newSession({ sessionId: 'v143-checkpoint' });
-    checkpointApi.step('v143-checkpoint', { action: { type: 'EndTurn' }, decisionSummary: 'create v1.4.4 checkpoint' });
+    checkpointApi.step('v143-checkpoint', { action: { type: 'EndTurn' }, decisionSummary: 'create current checkpoint' });
     const checkpoint = checkpointApi.saveCheckpoint('v143-checkpoint');
     const activeBeforeCheckpointRejection = checkpointApi.store.load('v143-checkpoint').active;
     const checkpointPath = join(checkpointRoot, 'v143-checkpoint', 'checkpoints', `${checkpoint.checkpointId}.meta.json`);
@@ -431,21 +427,17 @@ describe('AI Portable Session lifecycle', () => {
     const { metadataIntegrityHash: _metadataIntegrityHash, ...metadataWithoutHash } = metadata;
     const legacyMetadata = {
       ...metadataWithoutHash,
-      checkpointSchemaVersion: '1.0.0',
-      sessionSchemaVersion: '1.0.0',
-      gameRulesVersion: '2.3.0',
-      saveFormatVersion: 8,
-      artifactSchemaVersion: '4.0.0',
-      agentApiVersion: '5.0.0',
-      observationApiVersion: '5.0.0',
-      bridgeApiVersion: '5.0.0',
-      mapId: 'fixed-31x31-v2',
+      appVersion: '1.4.4',
+      gameRulesVersion: '2.4.0',
+      agentApiVersion: '6.0.0',
+      observationApiVersion: '6.0.0',
+      bridgeApiVersion: '6.0.0',
     };
     writeFileSync(checkpointPath, JSON.stringify({
       ...legacyMetadata,
       metadataIntegrityHash: sha256Json(legacyMetadata),
     }), 'utf8');
-    expect(() => checkpointApi.loadCheckpoint('v143-checkpoint', checkpoint.checkpointId, 'v143-child')).toThrow(/Checkpoint schema|schema/i);
+    expect(() => checkpointApi.loadCheckpoint('v143-checkpoint', checkpoint.checkpointId, 'v143-child')).toThrow(/Checkpoint .*does not match Session|version/i);
     expect(checkpointApi.store.load('v143-checkpoint').active).toEqual(activeBeforeCheckpointRejection);
   });
 

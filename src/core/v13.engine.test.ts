@@ -4,6 +4,8 @@ import { singleFinalWave } from './testConfig';
 import { deriveVictoryProgress, GameEngine } from './engine';
 import { hexKey, hexNeighbors } from './hex';
 import { createUnit } from './state';
+import { isHexSuppliedByBranch } from './supply';
+import { getPlayerVisibleTileKeys } from './visibility';
 import type { GameState } from './types';
 
 describe('v1.4 zombie, Final Horde and victory flow', () => {
@@ -153,13 +155,34 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
   });
 
   it('allows checkpoint expansion when its only blocker is a hidden zombie', () => {
-    const config = createDefaultConfig({ units: { police: { vision: 0 }, nationalGuard: { vision: 0 } } });
+    const config = createDefaultConfig({
+      units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
+      vision: { capital: 50 },
+    });
     const engine = new GameEngine(17, config);
     const editable = JSON.parse(JSON.stringify(engine.getState()));
     editable.units = editable.units.filter((unit: { isPlayerUnit: boolean }) => unit.isPlayerUnit);
-    editable.units.push(createUnit(editable, 'zombie-hidden', 'zombie', { q: 25, r: 1 }));
+    const target = { q: 25, r: 1 };
+    const visible = getPlayerVisibleTileKeys(editable);
+    const occupied = new Set([
+      ...editable.facilities.map((facility: { position: { q: number; r: number } }) => hexKey(facility.position)),
+      ...editable.units.map((unit: { position: { q: number; r: number } }) => hexKey(unit.position)),
+    ]);
+    const hiddenBlocker = editable.map.tiles.find((tile: {
+      key: string;
+      playerOccupancyAllowed: boolean;
+      hordeEntranceDirections: string[];
+      q: number;
+      r: number;
+    }) => !visible.has(tile.key)
+      && tile.playerOccupancyAllowed
+      && !occupied.has(tile.key)
+      && tile.hordeEntranceDirections.length === 0
+      && isHexSuppliedByBranch(editable, tile, 'north', target));
+    expect(hiddenBlocker).toBeDefined();
+    editable.units.push(createUnit(editable, 'zombie-hidden', 'zombie', hiddenBlocker!));
     expect(engine.step({ type: 'LoadSnapshot', snapshot: editable }).error).toBeNull();
-    const action = { type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 1 } } as const;
+    const action = { type: 'BuildCheckpoint', branchId: 'north', position: target } as const;
     expect(engine.getLegalActions()).toContainEqual(action);
     expect(engine.step(action).error).toBeNull();
   });

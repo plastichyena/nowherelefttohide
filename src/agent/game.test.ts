@@ -7,7 +7,7 @@ import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.4.4');
+    expect(APP_VERSION).toBe('1.4.5');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -32,7 +32,7 @@ describe('AgentGame public boundary', () => {
     expect(first.roadBranches.every((branch) =>
       branch.currentPolicy === 'normal' &&
       branch.preparedPostCount === 0 &&
-      branch.preparedPostLimit === 3 &&
+      branch.preparedPostLimit === 5 &&
       branch.standbyCheckpointIds.length === 0 &&
       branch.dormantCheckpointIds.length === 0 &&
       branch.fallbackAvailable === false,
@@ -69,7 +69,45 @@ describe('AgentGame public boundary', () => {
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.4.4 API, checkpoint candidates, logistics rules, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
+  it('invalidates checkpoint candidate projections when Drone Base vision changes', () => {
+    const game = createAgentGame();
+    game.reset({ seed: 1423, agent: { id: 'vision-cache-test' } });
+    const build = game.getLegalActions().find(
+      (action): action is Extract<GameAction, { type: 'BuildConstructibleFacility' }> =>
+        action.type === 'BuildConstructibleFacility' && action.facilityType === 'civilianDroneBase',
+    );
+    expect(build).toBeDefined();
+    expect(game.step(build!).error).toBeNull();
+    expect(game.step({ type: 'EndTurn' }).error).toBeNull();
+
+    const drone = game.getObservation().facilities.find(
+      (facility) => facility.type === 'civilianDroneBase',
+    );
+    expect(drone).toBeDefined();
+    const assign = game.getLegalActions().find(
+      (action): action is Extract<GameAction, { type: 'AssignWorkers' }> =>
+        action.type === 'AssignWorkers' && action.facilityId === drone!.id && action.workers === 5,
+    );
+    expect(assign).toBeDefined();
+    expect(game.step(assign!).error).toBeNull();
+    expect(game.step({ type: 'EndTurn' }).error).toBeNull();
+
+    const powered = game.getObservation();
+    const toggleOff = game.getLegalActions().find(
+      (action): action is Extract<GameAction, { type: 'SetPowerSupply' }> =>
+        action.type === 'SetPowerSupply' && action.facilityId === drone!.id && action.enabled === false,
+    );
+    expect(toggleOff).toBeDefined();
+    const unpowered = game.step(toggleOff!).observation;
+    expect(unpowered.map.tiles.filter((tile) => tile.visibleToPlayer).length)
+      .toBeLessThan(powered.map.tiles.filter((tile) => tile.visibleToPlayer).length);
+    expect(unpowered.checkpointPositionCandidates).not.toEqual(powered.checkpointPositionCandidates);
+    expect(powered.checkpointPositionCandidates.some((candidate, index) =>
+      candidate.reasonCode !== unpowered.checkpointPositionCandidates[index]?.reasonCode,
+    )).toBe(true);
+  });
+
+  it('describes the v1.4.5 API, checkpoint candidates, logistics rules, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
@@ -120,10 +158,13 @@ describe('AgentGame public boundary', () => {
       fairPlay: { hiddenEnemiesBlock: false, blockerUnitIdsPublic: false },
     });
     expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('checkpoint_supply_zombie_blocked');
+    expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('checkpoint_target_not_visible');
+    expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('checkpoint_route_not_visible');
+    expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('checkpoint_facility_occupied');
     expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('horde_spawn_reserve');
     expect(info.rules.checkpoint).toMatchObject({
       activePerBranchLimit: 1,
-      preparedPostLimit: 3,
+      preparedPostLimit: 5,
       screeningCapacity: 20,
       estimatedScreeningThroughputByPolicy: { passThrough: 20, normal: 10, strict: 4 },
       queuePressureThresholds: {

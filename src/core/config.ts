@@ -15,7 +15,7 @@ import type {
 } from './types';
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 
-export const CONFIG_VERSION = '2.4.0';
+export const CONFIG_VERSION = '2.5.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v1';
 
 const facilityIds: FacilityId[] = [
@@ -168,7 +168,7 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
 
 const initialResources: ResourceStock = {
   food: 230,
-  civilianGoods: 230,
+  civilianGoods: 255,
   militaryGoods: 75,
   fuel: 92,
 };
@@ -298,7 +298,7 @@ export const DEFAULT_CONFIG: GameConfig = {
     constructionCivilianGoods: 5,
     subsequentConstructionCivilianGoods: 25,
     relocationCivilianGoods: 25,
-    maxPreparedPostsPerDirection: 3,
+    maxPreparedPostsPerDirection: 5,
     requiresPolice: false,
     consumesPower: false,
     initialSupplyRadius: 5,
@@ -398,7 +398,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('mapId must be a non-empty string');
   }
   if (Object.prototype.hasOwnProperty.call(config as unknown as Record<string, unknown>, 'finalHordeTurn')) {
-    errors.push('finalHordeTurn is not part of Game Rules 2.4.0; derive it from the Final Wave');
+    errors.push(`finalHordeTurn is not part of Game Rules ${CONFIG_VERSION}; derive it from the Final Wave`);
   }
   requireInteger(errors, config.maxActionsPerTurn, 'maxActionsPerTurn', 1);
 
@@ -610,7 +610,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   } else {
     for (const retiredField of ['cycle', 'periodicInitial', 'periodicIncrement', 'warningStartTurn', 'spawnOnlyBeforeFinalTurn', 'finalComposition']) {
       if (Object.prototype.hasOwnProperty.call(horde as unknown as Record<string, unknown>, retiredField)) {
-        errors.push(`horde.${retiredField} is not supported by Game Rules 2.4.0`);
+        errors.push(`horde.${retiredField} is not supported by Game Rules ${CONFIG_VERSION}`);
       }
     }
     requireInteger(errors, horde.warningLeadTurns, 'horde.warningLeadTurns', 1);

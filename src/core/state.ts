@@ -23,7 +23,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '2.4.0';
+export const GAME_VERSION = '2.5.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 

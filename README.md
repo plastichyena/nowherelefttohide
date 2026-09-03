@@ -29,7 +29,7 @@
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 - 1回のAI応答をまたいで継続できるActive Session、Public Decision Log、履歴Checkpoint、分岐Session、7コマンドCLI
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.4.4の実装目標は [`Doc/Nowhere Left to Hide PoC v1.4.4 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.4.4%20アップデート要件%20確定版.md) です。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.4.5の実装目標は [`Doc/Nowhere Left to Hide PoC v1.4.5 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.4.5%20アップデート要件%20確定版.md) です。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## ローカルで起動する
 
@@ -61,7 +61,7 @@ Open https://plastichyena.github.io/nowherelefttohide/ and use the documented wi
 
 公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact` だけです。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・Checkpoint候補Schema／Reason Code・生産/電力の静的ルールを返します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
 
-v1.4.4ではHuman UIとAgentが同じCore Visibilityを使い、Ground VisionはForest／Mountainで遮蔽され、Civilian Drone BaseのAerial Visionは遮蔽を無視します。ObservationはGround／Aerial種別と最新50件の重要Site Eventを返します。初期Normal ZombieはSeedから決定的に配置される25体で、Police Zombie／Soldier Zombieを含む敵は可視時だけ公開します。Checkpointの拒絶Counterと将来Horde増援数は非公開であり、Turn Awayの定性的なTrade-offだけを公開します。Policeは`medium`、National Guardは`large`だけを公開し、正確なRadius、Hidden Enemyの反応数・ID・Target・非可視Spawn位置は公開しません。
+v1.4.5ではHuman UIとAgentが同じCore Visibilityを使い、Checkpointの新設・移設には対象地点と州都側からの幹線道路全区間の現在視界が必要です。Hidden Zombieは候補や実行を妨害せず、可視Zombieだけが妨害理由になります。Ground VisionはForest／Mountainで遮蔽され、Civilian Drone BaseのAerial Visionは遮蔽を無視します。ObservationはGround／Aerial種別と最新50件の重要Site Eventを返します。初期Normal ZombieはSeedから決定的に配置される25体で、Police Zombie／Soldier Zombieを含む敵は可視時だけ公開します。Checkpointの拒絶Counterと将来Horde増援数は非公開であり、Turn Awayの定性的なTrade-offだけを公開します。Policeは`medium`、National Guardは`large`だけを公開し、正確なRadius、Hidden Enemyの反応数・ID・Target・非可視Spawn位置は公開しません。
 
 ## Agent Simulation CLI
 
@@ -140,7 +140,7 @@ Turn 50に4方向からHorde Zombie 16体とNormal Zombie 28体の合計44体か
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Build・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.4.4`、Game Rules / GameState / Configは `2.4.0`、Fixed Mapは `fixed-51x51-v1`、Agent / Observation / Browser Bridge APIは `6.0.0`、Artifact Schemaは `5.0.0`、Checkpoint／Session Schemaは`2.0.0`、Balanced Agentは`4.4.0`、Random Agentは`2.3.0`です。v1.4.3以前のSave、Replay、Artifact、Session、Checkpointは変換せず拒否します。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Build・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.4.5`、Game Rules / GameState / Configは `2.5.0`、Fixed Mapは `fixed-51x51-v1`、Agent / Observation / Browser Bridge APIは `6.1.0`、Artifact Schemaは `5.0.0`、Checkpoint／Session Schemaは`2.0.0`、Balanced Agentは`4.4.0`、Random Agentは`2.3.0`です。v1.4.4以前のSave、Replay、Artifact、Session、Checkpointは変換せず拒否します。
 
 ## CoreとHeadless API
 
@@ -165,7 +165,7 @@ UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` �
 
 ## 保存と復元
 
-確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。App／Release `1.4.4`、Game Rules／State／Config `2.4.0`、Save Format `9`と新しいAutosave Namespaceを使用します。Save 9はFixed Map 51×51、Seed付き初期Zombie、Rejected Counter、Police／Soldier Zombie、Checkpoint初回Build履歴、PRNG、Config完全コピーを検証し、導出値は復元時に再計算します。v1.4.3以前のSave、Replay、Artifact、Session、Checkpointは変換せず、現在状態と元データを変更しないままVersion不一致として拒否します。
+確定したActionまたはターン終了時にローカル領域へ自動保存します。タイトル画面から続きのゲームを読み込めます。App／Release `1.4.5`、Game Rules／State／Config `2.5.0`、Save Format `9`を使用します。Save 9はFixed Map 51×51、Seed付き初期Zombie、Rejected Counter、Police／Soldier Zombie、Checkpoint初回Build履歴、PRNG、Config完全コピーを検証し、導出値は復元時に再計算します。v1.4.4以前のSave、Replay、Artifact、Session、Checkpointは変換せず、現在状態と元データを変更しないままVersion不一致として拒否します。
 
 ## テスト
 
@@ -174,7 +174,7 @@ npm run typecheck
 npm test
 npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --summary-only --out=output/simulations/random-smoke --overwrite
 npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --summary-only --out=output/simulations/balanced-smoke --overwrite
-npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=300 --seed=1 --summary-only --out=output/simulations/v1.4.4-balanced-300 --overwrite
+npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=300 --seed=1 --summary-only --out=output/simulations/v1.4.5-balanced-300 --overwrite
 npm run build
 npm run test:browser-bridge
 ```
@@ -185,7 +185,7 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 
 `test:random`と`test:balanced`は標準ConfigのSeed群を共通Batch CLIで実行します。通常CIはUnit／Invariant、Observation境界、Replay、Production Bridge smokeを検証し、固定Seed Batchは手動Release検証へ分離します。
 
-`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.4.4手動Release検証として、v1.4.3 stable commitの同Seed／同上限の基準Batch、v1.4.4感度Batch、標準Random 100ゲーム、標準Balanced 300ゲームを実行します。Balanced検証はSeed `1..100`、`101..200`、`201..300`の3並列Jobに分け、比較可能なJSON／CSV ReportをArtifactへ保存します。
+`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.4.5手動Release検証として、v1.4.4 stable commitの同Seed／同上限の基準Batch、標準Random 100ゲーム、標準Balanced 300ゲームを実行します。Balanced検証はSeed `1..100`、`101..200`、`201..300`の3並列Jobに分け、比較可能なJSON／CSV ReportをArtifactへ保存します。
 
 ## GitHub ActionsとPages
 
@@ -201,7 +201,7 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 
 Workflowは`actions/configure-pages`でPagesの有効化を要求し、相対asset URLで生成した`dist`を公開します。リポジトリ/組織ポリシーが自動有効化を拒否した場合だけ、Pages設定のSourceを「GitHub Actions」に変更してください。
 
-Pages公開後は実ブラウザでゲームURLを開き、`window.NLTH`をSeed 1でGame Overまで実行します。`appVersion` 1.4.4、各6.0.0 API、Artifact 5.0.0、51×51 Map、Ground／Aerial Vision、Turn Awayの公開境界、重要Site Event、`verificationEvents`とHidden Spawn／Rejected Counter情報の非公開、Action列Replay一致を確認します。勝利は合格条件ではありません。
+Pages公開後は実ブラウザでゲームURLを開き、`window.NLTH`をSeed 1でGame Overまで実行します。`appVersion` 1.4.5、各6.1.0 API、Artifact 5.0.0、51×51 Map、Checkpoint偵察ゲート、Ground／Aerial Vision、Turn Awayの公開境界、重要Site Event、`verificationEvents`とHidden Spawn／Rejected Counter情報の非公開、Action列Replay一致を確認します。勝利は合格条件ではありません。
 
 ## 実機確認条件と既知の問題
 

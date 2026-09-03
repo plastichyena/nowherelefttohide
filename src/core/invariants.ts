@@ -451,6 +451,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     errors.push('A defeated Final Horde cannot have surviving members');
   }
 
+  const facilityTiles = new Set(state.facilities.map((facility) => hexKey(facility.position)));
   const checkpointTiles = new Set<string>();
   const checkpointIds = new Set<string>();
   for (const checkpoint of state.checkpoints) {
@@ -459,6 +460,9 @@ export function validateInvariants(state: GameState): InvariantResult {
       errors.push(`Duplicate checkpoint tile ${key}`);
     }
     checkpointTiles.add(key);
+    if (facilityTiles.has(key)) {
+      errors.push(`Checkpoint ${checkpoint.id} cannot share facility tile ${key}`);
+    }
     if (checkpointIds.has(checkpoint.id)) errors.push(`Duplicate checkpoint id ${checkpoint.id}`);
     checkpointIds.add(checkpoint.id);
     if (!isRoad(state.map, checkpoint.position)) {

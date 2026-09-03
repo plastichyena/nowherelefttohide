@@ -11,12 +11,12 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.4.4 saves. */
+/** The sole game-rules version accepted by v1.4.5 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
 export const SAVE_FORMAT_VERSION = 9;
-/** v1.4.4 never writes to an earlier autosave namespace. */
+/** v1.4.5 never writes to an earlier autosave namespace. */
 export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v9';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
 export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v8';
@@ -28,7 +28,7 @@ const OLDER_AUTOSAVE_KEYS = [
   'nowhere-left-to-hide:auto-save:v3',
   'nowhere-left-to-hide:auto-save:v2',
 ] as const;
-/** Deprecated metadata exports. They are never migration targets in v1.4.4. */
+/** Deprecated metadata exports. They are never migration targets in v1.4.5. */
 export const V125_GAME_VERSION = '1.2.0';
 export const V126_GAME_VERSION = '1.2.1';
 export const LEGACY_GAME_VERSION = V125_GAME_VERSION;
@@ -430,7 +430,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.4.3 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.4.4 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -522,7 +522,7 @@ function hasCanonicalDirectionOrder(directions: unknown[]): boolean {
 }
 
 /**
- * Reject obsolete or partial v1.4.4 container shapes before casting. The core
+ * Reject obsolete or partial v1.4.5 container shapes before casting. The core
  * invariant checker performs relational validation; this guard makes the Wave
  * schedule, reserved map perimeter, and warning state an explicit save
  * boundary instead of silently accepting a partial snapshot.
@@ -1058,7 +1058,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.3以前 / v1.4.3 and earlier saves cannot be loaded or converted; Save Format 8 or below is rejected without conversion, deletion, or overwrite`);
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.4以前 / v1.4.4 and earlier saves cannot be loaded or converted; earlier formats are rejected without conversion, deletion, or overwrite`);
   }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (value.mapId !== FIXED_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID}`);
@@ -1097,14 +1097,14 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   return { valid: true, errors: [], state: clone(state), envelope };
 }
 
-/** Create a checksummed, URL-safe v1.4.4 Save Format 9 code. */
+/** Create a checksummed, URL-safe v1.4.5 Save Format 9 code. */
 export function encodeSaveCode(state: GameState): string {
   const errors = validateStateForSave(state);
   if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
   return toBase64Url(gzipSync(strToU8(canonicalJson(makeEnvelope(state))), { level: 9 }));
 }
 
-/** Decode and validate a v1.4.4 save code without changing caller-owned state. */
+/** Decode and validate a v1.4.5 save code without changing caller-owned state. */
 export function decodeSaveCode(code: string): SaveValidationResult {
   if (typeof code !== 'string' || code.trim().length === 0) return reject(['Save code is empty']);
   try {
@@ -1194,7 +1194,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the v1.4.4/v9 key; legacy data is deliberately preserved. */
+  /** Clears only the current v1.4.5/v9 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

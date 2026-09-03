@@ -5,12 +5,18 @@ import {
   validateGameConfig,
 } from './config';
 
-describe('v1.4.4 GameConfig', () => {
+describe('v1.4.5 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('2.4.0');
+    expect(DEFAULT_CONFIG.version).toBe('2.5.0');
     expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v1');
     expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(25);
+    expect(DEFAULT_CONFIG.economy.initialResources).toMatchObject({
+      food: 230,
+      civilianGoods: 255,
+      militaryGoods: 75,
+      fuel: 92,
+    });
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(10);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, outputs: { food: 10 }, powerMode: 'required' });
     expect(DEFAULT_CONFIG.facilities.refinery.production).toMatchObject({ outputs: { fuel: 5 }, powerMode: 'required', powerCapacity: 5 });
@@ -38,7 +44,7 @@ describe('v1.4.4 GameConfig', () => {
       constructionCivilianGoods: 5,
       subsequentConstructionCivilianGoods: 25,
       relocationCivilianGoods: 25,
-      maxPreparedPostsPerDirection: 3,
+      maxPreparedPostsPerDirection: 5,
       requiresPolice: false,
       initialSupplyRadius: 5,
     });

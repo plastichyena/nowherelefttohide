@@ -42,7 +42,7 @@ jobs:
         # The 30-seed regression file is covered by the stricter 1..100 matrix
         # below. Keeping it out of this job prevents slow seeds from timing out
         # while preserving the exact fixed-seed release gate.
-        run: npx --no-install vitest run --exclude src/agent/balancedAgent.batch.test.ts
+        run: npx --no-install vitest run --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts
 
       - name: Build production bundle
         run: npm run build
@@ -81,7 +81,7 @@ jobs:
     name: Deploy to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Long fixed-seed release batches live in the separately dispatched
-    # v1.4.4 Release Validation workflow and never delay Pages or AI Portable.
+    # v1.4.5 Release Validation workflow and never delay Pages or AI Portable.
     needs: verify
     runs-on: ubuntu-latest
     permissions:

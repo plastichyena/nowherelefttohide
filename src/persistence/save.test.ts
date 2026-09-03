@@ -71,7 +71,7 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.4.4 Save Format 9', () => {
+describe('v1.4.5 Save Format 9', () => {
   it('round-trips a detached complete Save Format 9 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
@@ -93,15 +93,15 @@ describe('v1.4.4 Save Format 9', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('writes the v1.4.4 version boundaries and complete v1.4.4 Config / Statistics / Event state', () => {
+  it('writes the v1.4.5 version boundaries and complete v1.4.5 Config / Statistics / Event state', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
     expect(envelope.formatVersion).toBe(9);
-    expect(envelope.gameVersion).toBe('2.4.0');
-    expect(config.version).toBe('2.4.0');
+    expect(envelope.gameVersion).toBe('2.5.0');
+    expect(config.version).toBe('2.5.0');
     expect(config.mapId).toBe('fixed-51x51-v1');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
@@ -130,7 +130,7 @@ describe('v1.4.4 Save Format 9', () => {
     });
   });
 
-  it('requires the Wave Config, Horde State, Horde Spawn Reserve, and v1.4.4 Statistics shape', () => {
+  it('requires the Wave Config, Horde State, Horde Spawn Reserve, and current Statistics shape', () => {
     const envelope = exportedEnvelope(initialState(17));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
@@ -149,7 +149,7 @@ describe('v1.4.4 Save Format 9', () => {
     expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|hordeSpawnReserve|playerOccupancyAllowed|noiseRespawnAttempts/i);
   });
 
-  it('requires v1.4.4 Checkpoint history, Rejected Refugee counters, and reanimation statistics', () => {
+  it('requires current Checkpoint history, Rejected Refugee counters, and reanimation statistics', () => {
     const envelope = exportedEnvelope(initialState(18));
     const state = envelope.state as Record<string, unknown>;
     delete state.rejectedRefugeesByDirection;
@@ -199,7 +199,7 @@ describe('v1.4.4 Save Format 9', () => {
     expect(decodeSaveCode(encodeSaveCode(state)).state).toEqual(state);
   });
 
-  it('preserves v1.4.4 overrun Event payloads and derived Statistics without adding UI-only state', () => {
+  it('preserves current overrun Event payloads and derived Statistics without adding UI-only state', () => {
     const state = initialState(51);
     state.events.push({
       id: 'event-999',
@@ -311,22 +311,22 @@ describe('v1.4.4 Save Format 9', () => {
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
     expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.3\.0/i);
-    expect(result.errors.join(' ')).toContain('v1.4.3 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toContain('v1.4.4 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 
   it('rejects a stale state/config version even when the envelope has Save Format 9', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
-    state.gameVersion = '2.2.0';
-    (state.config as Record<string, unknown>).version = '2.2.0';
+    state.gameVersion = '2.4.0';
+    (state.config as Record<string, unknown>).version = '2.4.0';
     const result = importSaveJson(JSON.stringify(resign(envelope)));
 
     expect(result).toMatchObject({ valid: false, state: null, envelope: null });
     expect(result.errors.join(' ')).toMatch(/incompatible/i);
   });
 
-  it('rejects a partial v1.4.4 schema rather than treating it as a migration candidate', () => {
+  it('rejects a partial current schema rather than treating it as a migration candidate', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     delete (state.horde as Record<string, unknown>).finalHordeStatus;

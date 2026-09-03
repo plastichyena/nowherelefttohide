@@ -34,13 +34,13 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.4.4 has no compatibility or migration path for v1.4.3 data. */
-export const APP_VERSION = '1.4.4';
-export const GAME_RULES_VERSION = '2.4.0';
+/** v1.4.5 has no compatibility or migration path for v1.4.4-or-earlier data. */
+export const APP_VERSION = '1.4.5';
+export const GAME_RULES_VERSION = '2.5.0';
 export const SAVE_FORMAT_VERSION = '9';
-export const AGENT_API_VERSION = '6.0.0';
-export const OBSERVATION_API_VERSION = '6.0.0';
-export const BRIDGE_API_VERSION = '6.0.0';
+export const AGENT_API_VERSION = '6.1.0';
+export const OBSERVATION_API_VERSION = '6.1.0';
+export const BRIDGE_API_VERSION = '6.1.0';
 export const BALANCED_AGENT_VERSION = '4.4.0';
 export const RANDOM_AGENT_VERSION = '2.3.0';
 export const ARTIFACT_SCHEMA_VERSION = '5.0.0';

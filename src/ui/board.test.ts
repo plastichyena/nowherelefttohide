@@ -24,8 +24,10 @@ import {
   hordeWarningTileKeys,
   projectWorldToScreen,
   roadTextureRotations,
+  shouldShowUnpoweredFacilityMarker,
   spawnReserveTileKeys,
   supplyBoundaryEdges,
+  UNPOWERED_FACILITY_MARKER,
   visionOverlayState,
 } from './board';
 import { createFixedMap } from '../core/map';
@@ -44,7 +46,7 @@ describe('Phaser board asset boundary helpers', () => {
     ]);
   });
 
-  it('uses the v1.4.4 mobile camera bounds', () => {
+  it('uses the v1.4.5 mobile camera bounds', () => {
     expect(BOARD_MIN_ZOOM).toBe(0.35);
     expect(BOARD_MAX_ZOOM).toBe(2.2);
   });
@@ -142,6 +144,18 @@ describe('Phaser board asset boundary helpers', () => {
     expect(invalid.color).not.toBe(legal.color);
     expect(invalid.lineWidth).not.toBe(legal.lineWidth);
     expect(selectedInvalid.lineWidth).toBeGreaterThan(invalid.lineWidth);
+  });
+
+  it('shows the projected power marker only for player-owned Required facilities', () => {
+    const unavailable = { powerMode: 'required' as const, projectedPowerSupplied: false };
+    const supplied = { powerMode: 'required' as const, projectedPowerSupplied: true };
+    const excluded = { powerMode: 'none' as const, projectedPowerSupplied: false };
+
+    expect(UNPOWERED_FACILITY_MARKER).toBe('⚡×');
+    expect(shouldShowUnpoweredFacilityMarker({ owner: 'player' }, unavailable)).toBe(true);
+    expect(shouldShowUnpoweredFacilityMarker({ owner: 'player' }, supplied)).toBe(false);
+    expect(shouldShowUnpoweredFacilityMarker({ owner: 'player' }, excluded)).toBe(false);
+    expect(shouldShowUnpoweredFacilityMarker({ owner: 'none' }, unavailable)).toBe(false);
   });
 
   it('does not draw the shared edge between adjacent supplied Hexes', () => {

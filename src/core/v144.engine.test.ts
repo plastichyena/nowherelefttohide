@@ -30,17 +30,18 @@ function noInitialZombies() {
       initialZombieCount: 0,
       initialResources: { food: 5_000, civilianGoods: 5_000, militaryGoods: 5_000, fuel: 5_000 },
     },
+    vision: { capital: 30 },
   });
 }
 
-describe('v1.4.4 checkpoint and rejection rules', () => {
-  it('does not build a fourth prepared post when a branch has no Active checkpoint', () => {
+describe('v1.4.5 checkpoint and rejection rules', () => {
+  it('does not build a sixth prepared post when a branch has no Active checkpoint', () => {
     const engine = new GameEngine(14408, noInitialZombies());
     const snapshot = engine.getState() as Snapshot;
     const branch = snapshot.roadBranches.find((item) => item.branchId === 'north')!;
     branch.activeCheckpointId = null;
     branch.standbyCheckpointIds = [];
-    for (const [index, r] of [19, 18, 17].entries()) {
+    for (const [index, r] of [19, 18, 17, 16, 15].entries()) {
       const id = `checkpoint-north-prepared-${index + 1}`;
       snapshot.checkpoints.push({
         id,
@@ -65,7 +66,7 @@ describe('v1.4.4 checkpoint and rejection rules', () => {
     const result = engine.step({
       type: 'BuildCheckpoint',
       branchId: 'north',
-      position: { q: 25, r: 16 },
+      position: { q: 25, r: 14 },
     });
 
     expect(result.error).toMatchObject({ code: 'checkpoint_prepared_post_limit_reached' });

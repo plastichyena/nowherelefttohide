@@ -186,6 +186,7 @@ describe('GameEngine', () => {
     const config = createDefaultConfig({
       horde: singleFinalWave(3),
       refugees: { arrivalIntervalMin: 1, arrivalIntervalMax: 1, arrivalPeopleMin: 2, arrivalPeopleMax: 2, screeningCapacity: 2 },
+      vision: { capital: 50 },
     });
     const engine = new GameEngine(12, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
@@ -657,7 +658,11 @@ describe('GameEngine', () => {
   });
 
   it('keeps newly secured production facilities unavailable until the next player turn', () => {
-    const engine = new GameEngine(203, createDefaultConfig({ horde: singleFinalWave(3), economy: { initialZombieCount: 0 } }));
+    const engine = new GameEngine(203, createDefaultConfig({
+      horde: singleFinalWave(3),
+      economy: { initialZombieCount: 0 },
+      vision: { capital: 50 },
+    }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
     snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 21, r: 12 };

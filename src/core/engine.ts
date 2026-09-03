@@ -12,7 +12,14 @@ import { findNearestOpenTiles, findReachablePaths, findShortestPath, pathMovemen
 import { SeededRng } from './rng';
 import { deriveUnitRecovery } from './recovery';
 import { effectiveMovementCost, terrainAdjustedDamage } from './terrain';
-import { canUnitSee, getPlayerVisionCoverage, getPlayerVisibleTileKeys, getVisibleEnemyUnits, isVisibleToPlayer } from './visibility';
+import {
+  canUnitSee,
+  getCheckpointRouteVisibility,
+  getPlayerVisionCoverage,
+  getPlayerVisibleTileKeys,
+  getVisibleEnemyUnits,
+  isVisibleToPlayer,
+} from './visibility';
 import {
   getBlockingZombiesForCheckpoint,
   activeCheckpointForBranch,
@@ -3503,26 +3510,50 @@ function checkpointForwardBlockers(state: Readonly<GameState>, branchId: string)
   );
 }
 
+function validateCheckpointVisibility(
+  state: Readonly<GameState>,
+  action: Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }>,
+  branchId: string,
+  visibleTileKeys?: ReadonlySet<string>,
+): ActionError | null {
+  const visibility = getCheckpointRouteVisibility(state, branchId, action.position, visibleTileKeys);
+  if (!visibility.targetVisible) {
+    return error(action, 'checkpoint_target_not_visible', 'The checkpoint destination is outside current Player Vision');
+  }
+  if (!visibility.routeVisible) {
+    return error(action, 'checkpoint_route_not_visible', 'The road corridor from the capital to this destination is not fully visible');
+  }
+  return null;
+}
+
 function validateCheckpointDestination(
   state: Readonly<GameState>,
   action: Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' }>,
   branchId: string,
   ignoredCheckpointId?: string,
-  zombieBlockerMode: 'supply' | 'tile' = 'supply',
   visibleZombies?: readonly UnitState[],
+  visibleTileKeys?: ReadonlySet<string>,
+  visibilityAlreadyValidated = false,
 ): ActionError | null {
+  if (!visibilityAlreadyValidated) {
+    const visibilityError = validateCheckpointVisibility(state, action, branchId, visibleTileKeys);
+    if (visibilityError) return visibilityError;
+  }
   const tile = getTile(state.map, action.position);
   if (isHordeSpawnReserve(state.map, action.position)) {
     return error(action, 'horde_spawn_reserve', 'Player checkpoints cannot occupy the Horde Spawn Reserve');
   }
-  if (
-    !tile?.road ||
-    tile.facilityId ||
-    state.checkpoints.some(
-      (checkpoint) => checkpoint.id !== ignoredCheckpointId && hexKey(checkpoint.position) === hexKey(action.position),
-    )
-  ) {
+  if (!tile?.road || state.checkpoints.some(
+    (checkpoint) => checkpoint.id !== ignoredCheckpointId && hexKey(checkpoint.position) === hexKey(action.position),
+  ) || state.units.some(
+    (unit) => unit.isPlayerUnit && hexKey(unit.position) === hexKey(action.position),
+  )) {
     return error(action, 'invalid_checkpoint_tile', 'A checkpoint requires an empty branch road tile');
+  }
+  if (tile.facilityId || state.facilities.some(
+    (facility) => hexKey(facility.position) === hexKey(action.position),
+  )) {
+    return error(action, 'checkpoint_facility_occupied', 'A Facility occupies this checkpoint destination');
   }
   if (checkpointBranchId(state, action.position, action.branchId) !== branchId) {
     return error(action, 'invalid_checkpoint_branch', 'Checkpoint destination must be on the selected road branch');
@@ -3544,9 +3575,7 @@ function validateCheckpointDestination(
     .filter(isZombieFaction)
     .filter((zombie) => isVisibleToPlayer(state, zombie.position)))
     .filter((zombie) =>
-      zombieBlockerMode === 'tile'
-        ? hexKey(zombie.position) === hexKey(action.position)
-        : getBlockingZombiesForCheckpoint(state, branchId, action.position).some((candidate) => candidate.id === zombie.id),
+      getBlockingZombiesForCheckpoint(state, branchId, action.position).some((candidate) => candidate.id === zombie.id),
     );
   if (zombies.length > 0) {
     return error(action, 'checkpoint_supply_zombie_blocked', 'A visible Zombie blocks this checkpoint position or supply area');
@@ -3571,6 +3600,7 @@ function validateBuildCheckpointAction(
   state: Readonly<GameState>,
   action: Extract<GameAction, { type: 'BuildCheckpoint' }>,
   visibleZombies?: readonly UnitState[],
+  visibleTileKeys?: ReadonlySet<string>,
 ): { branchId: string | null; error: ActionError | null } {
   const budget = playerActionBudgetError(state, action);
   if (budget) return { branchId: null, error: budget };
@@ -3583,6 +3613,8 @@ function validateBuildCheckpointAction(
   }
   const branch = getRoadBranchState(state, branchId);
   if (!branch) return { branchId, error: error(action, 'unknown_road_branch', 'Unknown road branch') };
+  const visibilityError = validateCheckpointVisibility(state, action, branchId, visibleTileKeys);
+  if (visibilityError) return { branchId, error: visibilityError };
   const active = activeCheckpointForBranch(state, branchId);
   if (preparedCheckpointCount(state, branchId) >= state.config.checkpoint.maxPreparedPostsPerDirection) {
     return {
@@ -3600,7 +3632,7 @@ function validateBuildCheckpointAction(
   }
   return {
     branchId,
-    error: validateCheckpointDestination(state, action, branchId, undefined, active ? 'tile' : 'supply', visibleZombies),
+    error: validateCheckpointDestination(state, action, branchId, undefined, visibleZombies, visibleTileKeys, true),
   };
 }
 
@@ -3608,6 +3640,7 @@ function validateRelocateCheckpointAction(
   state: Readonly<GameState>,
   action: Extract<GameAction, { type: 'RelocateCheckpoint' }>,
   visibleZombies?: readonly UnitState[],
+  visibleTileKeys?: ReadonlySet<string>,
 ): { source: CheckpointState | null; branchId: string | null; error: ActionError | null } {
   const budget = playerActionBudgetError(state, action);
   if (budget) return { source: null, branchId: null, error: budget };
@@ -3636,6 +3669,8 @@ function validateRelocateCheckpointAction(
       error: error(action, 'checkpoint_wrong_branch', 'A checkpoint can only relocate on its current branch'),
     };
   }
+  const visibilityError = validateCheckpointVisibility(state, action, branchId, visibleTileKeys);
+  if (visibilityError) return { source, branchId, error: visibilityError };
   if (source.infected > 0) {
     return {
       source,
@@ -3646,7 +3681,7 @@ function validateRelocateCheckpointAction(
   return {
     source,
     branchId,
-    error: validateCheckpointDestination(state, action, branchId, source.id, 'supply', visibleZombies),
+    error: validateCheckpointDestination(state, action, branchId, source.id, visibleZombies, visibleTileKeys, true),
   };
 }
 
@@ -4440,7 +4475,10 @@ export function getCheckpointPositionCandidates(
 ): CheckpointPositionCandidate[] {
   const candidates: CheckpointPositionCandidate[] = [];
   const projectionContext = includeProjectedEffects ? createCheckpointProjectionContext(state) : null;
-  const visibleZombies = getVisibleEnemyUnits(state);
+  const visibleTileKeys = getPlayerVisibleTileKeys(state);
+  const visibleZombies = state.units
+    .filter((unit) => isZombieFaction(unit) && visibleTileKeys.has(hexKey(unit.position)))
+    .sort((left, right) => left.id.localeCompare(right.id));
   for (const branch of [...state.map.roadBranches].sort((left, right) => left.id.localeCompare(right.id))) {
     const active = activeCheckpointForBranch(state, branch.id);
     for (const position of branch.roadTiles) {
@@ -4450,8 +4488,8 @@ export function getCheckpointPositionCandidates(
       if (active) actions.push({ type: 'RelocateCheckpoint', checkpointId: active.id, branchId: branch.id, position: { ...position } });
       for (const action of actions) {
         const reason = action.type === 'BuildCheckpoint'
-          ? validateBuildCheckpointAction(state, action, visibleZombies).error
-          : validateRelocateCheckpointAction(state, action, visibleZombies).error;
+          ? validateBuildCheckpointAction(state, action, visibleZombies, visibleTileKeys).error
+          : validateRelocateCheckpointAction(state, action, visibleZombies, visibleTileKeys).error;
         const effect = includeProjectedEffects
           ? checkpointProjectedEffect(state, action, reason === null, projectionContext!)
           : {};

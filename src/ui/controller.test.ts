@@ -12,7 +12,7 @@ vi.mock('phaser', () => ({
 import type { CheckpointPositionCandidate, CheckpointState, FacilityState, GameAction, GameEvent, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
 import { createAgentObservation } from '../agent/observation';
-import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderHordeWarningCard, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep } from './controller';
+import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderHordeWarningCard, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, roadBranchForPosition, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
@@ -45,8 +45,8 @@ function siteEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.4.4');
-    expect(titleVersionLabel('en')).toContain('1.4.4');
+    expect(titleVersionLabel('ja')).toContain('1.4.5');
+    expect(titleVersionLabel('en')).toContain('1.4.5');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -125,6 +125,15 @@ describe('controller view models', () => {
     expect(resolveTileSelection(state, { q: 4, r: 5 }, 'domestic')).toBeNull();
   });
 
+  it('selects an empty trunk-road Hex in domestic mode and resolves its branch', () => {
+    const state = new GameEngine(145).getState();
+    const branch = state.map.roadBranches[0]!;
+    const position = branch.roadTiles[0]!;
+
+    expect(resolveTileSelection(state, position, 'domestic')).toEqual({ kind: 'road', position });
+    expect(roadBranchForPosition(state, position)).toBe(branch.id);
+  });
+
   it('never selects an enemy-only tile through the human selection resolver', () => {
     const state = testState([testUnit('zombie-1', 4, 5, false)]);
 
@@ -158,26 +167,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.4.3-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.4.4-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.3以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.4');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.4以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.5');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.3 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.4');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.4 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.5');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.4.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.5.0');
     expect(createTranslator('ja')('tipSave')).toContain('Save Format 9');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.4.0');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.5.0');
     expect(createTranslator('en')('tipSave')).toContain('Save Format 9');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3 or earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4 or earlier');
     }
   });
 
@@ -370,7 +379,7 @@ describe('controller view models', () => {
     expect(localizeActionError('invalid_action_input', 'en')).toContain('legal action');
   });
 
-  it('localizes v1.4.4 refugee and decommission action errors', () => {
+  it('localizes v1.4.5 refugee and decommission action errors', () => {
     expect(localizeActionError('checkpoint_not_eligible_for_turn_away', 'ja')).toContain('Active');
     expect(localizeActionError('invalid_refugee_turn_away_count', 'en')).toContain('Waiting');
     expect(localizeActionError('facility_not_decommissionable', 'ja')).toContain('Civilian Drone Base');
@@ -396,6 +405,7 @@ describe('controller view models', () => {
   it('localizes every checkpoint candidate reason in both languages', () => {
     const codes = [
       'invalid_checkpoint_tile', 'invalid_checkpoint_branch', 'unknown_road_branch',
+      'checkpoint_target_not_visible', 'checkpoint_route_not_visible', 'checkpoint_facility_occupied',
       'checkpoint_requires_relocation', 'unknown_operational_checkpoint', 'checkpoint_same_position',
       'checkpoint_wrong_branch', 'checkpoint_infection_blocked', 'checkpoint_branch_action_limit',
       'checkpoint_abandoned_forward_block', 'checkpoint_supply_zombie_blocked',
@@ -406,6 +416,34 @@ describe('controller view models', () => {
       expect(localizeActionError(code, 'ja')).not.toBe(createTranslator('ja')('invalidAction'));
       expect(localizeActionError(code, 'en')).not.toBe(createTranslator('en')('invalidAction'));
     }
+  });
+
+  it('keeps the global End Turn forecast to an unpowered count, not facility IDs or reasons', () => {
+    const base = forecastEndTurn(new GameEngine(145).getState());
+    const forecast = {
+      ...base,
+      electricity: {
+        ...base.electricity,
+        unpoweredFacilities: [
+          { facilityId: 'secret-facility-a', reason: 'power_supply_off' },
+          { facilityId: 'secret-facility-b', reason: 'fuel_shortage' },
+        ],
+      },
+    } as typeof base;
+    const japanese = renderEndTurnForecast(forecast, 'ja');
+    const english = renderEndTurnForecast(forecast, 'en');
+
+    expect(japanese).toContain('未給電見込み</strong>: 2施設');
+    expect(english).toContain('Unpowered forecast</strong>: 2 facilities');
+    expect(japanese).not.toContain('secret-facility-a');
+    expect(english).not.toContain('secret-facility-b');
+    expect(english).not.toContain('Power supply off');
+
+    const noUnpowered = renderEndTurnForecast({
+      ...base,
+      electricity: { ...base.electricity, unpoweredFacilities: [] },
+    }, 'en');
+    expect(noUnpowered).toContain('Unpowered forecast</strong>: 0 facilities');
   });
 
   it('localizes Power Supply action errors', () => {
@@ -498,6 +536,7 @@ describe('controller view models', () => {
     const keys = [
       'fixedHordeScheduleHint', 'hordeWarningLeadTurns', 'spawnReserve', 'spawnReserveReason',
       'screeningCapacity', 'screeningThroughput', 'checkpointCapacityRule', 'checkpointCandidateHint', 'newGameError',
+      'roadHex', 'roadCheckpointBuild', 'checkpointBuildUnavailable', 'checkpointTargetNotVisible', 'checkpointRouteNotVisible', 'checkpointFacilityOccupied', 'checkpointPlacementLocalHint', 'checkpointRelocateBoardHint', 'unpoweredForecast',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);

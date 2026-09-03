@@ -8,7 +8,7 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** Session/Checkpoint v2 deliberately rejects all v1.4.3 portable data. */
+/** Session/Checkpoint v2 still rejects v1.4.4-or-earlier data at the version boundary. */
 export const CHECKPOINT_SCHEMA_VERSION = '2.0.0' as const;
 export const SESSION_SCHEMA_VERSION = '2.0.0' as const;
 export const DEFAULT_CHECKPOINT_INTERVAL = 5;

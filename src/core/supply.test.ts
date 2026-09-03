@@ -14,7 +14,10 @@ import {
 } from './supply';
 
 function engineWithoutZombies(): GameEngine {
-  const engine = new GameEngine(17);
+  // v1.4.5 checkpoint placement requires a currently visible capital
+  // corridor. These supply tests exercise cost/radius behavior, so give them
+  // a complete road reconnaissance budget explicitly.
+  const engine = new GameEngine(17, createDefaultConfig({ vision: { capital: 50 } }));
   const snapshot = engine.getState() as GameState;
   snapshot.units = snapshot.units.filter((unit) => unit.type !== 'zombie');
   expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
@@ -174,7 +177,11 @@ describe('road branches and supply network', () => {
   });
 
   it('ruins an empty occupied checkpoint and allows a forward replacement once the Zombie is cleared', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, horde: singleFinalWave(4) });
+    const config = createDefaultConfig({
+      economy: { initialZombieCount: 0 },
+      horde: singleFinalWave(4),
+      vision: { capital: 50 },
+    });
     const engine = new GameEngine(5, config);
     expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 19 } }).error).toBeNull();
     const occupied = engine.getState();

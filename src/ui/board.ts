@@ -63,6 +63,8 @@ export interface BoardRenderState {
   checkpointLegalPreviewPositions?: readonly HexCoord[];
   checkpointInvalidPreviewPositions?: readonly HexCoord[];
   checkpointPreviewSelected?: HexCoord | null;
+  /** Build previews are local to the selected road Hex; only Relocate draws candidate markers. */
+  checkpointPreviewMode?: 'build' | 'relocate' | null;
   blockedZombieIds?: readonly string[];
   /** Core-provided BuildConstructibleFacility candidate preview. */
   constructibleFacilityType?: ConstructibleFacilityType | null;
@@ -438,6 +440,19 @@ export interface ConstructibleCandidateMarkerStyle {
   symbol: '＋' | '×';
   lineWidth: number;
   alpha: number;
+}
+
+/** Dynamic marker shown for a player's Required Power facility that is not
+ * expected to receive power when the current turn ends. */
+export const UNPOWERED_FACILITY_MARKER = '⚡×';
+
+export function shouldShowUnpoweredFacilityMarker(
+  facility: Pick<FacilityState, 'owner'>,
+  projection: Pick<ReturnType<typeof forecastFacilityProduction>[number], 'powerMode' | 'projectedPowerSupplied'> | null | undefined,
+): boolean {
+  return facility.owner === 'player'
+    && projection?.powerMode === 'required'
+    && projection.projectedPowerSupplied === false;
 }
 
 /** Keep Build Mode candidates distinguishable without relying on color alone. */
@@ -968,8 +983,17 @@ export class HexBoardScene extends Phaser.Scene {
     const path = new Set((render.pendingPath ?? []).map((position) => hexKey(position)));
     const attackTargets = new Set(render.attackTargetIds ?? []);
     const suppliedTiles = new Set(render.suppliedTileKeys ?? []);
-    const checkpointLegalPreview = new Set((render.checkpointLegalPreviewPositions ?? []).map((position) => hexKey(position)));
-    const checkpointInvalidPreview = new Set((render.checkpointInvalidPreviewPositions ?? []).map((position) => hexKey(position)));
+    // Build candidate markers were intentionally removed from Human UI in
+    // v1.4.5. Keep the board-wide marker pass strictly for Relocate; callers
+    // must opt into that mode explicitly, so stale/legacy Build arrays cannot
+    // reappear on the board.
+    const checkpointPreviewEnabled = render.checkpointPreviewMode === 'relocate';
+    const checkpointLegalPreview = checkpointPreviewEnabled
+      ? new Set((render.checkpointLegalPreviewPositions ?? []).map((position) => hexKey(position)))
+      : new Set<string>();
+    const checkpointInvalidPreview = checkpointPreviewEnabled
+      ? new Set((render.checkpointInvalidPreviewPositions ?? []).map((position) => hexKey(position)))
+      : new Set<string>();
     const selectedCheckpointPreview = render.checkpointPreviewSelected ? hexKey(render.checkpointPreviewSelected) : null;
     const constructibleLegalPreview = new Set((render.constructibleFacilityLegalPreviewPositions ?? []).map((position) => hexKey(position)));
     const constructibleInvalidPreview = new Set((render.constructibleFacilityInvalidPreviewPositions ?? []).map((position) => hexKey(position)));
@@ -1299,6 +1323,11 @@ export class HexBoardScene extends Phaser.Scene {
     const currentRuined = facility.status === 'ruined' || facility.operationalStatus === 'ruined';
     const projectedStopped = Boolean(projection?.stoppedReason) && !currentStopped && !currentRuined && facility.infected === 0;
     if (projectedStopped) this.drawForecastWarning(this.graphics, center, facility.id);
+    if (shouldShowUnpoweredFacilityMarker(facility, projection)) {
+      // This pass runs after Fog, so the marker remains visible for player
+      // facilities even when their Hex is outside current Player Vision.
+      this.addLabel(`facility:${facility.id}:projected-power`, UNPOWERED_FACILITY_MARKER, center.x + 17, center.y - 17, '#ffcf66', 9, true);
+    }
     if (render.supplyOverlay && facility.owner === 'player' && !suppliedTiles.has(tileKey)) {
       this.graphics.lineStyle(2, 0xef8c7a, 0.85);
       this.graphics.strokeCircle(center.x, center.y, 19);

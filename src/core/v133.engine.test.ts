@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
-import { deriveCheckpointRole, isHexSupplied } from './supply';
+import { hexKey } from './hex';
+import { deriveCheckpointRole, isHexSupplied, isHexSuppliedByBranch } from './supply';
 import { createUnit, synchronizePopulation } from './state';
 import { GameEngine } from './engine';
 import { singleFinalWave } from './testConfig';
+import { getPlayerVisibleTileKeys } from './visibility';
 import type {
   BuildCheckpointAction,
   CheckpointState,
@@ -219,8 +221,10 @@ describe('v1.4 Checkpoint Role / Fallback / Supply', () => {
   it('blocks only visible zombies at a Standby destination and keeps hidden candidates legal', () => {
     for (const visible of [true, false]) {
       const config = safeConfig({
-        checkpoint: { initialSupplyRadius: 0 },
-        vision: { operationalCheckpoint: 0 },
+        // Keep the branch corridor visible while placing the hidden-only
+        // blocker outside the Player Vision.
+        checkpoint: { initialSupplyRadius: 20 },
+        vision: { capital: 50, operationalCheckpoint: 0 },
         units: {
           police: { vision: visible ? 4 : 0 },
           nationalGuard: { vision: 0 },
@@ -236,12 +240,31 @@ describe('v1.4 Checkpoint Role / Fallback / Supply', () => {
       const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
       guard.position = { q: 1, r: 1 };
       guard.vision = 0;
-      addZombie(state, `zombie-${visible ? 'visible' : 'hidden'}-post`, { q: 34, r: 25 });
+      const target = { q: 34, r: 25 };
+      const blockerPosition = visible
+        ? target
+        : (() => {
+            const visibleKeys = getPlayerVisibleTileKeys(state);
+            const occupied = new Set([
+              ...state.facilities.map((facility) => hexKey(facility.position)),
+              ...state.units.map((unit) => hexKey(unit.position)),
+            ]);
+            const hidden = state.map.tiles.find((tile) =>
+              !visibleKeys.has(tile.key)
+              && tile.playerOccupancyAllowed
+              && !occupied.has(tile.key)
+              && tile.hordeEntranceDirections.length === 0
+              && isHexSuppliedByBranch(state, tile, 'east', target),
+            );
+            expect(hidden).toBeDefined();
+            return hidden!;
+          })();
+      addZombie(state, `zombie-${visible ? 'visible' : 'hidden'}-post`, blockerPosition);
       synchronizePopulation(state);
       stepOk(engine, { type: 'LoadSnapshot', snapshot: state });
 
       const candidate = engine.getCheckpointPositionCandidates().find(
-        (entry) => entry.actionType === 'BuildCheckpoint' && entry.position.q === 34 && entry.position.r === 25,
+        (entry) => entry.actionType === 'BuildCheckpoint' && entry.position.q === target.q && entry.position.r === target.r,
       );
       expect(candidate).toBeDefined();
       expect(candidate?.legal).toBe(!visible);
@@ -257,10 +280,16 @@ describe('v1.4 Checkpoint Role / Fallback / Supply', () => {
   });
 
   it('enforces the Active plus Standby prepared-post limit without removing physical posts', () => {
-    const engine = new GameEngine(503, safeConfig());
-    prepareEastBranch(engine, [{ q: 35, r: 25 }, { q: 34, r: 25 }, { q: 32, r: 25 }]);
+    const engine = new GameEngine(503, safeConfig({ vision: { capital: 50 } }));
+    prepareEastBranch(engine, [
+      { q: 35, r: 25 },
+      { q: 34, r: 25 },
+      { q: 32, r: 25 },
+      { q: 31, r: 25 },
+      { q: 30, r: 25 },
+    ]);
     const before = engine.getState();
-    const rejected = engine.step({ type: 'BuildCheckpoint', branchId: 'east', position: { q: 32, r: 25 } });
+    const rejected = engine.step({ type: 'BuildCheckpoint', branchId: 'east', position: { q: 29, r: 25 } });
     expect(rejected.error?.code).toBe('checkpoint_prepared_post_limit_reached');
     expect(engine.getState().checkpoints.map((checkpoint) => checkpoint.id)).toEqual(
       before.checkpoints.map((checkpoint) => checkpoint.id),
@@ -302,7 +331,7 @@ describe('v1.4 Checkpoint Role / Fallback / Supply', () => {
   });
 
   it('falls back to the frontmost Standby, then to Dormant, immediately on Active loss', () => {
-    const config = safeConfig();
+    const config = safeConfig({ vision: { capital: 50 } });
     const source = new GameEngine(506, config);
     prepareEastBranch(source, [{ q: 35, r: 25 }, { q: 34, r: 25 }, { q: 32, r: 25 }]);
     const prepared = source.getState();
@@ -329,7 +358,7 @@ describe('v1.4 Checkpoint Role / Fallback / Supply', () => {
   });
 
   it('resolves fallback before the next refugee arrival and sends new arrivals to the replacement Active', () => {
-    const config = safeConfig();
+    const config = safeConfig({ vision: { capital: 50 } });
     const engine = new GameEngine(508, config);
     prepareEastBranch(engine, [{ q: 35, r: 25 }, { q: 34, r: 25 }]);
     const failed = overrunActiveCheckpoint(engine, { q: 35, r: 25 });

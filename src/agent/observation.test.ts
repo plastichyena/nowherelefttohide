@@ -5,7 +5,7 @@ import { createInitialState, createUnit } from '../core/state';
 import { compactArtifactObservation, createAgentObservation, restoreArtifactObservation } from './observation';
 import { createAgentGame } from './game';
 
-describe('Agent Observation 6.0.0 rule projections', () => {
+describe('Agent Observation 6.1.0 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;

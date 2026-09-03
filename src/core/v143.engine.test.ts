@@ -76,10 +76,10 @@ function movePlayersAway(state: MutableState): void {
   if (guard) guard.position = { q: 2, r: 1 };
 }
 
-describe('v1.4.4 Core version, map, and initial state', () => {
-  it('creates a v2.4.0 state on fixed-51x51-v1 with all 25 initial Normal Zombies', () => {
+describe('v1.4.5 Core version, map, and initial state', () => {
+  it('creates a v2.5.0 state on fixed-51x51-v1 with all 25 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('2.4.0');
+    expect(state.gameVersion).toBe('2.5.0');
     expect(state.mapId).toBe('fixed-51x51-v1');
     expect(state.map.id).toBe('fixed-51x51-v1');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');

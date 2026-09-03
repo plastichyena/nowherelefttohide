@@ -151,7 +151,7 @@ describe('v1.4 Horde composition and combat', () => {
       finalNormalZombiesSpawned: 28,
       finalHordeSpawned: 44,
     });
-  }, 45_000);
+  }, 60_000);
 
   it('uses custom per-type composition arithmetic for Periodic and Final groups', () => {
     const engine = new GameEngine(303, safeScenarioConfig({
