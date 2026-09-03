@@ -12,7 +12,7 @@ vi.mock('phaser', () => ({
 import type { CheckpointPositionCandidate, CheckpointState, FacilityState, GameAction, GameEvent, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
 import { createAgentObservation } from '../agent/observation';
-import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep } from './controller';
+import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderHordeWarningCard, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
@@ -49,6 +49,17 @@ describe('controller view models', () => {
     expect(titleVersionLabel('en')).toContain('1.4.4');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
+  });
+
+  it('renders Horde warning details as a collapsed disclosure with a persistent heading', () => {
+    const markup = renderHordeWarningCard('ja');
+
+    expect(markup).toContain('<details class="horde-card"');
+    expect(markup).toContain('<summary class="horde-heading">');
+    expect(markup).not.toMatch(/<details[^>]*\sopen(?:\s|>)/);
+    expect(markup).toContain('data-bind="horde-warning"');
+    expect(markup).toContain('data-bind="horde-status"');
+    expect(markup).toContain('data-bind="horde-directions"');
   });
 
   it('derives action-menu availability only from legal actions for the selected unit', () => {

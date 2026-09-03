@@ -119,8 +119,8 @@ UI / Phaser / Test Agent
 - タイトル画面にはローカライズした`App Version 1.4.4`を常時明示する。表示値は実行中の`APP_VERSION`から導出し、固定文字列やBuild IDで代用しない。
 - マップはドラッグパンとピンチズームに対応し、PCではマウス操作にも対応する。
 - 上部にターン、フェーズ、総人口、5資源、次回EndTurnの電力予測需要量／利用可能供給量を常時表示する。
-- 次WaveのTurn・方向数・Composition・Finalフラグと、Warning開始後の全方向・残りTurnは独立した警告カードとして常時確認可能にする。Warning前にRandom方向は表示しない。
-- ターン、Horde、致命的不足等を折りたたみ領域だけへ隠さない。
+- 次WaveのTurn・方向数・Composition・Finalフラグと、Warning開始後の全方向・残りTurnは独立した警告カードで確認可能にする。警告カードは初期状態を折りたたみとし、見出しとHorde進行状態を常時表示したまま詳細を開閉できる。Warning前にRandom方向は表示しない。
+- ターン、Hordeの見出し・進行状態、致命的不足等を折りたたみ領域だけへ隠さない。
 
 ## 5.2 Bottom Sheet
 

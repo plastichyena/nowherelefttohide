@@ -1362,6 +1362,12 @@ export function titleVersionLabel(locale: Locale): string {
   return `${createTranslator(locale)('appVersion')} ${APP_VERSION}`;
 }
 
+/** Keep the Horde headline visible while allowing its detailed warning facts to collapse. */
+export function renderHordeWarningCard(locale: Locale): string {
+  const t = createTranslator(locale);
+  return `<details class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><summary class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></summary><div class="horde-facts"><span><small>${escapeHtml(t('nextWave'))}</small><b data-bind="horde-wave-index">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('directionCount'))}</small><b data-bind="horde-direction-count">—</b></span><span><small>${escapeHtml(t('directions'))}</small><b data-bind="horde-directions">—</b></span><span><small>${escapeHtml(t('composition'))}</small><b data-bind="horde-composition">—</b></span><span><small>${escapeHtml(t('waveType'))}</small><b data-bind="horde-final">—</b></span></div></details>`;
+}
+
 function isCity(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
 }
@@ -1957,7 +1963,7 @@ export class GameUiController {
         <span class="resource-pill civilian-pill">♙ <b data-bind="healthy-civilians">0</b><small>${escapeHtml(t('healthyCivilians'))}</small></span>
         <span class="resource-pill infected-pill">☣ <b data-bind="infected">0</b><small>${escapeHtml(t('infected'))}</small></span>
       </section>
-      <section class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><div class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></div><div class="horde-facts"><span><small>${escapeHtml(t('nextWave'))}</small><b data-bind="horde-wave-index">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('directionCount'))}</small><b data-bind="horde-direction-count">—</b></span><span><small>${escapeHtml(t('directions'))}</small><b data-bind="horde-directions">—</b></span><span><small>${escapeHtml(t('composition'))}</small><b data-bind="horde-composition">—</b></span><span><small>${escapeHtml(t('waveType'))}</small><b data-bind="horde-final">—</b></span></div></section>
+      ${renderHordeWarningCard(this.locale)}
       <section class="strategic-critical-strip" data-bind="strategic-critical" data-warning-tier="critical" aria-live="assertive" hidden><strong>${escapeHtml(t('strategicCritical'))}</strong><span data-bind="strategic-critical-text"></span></section>
       <section class="victory-progress" aria-live="polite" aria-label="${escapeHtml(t('victoryProgress'))}"><strong>${escapeHtml(t('victoryProgress'))}</strong><div data-bind="victory-progress"></div></section>
       <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="unit-context-layer" data-unit-context-layer aria-live="polite"></div>${noiseDebugMount}<div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
