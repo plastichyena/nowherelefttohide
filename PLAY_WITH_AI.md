@@ -64,7 +64,7 @@ The Session directory includes a private Save Format 9 checkpoint state solely s
 For a quick built-in-agent smoke test instead of an interactive Session:
 
 ```bash
-./run-npm.sh run sim -- --agent=balanced --games=1 --seed=1 --out=output/ai-smoke --overwrite
+./run-npm.sh run sim -- --agent=balanced --games=1 --seed=1 --summary-only --out=output/ai-smoke --overwrite
 ```
 
 This runs the built-in Balanced Agent and is a quick way to verify that the bundled runtime works. The package workflow separately exercises all seven Session commands with the bundled Node.js runtime.
