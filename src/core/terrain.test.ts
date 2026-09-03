@@ -13,7 +13,7 @@ describe('v1.4 terrain defense', () => {
     zombie.position = { q: 4, r: 4 };
     expect(terrainDefenseAt(state, police)).toEqual({ source: 'none', multiplier: 1 });
     expect(terrainDefenseAt(state, zombie)).toEqual({ source: 'forest', multiplier: 0.5 });
-    zombie.position = { q: 15, r: 8 };
+    zombie.position = { q: 25, r: 20 };
     expect(terrainDefenseAt(state, zombie)).toEqual({ source: 'urban', multiplier: 0.5 });
     expect(terrainAdjustedDamage(state, zombie, 5).finalDamage).toBe(3);
     expect(terrainAdjustedDamage(state, zombie, 1).finalDamage).toBe(1);

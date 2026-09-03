@@ -71,8 +71,8 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.4.3 Save Format 8', () => {
-  it('round-trips a detached complete Save Format 8 GameState through code and JSON', () => {
+describe('v1.4.4 Save Format 9', () => {
+  it('round-trips a detached complete Save Format 9 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -80,9 +80,9 @@ describe('v1.4.3 Save Format 8', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 8,
+      formatVersion: 9,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-31x31-v2',
+      mapId: 'fixed-51x51-v1',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -93,25 +93,25 @@ describe('v1.4.3 Save Format 8', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('writes the v1.4.3 version boundaries and complete v1.4.3 Config / Statistics / Event state', () => {
+  it('writes the v1.4.4 version boundaries and complete v1.4.4 Config / Statistics / Event state', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(8);
-    expect(envelope.gameVersion).toBe('2.3.0');
-    expect(config.version).toBe('2.3.0');
-    expect(config.mapId).toBe('fixed-31x31-v2');
-    expect((state.map as Record<string, unknown>).width).toBe(31);
-    expect((state.map as Record<string, unknown>).height).toBe(31);
+    expect(envelope.formatVersion).toBe(9);
+    expect(envelope.gameVersion).toBe('2.4.0');
+    expect(config.version).toBe('2.4.0');
+    expect(config.mapId).toBe('fixed-51x51-v1');
+    expect((state.map as Record<string, unknown>).width).toBe(51);
+    expect((state.map as Record<string, unknown>).height).toBe(51);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
     expect(state).toHaveProperty('finalHordeTurn', 50);
     expect(state).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('finalHordeTurn');
     expect(config).toMatchObject({
-      economy: { initialZombieCount: 12 },
+      economy: { initialZombieCount: 25 },
       infection: {
         zombieSpawnPopulationPerUnit: 5,
         maxZombieSpawnPerResolution: 6,
@@ -120,9 +120,9 @@ describe('v1.4.3 Save Format 8', () => {
       },
       noise: { publicClass: { police: 'medium', nationalGuard: 'large' } },
     });
-    expect((state.map as Record<string, unknown>).initialZombiePositions).toHaveLength(12);
+    expect((state.map as Record<string, unknown>).initialZombiePositions).toHaveLength(25);
     expect(state.statistics).toMatchObject({
-      initialNormalZombies: 12,
+      initialNormalZombies: 25,
       noiseRespawnAttempts: 0,
       infectedPopulationConvertedToZombies: 0,
       groundVisionBlockedHexes: 0,
@@ -130,7 +130,7 @@ describe('v1.4.3 Save Format 8', () => {
     });
   });
 
-  it('requires the Wave Config, Horde State, Horde Spawn Reserve, and v1.4.3 Statistics shape', () => {
+  it('requires the Wave Config, Horde State, Horde Spawn Reserve, and v1.4.4 Statistics shape', () => {
     const envelope = exportedEnvelope(initialState(17));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
@@ -149,14 +149,27 @@ describe('v1.4.3 Save Format 8', () => {
     expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|hordeSpawnReserve|playerOccupancyAllowed|noiseRespawnAttempts/i);
   });
 
+  it('requires v1.4.4 Checkpoint history, Rejected Refugee counters, and reanimation statistics', () => {
+    const envelope = exportedEnvelope(initialState(18));
+    const state = envelope.state as Record<string, unknown>;
+    delete state.rejectedRefugeesByDirection;
+    delete ((state.roadBranches as Array<Record<string, unknown>>)[0]!).hasBuiltCheckpoint;
+    delete (state.statistics as Record<string, unknown>).reanimationFacilityInfections;
+    delete (state.statistics as Record<string, unknown>).rejectedBonusZombiesByDirection;
+
+    const result = importSaveJson(JSON.stringify(resign(envelope)));
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/rejectedRefugeesByDirection|hasBuiltCheckpoint|reanimationFacilityInfections|rejectedBonusZombiesByDirection/i);
+  });
+
   it('rejects a Player Unit on the static Horde Spawn Reserve without changing the live state', () => {
     const current = initialState(83);
     const before = clone(current);
     const envelope = exportedEnvelope(current);
     const state = envelope.state as Record<string, unknown>;
     const units = state.units as Array<Record<string, unknown>>;
-    (units[0]!.position as Record<string, unknown>).q = 30;
-    (units[0]!.position as Record<string, unknown>).r = 30;
+    (units[0]!.position as Record<string, unknown>).q = 50;
+    (units[0]!.position as Record<string, unknown>).r = 25;
 
     const result = importSaveJson(JSON.stringify(resign(envelope)));
     expect(result).toMatchObject({ valid: false, state: null, envelope: null });
@@ -186,7 +199,7 @@ describe('v1.4.3 Save Format 8', () => {
     expect(decodeSaveCode(encodeSaveCode(state)).state).toEqual(state);
   });
 
-  it('preserves v1.4.3 overrun Event payloads and derived Statistics without adding UI-only state', () => {
+  it('preserves v1.4.4 overrun Event payloads and derived Statistics without adding UI-only state', () => {
     const state = initialState(51);
     state.events.push({
       id: 'event-999',
@@ -253,10 +266,24 @@ describe('v1.4.3 Save Format 8', () => {
     const envelope = exportedEnvelope(initialState(83));
     const state = envelope.state as Record<string, unknown>;
     const units = state.units as Array<Record<string, unknown>>;
-    (units[0]!.position as Record<string, unknown>).q = 31;
+    (units[0]!.position as Record<string, unknown>).q = 51;
     const outsideResult = importSaveJson(JSON.stringify(resign(envelope)));
     expect(outsideResult.valid).toBe(false);
     expect(outsideResult.errors.join(' ')).toMatch(/in-bounds|outside|map/i);
+  });
+
+  it('rejects legal initial Zombie coordinates whose order does not match the saved seed', () => {
+    const envelope = exportedEnvelope(initialState(83));
+    const state = envelope.state as Record<string, unknown>;
+    const map = state.map as Record<string, unknown>;
+    const positions = map.initialZombiePositions as Array<Record<string, unknown>>;
+    [positions[0], positions[1]] = [positions[1]!, positions[0]!];
+
+    const result = importSaveJson(JSON.stringify(resign(envelope)));
+
+    expect(result.valid).toBe(false);
+    expect(result.state).toBeNull();
+    expect(result.errors.join(' ')).toMatch(/initial Zombie positions and order.*seed/i);
   });
 
   it('re-derives identical checkpoint candidates after load without storing them in GameState', () => {
@@ -271,24 +298,24 @@ describe('v1.4.3 Save Format 8', () => {
     const current = initialState(18);
     const before = clone(current);
     const legacy = exportedEnvelope(current);
-    legacy.formatVersion = 7;
-    legacy.gameVersion = '2.2.0';
+    legacy.formatVersion = 8;
+    legacy.gameVersion = '2.3.0';
     const legacyState = legacy.state as Record<string, unknown>;
-    legacyState.gameVersion = '2.2.0';
-    legacyState.mapId = 'fixed-31x31-v1';
-    (legacyState.config as Record<string, unknown>).version = '2.2.0';
-    (legacyState.config as Record<string, unknown>).mapId = 'fixed-31x31-v1';
+    legacyState.gameVersion = '2.3.0';
+    legacyState.mapId = 'fixed-31x31-v2';
+    (legacyState.config as Record<string, unknown>).version = '2.3.0';
+    (legacyState.config as Record<string, unknown>).mapId = 'fixed-31x31-v2';
 
     const result = decodeSaveCode(codeForEnvelope(legacy));
     expect(result.valid).toBe(false);
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
-    expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.2\.0/i);
-    expect(result.errors.join(' ')).toContain('v1.4.2 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.3\.0/i);
+    expect(result.errors.join(' ')).toContain('v1.4.3 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Save Format 8', () => {
+  it('rejects a stale state/config version even when the envelope has Save Format 9', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     state.gameVersion = '2.2.0';
@@ -299,7 +326,7 @@ describe('v1.4.3 Save Format 8', () => {
     expect(result.errors.join(' ')).toMatch(/incompatible/i);
   });
 
-  it('rejects a partial v1.4.3 schema rather than treating it as a migration candidate', () => {
+  it('rejects a partial v1.4.4 schema rather than treating it as a migration candidate', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     delete (state.horde as Record<string, unknown>).finalHordeStatus;
@@ -326,11 +353,11 @@ describe('v1.4.3 Save Format 8', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v8 autosave key and never rewrites or removes a v7 legacy key', () => {
+  it('uses the v9 autosave key and never rewrites or removes a v8 legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
-    legacy.formatVersion = 7;
-    legacy.gameVersion = '2.2.0';
+    legacy.formatVersion = 8;
+    legacy.gameVersion = '2.3.0';
     storage.setItem(LEGACY_AUTOSAVE_KEY, codeForEnvelope(legacy));
     const beforeLegacy = storage.getItem(LEGACY_AUTOSAVE_KEY);
     const store = new AutoSaveStore({ storage });

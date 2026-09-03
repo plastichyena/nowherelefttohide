@@ -19,9 +19,12 @@ import type {
 import {
   BOARD_ASSET_PATHS,
   BOARD_ASSET_REGISTRY,
+  BOARD_MAX_ZOOM,
+  BOARD_MIN_ZOOM,
   BOARD_LOD_ZOOM_THRESHOLD,
   deriveRoadConnectionDirections,
   getFacilityUnitOffset,
+  isBoardZombieUnitType,
   mapCheckpointAssetLayers,
   mapFacilityAssetLayers,
   mapTerrainAsset,
@@ -29,6 +32,10 @@ import {
   resolveBoardAssetUrl,
 } from './boardAssets';
 import { createTranslator, type Locale } from './i18n';
+
+// Camera bounds are part of the Board UI contract; re-export the Registry's
+// single source of truth so direct Board consumers and tests cannot drift.
+export { BOARD_MIN_ZOOM, BOARD_MAX_ZOOM } from './boardAssets';
 
 /**
  * Phaser-only board adapter. It reads GameState and sends coordinates back to
@@ -261,6 +268,8 @@ const FALLBACK_UNIT_SYMBOL: Record<string, string> = {
   nationalGuard: 'G',
   zombie: 'Z',
   hordeZombie: 'H',
+  policeZombie: 'PZ',
+  soldierZombie: 'SZ',
 };
 
 function sameHex(a: HexCoord, b: HexCoord): boolean {
@@ -382,6 +391,8 @@ function isUnitVisible(unit: UnitState, visibleTileKeys: ReadonlySet<string>): b
 function unitColor(unit: UnitState): number {
   if (unit.type === 'zombie') return 0xa24c55;
   if (unit.type === 'hordeZombie') return unit.hordeKind === 'final' ? 0xe07a45 : 0xc8674d;
+  if (unit.type === 'policeZombie') return 0x7f4f67;
+  if (unit.type === 'soldierZombie') return 0x806b49;
   return unit.type === 'nationalGuard' ? 0xb6d8ff : 0x7fc7a0;
 }
 
@@ -477,8 +488,8 @@ export class HexBoardScene extends Phaser.Scene {
   private pinchDistance = 0;
   private pinchZoom = 1;
   private cameraInitialized = false;
-  private readonly zoomMin = 0.55;
-  private readonly zoomMax = 2.2;
+  private readonly zoomMin = BOARD_MIN_ZOOM;
+  private readonly zoomMax = BOARD_MAX_ZOOM;
 
   constructor(callbacks: BoardCallbacks) {
     super({ key: 'hex-board' });
@@ -1180,8 +1191,8 @@ export class HexBoardScene extends Phaser.Scene {
   ): void {
     if (isSpawnReserve) {
       // Spawn Reserve is public static map information and must remain visible
-      // even when Fog of War dims the rest of the tile.  The inset hatch keeps
-      // the outer 120 Hexes legible without hiding Terrain or other markers.
+      // even when Fog of War dims the rest of the tile. The inset hatch keeps
+      // the outer 200 Hexes legible without hiding Terrain or other markers.
       const points = this.hexPoints(center);
       this.graphics.fillStyle(0x8b4c76, 0.2);
       this.graphics.fillPoints(points, true);
@@ -1338,7 +1349,7 @@ export class HexBoardScene extends Phaser.Scene {
   ): void {
     const offset = this.stackUnitOffset(facilityOffset, index, total);
     const position = { x: center.x + offset.x, y: center.y + offset.y + 1 };
-    const isZombie = unit.type === 'zombie' || unit.type === 'hordeZombie';
+    const isZombie = isBoardZombieUnitType(unit.type);
     const selected = render.selectedUnitId === unit.id;
     const target = attackTargets.has(unit.id);
     if (selected || target || blockedZombies.has(unit.id)) {
@@ -1486,10 +1497,22 @@ export class HexBoardScene extends Phaser.Scene {
   }
 
   private drawUnitSilhouette(graphics: Phaser.GameObjects.Graphics, center: { x: number; y: number }, unit: UnitState): void {
-    const radius = unit.type === 'hordeZombie' ? 11 : 9;
+    const radius = unit.type === 'hordeZombie' || unit.type === 'soldierZombie' ? 11 : 9;
     graphics.fillStyle(unitColor(unit), 0.95);
     graphics.lineStyle(unit.hordeKind === 'final' ? 3 : 2, unit.hordeKind === 'final' ? 0xffcf66 : 0x071019, 1);
-    if (unit.type === 'zombie' || unit.type === 'hordeZombie') {
+    if (unit.type === 'policeZombie') {
+      // Distinct shield-like silhouette for a reanimated Police Unit.  It is
+      // intentionally drawn without a letter so LOD stays legible at 0.35.
+      graphics.fillRoundedRect(center.x - radius, center.y - radius, radius * 2, radius * 2, 4);
+      graphics.strokeRoundedRect(center.x - radius, center.y - radius, radius * 2, radius * 2, 4);
+      graphics.lineBetween(center.x, center.y - radius + 2, center.x, center.y + radius - 2);
+    } else if (unit.type === 'soldierZombie') {
+      // A broad chevron communicates the heavier Soldier Zombie silhouette.
+      graphics.fillTriangle(center.x, center.y - radius, center.x - radius, center.y + radius - 2, center.x, center.y + radius - 6);
+      graphics.fillTriangle(center.x, center.y - radius, center.x, center.y + radius - 6, center.x + radius, center.y + radius - 2);
+      graphics.strokeTriangle(center.x, center.y - radius, center.x - radius, center.y + radius - 2, center.x, center.y + radius - 6);
+      graphics.strokeTriangle(center.x, center.y - radius, center.x, center.y + radius - 6, center.x + radius, center.y + radius - 2);
+    } else if (isBoardZombieUnitType(unit.type)) {
       graphics.fillTriangle(center.x, center.y - radius, center.x - radius, center.y + radius, center.x + radius, center.y + radius);
       graphics.strokeTriangle(center.x, center.y - radius, center.x - radius, center.y + radius, center.x + radius, center.y + radius);
     } else {

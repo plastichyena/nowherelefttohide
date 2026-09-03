@@ -22,9 +22,9 @@ describe('v1.4 weighted terrain pathfinding', () => {
   it('charges destination terrain and lets road and urban overlays override it', () => {
     const state = createInitialState(1, createDefaultConfig());
     expect(effectiveMovementCost(state, { q: 4, r: 4 })).toBe(2);
-    expect(effectiveMovementCost(state, { q: 8, r: 3 })).toBe(3);
-    expect(effectiveMovementCost(state, { q: 15, r: 1 })).toBe(1);
-    expect(effectiveMovementCost(state, { q: 15, r: 8 })).toBe(1);
+    expect(effectiveMovementCost(state, { q: 14, r: 4 })).toBe(3);
+    expect(effectiveMovementCost(state, { q: 25, r: 1 })).toBe(1);
+    expect(effectiveMovementCost(state, { q: 25, r: 20 })).toBe(1);
 
     const reachable = findReachableTiles(
       state.map,

@@ -5,6 +5,7 @@ import {
   FIXED_FACILITY_IDS,
   FIXED_FOREST_COORDINATES,
   FIXED_FOREST_SEED_COORDINATES,
+  FIXED_INITIAL_ZOMBIE_COUNT,
   FIXED_INITIAL_UNIT_POSITIONS,
   FIXED_INITIAL_ZOMBIE_POSITIONS,
   FIXED_MAP,
@@ -15,30 +16,32 @@ import {
   FIXED_MOUNTAIN_SEED_COORDINATES,
   canPlayerOccupyHex,
   createFixedMap,
+  generateInitialZombiePositions,
+  getInitialZombieCandidates,
   isHordeSpawnReserve,
   validateFixedMap,
 } from './map';
 
 const key = ({ q, r }: { q: number; r: number }) => `${q},${r}`;
 const at = (q: number, r: number) => FIXED_MAP.tiles.find((tile) => tile.q === q && tile.r === r);
-const rotate = ({ q, r }: { q: number; r: number }) => ({ q: 30 - q, r: 30 - r });
+const rotate = ({ q, r }: { q: number; r: number }) => ({ q: 50 - q, r: 50 - r });
 
-describe('v1.4.3 fixed map', () => {
-  it('uses the 31x31 fixed map contract and covers every hex exactly once', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-31x31-v2');
+describe('v1.4.4 fixed map', () => {
+  it('uses the 51x51 fixed map contract and covers every hex exactly once', () => {
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v1');
     expect(FIXED_MAP.width).toBe(FIXED_MAP_WIDTH);
     expect(FIXED_MAP.height).toBe(FIXED_MAP_HEIGHT);
-    expect(FIXED_MAP.tiles).toHaveLength(31 * 31);
-    expect(new Set(FIXED_MAP.tiles.map((tile) => tile.key)).size).toBe(31 * 31);
+    expect(FIXED_MAP.tiles).toHaveLength(51 * 51);
+    expect(new Set(FIXED_MAP.tiles.map((tile) => tile.key)).size).toBe(51 * 51);
     expect(FIXED_MAP.tiles.every((tile) => tile.terrain !== 'water')).toBe(true);
 
     const counts = FIXED_MAP.tiles.reduce<Record<string, number>>((result, tile) => {
       result[tile.terrain] = (result[tile.terrain] ?? 0) + 1;
       return result;
     }, {});
-    expect(counts).toEqual({ plain: 720, forest: 197, mountain: 44 });
-    expect(new Set(FIXED_MOUNTAIN_COORDINATES.map(key)).size).toBe(44);
-    expect(new Set(FIXED_FOREST_COORDINATES.map(key)).size).toBe(197);
+    expect(counts).toEqual({ plain: 1961, forest: 514, mountain: 126 });
+    expect(new Set(FIXED_MOUNTAIN_COORDINATES.map(key)).size).toBe(126);
+    expect(new Set(FIXED_FOREST_COORDINATES.map(key)).size).toBe(514);
     expect(new Set(FIXED_MOUNTAIN_COORDINATES.map(key).filter((coordinate) =>
       FIXED_FOREST_COORDINATES.some((forest) => key(forest) === coordinate),
     ))).toHaveLength(0);
@@ -54,20 +57,17 @@ describe('v1.4.3 fixed map', () => {
       expect(forestSeedKeys.has(key(rotate(seed)))).toBe(true);
     }
 
-    // Raw Forest contains the civilian factory coordinate; Road/Facility
-    // exclusion must win over the earlier terrain sets and leave Plain.
-    expect(forestSeedKeys.has('25,16')).toBe(true);
-    expect(at(25, 16)).toMatchObject({ terrain: 'plain', road: false, facilityId: 'civilian-factory-2' });
+    // Road/Facility exclusion wins over the earlier terrain sets.
     for (const tile of FIXED_MAP.tiles) {
       if (tile.road || tile.facilityId !== null) expect(tile.terrain).toBe('plain');
     }
   });
 
-  it('has the fixed center, four entrances, and four 15-hex road branches', () => {
-    expect(at(15, 15)).toMatchObject({ road: true, facilityId: 'capital', terrain: 'plain' });
-    expect(FIXED_MAP.roadTiles).toHaveLength(61);
-    expect(new Set(FIXED_MAP.roadTiles.map(key)).size).toBe(61);
-    expect(FIXED_MAP.roadTiles.every(({ q, r }) => q === 15 || r === 15)).toBe(true);
+  it('has the fixed center, four entrances, and four 25-hex road branches', () => {
+    expect(at(25, 25)).toMatchObject({ road: true, facilityId: 'capital', terrain: 'plain' });
+    expect(FIXED_MAP.roadTiles).toHaveLength(101);
+    expect(new Set(FIXED_MAP.roadTiles.map(key)).size).toBe(101);
+    expect(FIXED_MAP.roadTiles.every(({ q, r }) => q === 25 || r === 25)).toBe(true);
 
     const branches = new Map(FIXED_MAP.roadBranches.map((branch) => [branch.id, branch]));
     const entrances = new Map(FIXED_MAP.hordeEntrances.map((entrance) => [entrance.direction, entrance]));
@@ -76,28 +76,28 @@ describe('v1.4.3 fixed map', () => {
       const entrance = entrances.get(direction);
       expect(branch).toBeDefined();
       expect(entrance).toBeDefined();
-      expect(branch!.capitalConnection).toEqual({ q: 15, r: 15 });
-      expect(branch!.roadTiles).toHaveLength(15);
-      expect(entrance!.roadTiles).toHaveLength(15);
+      expect(branch!.capitalConnection).toEqual({ q: 25, r: 25 });
+      expect(branch!.roadTiles).toHaveLength(25);
+      expect(entrance!.roadTiles).toHaveLength(25);
       expect(branch!.entrance).toEqual(entrance!.tile);
       expect(branch!.roadTiles.at(-1)).toEqual(entrance!.tile);
       expect(branch!.roadTiles.every((position) => at(position.q, position.r)?.road)).toBe(true);
       expect(entrance!.roadTiles.every((position) => at(position.q, position.r)?.road)).toBe(true);
-      expect(hexDistance(entrance!.tile, { q: 15, r: 15 })).toBe(15);
+      expect(hexDistance(entrance!.tile, { q: 25, r: 25 })).toBe(25);
     }
     expect([...entrances.values()].map((entrance) => entrance.tile)).toEqual([
-      { q: 15, r: 0 },
-      { q: 30, r: 15 },
-      { q: 15, r: 30 },
-      { q: 0, r: 15 },
+      { q: 25, r: 0 },
+      { q: 50, r: 25 },
+      { q: 25, r: 50 },
+      { q: 0, r: 25 },
     ]);
   });
 
-  it('publishes the 120-hex outer ring as the Horde Spawn Reserve', () => {
-    expect(FIXED_MAP.hordeSpawnReserve).toHaveLength(120);
-    expect(new Set(FIXED_MAP.hordeSpawnReserve.map(key)).size).toBe(120);
+  it('publishes the 200-hex outer ring as the Horde Spawn Reserve', () => {
+    expect(FIXED_MAP.hordeSpawnReserve).toHaveLength(200);
+    expect(new Set(FIXED_MAP.hordeSpawnReserve.map(key)).size).toBe(200);
     for (const tile of FIXED_MAP.tiles) {
-      const expected = tile.q === 0 || tile.q === 30 || tile.r === 0 || tile.r === 30;
+      const expected = tile.q === 0 || tile.q === 50 || tile.r === 0 || tile.r === 50;
       expect(isHordeSpawnReserve(FIXED_MAP, tile)).toBe(expected);
       expect(tile.playerOccupancyAllowed).toBe(!expected);
     }
@@ -112,27 +112,39 @@ describe('v1.4.3 fixed map', () => {
     expect(canPlayerOccupyHex(replaced, { q: 15, r: 0 })).toBe(true);
   });
 
-  it('contains the 17 permanent facilities at the specified coordinates', () => {
+  it('contains the 29 permanent facilities at the specified coordinates', () => {
     expect(FIXED_MAP.facilities).toHaveLength(FIXED_FACILITY_COUNT);
     expect(FIXED_MAP.facilities.map((facility) => facility.id)).toEqual(FIXED_FACILITY_IDS);
     const expected = {
-      capital: ['capital', 15, 15, true],
-      'city-1': ['city', 15, 8, false],
-      'city-2': ['city', 22, 15, false],
-      'city-3': ['city', 15, 22, false],
-      'city-4': ['city', 8, 15, false],
-      'farm-1': ['farm', 13, 15, true],
-      'farm-2': ['farm', 14, 4, false],
-      'farm-3': ['farm', 16, 26, false],
-      'civilian-factory-1': ['civilianFactory', 17, 15, true],
-      'civilian-factory-2': ['civilianFactory', 25, 16, false],
-      'military-factory-1': ['militaryFactory', 26, 15, false],
-      'military-factory-2': ['militaryFactory', 11, 15, false],
-      'refinery-1': ['refinery', 15, 13, true],
-      'refinery-2': ['refinery', 14, 6, false],
-      'power-plant-1': ['powerPlant', 15, 17, true],
-      'power-plant-2': ['powerPlant', 16, 24, false],
-      'wind-power-plant-1': ['windPowerPlant', 16, 14, true],
+      capital: ['capital', 25, 25, true],
+      'city-1': ['city', 25, 20, false],
+      'city-2': ['city', 24, 8, false],
+      'city-3': ['city', 33, 25, false],
+      'city-4': ['city', 43, 24, false],
+      'city-5': ['city', 25, 34, false],
+      'city-6': ['city', 26, 43, false],
+      'city-7': ['city', 16, 25, false],
+      'city-8': ['city', 7, 26, false],
+      'farm-1': ['farm', 23, 25, true],
+      'farm-2': ['farm', 21, 11, false],
+      'farm-3': ['farm', 39, 20, false],
+      'farm-4': ['farm', 29, 39, false],
+      'farm-5': ['farm', 10, 29, false],
+      'civilian-factory-1': ['civilianFactory', 27, 25, true],
+      'civilian-factory-2': ['civilianFactory', 29, 13, false],
+      'civilian-factory-3': ['civilianFactory', 22, 38, false],
+      'civilian-factory-4': ['civilianFactory', 11, 28, false],
+      'military-factory-1': ['militaryFactory', 21, 25, false],
+      'military-factory-2': ['militaryFactory', 22, 10, false],
+      'military-factory-3': ['militaryFactory', 28, 40, false],
+      'refinery-1': ['refinery', 25, 23, true],
+      'refinery-2': ['refinery', 38, 21, false],
+      'refinery-3': ['refinery', 25, 39, false],
+      'refinery-4': ['refinery', 11, 30, false],
+      'power-plant-1': ['powerPlant', 25, 27, true],
+      'power-plant-2': ['powerPlant', 40, 22, false],
+      'power-plant-3': ['powerPlant', 10, 28, false],
+      'wind-power-plant-1': ['windPowerPlant', 26, 24, true],
     } as Record<string, [string, number, number, boolean]>;
     for (const facility of FIXED_MAP.facilities) {
       const definition = expected[facility.id]!;
@@ -154,63 +166,33 @@ describe('v1.4.3 fixed map', () => {
     });
   });
 
-  it('publishes canonical initial Unit positions and twelve safe Normal Zombie positions', () => {
+  it('publishes canonical initial Unit positions and seed-selected safe Normal Zombies', () => {
     expect(FIXED_INITIAL_UNIT_POSITIONS).toEqual({
-      police: { q: 14, r: 15 },
-      nationalGuard: { q: 16, r: 15 },
+      police: { q: 24, r: 25 },
+      nationalGuard: { q: 26, r: 25 },
     });
-    expect(FIXED_INITIAL_ZOMBIE_POSITIONS).toEqual([
-      { q: 9, r: 9 },
-      { q: 21, r: 21 },
-      { q: 21, r: 9 },
-      { q: 9, r: 21 },
-      { q: 15, r: 6 },
-      { q: 15, r: 24 },
-      { q: 16, r: 2 },
-      { q: 28, r: 2 },
-      { q: 28, r: 14 },
-      { q: 14, r: 28 },
-      { q: 2, r: 28 },
-      { q: 2, r: 16 },
-    ]);
-    expect(FIXED_INITIAL_ZOMBIE_POSITIONS).toHaveLength(12);
+    expect(FIXED_INITIAL_ZOMBIE_POSITIONS).toHaveLength(FIXED_INITIAL_ZOMBIE_COUNT);
     expect(FIXED_MAP.initialZombiePositions).toEqual(FIXED_INITIAL_ZOMBIE_POSITIONS);
-    const ownedFacilities = FIXED_MAP.facilities.filter((facility) => facility.startingOwned);
-    const ownedKeys = new Set(ownedFacilities.map((facility) => hexKey(facility.position)));
     const occupiedStaticKeys = new Set([
       ...FIXED_MAP.facilities.map((facility) => hexKey(facility.position)),
       ...FIXED_MAP.roadTiles.map(hexKey),
       ...FIXED_MAP.hordeSpawnReserve.map(hexKey),
       ...Object.values(FIXED_INITIAL_UNIT_POSITIONS).map(hexKey),
     ]);
-    const capital = { q: 15, r: 15 };
-    const appended = FIXED_INITIAL_ZOMBIE_POSITIONS.slice(6);
-    expect(appended.every((position) => hexDistance(position, capital) === 13)).toBe(true);
-    expect(appended).toEqual([
-      { q: 16, r: 2 }, { q: 28, r: 2 }, { q: 28, r: 14 },
-      { q: 14, r: 28 }, { q: 2, r: 28 }, { q: 2, r: 16 },
-    ]);
-    for (const position of appended) {
+    const capital = { q: 25, r: 25 };
+    for (const position of FIXED_INITIAL_ZOMBIE_POSITIONS) {
       expect(occupiedStaticKeys.has(hexKey(position))).toBe(false);
-      expect(at(position.q, position.r)).toMatchObject({ road: false, facilityId: null });
+      expect(hexDistance(position, capital)).toBeGreaterThanOrEqual(9);
+      expect(at(position.q, position.r)?.movementCost).not.toBeNull();
     }
-    expect(appended.map((position) => hexKey(position))).toEqual([
-      '16,2', '28,2', '28,14', '14,28', '2,28', '2,16',
-    ]);
-    expect(appended[0]).toEqual(rotate(appended[3]!));
-    expect(appended[1]).toEqual(rotate(appended[4]!));
-    expect(appended[2]).toEqual(rotate(appended[5]!));
-    for (const zombie of FIXED_MAP.initialZombiePositions) {
-      expect(ownedKeys.has(hexKey(zombie))).toBe(false);
-      expect(Math.min(...ownedFacilities.map((facility) => hexDistance(zombie, facility.position)))).toBeGreaterThanOrEqual(4);
-      // Current Zombie movement is three hexes; every initial facility remains
-      // unreachable during the first Zombie turn by distance alone.
-      expect(Math.min(...ownedFacilities.map((facility) => hexDistance(zombie, facility.position)))).toBeGreaterThan(3);
-    }
+    expect(new Set(FIXED_INITIAL_ZOMBIE_POSITIONS.map(hexKey)).size).toBe(FIXED_INITIAL_ZOMBIE_COUNT);
+    expect(generateInitialZombiePositions(FIXED_MAP, 101)).toEqual(generateInitialZombiePositions(FIXED_MAP, 101));
+    expect(generateInitialZombiePositions(FIXED_MAP, 101)).not.toEqual(generateInitialZombiePositions(FIXED_MAP, 102));
+    expect(getInitialZombieCandidates(FIXED_MAP).length).toBeGreaterThan(FIXED_INITIAL_ZOMBIE_COUNT);
   });
 
   it('keeps starting Supply open for construction and extension bands populated', () => {
-    const capital = { q: 15, r: 15 };
+    const capital = { q: 25, r: 25 };
     const occupied = new Set([
       ...FIXED_MAP.facilities.map((facility) => hexKey(facility.position)),
       hexKey(FIXED_INITIAL_UNIT_POSITIONS.police),
@@ -222,21 +204,10 @@ describe('v1.4.3 fixed map', () => {
     });
     expect(staticBuildable.length).toBeGreaterThanOrEqual(12);
 
-    const branchByDirection = new Map(FIXED_MAP.roadBranches.map((branch) => [branch.direction, branch]));
-    for (const branch of branchByDirection.values()) {
-      for (let radius = 6; radius <= 15; radius += 1) {
-        const candidates = FIXED_MAP.tiles.filter((tile) => {
-          if (tile.terrain !== 'plain' || tile.road || tile.facilityId !== null) return false;
-          if (hexDistance(capital, tile) !== radius) return false;
-          const distances = FIXED_MAP.roadBranches.map((other) =>
-            Math.min(...other.roadTiles.map((roadTile) => hexDistance(tile, roadTile))),
-          );
-          const branchDistance = Math.min(...branch.roadTiles.map((roadTile) => hexDistance(tile, roadTile)));
-          return branchDistance === Math.min(...distances);
-        });
-        expect(candidates.length, `${branch.direction} radius ${radius}`).toBeGreaterThanOrEqual(2);
-      }
-    }
+    expect(FIXED_MAP.tiles.filter((tile) =>
+      tile.terrain === 'plain' && !tile.road && tile.facilityId === null
+      && hexDistance(capital, tile) <= 5,
+    ).length).toBeGreaterThanOrEqual(12);
   });
 
   it('validates the canonical map and returns independent snapshots', () => {

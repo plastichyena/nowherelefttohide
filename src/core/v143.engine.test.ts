@@ -76,22 +76,22 @@ function movePlayersAway(state: MutableState): void {
   if (guard) guard.position = { q: 2, r: 1 };
 }
 
-describe('v1.4.3 Core version, map, and initial state', () => {
-  it('creates a v2.3.0 state on fixed-31x31-v2 with all twelve initial Normal Zombies', () => {
+describe('v1.4.4 Core version, map, and initial state', () => {
+  it('creates a v2.4.0 state on fixed-51x51-v1 with all 25 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('2.3.0');
-    expect(state.mapId).toBe('fixed-31x31-v2');
-    expect(state.map.id).toBe('fixed-31x31-v2');
+    expect(state.gameVersion).toBe('2.4.0');
+    expect(state.mapId).toBe('fixed-51x51-v1');
+    expect(state.map.id).toBe('fixed-51x51-v1');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');
-    expect(zombies).toHaveLength(12);
+    expect(zombies).toHaveLength(25);
     expect(zombies.map((unit) => unit.position)).toEqual(state.map.initialZombiePositions);
     expect(zombies.every((unit) => unit.hordeKind === null && unit.spawnGroupId === null)).toBe(true);
-    expect(state.statistics.initialNormalZombies).toBe(12);
+    expect(state.statistics.initialNormalZombies).toBe(25);
     expect(state.horde.totalSpawned).toBe(0);
   });
 });
 
-describe('v1.4.3 infection fall Spawn boundaries', () => {
+describe('v1.4.4 infection fall Spawn boundaries', () => {
   function infectionFall(infected: number, blockAllAdjacent = false): ReturnType<GameEngine['step']> {
     const engine = new GameEngine(14310 + infected, quietConfig());
     const state = cloneState(engine.getState());
@@ -201,7 +201,7 @@ describe('v1.4.3 infection fall Spawn boundaries', () => {
   });
 });
 
-describe('v1.4.3 constructible and Wind Power Plant overrun behavior', () => {
+describe('v1.4.4 constructible and Wind Power Plant overrun behavior', () => {
   it('removes a constructible facility and counts only unspawned residual infection as deaths', () => {
     const engine = new GameEngine(14330, quietConfig());
     const candidate = engine.getConstructibleFacilityPositionCandidates('simpleFarm').find((entry) => entry.legal);
@@ -264,14 +264,14 @@ describe('v1.4.3 constructible and Wind Power Plant overrun behavior', () => {
   });
 });
 
-describe('v1.4.3 generated Zombie immediate occupancy and FIFO chains', () => {
+describe('v1.4.4 generated Zombie immediate occupancy and FIFO chains', () => {
   it('processes generated occupancy immediately in generated-ID order and records chain origin/depth', () => {
     const engine = new GameEngine(14340, quietConfig());
     const setup = cloneState(engine.getState());
     movePlayersAway(setup);
     const source = setup.facilities.find((facility) => facility.id === 'farm-1')!;
     const capital = setup.facilities.find((facility) => facility.id === 'capital')!;
-    const checkpointPosition = { q: 14, r: 15 };
+    const checkpointPosition = { q: 22, r: 25 };
     const checkpoint = {
       id: 'checkpoint-chain-test',
       position: checkpointPosition,
@@ -354,7 +354,7 @@ describe('v1.4.3 generated Zombie immediate occupancy and FIFO chains', () => {
   });
 });
 
-describe('v1.4.3 Combat Noise respawn', () => {
+describe('v1.4.4 Combat Noise respawn', () => {
   it('respawns a nearby fallen permanent site after the full Guard attack, while hiding internal Noise fields', () => {
     const engine = new GameEngine(14350, quietConfig({
       units: {
@@ -367,7 +367,7 @@ describe('v1.4.3 Combat Noise respawn', () => {
     const setup = cloneState(engine.getState());
     const guard = setup.units.find((unit) => unit.type === 'nationalGuard')!;
     const police = setup.units.find((unit) => unit.type === 'police')!;
-    guard.position = { q: 16, r: 15 };
+    guard.position = { q: 24, r: 24 };
     guard.actionState = 'ready';
     guard.canAttack = true;
     guard.canMove = true;
@@ -382,7 +382,7 @@ describe('v1.4.3 Combat Noise respawn', () => {
     fallen.workers = 0;
     fallen.infected = 5;
     capital.workers += 13;
-    const target = createUnit(setup, 'noise-combat-target', 'zombie', { q: 17, r: 15 });
+    const target = createUnit(setup, 'noise-combat-target', 'zombie', { q: 25, r: 24 });
     target.hp = 1;
     target.inheritedTarget = { q: 1, r: 1 };
     target.movement = 0;
@@ -397,8 +397,8 @@ describe('v1.4.3 Combat Noise respawn', () => {
     expect(noise?.payload).toMatchObject({
       sourceUnitId: guard.id,
       sourceUnitType: 'nationalGuard',
-      q: 16,
-      r: 15,
+      q: 24,
+      r: 24,
       noiseClass: 'large',
     });
     expect(noise?.payload).not.toHaveProperty('radius');

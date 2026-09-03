@@ -8,8 +8,9 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-export const CHECKPOINT_SCHEMA_VERSION = '1.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '1.0.0' as const;
+/** Session/Checkpoint v2 deliberately rejects all v1.4.3 portable data. */
+export const CHECKPOINT_SCHEMA_VERSION = '2.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '2.0.0' as const;
 export const DEFAULT_CHECKPOINT_INTERVAL = 5;
 export const MAX_DECISION_SUMMARY_CODE_POINTS = 500;
 export const ZERO_HASH = '0'.repeat(64);

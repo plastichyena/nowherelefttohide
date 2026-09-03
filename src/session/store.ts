@@ -600,7 +600,13 @@ export class SessionStore {
     if (!existsSync(path)) throw new SessionError('checkpoint_not_found', `Checkpoint metadata not found: ${path}`);
     const metadata = parseJson<SessionCheckpointMetadata>(readFileSync(path, 'utf8'), 'Checkpoint metadata');
     ensureObject(metadata, 'Checkpoint metadata');
-    if (metadata.checkpointSchemaVersion !== CHECKPOINT_SCHEMA_VERSION || metadata.sessionId !== descriptor.sessionId) {
+    if (
+      metadata.checkpointSchemaVersion !== CHECKPOINT_SCHEMA_VERSION
+      || metadata.sessionSchemaVersion !== SESSION_SCHEMA_VERSION
+    ) {
+      throw new SessionError('checkpoint_version_mismatch', 'Checkpoint or Session Schema Version is unsupported');
+    }
+    if (metadata.sessionId !== descriptor.sessionId) {
       throw new SessionError('checkpoint_corrupt', 'Checkpoint metadata does not match Session');
     }
     const expected = integrityHash(metadata as unknown as Record<string, unknown>, 'metadataIntegrityHash');

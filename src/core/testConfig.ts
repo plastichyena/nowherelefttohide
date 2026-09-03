@@ -1,6 +1,6 @@
 import type { HordeComposition, HordeConfig } from './types';
 
-/** Compact valid v1.4.3 schedule for focused Core tests. */
+/** Compact valid v1.4.4 schedule for focused Core tests. */
 export function singleFinalWave(
   turn: number,
   composition: HordeComposition = { hordeZombie: 1, zombie: 0 },

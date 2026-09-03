@@ -66,7 +66,8 @@ export interface SimulationRunOptions {
 }
 
 export interface SimulationReport {
-  schemaVersion: '4.0.0';
+  /** Mirrors the current public Artifact contract; v1.4.3 reports are not replay inputs. */
+  schemaVersion: '5.0.0';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -314,7 +315,7 @@ function createSimulationReport(
     aggregate[agent] = aggregateMetrics(rows);
   }
   return {
-    schemaVersion: '4.0.0',
+    schemaVersion: '5.0.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -378,6 +379,8 @@ const CSV_COLUMNS: readonly string[] = [
   'periodicHordeZombiesSpawned', 'periodicNormalZombiesSpawned',
   'finalHordeZombiesSpawned', 'finalNormalZombiesSpawned',
   'normalZombiesKilled', 'hordeZombiesKilled',
+  'policeZombiesSpawned', 'soldierZombiesSpawned', 'policeZombiesKilled', 'soldierZombiesKilled',
+  'policeZombiesFinal', 'soldierZombiesFinal',
   'maxVisibleZombies', 'turnsAfterFinalHorde', 'suppliedAreaZombieClearTurn', 'suppliedAreaInfectionClearTurn', 'victoryTurn',
   'terrainEntriesByType.plain', 'terrainEntriesByType.forest', 'terrainEntriesByType.mountain', 'terrainEntriesByType.water',
   'urbanDefenseApplications', 'urbanDefenseDamagePrevented', 'forestDefenseApplications', 'forestDefenseDamagePrevented',
@@ -391,7 +394,8 @@ const CSV_COLUMNS: readonly string[] = [
   'policeNoiseChainOverruns', 'nationalGuardNoiseChainOverruns',
   'groundVisionPotentialHexes', 'groundVisionVisibleHexes', 'groundVisionBlockedHexes',
   'maxGroundVisionBlockedHexes', 'averageGroundVisionBlockedHexes',
-  'civilianDroneBasesBuilt', 'maxCivilianDroneVisionRadius', 'aerialDiscoveriesInGroundBlockedArea',
+  'civilianDroneBasesBuilt', 'civilianDroneBasesDecommissioned', 'civilianGoodsRefundedFromDecommission',
+  'maxCivilianDroneVisionRadius', 'aerialDiscoveriesInGroundBlockedArea',
   'infectedPopulationAtFall', 'requestedSiteZombieSpawns', 'actualSiteZombieSpawns',
   'fallSiteZombieSpawns', 'noiseSiteZombieSpawns', 'maxSixZombieSpawnResolutions',
   'infectedPopulationConvertedToZombies', 'unspawnedInfectedPopulation', 'immediateInfectionsFromSpawn',
@@ -401,7 +405,7 @@ const CSV_COLUMNS: readonly string[] = [
   'mapWidth', 'mapHeight',
   'humanHexesMoved.police', 'humanHexesMoved.nationalGuard',
   'maxSingleMoveDistance.police', 'maxSingleMoveDistance.nationalGuard',
-  'longMoves6Plus.police', 'longMoves6Plus.nationalGuard',
+  'longMoves6Plus.police', 'longMoves6Plus.nationalGuard', 'policeLongRangeMoves',
   'unitFuelConsumed.police', 'unitFuelConsumed.nationalGuard',
   'unitFuelRefilled.police', 'unitFuelRefilled.nationalGuard',
   'commissioningFuel.police', 'commissioningFuel.nationalGuard',
@@ -432,6 +436,15 @@ const CSV_COLUMNS: readonly string[] = [
   'resourceSinglePointFailureTurns.electricity',
   'checkpointQueuePressureTurns.none', 'checkpointQueuePressureTurns.low',
   'checkpointQueuePressureTurns.medium', 'checkpointQueuePressureTurns.high',
+  'checkpointQueueFoodDemand', 'checkpointQueueCivilianGoodsDemand',
+  'checkpointQueueFoodConsumed', 'checkpointQueueCivilianGoodsConsumed',
+  ...CSV_DIRECTIONS.flatMap((direction) => [
+    `refugeesRejected.${direction}.normal`, `refugeesRejected.${direction}.strict`,
+    `refugeesTurnedAway.${direction}`, `rejectedBonusZombies.${direction}`, `rejectedCounterResets.${direction}`,
+  ]),
+  'preventedRefugeeArrivalsAfterFinal', 'policeReanimations', 'nationalGuardReanimations',
+  'reanimationImmediateInfections', 'reanimationFacilityInfections', 'reanimationCheckpointInfections',
+  'reanimationSiteFalls', 'reanimationChainOverruns',
   ...CSV_FACILITY_TYPES.flatMap((type) => [
     `power.${type}.requested`, `power.${type}.supplied`, `power.${type}.unavailable`, `power.${type}.off`,
   ]),
@@ -508,7 +521,10 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.finalHordeSpawned, game.finalHordeKilled, game.finalHordeDefeated,
       game.periodicHordeZombiesSpawned, game.periodicNormalZombiesSpawned,
       game.finalHordeZombiesSpawned, game.finalNormalZombiesSpawned,
-      game.normalZombiesKilled, game.hordeZombiesKilled, game.maxVisibleZombies, game.turnsAfterFinalHorde,
+       game.normalZombiesKilled, game.hordeZombiesKilled,
+       game.policeZombiesSpawned, game.soldierZombiesSpawned, game.policeZombiesKilled, game.soldierZombiesKilled,
+       game.policeZombiesFinal, game.soldierZombiesFinal,
+       game.maxVisibleZombies, game.turnsAfterFinalHorde,
       game.suppliedAreaZombieClearTurn, game.suppliedAreaInfectionClearTurn, game.victoryTurn,
       game.terrainEntriesByType.plain, game.terrainEntriesByType.forest,
       game.terrainEntriesByType.mountain, game.terrainEntriesByType.water,
@@ -525,7 +541,8 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.policeNoiseChainOverruns, game.nationalGuardNoiseChainOverruns,
       game.groundVisionPotentialHexes, game.groundVisionVisibleHexes, game.groundVisionBlockedHexes,
       game.maxGroundVisionBlockedHexes, game.averageGroundVisionBlockedHexes,
-      game.civilianDroneBasesBuilt, game.maxCivilianDroneVisionRadius, game.aerialDiscoveriesInGroundBlockedArea,
+       game.civilianDroneBasesBuilt, game.civilianDroneBasesDecommissioned, game.civilianGoodsRefundedFromDecommission,
+       game.maxCivilianDroneVisionRadius, game.aerialDiscoveriesInGroundBlockedArea,
       game.infectedPopulationAtFall, game.requestedSiteZombieSpawns, game.actualSiteZombieSpawns,
       game.fallSiteZombieSpawns, game.noiseSiteZombieSpawns, game.maxSixZombieSpawnResolutions,
       game.infectedPopulationConvertedToZombies, game.unspawnedInfectedPopulation,
@@ -537,7 +554,7 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.mapWidth, game.mapHeight,
       game.humanHexesMovedByType.police, game.humanHexesMovedByType.nationalGuard,
       game.maxSingleMoveDistanceByType.police, game.maxSingleMoveDistanceByType.nationalGuard,
-      game.longMoves6PlusByType.police, game.longMoves6PlusByType.nationalGuard,
+       game.longMoves6PlusByType.police, game.longMoves6PlusByType.nationalGuard, game.policeLongRangeMoves,
       game.unitFuelConsumedByType.police, game.unitFuelConsumedByType.nationalGuard,
       game.unitFuelRefilledByType.police, game.unitFuelRefilledByType.nationalGuard,
       game.commissioningFuelByType.police, game.commissioningFuelByType.nationalGuard,
@@ -568,8 +585,20 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.resourceSinglePointFailureTurnsByResource.militaryGoods ?? 0,
       game.resourceSinglePointFailureTurnsByResource.fuel ?? 0,
       game.resourceSinglePointFailureTurnsByResource.electricity ?? 0,
-       game.checkpointQueuePressureTurnsByClass.none, game.checkpointQueuePressureTurnsByClass.low,
-       game.checkpointQueuePressureTurnsByClass.medium, game.checkpointQueuePressureTurnsByClass.high,
+        game.checkpointQueuePressureTurnsByClass.none, game.checkpointQueuePressureTurnsByClass.low,
+        game.checkpointQueuePressureTurnsByClass.medium, game.checkpointQueuePressureTurnsByClass.high,
+        game.checkpointQueueFoodDemand, game.checkpointQueueCivilianGoodsDemand,
+        game.checkpointQueueFoodConsumed, game.checkpointQueueCivilianGoodsConsumed,
+        ...CSV_DIRECTIONS.flatMap((direction) => [
+          game.refugeesRejectedByDirectionAndPolicy[direction]?.normal ?? 0,
+          game.refugeesRejectedByDirectionAndPolicy[direction]?.strict ?? 0,
+          game.refugeesTurnedAwayByDirection[direction] ?? 0,
+          game.rejectedBonusZombiesByDirection[direction] ?? 0,
+          game.rejectedCounterResetsByDirection[direction] ?? 0,
+        ]),
+        game.preventedRefugeeArrivalsAfterFinal, game.policeReanimations, game.nationalGuardReanimations,
+        game.reanimationImmediateInfections, game.reanimationFacilityInfections, game.reanimationCheckpointInfections,
+        game.reanimationSiteFalls, game.reanimationChainOverruns,
        ...CSV_FACILITY_TYPES.flatMap((type) => {
          const metric = game.powerTurnsByFacilityType[type] ?? { requested: 0, supplied: 0, unavailable: 0, off: 0 };
          return [metric.requested, metric.supplied, metric.unavailable, metric.off];

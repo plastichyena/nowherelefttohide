@@ -150,6 +150,9 @@ describe('Balanced Agent scenario intentions', () => {
         containingUnitId: null,
         projectedSuppression: 0,
         projectedCivilianDamage: 0,
+        healthyQueueConsumesMaintenance: true as const,
+        queueMaintenanceFood: 8,
+        queueMaintenanceCivilianGoods: 8,
       }];
     });
     expect(result.action).toMatchObject({ type: 'Move', destination: near });
@@ -331,6 +334,9 @@ describe('Balanced Agent scenario intentions', () => {
       containingUnitId: null,
       projectedSuppression: 0,
       projectedCivilianDamage: 0,
+      healthyQueueConsumesMaintenance: true as const,
+      queueMaintenanceFood: 0,
+      queueMaintenanceCivilianGoods: 0,
     };
     const relocate = decide([
       { type: 'RelocateCheckpoint', checkpointId: checkpoint.id, branchId: branch.branchId, position: { ...branch.roadTiles[1]! } },
@@ -438,6 +444,9 @@ describe('Balanced Agent scenario intentions', () => {
       containingUnitId: null,
       projectedSuppression: 0,
       projectedCivilianDamage: 0,
+      healthyQueueConsumesMaintenance: true as const,
+      queueMaintenanceFood: 0,
+      queueMaintenanceCivilianGoods: 0,
     };
     const actions: GameAction[] = [
       { type: 'SetCheckpointPolicy', branchId: branch.branchId, policy: 'passThrough' },

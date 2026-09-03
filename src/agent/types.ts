@@ -34,16 +34,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-export const APP_VERSION = '1.4.3';
-export const GAME_RULES_VERSION = '2.3.0';
-export const SAVE_FORMAT_VERSION = '8';
-export const AGENT_API_VERSION = '5.0.0';
-export const OBSERVATION_API_VERSION = '5.0.0';
-export const BRIDGE_API_VERSION = '5.0.0';
-export const BALANCED_AGENT_VERSION = '4.3.0';
-export const RANDOM_AGENT_VERSION = '2.2.0';
-export const ARTIFACT_SCHEMA_VERSION = '4.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '1.0.0';
+/** v1.4.4 has no compatibility or migration path for v1.4.3 data. */
+export const APP_VERSION = '1.4.4';
+export const GAME_RULES_VERSION = '2.4.0';
+export const SAVE_FORMAT_VERSION = '9';
+export const AGENT_API_VERSION = '6.0.0';
+export const OBSERVATION_API_VERSION = '6.0.0';
+export const BRIDGE_API_VERSION = '6.0.0';
+export const BALANCED_AGENT_VERSION = '4.4.0';
+export const RANDOM_AGENT_VERSION = '2.3.0';
+export const ARTIFACT_SCHEMA_VERSION = '5.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '2.0.0';
 
 export interface AgentMapTileObservation {
   q: number;
@@ -81,8 +82,15 @@ export interface AgentRoadBranchObservation {
   capitalConnection: HexCoord;
   roadTiles: HexCoord[];
   entrance: HexCoord;
-  nextArrivalTurn: number;
-  turnsUntilArrival: number;
+  nextArrivalTurn: number | null;
+  turnsUntilArrival: number | null;
+  /** Final Wave commit permanently stops new natural arrivals. */
+  arrivalsEnded: boolean;
+  /** Current branch-specific cost; the first ever Build is discounted. */
+  checkpointBuildCost: number;
+  checkpointRelocateCost: number;
+  /** Qualitative public warning; direction/count/bonus remain private. */
+  rejectionMayStrengthenFutureHorde: true;
   activeCheckpointId: string | null;
   activeCheckpointStatus: CheckpointStatus | null;
   standbyCheckpointIds: string[];
@@ -161,6 +169,8 @@ export interface AgentFacilityObservation {
   containingUnitId: string | null;
   projectedSuppression: number;
   projectedCivilianDamage: number;
+  /** Only an eligible Civilian Drone Base can expose this refund. */
+  decommissionRefundCivilianGoods: number | null;
 }
 
 export interface AgentUnitObservation {
@@ -259,6 +269,9 @@ export interface AgentCheckpointObservation {
   arrivalPeopleMin: number;
   arrivalPeopleMax: number;
   queuePressureClass: 'none' | 'low' | 'medium' | 'high';
+  healthyQueueConsumesMaintenance: true;
+  queueMaintenanceFood: number;
+  queueMaintenanceCivilianGoods: number;
   infected: number;
   remainingTurns: number;
   currentPolicy: CheckpointPolicy;
@@ -307,7 +320,7 @@ export interface AgentApiInfo {
       zombieSpawnRadius: number;
       noiseRespawnEnabled: boolean;
     };
-    ranges: Record<'police' | 'nationalGuard' | 'zombie' | 'hordeZombie', { baseRange: number }>;
+    ranges: Record<'police' | 'nationalGuard' | 'zombie' | 'hordeZombie' | 'policeZombie' | 'soldierZombie', { baseRange: number }>;
     terrain: {
       movementCost: Record<BaseTerrain, number | null>;
       damageMultiplier: {
@@ -716,14 +729,14 @@ export interface AgentRunArtifact {
   seed: number;
   config: GameConfig;
   agent: { id: string; version?: string; strategy?: string };
-  initialRoadArrivalSchedule: Array<{ branchId: string; nextArrivalTurn: number }>;
+  initialRoadArrivalSchedule: Array<{ branchId: string; nextArrivalTurn: number | null }>;
   acceptedActions: GameAction[];
   invalidAttempts: InvalidActionAttempt[];
   decisionTrace: AgentDecisionTrace[];
   /** Present for a Session artifact; absent for a standalone run. */
   sessionLineage?: { parentSessionId: string | null; parentCheckpointId: string | null };
   result: AgentGameResult | null;
-  /** Static map projection stored once per game by Artifact Schema 4.0.0. */
+  /** Static map projection stored once per game by Artifact Schema 5.0.0. */
   fixedMap?: AgentMapObservation;
   /** Dynamic public observations at reset and after each accepted action. */
   observationTrace?: AgentArtifactObservation[];
@@ -735,7 +748,7 @@ export interface AgentRunArtifact {
 }
 
 /**
- * Artifact Schema 4.0.0 stores topology once and keeps only dynamic map
+ * Artifact Schema 5.0.0 stores topology once and keeps only dynamic map
  * visibility in each trace entry.  Live observations remain complete.
  */
 export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {
@@ -746,7 +759,8 @@ export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {
 /**
  * Noise reaction counts can reveal hidden enemy activity.  They are retained
  * only in local/CI verification metrics and never in a production result or
- * Browser Bridge artifact.
+ * Browser Bridge artifact. Final special-Zombie survivor totals are included
+ * because a surviving unit may have left player vision before Game Over.
  */
 export const HIDDEN_NOISE_METRIC_KEYS = [
   'normalZombiesNoiseTargeted',
@@ -754,13 +768,28 @@ export const HIDDEN_NOISE_METRIC_KEYS = [
   'noiseTargetsOverriddenByHorde',
   'noiseTargetsOverriddenByVisiblePopulation',
   'aerialDiscoveriesInGroundBlockedArea',
+  'policeZombiesFinal',
+  'soldierZombiesFinal',
 ] as const;
 
 export type HiddenNoiseMetricKey = typeof HIDDEN_NOISE_METRIC_KEYS[number];
+
+/**
+ * Rejected-refugee detail predicts a future Horde composition. It remains
+ * verification-only just like hidden Noise reaction detail.
+ */
+export const HIDDEN_REJECTED_REFUGEE_METRIC_KEYS = [
+  'refugeesRejectedByDirectionAndPolicy',
+  'refugeesTurnedAwayByDirection',
+  'rejectedBonusZombiesByDirection',
+  'rejectedCounterResetsByDirection',
+] as const;
+
+export type HiddenRejectedRefugeeMetricKey = typeof HIDDEN_REJECTED_REFUGEE_METRIC_KEYS[number];
 export type AgentPublicConfig = Omit<GameConfig, 'noise'> & {
   noise: Pick<GameConfig['noise'], 'publicClass'>;
 };
-export type AgentPublicMetrics = Omit<GameMetrics, HiddenNoiseMetricKey | 'config'> & {
+export type AgentPublicMetrics = Omit<GameMetrics, HiddenNoiseMetricKey | HiddenRejectedRefugeeMetricKey | 'config'> & {
   config: AgentPublicConfig;
 };
 export type AgentPublicRunArtifact = Omit<

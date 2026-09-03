@@ -2,6 +2,7 @@ import { cloneAction, cloneJson } from '../agent/action';
 import { createAgentGame } from '../agent/game';
 import {
   BRIDGE_API_VERSION,
+  HIDDEN_REJECTED_REFUGEE_METRIC_KEYS,
   type AgentGameResult,
   type AgentPublicConfig,
   type AgentPublicMetrics,
@@ -187,6 +188,8 @@ function isBridgeAction(value: unknown): value is GameAction {
         return hasOnlyKeys(value, ['type', 'facilityType', 'position']) &&
           (value.facilityType === 'simpleFarm' || value.facilityType === 'civilianDroneBase') &&
           isCoordinate(value.position);
+      case 'DecommissionConstructibleFacility':
+        return hasOnlyKeys(value, ['type', 'facilityId']) && isSafeId(value.facilityId);
       case 'RelocateCheckpoint':
         return hasOnlyKeys(value, ['type', 'checkpointId', 'position'], ['branchId']) &&
           isSafeId(value.checkpointId) &&
@@ -196,6 +199,10 @@ function isBridgeAction(value: unknown): value is GameAction {
         return hasOnlyKeys(value, ['type', 'branchId', 'checkpointId']) &&
           isSafeId(value.branchId) &&
           isSafeId(value.checkpointId);
+      case 'TurnAwayCheckpointRefugees':
+        return hasOnlyKeys(value, ['type', 'checkpointId', 'count']) &&
+          isSafeId(value.checkpointId) &&
+          isNonNegativeSafeInteger(value.count) && value.count >= 1;
       case 'ProduceUnit':
         return (
           hasOnlyKeys(value, ['type', 'unitType'], ['destination']) &&
@@ -249,12 +256,14 @@ function publicMetrics(
   acceptedActionCount: number,
   invalidAttemptCount: number,
 ): BrowserBridgePublicMetrics {
-  return cloneJson({
+  const value = {
     ...metrics,
     totalAgentDecisions: acceptedActionCount + invalidAttemptCount,
     acceptedActionCount,
     invalidAttemptCount,
-  });
+  } as Record<string, unknown>;
+  for (const key of HIDDEN_REJECTED_REFUGEE_METRIC_KEYS) delete value[key];
+  return cloneJson(value) as BrowserBridgePublicMetrics;
 }
 
 export function createBrowserBridge(options: BrowserBridgeOptions = {}): BrowserBridgeApi {

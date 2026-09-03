@@ -15,6 +15,8 @@ vi.mock('phaser', () => ({
 
 import {
   BOARD_RENDER_LAYER_ORDER,
+  BOARD_MIN_ZOOM,
+  BOARD_MAX_ZOOM,
   boardTextureKey,
   checkpointCandidateMarkerStyle,
   classifyBoardAssetFailure,
@@ -40,6 +42,11 @@ describe('Phaser board asset boundary helpers', () => {
       'unit',
       'dynamic',
     ]);
+  });
+
+  it('uses the v1.4.4 mobile camera bounds', () => {
+    expect(BOARD_MIN_ZOOM).toBe(0.35);
+    expect(BOARD_MAX_ZOOM).toBe(2.2);
   });
 
   it('classifies independent asset failures for per-file fallback', () => {
@@ -103,8 +110,8 @@ describe('Phaser board asset boundary helpers', () => {
   it('exposes exactly the fixed outer Spawn Reserve tiles', () => {
     const map = createFixedMap();
     const reserve = spawnReserveTileKeys(map);
-    expect(reserve).toHaveLength(120);
-    expect(new Set(reserve).size).toBe(120);
+    expect(reserve).toHaveLength(200);
+    expect(new Set(reserve).size).toBe(200);
     expect(map.tiles.filter((tile) => tile.playerOccupancyAllowed === false).map((tile) => tile.key)).toEqual(reserve);
   });
 

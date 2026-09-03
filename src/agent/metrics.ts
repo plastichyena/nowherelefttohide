@@ -31,8 +31,10 @@ export const ACTION_TYPES = [
   'SetPowerSupply',
   'BuildCheckpoint',
   'BuildConstructibleFacility',
+  'DecommissionConstructibleFacility',
   'RelocateCheckpoint',
   'ActivateCheckpoint',
+  'TurnAwayCheckpointRefugees',
   'ProduceUnit',
   'EndTurn',
 ] as const;
@@ -193,6 +195,12 @@ export interface GameMetrics {
   finalNormalZombiesSpawned: number;
   normalZombiesKilled: number;
   hordeZombiesKilled: number;
+  policeZombiesSpawned: number;
+  soldierZombiesSpawned: number;
+  policeZombiesKilled: number;
+  soldierZombiesKilled: number;
+  policeZombiesFinal: number;
+  soldierZombiesFinal: number;
   maxVisibleZombies: number;
   turnsAfterFinalHorde: number;
   suppliedAreaZombieClearTurn: number | null;
@@ -232,6 +240,8 @@ export interface GameMetrics {
   maxGroundVisionBlockedHexes: number;
   averageGroundVisionBlockedHexes: number;
   civilianDroneBasesBuilt: number;
+  civilianDroneBasesDecommissioned: number;
+  civilianGoodsRefundedFromDecommission: number;
   maxCivilianDroneVisionRadius: number;
   /** Verification-only; production results and Browser Bridge artifacts omit it. */
   aerialDiscoveriesInGroundBlockedArea: number;
@@ -288,6 +298,23 @@ export interface GameMetrics {
   resourceSinglePointFailureTurnsByResource: Record<string, number>;
   checkpointMovesWithNoSupplyGain: number;
   checkpointQueuePressureTurnsByClass: Record<'none' | 'low' | 'medium' | 'high', number>;
+  checkpointQueueFoodDemand: number;
+  checkpointQueueCivilianGoodsDemand: number;
+  checkpointQueueFoodConsumed: number;
+  checkpointQueueCivilianGoodsConsumed: number;
+  refugeesRejectedByDirectionAndPolicy: Record<CardinalDirection, Record<'normal' | 'strict', number>>;
+  refugeesTurnedAwayByDirection: Record<CardinalDirection, number>;
+  rejectedBonusZombiesByDirection: Record<CardinalDirection, number>;
+  rejectedCounterResetsByDirection: Record<CardinalDirection, number>;
+  preventedRefugeeArrivalsAfterFinal: number;
+  policeReanimations: number;
+  nationalGuardReanimations: number;
+  reanimationImmediateInfections: number;
+  reanimationFacilityInfections: number;
+  reanimationCheckpointInfections: number;
+  reanimationSiteFalls: number;
+  reanimationChainOverruns: number;
+  policeLongRangeMoves: number;
   fixedMilitaryGoodsConsumedByType: Record<HumanUnitType, number>;
   attackMilitaryGoodsConsumedByType: Record<HumanUnitType, number>;
   counterattackMilitaryGoodsConsumedByType: Record<HumanUnitType, number>;
@@ -434,6 +461,25 @@ function zeroDirectionMetric(): Record<CardinalDirection, { hordeZombie: number;
   return Object.fromEntries(
     CARDINAL_DIRECTIONS.map((direction) => [direction, { hordeZombie: 0, normalZombie: 0 }]),
   ) as Record<CardinalDirection, { hordeZombie: number; normalZombie: number }>;
+}
+
+function directionNumberRecord(statistics: unknown, key: string): Record<CardinalDirection, number> {
+  const source = numericRecord(isRecord(statistics) ? statistics[key] : undefined);
+  return Object.fromEntries(
+    CARDINAL_DIRECTIONS.map((direction) => [direction, source[direction] ?? 0]),
+  ) as Record<CardinalDirection, number>;
+}
+
+function rejectedByDirectionAndPolicy(
+  statistics: unknown,
+): Record<CardinalDirection, Record<'normal' | 'strict', number>> {
+  const source = isRecord(statistics) && isRecord(statistics.refugeesRejectedByDirectionAndPolicy)
+    ? statistics.refugeesRejectedByDirectionAndPolicy
+    : {};
+  return Object.fromEntries(CARDINAL_DIRECTIONS.map((direction) => {
+    const directionSource = numericRecord(source[direction]);
+    return [direction, { normal: directionSource.normal ?? 0, strict: directionSource.strict ?? 0 }];
+  })) as Record<CardinalDirection, Record<'normal' | 'strict', number>>;
 }
 
 function zeroPowerMetric(): FacilityPowerMetric {
@@ -599,6 +645,12 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   ).length;
   const hordeZombiesKilled = statisticNumber(statistics, 'hordeZombiesKilled') ?? events.filter(
     (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'hordeZombie',
+  ).length;
+  const policeZombiesKilled = statisticNumber(statistics, 'policeZombiesKilled') ?? events.filter(
+    (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'policeZombie',
+  ).length;
+  const soldierZombiesKilled = statisticNumber(statistics, 'soldierZombiesKilled') ?? events.filter(
+    (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'soldierZombie',
   ).length;
   const finalHordeSpawned = statisticNumber(statistics, 'finalHordeSpawned') ?? events
     .filter((event) => event.type === 'horde_spawned' && event.payload.hordeKind === 'final')
@@ -1278,7 +1330,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     unitLosses: statisticNumber(statistics, 'unitLosses') ?? 0,
     zombiesKilled: statisticNumber(statistics, 'normalZombiesKilled') === null && statisticNumber(statistics, 'hordeZombiesKilled') === null
       ? destroyedZombieEvents
-      : normalZombiesKilled + hordeZombiesKilled,
+      : normalZombiesKilled + hordeZombiesKilled + policeZombiesKilled + soldierZombiesKilled,
     hordeInterceptions: statisticNumber(statistics, 'hordeInterceptions') ?? 0,
     finalHordeSpawned,
     finalHordeKilled,
@@ -1289,6 +1341,12 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     finalNormalZombiesSpawned,
     normalZombiesKilled,
     hordeZombiesKilled,
+    policeZombiesSpawned: statisticNumber(statistics, 'policeZombiesSpawned') ?? 0,
+    soldierZombiesSpawned: statisticNumber(statistics, 'soldierZombiesSpawned') ?? 0,
+    policeZombiesKilled,
+    soldierZombiesKilled,
+    policeZombiesFinal: statisticNumber(statistics, 'policeZombiesFinal') ?? 0,
+    soldierZombiesFinal: statisticNumber(statistics, 'soldierZombiesFinal') ?? 0,
     maxVisibleZombies,
     turnsAfterFinalHorde,
     suppliedAreaZombieClearTurn,
@@ -1330,6 +1388,8 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       ? cumulativeGroundVisionBlockedHexes / groundVisionSamples
       : 0,
     civilianDroneBasesBuilt: statisticNumber(statistics, 'civilianDroneBasesBuilt') ?? constructed('civilianDroneBase'),
+    civilianDroneBasesDecommissioned: statisticNumber(statistics, 'civilianDroneBasesDecommissioned') ?? 0,
+    civilianGoodsRefundedFromDecommission: statisticNumber(statistics, 'civilianGoodsRefundedFromDecommission') ?? 0,
     maxCivilianDroneVisionRadius: statisticNumber(statistics, 'maxCivilianDroneVisionRadius') ?? maxDroneVisionRadius,
     aerialDiscoveriesInGroundBlockedArea: statisticNumber(statistics, 'aerialDiscoveriesInGroundBlockedArea') ?? 0,
     siteFirstInfectionsByType,
@@ -1397,6 +1457,23 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     resourceSinglePointFailureTurnsByResource,
     checkpointMovesWithNoSupplyGain,
     checkpointQueuePressureTurnsByClass,
+    checkpointQueueFoodDemand: statisticNumber(statistics, 'checkpointQueueFoodDemand') ?? 0,
+    checkpointQueueCivilianGoodsDemand: statisticNumber(statistics, 'checkpointQueueCivilianGoodsDemand') ?? 0,
+    checkpointQueueFoodConsumed: statisticNumber(statistics, 'checkpointQueueFoodConsumed') ?? 0,
+    checkpointQueueCivilianGoodsConsumed: statisticNumber(statistics, 'checkpointQueueCivilianGoodsConsumed') ?? 0,
+    refugeesRejectedByDirectionAndPolicy: rejectedByDirectionAndPolicy(statistics),
+    refugeesTurnedAwayByDirection: directionNumberRecord(statistics, 'refugeesTurnedAwayByDirection'),
+    rejectedBonusZombiesByDirection: directionNumberRecord(statistics, 'rejectedBonusZombiesByDirection'),
+    rejectedCounterResetsByDirection: directionNumberRecord(statistics, 'rejectedCounterResetsByDirection'),
+    preventedRefugeeArrivalsAfterFinal: statisticNumber(statistics, 'preventedRefugeeArrivalsAfterFinal') ?? 0,
+    policeReanimations: statisticNumber(statistics, 'policeReanimations') ?? 0,
+    nationalGuardReanimations: statisticNumber(statistics, 'nationalGuardReanimations') ?? 0,
+    reanimationImmediateInfections: statisticNumber(statistics, 'reanimationImmediateInfections') ?? 0,
+    reanimationFacilityInfections: statisticNumber(statistics, 'reanimationFacilityInfections') ?? 0,
+    reanimationCheckpointInfections: statisticNumber(statistics, 'reanimationCheckpointInfections') ?? 0,
+    reanimationSiteFalls: statisticNumber(statistics, 'reanimationSiteFalls') ?? 0,
+    reanimationChainOverruns: statisticNumber(statistics, 'reanimationChainOverruns') ?? 0,
+    policeLongRangeMoves: statisticNumber(statistics, 'policeLongRangeMoves') ?? 0,
     fixedMilitaryGoodsConsumedByType,
     attackMilitaryGoodsConsumedByType,
     counterattackMilitaryGoodsConsumedByType,
@@ -1581,6 +1658,12 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'finalNormalZombiesSpawned',
   'normalZombiesKilled',
   'hordeZombiesKilled',
+  'policeZombiesSpawned',
+  'soldierZombiesSpawned',
+  'policeZombiesKilled',
+  'soldierZombiesKilled',
+  'policeZombiesFinal',
+  'soldierZombiesFinal',
   'maxVisibleZombies',
   'turnsAfterFinalHorde',
   'suppliedAreaZombieClearTurn',
@@ -1616,6 +1699,8 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'maxGroundVisionBlockedHexes',
   'averageGroundVisionBlockedHexes',
   'civilianDroneBasesBuilt',
+  'civilianDroneBasesDecommissioned',
+  'civilianGoodsRefundedFromDecommission',
   'maxCivilianDroneVisionRadius',
   'aerialDiscoveriesInGroundBlockedArea',
   'infectedPopulationAtFall',
@@ -1656,6 +1741,19 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'guaranteedDefeatWarnings',
   'guaranteedDefeatIgnored',
   'checkpointMovesWithNoSupplyGain',
+  'checkpointQueueFoodDemand',
+  'checkpointQueueCivilianGoodsDemand',
+  'checkpointQueueFoodConsumed',
+  'checkpointQueueCivilianGoodsConsumed',
+  'preventedRefugeeArrivalsAfterFinal',
+  'policeReanimations',
+  'nationalGuardReanimations',
+  'reanimationImmediateInfections',
+  'reanimationFacilityInfections',
+  'reanimationCheckpointInfections',
+  'reanimationSiteFalls',
+  'reanimationChainOverruns',
+  'policeLongRangeMoves',
   'refineryPowerOutageTurns',
   'refineryOutageNextTurnFuelShortageTurns',
   'simpleFarmFoodShortageAvoidanceTurns',

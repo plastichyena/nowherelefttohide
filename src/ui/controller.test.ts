@@ -12,7 +12,7 @@ vi.mock('phaser', () => ({
 import type { CheckpointPositionCandidate, CheckpointState, FacilityState, GameAction, GameEvent, GameState, UnitState } from '../core/types';
 import { forecastEndTurn, GameEngine } from '../core/engine';
 import { createAgentObservation } from '../agent/observation';
-import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, unitActionAvailability, unitInteractionCancelStep } from './controller';
+import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
@@ -44,6 +44,13 @@ function siteEvent(
 }
 
 describe('controller view models', () => {
+  it('derives a visible title-screen version label from APP_VERSION', () => {
+    expect(titleVersionLabel('ja')).toContain('1.4.4');
+    expect(titleVersionLabel('en')).toContain('1.4.4');
+    expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
+    expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
+  });
+
   it('derives action-menu availability only from legal actions for the selected unit', () => {
     const actions = [
       { type: 'Move', unitId: 'police-1', destination: { q: 2, r: 3 } },
@@ -140,19 +147,27 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.4.2-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.4.3-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.2以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.3');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.3以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.4');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.2 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.3');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.3 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.4');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.3.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 8');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.3.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 8');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.4.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 9');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.4.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 9');
+    for (const locale of ['ja', 'en'] as const) {
+      const t = createTranslator(locale);
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.4.3以前' : 'v1.4.3 or earlier');
+    }
   });
 
   it('projects public site events without hidden spawn details', () => {
@@ -344,11 +359,18 @@ describe('controller view models', () => {
     expect(localizeActionError('invalid_action_input', 'en')).toContain('legal action');
   });
 
+  it('localizes v1.4.4 refugee and decommission action errors', () => {
+    expect(localizeActionError('checkpoint_not_eligible_for_turn_away', 'ja')).toContain('Active');
+    expect(localizeActionError('invalid_refugee_turn_away_count', 'en')).toContain('Waiting');
+    expect(localizeActionError('facility_not_decommissionable', 'ja')).toContain('Civilian Drone Base');
+    expect(localizeActionError('facility_zombie_occupied', 'en')).toContain('Zombie');
+  });
+
   it('uses Core checkpoint candidates directly and localizes their reason without mutating input', () => {
     const candidates: CheckpointPositionCandidate[] = [
-      { actionType: 'BuildCheckpoint', branchId: 'north', position: { q: 7, r: 4 }, legal: true, reasonCode: null },
-      { actionType: 'RelocateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east', position: { q: 10, r: 7 }, legal: false, reasonCode: 'checkpoint_infection_blocked' },
-      { actionType: 'ActivateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east-2', position: { q: 9, r: 7 }, legal: true, reasonCode: null },
+      { actionType: 'BuildCheckpoint', branchId: 'north', position: { q: 7, r: 4 }, legal: true, reasonCode: null, civilianGoodsCost: 5 },
+      { actionType: 'RelocateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east', position: { q: 10, r: 7 }, legal: false, reasonCode: 'checkpoint_infection_blocked', civilianGoodsCost: 25 },
+      { actionType: 'ActivateCheckpoint', branchId: 'east', checkpointId: 'checkpoint-east-2', position: { q: 9, r: 7 }, legal: true, reasonCode: null, civilianGoodsCost: 0 },
     ];
     const before = JSON.stringify(candidates);
     const views = checkpointCandidateViewModels(candidates, 'en');
@@ -436,6 +458,7 @@ describe('controller view models', () => {
       'tipRecovery', 'tipSuppression', 'tipRange', 'tipProduction', 'tipPolicy',
       'tipMilitaryGoods', 'tipEmergencyMovement', 'carriedMilitaryGoods', 'emergencyMovement',
       'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'recoveryTiming', 'effectiveRange', 'projectedSuppression', 'powerRequirement', 'projectedPower', 'lastPowerSupplied', 'productionMultiplier', 'policyTradeoff', 'migratedSaveNotice', 'migrationSaveError',
+      'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipDecommission',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);
@@ -562,10 +585,19 @@ describe('controller view models', () => {
     expect(english).toContain('One Normal Zombie is requested per 5 infected people');
     expect(english).toContain('Wave 1');
     expect(english).toContain('Spawn Reserve');
+    expect(english).toContain('Subsequent checkpoint construction Civilian Goods');
+    expect(english).toContain('Checkpoint relocation Civilian Goods');
     expect(english).toContain('Screening Batch Capacity');
     expect(english).not.toContain('Industrial boost');
     expect(english).toContain('Mixed-Horde members');
     expect(english).toContain('HP 20');
-    expect(renderBoardLegend(null, 'en', ASSET_REGISTRY)).toContain('/assets/board/terrain/terrain_plain.png');
+    expect(english).toContain('Police Zombie');
+    expect(english).toContain('Soldier Zombie');
+    expect(english).toContain('0 / 3 / 6 / 9 / 12 / 15');
+    expect(english).toContain('unit.policeZombie');
+    const registryLegend = renderBoardLegend(null, 'en', ASSET_REGISTRY);
+    expect(registryLegend).toContain('/assets/board/terrain/terrain_plain.png');
+    expect(registryLegend).toContain('/assets/board/units/unit_police_zombie.png');
+    expect(registryLegend).toContain('/assets/board/units/unit_soldier_zombie.png');
   });
 });

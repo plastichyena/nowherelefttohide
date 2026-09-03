@@ -1,6 +1,11 @@
 import { assertValidGameConfig, cloneConfig } from './config';
 import { hexKey } from './hex';
-import { createFixedMap, FIXED_INITIAL_UNIT_POSITIONS } from './map';
+import {
+  createFixedMap,
+  FIXED_INITIAL_UNIT_POSITIONS,
+  FIXED_MAP_ID,
+  generateInitialZombiePositions,
+} from './map';
 import { SeededRng } from './rng';
 import { getBranchSupplyRadius, isHexSupplied } from './supply';
 import { getPlayerVisionCoverage, getVisibleEnemyUnits } from './visibility';
@@ -13,11 +18,30 @@ import type {
   HexCoord,
   InitialFacilityPopulationConfig,
   HumanUnitType,
+  RejectedRefugeeCounters,
   UnitState,
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '2.3.0';
+export const GAME_VERSION = '2.4.0';
+
+const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
+
+function emptyRejectedRefugeeCounters(): RejectedRefugeeCounters {
+  return { normalRejected: 0, strictRejected: 0, turnedAway: 0 };
+}
+
+function emptyRejectedRefugeeCounterByDirection(): Record<CardinalDirection, RejectedRefugeeCounters> {
+  return Object.fromEntries(
+    CARDINAL_DIRECTIONS.map((direction) => [direction, emptyRejectedRefugeeCounters()]),
+  ) as Record<CardinalDirection, RejectedRefugeeCounters>;
+}
+
+function emptyDirectionValues<T>(factory: () => T): Record<CardinalDirection, T> {
+  return Object.fromEntries(
+    CARDINAL_DIRECTIONS.map((direction) => [direction, factory()]),
+  ) as Record<CardinalDirection, T>;
+}
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
@@ -63,6 +87,13 @@ export function isHumanUnit(unit: UnitState): boolean {
   return unit.type === 'police' || unit.type === 'nationalGuard';
 }
 
+export function isZombieUnit(unit: Pick<UnitState, 'type'>): boolean {
+  return unit.type === 'zombie'
+    || unit.type === 'hordeZombie'
+    || unit.type === 'policeZombie'
+    || unit.type === 'soldierZombie';
+}
+
 export function facilityZombieTargetValue(
   state: Pick<GameState, 'config'>,
   facility: Readonly<FacilityState>,
@@ -96,8 +127,8 @@ export function createUnit(
     maxMilitaryGoods: stats.maxMilitaryGoods,
     actionState,
     canAttack: true,
-    canMove: type !== 'zombie' && type !== 'hordeZombie',
-    isPlayerUnit: type !== 'zombie' && type !== 'hordeZombie',
+    canMove: !isZombieUnit({ type }),
+    isPlayerUnit: !isZombieUnit({ type }),
     inheritedTarget: null,
     noiseTarget: null,
     spawnGroupId: null,
@@ -195,7 +226,11 @@ export function civilianWorkerCount(state: GameState): number {
 }
 
 export function resourceConsumerPopulation(state: GameState): number {
-  return civilianWorkerCount(state) + state.population.unitPopulation;
+  const checkpointHealthy = state.checkpoints.reduce(
+    (total, checkpoint) => total + checkpoint.waiting + checkpoint.screening + checkpoint.approved,
+    0,
+  );
+  return civilianWorkerCount(state) + state.population.unitPopulation + checkpointHealthy;
 }
 
 /** Auditable population ledger used to prove that atomic actions never create or lose people. */
@@ -337,7 +372,7 @@ function selectWarningDirections(rng: SeededRng, count: number): CardinalDirecti
  */
 export function createInitialState(seed: number, config: GameConfig): GameState {
   assertValidGameConfig(config);
-  if (config.mapId !== 'fixed-31x31-v2') {
+  if (config.mapId !== FIXED_MAP_ID) {
     throw new Error(`Unsupported map id: ${config.mapId}`);
   }
   if (!Number.isSafeInteger(seed)) {
@@ -353,6 +388,11 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     ) as Record<keyof GameConfig['facilities'], number>,
   );
   const rng = new SeededRng(seed);
+  // Initial Zombie placement is part of new-game setup and uses the same
+  // serializable stream as every other seeded rule. Generate the full
+  // canonical set even when a test Config requests fewer initial Zombies so
+  // the map snapshot and replay contract remain stable.
+  map.initialZombiePositions = generateInitialZombiePositions(map, rng);
   let securedOrder = 0;
   const facilities = map.facilities.map((definition) =>
     facilityStateFromDefinition(
@@ -374,6 +414,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       activeCheckpointId: null,
       standbyCheckpointIds: [],
       currentPolicy: 'normal' as const,
+      hasBuiltCheckpoint: false,
     }));
   const state: GameState = {
     gameVersion: GAME_VERSION,
@@ -424,6 +465,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     ],
     checkpoints: [],
     roadBranches,
+    rejectedRefugeesByDirection: emptyRejectedRefugeeCounterByDirection(),
     pendingUnitProductions: [],
     nextCheckpointNumber: 1,
     nextConstructibleFacilityNumber: 1,
@@ -533,6 +575,31 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       civilianDroneBasesBuilt: 0,
       maxCivilianDroneVisionRadius: 0,
       aerialDiscoveriesInGroundBlockedArea: 0,
+      checkpointQueueFoodDemand: 0,
+      checkpointQueueCivilianGoodsDemand: 0,
+      checkpointQueueFoodConsumed: 0,
+      checkpointQueueCivilianGoodsConsumed: 0,
+      refugeesRejectedByDirectionAndPolicy: emptyDirectionValues(() => ({ normal: 0, strict: 0 })),
+      refugeesTurnedAwayByDirection: emptyDirectionValues(() => 0),
+      rejectedBonusZombiesByDirection: emptyDirectionValues(() => 0),
+      rejectedCounterResetsByDirection: emptyDirectionValues(() => 0),
+      policeZombiesSpawned: 0,
+      soldierZombiesSpawned: 0,
+      policeZombiesKilled: 0,
+      soldierZombiesKilled: 0,
+      policeZombiesFinal: 0,
+      soldierZombiesFinal: 0,
+      policeReanimations: 0,
+      nationalGuardReanimations: 0,
+      reanimationImmediateInfections: 0,
+      reanimationFacilityInfections: 0,
+      reanimationCheckpointInfections: 0,
+      reanimationSiteFalls: 0,
+      reanimationChainOverruns: 0,
+      preventedRefugeeArrivalsAfterFinal: 0,
+      civilianDroneBasesDecommissioned: 0,
+      civilianGoodsRefundedFromDecommission: 0,
+      policeLongRangeMoves: 0,
     },
     gameOver: false,
     result: null,

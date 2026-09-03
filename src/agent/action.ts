@@ -16,6 +16,8 @@ export function actionKey(action: GameAction): string {
   if (action.type === 'BuildConstructibleFacility') return `BuildConstructibleFacility|${action.facilityType}|${action.position.q},${action.position.r}`;
   if (action.type === 'RelocateCheckpoint') return `RelocateCheckpoint|${action.checkpointId}|${action.branchId ?? ''}|${action.position.q},${action.position.r}`;
   if (action.type === 'ActivateCheckpoint') return `ActivateCheckpoint|${action.branchId}|${action.checkpointId}`;
+  if (action.type === 'TurnAwayCheckpointRefugees') return `TurnAwayCheckpointRefugees|${action.checkpointId}|${action.count}`;
+  if (action.type === 'DecommissionConstructibleFacility') return `DecommissionConstructibleFacility|${action.facilityId}`;
   if (action.type === 'ProduceUnit') {
     const destination = action.destination ? `${action.destination.q},${action.destination.r}` : '';
     return `ProduceUnit|${action.unitType}|${destination}`;

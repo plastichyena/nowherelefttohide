@@ -34,6 +34,7 @@ import type {
 } from '../core/types';
 import {
   HIDDEN_NOISE_METRIC_KEYS,
+  HIDDEN_REJECTED_REFUGEE_METRIC_KEYS,
   OBSERVATION_API_VERSION,
   type AgentGameResult,
   type AgentArtifactObservation,
@@ -81,6 +82,7 @@ function publicResult(result: GameResult | null): AgentGameResult | null {
   if (!result) return null;
   const statistics = cloneJson(result.statistics) as unknown as Record<string, unknown>;
   for (const key of HIDDEN_NOISE_METRIC_KEYS) delete statistics[key];
+  for (const key of HIDDEN_REJECTED_REFUGEE_METRIC_KEYS) delete statistics[key];
   return cloneJson({
     outcome: result.outcome,
     reason: result.reason,
@@ -290,7 +292,7 @@ export function createAgentObservation(
         return checkpointRoadIndex >= 0 && checkpointRoadIndex < activeRoadIndex;
       });
       const preparedPostCount = (activeCheckpoint ? 1 : 0) + standbyCheckpointIds.length;
-      const nextArrivalTurn = branchState?.nextArrivalTurn ?? state.turn;
+      const nextArrivalTurn = branchState?.nextArrivalTurn ?? null;
       return {
         branchId: definition.id,
         direction: definition.direction,
@@ -298,7 +300,13 @@ export function createAgentObservation(
         roadTiles: definition.roadTiles.map((position) => ({ ...position })),
         entrance: { ...definition.entrance },
         nextArrivalTurn,
-        turnsUntilArrival: Math.max(0, nextArrivalTurn - state.turn),
+        turnsUntilArrival: nextArrivalTurn === null ? null : Math.max(0, nextArrivalTurn - state.turn),
+        arrivalsEnded: state.horde.finalHordeStatus !== 'notStarted',
+        checkpointBuildCost: branchState?.hasBuiltCheckpoint
+          ? state.config.checkpoint.subsequentConstructionCivilianGoods
+          : state.config.checkpoint.constructionCivilianGoods,
+        checkpointRelocateCost: state.config.checkpoint.relocationCivilianGoods,
+        rejectionMayStrengthenFutureHorde: true as const,
         activeCheckpointId: activeCheckpoint?.id ?? null,
         activeCheckpointStatus: activeCheckpoint?.status ?? null,
         standbyCheckpointIds,
@@ -373,7 +381,7 @@ export function createAgentObservation(
             ? state.config.vision.capital
             : facility.type === 'civilianDroneBase'
               ? facility.workers > 0 && facility.powerSupplyEnabled && facility.lastPowerSupplied === true
-                ? facility.workers * 2
+                ? facility.workers * 3
                 : 0
               : state.config.vision.ownedFacility
           : 0,
@@ -427,6 +435,9 @@ export function createAgentObservation(
         containingUnitId: containingUnit?.id ?? null,
         projectedSuppression: suppression?.projectedSuppression ?? 0,
         projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
+        decommissionRefundCivilianGoods: facility.constructible && facility.type === 'civilianDroneBase'
+          ? Math.ceil(state.config.facilities.civilianDroneBase.buildCivilianGoods / 2)
+          : null,
       };
     });
   const orderedUnits = [...state.units].sort((left, right) => left.id.localeCompare(right.id));
@@ -531,6 +542,13 @@ export function createAgentObservation(
             checkpoint.waiting + checkpoint.screening + checkpoint.approved,
             state.config.refugees.screeningCapacity,
           ),
+          healthyQueueConsumesMaintenance: true as const,
+          queueMaintenanceFood:
+            (checkpoint.waiting + checkpoint.screening + checkpoint.approved) *
+            state.config.economy.populationConsumption.food,
+          queueMaintenanceCivilianGoods:
+            (checkpoint.waiting + checkpoint.screening + checkpoint.approved) *
+            state.config.economy.populationConsumption.civilianGoods,
           infected: checkpoint.infected,
           remainingTurns: checkpoint.remainingTurns,
           currentPolicy: branch?.currentPolicy ?? 'normal',
@@ -585,7 +603,7 @@ export function createAgentObservation(
   } satisfies AgentObservation as unknown as JsonValue) as unknown as AgentObservation;
 }
 
-/** Remove fixed topology from one Artifact Schema 4.0.0 trace entry. */
+/** Remove fixed topology from one Artifact Schema 5.0.0 trace entry. */
 export function compactArtifactObservation(observation: AgentObservation): AgentArtifactObservation {
   const copy = cloneJson(observation);
   const { map, ...dynamic } = copy;

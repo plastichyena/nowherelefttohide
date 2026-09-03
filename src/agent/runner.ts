@@ -834,7 +834,7 @@ function artifactValidationError(artifact: AgentRunArtifact): AgentActionError |
   return null;
 }
 
-function scheduleFromObservation(observation: AgentObservation): Array<{ branchId: string; nextArrivalTurn: number }> {
+function scheduleFromObservation(observation: AgentObservation): Array<{ branchId: string; nextArrivalTurn: number | null }> {
   return observation.roadBranches
     .map((branch) => ({ branchId: branch.branchId, nextArrivalTurn: branch.nextArrivalTurn }))
     .sort((left, right) => left.branchId.localeCompare(right.branchId));

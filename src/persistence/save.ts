@@ -5,28 +5,30 @@ import {
   FIXED_MAP_HEIGHT,
   FIXED_MAP_ID,
   FIXED_MAP_WIDTH,
+  initialZombiePositionsMatchSeed,
   validateFixedMap,
 } from '../core/map';
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.4.3 saves. */
+/** The sole game-rules version accepted by v1.4.4 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 8;
-/** v1.4.3 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v8';
+export const SAVE_FORMAT_VERSION = 9;
+/** v1.4.4 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v9';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v7';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v8';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v7',
   'nowhere-left-to-hide:auto-save:v6',
   'nowhere-left-to-hide:auto-save:v5',
   'nowhere-left-to-hide:auto-save:v4',
   'nowhere-left-to-hide:auto-save:v3',
   'nowhere-left-to-hide:auto-save:v2',
 ] as const;
-/** Deprecated metadata exports. They are never migration targets in v1.4.3. */
+/** Deprecated metadata exports. They are never migration targets in v1.4.4. */
 export const V125_GAME_VERSION = '1.2.0';
 export const V126_GAME_VERSION = '1.2.1';
 export const LEGACY_GAME_VERSION = V125_GAME_VERSION;
@@ -65,8 +67,9 @@ export interface StorageLike {
 export type SaveErrorListener = (message: string, error?: unknown) => void;
 
 const BASE_TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const;
-const UNIT_TYPES = ['police', 'nationalGuard', 'zombie', 'hordeZombie'] as const;
+const UNIT_TYPES = ['police', 'nationalGuard', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'] as const;
 const HUMAN_UNIT_TYPES = ['police', 'nationalGuard'] as const;
+const ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'] as const;
 const FACILITY_TYPES = [
   'capital',
   'city',
@@ -144,6 +147,12 @@ const GAME_EVENT_TYPES = [
   'victory_progress_changed',
   'horde_warning',
   'horde_spawned',
+  'checkpoint_refugees_turned_away',
+  'checkpoint_refugees_rejected',
+  'horde_rejected_bonus_applied',
+  'refugee_arrivals_ended',
+  'constructible_decommissioned',
+  'human_unit_reanimated',
   'game_over',
 ] as const;
 const HORDE_KINDS = ['periodic', 'final'] as const;
@@ -225,6 +234,27 @@ const STATISTIC_INTEGER_FIELDS = [
   'civilianDroneBasesBuilt',
   'maxCivilianDroneVisionRadius',
   'aerialDiscoveriesInGroundBlockedArea',
+  'checkpointQueueFoodDemand',
+  'checkpointQueueCivilianGoodsDemand',
+  'checkpointQueueFoodConsumed',
+  'checkpointQueueCivilianGoodsConsumed',
+  'policeZombiesSpawned',
+  'soldierZombiesSpawned',
+  'policeZombiesKilled',
+  'soldierZombiesKilled',
+  'policeZombiesFinal',
+  'soldierZombiesFinal',
+  'policeReanimations',
+  'nationalGuardReanimations',
+  'reanimationImmediateInfections',
+  'reanimationFacilityInfections',
+  'reanimationCheckpointInfections',
+  'reanimationSiteFalls',
+  'reanimationChainOverruns',
+  'preventedRefugeeArrivalsAfterFinal',
+  'civilianDroneBasesDecommissioned',
+  'civilianGoodsRefundedFromDecommission',
+  'policeLongRangeMoves',
 ] as const;
 const STATISTIC_NULLABLE_FIELDS = [
   'suppliedAreaZombieClearTurn',
@@ -236,6 +266,10 @@ const STATISTIC_RECORD_FIELDS = [
   'refugeesScreenedByPolicy',
   'terrainEntriesByType',
   'checkpointFallbacksByBranch',
+  'refugeesRejectedByDirectionAndPolicy',
+  'refugeesTurnedAwayByDirection',
+  'rejectedBonusZombiesByDirection',
+  'rejectedCounterResetsByDirection',
 ] as const;
 const REQUIRED_STATISTIC_FIELDS = [
   ...STATISTIC_INTEGER_FIELDS,
@@ -261,6 +295,7 @@ const REQUIRED_STATE_FIELDS = [
   'units',
   'checkpoints',
   'roadBranches',
+  'rejectedRefugeesByDirection',
   'pendingUnitProductions',
   'nextCheckpointNumber',
   'nextConstructibleFacilityNumber',
@@ -395,7 +430,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.4.2 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.4.3 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -487,12 +522,12 @@ function hasCanonicalDirectionOrder(directions: unknown[]): boolean {
 }
 
 /**
- * Reject obsolete or partial v1.4.3 container shapes before casting. The core
+ * Reject obsolete or partial v1.4.4 container shapes before casting. The core
  * invariant checker performs relational validation; this guard makes the Wave
  * schedule, reserved map perimeter, and warning state an explicit save
  * boundary instead of silently accepting a partial snapshot.
  */
-function validateV143Shape(state: Record<string, unknown>, errors: string[]): void {
+function validateV144Shape(state: Record<string, unknown>, errors: string[]): void {
   requireFields(errors, state, 'state', REQUIRED_STATE_FIELDS);
   if (hasOwn(state, 'maxTurns')) errors.push('state.maxTurns is obsolete; use state.finalHordeTurn');
   if (state.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(state.gameVersion, 'state.gameVersion'));
@@ -546,8 +581,8 @@ function validateV143Shape(state: Record<string, unknown>, errors: string[]): vo
     if (!isRecord(infection)) {
       errors.push('state.config.infection must be an object');
     } else {
-      // Save Format 8 deliberately has no conversion path for the old
-      // fallback-capacity tuning.  Reject a hand-edited v1.4.2-shaped
+      // Save Format 9 deliberately has no conversion path for the old
+      // fallback-capacity tuning. Reject a hand-edited v1.4.3-shaped
       // container even when its outer version strings were forged as current.
       for (const retiredField of ['fallBackCapacityRate', 'fallBackCapacityRounding']) {
         if (hasOwn(infection, retiredField)) {
@@ -770,7 +805,7 @@ function validateV143Shape(state: Record<string, unknown>, errors: string[]): vo
         : undefined;
       if (isRecord(configuredUnit) && isInteger(configuredUnit.maxFuel) && unit.maxFuel !== configuredUnit.maxFuel) errors.push(`${path}.maxFuel must match state.config.units.${String(unit.type)}.maxFuel`);
       if (isRecord(configuredUnit) && isInteger(configuredUnit.maxMilitaryGoods) && unit.maxMilitaryGoods !== configuredUnit.maxMilitaryGoods) errors.push(`${path}.maxMilitaryGoods must match state.config.units.${String(unit.type)}.maxMilitaryGoods`);
-      if (unit.type === 'zombie' || unit.type === 'hordeZombie') {
+      if (ZOMBIE_UNIT_TYPES.includes(unit.type as typeof ZOMBIE_UNIT_TYPES[number])) {
         if (unit.currentFuel !== 0 || unit.maxFuel !== 0) errors.push(`${path} Zombie Fuel must be zero`);
         if (unit.currentMilitaryGoods !== 0 || unit.maxMilitaryGoods !== 0) errors.push(`${path} Zombie Military Goods must be zero`);
       } else if (!HUMAN_UNIT_TYPES.includes(unit.type as typeof HUMAN_UNIT_TYPES[number])
@@ -826,13 +861,32 @@ function validateV143Shape(state: Record<string, unknown>, errors: string[]): vo
         errors.push(`${path} must be an object`);
         continue;
       }
-      requireFields(errors, branch, path, ['branchId', 'nextArrivalTurn', 'checkpointActionsThisTurn', 'activeCheckpointId', 'standbyCheckpointIds', 'currentPolicy']);
+      requireFields(errors, branch, path, ['branchId', 'nextArrivalTurn', 'checkpointActionsThisTurn', 'activeCheckpointId', 'standbyCheckpointIds', 'currentPolicy', 'hasBuiltCheckpoint']);
       if (typeof branch.branchId !== 'string' || branch.branchId.length === 0) errors.push(`${path}.branchId is invalid`);
-      if (!isInteger(branch.nextArrivalTurn, 1)) errors.push(`${path}.nextArrivalTurn is invalid`);
+      if (branch.nextArrivalTurn !== null && !isInteger(branch.nextArrivalTurn, 1)) errors.push(`${path}.nextArrivalTurn is invalid`);
       if (!isInteger(branch.checkpointActionsThisTurn)) errors.push(`${path}.checkpointActionsThisTurn is invalid`);
       if (branch.activeCheckpointId !== null && (typeof branch.activeCheckpointId !== 'string' || branch.activeCheckpointId.length === 0)) errors.push(`${path}.activeCheckpointId is invalid`);
       if (!Array.isArray(branch.standbyCheckpointIds) || branch.standbyCheckpointIds.some((id) => typeof id !== 'string' || id.length === 0) || new Set(branch.standbyCheckpointIds).size !== branch.standbyCheckpointIds.length) errors.push(`${path}.standbyCheckpointIds is invalid`);
       if (!CHECKPOINT_POLICIES.includes(branch.currentPolicy as typeof CHECKPOINT_POLICIES[number])) errors.push(`${path}.currentPolicy is invalid`);
+      if (typeof branch.hasBuiltCheckpoint !== 'boolean') errors.push(`${path}.hasBuiltCheckpoint is invalid`);
+    }
+  }
+
+  const rejectedRefugees = state.rejectedRefugeesByDirection;
+  if (!isRecord(rejectedRefugees)) {
+    errors.push('state.rejectedRefugeesByDirection must be an object');
+  } else {
+    for (const direction of CARDINAL_DIRECTIONS) {
+      const path = `state.rejectedRefugeesByDirection.${direction}`;
+      const counters = rejectedRefugees[direction];
+      if (!isRecord(counters)) {
+        errors.push(`${path} must be an object`);
+        continue;
+      }
+      requireFields(errors, counters, path, ['normalRejected', 'strictRejected', 'turnedAway']);
+      for (const field of ['normalRejected', 'strictRejected', 'turnedAway'] as const) {
+        if (!isInteger(counters[field])) errors.push(`${path}.${field} is invalid`);
+      }
     }
   }
 
@@ -947,15 +1001,26 @@ function validateStatisticsShape(value: unknown, errors: string[], path: string)
   } else {
     for (const policy of CHECKPOINT_POLICIES) if (!isInteger(policyEntries[policy])) errors.push(`${path}.refugeesScreenedByPolicy.${policy} is invalid`);
   }
-  for (const field of ['refugeeArrivalsByBranch', 'checkpointFallbacksByBranch'] as const) {
+  for (const field of ['refugeeArrivalsByBranch', 'checkpointFallbacksByBranch', 'refugeesTurnedAwayByDirection', 'rejectedBonusZombiesByDirection', 'rejectedCounterResetsByDirection'] as const) {
     if (!isRecord(value[field]) || Object.values(value[field]).some((entry) => !isInteger(entry))) errors.push(`${path}.${field} is invalid`);
+  }
+  const rejectedByDirectionAndPolicy = value.refugeesRejectedByDirectionAndPolicy;
+  if (!isRecord(rejectedByDirectionAndPolicy)) {
+    errors.push(`${path}.refugeesRejectedByDirectionAndPolicy is invalid`);
+  } else {
+    for (const direction of CARDINAL_DIRECTIONS) {
+      const entry = rejectedByDirectionAndPolicy[direction];
+      if (!isRecord(entry) || !isInteger(entry.normal) || !isInteger(entry.strict)) {
+        errors.push(`${path}.refugeesRejectedByDirectionAndPolicy.${direction} is invalid`);
+      }
+    }
   }
 }
 
 function validateStateForSave(state: GameState): string[] {
   const errors: string[] = [];
   const raw = state as unknown as Record<string, unknown>;
-  validateV143Shape(raw, errors);
+  validateV144Shape(raw, errors);
   if (raw.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(raw.gameVersion, 'state.gameVersion'));
   const config = isRecord(raw.config) ? raw.config : null;
   const map = isRecord(raw.map) ? raw.map : null;
@@ -971,6 +1036,10 @@ function validateStateForSave(state: GameState): string[] {
   try {
     const mapResult = validateFixedMap(map as unknown as GameState['map']);
     if (!mapResult.valid) errors.push(...mapResult.errors.map((error) => `map: ${error}`));
+    if (Number.isSafeInteger(raw.seed)
+      && !initialZombiePositionsMatchSeed(map as unknown as GameState['map'], raw.seed as number)) {
+      errors.push('map: initial Zombie positions and order must match the deterministic state seed');
+    }
   } catch (error) {
     errors.push(`map validation failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -989,7 +1058,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.2以前 / v1.4.2 and earlier saves cannot be loaded or converted; Save Format 7 or below is rejected without conversion, deletion, or overwrite`);
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.3以前 / v1.4.3 and earlier saves cannot be loaded or converted; Save Format 8 or below is rejected without conversion, deletion, or overwrite`);
   }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (value.mapId !== FIXED_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID}`);
@@ -1028,14 +1097,14 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   return { valid: true, errors: [], state: clone(state), envelope };
 }
 
-/** Create a checksummed, URL-safe v1.4.3 Save Format 8 code. */
+/** Create a checksummed, URL-safe v1.4.4 Save Format 9 code. */
 export function encodeSaveCode(state: GameState): string {
   const errors = validateStateForSave(state);
   if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
   return toBase64Url(gzipSync(strToU8(canonicalJson(makeEnvelope(state))), { level: 9 }));
 }
 
-/** Decode and validate a v1.4.3 save code without changing caller-owned state. */
+/** Decode and validate a v1.4.4 save code without changing caller-owned state. */
 export function decodeSaveCode(code: string): SaveValidationResult {
   if (typeof code !== 'string' || code.trim().length === 0) return reject(['Save code is empty']);
   try {
@@ -1125,7 +1194,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the v1.4.3/v8 key; legacy data is deliberately preserved. */
+  /** Clears only the v1.4.4/v9 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

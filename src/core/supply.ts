@@ -191,7 +191,7 @@ export function getBlockingZombiesForCheckpoint(
   return state.units
     .filter(
       (unit) =>
-        (unit.type === 'zombie' || unit.type === 'hordeZombie') &&
+        !unit.isPlayerUnit &&
         isHexSuppliedByBranch(state, unit.position, branchId, checkpointPosition),
     )
     .sort((left, right) => left.id.localeCompare(right.id));

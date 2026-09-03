@@ -215,6 +215,27 @@ export function validateInvariants(state: GameState): InvariantResult {
     'civilianDroneBasesBuilt',
     'maxCivilianDroneVisionRadius',
     'aerialDiscoveriesInGroundBlockedArea',
+    'checkpointQueueFoodDemand',
+    'checkpointQueueCivilianGoodsDemand',
+    'checkpointQueueFoodConsumed',
+    'checkpointQueueCivilianGoodsConsumed',
+    'policeZombiesSpawned',
+    'soldierZombiesSpawned',
+    'policeZombiesKilled',
+    'soldierZombiesKilled',
+    'policeZombiesFinal',
+    'soldierZombiesFinal',
+    'policeReanimations',
+    'nationalGuardReanimations',
+    'reanimationImmediateInfections',
+    'reanimationFacilityInfections',
+    'reanimationCheckpointInfections',
+    'reanimationSiteFalls',
+    'reanimationChainOverruns',
+    'preventedRefugeeArrivalsAfterFinal',
+    'civilianDroneBasesDecommissioned',
+    'civilianGoodsRefundedFromDecommission',
+    'policeLongRangeMoves',
   ] as const) {
     if (!isNonNegativeInteger(state.statistics[field])) {
       errors.push(`Statistic ${field} must be a non-negative integer`);
@@ -223,6 +244,28 @@ export function validateInvariants(state: GameState): InvariantResult {
   for (const policy of ['passThrough', 'normal', 'strict'] as const) {
     if (!isNonNegativeInteger(state.statistics.refugeesScreenedByPolicy?.[policy])) {
       errors.push(`Statistic refugeesScreenedByPolicy.${policy} must be a non-negative integer`);
+    }
+  }
+  for (const direction of ['north', 'east', 'south', 'west'] as const) {
+    for (const policy of ['normal', 'strict'] as const) {
+      if (!isNonNegativeInteger(state.statistics.refugeesRejectedByDirectionAndPolicy?.[direction]?.[policy])) {
+        errors.push(`Statistic refugeesRejectedByDirectionAndPolicy.${direction}.${policy} must be a non-negative integer`);
+      }
+    }
+    for (const [name, record] of [
+      ['refugeesTurnedAwayByDirection', state.statistics.refugeesTurnedAwayByDirection],
+      ['rejectedBonusZombiesByDirection', state.statistics.rejectedBonusZombiesByDirection],
+      ['rejectedCounterResetsByDirection', state.statistics.rejectedCounterResetsByDirection],
+    ] as const) {
+      if (!isNonNegativeInteger(record?.[direction])) {
+        errors.push(`Statistic ${name}.${direction} must be a non-negative integer`);
+      }
+    }
+    const counters = state.rejectedRefugeesByDirection?.[direction];
+    for (const field of ['normalRejected', 'strictRejected', 'turnedAway'] as const) {
+      if (!isNonNegativeInteger(counters?.[field])) {
+        errors.push(`Rejected counter ${direction}.${field} must be a non-negative integer`);
+      }
     }
   }
   if (typeof state.statistics.finalHordeDefeated !== 'boolean') {
@@ -348,14 +391,14 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (configuredUnit && unit.maxMilitaryGoods !== configuredUnit.maxMilitaryGoods) {
       errors.push(`Unit ${unit.id} maxMilitaryGoods does not match Config`);
     }
-    if ((unit.type === 'zombie' || unit.type === 'hordeZombie') && (unit.currentFuel !== 0 || unit.maxFuel !== 0)) {
+    if (!unit.isPlayerUnit && (unit.currentFuel !== 0 || unit.maxFuel !== 0)) {
       errors.push(`Zombie unit ${unit.id} cannot store Fuel`);
     }
-    if ((unit.type === 'zombie' || unit.type === 'hordeZombie')
+    if (!unit.isPlayerUnit
       && (unit.currentMilitaryGoods !== 0 || unit.maxMilitaryGoods !== 0)) {
       errors.push(`Zombie unit ${unit.id} cannot store Military Goods`);
     }
-    if (!['police', 'nationalGuard', 'zombie', 'hordeZombie'].includes(unit.type)) {
+    if (!['police', 'nationalGuard', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'].includes(unit.type)) {
       errors.push(`Unit ${unit.id} has an invalid type`);
     }
     const shouldBePlayerUnit = unit.type === 'police' || unit.type === 'nationalGuard';
@@ -380,6 +423,10 @@ export function validateInvariants(state: GameState): InvariantResult {
       if (hasKind !== hasGroup) errors.push(`Normal Zombie ${unit.id} must have both Horde kind and spawn group, or neither`);
       if (unit.hordeKind === 'final' && !state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId ?? '')) {
         errors.push(`Final Normal Zombie ${unit.id} must use the active Final Horde group`);
+      }
+    } else if (unit.type === 'policeZombie' || unit.type === 'soldierZombie') {
+      if (unit.hordeKind !== null || unit.spawnGroupId !== null) {
+        errors.push(`Reanimated Zombie ${unit.id} cannot belong to a Horde group`);
       }
     } else if (unit.type === 'hordeZombie') {
       if (!['periodic', 'final'].includes(unit.hordeKind ?? '') || typeof unit.spawnGroupId !== 'string' || unit.spawnGroupId.length === 0) {
@@ -445,8 +492,17 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (!state.map.roadBranches.some((definition) => definition.id === branch.branchId)) {
       errors.push(`Unknown road branch state ${branch.branchId}`);
     }
-    if (!isNonNegativeInteger(branch.nextArrivalTurn) || branch.nextArrivalTurn < state.turn) {
+    if (branch.nextArrivalTurn !== null && (!isNonNegativeInteger(branch.nextArrivalTurn) || branch.nextArrivalTurn < state.turn)) {
       errors.push(`Road branch ${branch.branchId} has an invalid next arrival turn`);
+    }
+    if (typeof branch.hasBuiltCheckpoint !== 'boolean') {
+      errors.push(`Road branch ${branch.branchId} has an invalid checkpoint build history`);
+    }
+    if (state.horde.finalHordeStatus === 'notStarted' && branch.nextArrivalTurn === null) {
+      errors.push(`Road branch ${branch.branchId} must schedule arrivals before the Final Wave`);
+    }
+    if (state.horde.finalHordeStatus !== 'notStarted' && branch.nextArrivalTurn !== null) {
+      errors.push(`Road branch ${branch.branchId} cannot schedule arrivals after the Final Wave`);
     }
     if (!isNonNegativeInteger(branch.checkpointActionsThisTurn) || branch.checkpointActionsThisTurn > 1) {
       errors.push(`Road branch ${branch.branchId} has an invalid checkpoint action count`);

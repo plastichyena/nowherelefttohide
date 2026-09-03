@@ -51,6 +51,7 @@ h2 { margin-bottom: 18px; color: #f3fbfc; font-size: 1.5rem; }
 h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 
 .title-copy { margin: 0 auto 28px; max-width: 36rem; color: var(--muted); line-height: 1.7; font-size: 0.93rem; }
+.title-version { margin: -4px 0 18px; color: #b8e7e6; font-size: 0.72rem; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; text-transform: uppercase; }
 
 .title-actions, .modal-actions, .action-row { display: flex; flex-wrap: wrap; gap: 10px; }
 
@@ -263,6 +264,9 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .branch-flow-section { margin: 10px 0; }
 .branch-flow-section > h3 { margin-top: 10px; }
 .branch-flow-card { margin: 7px 0; padding: 9px; border: 1px solid #2c5962; border-radius: 8px; background: #102a31; }
+.branch-flow-card.branch-flow-stopped { border-color: #806f43; background: #2a261b; }
+.refugee-arrivals-stopped { margin: 7px 0; padding: 8px 9px; border-left: 3px solid var(--warning); border-radius: 6px; background: #2c2718; }
+.refugee-rejection-warning { margin: 7px 0; padding: 7px 8px; border-left: 3px solid #806f43; background: #211d15; }
 .branch-flow-heading, .checkpoint-heading, .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .branch-flow-heading strong { color: #d9f0e9; font-size: 0.8rem; }
 .status-chip { display: inline-flex; max-width: 55%; align-items: center; min-height: 26px; padding: 3px 7px; border: 1px solid #416a72; border-radius: 999px; color: var(--muted); font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -286,6 +290,12 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .checkpoint-inline-message { min-height: 36px; margin: 8px 0; padding: 8px 9px; border-left: 3px solid #df8178; border-radius: 6px; background: #321f20; color: #ffd0ca; font-size: 0.78rem; line-height: 1.4; }
 .checkpoint-inline-message[hidden] { display: none; }
 .checkpoint-heading { margin-bottom: 7px; }
+.checkpoint-queue-maintenance, .checkpoint-turn-away, .decommission-editor { margin: 9px 0; padding: 9px 10px; border: 1px solid #3e7180; border-radius: 9px; background: #102d35; }
+.checkpoint-queue-maintenance h3, .checkpoint-turn-away h3, .decommission-editor h3 { margin: 0 0 6px; }
+.checkpoint-turn-away { border-color: #806f43; background: #2a261b; }
+.checkpoint-turn-away > label, .decommission-editor > label { display: grid; gap: 5px; margin: 7px 0; color: var(--muted); font-size: 0.76rem; }
+.checkpoint-turn-away input { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #0a1821; color: #edf9fa; font-variant-numeric: tabular-nums; }
+.decommission-editor { border-color: #6d5a32; background: #282319; }
 .checkpoint-status-remnant { border-color: #806f43; }
 .checkpoint-status-ruined { border-color: #8c4f4b; }
 .checkpoint-status-abandoned { border-color: #67405f; }

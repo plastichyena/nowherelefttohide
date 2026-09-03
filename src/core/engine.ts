@@ -1,7 +1,13 @@
 import { createDefaultConfig, HUMAN_UNIT_TYPES } from './config';
 import { hexDistance, hexKey, hexNeighbors, hexWithinBounds } from './hex';
 import { assertInvariants, validateInvariants } from './invariants';
-import { canPlayerOccupyHex, getHordeEntrance, getTile, isHordeSpawnReserve } from './map';
+import {
+  canPlayerOccupyHex,
+  getHordeEntrance,
+  getTile,
+  initialZombiePositionsMatchSeed,
+  isHordeSpawnReserve,
+} from './map';
 import { findNearestOpenTiles, findReachablePaths, findShortestPath, pathMovementCost } from './path';
 import { SeededRng } from './rng';
 import { deriveUnitRecovery } from './recovery';
@@ -123,6 +129,15 @@ export interface FacilityProductionProjection {
 }
 
 const RESOURCE_TYPES: readonly ResourceType[] = ['food', 'civilianGoods', 'militaryGoods', 'fuel'];
+const CANONICAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
+
+function isZombieFaction(unit: Pick<UnitState, 'isPlayerUnit'>): boolean {
+  return !unit.isPlayerUnit;
+}
+
+function isNormalAiZombie(unit: Pick<UnitState, 'type'>): boolean {
+  return unit.type === 'zombie' || unit.type === 'policeZombie' || unit.type === 'soldierZombie';
+}
 
 export function unitMoveFuelCost(unitType: HumanUnitType, distance: number): number {
   const entered = Math.max(0, Math.floor(distance));
@@ -356,7 +371,7 @@ function markAttacked(unit: UnitState, interception = false): void {
   }
 }
 
-function destroyUnit(state: GameState, unit: UnitState, cause: string): void {
+function destroyUnit(state: GameState, unit: UnitState, cause: string, rng: SeededRng): void {
   const index = state.units.findIndex((candidate) => candidate.id === unit.id);
   if (index < 0) {
     return;
@@ -374,6 +389,8 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string): void {
     state.statistics.hordeZombiesKilled += 1;
     if (unit.hordeKind === 'final') state.statistics.finalHordeKilled += 1;
   }
+  if (unit.type === 'policeZombie') state.statistics.policeZombiesKilled += 1;
+  if (unit.type === 'soldierZombie') state.statistics.soldierZombiesKilled += 1;
   emit(state, 'unit_destroyed', {
     unitId: unit.id,
     unitType: unit.type,
@@ -385,9 +402,65 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string): void {
     lostFuel: unit.isPlayerUnit ? unit.currentFuel : 0,
     lostMilitaryGoods: unit.isPlayerUnit ? unit.currentMilitaryGoods : 0,
   });
+  if (unit.type === 'police' || unit.type === 'nationalGuard') {
+    const reanimatedType = unit.type === 'police' ? 'policeZombie' as const : 'soldierZombie' as const;
+    const prefix = reanimatedType === 'policeZombie' ? 'police-zombie' : 'soldier-zombie';
+    let id = `${prefix}-${state.nextUnitNumber}`;
+    while (state.units.some((candidate) => candidate.id === id)) {
+      state.nextUnitNumber += 1;
+      id = `${prefix}-${state.nextUnitNumber}`;
+    }
+    state.nextUnitNumber += 1;
+    const reanimated = createUnit(state, id, reanimatedType, unit.position);
+    reanimated.canMove = false;
+    reanimated.canAttack = false;
+    state.units.push(reanimated);
+    if (reanimatedType === 'policeZombie') {
+      state.statistics.policeZombiesSpawned += 1;
+      state.statistics.policeReanimations += 1;
+    } else {
+      state.statistics.soldierZombiesSpawned += 1;
+      state.statistics.nationalGuardReanimations += 1;
+    }
+    const event = emit(state, 'human_unit_reanimated', {
+      humanUnitId: unit.id,
+      humanUnitType: unit.type,
+      zombieUnitId: reanimated.id,
+      zombieUnitType: reanimated.type,
+      q: reanimated.position.q,
+      r: reanimated.position.r,
+      cause,
+    });
+    const beforeImmediate = state.statistics.immediateInfectionsFromSpawn;
+    const beforeChains = state.statistics.chainOverruns;
+    const beforeOccupancyEventIndex = state.events.length;
+    const queue: SpawnOccupancyEntry[] = [];
+    applyGeneratedZombieOccupancy(state, reanimated, rng, queue, event.id, 0);
+    processSpawnOccupancyQueue(state, rng, queue);
+    const occupancyEvents = state.events.slice(beforeOccupancyEventIndex);
+    state.statistics.reanimationImmediateInfections +=
+      state.statistics.immediateInfectionsFromSpawn - beforeImmediate;
+    state.statistics.reanimationFacilityInfections += occupancyEvents.filter(
+      (candidate) => candidate.type === 'site_immediate_infection' && candidate.payload.siteKind === 'facility',
+    ).length;
+    state.statistics.reanimationCheckpointInfections += occupancyEvents.filter(
+      (candidate) => candidate.type === 'site_immediate_infection' && candidate.payload.siteKind === 'checkpoint',
+    ).length;
+    state.statistics.reanimationSiteFalls += occupancyEvents.filter(
+      (candidate) => candidate.type === 'site_fallen' || candidate.type === 'site_chain_fallen',
+    ).length;
+    state.statistics.reanimationChainOverruns += state.statistics.chainOverruns - beforeChains;
+  }
 }
 
-function dealDamage(state: GameState, target: UnitState, amount: number, sourceId: string, cause: string): void {
+function dealDamage(
+  state: GameState,
+  target: UnitState,
+  amount: number,
+  sourceId: string,
+  cause: string,
+  rng: SeededRng,
+): void {
   const adjusted = terrainAdjustedDamage(state, target, amount);
   const damage = Math.max(0, Math.min(target.hp, adjusted.finalDamage));
   target.hp -= damage;
@@ -418,7 +491,7 @@ function dealDamage(state: GameState, target: UnitState, amount: number, sourceI
     terrainDamageMultiplier: adjusted.defense.multiplier,
   });
   if (target.hp <= 0) {
-    destroyUnit(state, target, cause);
+    destroyUnit(state, target, cause, rng);
   }
 }
 
@@ -450,7 +523,7 @@ function resolveCombat(
   if (kind === 'interception') {
     state.statistics.hordeInterceptions += attacker.isPlayerUnit ? 1 : 0;
   }
-  dealDamage(state, defender, attackProjection.effectiveAttack, attacker.id, kind);
+  dealDamage(state, defender, attackProjection.effectiveAttack, attacker.id, kind, rng);
   if (!state.units.some((unit) => unit.id === defender.id)) {
     if (noise) resolveFallenSiteNoiseRespawns(state, noise.sourceUnitType, noise.center, rng);
     return;
@@ -469,7 +542,7 @@ function resolveCombat(
       militaryGoodsCost: counterProjection.militaryGoodsCost,
       militaryGoodsRemaining: defender.isPlayerUnit ? defender.currentMilitaryGoods : 0,
     });
-    dealDamage(state, attacker, counterProjection.effectiveAttack, defender.id, 'counterattack');
+    dealDamage(state, attacker, counterProjection.effectiveAttack, defender.id, 'counterattack', rng);
   }
   if (noise) resolveFallenSiteNoiseRespawns(state, noise.sourceUnitType, noise.center, rng);
 }
@@ -559,6 +632,9 @@ function applyMovement(
       mover.activity.moved = traversed.length > 0;
       mover.canMove = false;
       mover.actionState = 'moved';
+      if (mover.type === 'police' && traversed.length >= 11 && traversed.length <= 15) {
+        state.statistics.policeLongRangeMoves += 1;
+      }
     }
     emit(state, 'unit_moved', {
       unitId: mover.id,
@@ -882,10 +958,29 @@ function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rn
   checkpoint.screening = 0;
   checkpoint.remainingTurns = 0;
   const acceptedWorkers = Math.floor(screened * policy.workerRate);
-  state.population.cumulativeDepartures += screened - acceptedWorkers;
-  state.statistics.refugeesDeparted += screened - acceptedWorkers;
+  const rejected = screened - acceptedWorkers;
+  state.population.cumulativeDepartures += rejected;
+  state.statistics.refugeesDeparted += rejected;
   state.statistics.refugeesScreenedByPolicy[checkpoint.screeningPolicy] += screened;
   state.statistics.refugeesAccepted += acceptedWorkers;
+  if (checkpoint.screeningPolicy === 'normal' || checkpoint.screeningPolicy === 'strict') {
+    state.statistics.refugeesRejectedByDirectionAndPolicy[checkpoint.direction][checkpoint.screeningPolicy] += rejected;
+    const contributesToFutureHorde = state.horde.finalHordeStatus === 'notStarted';
+    if (contributesToFutureHorde) {
+      state.rejectedRefugeesByDirection[checkpoint.direction][
+        checkpoint.screeningPolicy === 'normal' ? 'normalRejected' : 'strictRejected'
+      ] += rejected;
+    }
+    if (rejected > 0) {
+      emit(state, 'checkpoint_refugees_rejected', {
+        checkpointId: checkpoint.id,
+        direction: checkpoint.direction,
+        policy: checkpoint.screeningPolicy,
+        count: rejected,
+        contributesToFutureHorde,
+      });
+    }
+  }
   let latentInfected = 0;
   if (acceptedWorkers > 0 && policy.infectionRate > 0 && rng.chance(policy.infectionRate)) {
     latentInfected = Math.ceil(acceptedWorkers * policy.infectionPopulationRate);
@@ -929,7 +1024,7 @@ function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rn
 function checkpointHasZombie(state: Readonly<GameState>, checkpoint: Readonly<CheckpointState>): boolean {
   return state.units.some(
     (unit) =>
-      (unit.type === 'zombie' || unit.type === 'hordeZombie') &&
+      isZombieFaction(unit) &&
       hexKey(unit.position) === hexKey(checkpoint.position),
   );
 }
@@ -1019,7 +1114,15 @@ function processUnmanagedArrival(
 function processRefugees(state: GameState, rng: SeededRng): void {
   for (const branch of [...state.roadBranches].sort((a, b) => a.branchId.localeCompare(b.branchId))) {
     const checkpoint = activeCheckpointForBranch(state, branch.branchId);
-    if (!checkpoint) state.statistics.unmanagedBranchTurns += 1;
+    const arrivalsEnded = state.horde.finalHordeStatus !== 'notStarted';
+    if (!checkpoint && !arrivalsEnded) state.statistics.unmanagedBranchTurns += 1;
+    if (arrivalsEnded) {
+      if (branch.nextArrivalTurn !== null && branch.nextArrivalTurn <= state.turn) {
+        state.statistics.preventedRefugeeArrivalsAfterFinal += 1;
+      }
+      branch.nextArrivalTurn = null;
+      continue;
+    }
     if (branch.nextArrivalTurn === state.turn) {
       const people = rng.nextInt(state.config.refugees.arrivalPeopleMin, state.config.refugees.arrivalPeopleMax);
       state.population.cumulativeArrivals += people;
@@ -1174,10 +1277,14 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const isOwned = (facility: Readonly<FacilityState>) => facility.owner === 'player' && facility.status === 'owned';
   const canProduce = (facility: Readonly<FacilityState>) =>
     isOwned(facility) && facility.infected === 0 && facility.workers > 0 && facility.operationalStatus === 'operational';
+  const checkpointHealthyConsumers = state.checkpoints.reduce(
+    (total, checkpoint) => total + checkpoint.waiting + checkpoint.screening + checkpoint.approved,
+    0,
+  );
   const consumers = state.facilities.reduce(
     (total, facility) => total + (facility.owner === 'player' ? facility.workers : 0),
     state.population.unitPopulation,
-  );
+  ) + checkpointHealthyConsumers;
   const overcrowding = overcrowdingTerms(state);
   const normalFood = consumers * state.config.economy.populationConsumption.food;
   const normalCivilian = consumers * state.config.economy.populationConsumption.civilianGoods;
@@ -1503,6 +1610,27 @@ function calculateEconomyPlan(state: Readonly<GameState>): EconomyPlan {
 function removeWorkersForShortage(state: GameState, amount: number, resource: 'food' | 'civilianGoods'): number {
   let remaining = Math.max(0, Math.floor(amount));
   let removed = 0;
+  const directionOrder = new Map(CANONICAL_DIRECTIONS.map((direction, index) => [direction, index]));
+  const checkpoints = [...state.checkpoints].sort(
+    (left, right) =>
+      (directionOrder.get(left.direction) ?? Number.MAX_SAFE_INTEGER) -
+        (directionOrder.get(right.direction) ?? Number.MAX_SAFE_INTEGER) ||
+      left.id.localeCompare(right.id),
+  );
+  for (const checkpoint of checkpoints) {
+    const loss = Math.min(remaining, totalCheckpointPeople(checkpoint));
+    if (loss <= 0) continue;
+    const actual = removeCheckpointPeople(checkpoint, loss, ['waiting', 'screening', 'approved']);
+    remaining -= actual;
+    removed += actual;
+    emit(state, 'resource_shortage', {
+      resource,
+      checkpointId: checkpoint.id,
+      populationLost: actual,
+      rejectedCounterChanged: false,
+    });
+    if (remaining === 0) break;
+  }
   const cities = state.cityPopulationSnapshot.supply
     .map((entry) => getFacilityState(state, entry.facilityId))
     .filter(
@@ -1612,6 +1740,21 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
   synchronizePopulation(state);
   const plan = calculateEconomyPlan(state);
   const forecast = plan.forecast;
+  const queuePopulation = state.checkpoints.reduce(
+    (total, checkpoint) => total + checkpoint.waiting + checkpoint.screening + checkpoint.approved,
+    0,
+  );
+  state.statistics.checkpointQueueFoodDemand +=
+    queuePopulation * state.config.economy.populationConsumption.food;
+  state.statistics.checkpointQueueCivilianGoodsDemand +=
+    queuePopulation * state.config.economy.populationConsumption.civilianGoods;
+  const queueFoodDemand = queuePopulation * state.config.economy.populationConsumption.food;
+  const queueCivilianGoodsDemand = queuePopulation * state.config.economy.populationConsumption.civilianGoods;
+  state.statistics.checkpointQueueFoodConsumed += Math.max(0, queueFoodDemand - forecast.food.shortage);
+  state.statistics.checkpointQueueCivilianGoodsConsumed += Math.max(
+    0,
+    queueCivilianGoodsDemand - forecast.civilianGoods.maintenanceShortage,
+  );
   state.resources.food = forecast.food.endingStock;
   state.resources.civilianGoods = forecast.civilianGoods.endingStock;
   state.resources.militaryGoods = forecast.militaryGoods.projectedEndingStock;
@@ -2537,7 +2680,7 @@ function emitCombatNoise(state: GameState, source: UnitState, center: HexCoord):
   const radius = state.config.noise[source.type];
   const noiseClass = state.config.noise.publicClass[source.type];
   const affected: string[] = [];
-  for (const zombie of state.units.filter((unit) => unit.type === 'zombie').sort((a, b) => a.id.localeCompare(b.id))) {
+  for (const zombie of state.units.filter(isNormalAiZombie).sort((a, b) => a.id.localeCompare(b.id))) {
     if (
       hexDistance(zombie.position, center) > radius ||
       hexKey(zombie.position) === hexKey(center) ||
@@ -2665,7 +2808,7 @@ function targetDecisionSnapshot(state: GameState, rng: SeededRng): Map<string, Z
       noiseChanged: null,
     });
   }
-  for (const zombie of snapshot.units.filter((unit) => unit.type === 'zombie').sort((a, b) => a.id.localeCompare(b.id))) {
+  for (const zombie of snapshot.units.filter(isNormalAiZombie).sort((a, b) => a.id.localeCompare(b.id))) {
     const visible = chooseVisiblePopulationTarget(snapshot, zombie, rng);
     if (visible) {
       decisions.set(zombie.id, {
@@ -2726,7 +2869,7 @@ function targetDecisionSnapshot(state: GameState, rng: SeededRng): Map<string, Z
 function processZombieTurn(state: GameState, rng: SeededRng): void {
   const decisions = targetDecisionSnapshot(state, rng);
   const zombieIds = state.units
-    .filter((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')
+    .filter(isZombieFaction)
     .map((unit) => unit.id)
     .sort();
   for (const zombieId of zombieIds) {
@@ -2744,7 +2887,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
       noiseTarget: null,
       noiseChanged: null,
     };
-    if (zombie.type === 'zombie') {
+    if (isNormalAiZombie(zombie)) {
       const noiseAcquiredAfterSnapshot =
         zombie.noiseTarget !== null && decision.noiseTarget === null && decision.noiseChanged === null
           ? { ...zombie.noiseTarget }
@@ -2775,7 +2918,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
       continue;
     }
     if (!decision.target) {
-      if (zombie.type === 'zombie') {
+      if (isNormalAiZombie(zombie)) {
         state.statistics.normalZombieIdleCount += 1;
         emit(state, 'zombie_idle', { zombieId });
       }
@@ -2789,7 +2932,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
     }
     const survivor = getUnit(state, zombieId);
     if (
-      survivor?.type === 'zombie' &&
+      survivor !== undefined && isNormalAiZombie(survivor) &&
       decision.reason === 'noise' &&
       decision.target &&
       hexKey(survivor.position) === hexKey(decision.target) &&
@@ -2809,7 +2952,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
 
 function processZombieInfection(state: GameState, rng: SeededRng): void {
   const zombies = state.units
-    .filter((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')
+    .filter(isZombieFaction)
     .sort((a, b) => a.id.localeCompare(b.id));
   for (const zombie of zombies) {
     const facility = getFacilityAt(state, zombie.position);
@@ -2902,27 +3045,36 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
   const kind = wave.final ? 'final' as const : 'periodic' as const;
   const allSpawned: UnitState[] = [];
   const groupIds: string[] = [];
+  const rejectedBonuses: Array<{ direction: CardinalDirection; rejectedTotal: number; extraNormalZombies: number }> = [];
   for (const direction of state.horde.warningDirections) {
     const entrance = getHordeEntrance(state.map, direction);
     if (!entrance) {
       return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', `Missing Horde entrance for ${direction}`);
     }
     const groupId = `wave-${waveIndex}-${direction}`;
+    const counters = state.rejectedRefugeesByDirection[direction];
+    const rejectedTotal = counters.normalRejected + counters.strictRejected + counters.turnedAway;
+    const extraNormalZombies = Math.ceil(rejectedTotal / 5);
+    const composition = {
+      hordeZombie: wave.compositionPerDirection.hordeZombie,
+      zombie: wave.compositionPerDirection.zombie + extraNormalZombies,
+    };
     const spawned = spawnHordeComposition(
       state,
       entrance.tile,
-      wave.compositionPerDirection,
+      composition,
       rng,
       wave.final ? 'final_horde' : 'periodic_horde',
       groupId,
       kind,
     );
-    const expected = wave.compositionPerDirection.hordeZombie + wave.compositionPerDirection.zombie;
+    const expected = composition.hordeZombie + composition.zombie;
     if (spawned.length !== expected) {
       return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', `Wave ${waveIndex} could not place every unit for ${direction}`);
     }
     groupIds.push(groupId);
     allSpawned.push(...spawned);
+    rejectedBonuses.push({ direction, rejectedTotal, extraNormalZombies });
   }
   const hordeZombieCount = allSpawned.filter((unit) => unit.type === 'hordeZombie').length;
   const zombieCount = allSpawned.filter((unit) => unit.type === 'zombie').length;
@@ -2931,6 +3083,23 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
   state.horde.spawnGroupIdsByWave[String(waveIndex)] = groupIds;
   state.horde.totalSpawned += count;
   state.horde.lastSpawnTurn = state.turn;
+  for (const bonus of rejectedBonuses) {
+    const counters = state.rejectedRefugeesByDirection[bonus.direction];
+    emit(state, 'horde_rejected_bonus_applied', {
+      direction: bonus.direction,
+      normalRejected: counters.normalRejected,
+      strictRejected: counters.strictRejected,
+      turnedAway: counters.turnedAway,
+      rejectedTotal: bonus.rejectedTotal,
+      extraNormalZombies: bonus.extraNormalZombies,
+      waveIndex,
+    });
+    state.statistics.rejectedBonusZombiesByDirection[bonus.direction] += bonus.extraNormalZombies;
+    state.statistics.rejectedCounterResetsByDirection[bonus.direction] += 1;
+    counters.normalRejected = 0;
+    counters.strictRejected = 0;
+    counters.turnedAway = 0;
+  }
   if (wave.final) {
     state.horde.finalSpawnGroupIds = [...groupIds];
     state.horde.finalSpawnedCount = count;
@@ -2938,6 +3107,8 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
     state.statistics.finalHordeSpawned = count;
     state.statistics.finalHordeZombiesSpawned += hordeZombieCount;
     state.statistics.finalNormalZombiesSpawned += zombieCount;
+    for (const branch of state.roadBranches) branch.nextArrivalTurn = null;
+    emit(state, 'refugee_arrivals_ended', { finalWaveIndex: waveIndex, spawnTurn: state.turn });
   } else {
     state.statistics.periodicHordeZombiesSpawned += hordeZombieCount;
     state.statistics.periodicNormalZombiesSpawned += zombieCount;
@@ -2974,6 +3145,8 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
 function finishGame(state: GameState, outcome: 'won' | 'lost', reason: GameOverReason): void {
   if (state.gameOver) return;
   synchronizePopulation(state);
+  state.statistics.policeZombiesFinal = state.units.filter((unit) => unit.type === 'policeZombie').length;
+  state.statistics.soldierZombiesFinal = state.units.filter((unit) => unit.type === 'soldierZombie').length;
   state.gameOver = true;
   state.phase = 'gameOver';
   state.result = { outcome, reason, turn: state.turn, statistics: JSON.parse(JSON.stringify(state.statistics)) as GameState['statistics'] };
@@ -3009,7 +3182,7 @@ export function deriveVictoryProgress(state: Readonly<GameState>): VictoryProgre
     );
   const suppliedAreaZombieClear = !state.units.some(
     (unit) =>
-      (unit.type === 'zombie' || unit.type === 'hordeZombie') &&
+      isZombieFaction(unit) &&
       supplied.has(hexKey(unit.position)),
   );
   const suppliedAreaInfectionClear =
@@ -3113,7 +3286,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
     unit.canAttack = true;
     unit.activity = { moved: false, attacked: false, intercepted: false, suppressed: false };
   }
-  for (const zombie of state.units.filter((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')) {
+  for (const zombie of state.units.filter(isZombieFaction)) {
     zombie.canAttack = true;
   }
   const orders = [...state.pendingUnitProductions].sort((left, right) => left.id.localeCompare(right.id));
@@ -3165,7 +3338,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
   state.statistics.groundVisionSamples += 1;
   state.statistics.maxCivilianDroneVisionRadius = Math.max(
     state.statistics.maxCivilianDroneVisionRadius,
-    ...state.facilities.filter((facility) => facility.type === 'civilianDroneBase').map((facility) => facility.workers * 2),
+    ...state.facilities.filter((facility) => facility.type === 'civilianDroneBase').map((facility) => facility.workers * 3),
   );
   const previouslyDiscovered = new Set(state.events
     .filter((event) => event.type === 'aerial_enemy_discovered' && typeof event.payload.unitId === 'string')
@@ -3368,7 +3541,7 @@ function validateCheckpointDestination(
     return error(action, 'checkpoint_abandoned_forward_block', 'An infected ruined or abandoned site only permits a position closer to the capital');
   }
   const zombies = (visibleZombies ?? state.units
-    .filter((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')
+    .filter(isZombieFaction)
     .filter((zombie) => isVisibleToPlayer(state, zombie.position)))
     .filter((zombie) =>
       zombieBlockerMode === 'tile'
@@ -3378,10 +3551,20 @@ function validateCheckpointDestination(
   if (zombies.length > 0) {
     return error(action, 'checkpoint_supply_zombie_blocked', 'A visible Zombie blocks this checkpoint position or supply area');
   }
-  if (state.resources.civilianGoods < state.config.checkpoint.constructionCivilianGoods) {
+  const cost = action.type === 'RelocateCheckpoint'
+    ? state.config.checkpoint.relocationCivilianGoods
+    : getCheckpointBuildCost(state, branchId);
+  if (state.resources.civilianGoods < cost) {
     return error(action, 'insufficient_civilian_goods', 'Not enough civilian goods');
   }
   return null;
+}
+
+export function getCheckpointBuildCost(state: Readonly<GameState>, branchId: string): number {
+  const branch = getRoadBranchState(state, branchId);
+  return branch?.hasBuiltCheckpoint
+    ? state.config.checkpoint.subsequentConstructionCivilianGoods
+    : state.config.checkpoint.constructionCivilianGoods;
 }
 
 function validateBuildCheckpointAction(
@@ -3401,13 +3584,13 @@ function validateBuildCheckpointAction(
   const branch = getRoadBranchState(state, branchId);
   if (!branch) return { branchId, error: error(action, 'unknown_road_branch', 'Unknown road branch') };
   const active = activeCheckpointForBranch(state, branchId);
+  if (preparedCheckpointCount(state, branchId) >= state.config.checkpoint.maxPreparedPostsPerDirection) {
+    return {
+      branchId,
+      error: error(action, 'checkpoint_prepared_post_limit_reached', 'This branch already has the maximum prepared checkpoint posts'),
+    };
+  }
   if (active) {
-    if (preparedCheckpointCount(state, branchId) >= state.config.checkpoint.maxPreparedPostsPerDirection) {
-      return {
-        branchId,
-        error: error(action, 'checkpoint_prepared_post_limit_reached', 'This branch already has the maximum prepared checkpoint posts'),
-      };
-    }
     if (checkpointBranchIndex(state, branchId, action.position) >= checkpointBranchIndex(state, branchId, active.position)) {
       return {
         branchId,
@@ -3522,7 +3705,8 @@ function buildCheckpoint(state: GameState, action: Extract<GameAction, { type: '
   const branch = getRoadBranchState(state, branchId);
   const role = branch?.activeCheckpointId ? 'standby' as const : 'active' as const;
   const beforeSupply = getSuppliedTileKeys(state);
-  state.resources.civilianGoods -= state.config.checkpoint.constructionCivilianGoods;
+  const cost = getCheckpointBuildCost(state, branchId);
+  state.resources.civilianGoods -= cost;
   const ruined = state.checkpoints.filter(
     (checkpoint) =>
       checkpoint.status === 'ruined' &&
@@ -3536,7 +3720,10 @@ function buildCheckpoint(state: GameState, action: Extract<GameAction, { type: '
       emit(state, 'checkpoint_abandoned', { checkpointId: old.id, branchId, replacementId: checkpoint.id });
     }
   }
-  if (branch) branch.checkpointActionsThisTurn += 1;
+  if (branch) {
+    branch.checkpointActionsThisTurn += 1;
+    branch.hasBuiltCheckpoint = true;
+  }
   state.actionsTakenThisTurn += 1;
   state.statistics.checkpointsBuilt += 1;
   if (role === 'standby') state.statistics.standbyCheckpointsCreated += 1;
@@ -3548,6 +3735,7 @@ function buildCheckpoint(state: GameState, action: Extract<GameAction, { type: '
     branchId,
     direction: checkpoint.direction,
     role,
+    civilianGoods: cost,
     retreat: role === 'active' && ruined.length > 0,
   });
   if (role === 'active') {
@@ -3565,7 +3753,7 @@ function relocateCheckpoint(
   const source = validation.source!;
   const branchId = validation.branchId!;
   const beforeSupply = getSuppliedTileKeys(state);
-  state.resources.civilianGoods -= state.config.checkpoint.constructionCivilianGoods;
+  state.resources.civilianGoods -= state.config.checkpoint.relocationCivilianGoods;
   const branch = getRoadBranchState(state, branchId);
   if (branch) {
     branch.activeCheckpointId = null;
@@ -3605,6 +3793,7 @@ function relocateCheckpoint(
     sourceCheckpointId: source.id,
     branchId,
     sourceRole,
+    civilianGoods: state.config.checkpoint.relocationCivilianGoods,
   });
   resolveCheckpointRemnants(state);
   emitSupplyChanged(state, branchId, beforeSupply, 'checkpoint_relocated');
@@ -3633,11 +3822,11 @@ function validateActivateCheckpointAction(
   }
   const visibleZombieOnTarget = (visibleZombies ?? state.units.filter(
     (unit) =>
-      (unit.type === 'zombie' || unit.type === 'hordeZombie') &&
+      isZombieFaction(unit) &&
       isVisibleToPlayer(state, unit.position),
   )).some(
     (unit) =>
-      (unit.type === 'zombie' || unit.type === 'hordeZombie') &&
+      isZombieFaction(unit) &&
       hexKey(unit.position) === hexKey(target.position) &&
       (visibleZombies !== undefined || isVisibleToPlayer(state, unit.position)),
   );
@@ -3713,6 +3902,37 @@ function setCheckpointPolicy(state: GameState, action: Extract<GameAction, { typ
   if (!['passThrough', 'normal', 'strict'].includes(action.policy)) return error(action, 'invalid_policy', 'Unknown checkpoint policy');
   branch.currentPolicy = action.policy;
   state.actionsTakenThisTurn += 1;
+  return null;
+}
+
+function turnAwayCheckpointRefugees(
+  state: GameState,
+  action: Extract<GameAction, { type: 'TurnAwayCheckpointRefugees' }>,
+): ActionError | null {
+  const budget = playerActionBudgetError(state, action);
+  if (budget) return budget;
+  const checkpoint = state.checkpoints.find((candidate) => candidate.id === action.checkpointId);
+  if (!checkpoint || !['active', 'remnant'].includes(deriveCheckpointRole(state, checkpoint))) {
+    return error(action, 'checkpoint_not_eligible_for_turn_away', 'Only Active or Remnant checkpoints can turn away waiting refugees');
+  }
+  if (!Number.isInteger(action.count) || action.count < 1 || action.count > checkpoint.waiting) {
+    return error(action, 'invalid_refugee_turn_away_count', 'Turn Away count must be an integer within the waiting pool');
+  }
+  checkpoint.waiting -= action.count;
+  state.population.cumulativeDepartures += action.count;
+  state.statistics.refugeesDeparted += action.count;
+  state.statistics.refugeesTurnedAwayByDirection[checkpoint.direction] += action.count;
+  const contributesToFutureHorde = state.horde.finalHordeStatus === 'notStarted';
+  if (contributesToFutureHorde) {
+    state.rejectedRefugeesByDirection[checkpoint.direction].turnedAway += action.count;
+  }
+  state.actionsTakenThisTurn += 1;
+  emit(state, 'checkpoint_refugees_turned_away', {
+    checkpointId: checkpoint.id,
+    direction: checkpoint.direction,
+    count: action.count,
+    contributesToFutureHorde,
+  });
   return null;
 }
 
@@ -3857,8 +4077,10 @@ function wait(state: GameState, action: Extract<GameAction, { type: 'Wait' }>): 
   return null;
 }
 
-function constructibleLimit(state: Readonly<GameState>): number {
-  return Math.ceil(state.map.roadBranches.length / state.config.constructibleFacility.limitPerTypeDivisor);
+function constructibleLimit(state: Readonly<GameState>, facilityType: ConstructibleFacilityType): number {
+  return facilityType === 'simpleFarm'
+    ? state.map.roadBranches.length
+    : Math.ceil(state.map.roadBranches.length / state.config.constructibleFacility.limitPerTypeDivisor);
 }
 
 interface ConstructibleValidationContext {
@@ -3889,7 +4111,7 @@ function validateConstructibleFacilityAction(
   if (!['simpleFarm', 'civilianDroneBase'].includes(action.facilityType)) {
     return error(action, 'invalid_constructible_facility_type', 'Unknown constructible facility type');
   }
-  if (state.facilities.filter((facility) => facility.constructible && facility.type === action.facilityType).length >= constructibleLimit(state)) {
+  if (state.facilities.filter((facility) => facility.constructible && facility.type === action.facilityType).length >= constructibleLimit(state, action.facilityType)) {
     return error(action, 'constructible_facility_limit_reached', 'The per-type constructible facility limit has been reached');
   }
   const cost = state.config.facilities[action.facilityType].buildCivilianGoods;
@@ -4005,6 +4227,41 @@ function buildConstructibleFacility(
   return null;
 }
 
+function decommissionConstructibleFacility(
+  state: GameState,
+  action: Extract<GameAction, { type: 'DecommissionConstructibleFacility' }>,
+): ActionError | null {
+  const budget = playerActionBudgetError(state, action);
+  if (budget) return budget;
+  const facility = getFacilityState(state, action.facilityId);
+  if (!facility || !facility.constructible || facility.type !== 'civilianDroneBase') {
+    return error(action, 'facility_not_decommissionable', 'Only a constructed Civilian Drone Base can be decommissioned');
+  }
+  if (facility.operationalStatus === 'building') {
+    return error(action, 'facility_building', 'A facility under construction cannot be decommissioned');
+  }
+  if (facility.owner !== 'player' || facility.workers !== 0 || facility.infected !== 0) {
+    return error(action, 'facility_decommission_conditions_not_met', 'The facility must be player-owned, unstaffed, and uninfected');
+  }
+  if (state.units.some((unit) => isZombieFaction(unit) && hexKey(unit.position) === hexKey(facility.position))) {
+    return error(action, 'facility_zombie_occupied', 'A Zombie occupies this facility');
+  }
+  const refund = Math.ceil(state.config.facilities.civilianDroneBase.buildCivilianGoods / 2);
+  state.facilities.splice(state.facilities.findIndex((candidate) => candidate.id === facility.id), 1);
+  state.resources.civilianGoods += refund;
+  state.actionsTakenThisTurn += 1;
+  state.statistics.civilianDroneBasesDecommissioned += 1;
+  state.statistics.civilianGoodsRefundedFromDecommission += refund;
+  emit(state, 'constructible_decommissioned', {
+    facilityId: facility.id,
+    facilityType: facility.type,
+    q: facility.position.q,
+    r: facility.position.r,
+    civilianGoodsRefunded: refund,
+  });
+  return null;
+}
+
 /** Lightweight, non-mutating validation for callers that need an error reason. */
 export function validateAction(state: Readonly<GameState>, action: GameAction): ActionError | null {
   if (state.gameOver) return error(action, 'game_over', 'The game is over');
@@ -4018,7 +4275,9 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   }
   if (action.type === 'LoadSnapshot') {
     const valid = validateInvariants(action.snapshot);
-    if (action.snapshot.gameVersion !== state.gameVersion || !valid.valid) {
+    const seededInitialZombiesValid = initialZombiePositionsMatchSeed(action.snapshot.map, action.snapshot.seed);
+    if (action.snapshot.gameVersion !== state.gameVersion || !valid.valid || !seededInitialZombiesValid) {
+      if (!seededInitialZombiesValid) valid.errors.push('Map initial Zombie positions and order must match the deterministic state seed');
       return error(action, 'invalid_snapshot', valid.errors.join('; ') || 'Unsupported game version');
     }
     return null;
@@ -4033,6 +4292,8 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   if (action.type === 'RelocateCheckpoint') return validateRelocateCheckpointAction(state, action).error;
   if (action.type === 'ActivateCheckpoint') return validateActivateCheckpointAction(state, action).error;
   if (action.type === 'BuildConstructibleFacility') return validateConstructibleFacilityAction(state, action);
+  if (action.type === 'TurnAwayCheckpointRefugees') return turnAwayCheckpointRefugees(cloneState(state as GameState), action);
+  if (action.type === 'DecommissionConstructibleFacility') return decommissionConstructibleFacility(cloneState(state as GameState), action);
   const candidate = cloneState(state as GameState);
   if (action.type === 'Move') return move(candidate, action);
   if (action.type === 'Attack') return attack(candidate, action);
@@ -4117,7 +4378,7 @@ function checkpointProjectedEffect(
   action: Extract<GameAction, { type: 'BuildCheckpoint' | 'RelocateCheckpoint' | 'ActivateCheckpoint' }>,
   legal: boolean,
   context: CheckpointProjectionContext,
-): Omit<CheckpointPositionCandidate, 'actionType' | 'branchId' | 'checkpointId' | 'position' | 'legal' | 'reasonCode'> {
+): Omit<CheckpointPositionCandidate, 'actionType' | 'branchId' | 'checkpointId' | 'position' | 'legal' | 'reasonCode' | 'civilianGoodsCost'> {
   const branchId = action.branchId ?? ('position' in action ? getBranchIdAt(state.map, action.position) : null) ?? '';
   if (!legal) {
     const radius = getBranchSupplyRadius(state, branchId);
@@ -4201,6 +4462,9 @@ export function getCheckpointPositionCandidates(
           position: { ...position },
           legal: reason === null,
           reasonCode: reason?.code ?? null,
+          civilianGoodsCost: action.type === 'BuildCheckpoint'
+            ? getCheckpointBuildCost(state, branch.id)
+            : state.config.checkpoint.relocationCivilianGoods,
           ...effect,
         });
       }
@@ -4231,6 +4495,7 @@ export function getCheckpointPositionCandidates(
         position: { ...checkpoint.position },
         legal: reason === null,
         reasonCode: reason?.code ?? null,
+        civilianGoodsCost: 0,
         ...effect,
       });
     }
@@ -4358,6 +4623,14 @@ export class GameEngine implements HeadlessGame {
         if (policy !== branch.currentPolicy) actions.push({ type: 'SetCheckpointPolicy', branchId: branch.branchId, policy });
       }
     }
+    for (const checkpoint of [...this.state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
+      if (checkpoint.waiting > 0 && ['active', 'remnant'].includes(deriveCheckpointRole(this.state, checkpoint))) {
+        actions.push({ type: 'TurnAwayCheckpointRefugees', checkpointId: checkpoint.id, count: 1 });
+        if (checkpoint.waiting > 1) {
+          actions.push({ type: 'TurnAwayCheckpointRefugees', checkpointId: checkpoint.id, count: checkpoint.waiting });
+        }
+      }
+    }
     for (const candidate of getCheckpointPositionCandidates(this.state, false)) {
       if (!candidate.legal) continue;
       actions.push(candidate.actionType === 'RelocateCheckpoint'
@@ -4372,6 +4645,13 @@ export class GameEngine implements HeadlessGame {
           : { type: 'BuildCheckpoint', branchId: candidate.branchId, position: { ...candidate.position } });
     }
     actions.push(...getLegalConstructibleBuildActions(this.state));
+    for (const facility of stableFacilities(this.state)) {
+      const action: Extract<GameAction, { type: 'DecommissionConstructibleFacility' }> = {
+        type: 'DecommissionConstructibleFacility',
+        facilityId: facility.id,
+      };
+      if (decommissionConstructibleFacility(cloneState(this.state), action) === null) actions.push(action);
+    }
     const currentCivilianWorkers = civilianWorkerCount(this.state);
     for (const city of cities.filter((candidate) => suppliedKeys.has(hexKey(candidate.position)))) {
       if (!this.state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) {
@@ -4420,7 +4700,9 @@ export class GameEngine implements HeadlessGame {
       try {
         const candidate = cloneState(action.snapshot);
         const valid = validateInvariants(candidate);
-        if (candidate.gameVersion !== original.gameVersion || !valid.valid) {
+        const seededInitialZombiesValid = initialZombiePositionsMatchSeed(candidate.map, candidate.seed);
+        if (candidate.gameVersion !== original.gameVersion || !valid.valid || !seededInitialZombiesValid) {
+          if (!seededInitialZombiesValid) valid.errors.push('Map initial Zombie positions and order must match the deterministic state seed');
           return { state: this.getState(), events: [], error: error(action, 'invalid_snapshot', valid.errors.join('; ') || 'Unsupported game version'), gameOver: false, result: null };
         }
         this.state = candidate;
@@ -4431,7 +4713,7 @@ export class GameEngine implements HeadlessGame {
     }
 
     const candidate = cloneState(original);
-    const populationBeforeAction = populationLedgerTotal(original);
+    const populationBeforeAction = populationLedgerTotal(original) + original.population.cumulativeDepartures;
     const rng = SeededRng.fromState(candidate.rngState);
     const eventCount = candidate.events.length;
     let actionError: ActionError | null = null;
@@ -4449,6 +4731,8 @@ export class GameEngine implements HeadlessGame {
     else if (action.type === 'BuildCheckpoint') actionError = buildCheckpoint(candidate, action);
     else if (action.type === 'RelocateCheckpoint') actionError = relocateCheckpoint(candidate, action);
     else if (action.type === 'ActivateCheckpoint') actionError = activateCheckpoint(candidate, action);
+    else if (action.type === 'TurnAwayCheckpointRefugees') actionError = turnAwayCheckpointRefugees(candidate, action);
+    else if (action.type === 'DecommissionConstructibleFacility') actionError = decommissionConstructibleFacility(candidate, action);
     else if (action.type === 'ProduceUnit') actionError = produceUnit(candidate, action);
     else actionError = error(action, 'unknown_action', 'Unknown or retired action');
 
@@ -4458,7 +4742,10 @@ export class GameEngine implements HeadlessGame {
     saveRng(candidate, rng);
     synchronizePopulation(candidate);
     if (!candidate.gameOver) checkImmediateGameEnd(candidate);
-    if (action.type !== 'EndTurn' && populationLedgerTotal(candidate) !== populationBeforeAction) {
+    if (
+      action.type !== 'EndTurn'
+      && populationLedgerTotal(candidate) + candidate.population.cumulativeDepartures !== populationBeforeAction
+    ) {
       return {
         state: this.getState(),
         events: [],

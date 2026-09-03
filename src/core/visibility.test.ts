@@ -18,36 +18,36 @@ function tile(state: GameState, position: HexCoord) {
   return found;
 }
 
-describe('v1.4.3 player visibility', () => {
+describe('v1.4.4 player visibility', () => {
   it('combines human units, capital, owned facilities and operational checkpoints', () => {
     const state = createInitialState(1, createDefaultConfig());
     const visible = getPlayerVisibleTileKeys(state);
-    expect(visible.has('15,15')).toBe(true);
+    expect(visible.has('25,25')).toBe(true);
     expect(visible.has('4,4')).toBe(false);
     expect(getVisibleEnemyUnits(state).map((unit) => unit.id)).not.toContain('zombie-1');
 
     const city = state.facilities.find((facility) => facility.id === 'city-1')!;
     city.owner = 'player';
     city.status = 'owned';
-    expect(getPlayerVisibleTileKeys(state).has('15,8')).toBe(true);
-    expect(getPlayerVisibleTileKeys(state).has('15,7')).toBe(true);
+    expect(getPlayerVisibleTileKeys(state).has('25,20')).toBe(true);
+    expect(getPlayerVisibleTileKeys(state).has('25,19')).toBe(true);
 
     state.checkpoints.push({
-      id: 'checkpoint-test', position: { q: 15, r: 1 }, direction: 'north', branchId: 'north',
+      id: 'checkpoint-test', position: { q: 25, r: 1 }, direction: 'north', branchId: 'north',
       status: 'operational', waiting: 0, screening: 0, approved: 0, remainingTurns: 0,
       screeningPolicy: 'normal', nextArrivalTurn: 2, infected: 0,
     });
     state.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-test';
-    expect(getPlayerVisibleTileKeys(state).has('15,0')).toBe(true);
+    expect(getPlayerVisibleTileKeys(state).has('25,0')).toBe(true);
     state.checkpoints[0]!.status = 'ruined';
-    expect(getPlayerVisibleTileKeys(state).has('15,0')).toBe(false);
+    expect(getPlayerVisibleTileKeys(state).has('25,0')).toBe(false);
   });
 
   it('uses the first Forest or Mountain on a Ground LOS as the visible boundary', () => {
     const state = createInitialState(1, createDefaultConfig());
-    const origin = { q: 15, r: 15 };
-    const firstBlocking = { q: 15, r: 16 };
-    const beyondBlocking = { q: 15, r: 17 };
+    const origin = { q: 25, r: 25 };
+    const firstBlocking = { q: 25, r: 26 };
+    const beyondBlocking = { q: 25, r: 27 };
     tile(state, firstBlocking).terrain = 'forest';
     tile(state, beyondBlocking).terrain = 'plain';
 
@@ -66,17 +66,17 @@ describe('v1.4.3 player visibility', () => {
     const source = getGroundVisionCoverageFrom(state, { q: 0, r: 0 }, 1);
 
     expect(source.potential.has('0,0')).toBe(true);
-    expect(source.potential.has('15,15')).toBe(false);
-    expect(source.visible.has('15,15')).toBe(false);
-    expect(source.blocked.has('15,15')).toBe(false);
-    expect(getPlayerVisionCoverage(state).groundPotential.has('15,15')).toBe(true);
+    expect(source.potential.has('25,25')).toBe(false);
+    expect(source.visible.has('25,25')).toBe(false);
+    expect(source.blocked.has('25,25')).toBe(false);
+    expect(getPlayerVisionCoverage(state).groundPotential.has('25,25')).toBe(true);
   });
 
   it('does not let the source terrain block itself and uses base terrain behind overlays', () => {
     const state = createInitialState(2, createDefaultConfig());
-    const origin = { q: 15, r: 15 };
-    const target = { q: 15, r: 17 };
-    const middle = { q: 15, r: 16 };
+    const origin = { q: 25, r: 25 };
+    const target = { q: 25, r: 27 };
+    const middle = { q: 25, r: 26 };
     tile(state, origin).terrain = 'mountain';
     tile(state, middle).terrain = 'forest';
     tile(state, target).terrain = 'plain';
@@ -93,7 +93,7 @@ describe('v1.4.3 player visibility', () => {
 
   it('keeps Capital Vision independent from the initial Supply radius', () => {
     const state = createInitialState(3, createDefaultConfig({ checkpoint: { initialSupplyRadius: 0 } }));
-    const capitalSightline = '15,20';
+    const capitalSightline = '25,20';
     expect(getPlayerVisibleTileKeys(state).has(capitalSightline)).toBe(true);
     expect(getSuppliedTileKeys(state)).not.toContain(capitalSightline);
   });

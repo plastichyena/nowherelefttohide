@@ -18,7 +18,7 @@ import { isHexSupplied } from './supply';
 import { singleFinalWave } from './testConfig';
 import type { GameConfig, GameState, HexCoord } from './types';
 
-const CENTER: HexCoord = { q: 15, r: 15 };
+const CENTER: HexCoord = { q: 25, r: 25 };
 
 function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): GameConfig {
   return createDefaultConfig({
@@ -65,12 +65,12 @@ function facilityAt(state: Readonly<GameState>, id: string) {
 
 describe('v1.4 Unit Fuel and deterministic refuel', () => {
   it('uses the Hex-count Fuel table independently from weighted Terrain Cost', () => {
-    expect([0, 1, 2, 5, 6, 7, 8, 9, 10].map((distance) => unitMoveFuelCost('police', distance)))
-      .toEqual([0, 1, 1, 1, 2, 3, 4, 5, 6]);
+    expect([0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((distance) => unitMoveFuelCost('police', distance)))
+      .toEqual([0, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     expect([0, 1, 2, 5, 6, 7, 8, 9, 10].map((distance) => unitMoveFuelCost('nationalGuard', distance)))
       .toEqual([0, 1, 1, 1, 3, 5, 7, 9, 11]);
     const state = createInitialState(1401, safeConfig());
-    expect(state.units.find((unit) => unit.type === 'police')).toMatchObject({ currentFuel: 12, maxFuel: 12, movement: 10 });
+    expect(state.units.find((unit) => unit.type === 'police')).toMatchObject({ currentFuel: 12, maxFuel: 12, movement: 15 });
     expect(state.units.find((unit) => unit.type === 'nationalGuard')).toMatchObject({ currentFuel: 22, maxFuel: 22, movement: 10 });
   });
 
@@ -101,21 +101,21 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const guard = snapshot.units.find((unit) => unit.type === 'nationalGuard')!;
     guard.position = { q: 1, r: 1 };
     police.currentFuel = 12;
-    const hidden = createUnit(snapshot, 'hidden-fuel-blocker', 'zombie', { q: 21, r: 15 });
+    const hidden = createUnit(snapshot, 'hidden-fuel-blocker', 'zombie', { q: 31, r: 25 });
     hidden.movement = 0;
     hidden.attack = 0;
     hidden.vision = 0;
     snapshot.units.push(hidden);
     loadScenario(engine, snapshot);
-    expect(engine.getLegalActions()).toContainEqual({ type: 'Move', unitId: police.id, destination: { q: 22, r: 15 } });
-    const preview = previewMove(engine.getState(), police.id, { q: 22, r: 15 });
+    expect(engine.getLegalActions()).toContainEqual({ type: 'Move', unitId: police.id, destination: { q: 32, r: 25 } });
+    const preview = previewMove(engine.getState(), police.id, { q: 32, r: 25 });
     expect(preview.legal).toBe(true);
     expect(preview.interception).toBeNull();
-    const result = engine.step({ type: 'Move', unitId: police.id, destination: { q: 22, r: 15 } });
+    const result = engine.step({ type: 'Move', unitId: police.id, destination: { q: 32, r: 25 } });
     expect(result.error).toBeNull();
     expect(result.events.some((event) => event.type === 'interception')).toBe(true);
     const movedPolice = result.state.units.find((unit) => unit.id === police.id)!;
-    expect(movedPolice.position).not.toEqual({ q: 22, r: 15 });
+    expect(movedPolice.position).not.toEqual({ q: 32, r: 25 });
     const moveEvent = result.events.find((event) => event.type === 'unit_moved');
     expect(moveEvent).toBeDefined();
     const hexesMoved = Number(moveEvent?.payload.hexesMoved);
@@ -227,7 +227,7 @@ describe('v1.4 Wind Power Plant', () => {
     const cleared = cloneState(engine.getState());
     cleared.units = cleared.units.filter((unit) => unit.id !== 'wind-occupier');
     const guard = cleared.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.position = { q: 16, r: 15 };
+    guard.position = { q: 25, r: 24 };
     loadScenario(engine, cleared);
     expect(engine.step({ type: 'Move', unitId: guard.id, destination: wind.position }).error).toBeNull();
     expect(facilityAt(engine.getState(), wind.id).operationalStatus).toBe('recovering');
@@ -284,15 +284,15 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
   it('enforces independent per-Type limits and does not count a destroyed facility', () => {
     const engine = new GameEngine(1421, safeConfig());
     const farms: string[] = [];
-    for (let index = 0; index < 2; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       const position = firstBuildable(engine, 'simpleFarm');
       expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position }).error).toBeNull();
       farms.push(engine.getState().facilities.find((facility) => facility.constructible && facility.type === 'simpleFarm' && !farms.includes(facility.id))!.id);
     }
-    const third = engine.getConstructibleFacilityPositionCandidates('simpleFarm')
+    const fifth = engine.getConstructibleFacilityPositionCandidates('simpleFarm')
       .find((candidate) => candidate.reasonCode === 'constructible_facility_limit_reached');
-    expect(third).toBeDefined();
-    expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: third!.position }).error?.code)
+    expect(fifth).toBeDefined();
+    expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: fifth!.position }).error?.code)
       .toBe('constructible_facility_limit_reached');
     const dronePosition = firstBuildable(engine, 'civilianDroneBase');
     expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'civilianDroneBase', position: dronePosition }).error).toBeNull();
@@ -316,7 +316,7 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
     expect(forecastFacilityProduction(engine.getState()).find((entry) => entry.facilityId === farm.id)?.outputs).toEqual({ food: 50 });
   });
 
-  it('gives a powered Drone Base Vision workers*2 without extending Supply, and stops on Power OFF', () => {
+  it('gives a powered Drone Base Vision workers*3 without extending Supply, and stops on Power OFF', () => {
     const config = safeConfig({
       units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       vision: { ownedFacility: 0, operationalCheckpoint: 0 },
@@ -333,7 +333,7 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
     expect(staffedDrone.lastPowerSupplied).toBe(true);
     expect(facilityZombieTargetValue(powered, staffedDrone)).toBe(5);
     const frontier = powered.map.tiles.find((tile) =>
-      hexDistance(staffedDrone.position, tile) === 10 && hexDistance(CENTER, tile) > 5,
+      hexDistance(staffedDrone.position, tile) === 15 && hexDistance(CENTER, tile) > 5,
     );
     expect(frontier).toBeDefined();
     expect(getPlayerVisibleTileKeys(powered).has(frontier!.key)).toBe(true);
@@ -414,7 +414,7 @@ describe('v1.4 Strategic Forecast and Queue Pressure', () => {
     });
     expect(JSON.stringify(engine.getState())).toBe(before);
     const constructible = getConstructibleFacilityPositionCandidates(state, 'simpleFarm');
-    expect(constructible.length).toBe(31 * 31);
+    expect(constructible.length).toBe(51 * 51);
     expect(JSON.stringify(engine.getState())).toBe(before);
   });
 });

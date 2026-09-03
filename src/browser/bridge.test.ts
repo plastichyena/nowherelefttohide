@@ -242,4 +242,13 @@ describe('Developer / Browser Bridge', () => {
     expect(result.observation.facilities.some((facility) => facility.constructible)).toBe(true);
     expect(result.observation.facilities.find((facility) => facility.constructible)?.operationalStatus).toBe('building');
   });
+
+  it('rejects malformed Turn Away input before it reaches the Agent session', () => {
+    const api = bridge();
+    const before = api.getObservation();
+    const result = api.step({ type: 'TurnAwayCheckpointRefugees', checkpointId: 'checkpoint-north-1', count: 0 } as never);
+    expect(result.error).toMatchObject({ code: 'invalid_action_input' });
+    expect(api.getObservation()).toEqual(before);
+    expect(api.getRunArtifact().invalidAttempts).toHaveLength(1);
+  });
 });

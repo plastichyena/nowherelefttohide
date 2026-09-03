@@ -145,6 +145,8 @@ jobs:
           test -f "${ROOT}/game/public/assets/board/ASSET_MANIFEST.md"
           test -f "${ROOT}/game/public/assets/board/units/unit_police.png"
           test -f "${ROOT}/game/public/assets/board/units/unit_horde_zombie.png"
+          test -f "${ROOT}/game/public/assets/board/units/unit_police_zombie.png"
+          test -f "${ROOT}/game/public/assets/board/units/unit_soldier_zombie.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_wind_power_plant.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_simple_farm.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_civilian_drone_base.png"

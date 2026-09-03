@@ -11,6 +11,7 @@ import {
   ARTIFACT_SCHEMA_VERSION,
   BRIDGE_API_VERSION,
   HIDDEN_NOISE_METRIC_KEYS,
+  HIDDEN_REJECTED_REFUGEE_METRIC_KEYS,
   OBSERVATION_API_VERSION,
   type AgentActionError,
   type AgentGame,
@@ -97,6 +98,7 @@ function safeUnknownClone(value: unknown): unknown {
 function publicMetrics(metrics: ReturnType<typeof collectGameMetrics>): AgentPublicMetrics {
   const value = cloneJson(metrics) as unknown as Record<string, unknown>;
   for (const key of HIDDEN_NOISE_METRIC_KEYS) delete value[key];
+  for (const key of HIDDEN_REJECTED_REFUGEE_METRIC_KEYS) delete value[key];
   value.config = createAgentPublicConfig(metrics.config);
   return value as AgentPublicMetrics;
 }
@@ -117,6 +119,8 @@ const INTERNAL_EVENT_TYPES = new Set([
   'noise_target_reached',
   'noise_target_overridden',
   'aerial_enemy_discovered',
+  'checkpoint_refugees_rejected',
+  'horde_rejected_bonus_applied',
 ]);
 
 const SITE_PUBLIC_EVENT_TYPES = new Set([
@@ -169,15 +173,34 @@ function publicEvents(
         ) as JsonObject;
       }
       if (event.type === 'horde_spawned') {
-        for (const field of [
-          'units', 'unit', 'spawnedUnits', 'position', 'positions', 'spawnGroupId', 'spawnGroupIds', 'groupId',
-          'hordeZombies', 'normalZombies',
-        ] as const) delete payload[field];
+        const waveIndex = typeof payload.waveIndex === 'number' && Number.isSafeInteger(payload.waveIndex)
+          ? payload.waveIndex
+          : null;
+        const wave = waveIndex === null ? undefined : after.config.horde.waves[waveIndex - 1];
+        const directions = Array.isArray(payload.directions)
+          ? payload.directions.filter((direction): direction is 'north' | 'east' | 'south' | 'west' =>
+            direction === 'north' || direction === 'east' || direction === 'south' || direction === 'west',
+          )
+          : [];
+        // An internal bonus is deliberately not observable. Rebuild the whole
+        // payload from the fixed public Wave schedule, not from spawn counts.
+        if (!wave || directions.length === 0) return null;
+        payload = {
+          hordeKind: wave.final ? 'final' : 'periodic',
+          waveIndex,
+          spawnTurn: wave.turn,
+          final: wave.final,
+          directions,
+          compositionPerDirection: cloneJson(wave.compositionPerDirection) as unknown as JsonValue,
+          hordeZombieCount: directions.length * wave.compositionPerDirection.hordeZombie,
+          normalZombieCount: directions.length * wave.compositionPerDirection.zombie,
+        };
       }
-      const spawnedEnemyId = event.type === 'horde_spawned' && typeof payload.zombieId === 'string'
-        ? payload.zombieId
-        : null;
-      if (spawnedEnemyId && !visibleEnemyIds.has(spawnedEnemyId)) return null;
+      if (event.type === 'checkpoint_refugees_turned_away') {
+        // The fact of rejection is player-visible, but neither direction nor
+        // count may reveal a future direction-specific Horde increase.
+        payload = { qualitativeRisk: 'future_horde_may_be_strengthened' };
+      }
       for (const field of ['zombieId', 'unitId', 'sourceId', 'targetId', 'attackerId', 'defenderId'] as const) {
         const id = payload[field];
         if (typeof id === 'string' && enemyById.has(id) && !visibleEnemyIds.has(id)) delete payload[field];
@@ -367,7 +390,9 @@ export class AgentGameAdapter implements AgentGame {
         action.type === 'BuildCheckpoint' ||
         action.type === 'RelocateCheckpoint' ||
         action.type === 'ActivateCheckpoint' ||
-        action.type === 'BuildConstructibleFacility'
+        action.type === 'BuildConstructibleFacility' ||
+        action.type === 'DecommissionConstructibleFacility' ||
+        action.type === 'TurnAwayCheckpointRefugees'
       ) {
         try {
           const coreError = validateAction(this.engine.getState(), action);

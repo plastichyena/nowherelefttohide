@@ -110,7 +110,7 @@ export function getPlayerVisionCoverage(state: Readonly<GameState>): VisionCover
     if (['building', 'disabled', 'recovering'].includes(facility.operationalStatus)) continue;
     if (facility.type === 'civilianDroneBase') {
       if (facility.workers > 0 && facility.powerSupplyEnabled && facility.lastPowerSupplied === true) {
-        addRadius(state, aerialVisible, facility.position, facility.workers * 2);
+        addRadius(state, aerialVisible, facility.position, facility.workers * 3);
       }
       continue;
     }

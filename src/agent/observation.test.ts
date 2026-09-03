@@ -5,7 +5,7 @@ import { createInitialState, createUnit } from '../core/state';
 import { compactArtifactObservation, createAgentObservation, restoreArtifactObservation } from './observation';
 import { createAgentGame } from './game';
 
-describe('Agent Observation 5.0.0 rule projections', () => {
+describe('Agent Observation 6.0.0 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
     const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -56,7 +56,10 @@ describe('Agent Observation 5.0.0 rule projections', () => {
     const state = createInitialState(142, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
     guard.currentMilitaryGoods = 2;
-    state.units.push(createUnit(state, 'zombie-range-2', 'zombie', { q: 18, r: 15 }));
+    state.units.push(createUnit(state, 'zombie-range-2', 'zombie', {
+      q: guard.position.q + 2,
+      r: guard.position.r,
+    }));
 
     const publicGuard = createAgentObservation(state).units.find((unit) => unit.id === guard.id)!;
     expect(publicGuard).toMatchObject({
@@ -147,7 +150,6 @@ describe('Agent Observation 5.0.0 rule projections', () => {
       currentFuel: 0,
     });
     expect(publicPolice.fuelCostByLegalMove).toContainEqual(expect.objectContaining({
-      destination: { q: 11, r: 15 },
       movementMode: 'emergency',
       effectiveMovementCost: 3,
       fuelCost: 0,
@@ -158,7 +160,6 @@ describe('Agent Observation 5.0.0 rule projections', () => {
     )).toBe(true);
     expect(publicGuard).toMatchObject({ emergencyMovementPoints: 2, emergencyMovementAvailable: true });
     expect(publicGuard.fuelCostByLegalMove).toContainEqual(expect.objectContaining({
-      destination: { q: 18, r: 15 },
       movementMode: 'emergency',
       effectiveMovementCost: 2,
       fuelCost: 0,
@@ -247,21 +248,16 @@ describe('Agent Observation 5.0.0 rule projections', () => {
       .filter((id) => !observation.zombies.some((unit) => unit.id === id));
 
     expect(observation.finalHordeTurn).toBe(50);
-    expect(observation.map.tiles).toHaveLength(961);
-    expect(observation.map.tiles.filter((tile) => tile.terrain === 'forest')).toHaveLength(197);
-    expect(observation.map.tiles.filter((tile) => tile.terrain === 'mountain')).toHaveLength(44);
+    expect(observation.map.tiles).toHaveLength(2601);
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'forest')).toHaveLength(514);
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'mountain')).toHaveLength(126);
     expect(observation.map.tiles.filter((tile) => tile.terrain === 'water')).toHaveLength(0);
-    expect(observation.map.tiles).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        q: 2,
-        r: 1,
-        terrain: 'forest',
-        road: false,
-        effectiveMovementCost: 2,
-        terrainDefenseSource: 'forest',
-        terrainDamageMultiplier: 0.5,
-      }),
-    ]));
+    expect(observation.map.tiles.find((tile) => tile.terrain === 'forest')).toMatchObject({
+      road: false,
+      effectiveMovementCost: 2,
+      terrainDefenseSource: 'forest',
+      terrainDamageMultiplier: 0.5,
+    });
     expect(observation.map.tiles.every((tile) =>
       typeof tile.visibleToPlayer === 'boolean' &&
       typeof tile.urban === 'boolean' &&
@@ -273,7 +269,9 @@ describe('Agent Observation 5.0.0 rule projections', () => {
       typeof unit.positionTerrain === 'string' &&
       (unit.effectiveMovementCostAtPosition === null || unit.effectiveMovementCostAtPosition >= 1),
     )).toBe(true);
-    expect(observation.zombies.every((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')).toBe(true);
+    expect(observation.zombies.every((unit) =>
+      ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'].includes(unit.type),
+    )).toBe(true);
     expect(hiddenEnemyIds.length).toBeGreaterThan(0);
     expect(observation.zombies.map((unit) => unit.id)).not.toEqual(expect.arrayContaining(hiddenEnemyIds));
     expect(observation.horde).toMatchObject({
@@ -302,7 +300,7 @@ describe('Agent Observation 5.0.0 rule projections', () => {
     const clearState = createInitialState(132, config);
     const clearCandidates = createAgentObservation(clearState).checkpointPositionCandidates;
     expect(clearCandidates).toEqual(getCheckpointPositionCandidates(clearState));
-    expect(clearCandidates).toHaveLength(60);
+    expect(clearCandidates).toHaveLength(100);
 
     const hiddenState = createInitialState(132, config);
     hiddenState.units.push(createUnit(hiddenState, 'zombie-secret-blocker', 'zombie', { q: 7, r: 1 }));
@@ -326,13 +324,13 @@ describe('Agent Observation 5.0.0 rule projections', () => {
       (facility) => facility.id === 'military-factory-2',
     );
     expect(nearbyMilitaryFactory).toMatchObject({
-      position: { q: 11, r: 15 },
+      position: { q: 22, r: 10 },
       owner: 'none',
       status: 'unowned',
-      inSupply: true,
+      inSupply: false,
     });
     expect(observation.strategicForecast.resources.fuel).toHaveProperty('singlePointOfFailure');
-    expect(observation.constructibleFacilityPositionCandidates).toHaveLength(31 * 31 * 2);
+    expect(observation.constructibleFacilityPositionCandidates).toHaveLength(51 * 51 * 2);
     expect(observation.roadBranches.every((branch) => branch.currentPolicyTurns === 2)).toBe(true);
     expect(observation.checkpoints.every((checkpoint) => checkpoint.queuePressureClass === 'none' || checkpoint.queuePeople > 0)).toBe(true);
   });

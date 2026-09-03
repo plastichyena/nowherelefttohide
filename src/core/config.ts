@@ -13,9 +13,10 @@ import type {
   UnitConfig,
   UnitType,
 } from './types';
+import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 
-export const CONFIG_VERSION = '2.3.0';
-export const DEFAULT_MAP_ID = 'fixed-31x31-v2';
+export const CONFIG_VERSION = '2.4.0';
+export const DEFAULT_MAP_ID = 'fixed-51x51-v1';
 
 const facilityIds: FacilityId[] = [
   'capital',
@@ -23,17 +24,29 @@ const facilityIds: FacilityId[] = [
   'city-2',
   'city-3',
   'city-4',
+  'city-5',
+  'city-6',
+  'city-7',
+  'city-8',
   'farm-1',
   'farm-2',
   'farm-3',
+  'farm-4',
+  'farm-5',
   'civilian-factory-1',
   'civilian-factory-2',
+  'civilian-factory-3',
+  'civilian-factory-4',
   'military-factory-1',
   'military-factory-2',
+  'military-factory-3',
   'refinery-1',
   'refinery-2',
+  'refinery-3',
+  'refinery-4',
   'power-plant-1',
   'power-plant-2',
+  'power-plant-3',
   'wind-power-plant-1',
 ];
 
@@ -53,7 +66,7 @@ function production(
 
 const defaultUnitConfig: Record<UnitType, UnitConfig> = {
   police: {
-    hp: 25, attack: 5, movement: 10, range: 1, vision: 5, population: 5, maxFuel: 12,
+    hp: 25, attack: 5, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 12,
     maxMilitaryGoods: 5, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 1: 1 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 3,
@@ -72,6 +85,18 @@ const defaultUnitConfig: Record<UnitType, UnitConfig> = {
   },
   hordeZombie: {
     hp: 20, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
+    maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
+    militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
+  },
+  policeZombie: {
+    hp: 10, attack: 5, movement: 3, range: 1, vision: 5, population: 0, maxFuel: 0,
+    maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
+    militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
+  },
+  soldierZombie: {
+    hp: 20, attack: 5, movement: 5, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
@@ -137,7 +162,7 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
     workerCapacity: 5,
     production: production(emptyInputs(), emptyOutputs(), 'required', 5),
     overrunSpawnCount: 2,
-    buildCivilianGoods: 25, visionRadius: 10, zombieTargetValue: 0,
+    buildCivilianGoods: 25, visionRadius: 15, zombieTargetValue: 0,
   },
 };
 
@@ -154,17 +179,29 @@ const initialWorkersByFacility: Record<FacilityId, number> = {
   'city-2': 0,
   'city-3': 0,
   'city-4': 0,
+  'city-5': 0,
+  'city-6': 0,
+  'city-7': 0,
+  'city-8': 0,
   'farm-1': 23,
   'farm-2': 0,
   'farm-3': 0,
+  'farm-4': 0,
+  'farm-5': 0,
   'civilian-factory-1': 23,
   'civilian-factory-2': 0,
+  'civilian-factory-3': 0,
+  'civilian-factory-4': 0,
   'military-factory-1': 0,
   'military-factory-2': 0,
+  'military-factory-3': 0,
   'refinery-1': 10,
   'refinery-2': 0,
+  'refinery-3': 0,
+  'refinery-4': 0,
   'power-plant-1': 3,
   'power-plant-2': 0,
+  'power-plant-3': 0,
   'wind-power-plant-1': 0,
 };
 
@@ -172,7 +209,7 @@ const defaultEconomy: EconomyConfig = {
   populationConsumption: { food: 1, civilianGoods: 1 },
   initialResources,
   initialWorkersByFacility,
-  initialZombieCount: 12,
+  initialZombieCount: 25,
 };
 
 const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopulationConfig> =
@@ -259,6 +296,8 @@ export const DEFAULT_CONFIG: GameConfig = {
   },
   checkpoint: {
     constructionCivilianGoods: 5,
+    subsequentConstructionCivilianGoods: 25,
+    relocationCivilianGoods: 25,
     maxPreparedPostsPerDirection: 3,
     requiresPolice: false,
     consumesPower: false,
@@ -359,11 +398,13 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('mapId must be a non-empty string');
   }
   if (Object.prototype.hasOwnProperty.call(config as unknown as Record<string, unknown>, 'finalHordeTurn')) {
-    errors.push('finalHordeTurn is not part of Game Rules 2.3.0; derive it from the Final Wave');
+    errors.push('finalHordeTurn is not part of Game Rules 2.4.0; derive it from the Final Wave');
   }
   requireInteger(errors, config.maxActionsPerTurn, 'maxActionsPerTurn', 1);
 
-  const unitTypes: UnitType[] = ['police', 'nationalGuard', 'zombie', 'hordeZombie'];
+  const unitTypes: UnitType[] = [
+    'police', 'nationalGuard', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie',
+  ];
   for (const type of unitTypes) {
     const unit = config.units?.[type];
     if (!unit) {
@@ -401,7 +442,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     if ((type === 'police' || type === 'nationalGuard') && unit.maxMilitaryGoods < 1) {
       errors.push(`units.${type}.maxMilitaryGoods must be at least 1`);
     }
-    if ((type === 'zombie' || type === 'hordeZombie')
+    if (['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'].includes(type)
       && (unit.maxMilitaryGoods !== 0 || unit.emergencyMovementPoints !== 0)) {
       errors.push(`units.${type} must not carry military goods or use emergency movement`);
     }
@@ -479,17 +520,29 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       'city-2': 'city',
       'city-3': 'city',
       'city-4': 'city',
+      'city-5': 'city',
+      'city-6': 'city',
+      'city-7': 'city',
+      'city-8': 'city',
       'farm-1': 'farm',
       'farm-2': 'farm',
       'farm-3': 'farm',
+      'farm-4': 'farm',
+      'farm-5': 'farm',
       'civilian-factory-1': 'civilianFactory',
       'civilian-factory-2': 'civilianFactory',
+      'civilian-factory-3': 'civilianFactory',
+      'civilian-factory-4': 'civilianFactory',
       'military-factory-1': 'militaryFactory',
       'military-factory-2': 'militaryFactory',
+      'military-factory-3': 'militaryFactory',
       'refinery-1': 'refinery',
       'refinery-2': 'refinery',
+      'refinery-3': 'refinery',
+      'refinery-4': 'refinery',
       'power-plant-1': 'powerPlant',
       'power-plant-2': 'powerPlant',
+      'power-plant-3': 'powerPlant',
       'wind-power-plant-1': 'windPowerPlant',
     };
     for (const facilityId of facilityIds) {
@@ -535,8 +588,8 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('economy is required');
   } else {
     requireInteger(errors, economy.initialZombieCount, 'economy.initialZombieCount', 0);
-    if (economy.initialZombieCount > 12) {
-      errors.push('economy.initialZombieCount cannot exceed the twelve fixed-map positions');
+    if (economy.initialZombieCount > FIXED_INITIAL_ZOMBIE_COUNT) {
+      errors.push(`economy.initialZombieCount cannot exceed the ${FIXED_INITIAL_ZOMBIE_COUNT} fixed-map positions`);
     }
     const stock = economy.initialResources;
     if (!stock || typeof stock !== 'object') {
@@ -557,7 +610,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   } else {
     for (const retiredField of ['cycle', 'periodicInitial', 'periodicIncrement', 'warningStartTurn', 'spawnOnlyBeforeFinalTurn', 'finalComposition']) {
       if (Object.prototype.hasOwnProperty.call(horde as unknown as Record<string, unknown>, retiredField)) {
-        errors.push(`horde.${retiredField} is not supported by Game Rules 2.3.0`);
+        errors.push(`horde.${retiredField} is not supported by Game Rules 2.4.0`);
       }
     }
     requireInteger(errors, horde.warningLeadTurns, 'horde.warningLeadTurns', 1);
@@ -627,6 +680,8 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('checkpoint is required');
   } else {
     requireInteger(errors, checkpoint.constructionCivilianGoods, 'checkpoint.constructionCivilianGoods', 0);
+    requireInteger(errors, checkpoint.subsequentConstructionCivilianGoods, 'checkpoint.subsequentConstructionCivilianGoods', 0);
+    requireInteger(errors, checkpoint.relocationCivilianGoods, 'checkpoint.relocationCivilianGoods', 0);
     requireInteger(errors, checkpoint.maxPreparedPostsPerDirection, 'checkpoint.maxPreparedPostsPerDirection', 1);
     requireInteger(errors, checkpoint.initialSupplyRadius, 'checkpoint.initialSupplyRadius', 0);
     if (typeof checkpoint.requiresPolice !== 'boolean' || typeof checkpoint.consumesPower !== 'boolean') {

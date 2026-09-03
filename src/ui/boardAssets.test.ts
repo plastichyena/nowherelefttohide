@@ -6,6 +6,8 @@ import {
   BOARD_CHECKPOINT_OVERLAYS,
   BOARD_COMMON_OVERLAYS,
   BOARD_FACILITY_OVERLAYS,
+  BOARD_MAX_ZOOM,
+  BOARD_MIN_ZOOM,
   BOARD_LOD_ZOOM_THRESHOLD,
   BOARD_UNIT_OVERLAYS,
   boardLodMode,
@@ -14,6 +16,7 @@ import {
   getFacilityUnitOffset,
   getTerrainAssetPath,
   getUnitAssetPath,
+  isBoardZombieUnitType,
   mapCheckpointAssetLayers,
   mapFacilityAssetLayers,
   mapTerrainAsset,
@@ -44,12 +47,21 @@ describe('board asset registry', () => {
       'nationalGuard',
       'zombie',
       'hordeZombie',
+      'policeZombie',
+      'soldierZombie',
     ]);
     expect('water' in BOARD_ASSET_REGISTRY.terrain).toBe(false);
     expect(getTerrainAssetPath('water')).toBeNull();
     expect(mapTerrainAsset('water')).toEqual({ key: 'water', path: null, fallback: true });
     expect(getFacilityAssetPath('not-a-facility')).toBeNull();
     expect(getUnitAssetPath('not-a-unit')).toBeNull();
+    expect(getUnitAssetPath('policeZombie')).toBe(BOARD_ASSET_REGISTRY.units.policeZombie);
+    expect(getUnitAssetPath('soldierZombie')).toBe(BOARD_ASSET_REGISTRY.units.soldierZombie);
+    expect(isBoardZombieUnitType('zombie')).toBe(true);
+    expect(isBoardZombieUnitType('hordeZombie')).toBe(true);
+    expect(isBoardZombieUnitType('policeZombie')).toBe(true);
+    expect(isBoardZombieUnitType('soldierZombie')).toBe(true);
+    expect(isBoardZombieUnitType('police')).toBe(false);
     expect(BOARD_ASSET_PATHS.some((path) => /water/iu.test(path))).toBe(false);
   });
 
@@ -195,6 +207,24 @@ describe('board state asset mappings', () => {
       isHorde: true,
       isFinalHorde: true,
     });
+    expect(mapUnitAssetLayers({ type: 'policeZombie', hordeKind: null })).toMatchObject({
+      base: BOARD_ASSET_REGISTRY.units.policeZombie,
+      layers: [],
+      isHorde: false,
+      isFinalHorde: false,
+    });
+    expect(mapUnitAssetLayers({ type: 'soldierZombie', hordeKind: null })).toMatchObject({
+      base: BOARD_ASSET_REGISTRY.units.soldierZombie,
+      layers: [],
+      isHorde: false,
+      isFinalHorde: false,
+    });
+    expect(mapUnitAssetLayers({ type: 'soldierZombie', hordeKind: 'final' })).toMatchObject({
+      base: BOARD_ASSET_REGISTRY.units.soldierZombie,
+      layers: ['horde', 'final'],
+      isHorde: true,
+      isFinalHorde: true,
+    });
     expect(getUnitAssetPath('hordeZombie')).toBe(BOARD_ASSET_REGISTRY.units.hordeZombie);
   });
 });
@@ -232,6 +262,8 @@ describe('pure board layout helpers', () => {
   });
 
   it('uses the documented LOD boundary and facility/unit offset without mutation', () => {
+    expect(BOARD_MIN_ZOOM).toBe(0.35);
+    expect(BOARD_MAX_ZOOM).toBe(2.2);
     expect(BOARD_LOD_ZOOM_THRESHOLD).toBe(0.75);
     expect(shouldUseBoardLod(0.7499)).toBe(true);
     expect(shouldUseBoardLod(0.75)).toBe(false);

@@ -3,7 +3,7 @@ import type { GameAction, GameConfig, JsonValue } from '../core/types';
 import { cloneAction, cloneJson } from '../agent/action';
 import { compactArtifactObservation, restoreArtifactObservation } from '../agent/observation';
 import { collectGameMetrics } from '../agent/metrics';
-import { HIDDEN_NOISE_METRIC_KEYS } from '../agent/types';
+import { HIDDEN_NOISE_METRIC_KEYS, HIDDEN_REJECTED_REFUGEE_METRIC_KEYS } from '../agent/types';
 import {
   assertSafeIdentifier,
   canonicalJson,
@@ -371,6 +371,7 @@ export class SessionService {
     }) as unknown as Record<string, unknown>;
     metrics.config = clone(loaded.descriptor.publicConfig);
     for (const key of HIDDEN_NOISE_METRIC_KEYS) delete metrics[key];
+    for (const key of HIDDEN_REJECTED_REFUGEE_METRIC_KEYS) delete metrics[key];
       const sessionMetrics = this.store.readSessionMetrics(sessionId);
       return clone({
       ...live,

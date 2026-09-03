@@ -187,6 +187,8 @@ function repeatSensitiveActionFamily(action: GameAction, observation: AgentObser
   if (action.type === 'RelocateCheckpoint') return `RelocateCheckpoint|${action.checkpointId}`;
   if (action.type === 'ActivateCheckpoint') return `ActivateCheckpoint|${action.branchId}`;
   if (action.type === 'BuildConstructibleFacility') return `BuildConstructibleFacility|${action.facilityType}`;
+  if (action.type === 'TurnAwayCheckpointRefugees') return `TurnAwayCheckpointRefugees|${action.checkpointId}`;
+  if (action.type === 'DecommissionConstructibleFacility') return `DecommissionConstructibleFacility|${action.facilityId}`;
   return null;
 }
 
@@ -200,6 +202,7 @@ function checkpointBranch(observation: AgentObservation, checkpointId: string) {
 
 function unmanagedRoadUrgency(observation: AgentObservation): number {
   return observation.roadBranches.reduce((score, branch) => {
+    if (branch.turnsUntilArrival === null) return score;
     if (branch.activeCheckpointId !== null) return score;
     if (branch.turnsUntilArrival <= 0) return score + 5;
     if (branch.turnsUntilArrival <= 1) return score + 3;
@@ -315,7 +318,7 @@ function scoreAction(
         reasonCodes.push('AVOID_NONURGENT_FOREST_FIGHT');
       }
       const visibleNormalNearAttacker = observation.zombies.filter((zombie) =>
-        zombie.type === 'zombie' && hexDistance(attacker.position, zombie.position) <= attacker.vision,
+        zombie.type !== 'hordeZombie' && hexDistance(attacker.position, zombie.position) <= attacker.vision,
       ).length;
       const noiseClassMultiplier = attacker.type === 'nationalGuard' ? 2 : 1;
       if (visibleNormalNearAttacker > 0) {
@@ -816,10 +819,12 @@ function scoreAction(
     const branch = branchFor(observation, action.branchId);
     score += weights.checkpoint + (urgentHorde ? 30 : 0);
     if (branch) {
-      score += branch.turnsUntilArrival <= 1 ? 140 : branch.turnsUntilArrival <= 2 ? 65 : 0;
+      score += branch.turnsUntilArrival !== null
+        ? branch.turnsUntilArrival <= 1 ? 140 : branch.turnsUntilArrival <= 2 ? 65 : 0
+        : 0;
       if (branch.activeCheckpointId === null) reasonCodes.push('ROAD_UNMANAGED_ARRIVAL');
       else {
-        const reserve = Math.max(0, observation.resources.civilianGoods - 5);
+        const reserve = Math.max(0, observation.resources.civilianGoods - branch.checkpointBuildCost);
         score += weights.checkpointFallback + Math.min(40, reserve);
         reasonCodes.push('BUILD_STANDBY_CHECKPOINT');
         if (branch.fallbackAvailable) {
@@ -828,7 +833,7 @@ function scoreAction(
         }
       }
       if (branch.checkpointActionAvailable) reasonCodes.push('CHECKPOINT_BUILD_AVAILABLE');
-      if (branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_ARRIVAL_IMMINENT');
+      if (branch.turnsUntilArrival !== null && branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_ARRIVAL_IMMINENT');
     }
     score += roadUrgency * 15;
     const effect = observation.checkpointPositionCandidates.find((candidate) =>
@@ -849,12 +854,12 @@ function scoreAction(
     const movingOutward = destinationDistance > sourceDistance;
     const movingInward = destinationDistance < sourceDistance;
     score += weights.checkpoint;
-    if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival <= 2) {
+    if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival !== null && branch.turnsUntilArrival <= 2) {
       score += 50;
       reasonCodes.push('ROAD_ARRIVAL_IMMINENT');
     }
     if (movingOutward) {
-      score += branch?.activeCheckpointStatus === 'operational' ? 35 : 0;
+      score += 10 + (branch?.activeCheckpointStatus === 'operational' ? 35 : 0);
       reasonCodes.push('CHECKPOINT_ADVANCE_OUTWARD');
     }
     if (movingInward && (urgentThreats.length > 0 || observation.population.infected > 0)) {
@@ -877,7 +882,7 @@ function scoreAction(
     const branch = branchFor(observation, action.branchId);
     const checkpoint = observation.checkpoints.find((candidate) => candidate.id === action.checkpointId);
     score += weights.checkpointFallback;
-    if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival <= 2) {
+    if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival !== null && branch.turnsUntilArrival <= 2) {
       score += 75;
       reasonCodes.push('ROAD_ARRIVAL_IMMINENT');
     }
@@ -925,8 +930,30 @@ function scoreAction(
       else score -= 85;
       reasonCodes.push('REDUCE_HIGH_QUEUE_PRESSURE');
     }
-    if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_POLICY_BEFORE_ARRIVAL');
+    if (branch?.turnsUntilArrival !== undefined && branch.turnsUntilArrival !== null && branch.turnsUntilArrival <= 1) reasonCodes.push('ROAD_POLICY_BEFORE_ARRIVAL');
     reasonCodes.push(`SET_POLICY_${action.policy.toUpperCase()}`);
+  } else if (action.type === 'TurnAwayCheckpointRefugees') {
+    const checkpoint = observation.checkpoints.find((candidate) => candidate.id === action.checkpointId);
+    const maintenanceShortage = observation.endTurnForecast.food.shortage
+      + observation.endTurnForecast.civilianGoods.maintenanceShortage;
+    if (checkpoint) {
+      const severeQueue = checkpoint.queuePressureClass === 'high' || checkpoint.queuePressureClass === 'medium';
+      score += maintenanceShortage > 0 ? 240 + Math.min(120, action.count * 5) : severeQueue ? 45 : -180;
+      if (maintenanceShortage > 0) reasonCodes.push('TURN_AWAY_TO_AVOID_MAINTENANCE_SHORTAGE');
+      if (severeQueue) reasonCodes.push('RELIEVE_CHECKPOINT_QUEUE_PRESSURE');
+      if (observation.horde.finalHordeStatus === 'notStarted') {
+        score -= Math.ceil(action.count / 5) * (observation.horde.warningType === 'none' ? 35 : 80);
+        reasonCodes.push('REJECTED_REFUGEES_MAY_STRENGTHEN_HORDE');
+      }
+    }
+  } else if (action.type === 'DecommissionConstructibleFacility') {
+    const facility = facilities.get(action.facilityId);
+    if (facility) {
+      const resourceEmergency = guaranteedDefeat || observation.endTurnForecast.food.shortage > 0
+        || observation.endTurnForecast.civilianGoods.maintenanceShortage > 0;
+      score += resourceEmergency ? 130 : observation.horde.warningType === 'none' ? 5 : -120;
+      reasonCodes.push(resourceEmergency ? 'DECOMMISSION_DRONE_FOR_CIVILIAN_GOODS' : 'PRESERVE_AERIAL_RECON');
+    }
   } else if (action.type === 'EndTurn') {
     const readyUnits = observation.units.filter((unit) => unit.actionState !== 'acted').length;
     if (readyUnits === 0) score += 80;

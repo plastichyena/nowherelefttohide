@@ -31,6 +31,16 @@ import type {
 /** Camera zoom below this value uses the board's low-detail rendering path. */
 export const BOARD_LOD_ZOOM_THRESHOLD = 0.75;
 
+/** Minimum camera zoom for the v1.4.4 51×51 board. */
+export const BOARD_MIN_ZOOM = 0.35;
+
+/** Maximum camera zoom kept here so Board and tests share one bound. */
+export const BOARD_MAX_ZOOM = 2.2;
+
+// Descriptive aliases for integrations that refer to the camera bound by name.
+export const BOARD_ZOOM_MIN = BOARD_MIN_ZOOM;
+export const BOARD_ZOOM_MAX = BOARD_MAX_ZOOM;
+
 /** App/release version used to invalidate cached board images by default. */
 export const BOARD_ASSET_APP_VERSION = APP_VERSION;
 
@@ -88,8 +98,19 @@ export const BOARD_FACILITY_TYPES = [
 export const BOARD_FACILITY_ASSET_TYPES = [...BOARD_FACILITY_TYPES, 'checkpoint'] as const;
 export type BoardFacilityAssetType = (typeof BOARD_FACILITY_ASSET_TYPES)[number];
 
-export const BOARD_UNIT_TYPES = ['police', 'nationalGuard', 'zombie', 'hordeZombie'] as const satisfies readonly UnitType[];
+export const BOARD_UNIT_TYPES = [
+  'police',
+  'nationalGuard',
+  'zombie',
+  'hordeZombie',
+  'policeZombie',
+  'soldierZombie',
+] as const satisfies readonly UnitType[];
 export type BoardUnitAssetType = (typeof BOARD_UNIT_TYPES)[number];
+
+/** Zombie-side unit types rendered by the Board (including reanimated units). */
+export const BOARD_ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'] as const;
+export type BoardZombieUnitAssetType = (typeof BOARD_ZOMBIE_UNIT_TYPES)[number];
 
 export const BOARD_COMMON_STATE_LAYERS = ['infected', 'ruined'] as const;
 export type BoardCommonStateLayer = (typeof BOARD_COMMON_STATE_LAYERS)[number];
@@ -145,6 +166,8 @@ export const BOARD_ASSET_REGISTRY = {
     nationalGuard: 'units/unit_national_guard.png',
     zombie: 'units/unit_zombie.png',
     hordeZombie: 'units/unit_horde_zombie.png',
+    policeZombie: 'units/unit_police_zombie.png',
+    soldierZombie: 'units/unit_soldier_zombie.png',
   },
 } as const;
 
@@ -474,6 +497,13 @@ export function boardLodMode(zoom: number): BoardLodMode {
 
 export const getBoardLodMode = boardLodMode;
 export const isBoardLodZoom = shouldUseBoardLod;
+
+/** True for every Zombie-side type, including reanimated Human Units. */
+export function isBoardZombieUnitType(type: UnitType | string): type is BoardZombieUnitAssetType {
+  return (BOARD_ZOMBIE_UNIT_TYPES as readonly string[]).includes(type);
+}
+
+export const isZombieUnitType = isBoardZombieUnitType;
 
 export interface BoardUnitOffset {
   x: number;

@@ -35,7 +35,7 @@ export function effectiveMovementCost(
 
 export function terrainDefenseAt(
   state: Readonly<TerrainState>,
-  target: Pick<UnitState, 'type' | 'position'>,
+  target: Pick<UnitState, 'type' | 'position' | 'isPlayerUnit'>,
 ): TerrainDefense {
   if (isUrbanHex(state, target.position)) {
     return { source: 'urban', multiplier: state.config.terrain.damageMultiplier.urban };
@@ -43,7 +43,7 @@ export function terrainDefenseAt(
   const tile = getTile(state.map, target.position);
   if (
     tile?.terrain === 'forest' &&
-    (target.type === 'zombie' || target.type === 'hordeZombie')
+    !target.isPlayerUnit
   ) {
     return { source: 'forest', multiplier: state.config.terrain.damageMultiplier.forestZombie };
   }
@@ -52,7 +52,7 @@ export function terrainDefenseAt(
 
 export function terrainAdjustedDamage(
   state: Readonly<TerrainState>,
-  target: Pick<UnitState, 'type' | 'position'>,
+  target: Pick<UnitState, 'type' | 'position' | 'isPlayerUnit'>,
   baseDamage: number,
 ): { baseDamage: number; finalDamage: number; defense: TerrainDefense } {
   const normalizedBase = Math.max(0, Math.floor(baseDamage));

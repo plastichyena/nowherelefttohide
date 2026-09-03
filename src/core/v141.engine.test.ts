@@ -86,7 +86,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
       ...state.units[0]!,
       id: 'zombie-test',
       type: 'zombie' as const,
-      position: { q: 18, r: 15 },
+      position: { q: 28, r: 25 },
       hp: 10,
       maxHp: 10,
       attack: 5,
@@ -173,11 +173,12 @@ describe('v1.4.1 carried Military Goods combat', () => {
     const state = mutableState(engine);
     state.units = state.units.filter((unit) => unit.isPlayerUnit);
     const guard = state.units.find((unit) => unit.id === 'national-guard-1')!;
-    guard.position = { q: 25, r: 25 };
+    guard.position = { q: 1, r: 1 };
+    state.units.find((unit) => unit.id === 'police-1')!.position = { q: 49, r: 49 };
     guard.hp = 5;
     guard.currentMilitaryGoods = 5;
     state.resources.militaryGoods = 0;
-    const zombie = createUnit(state, 'zombie-kill', 'zombie', { q: 25, r: 24 });
+    const zombie = createUnit(state, 'zombie-kill', 'zombie', { q: 1, r: 0 });
     zombie.movement = 0;
     state.units.push(zombie);
     rebalance(state);
@@ -306,8 +307,8 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
 
 describe('v1.4.1 Fuel-zero Emergency Movement', () => {
   it.each([
-    ['police-1', { q: 11, r: 15 }, 3],
-    ['national-guard-1', { q: 18, r: 15 }, 2],
+    ['police-1', { q: 21, r: 25 }, 3],
+    ['national-guard-1', { q: 28, r: 25 }, 2],
   ] as const)('moves %s at Fuel zero within its effective-MP limit', (unitId, destination, expectedMp) => {
     const engine = quietEngine(405);
     const state = mutableState(engine);
@@ -343,7 +344,7 @@ describe('v1.4.1 Fuel-zero Emergency Movement', () => {
     state.units.find((unit) => unit.id === 'national-guard-1')!.currentFuel = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const before = engine.getState();
-    const result = engine.step({ type: 'Move', unitId: 'national-guard-1', destination: { q: 19, r: 15 } });
+    const result = engine.step({ type: 'Move', unitId: 'national-guard-1', destination: { q: 29, r: 25 } });
     expect(result.error?.code).toBe('out_of_range');
     expect(engine.getState()).toEqual(before);
   });

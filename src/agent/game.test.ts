@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { createAgentGame } from './game';
 import { createAgentResult } from './observation';
 import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, GAME_RULES_VERSION, OBSERVATION_API_VERSION } from './types';
+import type { GameAction, GameState } from '../core/types';
 import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.4.3');
+    expect(APP_VERSION).toBe('1.4.4');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -18,16 +19,16 @@ describe('AgentGame public boundary', () => {
     expect(JSON.parse(encoded)).toEqual(first);
     expect(encoded).not.toContain('rngState');
     expect(encoded).not.toContain('spawnedCount');
-    expect(first.map.tiles).toHaveLength(961);
+    expect(first.map.tiles).toHaveLength(2601);
     expect(first).not.toHaveProperty('maxTurns');
     expect(first.finalHordeTurn).toBe(50);
     expect(first.apiVersion).toBe(OBSERVATION_API_VERSION);
     expect(first.roadBranches).toHaveLength(4);
-    expect(first.checkpointPositionCandidates).toHaveLength(60);
+    expect(first.checkpointPositionCandidates).toHaveLength(100);
     expect(first.checkpointPositionCandidates.every((candidate) =>
       typeof candidate.legal === 'boolean' && (candidate.reasonCode === null || typeof candidate.reasonCode === 'string'),
     )).toBe(true);
-    expect(first.roadBranches.every((branch) => branch.turnsUntilArrival >= 0)).toBe(true);
+    expect(first.roadBranches.every((branch) => branch.turnsUntilArrival === null || branch.turnsUntilArrival >= 0)).toBe(true);
     expect(first.roadBranches.every((branch) =>
       branch.currentPolicy === 'normal' &&
       branch.preparedPostCount === 0 &&
@@ -46,8 +47,8 @@ describe('AgentGame public boundary', () => {
       typeof tile.visibleToPlayer === 'boolean' &&
       typeof tile.playerOccupancyAllowed === 'boolean',
     )).toBe(true);
-    expect(first.map.hordeSpawnReserve).toHaveLength(120);
-    expect(first.zombies.every((unit) => unit.type === 'zombie' || unit.type === 'hordeZombie')).toBe(true);
+    expect(first.map.hordeSpawnReserve).toHaveLength(200);
+    expect(first.zombies.every((unit) => ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'].includes(unit.type))).toBe(true);
     // The fixed v1.4 initial Zombies are outside initial shared vision; only
     // visible enemies may enter the public Observation.
     expect(first.zombies).toHaveLength(0);
@@ -68,16 +69,17 @@ describe('AgentGame public boundary', () => {
     expect(first.facilities.every((facility) => facility.production && typeof facility.infectionContained === 'boolean')).toBe(true);
   });
 
-  it('describes the v1.4.3 API, checkpoint candidates, logistics rules, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
+  it('describes the v1.4.4 API, checkpoint candidates, logistics rules, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('8');
+    expect(info.saveFormatVersion).toBe('9');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
+    expect(info.publicInformation.at(-1)).toContain('Police, and Soldier Zombies');
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
     expect(info.rules.production.workerCapacityByFacilityType.farm).toBe(30);
     expect(info.rules.production).toMatchObject({
@@ -87,6 +89,8 @@ describe('AgentGame public boundary', () => {
       sameTurnProductionCanCoverProductionInputs: false,
     });
     expect(info.rules.ranges.hordeZombie.baseRange).toBe(1);
+    expect(info.rules.ranges.policeZombie.baseRange).toBe(1);
+    expect(info.rules.ranges.soldierZombie.baseRange).toBe(1);
     expect(info.rules.terrain).toMatchObject({
       movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
       roadAndUrbanMovementCost: 1,
@@ -100,8 +104,8 @@ describe('AgentGame public boundary', () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
-    expect(info.rules.map).toMatchObject({ id: 'fixed-31x31-v2', width: 31, height: 31 });
-    expect(info.rules.map.hordeSpawnReserve).toHaveLength(120);
+    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v1', width: 51, height: 51 });
+    expect(info.rules.map.hordeSpawnReserve).toHaveLength(200);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 50 });
     expect(info.rules.horde.waves).toEqual([
       expect.objectContaining({ index: 1, turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 3 }, final: false }),
@@ -217,7 +221,7 @@ describe('AgentGame public boundary', () => {
       expect(result).not.toHaveProperty('state');
       expect(result.observation).not.toHaveProperty('rngState');
     }
-  });
+  }, 20_000);
 
   it('publishes fixed-wave Horde facts without leaking spawn identity or coordinates', () => {
     const game = createAgentGame();
@@ -248,6 +252,84 @@ describe('AgentGame public boundary', () => {
       expect(hordeEvents[0]!.payload).not.toHaveProperty(hiddenField);
     }
     expect(JSON.stringify(hordeEvents)).not.toContain('final-horde-1');
+  });
+
+  it('keeps rejected-refugee Horde detail out of public events, artifacts, and metrics', () => {
+    const game = createAgentGame();
+    game.reset({
+      seed: 22,
+      configOverrides: {
+        maxActionsPerTurn: 5,
+        horde: {
+          warningLeadTurns: 1,
+          waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 3 }, final: true }],
+        },
+        economy: { initialZombieCount: 0 },
+        refugees: { arrivalIntervalMin: 1, arrivalIntervalMax: 1, arrivalPeopleMin: 1, arrivalPeopleMax: 1 },
+        units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
+      },
+    });
+    const buildsByBranch = new Map<string, Extract<GameAction, { type: 'BuildCheckpoint' }>>();
+    for (const action of game.getLegalActions()) {
+      if (action.type !== 'BuildCheckpoint') continue;
+      const branchId = action.branchId;
+      if (branchId && !buildsByBranch.has(branchId)) buildsByBranch.set(branchId, action);
+    }
+    expect(buildsByBranch.size).toBe(4);
+    for (const action of buildsByBranch.values()) expect(game.step(action).error).toBeNull();
+
+    let turnAway = game.getLegalActions().filter((action): action is Extract<GameAction, { type: 'TurnAwayCheckpointRefugees' }> => action.type === 'TurnAwayCheckpointRefugees');
+    for (let turns = 0; turns < 3 && turnAway.length === 0; turns += 1) {
+      expect(game.step({ type: 'EndTurn' }).error).toBeNull();
+      turnAway = game.getLegalActions().filter((action): action is Extract<GameAction, { type: 'TurnAwayCheckpointRefugees' }> => action.type === 'TurnAwayCheckpointRefugees');
+    }
+    expect(turnAway).toHaveLength(4);
+    for (const action of turnAway) expect(game.step(action).error).toBeNull();
+
+    let result = game.step({ type: 'EndTurn' });
+    for (let turns = 0; turns < 3 && !result.events.some((event) => event.type === 'horde_spawned'); turns += 1) {
+      expect(result.error).toBeNull();
+      result = game.step({ type: 'EndTurn' });
+    }
+    const spawned = result.events.find((event) => event.type === 'horde_spawned');
+    expect(spawned?.payload).toMatchObject({ normalZombieCount: 3, hordeZombieCount: 1 });
+    const internalSpawn = [...(game.getDebugState() as GameState).events].reverse().find((event) => event.type === 'horde_spawned');
+    expect(internalSpawn?.payload).toMatchObject({ normalZombieCount: 4, hordeZombieCount: 1 });
+    const publicTrace = JSON.stringify(game.getRunArtifact());
+    for (const privateField of [
+      'rejectedRefugeesByDirection',
+      'refugeesRejectedByDirectionAndPolicy',
+      'refugeesTurnedAwayByDirection',
+      'rejectedBonusZombiesByDirection',
+      'rejectedCounterResetsByDirection',
+      'horde_rejected_bonus_applied',
+    ]) expect(publicTrace).not.toContain(privateField);
+  }, 20_000);
+
+  it('makes Turn Away public only as a qualitative event', () => {
+    const game = createAgentGame();
+    game.reset({
+      seed: 23,
+      configOverrides: {
+        economy: { initialZombieCount: 0 },
+        refugees: { arrivalIntervalMin: 1, arrivalIntervalMax: 1, arrivalPeopleMin: 1, arrivalPeopleMax: 1 },
+      },
+    });
+    const build = game.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
+    expect(build).toBeDefined();
+    expect(game.step(build!).error).toBeNull();
+    let turnAway = game.getLegalActions().find((action) => action.type === 'TurnAwayCheckpointRefugees');
+    // The first scheduled arrival is initialized at turn 2. Drive only public
+    // EndTurn actions until the active post receives its deterministic queue.
+    for (let turns = 0; turns < 3 && !turnAway; turns += 1) {
+      expect(game.step({ type: 'EndTurn' }).error).toBeNull();
+      turnAway = game.getLegalActions().find((action) => action.type === 'TurnAwayCheckpointRefugees');
+    }
+    expect(turnAway).toBeDefined();
+    const result = game.step(turnAway!);
+    expect(result.error).toBeNull();
+    const event = result.events.find((candidate) => candidate.type === 'checkpoint_refugees_turned_away');
+    expect(event?.payload).toEqual({ qualitativeRisk: 'future_horde_may_be_strengthened' });
   });
 
   it('does not canonicalize a checkpoint action with the wrong branch', () => {

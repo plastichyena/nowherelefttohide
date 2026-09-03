@@ -9,41 +9,33 @@ import type {
   HordeEntrance,
   RoadBranchDefinition,
 } from './types';
-import { hexKey, hexWithinBounds } from './hex';
+import { hexDistance, hexKey, hexWithinBounds } from './hex';
+import { SeededRng } from './rng';
 
 /**
- * The v1.4.0 map is intentionally data-only and deterministic. Keep the
+ * The v1.4.4 map is intentionally data-only and deterministic. Keep the
  * identifier here rather than deriving it from caller config: map validation
  * and save loading must reject a different fixed-map contract.
  */
-export const FIXED_MAP_ID = 'fixed-31x31-v2' as const;
-export const FIXED_MAP_WIDTH = 31 as const;
-export const FIXED_MAP_HEIGHT = 31 as const;
-export const FIXED_FACILITY_COUNT = 17 as const;
+export const FIXED_MAP_ID = 'fixed-51x51-v1' as const;
+export const FIXED_MAP_WIDTH = 51 as const;
+export const FIXED_MAP_HEIGHT = 51 as const;
+export const FIXED_FACILITY_COUNT = 29 as const;
+export const FIXED_INITIAL_ZOMBIE_COUNT = 25 as const;
 
 /** Starting human unit locations belong to the initial-state contract rather
  * than the FixedMap shape, but exporting them keeps state creation and tests
  * on the same canonical coordinates. */
 export const FIXED_INITIAL_UNIT_POSITIONS = {
-  police: { q: 14, r: 15 },
-  nationalGuard: { q: 16, r: 15 },
+  police: { q: 24, r: 25 },
+  nationalGuard: { q: 26, r: 25 },
 } as const;
 
-export const FIXED_INITIAL_ZOMBIE_POSITIONS = [
-  { q: 9, r: 9 },
-  { q: 21, r: 21 },
-  { q: 21, r: 9 },
-  { q: 9, r: 21 },
-  { q: 15, r: 6 },
-  { q: 15, r: 24 },
-  { q: 16, r: 2 },
-  { q: 28, r: 2 },
-  { q: 28, r: 14 },
-  { q: 14, r: 28 },
-  { q: 2, r: 28 },
-  { q: 2, r: 16 },
-] as const;
-
+/**
+ * Initial Zombies are seed-selected at new-game creation. This exported
+ * value is populated below with a canonical seed-0 template for FIXED_MAP;
+ * a GameState's map.initialZombiePositions is replaced for its own seed.
+ */
 export const STARTING_FACILITY_IDS = [
   'capital',
   'farm-1',
@@ -53,7 +45,7 @@ export const STARTING_FACILITY_IDS = [
   'wind-power-plant-1',
 ] as const;
 
-const CENTER = 15;
+const CENTER = 25;
 const ROAD_ROW = CENTER;
 const ROAD_COLUMN = CENTER;
 const cardinalDirections: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
@@ -65,53 +57,35 @@ const facilitySpecs: Array<{
   startingOwned: boolean;
   startingWorkers: number;
 }> = [
-  { id: 'capital', type: 'capital', position: { q: 15, r: 15 }, startingOwned: true, startingWorkers: 41 },
-  { id: 'city-1', type: 'city', position: { q: 15, r: 8 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'city-2', type: 'city', position: { q: 22, r: 15 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'city-3', type: 'city', position: { q: 15, r: 22 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'city-4', type: 'city', position: { q: 8, r: 15 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'farm-1', type: 'farm', position: { q: 13, r: 15 }, startingOwned: true, startingWorkers: 23 },
-  { id: 'farm-2', type: 'farm', position: { q: 14, r: 4 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'farm-3', type: 'farm', position: { q: 16, r: 26 }, startingOwned: false, startingWorkers: 0 },
-  {
-    id: 'civilian-factory-1',
-    type: 'civilianFactory',
-    position: { q: 17, r: 15 },
-    startingOwned: true,
-    startingWorkers: 23,
-  },
-  {
-    id: 'civilian-factory-2',
-    type: 'civilianFactory',
-    position: { q: 25, r: 16 },
-    startingOwned: false,
-    startingWorkers: 0,
-  },
-  {
-    id: 'military-factory-1',
-    type: 'militaryFactory',
-    position: { q: 26, r: 15 },
-    startingOwned: false,
-    startingWorkers: 0,
-  },
-  {
-    id: 'military-factory-2',
-    type: 'militaryFactory',
-    position: { q: 11, r: 15 },
-    startingOwned: false,
-    startingWorkers: 0,
-  },
-  { id: 'refinery-1', type: 'refinery', position: { q: 15, r: 13 }, startingOwned: true, startingWorkers: 10 },
-  { id: 'refinery-2', type: 'refinery', position: { q: 14, r: 6 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'power-plant-1', type: 'powerPlant', position: { q: 15, r: 17 }, startingOwned: true, startingWorkers: 3 },
-  { id: 'power-plant-2', type: 'powerPlant', position: { q: 16, r: 24 }, startingOwned: false, startingWorkers: 0 },
-  {
-    id: 'wind-power-plant-1',
-    type: 'windPowerPlant',
-    position: { q: 16, r: 14 },
-    startingOwned: true,
-    startingWorkers: 0,
-  },
+  { id: 'capital', type: 'capital', position: { q: 25, r: 25 }, startingOwned: true, startingWorkers: 41 },
+  { id: 'city-1', type: 'city', position: { q: 25, r: 20 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'city-2', type: 'city', position: { q: 24, r: 8 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'city-3', type: 'city', position: { q: 33, r: 25 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'city-4', type: 'city', position: { q: 43, r: 24 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'city-5', type: 'city', position: { q: 25, r: 34 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'city-6', type: 'city', position: { q: 26, r: 43 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'city-7', type: 'city', position: { q: 16, r: 25 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'city-8', type: 'city', position: { q: 7, r: 26 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'farm-1', type: 'farm', position: { q: 23, r: 25 }, startingOwned: true, startingWorkers: 23 },
+  { id: 'farm-2', type: 'farm', position: { q: 21, r: 11 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'farm-3', type: 'farm', position: { q: 39, r: 20 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'farm-4', type: 'farm', position: { q: 29, r: 39 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'farm-5', type: 'farm', position: { q: 10, r: 29 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'civilian-factory-1', type: 'civilianFactory', position: { q: 27, r: 25 }, startingOwned: true, startingWorkers: 23 },
+  { id: 'civilian-factory-2', type: 'civilianFactory', position: { q: 29, r: 13 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'civilian-factory-3', type: 'civilianFactory', position: { q: 22, r: 38 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'civilian-factory-4', type: 'civilianFactory', position: { q: 11, r: 28 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'military-factory-1', type: 'militaryFactory', position: { q: 21, r: 25 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'military-factory-2', type: 'militaryFactory', position: { q: 22, r: 10 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'military-factory-3', type: 'militaryFactory', position: { q: 28, r: 40 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'refinery-1', type: 'refinery', position: { q: 25, r: 23 }, startingOwned: true, startingWorkers: 10 },
+  { id: 'refinery-2', type: 'refinery', position: { q: 38, r: 21 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'refinery-3', type: 'refinery', position: { q: 25, r: 39 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'refinery-4', type: 'refinery', position: { q: 11, r: 30 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'power-plant-1', type: 'powerPlant', position: { q: 25, r: 27 }, startingOwned: true, startingWorkers: 3 },
+  { id: 'power-plant-2', type: 'powerPlant', position: { q: 40, r: 22 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'power-plant-3', type: 'powerPlant', position: { q: 10, r: 28 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'wind-power-plant-1', type: 'windPowerPlant', position: { q: 26, r: 24 }, startingOwned: true, startingWorkers: 0 },
 ];
 
 export const FIXED_FACILITY_IDS = facilitySpecs.map((facility) => facility.id) as readonly string[];
@@ -154,40 +128,51 @@ function addRotated(target: Set<string>): void {
  */
 function createMountainSeedKeys(): Set<string> {
   const keys = new Set<string>();
-  addRange(keys, 3, 8, 10);
-  addRange(keys, 4, 7, 10);
-  addRange(keys, 4, 20, 22);
-  addRange(keys, 5, 7, 9);
-  addRange(keys, 5, 21, 23);
-  addRange(keys, 6, 6, 8);
-  addRange(keys, 6, 22, 24);
+  addRange(keys, 4, 14, 18);
+  addRange(keys, 5, 13, 18);
+  addRange(keys, 6, 12, 17);
+  addRange(keys, 6, 36, 39);
+  addRange(keys, 7, 11, 16);
+  addRange(keys, 7, 35, 39);
+  addRange(keys, 8, 10, 15);
+  addRange(keys, 8, 34, 38);
+  addRange(keys, 9, 9, 14);
+  addRange(keys, 9, 34, 37);
+  addRange(keys, 10, 8, 13);
+  addRange(keys, 10, 33, 36);
   addRotated(keys);
   return keys;
 }
 
 function createForestSeedKeys(): Set<string> {
   const keys = new Set<string>();
-  addRange(keys, 1, 2, 6);
-  addRange(keys, 1, 24, 28);
-  addRange(keys, 2, 2, 7);
-  addRange(keys, 2, 23, 28);
-  addRange(keys, 3, 3, 6);
-  addRange(keys, 3, 24, 28);
-  addRange(keys, 4, 2, 5);
-  addRange(keys, 4, 24, 27);
-  addRange(keys, 5, 3, 6);
-  addRange(keys, 5, 25, 28);
-  addRange(keys, 6, 2, 5);
-  addRange(keys, 6, 25, 28);
-  addRange(keys, 7, 3, 7);
-  addRange(keys, 7, 23, 27);
-  addRange(keys, 8, 3, 6);
-  addRange(keys, 8, 24, 27);
-  addRange(keys, 10, 4, 8);
-  addRange(keys, 11, 3, 8);
-  addRange(keys, 12, 4, 8);
-  addRange(keys, 13, 5, 9);
-  addRange(keys, 14, 4, 8);
+  addRange(keys, 1, 2, 9);
+  addRange(keys, 1, 38, 48);
+  addRange(keys, 2, 2, 11);
+  addRange(keys, 2, 36, 48);
+  addRange(keys, 3, 3, 13);
+  addRange(keys, 3, 35, 47);
+  addRange(keys, 4, 3, 12);
+  addRange(keys, 4, 34, 46);
+  addRange(keys, 5, 4, 12);
+  addRange(keys, 5, 33, 45);
+  addRange(keys, 6, 4, 11);
+  addRange(keys, 6, 32, 44);
+  addRange(keys, 7, 3, 10);
+  addRange(keys, 7, 31, 43);
+  addRange(keys, 8, 4, 9);
+  addRange(keys, 8, 31, 44);
+  addRange(keys, 9, 3, 8);
+  addRange(keys, 9, 32, 45);
+  addRange(keys, 10, 4, 7);
+  addRange(keys, 10, 32, 46);
+  addRange(keys, 11, 33, 45);
+  addRange(keys, 12, 34, 44);
+  addRange(keys, 13, 5, 11);
+  addRange(keys, 14, 4, 12);
+  addRange(keys, 15, 5, 13);
+  addRange(keys, 16, 6, 14);
+  addRange(keys, 17, 7, 15);
   addRotated(keys);
   return keys;
 }
@@ -371,11 +356,87 @@ function buildFixedMap(
     hordeEntrances,
     hordeSpawnReserve,
     roadBranches,
-    initialZombiePositions: FIXED_INITIAL_ZOMBIE_POSITIONS.map((position) => ({ ...position })),
+    // Initial positions are selected from this static map at game creation
+    // time. A seed-0 template is attached to FIXED_MAP below for callers that
+    // inspect the map without creating a GameState.
+    initialZombiePositions: [],
   };
 }
 
-const baseFixedMap = buildFixedMap();
+/**
+ * Return the stable candidate list used by initial-zombie placement. Roads
+ * remain valid candidates; only the explicit fixed-map exclusions are
+ * applied. Coordinates are sorted q/r so PRNG selection is auditable and
+ * independent of array construction order.
+ */
+export function getInitialZombieCandidates(map: FixedMap): HexCoord[] {
+  const capital = map.facilities.find((facility) => facility.type === 'capital');
+  if (!capital) throw new Error('Fixed map requires a Capital for initial Zombie placement');
+  const facilityKeys = new Set(map.facilities.map((facility) => hexKey(facility.position)));
+  const humanKeys = new Set(Object.values(FIXED_INITIAL_UNIT_POSITIONS).map(hexKey));
+  return map.tiles
+    .filter((tile) => {
+      if (tile.movementCost === null || isHordeSpawnReserve(map, tile)) return false;
+      if (facilityKeys.has(tile.key) || humanKeys.has(tile.key)) return false;
+      return hexDistance(capital.position, tile) >= 9;
+    })
+    .map((tile) => ({ q: tile.q, r: tile.r }))
+    .sort((left, right) => left.q - right.q || left.r - right.r);
+}
+
+/**
+ * Select distinct initial Normal Zombie positions from a deterministic RNG.
+ * The partial Fisher-Yates sequence consumes exactly one RNG draw per
+ * selected position and preserves the selected order for stable Unit IDs.
+ */
+export function generateInitialZombiePositions(
+  map: FixedMap,
+  rngOrSeed: SeededRng | number,
+  count = FIXED_INITIAL_ZOMBIE_COUNT,
+): HexCoord[] {
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error('Initial Zombie count must be a non-negative safe integer');
+  }
+  const candidates = getInitialZombieCandidates(map);
+  if (count > candidates.length) {
+    throw new Error(`Initial Zombie count ${count} exceeds ${candidates.length} valid map candidates`);
+  }
+  const rng = typeof rngOrSeed === 'number' ? new SeededRng(rngOrSeed) : rngOrSeed;
+  const available = candidates.map((position) => ({ ...position }));
+  const selected: HexCoord[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const selectedIndex = rng.nextInt(index, available.length - 1);
+    [available[index], available[selectedIndex]] = [available[selectedIndex]!, available[index]!];
+    selected.push({ ...available[index]! });
+  }
+  return selected;
+}
+
+/** Validate the seed-bound initial Zombie list at snapshot trust boundaries. */
+export function initialZombiePositionsMatchSeed(map: FixedMap, seed: number): boolean {
+  if (!Number.isSafeInteger(seed)) return false;
+  const expected = generateInitialZombiePositions(map, seed);
+  return map.initialZombiePositions.length === expected.length
+    && map.initialZombiePositions.every((position, index) => {
+      const expectedPosition = expected[index];
+      return expectedPosition !== undefined
+        && position.q === expectedPosition.q
+        && position.r === expectedPosition.r;
+    });
+}
+
+const mapWithoutInitialZombies = buildFixedMap();
+
+/** Canonical seed-0 positions are only a template; new games reseed them. */
+export const FIXED_INITIAL_ZOMBIE_POSITIONS: readonly HexCoord[] = generateInitialZombiePositions(
+  mapWithoutInitialZombies,
+  0,
+);
+
+const baseFixedMap: FixedMap = {
+  ...mapWithoutInitialZombies,
+  initialZombiePositions: FIXED_INITIAL_ZOMBIE_POSITIONS.map((position) => ({ ...position })),
+};
 
 /** Final terrain sets after Mountain precedence and Road/Facility exclusion. */
 const finalTerrainCoordinates = (terrain: BaseTerrain): HexCoord[] =>
@@ -407,13 +468,19 @@ function canonicalMapJson(value: unknown): string {
   return JSON.stringify(normalize(value));
 }
 
-const FIXED_MAP_CANONICAL_JSON = canonicalMapJson(baseFixedMap);
+/** Initial Zombie coordinates are seed-dependent state, not static map data. */
+const canonicalStaticMapJson = (map: FixedMap): string =>
+  canonicalMapJson({ ...map, initialZombiePositions: [] });
+
+const FIXED_MAP_CANONICAL_JSON = canonicalStaticMapJson(baseFixedMap);
 
 /** Return a fresh JSON-compatible copy for a new GameState. */
 export function createFixedMap(
   capacities: Readonly<Record<string, number>> = capacityByType,
 ): FixedMap {
-  return cloneMap(buildFixedMap(capacities));
+  const map = buildFixedMap(capacities);
+  map.initialZombiePositions = FIXED_INITIAL_ZOMBIE_POSITIONS.map((position) => ({ ...position }));
+  return cloneMap(map);
 }
 
 export function getTile(map: FixedMap, position: HexCoord): HexTile | undefined {
@@ -483,13 +550,13 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
   const errors: string[] = [];
   if (!map || map.id !== FIXED_MAP_ID) errors.push(`map id must be ${FIXED_MAP_ID}`);
   if (map?.width !== FIXED_MAP_WIDTH || map?.height !== FIXED_MAP_HEIGHT) {
-    errors.push('map must be exactly 31x31');
+    errors.push('map must be exactly 51x51');
   }
   if (!Array.isArray(map?.tiles) || map.tiles.length !== FIXED_MAP_WIDTH * FIXED_MAP_HEIGHT) {
-    errors.push('map must contain 961 tiles');
+    errors.push('map must contain 2601 tiles');
   }
   if (!Array.isArray(map?.facilities) || map.facilities.length !== FIXED_FACILITY_COUNT) {
-    errors.push('map must contain exactly 17 facilities');
+    errors.push('map must contain exactly 29 facilities');
   }
 
   const seenTiles = new Set<string>();
@@ -522,8 +589,8 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
   }
   const reserve = Array.isArray(map?.hordeSpawnReserve) ? map.hordeSpawnReserve : [];
   const reserveKeys = new Set(reserve.map(hexKey));
-  if (reserve.length !== 120 || reserveKeys.size !== 120) {
-    errors.push('map must contain the 120 unique outer-ring Horde Spawn Reserve hexes');
+  if (reserve.length !== 200 || reserveKeys.size !== 200) {
+    errors.push('map must contain the 200 unique outer-ring Horde Spawn Reserve hexes');
   }
   for (const tile of map?.tiles ?? []) {
     const expectedReserve = tile.q === 0 || tile.q === FIXED_MAP_WIDTH - 1 || tile.r === 0 || tile.r === FIXED_MAP_HEIGHT - 1;
@@ -543,7 +610,15 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     (terrainCounts.water !== 0 ||
       terrainCounts.plain + terrainCounts.forest + terrainCounts.mountain !== FIXED_MAP_WIDTH * FIXED_MAP_HEIGHT)
   ) {
-    errors.push('map terrain must cover all 961 hexes with no Water');
+    errors.push('map terrain must cover all 2601 hexes with no Water');
+  }
+  if (terrainCounts && (
+    terrainCounts.plain !== 1961
+    || terrainCounts.forest !== 514
+    || terrainCounts.mountain !== 126
+    || terrainCounts.water !== 0
+  )) {
+    errors.push('map terrain counts must be Plain 1961, Forest 514, Mountain 126, Water 0');
   }
 
   const facilityPositions = new Set<string>();
@@ -586,7 +661,7 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
       if (!cardinalDirections.includes(branch.direction)) {
         errors.push(`invalid road branch direction: ${branch.id}`);
       }
-      if (branch.roadTiles.length !== CENTER) errors.push(`road branch must contain 15 tiles: ${branch.id}`);
+      if (branch.roadTiles.length !== CENTER) errors.push(`road branch must contain 25 tiles: ${branch.id}`);
       if (hexKey(branch.capitalConnection) !== hexKey(coord(CENTER, CENTER))) {
         errors.push(`road branch must connect at capital: ${branch.id}`);
       }
@@ -615,7 +690,7 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
       entranceDirections.add(entrance.direction);
       if (!isRoad(map, entrance.tile)) errors.push(`${entrance.direction} Horde entrance must be on a road`);
       if (entrance.roadTiles.length !== CENTER) {
-        errors.push(`${entrance.direction} Horde entrance must contain 15 road tiles`);
+        errors.push(`${entrance.direction} Horde entrance must contain 25 road tiles`);
       }
       for (const position of entrance.roadTiles) {
         if (!isRoad(map, position)) errors.push(`${entrance.direction} entrance has non-road tile: ${hexKey(position)}`);
@@ -626,8 +701,8 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     }
   }
 
-  if (!Array.isArray(map?.initialZombiePositions) || map.initialZombiePositions.length !== 12) {
-    errors.push('map must contain twelve initial zombie positions');
+  if (!Array.isArray(map?.initialZombiePositions) || map.initialZombiePositions.length !== FIXED_INITIAL_ZOMBIE_COUNT) {
+    errors.push(`map must contain ${FIXED_INITIAL_ZOMBIE_COUNT} initial zombie positions`);
   }
   const mapFacilityKeys = new Set((map?.facilities ?? []).map((facility) => hexKey(facility.position)));
   const initialZombieKeys = new Set<string>();
@@ -642,18 +717,20 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     if (mapFacilityKeys.has(key)) {
       errors.push(`initial zombie overlaps facility: ${key}`);
     }
-    // v1.4.3 preserves the first six v1.4.2 coordinates verbatim. Two of those
-    // legacy positions are on the unchanged north/south road; the six newly
-    // appended positions must satisfy the stricter non-road placement rule.
-    if (index >= 6 && map && isRoad(map, position)) errors.push(`initial zombie overlaps road: ${key}`);
     if (reserveKeys.has(key)) errors.push(`initial zombie overlaps Horde Spawn Reserve: ${key}`);
     if (initialHumanKeys.has(key)) errors.push(`initial zombie overlaps initial Human Unit: ${key}`);
+    const capital = map?.facilities.find((facility) => facility.type === 'capital');
+    if (capital && hexDistance(position, capital.position) < 9) {
+      errors.push(`initial zombie is within Capital safety distance: ${key}`);
+    }
+    const tile = map?.tiles.find((candidate) => candidate.key === key);
+    if (tile?.movementCost === null) errors.push(`initial zombie is on impassable terrain: ${key}`);
   }
 
   const expectedFacilityIds = new Set(FIXED_FACILITY_IDS);
   const actualFacilityIds = new Set((map?.facilities ?? []).map((facility) => facility.id));
   if (expectedFacilityIds.size !== actualFacilityIds.size || [...expectedFacilityIds].some((id) => !actualFacilityIds.has(id))) {
-    errors.push('map facilities must match the fixed 17-facility template');
+    errors.push('map facilities must match the fixed 29-facility template');
   }
 
   if (map && countStaticBuildablePlainHexes(map, 5) < 12) {
@@ -668,8 +745,8 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
       facility.workerCapacity = capacityByType[facility.type] ?? facility.workerCapacity;
     }
   }
-  if (canonicalCandidate && canonicalMapJson(canonicalCandidate) !== FIXED_MAP_CANONICAL_JSON) {
-    errors.push('map must match the fixed 31x31 map template');
+  if (canonicalCandidate && canonicalStaticMapJson(canonicalCandidate) !== FIXED_MAP_CANONICAL_JSON) {
+    errors.push('map must match the fixed 51x51 map template');
   }
   return { valid: errors.length === 0, errors };
 }

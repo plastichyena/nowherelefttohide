@@ -31,13 +31,13 @@ describe('road branches and supply network', () => {
       'west',
     ]);
     expect(state.roadBranches).toHaveLength(4);
-    expect(state.roadBranches.every((branch) => branch.nextArrivalTurn >= 3 && branch.nextArrivalTurn <= 5)).toBe(true);
+    expect(state.roadBranches.every((branch) => branch.nextArrivalTurn !== null && branch.nextArrivalTurn >= 3 && branch.nextArrivalTurn <= 5)).toBe(true);
     for (const tile of state.map.tiles) {
-      const distance = hexDistance({ q: 15, r: 15 }, tile);
+      const distance = hexDistance({ q: 25, r: 25 }, tile);
       if (distance <= 5) expect(isHexSupplied(state, tile)).toBe(true);
     }
-    expect(isHexSupplied(state, { q: 15, r: 0 })).toBe(false);
-    expect(getSectorBranchIds(state.map, { q: 18, r: 12 })).toEqual(expect.arrayContaining(['east', 'north']));
+    expect(isHexSupplied(state, { q: 25, r: 0 })).toBe(false);
+    expect(getSectorBranchIds(state.map, { q: 28, r: 22 })).toEqual(expect.arrayContaining(['east', 'north']));
   });
 
   it('places an unsecured military factory inside the initial capital supply network', () => {
@@ -46,12 +46,12 @@ describe('road branches and supply network', () => {
       (facility) => facility.type === 'militaryFactory' && facility.owner !== 'player',
     );
     const nearbyFactory = unsecuredMilitaryFactories.find(
-      (facility) => facility.id === 'military-factory-2',
+      (facility) => facility.id === 'military-factory-1',
     );
 
     expect(unsecuredMilitaryFactories.length).toBeGreaterThan(0);
     expect(nearbyFactory).toMatchObject({
-      position: { q: 11, r: 15 },
+      position: { q: 21, r: 25 },
       owner: 'none',
       status: 'unowned',
     });
@@ -60,22 +60,23 @@ describe('road branches and supply network', () => {
 
   it('uses the candidate sector plus initial radius for zombie construction blockers', () => {
     const state = new GameEngine(1, createDefaultConfig({ units: { police: { vision: 10 } } })).getState();
-    const blockers = getBlockingZombiesForCheckpoint(state, 'north', { q: 15, r: 9 });
+    state.units.push(createUnit(state, 'zombie-checkpoint-blocker', 'zombie', { q: 24, r: 20 }));
+    const blockers = getBlockingZombiesForCheckpoint(state, 'north', { q: 25, r: 19 });
     expect(blockers.length).toBeGreaterThan(0);
-    expect(validateAction(state, { type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 9 } })?.code)
+    expect(validateAction(state, { type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 19 } })?.code)
       .toBe('checkpoint_supply_zombie_blocked');
   });
 
   it('does not let another sector zombie block a branch inside the shared initial radius', () => {
     const state = new GameEngine(1).getState() as GameState;
     const otherSectorTile = state.map.tiles.find((tile) =>
-      hexDistance({ q: 15, r: 15 }, tile) <= state.config.checkpoint.initialSupplyRadius &&
+      hexDistance({ q: 25, r: 25 }, tile) <= state.config.checkpoint.initialSupplyRadius &&
       !getSectorBranchIds(state.map, tile).includes('north'))!;
     expect(otherSectorTile).toBeDefined();
-    expect(isHexSuppliedByBranch(state, otherSectorTile, 'north', { q: 15, r: 9 })).toBe(false);
+    expect(isHexSuppliedByBranch(state, otherSectorTile, 'north', { q: 25, r: 19 })).toBe(false);
     state.units = state.units.filter((unit) => unit.type !== 'zombie');
     state.units.push(createUnit(state, 'zombie-other-sector', 'zombie', otherSectorTile));
-    expect(getBlockingZombiesForCheckpoint(state, 'north', { q: 15, r: 9 })).toEqual([]);
+    expect(getBlockingZombiesForCheckpoint(state, 'north', { q: 25, r: 19 })).toEqual([]);
   });
 
   it('builds without police for five goods, extends supply, and keeps the branch arrival schedule', () => {
@@ -83,7 +84,7 @@ describe('road branches and supply network', () => {
     const before = engine.getState();
     const schedule = before.roadBranches.find((branch) => branch.branchId === 'north')!.nextArrivalTurn;
     const goods = before.resources.civilianGoods;
-    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 9 } }).error).toBeNull();
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 19 } }).error).toBeNull();
     const after = engine.getState();
     expect(after.resources.civilianGoods).toBe(goods - 5);
     expect(after.checkpoints[0]).toMatchObject({ branchId: 'north', status: 'operational' });
@@ -94,12 +95,12 @@ describe('road branches and supply network', () => {
       activeCheckpointId: after.checkpoints[0]!.id,
     });
     expect(getBranchSupplyRadius(after, 'north')).toBe(6);
-    expect(isHexSupplied(after, { q: 15, r: 9 })).toBe(true);
+    expect(isHexSupplied(after, { q: 25, r: 19 })).toBe(true);
   });
 
   it('relocates once per branch and preserves non-empty old pools in a remnant', () => {
     const engine = engineWithoutZombies();
-    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 9 } }).error).toBeNull();
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 19 } }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const snapshot = engine.getState();
     const source = snapshot.checkpoints.find((checkpoint) => checkpoint.status === 'operational')!;
@@ -111,7 +112,7 @@ describe('road branches and supply network', () => {
       type: 'RelocateCheckpoint',
       checkpointId: source.id,
       branchId: 'north',
-      position: { q: 15, r: 10 },
+      position: { q: 25, r: 18 },
     }).error).toBeNull();
     const after = engine.getState();
     expect(after.checkpoints.find((checkpoint) => checkpoint.id === source.id)).toMatchObject({
@@ -124,7 +125,7 @@ describe('road branches and supply network', () => {
       type: 'RelocateCheckpoint',
       checkpointId: active.id,
       branchId: 'north',
-      position: { q: 15, r: 1 },
+      position: { q: 25, r: 11 },
     }).error?.code).toBe('checkpoint_branch_action_limit');
   });
 
@@ -175,7 +176,7 @@ describe('road branches and supply network', () => {
   it('ruins an empty occupied checkpoint and allows a forward replacement once the Zombie is cleared', () => {
     const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, horde: singleFinalWave(4) });
     const engine = new GameEngine(5, config);
-    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 9 } }).error).toBeNull();
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 19 } }).error).toBeNull();
     const occupied = engine.getState();
     const checkpoint = occupied.checkpoints[0]!;
     const zombie = createUnit(occupied, 'zombie-empty-checkpoint', 'zombie', checkpoint.position);
@@ -190,7 +191,7 @@ describe('road branches and supply network', () => {
     const cleared = engine.getState() as GameState;
     cleared.units = cleared.units.filter((unit) => unit.type !== 'zombie');
     expect(engine.step({ type: 'LoadSnapshot', snapshot: cleared }).error).toBeNull();
-    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 1 } }).error).toBeNull();
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 11 } }).error).toBeNull();
     expect(engine.getState().roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId)
       .not.toBe(checkpoint.id);
   });

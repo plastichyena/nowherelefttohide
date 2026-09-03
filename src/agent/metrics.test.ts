@@ -54,7 +54,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('5.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('6.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -141,7 +141,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.checkpointsBuilt).toBeGreaterThanOrEqual(0);
     expect(run.metrics.checkpointsRelocated).toBeGreaterThanOrEqual(0);
     expect(run.metrics.supplyRejections).toBeGreaterThanOrEqual(0);
-  }, 10_000);
+  }, 20_000);
 
   it('counts policy branch-turns from the Active post only', () => {
     const config = createDefaultConfig({ maxActionsPerTurn: 1 });
@@ -172,6 +172,9 @@ describe('Agent Metrics', () => {
       containingUnitId: null,
       projectedSuppression: 0,
       projectedCivilianDamage: 0,
+      healthyQueueConsumesMaintenance: true as const,
+      queueMaintenanceFood: 0,
+      queueMaintenanceCivilianGoods: 0,
     };
     observation.checkpoints = [
       { ...baseCheckpoint, id: 'active', position: { q: 3, r: 7 }, role: 'active', currentPolicy: 'normal', currentPolicyTurns: 2, providesSupply: true },

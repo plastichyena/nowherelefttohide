@@ -91,7 +91,7 @@ describe('v1.4 position candidates', () => {
   it('returns all Constructible Facility candidates in stable coordinate order', () => {
     const engine = new GameEngine(45, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const candidates = getConstructibleFacilityPositionCandidates(engine.getState(), 'simpleFarm');
-    expect(candidates).toHaveLength(31 * 31);
+    expect(candidates).toHaveLength(51 * 51);
     expect(candidates.map((candidate) => `${candidate.position.q},${candidate.position.r}`)).toEqual(
       [...candidates]
         .sort((left, right) => left.position.q - right.position.q || left.position.r - right.position.r)
@@ -101,14 +101,14 @@ describe('v1.4 position candidates', () => {
     expect(candidates.filter((candidate) => candidate.legal).every((candidate) => candidate.reasonCode === null)).toBe(true);
     expect(candidates.filter((candidate) => !candidate.legal).every((candidate) => candidate.reasonCode !== null)).toBe(true);
     expect(candidates.filter((candidate) =>
-      candidate.position.q === 0 || candidate.position.q === 30 || candidate.position.r === 0 || candidate.position.r === 30
+      candidate.position.q === 0 || candidate.position.q === 50 || candidate.position.r === 0 || candidate.position.r === 50
     ).every((candidate) => candidate.reasonCode === 'horde_spawn_reserve')).toBe(true);
   });
 
   it('rejects Reserve placement with the shared reason without changing resources, actions, or RNG', () => {
     const engine = new GameEngine(47, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
     const before = engine.getState();
-    const checkpoint = engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 0 } });
+    const checkpoint = engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 0 } });
     expect(checkpoint.error?.code).toBe('horde_spawn_reserve');
     expect(engine.getState()).toEqual(before);
     const facility = engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: { q: 0, r: 0 } });
@@ -123,7 +123,7 @@ describe('v1.4 position candidates', () => {
       vision: { ownedFacility: 0, operationalCheckpoint: 0 },
     });
     const engine = new GameEngine(46, config);
-    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 15, r: 9 } }).error).toBeNull();
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 19 } }).error).toBeNull();
     const baseline = engine.getConstructibleFacilityPositionCandidates('simpleFarm');
     const visible = getPlayerVisibleTileKeys(engine.getState());
     const legal = baseline.find((candidate) => candidate.legal && !visible.has(hexKey(candidate.position)))!;

@@ -1,16 +1,16 @@
-# Nowhere Left to Hide v1.4.3 Board Asset Manifest
+# Nowhere Left to Hide v1.4.4 Board Asset Manifest
 
-- Generated: 2026-08-31
+- Generated: 2026-09-03
 - Runtime format: 256×256 PNG
 - Generated source resolutions: 1254×1254 for most sources, 1362×1155 for the
   twelve-Zombie Horde swarm, and 1536×1024 for Capital and Refinery; every
   checked-in runtime image is normalized to 256×256.
-- Runtime total: 30 PNG files, 1,328,850 bytes (approximately 1.27 MiB)
+- Runtime total: 32 PNG files, 1,442,395 bytes (approximately 1.38 MiB)
 - Source: original assets created for this project; no third-party images, real
   logos, seals, flags, or trademarks are included.
 - Provenance / licensing: generated specifically for this repository during
-  the v1.3.1 implementation. No third-party asset or external asset-license
-  obligation is incorporated into these PNGs.
+  the v1.3.1 and v1.4.4 implementations. No third-party asset or external
+  asset-license obligation is incorporated into these PNGs.
 - Generation: OpenAI built-in image generation. The built-in tool did not
   expose a more specific model identifier for recording.
 - Mechanical post-processing: Pillow resize/crop/centering, alpha preservation,
@@ -45,7 +45,10 @@ below. After visual review, the original three-Zombie concept replaced the
 abstract normal-Zombie silhouette. A new twelve-Zombie swarm was generated from
 that concept as a style reference for Horde, then extracted to genuine alpha.
 Police was edited from a shield composition to a fictional rounded six-point
-badge/emblem and then extracted to real alpha.
+badge/emblem and then extracted to real alpha. National Guard was replaced by
+the approved runtime candidate with a cleaner olive uniform silhouette. The
+v1.4.4 Police Zombie and Soldier Zombie candidates use the same compact,
+readable unit treatment and are normal Zombie-faction units in the rules.
 
 The Horde revision prompt requested 9–12 distinct adult Zombies in the same
 bold comic-painted style, with 3–4 readable foreground figures, overlapping
@@ -73,10 +76,12 @@ approved result contains twelve Zombies.
 | `facilities/facility_simple_farm.png` | `simpleFarm` | Small forward farm, field rows, and utility shed |
 | `facilities/facility_civilian_drone_base.png` | `civilianDroneBase` | Forward civilian drone pad and communications mast |
 | `facilities/facility_checkpoint.png` | Checkpoint base | Barrier and guard booth |
-| `units/unit_police.png` | `police` | Fictional badge/emblem, sidearm, and blue laurel |
-| `units/unit_national_guard.png` | `nationalGuard` | Olive helmet and rifle |
+| `units/unit_police.png` | `police` | Approved v1.4.4 five-person Police Group in US-style uniforms |
+| `units/unit_national_guard.png` | `nationalGuard` | Approved v1.4.4 five-person armed National Guard Group |
 | `units/unit_zombie.png` | `zombie` | Approved three-Zombie civilian/worker group |
 | `units/unit_horde_zombie.png` | `hordeZombie` | Dense twelve-Zombie swarm |
+| `units/unit_police_zombie.png` | `policeZombie` | Approved reanimated police silhouette; normal Zombie AI |
+| `units/unit_soldier_zombie.png` | `soldierZombie` | Approved reanimated soldier silhouette; normal Zombie AI |
 | `overlays/state_unsecured.png` | Unowned facility | Gray dashed perimeter |
 | `overlays/state_secured.png` | Player-owned facility | Teal perimeter |
 | `overlays/state_stopped.png` | Current `operationalStatus === stopped` | Pause bars; not used for forecast warnings |
@@ -104,7 +109,9 @@ warnings, and Horde entrance directions remain dynamic UI overlays.
    against the local generated-image directory, then inspect alpha edges and
    small-size silhouettes.
 4. Run Registry/file tests, production build, and both reference viewports.
-5. Keep the runtime total below 3 MiB and do not add a `water` mapping.
+5. Keep the runtime total below 3 MiB and do not add a `water` mapping. The
+   v1.4.4 runtime candidate files above are the approved sources for the two
+   replacement human sprites and two reanimated Zombie sprites.
 
 The original single-Zombie concept, approved three-Zombie normal-unit source,
 approved twelve-Zombie Horde source, and v1.4 facility references live in

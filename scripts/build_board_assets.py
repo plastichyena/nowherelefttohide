@@ -1,8 +1,9 @@
-"""Build the checked-in 256px board sprites from approved generated sources.
+"""Build 256px board sprites from approved generated sources.
 
-This is a deterministic post-processing helper for v1.3.1.  It keeps the
-runtime files small, preserves alpha, and draws the intentionally simple
-state/road overlays without introducing another runtime dependency.
+This deterministic post-processing helper supports the checked-in runtime
+assets and later approved candidate sets. It keeps files small, preserves
+alpha, and draws the intentionally simple state/road overlays without
+introducing another runtime dependency.
 """
 
 from __future__ import annotations
@@ -41,6 +42,13 @@ V140_SOURCE_FILES = {
     "facilities/facility_wind_power_plant.png": "wind_power_plant_concept.png",
     "facilities/facility_simple_farm.png": "simple_farm_concept.png",
     "facilities/facility_civilian_drone_base.png": "civilian_drone_base_concept.png",
+}
+
+V144_SOURCE_FILES = {
+    "units/unit_police.png": "police_group_approved_transparent_source.png",
+    "units/unit_national_guard.png": "national_guard_5_group_approved_source.png",
+    "units/unit_police_zombie.png": "police_zombie_3_group_approved_transparent_source.png",
+    "units/unit_soldier_zombie.png": "soldier_zombie_5_group_approved_transparent_source.png",
 }
 
 
@@ -174,14 +182,31 @@ def build_v140(source_root: Path, output_root: Path) -> None:
         )
 
 
+def build_v144(source_root: Path, output_root: Path) -> None:
+    """Post-process approved v1.4.4 unit concepts without changing current runtime assets."""
+    for relative, source_name in V144_SOURCE_FILES.items():
+        destination = output_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source = Image.open(source_root / source_name)
+        contain(source, (202, 202)).save(
+            destination,
+            optimize=True,
+            compress_level=9,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source_root", type=Path)
     parser.add_argument("output_root", type=Path)
-    parser.add_argument("--v140-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--v140-only", action="store_true")
+    mode.add_argument("--v144-only", action="store_true")
     args = parser.parse_args()
     if args.v140_only:
         build_v140(args.source_root, args.output_root)
+    elif args.v144_only:
+        build_v144(args.source_root, args.output_root)
     else:
         build(args.source_root, args.output_root)
 

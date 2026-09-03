@@ -66,12 +66,18 @@ export type FacilityOperationalStatus =
   | 'recovering'
   | 'ruined';
 
-export type UnitType = 'police' | 'nationalGuard' | 'zombie' | 'hordeZombie';
+export type UnitType =
+  | 'police'
+  | 'nationalGuard'
+  | 'zombie'
+  | 'hordeZombie'
+  | 'policeZombie'
+  | 'soldierZombie';
 
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
 
-export type HumanUnitType = Exclude<UnitType, 'zombie' | 'hordeZombie'>;
+export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard'>;
 
 export type UnitActionState = 'ready' | 'moved' | 'acted' | 'destroyed';
 
@@ -313,6 +319,7 @@ export interface CheckpointPositionCandidate {
   position: HexCoord;
   legal: boolean;
   reasonCode: string | null;
+  civilianGoodsCost: number;
   currentBranchRadius?: number;
   projectedBranchRadius?: number;
   newlySuppliedHexCount?: number;
@@ -332,11 +339,19 @@ export interface ConstructibleFacilityPositionCandidate {
 
 export interface RoadBranchState {
   branchId: RoadBranchId;
-  nextArrivalTurn: number;
+  nextArrivalTurn: number | null;
   checkpointActionsThisTurn: number;
   activeCheckpointId: string | null;
   standbyCheckpointIds: string[];
   currentPolicy: CheckpointPolicy;
+  /** Persisted history used for the one-time reduced build price on each branch. */
+  hasBuiltCheckpoint: boolean;
+}
+
+export interface RejectedRefugeeCounters {
+  normalRejected: number;
+  strictRejected: number;
+  turnedAway: number;
 }
 
 export interface UnitProductionOrder {
@@ -420,6 +435,12 @@ export type GameEventType =
   | 'victory_progress_changed'
   | 'horde_spawned'
   | 'horde_warning'
+  | 'checkpoint_refugees_turned_away'
+  | 'checkpoint_refugees_rejected'
+  | 'horde_rejected_bonus_applied'
+  | 'refugee_arrivals_ended'
+  | 'constructible_decommissioned'
+  | 'human_unit_reanimated'
   | 'game_over';
 
 export interface GameEvent {
@@ -515,6 +536,31 @@ export interface GameStatistics {
   civilianDroneBasesBuilt: number;
   maxCivilianDroneVisionRadius: number;
   aerialDiscoveriesInGroundBlockedArea: number;
+  checkpointQueueFoodDemand: number;
+  checkpointQueueCivilianGoodsDemand: number;
+  checkpointQueueFoodConsumed: number;
+  checkpointQueueCivilianGoodsConsumed: number;
+  refugeesRejectedByDirectionAndPolicy: Record<CardinalDirection, Record<'normal' | 'strict', number>>;
+  refugeesTurnedAwayByDirection: Record<CardinalDirection, number>;
+  rejectedBonusZombiesByDirection: Record<CardinalDirection, number>;
+  rejectedCounterResetsByDirection: Record<CardinalDirection, number>;
+  policeZombiesSpawned: number;
+  soldierZombiesSpawned: number;
+  policeZombiesKilled: number;
+  soldierZombiesKilled: number;
+  policeZombiesFinal: number;
+  soldierZombiesFinal: number;
+  policeReanimations: number;
+  nationalGuardReanimations: number;
+  reanimationImmediateInfections: number;
+  reanimationFacilityInfections: number;
+  reanimationCheckpointInfections: number;
+  reanimationSiteFalls: number;
+  reanimationChainOverruns: number;
+  preventedRefugeeArrivalsAfterFinal: number;
+  civilianDroneBasesDecommissioned: number;
+  civilianGoodsRefundedFromDecommission: number;
+  policeLongRangeMoves: number;
 }
 
 export interface GameResult {
@@ -677,6 +723,8 @@ export interface GameState {
   units: UnitState[];
   checkpoints: CheckpointState[];
   roadBranches: RoadBranchState[];
+  /** Internal-only counters. Public projections must expose only the qualitative risk. */
+  rejectedRefugeesByDirection: Record<CardinalDirection, RejectedRefugeeCounters>;
   pendingUnitProductions: UnitProductionOrder[];
   nextCheckpointNumber: number;
   nextConstructibleFacilityNumber: number;
@@ -764,6 +812,17 @@ export interface ActivateCheckpointAction {
   checkpointId: string;
 }
 
+export interface TurnAwayCheckpointRefugeesAction {
+  type: 'TurnAwayCheckpointRefugees';
+  checkpointId: string;
+  count: number;
+}
+
+export interface DecommissionConstructibleFacilityAction {
+  type: 'DecommissionConstructibleFacility';
+  facilityId: FacilityId;
+}
+
 export interface ProduceUnitAction {
   type: 'ProduceUnit';
   unitType: HumanUnitType;
@@ -798,6 +857,8 @@ export type GameAction =
   | BuildCheckpointAction
   | RelocateCheckpointAction
   | ActivateCheckpointAction
+  | TurnAwayCheckpointRefugeesAction
+  | DecommissionConstructibleFacilityAction
   | ProduceUnitAction
   | EndTurnAction
   | StartNewGameAction
@@ -931,7 +992,10 @@ export interface InfectionConfig {
 }
 
 export interface CheckpointConfig {
+  /** Cost of the first checkpoint ever built on a branch. */
   constructionCivilianGoods: number;
+  subsequentConstructionCivilianGoods: number;
+  relocationCivilianGoods: number;
   maxPreparedPostsPerDirection: number;
   requiresPolice: boolean;
   consumesPower: boolean;
