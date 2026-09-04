@@ -79,22 +79,30 @@ jobs:
   balanced-seed-regression:
     name: Balanced seeds ${{ matrix.start }}-${{ matrix.end }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
           - start: 1
-            end: 5
-          - start: 6
-            end: 10
-          - start: 11
+            end: 3
+          - start: 4
+            end: 6
+          - start: 7
+            end: 9
+          - start: 10
+            end: 12
+          - start: 13
             end: 15
           - start: 16
-            end: 20
-          - start: 21
-            end: 25
-          - start: 26
+            end: 18
+          - start: 19
+            end: 21
+          - start: 22
+            end: 24
+          - start: 25
+            end: 27
+          - start: 28
             end: 30
     steps:
       - name: Check out repository
