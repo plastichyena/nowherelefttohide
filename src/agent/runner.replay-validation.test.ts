@@ -32,7 +32,7 @@ describe('Agent replay version boundaries', () => {
     expect(missingAppMetadataReplay.error?.code).toBe('artifact_invalid');
   }, 30_000);
 
-  it('rejects legacy artifacts before creating a v1.4.5 replay session', () => {
+  it('rejects legacy artifacts before creating a v1.5.0 replay session', () => {
     const config = createDefaultConfig({
       horde: {
         warningLeadTurns: 1,

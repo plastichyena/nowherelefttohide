@@ -206,7 +206,7 @@ function isBridgeAction(value: unknown): value is GameAction {
       case 'ProduceUnit':
         return (
           hasOnlyKeys(value, ['type', 'unitType'], ['destination']) &&
-          (value.unitType === 'police' || value.unitType === 'nationalGuard') &&
+          (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice') &&
           (value.destination === undefined || isCoordinate(value.destination))
         );
       case 'EndTurn':

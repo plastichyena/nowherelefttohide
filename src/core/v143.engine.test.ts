@@ -27,8 +27,8 @@ function quietConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}):
       arrivalPeopleMax: 1,
     },
     units: {
-      zombie: { movement: 0, attack: 0, vision: 0 },
-      hordeZombie: { movement: 0, attack: 0, vision: 0 },
+      zombie: { movement: 0, attack: 1, vision: 0 },
+      hordeZombie: { movement: 0, attack: 1, vision: 0 },
     },
     ...overrides,
   });
@@ -77,9 +77,9 @@ function movePlayersAway(state: MutableState): void {
 }
 
 describe('v1.4.5 Core version, map, and initial state', () => {
-  it('creates a v2.5.0 state on fixed-51x51-v1 with all 25 initial Normal Zombies', () => {
+  it('creates a v3.0.0 state on fixed-51x51-v1 with all 25 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('2.5.0');
+    expect(state.gameVersion).toBe('3.0.0');
     expect(state.mapId).toBe('fixed-51x51-v1');
     expect(state.map.id).toBe('fixed-51x51-v1');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');
@@ -330,8 +330,8 @@ describe('v1.4.4 generated Zombie immediate occupancy and FIFO chains', () => {
   it('does not move or attack a Zombie generated during the current infection resolution', () => {
     const engine = new GameEngine(14341, quietConfig({
       units: {
-        zombie: { movement: 1, attack: 0, vision: 31 },
-        hordeZombie: { movement: 0, attack: 0, vision: 0 },
+        zombie: { movement: 1, attack: 1, vision: 31 },
+        hordeZombie: { movement: 0, attack: 1, vision: 0 },
       },
     }));
     const setup = cloneState(engine.getState());
@@ -360,8 +360,8 @@ describe('v1.4.4 Combat Noise respawn', () => {
       units: {
         police: { vision: 0 },
         nationalGuard: { vision: 4 },
-        zombie: { movement: 0, attack: 0, vision: 0 },
-        hordeZombie: { movement: 0, attack: 0, vision: 0 },
+        zombie: { movement: 0, attack: 1, vision: 0 },
+        hordeZombie: { movement: 0, attack: 1, vision: 0 },
       },
     }));
     const setup = cloneState(engine.getState());

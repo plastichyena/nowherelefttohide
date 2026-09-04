@@ -8,9 +8,9 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** Session/Checkpoint v2 still rejects v1.4.4-or-earlier data at the version boundary. */
-export const CHECKPOINT_SCHEMA_VERSION = '2.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '2.0.0' as const;
+/** Session/Checkpoint v3 rejects every pre-v1.5.0 payload at the version boundary. */
+export const CHECKPOINT_SCHEMA_VERSION = '3.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '3.0.0' as const;
 export const DEFAULT_CHECKPOINT_INTERVAL = 5;
 export const MAX_DECISION_SUMMARY_CODE_POINTS = 500;
 export const ZERO_HASH = '0'.repeat(64);
@@ -65,6 +65,31 @@ export interface SessionStepInput {
   decisionSummary: string;
 }
 
+/**
+ * A public-only diff between the two observations surrounding one Session
+ * Decision. It is intentionally kept out of AgentObservation and GameState;
+ * the Session layer owns the previous-public-observation history.
+ */
+export interface SessionStateDelta {
+  newlyInfectedSites: string[];
+  newlyRuinedSites: string[];
+  newlySpottedEnemies: string[];
+  lostEnemies: string[];
+  unitHpChanges: Array<{ unitId: string; before: number; after: number }>;
+  unitSupplyChanges: Array<{
+    unitId: string;
+    beforeFuel: number;
+    afterFuel: number;
+    beforeMilitaryGoods: number;
+    afterMilitaryGoods: number;
+  }>;
+  checkpointRoleChanges: Array<{
+    checkpointId: string;
+    before: string;
+    after: string;
+  }>;
+}
+
 export interface PublicDecisionRecord {
   decision: number;
   turn: number;
@@ -76,6 +101,7 @@ export interface PublicDecisionRecord {
   accepted: boolean;
   error: AgentStepResult['error'];
   events: AgentPublicEvent[];
+  stateDelta: SessionStateDelta;
   observationAfter: SessionTraceObservation;
   previousDecisionHash: string;
   decisionHash: string;
@@ -162,6 +188,7 @@ export interface SessionStepResult extends SessionStatusResult {
   accepted: boolean;
   error: AgentStepResult['error'];
   events: AgentPublicEvent[];
+  stateDelta: SessionStateDelta;
   decisionRecord: PublicDecisionRecord;
   checkpointsCreated: SessionCheckpointMetadata[];
 }

@@ -39,9 +39,8 @@ jobs:
         run: npm run typecheck
 
       - name: Run unit and invariant tests
-        # The 30-seed regression file is covered by the stricter 1..100 matrix
-        # below. Keeping it out of this job prevents slow seeds from timing out
-        # while preserving the exact fixed-seed release gate.
+        # The full 1..30 deterministic regression is split into the matrix job
+        # below so this Pages gate stays responsive.
         run: npx --no-install vitest run --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts
 
       - name: Build production bundle
@@ -77,11 +76,52 @@ jobs:
         with:
           path: dist
 
+  balanced-seed-regression:
+    name: Balanced seeds ${{ matrix.start }}-${{ matrix.end }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - start: 1
+            end: 5
+          - start: 6
+            end: 10
+          - start: 11
+            end: 15
+          - start: 16
+            end: 20
+          - start: 21
+            end: 25
+          - start: 26
+            end: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run v1.5.0 Balanced seed regression
+        env:
+          AGENT_STRATEGY: balanced
+          BALANCED_SEED_START: ${{ matrix.start }}
+          BALANCED_SEED_END: ${{ matrix.end }}
+          BALANCED_BATCH_TIMEOUT_MS: 1500000
+        run: npx --no-install vitest run src/agent/balancedAgent.batch.test.ts --maxWorkers=1
+
   deploy:
     name: Deploy to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Long fixed-seed release batches live in the separately dispatched
-    # v1.4.5 Release Validation workflow and never delay Pages or AI Portable.
+    # v1.5.0 Release Validation workflow and never delay Pages or AI Portable.
     needs: verify
     runs-on: ubuntu-latest
     permissions:

@@ -10,12 +10,12 @@ import type {
   InitialPopulationRange,
   ProductionRule,
   ResourceStock,
-  UnitConfig,
+  UnitConfigMap,
   UnitType,
 } from './types';
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 
-export const CONFIG_VERSION = '2.5.0';
+export const CONFIG_VERSION = '3.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v1';
 
 const facilityIds: FacilityId[] = [
@@ -64,18 +64,33 @@ function production(
   return { inputs, outputs, powerMode, requiresPower: powerMode === 'required', powerCapacity, powerGeneration, fixedPowerGeneration };
 }
 
-const defaultUnitConfig: Record<UnitType, UnitConfig> = {
+const defaultUnitConfig: UnitConfigMap = {
   police: {
-    hp: 25, attack: 5, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 12,
+    hp: 25, recruitAttack: 4, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 12,
     maxMilitaryGoods: 5, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 1: 1 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 3,
+    recruitmentFacilityTypes: ['capital', 'city'],
+    productionCivilianGoods: 10, productionMilitaryGoods: 10, fuelCostRule: 'policeLike',
+    suppressionCivilianDamageRate: 0, reanimationUnitType: 'policeZombie', noiseClass: 'medium', noiseRadius: 4,
   },
   nationalGuard: {
-    hp: 50, attack: 10, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 22,
+    hp: 50, recruitAttack: 8, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 22,
     maxMilitaryGoods: 20, fixedMilitaryGoodsUpkeepPerTurn: 1,
     attackMilitaryGoodsCostByRange: { 1: 1, 2: 2 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
+    recruitmentFacilityTypes: ['capital'],
+    productionCivilianGoods: 20, productionMilitaryGoods: 25, fuelCostRule: 'nationalGuardLike',
+    suppressionCivilianDamageRate: 0.5, reanimationUnitType: 'soldierZombie', noiseClass: 'large', noiseRadius: 8,
+  },
+  riotPolice: {
+    hp: 75, recruitAttack: 10, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 12,
+    maxMilitaryGoods: 5, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: { 1: 1 }, suppressionMilitaryGoodsCost: 1,
+    militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
+    recruitmentFacilityTypes: ['capital', 'city'],
+    productionCivilianGoods: 25, productionMilitaryGoods: 25, fuelCostRule: 'policeLike',
+    suppressionCivilianDamageRate: 0, reanimationUnitType: 'riotZombie', noiseClass: 'medium', noiseRadius: 5,
   },
   zombie: {
     hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
@@ -97,6 +112,12 @@ const defaultUnitConfig: Record<UnitType, UnitConfig> = {
   },
   soldierZombie: {
     hp: 20, attack: 5, movement: 5, range: 1, vision: 5, population: 0, maxFuel: 0,
+    maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
+    militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
+  },
+  riotZombie: {
+    hp: 50, attack: 5, movement: 3, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
@@ -238,6 +259,18 @@ export const DEFAULT_CONFIG: GameConfig = {
   mapId: DEFAULT_MAP_ID,
   maxActionsPerTurn: 100,
   units: defaultUnitConfig,
+  unitExperience: {
+    productionProficiencyByType: {
+      police: 'recruit',
+      nationalGuard: 'recruit',
+      riotPolice: 'recruit',
+    },
+    recruitSurvivalTurnsRequired: 5,
+    regularAttackMultiplier: 1.25,
+    regularAttackRounding: 'ceil',
+    veteranZombieKillsRequired: 5,
+    veteranAttackCharges: 2,
+  },
   facilities: defaultFacilityConfig,
   economy: defaultEconomy,
   initialFacilityPopulation: defaultInitialFacilityPopulation,
@@ -250,11 +283,14 @@ export const DEFAULT_CONFIG: GameConfig = {
     warningLeadTurns: 2,
     waves: [
       { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 3 }, final: false },
-      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 4 }, final: false },
-      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 6 }, final: false },
-      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 6 }, final: false },
-      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, final: true },
+      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 5 }, final: false },
+      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, final: false },
+      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 7 }, final: false },
+      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 8 }, final: true },
     ],
+    specialZombieWeights: { zombie: 70, policeZombie: 15, soldierZombie: 10, riotZombie: 5 },
+    riotZombieCapPerDirection: 1,
+    movementNoiseRadius: 8,
   },
   refugees: {
     arrivalIntervalMin: 2,
@@ -290,9 +326,6 @@ export const DEFAULT_CONFIG: GameConfig = {
     maxZombieSpawnPerResolution: 6,
     zombieSpawnRadius: 1,
     noiseRespawnEnabled: true,
-    policeSuppression: 5,
-    nationalGuardSuppression: 10,
-    nationalGuardCivilianDamageRate: 0.5,
   },
   checkpoint: {
     constructionCivilianGoods: 5,
@@ -305,11 +338,6 @@ export const DEFAULT_CONFIG: GameConfig = {
   },
   constructibleFacility: {
     limitPerTypeDivisor: 2,
-  },
-  noise: {
-    police: 4,
-    nationalGuard: 8,
-    publicClass: { police: 'medium', nationalGuard: 'large' },
   },
   terrain: {
     movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
@@ -403,7 +431,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   requireInteger(errors, config.maxActionsPerTurn, 'maxActionsPerTurn', 1);
 
   const unitTypes: UnitType[] = [
-    'police', 'nationalGuard', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie',
+    'police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie',
   ];
   for (const type of unitTypes) {
     const unit = config.units?.[type];
@@ -412,11 +440,35 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       continue;
     }
     for (const key of [
-      'hp', 'attack', 'movement', 'range', 'vision', 'population', 'maxFuel',
+      'hp', 'movement', 'range', 'vision', 'population', 'maxFuel',
       'maxMilitaryGoods', 'fixedMilitaryGoodsUpkeepPerTurn', 'suppressionMilitaryGoodsCost',
       'emergencyMovementPoints',
     ] as const) {
       requireInteger(errors, unit[key], `units.${type}.${key}`, 0);
+    }
+    const human = type === 'police' || type === 'nationalGuard' || type === 'riotPolice';
+    if (human) {
+      const humanUnit = unit as GameConfig['units']['police'];
+      requireInteger(errors, humanUnit.recruitAttack, `units.${type}.recruitAttack`, 1);
+      requireInteger(errors, humanUnit.productionCivilianGoods, `units.${type}.productionCivilianGoods`, 0);
+      requireInteger(errors, humanUnit.productionMilitaryGoods, `units.${type}.productionMilitaryGoods`, 0);
+      if (!Array.isArray(humanUnit.recruitmentFacilityTypes) || humanUnit.recruitmentFacilityTypes.length === 0) {
+        errors.push(`units.${type}.recruitmentFacilityTypes is required`);
+      }
+      if (!['policeLike', 'nationalGuardLike'].includes(humanUnit.fuelCostRule)) {
+        errors.push(`units.${type}.fuelCostRule is invalid`);
+      }
+      if (!['small', 'medium', 'large', 'extraLarge'].includes(humanUnit.noiseClass)) {
+        errors.push(`units.${type}.noiseClass is invalid`);
+      }
+      requireInteger(errors, humanUnit.noiseRadius, `units.${type}.noiseRadius`, 0);
+      if (!Number.isFinite(humanUnit.suppressionCivilianDamageRate)
+        || humanUnit.suppressionCivilianDamageRate < 0
+        || humanUnit.suppressionCivilianDamageRate > 1) {
+        errors.push(`units.${type}.suppressionCivilianDamageRate must be between 0 and 1`);
+      }
+    } else {
+      requireInteger(errors, (unit as GameConfig['units']['zombie']).attack, `units.${type}.attack`, 1);
     }
     if (typeof unit.militaryGoodsShortageAttackMultiplier !== 'number'
       || !Number.isFinite(unit.militaryGoodsShortageAttackMultiplier)
@@ -426,7 +478,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     }
     if (!unit.attackMilitaryGoodsCostByRange || typeof unit.attackMilitaryGoodsCostByRange !== 'object') {
       errors.push(`units.${type}.attackMilitaryGoodsCostByRange is required`);
-    } else if (type === 'police' || type === 'nationalGuard') {
+    } else if (human) {
       for (let distance = 1; distance <= unit.range; distance += 1) {
         requireInteger(
           errors,
@@ -436,16 +488,34 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
         );
       }
     }
-    if ((type === 'police' || type === 'nationalGuard') && unit.maxFuel < 1) {
+    if (human && unit.maxFuel < 1) {
       errors.push(`units.${type}.maxFuel must be at least 1`);
     }
-    if ((type === 'police' || type === 'nationalGuard') && unit.maxMilitaryGoods < 1) {
+    if (human && unit.maxMilitaryGoods < 1) {
       errors.push(`units.${type}.maxMilitaryGoods must be at least 1`);
     }
-    if (['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'].includes(type)
+    if (!human
       && (unit.maxMilitaryGoods !== 0 || unit.emergencyMovementPoints !== 0)) {
       errors.push(`units.${type} must not carry military goods or use emergency movement`);
     }
+  }
+
+  const experience = config.unitExperience;
+  if (!experience || typeof experience !== 'object') {
+    errors.push('unitExperience is required');
+  } else {
+    for (const type of HUMAN_UNIT_TYPES) {
+      if (!['recruit', 'regular', 'veteran'].includes(experience.productionProficiencyByType?.[type])) {
+        errors.push(`unitExperience.productionProficiencyByType.${type} is invalid`);
+      }
+    }
+    requireInteger(errors, experience.recruitSurvivalTurnsRequired, 'unitExperience.recruitSurvivalTurnsRequired', 1);
+    requireInteger(errors, experience.veteranZombieKillsRequired, 'unitExperience.veteranZombieKillsRequired', 1);
+    requireInteger(errors, experience.veteranAttackCharges, 'unitExperience.veteranAttackCharges', 2);
+    if (!Number.isFinite(experience.regularAttackMultiplier) || experience.regularAttackMultiplier <= 0) {
+      errors.push('unitExperience.regularAttackMultiplier must be positive');
+    }
+    if (experience.regularAttackRounding !== 'ceil') errors.push('unitExperience.regularAttackRounding must be ceil');
   }
 
   const facilityTypes: FacilityType[] = [
@@ -614,6 +684,15 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       }
     }
     requireInteger(errors, horde.warningLeadTurns, 'horde.warningLeadTurns', 1);
+    requireInteger(errors, horde.riotZombieCapPerDirection, 'horde.riotZombieCapPerDirection', 0);
+    requireInteger(errors, horde.movementNoiseRadius, 'horde.movementNoiseRadius', 0);
+    for (const type of ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const) {
+      requireInteger(errors, horde.specialZombieWeights?.[type], `horde.specialZombieWeights.${type}`, 0);
+    }
+    if (horde.specialZombieWeights
+      && Object.values(horde.specialZombieWeights).reduce((sum, weight) => sum + weight, 0) <= 0) {
+      errors.push('horde.specialZombieWeights must have a positive total');
+    }
     const validateComposition = (composition: GameConfig['horde']['waves'][number]['compositionPerDirection'], path: string): void => {
       if (!composition || typeof composition !== 'object') {
         errors.push(`${path} is required`);
@@ -662,9 +741,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('infection is required');
   } else {
     requireInteger(errors, infection.facilitySpreadPerTurn, 'infection.facilitySpreadPerTurn', 0);
-    requireInteger(errors, infection.policeSuppression, 'infection.policeSuppression', 0);
-    requireInteger(errors, infection.nationalGuardSuppression, 'infection.nationalGuardSuppression', 0);
-    for (const key of ['fallBackInfectionRate', 'nationalGuardCivilianDamageRate'] as const) {
+    for (const key of ['fallBackInfectionRate'] as const) {
       if (!Number.isFinite(infection[key]) || infection[key] < 0 || infection[key] > 1) {
         errors.push(`infection.${key} must be between 0 and 1`);
       }
@@ -694,19 +771,6 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('constructibleFacility is required');
   } else {
     requireInteger(errors, constructibleFacility.limitPerTypeDivisor, 'constructibleFacility.limitPerTypeDivisor', 1);
-  }
-
-  const noise = config.noise;
-  if (!noise || typeof noise !== 'object') {
-    errors.push('noise is required');
-  } else {
-    requireInteger(errors, noise.police, 'noise.police', 0);
-    requireInteger(errors, noise.nationalGuard, 'noise.nationalGuard', 0);
-    for (const unitType of ['police', 'nationalGuard'] as const) {
-      if (!['small', 'medium', 'large', 'extraLarge'].includes(noise.publicClass?.[unitType])) {
-        errors.push(`noise.publicClass.${unitType} is invalid`);
-      }
-    }
   }
 
   const terrain = config.terrain;
@@ -776,4 +840,4 @@ export function assertValidGameConfig(config: GameConfig): void {
 }
 
 export const DEFAULT_GAME_CONFIG = DEFAULT_CONFIG;
-export const HUMAN_UNIT_TYPES: HumanUnitType[] = ['police', 'nationalGuard'];
+export const HUMAN_UNIT_TYPES: HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice'];

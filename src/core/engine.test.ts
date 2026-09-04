@@ -323,6 +323,7 @@ describe('GameEngine', () => {
     police.actionState = 'ready';
     police.canMove = true;
     police.canAttack = true;
+    police.attackChargesRemaining = police.maxAttackCharges;
     police.hp = 25;
     police.activity = { moved: false, attacked: false, intercepted: false, suppressed: false };
     expect(engine.step({ type: 'LoadSnapshot', snapshot: killSnapshot }).error).toBeNull();

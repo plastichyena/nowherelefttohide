@@ -8,7 +8,9 @@ import {
   GAME_RULES_VERSION,
   OBSERVATION_API_VERSION,
   SAVE_FORMAT_VERSION,
+  type CrisisReasonCode,
   type AgentApiInfo,
+  type CrisisSeverity,
 } from './types';
 import { cloneJson } from './action';
 
@@ -46,6 +48,40 @@ export function createAgentApiInfo(
   bridgeApiVersion = BRIDGE_API_VERSION,
 ): AgentApiInfo {
   const policies = config.refugees.policies;
+  const configRecord = config as unknown as Record<string, unknown>;
+  const units = config.units as unknown as Record<string, Record<string, unknown>>;
+  const policeUnit = units.police ?? {};
+  const nationalGuardUnit = units.nationalGuard ?? {};
+  const unitExperience = (configRecord.unitExperience && typeof configRecord.unitExperience === 'object'
+    ? configRecord.unitExperience
+    : {}) as Record<string, unknown>;
+  const getNumber = (record: Record<string, unknown> | undefined, key: string, fallback: number): number =>
+    typeof record?.[key] === 'number' && Number.isFinite(record[key]) ? record[key] as number : fallback;
+  const riotPolice = units.riotPolice ?? {};
+  const riotZombie = units.riotZombie ?? {};
+  // Production proficiency is a shared Unit Experience rule in v1.5. Keep
+  // API metadata sourced from the same map the Core uses when commissioning.
+  const productionProficiencyByType = (
+    unitExperience.productionProficiencyByType ?? {
+      police: 'recruit',
+      nationalGuard: 'recruit',
+      riotPolice: 'recruit',
+    }
+  ) as Record<string, string>;
+  const publicProficiency = (value: string): 'recruit' | 'regular' | 'veteran' =>
+    value === 'regular' || value === 'veteran' ? value : 'recruit';
+  const publicProductionProficiency = Object.fromEntries(
+    Object.entries(productionProficiencyByType).map(([key, value]) => [key, publicProficiency(value)]),
+  );
+  const crisisCategories: Record<CrisisReasonCode, { severity: CrisisSeverity; category: string }> = {
+    capital_infection_uncontained: { severity: 'critical', category: 'infection' },
+    critical_site_infection_uncontained: { severity: 'critical', category: 'infection' },
+    checkpoint_defense_degraded: { severity: 'critical', category: 'checkpoint_defense' },
+    unit_out_of_supply_risk: { severity: 'warning', category: 'unit_supply' },
+    horde_warning_active: { severity: 'advisory', category: 'horde' },
+    guaranteed_resource_defeat: { severity: 'critical', category: 'resources' },
+    new_state_loss: { severity: 'advisory', category: 'loss' },
+  };
   return cloneJson({
     appVersion: APP_VERSION,
     gameRulesVersion: GAME_RULES_VERSION,
@@ -83,11 +119,16 @@ export function createAgentApiInfo(
       'The fixed outer-ring Horde Spawn Reserve is public; Player units and Player placements cannot occupy it, while Zombies and attacks may use it under normal rules.',
       'Horde schedule, selected warning directions, and per-direction planned composition are public at the documented warning boundary; future unselected directions and hidden spawn details are not.',
       'Required facilities produce their standard output only when powered. Simple Farm is a power-free Food 5/worker redundancy and has no SetPowerSupply action.',
-      'Combat noise exposes only center, unit type, and public noise class. Police is Medium and National Guard is Large in the standard rules.',
+      'Combat and Horde movement Noise expose only public centers, unit type/class, and documented movement radius rules. Police/Riot Police are Medium, National Guard is Large, and Horde movement uses radius 8.',
       'Ground Vision uses deterministic hex-line LOS: Forest and Mountain are visible blockers and hide Hexes beyond them. Civilian Drone Base provides terrain-ignoring Aerial Vision.',
       'Public site events report infection onset, fall, requested/actual adjacent Spawn counts, remaining infected population, Noise outflow, and chain origin without hidden Zombie IDs or positions.',
       'importantSiteEvents repeats the latest 50 of those public site events in every Observation, including off-screen site coordinates and status facts.',
-      'The enemy list contains only currently visible Normal, Horde, Police, and Soldier Zombies; hidden enemies are omitted.',
+      'The enemy list contains only currently visible Normal, Horde, Police, Soldier, and Riot Zombies; hidden enemies are omitted.',
+      'Crisis Summary and EndTurn Risk are deterministic read-only projections of public State, Legal Actions, and Forecast; they never alter State or PRNG.',
+      'Human Units expose recruit/regular/veteran proficiency, survival and kill counters, Veteran promotion pending state, and shared Attack Charges.',
+      'Scheduled Horde special Zombie Types are not drawn until Spawn. Warning exposes only possible Types and non-Horde Slot count; actual visible members carry public Wave flags.',
+      'Riot Police is a police-family Unit for Capital/City production; Riot Zombie is a Normal AI enemy and never carries a Horde Strategic Anchor.',
+      'AI Portable Session Decision responses include a public State Delta derived from adjacent public Observations; ordinary Observation remains pure and delta-free.',
     ],
     prohibited: [
       'GameState, PRNG state, future random outcomes, hidden enemy positions/counts, and unspawned Horde size are not public.',
@@ -97,10 +138,57 @@ export function createAgentApiInfo(
       'Checkpoint candidates never reveal blocker unit IDs; hidden enemies do not block a candidate or change its reason code.',
       'Constructible candidates and actions use only visible Zombies. Hidden Zombies never make an otherwise legal Build candidate illegal.',
       'Before a Horde warning starts, its randomly selected directions are not public. Spawn coordinates, non-visible individual IDs, internal targets, and hidden metrics are never public.',
+      'Warning-time special Zombie Type draws are not public until the Wave is Spawned; exact Noise Radius and hidden Noise reactions remain private.',
       'LoadSnapshot, StartNewGame, SuppressInfection, arbitrary code, files, saves, localStorage, network, and Batch execution are not public actions.',
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
     rules: {
+      proficiency: {
+        values: ['recruit', 'regular', 'veteran'],
+        productionProficiencyByType: publicProductionProficiency,
+        recruitSurvivalTurnsRequired: getNumber(unitExperience, 'recruitSurvivalTurnsRequired', 5),
+        regularAttackMultiplier: getNumber(unitExperience, 'regularAttackMultiplier', 1.25),
+        regularAttackRounding: unitExperience.regularAttackRounding === 'floor' ? 'floor' : 'ceil',
+        veteranZombieKillsRequired: getNumber(unitExperience, 'veteranZombieKillsRequired', 5),
+        veteranAttackCharges: getNumber(unitExperience, 'veteranAttackCharges', 2),
+        killCreditTypes: ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as never,
+      },
+      crisis: {
+        severityOrder: ['critical', 'warning', 'advisory'],
+        reasonCodes: crisisCategories,
+        endTurnRiskFields: [
+          'readyUnits',
+          'unitsWithMoveRemaining',
+          'unitsWithAttackChargesRemaining',
+          'uncontainedInfectedSites',
+          'criticalAlerts',
+          'forecastGuaranteedDefeat',
+        ],
+        hiddenInformationExcluded: true,
+      },
+      riot: {
+        police: {
+          recruitAttack: getNumber(riotPolice, 'recruitAttack', 10),
+          hp: getNumber(riotPolice, 'hp', 75),
+          movement: getNumber(riotPolice, 'movement', 10),
+          range: getNumber(riotPolice, 'range', 1),
+          vision: getNumber(riotPolice, 'vision', 5),
+          population: getNumber(riotPolice, 'population', 10),
+        },
+        zombie: {
+          hp: getNumber(riotZombie, 'hp', 50),
+          attack: getNumber(riotZombie, 'attack', 5),
+          movement: getNumber(riotZombie, 'movement', 3),
+          range: getNumber(riotZombie, 'range', 1),
+          vision: getNumber(riotZombie, 'vision', 5),
+        },
+        productionFacilities: ['capital', 'city'],
+        productionCost: {
+          population: 10,
+          civilianGoods: getNumber(riotPolice, 'productionCivilianGoods', 25),
+          militaryGoods: getNumber(riotPolice, 'productionMilitaryGoods', 25),
+        },
+      },
       recovery: {
         combatRate: config.naturalRecovery.combatRate,
         restRate: config.naturalRecovery.restRate,
@@ -113,21 +201,23 @@ export function createAgentApiInfo(
       infection: {
         stationedUnitsContainSpread: true,
         automaticSuppressionTiming: 'infectionPhaseAfterEndTurn',
-        policeSuppression: config.infection.policeSuppression,
-        nationalGuardSuppression: config.infection.nationalGuardSuppression,
-        nationalGuardCivilianDamageFormula: `ceil(suppressionPower * ${config.infection.nationalGuardCivilianDamageRate})`,
+        policeSuppression: getNumber(policeUnit, 'recruitAttack', 4),
+        nationalGuardSuppression: getNumber(nationalGuardUnit, 'recruitAttack', 8),
+        nationalGuardCivilianDamageFormula: `ceil(suppressionPower * ${getNumber(nationalGuardUnit, 'suppressionCivilianDamageRate', 0.5)})`,
         zombieSpawnPopulationPerUnit: config.infection.zombieSpawnPopulationPerUnit,
         maxZombieSpawnPerResolution: config.infection.maxZombieSpawnPerResolution,
         zombieSpawnRadius: config.infection.zombieSpawnRadius,
         noiseRespawnEnabled: config.infection.noiseRespawnEnabled,
       },
       ranges: {
-        police: { baseRange: config.units.police.range },
-        nationalGuard: { baseRange: config.units.nationalGuard.range },
-        zombie: { baseRange: config.units.zombie.range },
-        hordeZombie: { baseRange: config.units.hordeZombie.range },
-        policeZombie: { baseRange: config.units.policeZombie.range },
-        soldierZombie: { baseRange: config.units.soldierZombie.range },
+        police: { baseRange: getNumber(policeUnit, 'range', 1) },
+        nationalGuard: { baseRange: getNumber(nationalGuardUnit, 'range', 2) },
+        zombie: { baseRange: getNumber(units.zombie, 'range', 1) },
+        hordeZombie: { baseRange: getNumber(units.hordeZombie, 'range', 1) },
+        policeZombie: { baseRange: getNumber(units.policeZombie, 'range', 1) },
+        soldierZombie: { baseRange: getNumber(units.soldierZombie, 'range', 1) },
+        riotPolice: { baseRange: getNumber(riotPolice, 'range', 1) },
+        riotZombie: { baseRange: getNumber(riotZombie, 'range', 1) },
       },
       terrain: {
         movementCost: cloneJson(config.terrain.movementCost),
@@ -170,13 +260,27 @@ export function createAgentApiInfo(
       },
       horde: {
         warningLeadTurns: config.horde.warningLeadTurns,
-        waves: config.horde.waves.map((wave, index) => ({
-          index: index + 1,
-          turn: wave.turn,
-          directionCount: wave.directionCount,
-          compositionPerDirection: cloneJson(wave.compositionPerDirection),
-          final: wave.final,
-        })),
+        waves: config.horde.waves.map((wave, index) => {
+          const waveRecord = wave as unknown as Record<string, unknown>;
+          const composition = waveRecord.compositionPerDirection as Record<string, unknown>;
+          const nonHordeSlots = getNumber(
+            waveRecord,
+            'nonHordeSlotCountPerDirection',
+            getNumber(composition, 'zombie', 0),
+          );
+          const possibleNonHordeTypes = Array.isArray(waveRecord.possibleNonHordeTypes)
+            ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
+            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'].filter((type) => Object.prototype.hasOwnProperty.call(units, type));
+          return {
+            index: index + 1,
+            turn: wave.turn,
+            directionCount: wave.directionCount,
+            compositionPerDirection: cloneJson(wave.compositionPerDirection),
+            nonHordeSlotCountPerDirection: nonHordeSlots,
+            possibleNonHordeTypes: possibleNonHordeTypes as never,
+            final: wave.final,
+          };
+        }),
         finalHordeTurn: config.horde.waves.find((wave) => wave.final)?.turn ?? 0,
         finalHordeTurnRule: 'Derived from the turn of the sole wave with final=true; it is not an independent Config field.',
         warningDirectionRule: 'Directions are selected independently at warning start, deduplicated, and normalized north/east/south/west.',
@@ -253,14 +357,17 @@ export function createAgentApiInfo(
         movementByType: {
           police: config.units.police.movement,
           nationalGuard: config.units.nationalGuard.movement,
+          riotPolice: getNumber(riotPolice, 'movement', 10),
         },
         maxFuelByType: {
           police: config.units.police.maxFuel,
           nationalGuard: config.units.nationalGuard.maxFuel,
+          riotPolice: getNumber(riotPolice, 'maxFuel', 12),
         },
         fuelCostFormulaByType: {
           police: 'distance 0: 0; 1..5: 1; >=6: 1 + (distance - 5)',
           nationalGuard: 'distance 0: 0; 1..5: 1; >=6: 1 + 2 * (distance - 5)',
+          riotPolice: 'distance 0: 0; 1..5: 1; >=6: 1 + (distance - 5)',
         },
         refuelTiming: 'after_power_before_production',
         refuelRequiresSupply: true,
@@ -268,6 +375,7 @@ export function createAgentApiInfo(
         emergencyMovementPointsByType: {
           police: config.units.police.emergencyMovementPoints,
           nationalGuard: config.units.nationalGuard.emergencyMovementPoints,
+          riotPolice: getNumber(riotPolice, 'emergencyMovementPoints', 2),
         },
         emergencyMovementTrigger: 'current_fuel_zero',
         emergencyMovementUsesEffectiveMovementCost: true,
@@ -276,22 +384,27 @@ export function createAgentApiInfo(
         maxByType: {
           police: config.units.police.maxMilitaryGoods,
           nationalGuard: config.units.nationalGuard.maxMilitaryGoods,
+          riotPolice: getNumber(riotPolice, 'maxMilitaryGoods', 5),
         },
         fixedUpkeepByType: {
           police: config.units.police.fixedMilitaryGoodsUpkeepPerTurn,
           nationalGuard: config.units.nationalGuard.fixedMilitaryGoodsUpkeepPerTurn,
+          riotPolice: getNumber(riotPolice, 'fixedMilitaryGoodsUpkeepPerTurn', 0),
         },
         attackCostByRange: {
           police: cloneJson(config.units.police.attackMilitaryGoodsCostByRange),
           nationalGuard: cloneJson(config.units.nationalGuard.attackMilitaryGoodsCostByRange),
+          riotPolice: cloneJson(riotPolice.attackMilitaryGoodsCostByRange ?? { 1: 1 }) as never,
         },
         suppressionCostByType: {
           police: config.units.police.suppressionMilitaryGoodsCost,
           nationalGuard: config.units.nationalGuard.suppressionMilitaryGoodsCost,
+          riotPolice: getNumber(riotPolice, 'suppressionMilitaryGoodsCost', 1),
         },
         shortageAttackMultiplierByType: {
           police: config.units.police.militaryGoodsShortageAttackMultiplier,
           nationalGuard: config.units.nationalGuard.militaryGoodsShortageAttackMultiplier,
+          riotPolice: getNumber(riotPolice, 'militaryGoodsShortageAttackMultiplier', 0.2),
         },
         refillTiming: 'after_military_factory_production_before_suppression',
         refillRequiresSupply: true,
@@ -349,8 +462,10 @@ export function createAgentApiInfo(
       },
       noise: {
         classes: ['small', 'medium', 'large', 'extraLarge'],
-        policeClass: config.noise.publicClass.police,
-        nationalGuardClass: config.noise.publicClass.nationalGuard,
+        policeClass: (policeUnit.noiseClass as 'small' | 'medium' | 'large' | 'extraLarge' | undefined) ?? 'medium',
+        nationalGuardClass: (nationalGuardUnit.noiseClass as 'small' | 'medium' | 'large' | 'extraLarge' | undefined) ?? 'large',
+        riotPoliceClass: (riotPolice.noiseClass as 'small' | 'medium' | 'large' | 'extraLarge' | undefined) ?? 'medium',
+        hordeMovementNoiseRadius: config.horde.movementNoiseRadius,
         distance: 'hex',
         terrainAttenuation: false,
         normalZombieAffected: true,

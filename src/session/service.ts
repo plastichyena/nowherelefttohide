@@ -3,6 +3,7 @@ import type { GameAction, GameConfig, JsonValue } from '../core/types';
 import { cloneAction, cloneJson } from '../agent/action';
 import { compactArtifactObservation, restoreArtifactObservation } from '../agent/observation';
 import { collectGameMetrics } from '../agent/metrics';
+import type { AgentObservation, AgentPublicEvent } from '../agent/types';
 import { HIDDEN_NOISE_METRIC_KEYS, HIDDEN_REJECTED_REFUGEE_METRIC_KEYS } from '../agent/types';
 import {
   assertSafeIdentifier,
@@ -36,6 +37,7 @@ import {
   type SessionStatusResult,
   type SessionStepInput,
   type SessionStepResult,
+  type SessionStateDelta,
   type SessionVersionIdentity,
 } from './types';
 
@@ -109,6 +111,109 @@ function statusResult(loaded: LoadedSession, sessionMetrics: SessionMetrics): Se
     gameOver: loaded.publicState.gameOver,
     result: clone(loaded.publicState.result),
     sessionMetrics: clone(sessionMetrics),
+  };
+}
+
+function sortedUnique(values: Iterable<string>): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function siteRecords(observation: AgentObservation): Array<{ id: string; infected: number; status: string }> {
+  return [
+    ...observation.facilities.map((facility) => ({
+      id: facility.id,
+      infected: facility.infectedPopulation,
+      status: facility.status,
+    })),
+    ...observation.checkpoints.map((checkpoint) => ({
+      id: checkpoint.id,
+      infected: checkpoint.infected,
+      status: checkpoint.status,
+    })),
+  ];
+}
+
+/**
+ * Derive the v1.5 public State Delta without reading private GameState. The
+ * explicit event guard for lost enemies prevents a visibility transition from
+ * being misreported as a kill (and therefore avoids leaking hidden enemies).
+ */
+export function deriveSessionStateDelta(
+  before: AgentObservation,
+  after: AgentObservation,
+  events: readonly AgentPublicEvent[] = [],
+): SessionStateDelta {
+  const beforeSites = new Map(siteRecords(before).map((site) => [site.id, site] as const));
+  const afterSites = new Map(siteRecords(after).map((site) => [site.id, site] as const));
+  const newlyInfectedSites = sortedUnique(
+    [...afterSites.values()]
+      .filter((site) => site.infected > 0 && (beforeSites.get(site.id)?.infected ?? 0) <= 0)
+      .map((site) => site.id),
+  );
+  const newlyRuinedSites = sortedUnique(
+    [...afterSites.values()]
+      .filter((site) => ['ruined', 'abandoned'].includes(site.status) && !['ruined', 'abandoned'].includes(beforeSites.get(site.id)?.status ?? ''))
+      .map((site) => site.id),
+  );
+
+  const beforeEnemyIds = new Set(before.zombies.map((unit) => unit.id));
+  const afterEnemyIds = new Set(after.zombies.map((unit) => unit.id));
+  const newlySpottedEnemies = sortedUnique([...afterEnemyIds].filter((id) => !beforeEnemyIds.has(id)));
+  const publicLostEnemyIds = events
+    .filter((event) => event.type === 'enemy_lost' || event.type === 'unit_destroyed')
+    .flatMap((event) => {
+      const payload = event.payload as Record<string, unknown>;
+      const candidate = [payload.zombieId, payload.unitId, payload.id].find((value): value is string => typeof value === 'string');
+      return candidate ? [candidate] : [];
+    });
+  const lostEnemies = sortedUnique(publicLostEnemyIds.filter((id) => beforeEnemyIds.has(id) && !afterEnemyIds.has(id)));
+
+  const beforeUnits = new Map(before.units.map((unit) => [unit.id, unit] as const));
+  const afterUnits = new Map(after.units.map((unit) => [unit.id, unit] as const));
+  const unitHpChanges = [...afterUnits.values()]
+    .filter((unit) => {
+      const previous = beforeUnits.get(unit.id);
+      return previous !== undefined && previous.hp !== unit.hp;
+    })
+    .map((unit) => ({ unitId: unit.id, before: beforeUnits.get(unit.id)!.hp, after: unit.hp }))
+    .sort((left, right) => left.unitId.localeCompare(right.unitId));
+  const unitSupplyChanges = [...afterUnits.values()]
+    .filter((unit) => {
+      const previous = beforeUnits.get(unit.id);
+      return previous !== undefined && (
+        previous.currentFuel !== unit.currentFuel ||
+        previous.currentMilitaryGoods !== unit.currentMilitaryGoods
+      );
+    })
+    .map((unit) => {
+      const previous = beforeUnits.get(unit.id)!;
+      return {
+        unitId: unit.id,
+        beforeFuel: previous.currentFuel,
+        afterFuel: unit.currentFuel,
+        beforeMilitaryGoods: previous.currentMilitaryGoods,
+        afterMilitaryGoods: unit.currentMilitaryGoods,
+      };
+    })
+    .sort((left, right) => left.unitId.localeCompare(right.unitId));
+  const beforeCheckpoints = new Map(before.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint] as const));
+  const checkpointRoleChanges = after.checkpoints
+    .filter((checkpoint) => beforeCheckpoints.get(checkpoint.id)?.role !== checkpoint.role)
+    .map((checkpoint) => ({
+      checkpointId: checkpoint.id,
+      before: beforeCheckpoints.get(checkpoint.id)?.role ?? 'unknown',
+      after: checkpoint.role,
+    }))
+    .sort((left, right) => left.checkpointId.localeCompare(right.checkpointId));
+
+  return {
+    newlyInfectedSites,
+    newlyRuinedSites,
+    newlySpottedEnemies,
+    lostEnemies,
+    unitHpChanges,
+    unitSupplyChanges,
+    checkpointRoleChanges,
   };
 }
 
@@ -212,6 +317,7 @@ export class SessionService {
           throw new SessionError('rejected_action_mutated_state', 'Rejected Action changed Private State or RNG');
         }
         const afterObservation = clone(result.observation);
+        const stateDelta = deriveSessionStateDelta(beforeObservation, afterObservation, result.events);
         const decisionWithoutHash = {
           decision: loaded.active.decision + 1,
           turn: beforeObservation.turn,
@@ -223,6 +329,7 @@ export class SessionService {
           accepted,
           error: clone(result.error),
           events: clone(result.events),
+          stateDelta,
           observationAfter: compactArtifactObservation(afterObservation),
           previousDecisionHash: loaded.active.traceHeadHash,
         } satisfies Omit<PublicDecisionRecord, 'decisionHash'>;
@@ -252,6 +359,7 @@ export class SessionService {
           accepted,
           error: clone(result.error),
           events: clone(result.events),
+          stateDelta: clone(stateDelta),
           decisionRecord: clone(record),
           checkpointsCreated,
         };
@@ -428,7 +536,7 @@ export class SessionService {
 
   private assertDescriptorCompatible(descriptor: SessionDescriptor): void {
     for (const field of [
-      'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion',
+      'appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion',
       'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit', 'mapId',
     ] as const) {
       if (descriptor[field] !== this.identity[field]) {

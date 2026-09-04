@@ -106,8 +106,21 @@ function publicMetrics(metrics: ReturnType<typeof collectGameMetrics>): AgentPub
 /** Public AgentGame artifacts expose Noise classes, never exact radii. */
 export function createAgentPublicConfig(config: GameConfig): AgentPublicConfig {
   const value = cloneJson(config) as unknown as Record<string, unknown>;
-  const noise = isPlainObject(value.noise) ? value.noise : {};
-  value.noise = { publicClass: cloneJson(noise.publicClass as JsonValue) };
+  const noise = isPlainObject(value.noise) ? value.noise : null;
+  // Keep the public class contract while stripping all exact unit-radius
+  // diagnostics, including future aliases added to the Config. Horde movement
+  // radius is documented separately as a public rule, so it is not copied from
+  // this private Noise object. v1.5 stores unit Noise classes on each Human
+  // Unit Config; v1.4's top-level object is retained only when supplied by an
+  // older compatibility snapshot.
+  if (noise) value.noise = { publicClass: cloneJson(noise.publicClass as JsonValue) };
+  else delete value.noise;
+  if (isPlainObject(value.units)) {
+    for (const unit of Object.values(value.units)) {
+      if (!isPlainObject(unit)) continue;
+      for (const key of ['noiseRadius', 'combatNoiseRadius', 'noiseRadiusByType', 'exactNoiseRadius']) delete unit[key];
+    }
+  }
   return value as unknown as AgentPublicConfig;
 }
 
@@ -158,6 +171,13 @@ function publicEvents(
   );
   return events
     .filter((event) => !INTERNAL_EVENT_TYPES.has(event.type))
+    // Core emits one private bookkeeping event per placed Horde unit and a
+    // single aggregate event for the wave. Only the aggregate is a public
+    // decision-log fact; exposing the per-unit events would duplicate the
+    // wave, leak the internal placement order, and make one spawn appear as
+    // several public Horde events.
+    .filter((event) => !(event.type === 'horde_spawned' &&
+      isPlainObject(event.payload) && typeof event.payload.zombieId === 'string'))
     .map((event) => {
       let payload = cloneJson(event.payload) as JsonObject;
       if (SITE_PUBLIC_EVENT_TYPES.has(event.type)) {
@@ -182,19 +202,75 @@ function publicEvents(
             direction === 'north' || direction === 'east' || direction === 'south' || direction === 'west',
           )
           : [];
-        // An internal bonus is deliberately not observable. Rebuild the whole
-        // payload from the fixed public Wave schedule, not from spawn counts.
-        if (!wave || directions.length === 0) return null;
-        payload = {
-          hordeKind: wave.final ? 'final' : 'periodic',
-          waveIndex,
-          spawnTurn: wave.turn,
-          final: wave.final,
-          directions,
-          compositionPerDirection: cloneJson(wave.compositionPerDirection) as unknown as JsonValue,
-          hordeZombieCount: directions.length * wave.compositionPerDirection.hordeZombie,
-          normalZombieCount: directions.length * wave.compositionPerDirection.zombie,
-        };
+        // An internal bonus and exact hidden placement are deliberately not
+        // observable. Rebuild the payload from the fixed public Wave schedule,
+        // not from spawn counts. A malformed/internal event is still retained
+        // as a safe fact rather than dropped (dropping it changes the public
+        // event sequence and can make Session hashes diverge).
+        if (wave && directions.length > 0) {
+          const waveRecord = wave as unknown as Record<string, unknown>;
+          const composition = waveRecord.compositionPerDirection as Record<string, unknown>;
+          const slotValue = waveRecord.nonHordeSlotCountPerDirection
+            ?? waveRecord.nonHordeSlotsPerDirection
+            ?? composition.zombie;
+          const nonHordeSlotCountPerDirection = typeof slotValue === 'number' && Number.isSafeInteger(slotValue)
+            ? slotValue
+            : 0;
+          const possibleNonHordeTypes = Array.isArray(waveRecord.possibleNonHordeTypes)
+            ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
+            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'];
+          payload = {
+            hordeKind: wave.final ? 'final' : 'periodic',
+            waveIndex,
+            spawnTurn: wave.turn,
+            final: wave.final,
+            directions,
+            compositionPerDirection: cloneJson(wave.compositionPerDirection) as unknown as JsonValue,
+            hordeZombieCount: directions.length * wave.compositionPerDirection.hordeZombie,
+            normalZombieCount: directions.length * (nonHordeSlotCountPerDirection || wave.compositionPerDirection.zombie),
+            nonHordeSlotCountPerDirection,
+            possibleNonHordeTypes,
+          };
+        } else {
+          payload = {
+            waveIndex: waveIndex ?? null,
+            spawnTurn: typeof payload.spawnTurn === 'number' ? payload.spawnTurn : null,
+            final: payload.final === true,
+            directions,
+          };
+        }
+      }
+      if (event.type === 'horde_warning') {
+        const waveIndex = typeof payload.waveIndex === 'number' && Number.isSafeInteger(payload.waveIndex)
+          ? payload.waveIndex
+          : null;
+        const wave = waveIndex === null ? undefined : after.config.horde.waves[waveIndex - 1];
+        const waveRecord = wave as unknown as Record<string, unknown> | undefined;
+        const composition = (waveRecord?.compositionPerDirection && typeof waveRecord.compositionPerDirection === 'object'
+          ? waveRecord.compositionPerDirection
+          : {}) as Record<string, unknown>;
+        const directions = Array.isArray(payload.directions)
+          ? payload.directions.filter((direction): direction is 'north' | 'east' | 'south' | 'west' =>
+            direction === 'north' || direction === 'east' || direction === 'south' || direction === 'west')
+          : [];
+        const possibleNonHordeTypes = Array.isArray(waveRecord?.possibleNonHordeTypes)
+          ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
+          : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'];
+        if (wave && directions.length > 0) {
+          const slotValue = waveRecord?.nonHordeSlotCountPerDirection ?? waveRecord?.nonHordeSlotsPerDirection ?? composition.zombie;
+          const nonHordeSlotCountPerDirection = typeof slotValue === 'number' && Number.isSafeInteger(slotValue)
+            ? slotValue
+            : 0;
+          payload = {
+            waveIndex,
+            spawnTurn: wave.turn,
+            directions,
+            hordeZombieCountPerDirection: wave.compositionPerDirection.hordeZombie,
+            nonHordeSlotCountPerDirection,
+            possibleNonHordeTypes,
+            final: wave.final,
+          };
+        }
       }
       if (event.type === 'checkpoint_refugees_turned_away') {
         // The fact of rejection is player-visible, but neither direction nor

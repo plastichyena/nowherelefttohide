@@ -45,8 +45,8 @@ function siteEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.4.5');
-    expect(titleVersionLabel('en')).toContain('1.4.5');
+    expect(titleVersionLabel('ja')).toContain('1.5.0');
+    expect(titleVersionLabel('en')).toContain('1.5.0');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -167,26 +167,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.4.4-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.4.5-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.4以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.5以前');
     expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.5');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.4 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.5 or earlier');
     expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.5');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 2.5.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 9');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 2.5.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 9');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 3.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 10');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 3.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 10');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.4.4以前' : 'v1.4.4 or earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5 or earlier');
     }
   });
 
@@ -482,6 +482,7 @@ describe('controller view models', () => {
         distance: 1,
         militaryGoodsCost: 0,
         projectedMilitaryGoodsAfterAttack: 0,
+        projectedAttackChargesRemaining: 0,
         effectiveAttack: 1,
         projectedDamageBeforeTerrain: 1,
         projectedDamageAfterTerrain: 1,
@@ -508,6 +509,7 @@ describe('controller view models', () => {
       'tipMilitaryGoods', 'tipEmergencyMovement', 'carriedMilitaryGoods', 'emergencyMovement',
       'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'recoveryTiming', 'effectiveRange', 'projectedSuppression', 'powerRequirement', 'projectedPower', 'lastPowerSupplied', 'productionMultiplier', 'policyTradeoff', 'migratedSaveNotice', 'migrationSaveError',
       'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipDecommission',
+      'tipRiotPolice', 'tipProficiency', 'tipCrisis',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);

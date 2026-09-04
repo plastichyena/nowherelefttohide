@@ -134,6 +134,12 @@ function primaryGoal(
   const forecastCivilianLoss = observation.endTurnForecast.food.shortage + observation.endTurnForecast.civilianGoods.shortage;
   if (forecastCivilianLoss >= observation.population.healthyCivilians) return 'avoid_defeat';
   if (threats.some((threat) => threat.contactNextTurn)) return 'prevent_facility_contact';
+  // Crisis Summary is a deterministic public index, not a recommendation.
+  // Use it to keep an important-site infection above a merely opportunistic
+  // combat action while retaining the immediate-contact guard above.
+  if (observation.crisisSummary?.alerts.some((alert) =>
+    alert.severity === 'critical' && alert.category === 'infection',
+  )) return 'rescue_critical_infection';
   if (observation.facilities.some((facility) => facility.infectedPopulation > 0 && isCriticalFacility(facility.id, observation))) {
     return 'rescue_critical_infection';
   }
@@ -235,6 +241,20 @@ function scoreAction(
   );
   const highQueueCheckpoints = observation.checkpoints.filter((checkpoint) => checkpoint.queuePressureClass === 'high');
   const guaranteedDefeat = observation.strategicForecast.guaranteedDefeat.guaranteed;
+  const criticalInfectionAlert = observation.crisisSummary?.alerts.some((alert) =>
+    alert.severity === 'critical' && alert.category === 'infection',
+  ) ?? false;
+
+  const usableAttackCharges = observation.endTurnRisk?.unitsWithAttackChargesRemaining.filter((unit) =>
+    unit.legalAttackTargetIds.length > 0 || unit.suppressionTargetId !== null,
+  ) ?? [];
+  if (action.type === 'EndTurn' && usableAttackCharges.length > 0) {
+    // EndTurn remains legal, but a public risk reminder makes an unused charge
+    // an explicit trade-off for the chooser.  Do not let this override defeat
+    // prevention or an already-committed final-wave response.
+    score -= weights.attack * Math.min(3, usableAttackCharges.length);
+    reasonCodes.push('UNUSED_ATTACK_CHARGE_RISK');
+  }
 
   if (guaranteedDefeat) {
     if (
@@ -256,14 +276,18 @@ function scoreAction(
     const threat = threatByZombie.get(action.targetId);
     score += weights.attack;
     reasonCodes.push('ATTACK_THREAT');
+    if (criticalInfectionAlert && goal === 'rescue_critical_infection') {
+      score -= weights.criticalFacilityDefense * 0.4;
+      reasonCodes.push('CRITICAL_INFECTION_BEATS_LOCAL_COMBAT');
+    }
     const publishedPreview = attacker?.attackPreviews.find((preview) => preview.targetUnitId === action.targetId);
     const attackDistance = attacker && target ? hexDistance(attacker.position, target.position) : 0;
     const fallbackCost = attacker?.attackMilitaryGoodsCostByRange[attackDistance] ?? 0;
     const fallbackEffectiveAttack = attacker
       ? attacker.currentMilitaryGoods >= fallbackCost
-        ? attacker.attack
+          ? attacker.effectiveAttack
         : attackDistance === 1
-          ? Math.max(1, Math.ceil(attacker.attack * 0.2))
+          ? Math.max(1, Math.ceil(attacker.effectiveAttack * 0.2))
           : 0
       : 0;
     const attackMilitaryGoodsCost = publishedPreview?.militaryGoodsCost ?? fallbackCost;
@@ -273,7 +297,11 @@ function scoreAction(
     if (attacker) {
       score -= attackMilitaryGoodsCost * 8;
       if (attackMilitaryGoodsCost > 0) reasonCodes.push('PRESERVE_CARRIED_MILITARY_GOODS');
-      if (attackEffectiveAttack < attacker.attack) reasonCodes.push('MILITARY_GOODS_ZERO_WEAK_ATTACK');
+      if (attackEffectiveAttack < attacker.effectiveAttack) reasonCodes.push('MILITARY_GOODS_ZERO_WEAK_ATTACK');
+      if (attacker.proficiency === 'veteran') {
+        score += weights.criticalFacilityDefense * 0.2;
+        reasonCodes.push('PRESERVE_VETERAN_UNIT');
+      }
     }
     if (attacker && target && projectedDamage >= target.hp) {
       score += weights.lethalAttack;
@@ -306,9 +334,9 @@ function scoreAction(
       }
       if (attacker.rangeModifierReason === 'carried_military_goods_shortage') reasonCodes.push('CARRIED_MILITARY_GOODS_RANGE_REDUCED');
     }
-    if (attacker?.type === 'police' && !threat?.threatensCapital) {
+    if ((attacker?.type === 'police' || attacker?.type === 'riotPolice') && !threat?.threatensCapital) {
       score -= weights.policePreservation;
-      reasonCodes.push('PRESERVE_POLICE_FOR_SUPPRESSION');
+      reasonCodes.push(attacker.type === 'riotPolice' ? 'PRESERVE_RIOT_FOR_SUPPRESSION' : 'PRESERVE_POLICE_FOR_SUPPRESSION');
     }
     if (attacker && target) {
       const urgentCombat = Boolean(threat?.contactNextTurn || threat?.threatensCriticalFacility || threat?.threatensCapital);
@@ -351,7 +379,7 @@ function scoreAction(
         hexDistance(attacker.position, zombie.position) <= zombie.movement + zombie.effectiveRange,
       ).length;
       if (followUpThreats > 0) {
-        const exposureWeight = attacker.type === 'police'
+        const exposureWeight = attacker.type === 'police' || attacker.type === 'riotPolice'
           ? weights.policePreservation * 2.5
           : weights.criticalFacilityDefense;
         score -= followUpThreats * exposureWeight;
@@ -550,9 +578,9 @@ function scoreAction(
           if (distance > effectiveRange) return false;
           const militaryGoodsCost = unit.attackMilitaryGoodsCostByRange[distance] ?? Number.POSITIVE_INFINITY;
           const effectiveAttack = unit.currentMilitaryGoods >= militaryGoodsCost
-            ? unit.attack
+            ? unit.effectiveAttack
             : distance === 1
-              ? Math.max(1, Math.ceil(unit.attack * 0.2))
+              ? Math.max(1, Math.ceil(unit.effectiveAttack * 0.2))
               : 0;
           return Math.max(1, Math.ceil(effectiveAttack * zombie.terrainDamageMultiplier)) >= zombie.hp;
         })(),
@@ -596,7 +624,7 @@ function scoreAction(
           const after = hexDistance(action.destination, zombie.position);
           const firingProgress = Math.max(0, before - effectiveRange) - Math.max(0, after - effectiveRange);
           let denial = firingProgress * weights.contactDenial;
-          if (after <= effectiveRange && unit.attack >= zombie.hp) {
+          if (after <= effectiveRange && unit.effectiveAttack >= zombie.hp) {
             denial += threat.score + weights.safeGuardShot;
             if (after > zombie.effectiveRange) denial += weights.safeGuardShot;
           }
@@ -610,9 +638,18 @@ function scoreAction(
       }
       if (infected.length > 0) {
         const progress = nearestDistance(unit.position, infected) - nearestDistance(action.destination, infected);
-        const roleMultiplier = unit.type === 'police' ? 1.5 : 0.6;
+        const policeFamily = unit.type === 'police' || unit.type === 'riotPolice';
+        const roleMultiplier = policeFamily ? 1.5 : 0.6;
         score += progress * weights.suppression * roleMultiplier;
-        if (progress > 0) reasonCodes.push(unit.type === 'police' ? 'POLICE_RESPOND_TO_INFECTION' : 'APPROACH_INFECTION');
+        if (progress > 0) {
+          // Keep the established reason code for Police while giving the new
+          // Riot Police family its own explicit explanation.
+          reasonCodes.push(unit.type === 'riotPolice'
+            ? 'RIOT_POLICE_RESPOND_TO_INFECTION'
+            : unit.type === 'police'
+              ? 'POLICE_RESPOND_TO_INFECTION'
+              : 'APPROACH_INFECTION');
+        }
       } else if (unowned.length > 0 && urgentThreats.length === 0 && !urgentHorde) {
         let bestExpansion = Number.NEGATIVE_INFINITY;
         let bestTarget: typeof unowned[number] | undefined;
@@ -637,9 +674,9 @@ function scoreAction(
         }
       }
       const capitalEmergency = urgentThreats.some((threat) => threat.threatensCapital);
-      if (unit.type === 'police' && infected.length === 0 && !capitalEmergency && afterZombie < beforeZombie) {
+      if ((unit.type === 'police' || unit.type === 'riotPolice') && infected.length === 0 && !capitalEmergency && afterZombie < beforeZombie) {
         score -= weights.policePreservation;
-        reasonCodes.push('PRESERVE_POLICE_FOR_SUPPRESSION');
+        reasonCodes.push(unit.type === 'riotPolice' ? 'PRESERVE_RIOT_FOR_SUPPRESSION' : 'PRESERVE_POLICE_FOR_SUPPRESSION');
       }
       if (urgentHorde && urgentThreats.length === 0) {
         const entrances = hordeEntrancePositions(observation);
@@ -660,14 +697,16 @@ function scoreAction(
         }
       }
       if (followUpExposure > 0) {
-        const exposureWeight = unit.type === 'police' ? weights.policePreservation : weights.criticalFacilityDefense;
+        const exposureWeight = unit.type === 'police' || unit.type === 'riotPolice'
+          ? weights.policePreservation
+          : weights.criticalFacilityDefense;
         const healthMultiplier = unit.hp / unit.maxHp < 0.7 ? 1.5 : 1;
         score -= followUpExposure * exposureWeight * healthMultiplier;
         reasonCodes.push('AVOID_MULTI_ZOMBIE_EXPOSURE');
       }
-      if (unit.type === 'police' && zombiesReachingDestination > 0 && infected.length === 0 && !capitalEmergency) {
+      if ((unit.type === 'police' || unit.type === 'riotPolice') && zombiesReachingDestination > 0 && infected.length === 0 && !capitalEmergency) {
         score -= zombiesReachingDestination * weights.policePreservation;
-        reasonCodes.push('KEEP_POLICE_BEHIND_CONTACT_LINE');
+        reasonCodes.push(unit.type === 'riotPolice' ? 'KEEP_RIOT_BEHIND_CONTACT_LINE' : 'KEEP_POLICE_BEHIND_CONTACT_LINE');
       }
       const safeGuardPosition = unit.type === 'nationalGuard' && afterZombie <= effectiveRange && afterZombie > 1;
       if (unit.hp / unit.maxHp < BALANCED_THRESHOLDS.lowHpRatio && afterZombie <= 2 && !safeGuardPosition) {
@@ -695,13 +734,21 @@ function scoreAction(
     }
   } else if (action.type === 'Wait') {
     const unit = units.get(action.unitId);
+    // Wait is only a meaningful player-phase action for an uncommitted unit.
+    // The legal-action generator omits it after a unit has acted, but keeping
+    // this guard makes the chooser robust to stale or externally supplied
+    // action lists as well.
+    if (unit?.actionState === 'acted') {
+      score -= 10_000;
+      reasonCodes.push('WAIT_ALREADY_COMMITTED');
+    }
     if (unit?.suppressionAvailableIfTurnEndsNow) {
       const facility = unit.suppressionTargetId ? facilities.get(unit.suppressionTargetId) : undefined;
       score += weights.suppression + (facility?.infectedPopulation ?? 0) * 3;
       reasonCodes.push('AUTOMATIC_SUPPRESSION_READY');
-      if (unit.type === 'police') {
+      if (unit.type === 'police' || unit.type === 'riotPolice') {
         score += 45;
-        reasonCodes.push('PREFER_POLICE_SUPPRESSION');
+        reasonCodes.push(unit.type === 'riotPolice' ? 'PREFER_RIOT_SUPPRESSION' : 'PREFER_POLICE_SUPPRESSION');
       } else if (unit.suppressionCivilianDamage > 0) {
         score -= unit.suppressionCivilianDamage * 30;
         reasonCodes.push('AVOID_SUPPRESSION_CIVILIAN_DAMAGE');
@@ -720,9 +767,10 @@ function scoreAction(
       score -= weights.recoveryWait;
       reasonCodes.push('RECOVERY_OUT_OF_SUPPLY');
     }
-    if (unit?.type === 'police' && observation.population.infected === 0 && !urgentThreats.some((threat) => threat.threatensCapital)) {
+    if ((unit?.type === 'police' || unit?.type === 'riotPolice') && unit.inSupply && unit.hp === unit.maxHp
+      && observation.population.infected === 0 && !urgentThreats.some((threat) => threat.threatensCapital)) {
       score += weights.policePreservation * 0.35;
-      reasonCodes.push('HOLD_POLICE_IN_RESERVE');
+      reasonCodes.push(unit.type === 'riotPolice' ? 'HOLD_RIOT_IN_RESERVE' : 'HOLD_POLICE_IN_RESERVE');
     }
     if (
       unit?.terrainDefenseSource === 'urban' &&
@@ -758,15 +806,16 @@ function scoreAction(
         reasonCodes.push('RECRUIT_IN_SUPPLIED_CITY');
       }
     }
-    if (action.unitType === 'police' && observation.population.infected > 0) {
+    if ((action.unitType === 'police' || action.unitType === 'riotPolice') && observation.population.infected > 0) {
       score += 60;
-      reasonCodes.push('PRODUCE_SUPPRESSION_UNIT');
+      reasonCodes.push(action.unitType === 'riotPolice' ? 'PRODUCE_RIOT_SUPPRESSION_UNIT' : 'PRODUCE_SUPPRESSION_UNIT');
     }
     if (action.unitType === 'nationalGuard' && (urgentHorde || urgentThreats.length > 0)) {
       score += weights.safeGuardShot;
       reasonCodes.push('PRODUCE_CONTACT_DENIAL_UNIT');
     }
     const guardCount = observation.units.filter((unit) => unit.type === 'nationalGuard').length;
+    const riotCount = observation.units.filter((unit) => unit.type === 'riotPolice').length;
     if (
       action.unitType === 'nationalGuard' &&
       guardCount < 2 &&
@@ -774,6 +823,10 @@ function scoreAction(
     ) {
       score += weights.contactDenial * 1.5;
       reasonCodes.push('BUILD_SECOND_CONTACT_DENIAL_UNIT');
+    }
+    if (action.unitType === 'riotPolice' && riotCount < 2 && observation.population.infected > 0) {
+      score += weights.suppression * 1.25;
+      reasonCodes.push('BUILD_RIOT_BLOCKADE_RESERVE');
     }
     const productionCost = action.unitType === 'police' ? 10 : 25;
     const projectedFixedUpkeep = action.unitType === 'police' ? 0 : 1;
@@ -997,14 +1050,16 @@ export class BalancedAgent implements GameAgent {
       if (action.type === 'Attack') return urgentThreatIds.has(action.targetId);
       if (action.type !== 'Move') return false;
       const unit = observation.units.find((candidate) => candidate.id === action.unitId);
-      return unit?.type === 'nationalGuard' || threats.some((threat) => threat.contactNextTurn && threat.threatensCapital);
+      return unit?.type === 'nationalGuard' || unit?.type === 'riotPolice'
+        || threats.some((threat) => threat.contactNextTurn && threat.threatensCapital);
     });
     const canRespondToInfection = legalActions.some((action) => {
       if (action.type === 'Wait') {
         return observation.units.find((unit) => unit.id === action.unitId)?.suppressionAvailableIfTurnEndsNow === true;
       }
       if (action.type !== 'Move') return false;
-      return observation.units.find((unit) => unit.id === action.unitId)?.type === 'police';
+      const type = observation.units.find((unit) => unit.id === action.unitId)?.type;
+      return type === 'police' || type === 'riotPolice';
     });
     let candidates = sortActions(legalActions).map((action) => scoreAction(
       action,

@@ -54,7 +54,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('6.1.0');
+    expect(run.metrics.bridgeApiVersion).toBe('7.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -250,22 +250,22 @@ describe('Agent Metrics', () => {
       agent: { id: 'v141-metrics-test', version: '1' },
       config,
     });
-    expect(metrics.fixedMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 1 });
-    expect(metrics.attackMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 2 });
-    expect(metrics.counterattackMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 1 });
-    expect(metrics.interceptionMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 2 });
-    expect(metrics.suppressionMilitaryGoodsConsumedByType).toEqual({ police: 1, nationalGuard: 0 });
-    expect(metrics.militaryGoodsRefilledByType).toEqual({ police: 4, nationalGuard: 0 });
-    expect(metrics.unfilledMilitaryGoodsRefillByType).toEqual({ police: 3, nationalGuard: 0 });
-    expect(metrics.militaryGoodsLostOnDestructionByType).toEqual({ police: 3, nationalGuard: 0 });
-    expect(metrics.zeroMilitaryGoodsWeakAttacksByType).toEqual({ police: 1, nationalGuard: 0 });
+    expect(metrics.fixedMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 1, riotPolice: 0 });
+    expect(metrics.attackMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 2, riotPolice: 0 });
+    expect(metrics.counterattackMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 1, riotPolice: 0 });
+    expect(metrics.interceptionMilitaryGoodsConsumedByType).toEqual({ police: 0, nationalGuard: 2, riotPolice: 0 });
+    expect(metrics.suppressionMilitaryGoodsConsumedByType).toEqual({ police: 1, nationalGuard: 0, riotPolice: 0 });
+    expect(metrics.militaryGoodsRefilledByType).toEqual({ police: 4, nationalGuard: 0, riotPolice: 0 });
+    expect(metrics.unfilledMilitaryGoodsRefillByType).toEqual({ police: 3, nationalGuard: 0, riotPolice: 0 });
+    expect(metrics.militaryGoodsLostOnDestructionByType).toEqual({ police: 3, nationalGuard: 0, riotPolice: 0 });
+    expect(metrics.zeroMilitaryGoodsWeakAttacksByType).toEqual({ police: 1, nationalGuard: 0, riotPolice: 0 });
     expect(metrics.nationalGuardAttacksByRange).toEqual({ range1: 1, range2: 2 });
     expect(metrics.nationalGuardMilitaryGoodsConsumedByRange).toEqual({ range1: 1, range2: 4 });
     expect(metrics.militaryGoodsRefillShortageTurns).toBe(1);
-    expect(metrics.emergencyMovesByType).toEqual({ police: 1, nationalGuard: 1 });
-    expect(metrics.emergencyMovementHexesByType).toEqual({ police: 2, nationalGuard: 1 });
-    expect(metrics.emergencyMovementPointsByType).toEqual({ police: 3, nationalGuard: 2 });
-    expect(metrics.emergencyReturnsToSupplyByType).toEqual({ police: 1, nationalGuard: 0 });
+    expect(metrics.emergencyMovesByType).toEqual({ police: 1, nationalGuard: 1, riotPolice: 0 });
+    expect(metrics.emergencyMovementHexesByType).toEqual({ police: 2, nationalGuard: 1, riotPolice: 0 });
+    expect(metrics.emergencyMovementPointsByType).toEqual({ police: 3, nationalGuard: 2, riotPolice: 0 });
+    expect(metrics.emergencyReturnsToSupplyByType).toEqual({ police: 1, nationalGuard: 0, riotPolice: 0 });
   });
 
   it('aggregates averages, percentiles, outcomes, and action totals', () => {

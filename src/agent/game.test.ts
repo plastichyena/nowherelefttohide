@@ -7,7 +7,7 @@ import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.4.5');
+    expect(APP_VERSION).toBe('1.5.0');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -48,8 +48,8 @@ describe('AgentGame public boundary', () => {
       typeof tile.playerOccupancyAllowed === 'boolean',
     )).toBe(true);
     expect(first.map.hordeSpawnReserve).toHaveLength(200);
-    expect(first.zombies.every((unit) => ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'].includes(unit.type))).toBe(true);
-    // The fixed v1.4 initial Zombies are outside initial shared vision; only
+    expect(first.zombies.every((unit) => ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'].includes(unit.type))).toBe(true);
+    // The fixed v1.5 initial Zombies are outside initial shared vision; only
     // visible enemies may enter the public Observation.
     expect(first.zombies).toHaveLength(0);
     expect(first.horde).toMatchObject({
@@ -107,17 +107,37 @@ describe('AgentGame public boundary', () => {
     )).toBe(true);
   });
 
-  it('describes the v1.4.5 API, checkpoint candidates, logistics rules, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
+  it('describes the v1.5.0 API, proficiency, Riot, Crisis, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('9');
+    expect(info.saveFormatVersion).toBe('10');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
-    expect(info.publicInformation.at(-1)).toContain('Police, and Soldier Zombies');
+    expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
+    expect(info.rules.proficiency).toMatchObject({
+      values: ['recruit', 'regular', 'veteran'],
+      productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit' },
+      recruitSurvivalTurnsRequired: 5,
+      regularAttackMultiplier: 1.25,
+      regularAttackRounding: 'ceil',
+      veteranZombieKillsRequired: 5,
+      veteranAttackCharges: 2,
+    });
+    expect(info.rules.crisis).toMatchObject({
+      severityOrder: ['critical', 'warning', 'advisory'],
+      hiddenInformationExcluded: true,
+    });
+    expect(info.rules.crisis.reasonCodes).toHaveProperty('horde_warning_active');
+    expect(info.rules.riot).toMatchObject({
+      police: { recruitAttack: 10, hp: 75, movement: 10, range: 1, vision: 5, population: 10 },
+      zombie: { hp: 50, attack: 5, movement: 3, range: 1, vision: 5 },
+      productionFacilities: ['capital', 'city'],
+      productionCost: { population: 10, civilianGoods: 25, militaryGoods: 25 },
+    });
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
     expect(info.rules.production.workerCapacityByFacilityType.farm).toBe(30);
     expect(info.rules.production).toMatchObject({
@@ -147,10 +167,10 @@ describe('AgentGame public boundary', () => {
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 50 });
     expect(info.rules.horde.waves).toEqual([
       expect.objectContaining({ index: 1, turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 3 }, final: false }),
-      expect.objectContaining({ index: 2, turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 4 }, final: false }),
-      expect.objectContaining({ index: 3, turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 6 }, final: false }),
-      expect.objectContaining({ index: 4, turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 6 }, final: false }),
-      expect.objectContaining({ index: 5, turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, final: true }),
+      expect.objectContaining({ index: 2, turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 5 }, nonHordeSlotCountPerDirection: 5, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'], final: false }),
+      expect.objectContaining({ index: 3, turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'], final: false }),
+      expect.objectContaining({ index: 4, turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'], final: false }),
+      expect.objectContaining({ index: 5, turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 8 }, nonHordeSlotCountPerDirection: 8, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'], final: true }),
     ]);
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',
@@ -180,6 +200,8 @@ describe('AgentGame public boundary', () => {
       classes: ['small', 'medium', 'large', 'extraLarge'],
       policeClass: 'medium',
       nationalGuardClass: 'large',
+      riotPoliceClass: 'medium',
+      hordeMovementNoiseRadius: 8,
       distance: 'hex',
       terrainAttenuation: false,
       normalZombieAffected: true,
@@ -235,9 +257,13 @@ describe('AgentGame public boundary', () => {
     expect(game.getRunArtifact().artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(game.getRunArtifact().appVersion).toBe(APP_VERSION);
     expect(game.getRunArtifact().invalidAttempts).toHaveLength(1);
-    expect(game.getRunArtifact().config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'large' } });
-    expect(game.getRunArtifact().metrics?.config.noise).toEqual({ publicClass: { police: 'medium', nationalGuard: 'large' } });
-    expect(JSON.stringify(game.getRunArtifact())).not.toContain('"police":4');
+    expect(game.getRunArtifact().config.units).toMatchObject({
+      police: { noiseClass: 'medium' }, nationalGuard: { noiseClass: 'large' }, riotPolice: { noiseClass: 'medium' },
+    });
+    expect(game.getRunArtifact().metrics?.config.units).toMatchObject({
+      police: { noiseClass: 'medium' }, nationalGuard: { noiseClass: 'large' }, riotPolice: { noiseClass: 'medium' },
+    });
+    expect(JSON.stringify(game.getRunArtifact())).not.toContain('"noiseRadius"');
     expect(() => game.reset({ seed: 10, configOverrides: { unknown: 1 } as never })).toThrow(/Unknown field/);
     expect(game.getObservation()).toEqual(before);
   });
@@ -335,7 +361,10 @@ describe('AgentGame public boundary', () => {
     const spawned = result.events.find((event) => event.type === 'horde_spawned');
     expect(spawned?.payload).toMatchObject({ normalZombieCount: 3, hordeZombieCount: 1 });
     const internalSpawn = [...(game.getDebugState() as GameState).events].reverse().find((event) => event.type === 'horde_spawned');
-    expect(internalSpawn?.payload).toMatchObject({ normalZombieCount: 4, hordeZombieCount: 1 });
+    const internalPayload = internalSpawn?.payload as Record<string, unknown> | undefined;
+    // v1.5 draws only the base non-Horde slots. A private rejected-refugee
+    // Bonus remains a Normal Zombie in the same Horde group/kind.
+    expect(internalPayload).toMatchObject({ normalZombieCount: 4, hordeZombieCount: 1 });
     const publicTrace = JSON.stringify(game.getRunArtifact());
     for (const privateField of [
       'rejectedRefugeesByDirection',

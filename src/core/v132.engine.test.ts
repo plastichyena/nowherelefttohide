@@ -53,6 +53,7 @@ function resetGuardForAttack(state: GameState): UnitState {
   guard.actionState = 'ready';
   guard.canAttack = true;
   guard.canMove = true;
+  guard.attackChargesRemaining = guard.maxAttackCharges;
   return guard;
 }
 
@@ -107,8 +108,18 @@ describe('v1.4 Horde composition and combat', () => {
   });
 
   it('spawns the standard five deterministic multi-direction Waves', () => {
+    const defaultSchedule = createDefaultConfig().horde.waves;
+    expect(defaultSchedule.map((wave) => wave.turn)).toEqual([5, 10, 20, 35, 50]);
+    // Preserve the standard wave sizes/directions while moving their turns
+    // forward.  The full 50-turn map simulation is intentionally covered by
+    // integration tests; this unit test isolates spawn composition.
+    const acceleratedSchedule = defaultSchedule.map((wave, index) => ({ ...wave, turn: index + 3 }));
     const engine = new GameEngine(302, safeScenarioConfig({
-      units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
+      horde: { waves: acceleratedSchedule },
+      units: {
+        zombie: { movement: 0 }, hordeZombie: { movement: 0 }, policeZombie: { movement: 0 },
+        soldierZombie: { movement: 0 }, riotZombie: { movement: 0 },
+      },
     }));
     const schedule = engine.getState().config.horde.waves;
     let finalEvents: ReturnType<GameEngine['step']>['events'] = [];
@@ -126,14 +137,29 @@ describe('v1.4 Horde composition and combat', () => {
       for (const groupId of groupIds) {
         const group = engine.getState().units.filter((unit) => unit.spawnGroupId === groupId);
         expect(group.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(wave.compositionPerDirection.hordeZombie);
-        expect(group.filter((unit) => unit.type === 'zombie')).toHaveLength(wave.compositionPerDirection.zombie);
+        expect(group.filter((unit) => unit.type !== 'hordeZombie')).toHaveLength(wave.compositionPerDirection.zombie);
+        expect(group.filter((unit) => unit.type !== 'hordeZombie').every((unit) =>
+          ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'].includes(unit.type),
+        )).toBe(true);
         expect(group.every((unit) => unit.hordeKind === (wave.final ? 'final' : 'periodic'))).toBe(true);
       }
     }
     const finalIds = engine.getState().horde.finalSpawnGroupIds;
     const finalGroup = engine.getState().units.filter((unit) => unit.spawnGroupId !== null && finalIds.includes(unit.spawnGroupId));
     expect(finalIds).toHaveLength(4);
-    expect(finalGroup).toHaveLength(44);
+    const expectedFinalSpawned = schedule.filter((wave) => wave.final)
+      .reduce((sum, wave) => sum + wave.directionCount * (wave.compositionPerDirection.hordeZombie + wave.compositionPerDirection.zombie), 0);
+    const expectedTotalSpawned = schedule
+      .reduce((sum, wave) => sum + wave.directionCount * (wave.compositionPerDirection.hordeZombie + wave.compositionPerDirection.zombie), 0);
+    const expectedPeriodicHorde = schedule.filter((wave) => !wave.final)
+      .reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.hordeZombie, 0);
+    const expectedPeriodicNonHorde = schedule.filter((wave) => !wave.final)
+      .reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.zombie, 0);
+    const expectedFinalHorde = schedule.filter((wave) => wave.final)
+      .reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.hordeZombie, 0);
+    const expectedFinalNonHorde = schedule.filter((wave) => wave.final)
+      .reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.zombie, 0);
+    expect(finalGroup).toHaveLength(expectedFinalSpawned);
     const finalProgress = cloneState(engine.getState());
     finalProgress.units = finalProgress.units.filter((unit) => !unit.spawnGroupId || !finalIds.includes(unit.spawnGroupId) || unit.id === finalGroup[0]!.id);
     expect(deriveVictoryProgress(finalProgress).finalHordeDefeated).toBe(false);
@@ -143,20 +169,24 @@ describe('v1.4 Horde composition and combat', () => {
       type: 'horde_spawned',
       payload: expect.objectContaining({ hordeKind: 'final', waveIndex: 5, directions: ['north', 'east', 'south', 'west'] }),
     }));
-    expect(engine.getState().horde).toMatchObject({ finalSpawnedCount: 44, totalSpawned: 93 });
-    expect(engine.getState().statistics).toMatchObject({
-      periodicHordeZombiesSpawned: 14,
-      periodicNormalZombiesSpawned: 35,
-      finalHordeZombiesSpawned: 16,
-      finalNormalZombiesSpawned: 28,
-      finalHordeSpawned: 44,
+    expect(engine.getState().horde).toMatchObject({ finalSpawnedCount: expectedFinalSpawned, totalSpawned: expectedTotalSpawned });
+    const statistics = engine.getState().statistics;
+    const finalSpecial = Object.values(statistics.finalSpecialZombiesSpawnedByType).reduce((sum, value) => sum + value, 0);
+    const allSpecial = Object.values(statistics.hordeSpecialSpawnedByType).reduce((sum, value) => sum + value, 0);
+    expect(statistics).toMatchObject({
+      periodicHordeZombiesSpawned: expectedPeriodicHorde,
+      finalHordeZombiesSpawned: expectedFinalHorde,
+      finalHordeSpawned: expectedFinalSpawned,
     });
+    expect(statistics.periodicNormalZombiesSpawned + allSpecial - finalSpecial).toBe(expectedPeriodicNonHorde);
+    expect(statistics.finalNormalZombiesSpawned + finalSpecial).toBe(expectedFinalNonHorde);
   }, 60_000);
 
   it('uses custom per-type composition arithmetic for Periodic and Final groups', () => {
     const engine = new GameEngine(303, safeScenarioConfig({
       horde: {
         warningLeadTurns: 1,
+        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
         waves: [
           { turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 2 }, final: false },
           { turn: 2, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 3 }, final: false },
@@ -178,7 +208,10 @@ describe('v1.4 Horde composition and combat', () => {
 
   it('counts Final Normal Zombies as Final members and in both kill metrics', () => {
     const engine = new GameEngine(304, safeScenarioConfig({
-      horde: singleFinalWave(1, { hordeZombie: 1, zombie: 1 }),
+      horde: {
+        ...singleFinalWave(1, { hordeZombie: 1, zombie: 1 }),
+        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
+      },
       units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
     }));
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();

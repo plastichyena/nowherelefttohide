@@ -69,15 +69,21 @@ export type FacilityOperationalStatus =
 export type UnitType =
   | 'police'
   | 'nationalGuard'
+  | 'riotPolice'
   | 'zombie'
   | 'hordeZombie'
   | 'policeZombie'
-  | 'soldierZombie';
+  | 'soldierZombie'
+  | 'riotZombie';
 
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
 
-export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard'>;
+export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice'>;
+
+export type ZombieUnitType = Exclude<UnitType, HumanUnitType>;
+
+export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
 export type UnitActionState = 'ready' | 'moved' | 'acted' | 'destroyed';
 
@@ -225,6 +231,7 @@ export interface PopulationState {
   healthyCivilians: number;
   police: number;
   nationalGuard: number;
+  riotPolice: number;
   /** Population in units is tracked separately from civilian workers. */
   unitPopulation: number;
   /** Facility assignment is kept as an array so it remains JSON-only. */
@@ -267,6 +274,13 @@ export interface UnitState {
   range: number;
   vision: number;
   population: number;
+  /** Human-unit experience state. Zombie units store null/zero/false. */
+  proficiency: UnitProficiency | null;
+  recruitSurvivalTurns: number;
+  regularZombieKills: number;
+  veteranPromotionPending: boolean;
+  attackChargesRemaining: number;
+  maxAttackCharges: number;
   /** Human-unit endurance. Zombie units always store zero for both values. */
   currentFuel: number;
   maxFuel: number;
@@ -379,6 +393,18 @@ export interface HordeState {
   finalSpawnedCount: number;
 }
 
+export type NoisePulseSourceKind = 'humanCombat' | 'hordeMovement';
+
+/** Internal deterministic work item. Public projections never expose center or source id. */
+export interface NoisePulse {
+  id: string;
+  center: HexCoord;
+  radius: number;
+  sourceKind: NoisePulseSourceKind;
+  sourceUnitType: HumanUnitType | 'hordeZombie';
+  emittedTurn: number;
+}
+
 export type GameEventType =
   | 'unit_moved'
   | 'unit_recovered'
@@ -432,6 +458,11 @@ export type GameEventType =
   | 'noise_targeted'
   | 'noise_target_reached'
   | 'noise_target_overridden'
+  | 'unit_promoted'
+  | 'unit_promotion_pending'
+  | 'unit_kill_credited'
+  | 'attack_charge_consumed'
+  | 'riot_police_commissioned'
   | 'victory_progress_changed'
   | 'horde_spawned'
   | 'horde_warning'
@@ -550,6 +581,7 @@ export interface GameStatistics {
   soldierZombiesKilled: number;
   policeZombiesFinal: number;
   soldierZombiesFinal: number;
+  riotZombiesFinal: number;
   policeReanimations: number;
   nationalGuardReanimations: number;
   reanimationImmediateInfections: number;
@@ -561,6 +593,20 @@ export interface GameStatistics {
   civilianDroneBasesDecommissioned: number;
   civilianGoodsRefundedFromDecommission: number;
   policeLongRangeMoves: number;
+  recruitsCommissionedByType: Record<HumanUnitType, number>;
+  regularPromotionsByType: Record<HumanUnitType, number>;
+  veteranPromotionsByType: Record<HumanUnitType, number>;
+  veteranZombieKillsByType: Record<HumanUnitType, number>;
+  riotPoliceProduced: number;
+  riotPoliceLost: number;
+  riotZombiesSpawned: number;
+  riotZombiesKilled: number;
+  riotPoliceReanimations: number;
+  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie', number>;
+  hordeMovementNoisePulses: number;
+  hordeNoiseRespawnedByType: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
 }
 
 export interface GameResult {
@@ -704,6 +750,43 @@ export interface EndTurnForecast {
   };
 }
 
+export type CrisisSeverity = 'critical' | 'warning' | 'advisory';
+
+export type CrisisReasonCode =
+  | 'capital_infection_uncontained'
+  | 'critical_site_infection_uncontained'
+  | 'checkpoint_defense_degraded'
+  | 'unit_out_of_supply_risk'
+  | 'horde_warning_active'
+  | 'guaranteed_resource_defeat'
+  | 'new_state_loss';
+
+export interface CrisisAlert {
+  id: string;
+  severity: CrisisSeverity;
+  category: 'infection' | 'checkpoint' | 'unit' | 'horde' | 'resource' | 'loss';
+  reasonCode: CrisisReasonCode;
+  entityIds: string[];
+  publicFacts: JsonObject;
+}
+
+export interface EndTurnRiskUnit {
+  unitId: string;
+  moveRemaining: boolean;
+  attackChargesRemaining: number;
+  legalAttackTargetIds: string[];
+  suppressionTargetId: string | null;
+}
+
+export interface EndTurnRisk {
+  readyUnits: EndTurnRiskUnit[];
+  unitsWithMoveRemaining: EndTurnRiskUnit[];
+  unitsWithAttackChargesRemaining: EndTurnRiskUnit[];
+  uncontainedInfectedSites: Array<{ id: string; kind: 'facility' | 'checkpoint'; infected: number }>;
+  criticalAlerts: CrisisAlert[];
+  forecastGuaranteedDefeat: boolean;
+}
+
 export interface GameState {
   gameVersion: string;
   config: GameConfig;
@@ -725,6 +808,8 @@ export interface GameState {
   roadBranches: RoadBranchState[];
   /** Internal-only counters. Public projections must expose only the qualitative risk. */
   rejectedRefugeesByDirection: Record<CardinalDirection, RejectedRefugeeCounters>;
+  /** Noise emitted since the previous Zombie target snapshot. */
+  pendingNoisePulses: NoisePulse[];
   pendingUnitProductions: UnitProductionOrder[];
   nextCheckpointNumber: number;
   nextConstructibleFacilityNumber: number;
@@ -889,9 +974,8 @@ export interface HeadlessGame {
   getResult(): GameResult | null;
 }
 
-export interface UnitConfig {
+export interface BaseUnitConfig {
   hp: number;
-  attack: number;
   movement: number;
   range: number;
   vision: number;
@@ -903,6 +987,35 @@ export interface UnitConfig {
   suppressionMilitaryGoodsCost: number;
   militaryGoodsShortageAttackMultiplier: number;
   emergencyMovementPoints: number;
+}
+
+export interface HumanUnitConfig extends BaseUnitConfig {
+  recruitAttack: number;
+  recruitmentFacilityTypes: Array<'capital' | 'city'>;
+  productionCivilianGoods: number;
+  productionMilitaryGoods: number;
+  fuelCostRule: 'policeLike' | 'nationalGuardLike';
+  suppressionCivilianDamageRate: number;
+  reanimationUnitType: 'policeZombie' | 'soldierZombie' | 'riotZombie';
+  noiseClass: NoiseClass;
+  noiseRadius: number;
+}
+
+export interface ZombieUnitConfig extends BaseUnitConfig {
+  attack: number;
+}
+
+export type UnitConfig = HumanUnitConfig | ZombieUnitConfig;
+
+export interface UnitConfigMap {
+  police: HumanUnitConfig;
+  nationalGuard: HumanUnitConfig;
+  riotPolice: HumanUnitConfig;
+  zombie: ZombieUnitConfig;
+  hordeZombie: ZombieUnitConfig;
+  policeZombie: ZombieUnitConfig;
+  soldierZombie: ZombieUnitConfig;
+  riotZombie: ZombieUnitConfig;
 }
 
 export interface ProductionRule {
@@ -947,6 +1060,18 @@ export interface HordeWaveConfig {
 export interface HordeConfig {
   warningLeadTurns: number;
   waves: HordeWaveConfig[];
+  specialZombieWeights: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  riotZombieCapPerDirection: number;
+  movementNoiseRadius: number;
+}
+
+export interface UnitExperienceConfig {
+  productionProficiencyByType: Record<HumanUnitType, UnitProficiency>;
+  recruitSurvivalTurnsRequired: number;
+  regularAttackMultiplier: number;
+  regularAttackRounding: 'ceil';
+  veteranZombieKillsRequired: number;
+  veteranAttackCharges: number;
 }
 
 export interface TerrainConfig {
@@ -986,9 +1111,6 @@ export interface InfectionConfig {
   maxZombieSpawnPerResolution: number;
   zombieSpawnRadius: number;
   noiseRespawnEnabled: boolean;
-  policeSuppression: number;
-  nationalGuardSuppression: number;
-  nationalGuardCivilianDamageRate: number;
 }
 
 export interface CheckpointConfig {
@@ -1000,12 +1122,6 @@ export interface CheckpointConfig {
   requiresPolice: boolean;
   consumesPower: boolean;
   initialSupplyRadius: number;
-}
-
-export interface NoiseConfig {
-  police: number;
-  nationalGuard: number;
-  publicClass: Record<HumanUnitType, NoiseClass>;
 }
 
 export interface EconomyConfig {
@@ -1049,7 +1165,8 @@ export interface GameConfig {
   version: string;
   mapId: string;
   maxActionsPerTurn: number;
-  units: Record<UnitType, UnitConfig>;
+  units: UnitConfigMap;
+  unitExperience: UnitExperienceConfig;
   facilities: Record<FacilityType, FacilityConfig>;
   economy: EconomyConfig;
   initialFacilityPopulation: Record<FacilityId, InitialFacilityPopulationConfig>;
@@ -1059,7 +1176,6 @@ export interface GameConfig {
   infection: InfectionConfig;
   checkpoint: CheckpointConfig;
   constructibleFacility: ConstructibleFacilityConfig;
-  noise: NoiseConfig;
   terrain: TerrainConfig;
   vision: VisionConfig;
 }

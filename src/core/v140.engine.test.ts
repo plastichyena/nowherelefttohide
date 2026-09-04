@@ -215,7 +215,7 @@ describe('v1.4 Wind Power Plant', () => {
   });
 
   it('disables on Zombie occupation and recovers on Human entry at the next Player Turn', () => {
-    const config = safeConfig({ units: { zombie: { movement: 0, attack: 0, vision: 0 } } });
+    const config = safeConfig({ units: { zombie: { movement: 0, attack: 1, vision: 0 } } });
     const engine = new GameEngine(1412, config);
     const snapshot = cloneState(engine.getState());
     const wind = facilityAt(snapshot, 'wind-power-plant-1');

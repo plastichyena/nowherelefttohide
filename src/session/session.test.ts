@@ -177,7 +177,7 @@ describe('Session hash and input boundaries', () => {
 });
 
 describe('AI Portable Session lifecycle', () => {
-  it('restores v1.4.5 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
+  it('restores v1.5.0 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
     const root = tempRoot('real-wave-resume');
     const api = agentService(root);
     api.newSession({ sessionId: 'real-wave-resume', seed: 71, checkpointInterval: 99 });
@@ -224,10 +224,10 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '2.5.0',
+      gameVersion: '3.0.0',
       mapId: 'fixed-51x51-v1',
       config: {
-        version: '2.5.0',
+        version: '3.0.0',
         mapId: 'fixed-51x51-v1',
         infection: {
           zombieSpawnPopulationPerUnit: 5,
@@ -274,6 +274,16 @@ describe('AI Portable Session lifecycle', () => {
     const accepted = api.step('roundtrip', { action: { type: 'EndTurn' }, decisionSummary: 'advance one turn' });
     expect(accepted.accepted).toBe(true);
     expect(accepted.active.decision).toBe(1);
+    expect(accepted.stateDelta).toEqual({
+      newlyInfectedSites: [],
+      newlyRuinedSites: [],
+      newlySpottedEnemies: [],
+      lostEnemies: [],
+      unitHpChanges: [],
+      unitSupplyChanges: [],
+      checkpointRoleChanges: [],
+    });
+    expect(JSON.stringify(accepted.stateDelta)).not.toMatch(/rng|target|hidden|position/iu);
     const rejected = api.step('roundtrip', { action: { type: 'Wait', unitId: 'missing' }, decisionSummary: 'test rejection' });
     expect(rejected.accepted).toBe(false);
     expect(rejected.active.decision).toBe(2);
@@ -386,10 +396,10 @@ describe('AI Portable Session lifecycle', () => {
       fakeFactory(),
       { ...identity(), appVersion: '9.9.9' },
     );
-    expect(appVersionOnly.status('build-mismatch').session.appVersion).toBe(APP_VERSION);
+    expect(() => appVersionOnly.status('build-mismatch')).toThrow(/appVersion/u);
   });
 
-  it('explicitly rejects v1.4.4 Session descriptors and Checkpoints without mutating the current Active state', () => {
+  it('explicitly rejects v1.4.5 Session descriptors and Checkpoints without mutating the current Active state', () => {
     const descriptorRoot = tempRoot('v143-descriptor');
     const currentApi = service(descriptorRoot);
     currentApi.newSession({ sessionId: 'v143-descriptor' });
@@ -399,11 +409,11 @@ describe('AI Portable Session lifecycle', () => {
     const { descriptorIntegrityHash: _descriptorIntegrityHash, ...descriptorWithoutHash } = descriptor;
     const legacyDescriptor = {
       ...descriptorWithoutHash,
-      appVersion: '1.4.4',
-      gameRulesVersion: '2.4.0',
-      agentApiVersion: '6.0.0',
-      observationApiVersion: '6.0.0',
-      bridgeApiVersion: '6.0.0',
+      appVersion: '1.4.5',
+      gameRulesVersion: '2.5.0',
+      agentApiVersion: '6.1.0',
+      observationApiVersion: '6.1.0',
+      bridgeApiVersion: '6.1.0',
     };
     writeFileSync(descriptorPath, JSON.stringify({
       ...legacyDescriptor,
@@ -427,11 +437,11 @@ describe('AI Portable Session lifecycle', () => {
     const { metadataIntegrityHash: _metadataIntegrityHash, ...metadataWithoutHash } = metadata;
     const legacyMetadata = {
       ...metadataWithoutHash,
-      appVersion: '1.4.4',
-      gameRulesVersion: '2.4.0',
-      agentApiVersion: '6.0.0',
-      observationApiVersion: '6.0.0',
-      bridgeApiVersion: '6.0.0',
+      appVersion: '1.4.5',
+      gameRulesVersion: '2.5.0',
+      agentApiVersion: '6.1.0',
+      observationApiVersion: '6.1.0',
+      bridgeApiVersion: '6.1.0',
     };
     writeFileSync(checkpointPath, JSON.stringify({
       ...legacyMetadata,

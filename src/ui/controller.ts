@@ -38,6 +38,7 @@ import type {
   GameState,
   HeadlessGame,
   HexCoord,
+  HumanUnitType,
   ResourceType,
   PowerSupplyReason,
   RoadBranchId,
@@ -101,6 +102,8 @@ export type EngineFactory = () => UiGameEngine;
 type Screen = 'title' | 'game';
 type SheetState = 'collapsed' | 'standard' | 'expanded';
 const IS_DEVELOPMENT_BUILD = import.meta.env.DEV;
+type ResourceAccordionKey = 'food' | 'civilianGoods' | 'militaryGoods' | 'fuel' | 'electricity';
+type OverviewSectionKey = 'crisis' | 'population' | 'branches' | 'events' | 'construction';
 type CheckpointPlacement = {
   mode: 'build' | 'relocate';
   checkpointId?: string;
@@ -113,13 +116,315 @@ type CheckpointPreviewTarget = { branchId: RoadBranchId; position: HexCoord };
 export type NavigationMode = 'map' | 'domestic';
 export type Selection =
   | { kind: 'unit'; id: string }
+  /** A visible enemy unit selected from the board. */
+  | { kind: 'zombie'; id: string }
   | { kind: 'facility'; id: string }
   | { kind: 'checkpoint'; id: string }
   /** An empty trunk-road tile selected in Domestic mode. */
   | { kind: 'road'; position: HexCoord }
+  /** An otherwise empty, public map tile selected for local Domestic actions. */
+  | { kind: 'hex'; position: HexCoord }
   | null;
 
 export type UnitActionMode = 'move' | 'attack' | null;
+
+/** The v1.5.0 proficiency values are kept at the UI boundary so older
+ * snapshots and test doubles remain renderable while Core rolls out the
+ * formal fields. */
+export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
+
+export interface UnitProficiencyViewModel {
+  proficiency: UnitProficiency;
+  recruitSurvivalTurns: number;
+  recruitSurvivalTurnsRequired: number;
+  regularZombieKills: number;
+  veteranZombieKillsRequired: number;
+  veteranPromotionPending: boolean;
+  attackChargesRemaining: number;
+  maxAttackCharges: number;
+}
+
+function boundedCount(value: unknown, fallback = 0): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return Math.max(0, Math.trunc(fallback));
+  return Math.max(0, Math.trunc(value));
+}
+
+/**
+ * Read the public proficiency projection without trusting UI-authored
+ * values.  This is deliberately a pure formatter helper; Core remains the
+ * owner of promotion and charge transitions.
+ */
+export function unitProficiencyViewModel(
+  unit: { type: string },
+  config?: unknown,
+): UnitProficiencyViewModel | null {
+  if (!['police', 'nationalGuard', 'riotPolice'].includes(String(unit.type))) return null;
+  const source = unit as unknown as UnknownRecord;
+  const configRecord = unknownRecord(config);
+  const experience = configRecord.unitExperience && typeof configRecord.unitExperience === 'object'
+    ? configRecord.unitExperience as UnknownRecord
+    : {};
+  const proficiencyValue = source.proficiency;
+  const proficiency: UnitProficiency = proficiencyValue === 'recruit' || proficiencyValue === 'veteran' || proficiencyValue === 'regular'
+    ? proficiencyValue
+    : 'regular';
+  const recruitRequired = boundedCount(experience.recruitSurvivalTurnsRequired, 5) || 5;
+  const veteranRequired = boundedCount(experience.veteranZombieKillsRequired, 5) || 5;
+  const maxChargesDefault = proficiency === 'veteran' ? 2 : 1;
+  const maxAttackCharges = boundedCount(source.maxAttackCharges, maxChargesDefault) || maxChargesDefault;
+  return {
+    proficiency,
+    recruitSurvivalTurns: boundedCount(source.recruitSurvivalTurns),
+    recruitSurvivalTurnsRequired: recruitRequired,
+    regularZombieKills: boundedCount(source.regularZombieKills),
+    veteranZombieKillsRequired: veteranRequired,
+    veteranPromotionPending: source.veteranPromotionPending === true,
+    attackChargesRemaining: Math.min(maxAttackCharges, boundedCount(source.attackChargesRemaining, maxAttackCharges)),
+    maxAttackCharges,
+  };
+}
+
+function proficiencyLabel(proficiency: UnitProficiency, locale: Locale): string {
+  const t = createTranslator(locale);
+  return t(`proficiency.${proficiency}`);
+}
+
+export interface CrisisAlertViewModel {
+  id: string;
+  severity: 'critical' | 'warning' | 'advisory';
+  category: string;
+  reasonCode: string;
+  entityIds: string[];
+  publicFacts: UnknownRecord;
+}
+
+export interface CrisisSummaryViewModel {
+  alerts: CrisisAlertViewModel[];
+  criticalCount: number;
+  warningCount: number;
+  advisoryCount: number;
+}
+
+function crisisSeverity(value: unknown): CrisisAlertViewModel['severity'] {
+  return value === 'critical' || value === 'warning' || value === 'advisory' ? value : 'advisory';
+}
+
+/** Normalize the Core's public crisis projection for Human UI rendering. */
+export function crisisSummaryViewModel(observation: Readonly<AgentObservation> | UnknownRecord): CrisisSummaryViewModel {
+  const source = unknownRecord(observation);
+  const summary = unknownRecord(source.crisisSummary ?? source.crisis);
+  const rawAlerts = Array.isArray(summary.alerts)
+    ? summary.alerts
+    : Array.isArray(source.crisisAlerts)
+      ? source.crisisAlerts
+      : [];
+  const alerts = rawAlerts.map((raw, index): CrisisAlertViewModel => {
+    const entry = unknownRecord(raw);
+    const severity = crisisSeverity(entry.severity);
+    const entityIds = Array.isArray(entry.entityIds)
+      ? entry.entityIds.filter((id): id is string => typeof id === 'string').slice(0, 32)
+      : [];
+    const facts = unknownRecord(entry.publicFacts ?? entry.facts);
+    return {
+      id: typeof entry.id === 'string' && entry.id.length > 0 ? entry.id.slice(0, 128) : `crisis-${index}`,
+      severity,
+      category: typeof entry.category === 'string' ? entry.category.slice(0, 128) : '',
+      reasonCode: typeof entry.reasonCode === 'string' ? entry.reasonCode.slice(0, 128) : '',
+      entityIds,
+      publicFacts: facts,
+    };
+  });
+  const severityOrder: Record<CrisisAlertViewModel['severity'], number> = { critical: 0, warning: 1, advisory: 2 };
+  alerts.sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity]
+    || left.category.localeCompare(right.category)
+    || left.reasonCode.localeCompare(right.reasonCode)
+    || left.id.localeCompare(right.id));
+  return {
+    alerts,
+    criticalCount: alerts.filter((alert) => alert.severity === 'critical').length,
+    warningCount: alerts.filter((alert) => alert.severity === 'warning').length,
+    advisoryCount: alerts.filter((alert) => alert.severity === 'advisory').length,
+  };
+}
+
+function crisisReasonLabel(alert: CrisisAlertViewModel, locale: Locale): string {
+  const t = createTranslator(locale);
+  const translated = alert.reasonCode ? t(`crisisReason.${alert.reasonCode}`) : '';
+  if (translated && translated !== `crisisReason.${alert.reasonCode}`) return translated;
+  if (alert.category) {
+    const category = t(`crisisCategory.${alert.category}`);
+    if (category !== `crisisCategory.${alert.category}`) return category;
+  }
+  return alert.reasonCode || alert.category || t('crisisAlert');
+}
+
+function crisisFactsLabel(alert: CrisisAlertViewModel, locale: Locale): string {
+  const t = createTranslator(locale);
+  const facts = alert.publicFacts;
+  const pieces: string[] = [];
+  const infected = typeof facts.infected === 'number' ? boundedCount(facts.infected) : null;
+  if (infected !== null) pieces.push(`${t('infected')} ${infected}`);
+  const healthy = typeof facts.healthyPopulation === 'number' ? boundedCount(facts.healthyPopulation) : null;
+  if (healthy !== null) pieces.push(`${t('healthyPopulation')} ${healthy}`);
+  const units = typeof facts.suppressionCapableUnitCount === 'number' ? boundedCount(facts.suppressionCapableUnitCount) : null;
+  if (units !== null) pieces.push(`${t('suppressionCapableUnits')} ${units}`);
+  const fallbackDepth = typeof facts.fallbackDepth === 'number' ? boundedCount(facts.fallbackDepth) : null;
+  if (fallbackDepth !== null) pieces.push(`${t('fallbackDepth')} ${fallbackDepth}`);
+  return pieces.join(' · ');
+}
+
+/** Render the compact, persistent Crisis Strip used above the board. */
+export function renderCrisisStrip(summary: CrisisSummaryViewModel, locale: Locale): string {
+  const t = createTranslator(locale);
+  const first = summary.alerts[0];
+  if (!first) return '<section class="crisis-strip" data-crisis-strip hidden></section>';
+  const remaining = Math.max(0, summary.alerts.length - 1);
+  const count = remaining > 0 ? ` · ${t('crisisMore').replace('{0}', String(remaining))}` : '';
+  return `<button type="button" class="crisis-strip severity-${first.severity}" data-action="open-crisis" data-crisis-strip aria-live="assertive" aria-label="${escapeHtml(t('crisisStripLabel'))}"><strong>${escapeHtml(t(`crisisSeverity.${first.severity}`))}</strong><span>${escapeHtml(crisisReasonLabel(first, locale))}${crisisFactsLabel(first, locale) ? ` · ${escapeHtml(crisisFactsLabel(first, locale))}` : ''}${escapeHtml(count)}</span></button>`;
+}
+
+/** Compact EndTurn fields are intentionally read-only Core projection data. */
+export interface EndTurnRiskViewModel {
+  readyUnits: string[];
+  unitsWithMoveRemaining: string[];
+  unitsWithAttackChargesRemaining: Array<{
+    unitId: string;
+    remainingMove: number;
+    remainingAttackCharges: number;
+    legalAttackCount: number;
+    automaticSuppressionTargetId: string | null;
+  }>;
+  uncontainedInfectedSites: string[];
+  criticalAlerts: CrisisAlertViewModel[];
+  forecastGuaranteedDefeat: boolean;
+}
+
+export function endTurnRiskViewModel(observation: Readonly<AgentObservation> | UnknownRecord): EndTurnRiskViewModel {
+  const source = unknownRecord(observation);
+  const risk = unknownRecord(source.endTurnRisk ?? source.endTurn);
+  const ids = (value: unknown): string[] => Array.isArray(value)
+    ? value.filter((id): id is string => typeof id === 'string').slice(0, 128)
+    : [];
+  const attackChargeUnits = Array.isArray(risk.unitsWithAttackChargesRemaining)
+    ? risk.unitsWithAttackChargesRemaining.map((entry, index) => {
+      if (typeof entry === 'string') {
+        return {
+          unitId: entry,
+          remainingMove: 0,
+          remainingAttackCharges: 1,
+          legalAttackCount: 0,
+          automaticSuppressionTargetId: null,
+        };
+      }
+      const unit = unknownRecord(entry);
+      return {
+        unitId: typeof unit.unitId === 'string' ? unit.unitId : `unit-${index}`,
+        remainingMove: boundedCount(unit.remainingMove),
+        remainingAttackCharges: boundedCount(unit.remainingAttackCharges),
+        legalAttackCount: boundedCount(unit.legalAttackCount),
+        automaticSuppressionTargetId: typeof unit.automaticSuppressionTargetId === 'string'
+          ? unit.automaticSuppressionTargetId
+          : null,
+      };
+    }).filter((entry) => entry.unitId.length > 0).slice(0, 128)
+    : [];
+  const crisis = crisisSummaryViewModel(observation);
+  const criticalIds = new Set(crisis.alerts.filter((alert) => alert.severity === 'critical').map((alert) => alert.id));
+  const criticalAlerts = crisis.alerts.filter((alert) => criticalIds.has(alert.id));
+  return {
+    readyUnits: ids(risk.readyUnits),
+    unitsWithMoveRemaining: ids(risk.unitsWithMoveRemaining),
+    unitsWithAttackChargesRemaining: attackChargeUnits.length > 0
+      ? attackChargeUnits
+      : ids(risk.unitsWithAttackRemaining).map((unitId) => ({
+        unitId,
+        remainingMove: 0,
+        remainingAttackCharges: 1,
+        legalAttackCount: 0,
+        automaticSuppressionTargetId: null,
+      })),
+    uncontainedInfectedSites: ids(risk.uncontainedInfectedSites),
+    criticalAlerts,
+    forecastGuaranteedDefeat: risk.forecastGuaranteedDefeat === true
+      || unknownRecord(source.strategicForecast).guaranteedDefeat !== undefined
+        && unknownRecord(source.strategicForecast).guaranteedDefeat !== null
+        && unknownRecord(unknownRecord(source.strategicForecast).guaranteedDefeat).guaranteed === true,
+  };
+}
+
+/** True when the Core says Human UI should ask before EndTurn. */
+export function shouldConfirmEndTurn(
+  summary: CrisisSummaryViewModel,
+  risk: EndTurnRiskViewModel,
+): boolean {
+  return summary.criticalCount > 0
+    || risk.criticalAlerts.length > 0
+    || risk.unitsWithAttackChargesRemaining.length > 0
+    || risk.uncontainedInfectedSites.length > 0
+    || risk.forecastGuaranteedDefeat;
+}
+
+function overviewSectionMarkup(
+  section: OverviewSectionKey,
+  title: string,
+  summary: string,
+  content: string,
+  open: boolean,
+  locale: Locale,
+): string {
+  const t = createTranslator(locale);
+  const actionLabel = open ? t('collapseSection') : t('expandSection');
+  return `<section class="overview-section overview-${section}" data-overview-section="${section}"><button type="button" class="overview-section-toggle" data-action="toggle-overview" data-section="${section}" aria-expanded="${String(open)}" aria-controls="overview-content-${section}" aria-label="${escapeHtml(`${title}: ${actionLabel}`)}"><span class="overview-section-title"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(summary)}</small></span><span class="overview-chevron" aria-hidden="true">${open ? '⌄' : '›'}</span></button><div id="overview-content-${section}" class="overview-section-content"${open ? '' : ' hidden'}>${content}</div></section>`;
+}
+
+function crisisEntityTarget(alert: CrisisAlertViewModel): { kind: string; id: string } | null {
+  const facts = alert.publicFacts;
+  let kind = typeof facts.entityKind === 'string' ? facts.entityKind : typeof facts.siteKind === 'string' ? facts.siteKind : '';
+  if (!kind) {
+    kind = alert.category === 'unit_supply'
+      ? 'unit'
+      : alert.category === 'checkpoint_defense'
+        ? 'checkpoint'
+        : alert.category === 'infection'
+          ? 'facility'
+          : '';
+  }
+  const id = typeof facts.entityId === 'string' ? facts.entityId : alert.entityIds[0] ?? '';
+  if (!id || !['unit', 'zombie', 'facility', 'checkpoint'].includes(kind)) return null;
+  return { kind, id };
+}
+
+function renderCrisisList(
+  summary: CrisisSummaryViewModel,
+  locale: Locale,
+  expandedGroups: ReadonlySet<CrisisAlertViewModel['severity']> = new Set(),
+): string {
+  const t = createTranslator(locale);
+  if (summary.alerts.length === 0) return `<div class="empty-state crisis-empty"><span class="empty-glyph">✓</span><p>${escapeHtml(t('crisisNone'))}</p></div>`;
+  const groups: Array<CrisisAlertViewModel['severity']> = ['critical', 'warning', 'advisory'];
+  const content = groups.map((severity) => {
+    const alerts = summary.alerts.filter((alert) => alert.severity === severity);
+    if (alerts.length === 0) return '';
+    const expanded = expandedGroups.has(severity);
+    const visible = expanded ? alerts : alerts.slice(0, 3);
+    const rows = visible.map((alert) => {
+      const target = crisisEntityTarget(alert);
+      const facts = crisisFactsLabel(alert, locale);
+      const attrs = target
+        ? ` data-entity-kind="${escapeHtml(target.kind)}" data-entity-id="${escapeHtml(target.id)}"`
+        : '';
+      const q = typeof alert.publicFacts.q === 'number' ? Math.trunc(alert.publicFacts.q) : null;
+      const r = typeof alert.publicFacts.r === 'number' ? Math.trunc(alert.publicFacts.r) : null;
+      const coordinateAttrs = q !== null && r !== null ? ` data-q="${q}" data-r="${r}"` : '';
+      const tag = target || coordinateAttrs ? 'button' : 'article';
+      const close = tag === 'button' ? ` type="button" class="crisis-alert crisis-alert-action" data-action="focus-crisis-alert"${attrs}${coordinateAttrs}` : ' class="crisis-alert"';
+      return `<${tag}${close}><span class="crisis-alert-severity" aria-hidden="true">${severity === 'critical' ? '!' : severity === 'warning' ? '⚠' : 'i'}</span><span class="crisis-alert-copy"><strong>${escapeHtml(crisisReasonLabel(alert, locale))}</strong>${facts ? `<small>${escapeHtml(facts)}</small>` : ''}</span></${tag}>`;
+    }).join('');
+    const more = alerts.length > visible.length ? `<button type="button" class="text-button crisis-more" data-action="show-more-crisis" data-crisis-severity="${severity}">${escapeHtml(t('crisisMore').replace('{0}', String(alerts.length - visible.length)))}</button>` : '';
+    return `<section class="crisis-group severity-${severity}" data-crisis-group="${severity}"><h4>${escapeHtml(t(`crisisSeverity.${severity}`))} <small>${alerts.length}</small></h4><div class="crisis-alert-list">${rows}</div>${more}</section>`;
+  }).join('');
+  return `<div class="crisis-list">${content}</div>`;
+}
 
 export interface UnitActionAvailability {
   move: boolean;
@@ -691,6 +996,10 @@ export function resolveTileSelection(
     if (roadBranches.some((branch) => branch.roadTiles.some((tile) => samePosition(tile, position)))) {
       return { kind: 'road', position: { ...position } };
     }
+    // Domestic mode can inspect any otherwise-empty public Hex so local
+    // Constructible actions can be shown at exactly the selected location.
+    const occupied = state.units.some((candidate) => candidate.actionState !== 'destroyed' && samePosition(candidate.position, position));
+    if (!occupied) return { kind: 'hex', position: { ...position } };
     return null;
   }
 
@@ -700,7 +1009,23 @@ export function resolveTileSelection(
   );
   if (unit) return { kind: 'unit', id: unit.id };
   if (facility) return { kind: 'facility', id: facility.id };
-  return checkpoint ? { kind: 'checkpoint', id: checkpoint.id } : null;
+  if (checkpoint) return { kind: 'checkpoint', id: checkpoint.id };
+  const visibleKeys = (() => {
+    try {
+      return getPlayerVisibleTileKeys(state);
+    } catch {
+      return new Set<string>();
+    }
+  })();
+  const zombie = state.units.find((candidate) => !candidate.isPlayerUnit
+    && candidate.actionState !== 'destroyed'
+    && samePosition(candidate.position, position)
+    && visibleKeys.has(hexKey(candidate.position)));
+  if (zombie) return { kind: 'zombie', id: zombie.id };
+  // A public empty tile remains selectable in Map mode for inspection. The
+  // tile itself is read from AgentObservation in the sheet.
+  const tile = state.map?.tiles?.find((candidate) => samePosition(candidate, position));
+  return tile ? { kind: 'hex', position: { ...position } } : null;
 }
 
 function unselectedPrompt(mode: NavigationMode, locale: Locale): string {
@@ -955,7 +1280,7 @@ export interface BoardLegendViewModel {
 
 const LEGEND_TERRAINS = ['plain', 'forest', 'mountain'] as const;
 const LEGEND_OVERLAYS = ['road', 'urban'] as const;
-const LEGEND_UNITS = ['police', 'nationalGuard', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'] as const;
+const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const;
 const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'checkpoint'] as const;
 
 function legendAssetFromRegistry(
@@ -982,6 +1307,8 @@ function legendAssetFromRegistry(
       ? { operational: 'checkpointOperational', abandoned: 'checkpointAbandoned', remnant: 'checkpointRemnant' }
       : category === 'horde'
         ? { periodic: 'horde', final: 'final' }
+        : category === 'unit'
+          ? { riotPolice: 'police', riotZombie: 'policeZombie' }
         : {};
   const candidateKey = aliases[key] ?? key;
   const candidate = categoryEntries?.[candidateKey];
@@ -1067,8 +1394,10 @@ function configLegendEntries(
   add('aerialVision', t('legendAerialVision'), t('visionAerialLegend'));
 
   for (const key of LEGEND_UNITS) {
-    const unit = config.units[key];
-    add(`unit.${key}`, unitLabel(key, locale), `${t('legendHp')} ${unit.hp} · ${t('legendAttack')} ${unit.attack} · ${t('legendMovement')} ${unit.movement} · ${t('legendRange')} ${unit.range} · ${t('legendVision')} ${unit.vision} · ${t('legendPopulation')} ${unit.population}`);
+    const unit = unknownRecord((config.units as unknown as UnknownRecord)[key]);
+    if (Object.keys(unit).length === 0) continue;
+    const attack = unit.attack ?? unit.recruitAttack ?? 0;
+    add(`unit.${key}`, unitLabel(key, locale), `${t('legendHp')} ${unit.hp ?? 0} · ${t('legendAttack')} ${attack} · ${t('legendMovement')} ${unit.movement ?? 0} · ${t('legendRange')} ${unit.range ?? 0} · ${t('legendVision')} ${unit.vision ?? 0} · ${t('legendPopulation')} ${unit.population ?? 0}`);
   }
   for (const key of LEGEND_FACILITIES) {
     if (key === 'checkpoint') continue;
@@ -1082,13 +1411,14 @@ function configLegendEntries(
     add(`facility.${key}`, facilityLabel(key, locale), `${t('legendWorkers')} ${facility.workerCapacity} · ${t('legendMode')} ${powerModeLabel(production.powerMode, locale)} · ${t('legendPowerCapacity')} ${production.powerCapacity} · ${t('legendPowerGeneration')} ${generation} · ${t('legendInputs')} ${formatResourceAmounts(production.inputs, locale, true)} · ${t('legendOutputs')} ${formatResourceAmounts(production.outputs, locale, true)}${build}${target}`);
   }
   add('populationConsumption', t('legendPopulationConsumption'), `${t('food')} ${config.economy.populationConsumption.food} · ${t('civilianGoods')} ${config.economy.populationConsumption.civilianGoods}`);
-  for (const key of ['police', 'nationalGuard'] as const) {
-    const unit = config.units[key];
-    const attackCosts = Object.entries(unit.attackMilitaryGoodsCostByRange)
+  for (const key of ['police', 'nationalGuard', 'riotPolice'] as const) {
+    const unit = unknownRecord((config.units as unknown as UnknownRecord)[key]);
+    if (Object.keys(unit).length === 0) continue;
+    const attackCosts = Object.entries(unknownRecord(unit.attackMilitaryGoodsCostByRange))
       .sort(([left], [right]) => Number(left) - Number(right))
       .map(([range, cost]) => `${t('distance')} ${range}: ${cost}`)
       .join(' / ');
-    add(`militaryGoods.${key}`, `${unitLabel(key, locale)} · ${t('carriedMilitaryGoods')}`, `${t('max')} ${unit.maxMilitaryGoods} · ${t('fixedConsumption')} ${unit.fixedMilitaryGoodsUpkeepPerTurn} · ${t('attackCostByDistance')} ${attackCosts} · ${t('suppression')} ${unit.suppressionMilitaryGoodsCost} · ${t('emergencyMovement')} ${unit.emergencyMovementPoints} MP`);
+    add(`militaryGoods.${key}`, `${unitLabel(key, locale)} · ${t('carriedMilitaryGoods')}`, `${t('max')} ${unit.maxMilitaryGoods ?? 0} · ${t('fixedConsumption')} ${unit.fixedMilitaryGoodsUpkeepPerTurn ?? 0} · ${t('attackCostByDistance')} ${attackCosts} · ${t('suppression')} ${unit.suppressionMilitaryGoodsCost ?? 0} · ${t('emergencyMovement')} ${unit.emergencyMovementPoints ?? 0} MP`);
   }
   add('maxActionsPerTurn', t('maxActionsPerTurn'), String(config.maxActionsPerTurn));
   add('hordeWarningLeadTurns', t('hordeWarningLeadTurns'), String(config.horde.warningLeadTurns));
@@ -1113,9 +1443,11 @@ function configLegendEntries(
     add(`policy.${policy}`, t(policy), `${t('policyTurns')} ${rule.turns} · ${t('policyAcceptance')} ${formatPercent(rule.workerRate, locale)} · ${t('policyInfection')} ${formatPercent(rule.infectionRate, locale)} · ${t('policyInfectedPopulation')} ${formatPercent(rule.infectionPopulationRate, locale)}`);
   }
   add('facilitySpread', t('legendFacilitySpread'), String(config.infection.facilitySpreadPerTurn));
-  add('policeSuppression', t('legendPoliceSuppression'), String(config.infection.policeSuppression));
-  add('guardSuppression', t('legendGuardSuppression'), String(config.infection.nationalGuardSuppression));
-  add('guardCivilianDamage', t('legendGuardCivilianDamage'), formatPercent(config.infection.nationalGuardCivilianDamageRate, locale));
+  const policeConfig = unknownRecord((config.units as unknown as UnknownRecord).police);
+  const guardConfig = unknownRecord((config.units as unknown as UnknownRecord).nationalGuard);
+  add('policeSuppression', t('legendPoliceSuppression'), String(policeConfig.recruitAttack ?? 0));
+  add('guardSuppression', t('legendGuardSuppression'), String(guardConfig.recruitAttack ?? 0));
+  add('guardCivilianDamage', t('legendGuardCivilianDamage'), formatPercent(typeof guardConfig.suppressionCivilianDamageRate === 'number' ? guardConfig.suppressionCivilianDamageRate : 0, locale));
   add('combatRecovery', t('legendCombatRecovery'), formatPercent(config.naturalRecovery.combatRate, locale));
   add('restRecovery', t('legendRestRecovery'), formatPercent(config.naturalRecovery.restRate, locale));
   return entries;
@@ -1167,7 +1499,7 @@ function legendSections(
   const t = createTranslator(locale);
   const terrain = LEGEND_TERRAINS.map((key) => legendAssetEntry(registry, 'terrain', key, terrainLabel(key, locale), legendDescription(key, locale, t), key === 'plain' ? '◇' : key === 'forest' ? '♣' : '△'));
   const overlays = LEGEND_OVERLAYS.map((key) => legendAssetEntry(registry, 'overlay', key, key === 'road' ? t('roadOverlay') : t('urbanOverlay'), legendDescription(key, locale, t), key === 'road' ? '═' : '▦'));
-  const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : 'SZ'));
+  const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'riotPolice' ? 'RP' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : key === 'soldierZombie' ? 'SZ' : 'RZ'));
   const horde = (['periodic', 'final'] as const).map((key) => legendAssetEntry(registry, 'horde', key, key === 'periodic' ? t('periodicHorde') : t('finalHorde'), legendDescription(key, locale, t), key === 'periodic' ? '↝' : '✹'));
   const facilities = LEGEND_FACILITIES.map((key) => legendAssetEntry(registry, 'facility', key, key === 'checkpoint' ? t('checkpoint') : facilityLabel(key, locale), legendDescription(key, locale, t), key === 'capital' ? '★' : key === 'city' ? '⌂' : key === 'checkpoint' ? '⊞' : '▣'));
   const facilityStates = ['unowned', 'owned', 'stopped', 'infected', 'ruined'].map((key) => legendAssetEntry(registry, 'facilityState', key, t(key), legendDescription(key, locale, t), key === 'owned' ? '✓' : key === 'infected' ? '☣' : key === 'ruined' ? '×' : '•'));
@@ -1355,16 +1687,18 @@ function facilityLabel(type: string, locale: Locale): string {
   return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
 }
 
-function unitLabel(type: UnitState['type'], locale: Locale): string {
-  const names: Record<UnitState['type'], [string, string]> = {
+function unitLabel(type: string, locale: Locale): string {
+  const names: Record<string, [string, string]> = {
     police: ['警察', 'Police'],
     nationalGuard: ['州兵', 'National Guard'],
+    riotPolice: ['暴動鎮圧警察', 'Riot Police'],
     zombie: ['ゾンビ', 'Zombie'],
     hordeZombie: ['Hordeゾンビ', 'Horde Zombie'],
     policeZombie: ['警察ゾンビ', 'Police Zombie'],
     soldierZombie: ['兵士ゾンビ', 'Soldier Zombie'],
+    riotZombie: ['暴動鎮圧ゾンビ', 'Riot Zombie'],
   };
-  return names[type][locale === 'ja' ? 0 : 1];
+  return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
 }
 
 /** Human-facing release label; APP_VERSION remains the single source of truth. */
@@ -1378,6 +1712,98 @@ export function renderHordeWarningCard(locale: Locale): string {
   return `<details class="horde-card" data-bind="horde-card" data-horde-state="periodic" aria-live="polite"><summary class="horde-heading"><strong data-bind="horde-warning">${escapeHtml(t('horde'))}</strong><span data-bind="horde-status">—</span></summary><div class="horde-facts"><span><small>${escapeHtml(t('nextWave'))}</small><b data-bind="horde-wave-index">—</b></span><span><small>${escapeHtml(t('spawnTurn'))}</small><b data-bind="horde-spawn-turn">—</b></span><span><small>${escapeHtml(t('remaining'))}</small><b data-bind="horde-remaining">—</b></span><span><small>${escapeHtml(t('directionCount'))}</small><b data-bind="horde-direction-count">—</b></span><span><small>${escapeHtml(t('directions'))}</small><b data-bind="horde-directions">—</b></span><span><small>${escapeHtml(t('composition'))}</small><b data-bind="horde-composition">—</b></span><span><small>${escapeHtml(t('waveType'))}</small><b data-bind="horde-final">—</b></span></div></details>`;
 }
 
+const RESOURCE_ACCORDION_KEYS: readonly ResourceAccordionKey[] = ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricity'];
+
+/** Static top-HUD resource controls. Values/details are filled from Core
+ * Forecast by updateResourceAccordion; no resource rule lives in this view. */
+export function renderResourceAccordion(locale: Locale): string {
+  const t = createTranslator(locale);
+  const icons: Record<ResourceAccordionKey, string> = {
+    food: '◉',
+    civilianGoods: '▣',
+    militaryGoods: '✦',
+    fuel: '◌',
+    electricity: '⚡',
+  };
+  const buttons = RESOURCE_ACCORDION_KEYS.map((resource) => {
+    const label = resource === 'electricity' ? t('powerHudLabel') : t(resource);
+    return `<button type="button" class="resource-pill resource-accordion-toggle ${resource}-pill" data-action="toggle-resource" data-resource="${resource}" aria-expanded="false" aria-controls="resource-details-${resource}"><span aria-hidden="true">${icons[resource]}</span><b data-bind="${resource}">0</b><small>${escapeHtml(label)}</small><span class="resource-warning-marker" data-resource-warning="${resource}" aria-label="${escapeHtml(t('forecastShortage'))}" hidden>!</span></button>`;
+  }).join('');
+  const panels = RESOURCE_ACCORDION_KEYS.map((resource) => `<div id="resource-details-${resource}" class="resource-accordion-panel" data-resource-panel="${resource}" role="region" aria-label="${escapeHtml(t(resource === 'electricity' ? 'electricity' : resource))}" hidden></div>`).join('');
+  return `<section class="resource-accordion" data-resource-accordion="true" aria-label="${escapeHtml(t('resources'))}"><div class="resource-accordion-buttons">${buttons}</div><div class="resource-accordion-details">${panels}</div></section>`;
+}
+
+function resourceShortageAmount(resource: ResourceAccordionKey, forecast: EndTurnForecast): number {
+  if (resource === 'food') return Math.max(0, forecast.food.shortage);
+  if (resource === 'civilianGoods') return Math.max(0, forecast.civilianGoods.maintenanceShortage + forecast.civilianGoods.productionInputShortage);
+  if (resource === 'militaryGoods') return Math.max(0, forecast.militaryGoods.totalUnfilledRefillDemand);
+  if (resource === 'fuel') return Math.max(0, forecast.fuel.totalFuelShortage);
+  return Math.max(0, forecast.electricity.shortage);
+}
+
+function renderResourceAccordionPanel(
+  resource: ResourceAccordionKey,
+  forecast: EndTurnForecast,
+  locale: Locale,
+): string {
+  const t = createTranslator(locale);
+  const rows: Array<[string, string]> = [];
+  if (resource === 'electricity') {
+    const power = forecast.electricity;
+    rows.push(
+      [t('projectedPowerDemand'), String(power.requiredPowerDemand)],
+      [t('availablePowerSupply'), String(power.availableGenerationCapacity)],
+      [t('requiredPowerAllocated'), String(power.requiredPowerAllocated)],
+      [t('shortage'), String(power.shortage)],
+    );
+  } else {
+    const detail = unknownRecord(forecast[resource]);
+    if (resource === 'militaryGoods') {
+      const units = Array.isArray(detail.units) ? detail.units : [];
+      const fixedConsumption = units.reduce((total, unit) => total + boundedCount(unknownRecord(unit).fixedConsumption), 0);
+      rows.push(
+        [t('startingStock'), String(detail.startingStock ?? 0)],
+        [t('projectedProductionAmount'), String(detail.projectedProduction ?? 0)],
+        [t('fixedConsumption'), String(fixedConsumption)],
+        [t('militaryRefillDemand'), String(detail.totalRefillDemand ?? 0)],
+        [t('endingStock'), String(detail.projectedEndingStock ?? 0)],
+        [t('shortage'), String(resourceShortageAmount(resource, forecast))],
+      );
+    } else {
+      rows.push(
+        [t('startingStock'), String(detail.startingStock ?? 0)],
+        [t('projectedProductionAmount'), String(detail.projectedProduction ?? 0)],
+        [t('maintenanceRequired'), String(detail.maintenanceRequired ?? 0)],
+        [t('endingStock'), String(detail.endingStock ?? 0)],
+        [t('shortage'), String(resourceShortageAmount(resource, forecast))],
+      );
+    }
+    if (resource === 'civilianGoods') {
+      rows.push(
+        [t('productionInputDemand'), String(detail.productionInputDemand)],
+        [t('productionInputAllocated'), String(detail.productionInputAllocated)],
+        [t('productionInputShortage'), String(detail.productionInputShortage)],
+        [t('maintenanceShortage'), String(detail.maintenanceShortage)],
+      );
+    }
+    if (resource === 'fuel') {
+      rows.push(
+        [t('generationFuelDemand'), String(detail.projectedPowerFuelDemand)],
+        [t('unitRefillDemand'), String(detail.projectedUnitRefillDemand)],
+        [t('projectedFuelUsed'), String(detail.projectedFuelUsed)],
+      );
+    }
+    if (resource === 'militaryGoods') {
+      rows.push(
+        [t('militaryRefillAmount'), String(detail.projectedTotalRefilled ?? 0)],
+        [t('militaryUnfilledDemand'), String(detail.totalUnfilledRefillDemand ?? 0)],
+      );
+    }
+  }
+  const shortage = resourceShortageAmount(resource, forecast);
+  return `<dl class="resource-accordion-grid">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>${shortage > 0 ? `<p class="warning-text resource-accordion-shortage">${escapeHtml(t('forecastShortage'))}: ${shortage}</p>` : `<p class="muted resource-accordion-ok">${escapeHtml(t('forecastNormal'))}</p>`}`;
+}
+
 function isCity(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city';
 }
@@ -1388,7 +1814,8 @@ export function selectionShowsSupplyOverlay(
   selection: Selection | null,
 ): boolean {
   if (!selection) return false;
-  if (selection.kind === 'road') return true;
+  if (selection.kind === 'road' || selection.kind === 'hex') return true;
+  if (selection.kind === 'zombie') return false;
   if (selection.kind === 'checkpoint') {
     return state.checkpoints.some((checkpoint) => checkpoint.id === selection.id);
   }
@@ -1789,6 +2216,12 @@ export class GameUiController {
   private guideShown = false;
   private sheetPointerY: number | null = null;
   private sheetDragged = false;
+  /** UI-only accordion state; never serialized into GameState/Save. */
+  private resourceAccordion: ResourceAccordionKey | null = null;
+  private readonly overviewSections = new Map<OverviewSectionKey, boolean>();
+  /** Crisis groups reveal three alerts at a time without changing Core state. */
+  private readonly crisisExpandedGroups = new Set<CrisisAlertViewModel['severity']>();
+  private eventHistoryLimit = 10;
 
   constructor(root: HTMLElement, createEngine: EngineFactory) {
     this.root = root;
@@ -1804,6 +2237,11 @@ export class GameUiController {
   private readonly handleGlobalKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape' || this.screen !== 'game' || this.root.querySelector('[data-modal]')) return;
     event.preventDefault();
+    if (this.resourceAccordion) {
+      this.resourceAccordion = null;
+      this.updateView();
+      return;
+    }
     this.cancelUnitInteractionLevel();
   };
 
@@ -1826,6 +2264,9 @@ export class GameUiController {
     this.constructiblePreviewTarget = null;
     this.constructiblePlacementMessage = null;
     this.supplyOverlay = false;
+    this.resourceAccordion = null;
+    this.overviewSections.clear();
+    this.eventHistoryLimit = 10;
     this.notifiedEventIds.clear();
     this.destroyBoard();
     const t = this.translator();
@@ -1936,6 +2377,10 @@ export class GameUiController {
       this.constructiblePreviewTarget = null;
       this.constructiblePlacementMessage = null;
       this.supplyOverlay = false;
+      this.resourceAccordion = null;
+      this.overviewSections.clear();
+      this.crisisExpandedGroups.clear();
+      this.eventHistoryLimit = 10;
       this.notifiedEventIds.clear();
       for (const event of this.state.events ?? []) this.notifiedEventIds.add(event.id);
       this.guideShown = !this.hasSeenGuide();
@@ -1984,16 +2429,12 @@ export class GameUiController {
         <button class="icon-button" aria-label="${escapeHtml(t('help'))}" data-action="help">?</button>
       </header>
       <section class="resource-strip" aria-label="${escapeHtml(t('resources'))}">
-        <span class="resource-pill food-pill">◉ <b data-bind="food">0</b><small>${escapeHtml(t('food'))}</small></span>
-        <span class="resource-pill civ-pill">▣ <b data-bind="civilianGoods">0</b><small>${escapeHtml(t('civilianGoods'))}</small></span>
-        <span class="resource-pill mil-pill">✦ <b data-bind="militaryGoods">0</b><small>${escapeHtml(t('militaryGoods'))}</small></span>
-        <span class="resource-pill fuel-pill">◌ <b data-bind="fuel">0</b><small>${escapeHtml(t('fuel'))}</small></span>
-        <span class="resource-pill power-pill" data-bind="power-pill" role="img" aria-label="${escapeHtml(t('powerHudLabel'))}">⚡ <b data-bind="power">0/0</b><small data-bind="power-label">${escapeHtml(t('powerHudLabel'))}</small></span>
+        ${renderResourceAccordion(this.locale)}
         <span class="resource-pill civilian-pill">♙ <b data-bind="healthy-civilians">0</b><small>${escapeHtml(t('healthyCivilians'))}</small></span>
         <span class="resource-pill infected-pill">☣ <b data-bind="infected">0</b><small>${escapeHtml(t('infected'))}</small></span>
       </section>
       ${renderHordeWarningCard(this.locale)}
-      <section class="strategic-critical-strip" data-bind="strategic-critical" data-warning-tier="critical" aria-live="assertive" hidden><strong>${escapeHtml(t('strategicCritical'))}</strong><span data-bind="strategic-critical-text"></span></section>
+      <div data-crisis-mount></div>
       <section class="victory-progress" aria-live="polite" aria-label="${escapeHtml(t('victoryProgress'))}"><strong>${escapeHtml(t('victoryProgress'))}</strong><div data-bind="victory-progress"></div></section>
       <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="unit-context-layer" data-unit-context-layer aria-live="polite"></div>${noiseDebugMount}<div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
       <section class="bottom-sheet" data-sheet="standard" aria-label="${escapeHtml(t('selected'))}">
@@ -2077,6 +2518,10 @@ export class GameUiController {
       const action = target.closest<HTMLElement>('[data-action]')?.dataset.action;
       const nav = target.closest<HTMLElement>('[data-nav]')?.dataset.nav;
       if (action && !(action === 'sheet-toggle' && this.sheetDragged)) this.onAction(action, target.closest<HTMLElement>('[data-action]') ?? target);
+      if (this.resourceAccordion && !target.closest('[data-resource-accordion]')) {
+        this.resourceAccordion = null;
+        this.updateView();
+      }
       this.sheetDragged = false;
       if (nav) this.onNav(nav);
     };
@@ -2119,6 +2564,13 @@ export class GameUiController {
       case 'title': this.showTitle(); break;
       case 'help': this.showHelp(); break;
       case 'focus-important-event': this.focusImportantEvent(element); break;
+      case 'focus-crisis-alert': this.focusCrisisAlert(element); break;
+      case 'open-crisis': this.openCrisis(); break;
+      case 'toggle-resource': this.toggleResourceAccordion(element.dataset.resource as ResourceAccordionKey); break;
+      case 'toggle-overview': this.toggleOverviewSection(element.dataset.section as OverviewSectionKey); break;
+      case 'show-more-crisis': this.showMoreCrisis(element.dataset.crisisSeverity as CrisisAlertViewModel['severity']); break;
+      case 'show-more-events': this.eventHistoryLimit = Math.min(50, this.eventHistoryLimit + 10); this.updateView(); break;
+      case 'select-same-target': this.selectSameHexTarget(element); break;
       case 'toggle-supply': this.supplyOverlay = !this.supplyOverlay; this.updateView(); break;
       case 'sheet-toggle': this.toggleSheet(); break;
       case 'unit-mode-move': this.enterUnitActionMode('move'); break;
@@ -2144,6 +2596,8 @@ export class GameUiController {
       case 'toggle-power-supply': this.setPowerSupply(element); break;
       case 'produce-police': this.produce('police'); break;
       case 'produce-guard': this.produce('nationalGuard'); break;
+      case 'produce-riot-police': this.produce('riotPolice'); break;
+      case 'build-constructible-local': this.buildConstructibleAtSelectedHex(element.dataset.facilityType); break;
       case 'build-simple-farm': this.startConstructibleBuild('simpleFarm'); break;
       case 'build-civilian-drone-base': this.startConstructibleBuild('civilianDroneBase'); break;
       case 'constructible-place-cancel': this.constructiblePlacement = null; this.constructiblePreviewTarget = null; this.constructiblePlacementMessage = null; this.updateView(); break;
@@ -2192,6 +2646,73 @@ export class GameUiController {
     if (target.dataset.policy && event.type === 'change') this.setPolicy(target.dataset.policy, target.value as CheckpointPolicy);
   }
 
+  private toggleResourceAccordion(resource?: ResourceAccordionKey): void {
+    if (!resource || !['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricity'].includes(resource)) return;
+    this.resourceAccordion = this.resourceAccordion === resource ? null : resource;
+    this.updateView();
+  }
+
+  private toggleOverviewSection(section?: OverviewSectionKey): void {
+    if (!section || !['crisis', 'population', 'branches', 'events', 'construction'].includes(section)) return;
+    this.overviewSections.set(section, !(this.overviewSections.get(section) ?? false));
+    this.updateView();
+  }
+
+  private showMoreCrisis(severity?: CrisisAlertViewModel['severity']): void {
+    if (severity !== 'critical' && severity !== 'warning' && severity !== 'advisory') return;
+    this.crisisExpandedGroups.add(severity);
+    this.updateView();
+  }
+
+  private openCrisis(): void {
+    this.resourceAccordion = null;
+    this.selection = null;
+    this.overviewSections.set('crisis', true);
+    this.sheetState = 'expanded';
+    this.updateView();
+  }
+
+  private selectSameHexTarget(element: HTMLElement): void {
+    if (!this.state) return;
+    const kind = element.dataset.selectionKind;
+    const id = element.dataset.selectionId;
+    if ((kind === 'unit' || kind === 'zombie' || kind === 'facility' || kind === 'checkpoint') && id) {
+      this.selection = { kind, id } as Selection;
+    } else if ((kind === 'hex' || kind === 'road') && Number.isInteger(Number(element.dataset.q)) && Number.isInteger(Number(element.dataset.r))) {
+      this.selection = { kind, position: { q: Number(element.dataset.q), r: Number(element.dataset.r) } } as Selection;
+    }
+    this.unitActionMode = null;
+    this.pendingMove = null;
+    this.pendingAttackTargetId = null;
+    this.updateView();
+  }
+
+  private focusCrisisAlert(element: HTMLElement): void {
+    if (!this.state) return;
+    const kind = element.dataset.entityKind;
+    const id = element.dataset.entityId;
+    const q = Number(element.dataset.q);
+    const r = Number(element.dataset.r);
+    let position: HexCoord | null = Number.isSafeInteger(q) && Number.isSafeInteger(r) ? { q, r } : null;
+    if (kind === 'unit' || kind === 'zombie') {
+      const unit = id ? this.state.units.find((candidate) => candidate.id === id) : undefined;
+      if (unit) {
+        this.selection = unit.isPlayerUnit ? { kind: 'unit', id: unit.id } : { kind: 'zombie', id: unit.id };
+        position = { ...unit.position };
+      }
+    } else if (kind === 'facility' && id && this.state.facilities.some((candidate) => candidate.id === id)) {
+      this.selection = { kind: 'facility', id };
+      position = this.state.facilities.find((candidate) => candidate.id === id)?.position ?? position;
+    } else if (kind === 'checkpoint' && id && this.state.checkpoints.some((candidate) => candidate.id === id)) {
+      this.selection = { kind: 'checkpoint', id };
+      position = this.state.checkpoints.find((candidate) => candidate.id === id)?.position ?? position;
+    }
+    if (position) this.boardScene?.focusHex(position);
+    this.navMode = 'map';
+    this.sheetState = 'standard';
+    this.updateView();
+  }
+
   private toggleSheet(): void {
     const index = SHEET_ORDER.indexOf(this.sheetState);
     this.sheetState = SHEET_ORDER[(index + 1) % SHEET_ORDER.length]!;
@@ -2204,8 +2725,9 @@ export class GameUiController {
     this.renderSheetBody();
     const sheetBody = this.root.querySelector<HTMLElement>('[data-bind="sheet-body"]');
     if (this.selection?.kind === 'facility') this.updateFacilitySupplementalControls();
-    if (sheetBody && !this.selection) sheetBody.insertAdjacentHTML('beforeend', this.renderBranchFlow());
-    if (sheetBody && (!this.selection || this.constructiblePlacement)) sheetBody.insertAdjacentHTML('beforeend', this.renderConstructiblePlacement());
+    // v1.5.0 keeps global branch/resource/event information inside the
+    // unselected accordions. Constructible candidates are rendered only for a
+    // selected Domestic Hex; never append a board-wide candidate list here.
     if (sheetBody && this.checkpointPlacement) sheetBody.insertAdjacentHTML('beforeend', this.renderCheckpointPlacement());
     this.updateBoard();
     this.renderUnitContextUi();
@@ -2238,6 +2760,7 @@ export class GameUiController {
     const observation = createAgentObservation(this.state);
     const population = populationLocationTotals(this.state);
     const forecast = forecastEndTurn(this.state);
+    this.updateResourceAccordion(forecast);
     const forecastPower = forecast.electricity;
     const powerHud = powerHudViewModel(forecastPower, this.locale);
     const horde = observation.horde;
@@ -2276,6 +2799,7 @@ export class GameUiController {
       civilianGoods: String(this.state.resources.civilianGoods),
       militaryGoods: String(this.state.resources.militaryGoods),
       fuel: String(this.state.resources.fuel),
+      electricity: powerHud.display,
       power: powerHud.display,
       'horde-warning': warningLabel,
       'horde-status': hordeStatusLabel(horde.finalHordeStatus, this.locale),
@@ -2328,6 +2852,40 @@ export class GameUiController {
       fuelElement.title = `${t('fuelForecast')}: ${t('currentFuel')} ${fuel.turnStartFuel} · ${t('powerFuelDemand')} ${fuel.projectedPowerFuelDemand} · ${t('unitRefillDemand')} ${fuel.projectedUnitRefillDemand} · ${t('projectedEndingFuel')} ${fuel.projectedEndingFuel}`;
       fuelElement.setAttribute('aria-label', `${t('fuel')}: ${fuel.turnStartFuel}. ${t('totalFuelDemand')}: ${fuel.projectedTotalFuelDemand}. ${t('projectedEndingFuel')}: ${fuel.projectedEndingFuel}`);
     }
+    this.updateCrisisStrip(observation);
+  }
+
+  private updateResourceAccordion(forecast: EndTurnForecast): void {
+    const accordion = this.root.querySelector<HTMLElement>('[data-resource-accordion]');
+    if (!accordion) return;
+    const t = this.translator();
+    for (const resource of RESOURCE_ACCORDION_KEYS) {
+      const button = accordion.querySelector<HTMLButtonElement>(`[data-resource="${resource}"]`);
+      const panel = accordion.querySelector<HTMLElement>(`[data-resource-panel="${resource}"]`);
+      const shortage = resourceShortageAmount(resource, forecast);
+      const open = this.resourceAccordion === resource;
+      if (button) {
+        button.setAttribute('aria-expanded', String(open));
+        button.classList.toggle('is-open', open);
+        button.classList.toggle('has-shortage', shortage > 0);
+        button.title = shortage > 0 ? `${t('forecastShortage')}: ${shortage}` : t('forecastNormal');
+        const warning = button.querySelector<HTMLElement>('[data-resource-warning]');
+        if (warning) {
+          warning.hidden = shortage <= 0;
+          warning.textContent = shortage > 0 ? '!' : '';
+        }
+      }
+      if (panel) {
+        panel.hidden = !open;
+        if (open) panel.innerHTML = renderResourceAccordionPanel(resource, forecast, this.locale);
+      }
+    }
+  }
+
+  private updateCrisisStrip(observation: AgentObservation): void {
+    const mount = this.root.querySelector<HTMLElement>('[data-crisis-mount]');
+    if (!mount) return;
+    mount.innerHTML = renderCrisisStrip(crisisSummaryViewModel(observation), this.locale);
   }
 
   private updateBoard(): void {
@@ -2345,6 +2903,7 @@ export class GameUiController {
       locale: this.locale,
       selectedPosition: this.selectedPosition(),
       selectedUnitId: this.selection?.kind === 'unit' ? this.selection.id : null,
+      selectedZombieId: this.selection?.kind === 'zombie' ? this.selection.id : null,
       legalDestinations: this.selectedUnitLegalMoves(),
       attackTargetIds: this.selectedUnitAttackTargets(),
       pendingPath: this.pendingMove?.path,
@@ -2474,7 +3033,7 @@ export class GameUiController {
           : this.state.config.vision.ownedFacility);
       return selection(facility.position, radius, visionMode, terrainLosBlocking);
     }
-    if (selected.kind === 'road') return null;
+    if (selected.kind === 'road' || selected.kind === 'hex' || selected.kind === 'zombie') return null;
     const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === selected.id);
     const publicCheckpoint = createAgentObservation(this.state).checkpoints.find((candidate) => candidate.id === checkpoint?.id);
     return checkpoint?.status === 'operational'
@@ -2487,7 +3046,8 @@ export class GameUiController {
     const selected = this.selection;
     if (selected.kind === 'unit') return findUnit(this.state, selected.id)?.position ?? null;
     if (selected.kind === 'facility') return this.state.facilities.find((facility) => facility.id === selected.id)?.position ?? null;
-    if (selected.kind === 'road') return { ...selected.position };
+    if (selected.kind === 'road' || selected.kind === 'hex') return { ...selected.position };
+    if (selected.kind === 'zombie') return findUnit(this.state, selected.id)?.position ?? null;
     return this.state.checkpoints.find((checkpoint) => checkpoint.id === selected.id)?.position ?? null;
   }
 
@@ -2833,6 +3393,9 @@ export class GameUiController {
   private endTurn(): void {
     if (!this.state) return;
     const forecast = forecastEndTurn(this.state);
+    const observation = createAgentObservation(this.state);
+    const crisis = crisisSummaryViewModel(observation);
+    const endTurnRisk = endTurnRiskViewModel(observation);
     const t = this.translator();
     const projected: Array<[string, number]> = [];
     if (forecast.food.shortage > 0) projected.push([t('food'), forecast.food.shortage]);
@@ -2847,7 +3410,8 @@ export class GameUiController {
       projected.push([t('generationFuelWarning'), forecast.fuel.generationFuelShortage]);
     }
     if (forecast.electricity.shortage > 0) projected.push([t('powerShortageWarning'), forecast.electricity.shortage]);
-    if (projected.length > 0) {
+    const riskConfirmation = shouldConfirmEndTurn(crisis, endTurnRisk);
+    if (riskConfirmation || projected.length > 0) {
       const details = projected
         .map(([resource, amount]) => `<li>${escapeHtml(resource)}: <b>${amount}</b></li>`)
         .join('');
@@ -2855,7 +3419,12 @@ export class GameUiController {
       const crowdDetails = overcrowding.cities.length > 0
         ? `<p class="muted">${escapeHtml(t('overcrowding'))}: ${escapeHtml(formatPercent(overcrowding.cities.reduce((total, city) => total + city.excess / Math.max(1, city.softCap), 0), this.locale))} · ${escapeHtml(t('additionalFood'))} ${overcrowding.additionalFood} · ${escapeHtml(t('additionalCivilianGoods'))} ${overcrowding.additionalCivilianGoods}</p>`
         : '';
-      this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="shortage"><section class="modal-card floating-card" aria-labelledby="shortage-heading"><h2 id="shortage-heading">${escapeHtml(t('shortageWarning'))}</h2><p>${escapeHtml(t('shortageWarningBody'))}</p>${crowdDetails}<ul class="warning-list">${details}</ul><div class="modal-actions"><button class="primary-button" data-action="end-turn-confirm">${escapeHtml(t('proceedAnyway'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('back'))}</button></div></section></div>`);
+      const riskItems = riskConfirmation
+        ? `<section class="end-turn-risk" data-end-turn-risk="true"><h3>${escapeHtml(t('endTurnRisk'))}</h3>${crisis.criticalCount > 0 ? `<p class="warning-text">${escapeHtml(t('criticalAlertCount'))}: ${crisis.criticalCount}</p>` : ''}${endTurnRisk.unitsWithAttackChargesRemaining.length > 0 ? `<p>${escapeHtml(t('attackChargeRemainingUnits'))}: ${endTurnRisk.unitsWithAttackChargesRemaining.length}</p>` : ''}${endTurnRisk.uncontainedInfectedSites.length > 0 ? `<p>${escapeHtml(t('uncontainedInfectedSites'))}: ${endTurnRisk.uncontainedInfectedSites.length}</p>` : ''}${endTurnRisk.forecastGuaranteedDefeat ? `<p class="warning-text">${escapeHtml(t('guaranteedDefeat'))}</p>` : ''}</section>`
+        : '';
+      const title = riskConfirmation ? t('endTurnConfirmation') : t('shortageWarning');
+      const body = riskConfirmation ? t('endTurnRiskBody') : t('shortageWarningBody');
+      this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="shortage"><section class="modal-card floating-card" aria-labelledby="shortage-heading"><h2 id="shortage-heading">${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p>${riskItems}${crowdDetails}${details ? `<ul class="warning-list">${details}</ul>` : ''}<div class="modal-actions"><button class="primary-button" data-action="end-turn-confirm">${escapeHtml(t('proceedAnyway'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('back'))}</button></div></section></div>`);
       return;
     }
     this.commitEndTurn();
@@ -3053,47 +3622,70 @@ export class GameUiController {
     else this.apply(action);
   }
 
-  private produce(unitType: 'police' | 'nationalGuard'): void {
+  private produce(unitType: 'police' | 'nationalGuard' | 'riotPolice'): void {
     const facility = this.selectedCity();
     const destination = facility?.position;
-    const action = facility ? actionForUnitProduction(this.legalActions(), unitType, destination) : undefined;
+    const action = facility ? actionForUnitProduction(this.legalActions(), unitType as HumanUnitType, destination) : undefined;
     if (action) {
       this.apply(action);
       return;
     }
-    const requested: Extract<GameAction, { type: 'ProduceUnit' }> = {
+    const requested = {
       type: 'ProduceUnit',
       unitType,
       ...(destination ? { destination } : {}),
-    };
+    } as GameAction;
     const reason = actionReasonFor(this.state!, requested, this.locale) ??
-      (unitType === 'police' ? this.translator()('policeRecruitmentRule') : this.translator()('guardRecruitmentRule'));
+      (unitType === 'police' ? this.translator()('policeRecruitmentRule') : unitType === 'nationalGuard' ? this.translator()('guardRecruitmentRule') : this.translator()('riotPoliceRecruitmentRule'));
     this.showToast(reason);
     this.updateRecruitmentReasons();
   }
 
   private startConstructibleBuild(facilityType: ConstructibleFacilityType): void {
-    if (!this.state || !this.engine) return;
-    const placement: ConstructiblePlacement = { facilityType };
-    const candidates = this.constructibleFacilityCandidates(facilityType);
-    if (candidates.length === 0) {
-      this.showToast(this.translator()('buildSupplyRequired'));
+    // Legacy action names remain accepted for integrations, but v1.5 never
+    // opens a board-wide placement mode. Build must begin from the selected
+    // empty Domestic Hex so Core can validate exactly one coordinate.
+    if (this.selection?.kind !== 'hex') {
+      this.showToast(this.translator()('domesticBuildHint'));
       return;
     }
-    this.selection = null;
-    this.unitActionMode = null;
-    this.pendingMove = null;
-    this.pendingAttackTargetId = null;
-    this.checkpointPlacement = null;
-    this.checkpointPreviewTarget = null;
-    this.checkpointPlacementMessage = null;
-    this.constructiblePlacement = placement;
-    this.constructiblePlacementMessage = null;
-    const first = candidates.find((candidate) => candidate.legal) ?? candidates[0]!;
-    this.constructiblePreviewTarget = { ...first.position };
-    this.supplyOverlay = true;
-    this.sheetState = 'standard';
-    this.updateView();
+    this.buildConstructibleAtSelectedHex(facilityType);
+  }
+
+  /** Execute a Constructible build for the currently selected Domestic Hex.
+   * The candidate is narrowed to that one position; no board-wide marker or
+   * coordinate list is exposed to the Human UI. */
+  private buildConstructibleAtSelectedHex(facilityType: string | undefined): void {
+    if (!this.state || !this.engine || this.selection?.kind !== 'hex') return;
+    if (facilityType !== 'simpleFarm' && facilityType !== 'civilianDroneBase') return;
+    const position = { ...this.selection.position };
+    const candidate = this.constructibleFacilityCandidates(facilityType).find((entry) => samePosition(entry.position, position));
+    const action: Extract<GameAction, { type: 'BuildConstructibleFacility' }> = {
+      type: 'BuildConstructibleFacility',
+      facilityType,
+      position,
+    };
+    if (!candidate || !candidate.legal) {
+      const reason = candidate?.reasonCode
+        ? localizeActionError(candidate.reasonCode, this.locale)
+        : localizeActionError('constructible_invalid_terrain', this.locale);
+      this.constructiblePlacementMessage = reason;
+      this.updateView();
+      return;
+    }
+    const legalAction = this.legalActions().find((entry) => entry.type === 'BuildConstructibleFacility'
+      && entry.facilityType === facilityType && samePosition(entry.position, position));
+    if (!legalAction) {
+      this.constructiblePlacementMessage = actionReasonFor(this.state, action, this.locale) ?? this.translator()('invalidAction');
+      this.updateView();
+      return;
+    }
+    if (this.apply(legalAction)) {
+      this.constructiblePlacementMessage = null;
+      this.supplyOverlay = true;
+      if (this.state) this.selection = resolveTileSelection(this.state, position, 'domestic');
+      this.updateView();
+    }
   }
 
   private executeConstructibleCandidate(element: HTMLElement): void {
@@ -3370,14 +3962,15 @@ export class GameUiController {
     if (!this.state) return;
     const city = this.selectedCity();
     const destination = city?.position;
-    for (const unitType of ['police', 'nationalGuard'] as const) {
-      const button = this.root.querySelector<HTMLButtonElement>(`[data-action="produce-${unitType === 'police' ? 'police' : 'guard'}"]`);
+    for (const unitType of ['police', 'nationalGuard', 'riotPolice'] as const) {
+      const actionName = unitType === 'police' ? 'police' : unitType === 'nationalGuard' ? 'guard' : 'riot-police';
+      const button = this.root.querySelector<HTMLButtonElement>(`[data-action="produce-${actionName}"]`);
       if (!button) continue;
-      const requested: Extract<GameAction, { type: 'ProduceUnit' }> = { type: 'ProduceUnit', unitType, ...(destination ? { destination } : {}) };
+      const requested = { type: 'ProduceUnit', unitType, ...(destination ? { destination } : {}) } as GameAction;
       const reason = !city
-        ? (unitType === 'police' ? this.translator()('policeRecruitmentRule') : this.translator()('guardRecruitmentRule'))
-        : actionReasonFor(this.state, requested, this.locale) ?? (unitType === 'police' ? this.translator()('policeRecruitmentRule') : this.translator()('guardRecruitmentRule'));
-      const legal = Boolean(city && actionForUnitProduction(this.legalActions(), unitType, destination));
+        ? (unitType === 'police' ? this.translator()('policeRecruitmentRule') : unitType === 'nationalGuard' ? this.translator()('guardRecruitmentRule') : this.translator()('riotPoliceRecruitmentRule'))
+        : actionReasonFor(this.state, requested, this.locale) ?? (unitType === 'police' ? this.translator()('policeRecruitmentRule') : unitType === 'nationalGuard' ? this.translator()('guardRecruitmentRule') : this.translator()('riotPoliceRecruitmentRule'));
+      const legal = Boolean(city && actionForUnitProduction(this.legalActions(), unitType as HumanUnitType, destination));
       button.disabled = !legal;
       button.title = legal ? '' : reason;
       const reasonElement = this.root.querySelector<HTMLElement>(`[data-recruitment-reason="${unitType}"]`);
@@ -3493,6 +4086,10 @@ export class GameUiController {
       this.constructiblePreviewTarget = null;
       this.constructiblePlacementMessage = null;
       this.lastSaveCode = null;
+      this.resourceAccordion = null;
+      this.overviewSections.clear();
+      this.crisisExpandedGroups.clear();
+      this.eventHistoryLimit = 10;
       // Loading restores the history but must not replay old event Toasts.
       this.notifiedEventIds.clear();
       for (const event of this.state.events ?? []) this.notifiedEventIds.add(event.id);
@@ -3585,7 +4182,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipDecommission', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipRiotPolice', 'tipProficiency', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipDecommission', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipCrisis', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
@@ -3716,6 +4313,22 @@ export class GameUiController {
       escapeHtml(t('arrivalSchedule')) + '</h3>' + stoppedNotice + rejectionNotice + cards + '</section>' + renderNoiseEventLog(this.state, this.locale);
   }
 
+  /** Summary-only build information for the unselected Domestic accordion. */
+  private renderConstructionOverview(): string {
+    if (!this.state) return '';
+    const t = this.translator();
+    const types: Array<'simpleFarm' | 'civilianDroneBase'> = ['simpleFarm', 'civilianDroneBase'];
+    const rows = types.map((facilityType) => {
+      const config = this.state!.config.facilities[facilityType];
+      const count = this.state!.facilities.filter((facility) => facility.constructible && facility.type === facilityType).length;
+      const limit = Math.ceil(this.state!.map.roadBranches.length / Math.max(1, this.state!.config.constructibleFacility.limitPerTypeDivisor));
+      const label = facilityType === 'simpleFarm' ? t('buildSimpleFarm') : t('buildCivilianDroneBase');
+      const usage = facilityType === 'simpleFarm' ? t('simpleFarmUse') : t('civilianDroneBaseUse');
+      return `<div class="construction-overview-row"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(t('buildCost'))}: ${config.buildCivilianGoods} · ${escapeHtml(t('buildLimit'))}: ${count}/${limit}</span><small>${escapeHtml(usage)}</small></div>`;
+    }).join('');
+    return `<div class="construction-overview" data-construction-overview="true"><p class="muted">${escapeHtml(t('localBuildOnly'))}</p>${rows}</div>`;
+  }
+
   /**
    * Render the Core-backed Constructible Facility picker and candidate mode.
    * The complete candidate query remains on the board; the sheet keeps a
@@ -3725,17 +4338,8 @@ export class GameUiController {
   private renderConstructiblePlacement(): string {
     if (!this.state) return '';
     const t = this.translator();
-    const types: ConstructibleFacilityType[] = ['simpleFarm', 'civilianDroneBase'];
     if (!this.constructiblePlacement) {
-      const buttons = types.map((facilityType) => {
-        const config = this.state!.config.facilities[facilityType];
-        const count = this.state!.facilities.filter((facility) => facility.constructible && facility.type === facilityType).length;
-        const limit = Math.ceil(this.state!.map.roadBranches.length / Math.max(1, this.state!.config.constructibleFacility.limitPerTypeDivisor));
-        const action = facilityType === 'simpleFarm' ? 'build-simple-farm' : 'build-civilian-drone-base';
-        const label = facilityType === 'simpleFarm' ? t('buildSimpleFarm') : t('buildCivilianDroneBase');
-        return `<button class="secondary-button constructible-build-button" data-action="${action}" data-facility-type="${facilityType}">${escapeHtml(label)} · ${escapeHtml(t('buildCost'))} ${config.buildCivilianGoods} · ${escapeHtml(t('buildLimit'))} ${count}/${limit}</button>`;
-      }).join('');
-      return `<section class="constructible-placement constructible-picker" data-constructible-picker="true" aria-labelledby="constructible-heading"><div class="section-heading"><h3 id="constructible-heading">${escapeHtml(t('buildFacility'))}</h3><span class="status-chip">${escapeHtml(t('supply'))}</span></div><p class="muted">${escapeHtml(t('buildModeHint'))}</p><div class="action-row constructible-build-actions">${buttons}</div><p class="muted">${escapeHtml(t('tipBuild'))}</p></section>`;
+      return '';
     }
     const facilityType = this.constructiblePlacement.facilityType;
     const candidates = this.constructibleFacilityCandidates(facilityType);
@@ -3787,13 +4391,70 @@ export class GameUiController {
         ? null
         : localizeActionError(candidate.reasonCode ?? undefined, this.locale)
       : localizeActionError('invalid_checkpoint_tile', this.locale);
-    const cost = candidate?.civilianGoodsCost ?? this.state?.config.checkpoint.constructionCivilianGoods ?? 0;
+    const cost = this.state?.config.checkpoint.constructionCivilianGoods ?? 0;
     title.textContent = t('roadHex');
     summary.textContent = `${t('location')} ${position.q},${position.r} · ${t('branch')} ${branchId ?? t('unavailable')}`;
     const action = candidate?.legal && branchId
       ? `<button class="secondary-button" data-action="build-checkpoint-local" data-branch-id="${escapeHtml(branchId)}" data-q="${position.q}" data-r="${position.r}">${escapeHtml(t('roadCheckpointBuild'))} · ${escapeHtml(t('civilianGoods'))} ${cost}</button>`
       : `<p class="warning-text checkpoint-build-reason" data-checkpoint-build-reason="true" role="status">${escapeHtml(reason ?? t('checkpointBuildUnavailable'))}</p>`;
     body.innerHTML = `${this.renderTerrainDetails(publicTile, 0)}<section class="road-checkpoint-action" data-road-checkpoint-action="true"><h3>${escapeHtml(t('roadCheckpointBuild'))}</h3><p class="muted">${escapeHtml(t('checkpointPlacementLocalHint'))}</p>${action}</section>`;
+  }
+
+  /** Render an empty public Hex with local Constructible actions only. */
+  private renderHexSheet(
+    position: HexCoord,
+    body: HTMLElement,
+    title: HTMLElement,
+    summary: HTMLElement,
+    publicTile?: AgentMapTileObservation,
+  ): void {
+    const t = this.translator();
+    const types: ConstructibleFacilityType[] = ['simpleFarm', 'civilianDroneBase'];
+    const candidates = types.map((facilityType) => this.constructibleFacilityCandidates(facilityType)
+      .find((candidate) => samePosition(candidate.position, position)));
+    const legal = candidates.filter((candidate): candidate is ConstructibleFacilityPositionCandidate => Boolean(candidate?.legal));
+    const buttons = legal.map((candidate) => {
+      const label = candidate.facilityType === 'simpleFarm' ? t('buildSimpleFarm') : t('buildCivilianDroneBase');
+      const cost = this.state?.config.facilities[candidate.facilityType].buildCivilianGoods ?? 0;
+      return `<button type="button" class="secondary-button constructible-build-button" data-action="build-constructible-local" data-facility-type="${escapeHtml(candidate.facilityType)}" data-q="${position.q}" data-r="${position.r}">${escapeHtml(label)} · ${escapeHtml(t('buildCost'))} ${cost}</button>`;
+    }).join('');
+    const reasonCode = candidates.find((candidate) => candidate && !candidate.legal)?.reasonCode;
+    const selectedReason = this.constructiblePlacementMessage ?? (reasonCode ? localizeActionError(reasonCode, this.locale) : null);
+    title.textContent = t('hex');
+    summary.textContent = `${t('location')} ${position.q},${position.r} · ${publicTile?.road ? t('roadOverlay') : ''}${publicTile?.urban ? ` · ${t('urbanOverlay')}` : ''}`;
+    const buildBody = this.navMode === 'domestic'
+      ? `<section class="constructible-placement constructible-local" data-constructible-local="true"><h3>${escapeHtml(t('buildFacility'))}</h3><p class="muted">${escapeHtml(t('localBuildOnly'))}</p>${buttons || `<p class="warning-text constructible-inline-message" data-constructible-inline-message role="status">${escapeHtml(selectedReason ?? t('noConstructibleHere'))}</p>`}</section>`
+      : `<p class="muted">${escapeHtml(t('domesticBuildHint'))}</p>`;
+    body.innerHTML = `${this.renderTerrainDetails(publicTile, 0)}${buildBody}`;
+  }
+
+  /** Same-Hex tabs expose alternate public targets without changing Core. */
+  private renderSameHexTabs(position: HexCoord, selected: Exclude<Selection, null>): string {
+    if (!this.state) return '';
+    const targets: Array<{ kind: Exclude<Selection, null>['kind']; id?: string; label: string }> = [];
+    const units = this.state.units.filter((unit) => unit.actionState !== 'destroyed' && samePosition(unit.position, position));
+    for (const unit of units) {
+      if (unit.isPlayerUnit) targets.push({ kind: 'unit', id: unit.id, label: unitLabel(unit.type, this.locale) });
+      else targets.push({ kind: 'zombie', id: unit.id, label: unitLabel(unit.type, this.locale) });
+    }
+    const facility = findFacilityAt(this.state, position);
+    if (facility) targets.push({ kind: 'facility', id: facility.id, label: facilityLabel(facility.type, this.locale) });
+    const checkpoint = findCheckpointAt(this.state, position);
+    if (checkpoint) targets.push({ kind: 'checkpoint', id: checkpoint.id, label: this.translator()('checkpoint') });
+    const isRoad = this.state.map.roadBranches.some((branch) => branch.roadTiles.some((tile) => samePosition(tile, position)));
+    if (!facility && !checkpoint && !units.length) {
+      targets.push({ kind: isRoad ? 'road' : 'hex', label: isRoad ? this.translator()('roadHex') : this.translator()('hex') });
+    } else if (!targets.some((target) => target.kind === 'hex')) {
+      // Keep the full public terrain view reachable from every occupied
+      // target. Target tabs remain ordered Unit → Facility/Checkpoint → Hex.
+      targets.push({ kind: 'hex', label: this.translator()('hex') });
+    }
+    if (targets.length < 2) return '';
+    return `<nav class="same-hex-tabs" data-same-hex-tabs="true" role="tablist" aria-label="${escapeHtml(this.translator()('sameHexActions'))}">${targets.map((target) => {
+      const active = selected.kind === target.kind && ('id' in selected ? selected.id === target.id : samePosition(selected.position, position));
+      const positionAttrs = target.id ? ` data-selection-id="${escapeHtml(target.id)}"` : ` data-q="${position.q}" data-r="${position.r}"`;
+      return `<button type="button" class="same-hex-tab${active ? ' active' : ''}" role="tab" aria-selected="${String(active)}" data-action="select-same-target" data-selection-kind="${target.kind}"${positionAttrs}>${escapeHtml(target.label)}</button>`;
+    }).join('')}</nav>`;
   }
 
   private renderSheetBody(): void {
@@ -3808,10 +4469,22 @@ export class GameUiController {
     if (!selected) {
       const prompt = unselectedPrompt(this.navMode, this.locale);
       const population = populationLocationTotals(this.state);
-      const forecast = forecastEndTurn(this.state);
+      const crisis = crisisSummaryViewModel(observation);
       title.textContent = prompt;
       summary.textContent = stateSummary(this.state, this.locale);
-      body.innerHTML = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl>${renderStrategicWarnings(observation, this.locale)}${renderEndTurnForecast(forecast, this.locale)}<p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>${renderImportantEventHistory(this.state.events ?? [], this.locale, 50)}`;
+      const isOpen = (section: OverviewSectionKey): boolean => this.overviewSections.has(section)
+        ? Boolean(this.overviewSections.get(section))
+        : section === 'crisis' && crisis.criticalCount > 0;
+      const populationContent = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl><p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>`;
+      const risk = endTurnRiskViewModel(observation);
+      const crisisSummary = `${crisis.criticalCount} ${t('crisisSeverity.critical')} · ${crisis.warningCount} ${t('crisisSeverity.warning')} · ${crisis.advisoryCount} ${t('crisisSeverity.advisory')}`;
+      const branchContent = this.renderBranchFlow();
+      const eventHistory = renderImportantEventHistory(this.state.events ?? [], this.locale, this.eventHistoryLimit);
+      const moreEvents = this.eventHistoryLimit < 50 && importantEventViewModels(this.state.events ?? [], 50).length > this.eventHistoryLimit
+        ? `<button type="button" class="secondary-button overview-more-events" data-action="show-more-events">${escapeHtml(t('showMoreEvents'))}</button>`
+        : '';
+      const constructionContent = this.renderConstructionOverview();
+      body.innerHTML = `${overviewSectionMarkup('crisis', t('crisisSection'), crisisSummary, `${renderCrisisList(crisis, this.locale, this.crisisExpandedGroups)}${risk.forecastGuaranteedDefeat ? `<p class="warning-text">${escapeHtml(t('guaranteedDefeat'))}</p>` : ''}`, isOpen('crisis'), this.locale)}${overviewSectionMarkup('population', t('populationLocations'), `${population.total} ${t('population')}`, populationContent, isOpen('population'), this.locale)}${overviewSectionMarkup('branches', t('branchPanel'), t('arrivalSchedule'), branchContent, isOpen('branches'), this.locale)}${overviewSectionMarkup('events', t('importantEventHistory'), `${Math.min(50, importantEventViewModels(this.state.events ?? [], 50).length)}/50`, `${eventHistory}${moreEvents}`, isOpen('events'), this.locale)}${overviewSectionMarkup('construction', t('buildFacility'), t('localBuildOnly'), constructionContent, isOpen('construction'), this.locale)}`;
       return;
     }
     if (selected.kind === 'unit') {
@@ -3820,19 +4493,46 @@ export class GameUiController {
       const actions = legalActionsForUnit(this.state, this.legalActions(), unit.id);
       const publicUnit = observation.units.find((candidate) => candidate.id === unit.id);
       const publicTile = mapTileForPosition(observation, unit.position);
+      const proficiency = unitProficiencyViewModel(unit, this.state.config);
+      const proficiencySummary = proficiency
+        ? ` · ${proficiencyLabel(proficiency.proficiency, this.locale)} · ${t('attackCharge')} ${proficiency.attackChargesRemaining}/${proficiency.maxAttackCharges}`
+        : '';
       title.textContent = `${unitLabel(unit.type, this.locale)} · ${unit.id}`;
-      summary.textContent = `HP ${unit.hp}/${unit.maxHp} · ${t('unitFuel')} ${publicUnit?.currentFuel ?? unit.currentFuel}/${publicUnit?.maxFuel ?? unit.maxFuel} · ${t('carriedMilitaryGoods')} ${publicUnit?.currentMilitaryGoods ?? unit.currentMilitaryGoods}/${publicUnit?.maxMilitaryGoods ?? unit.maxMilitaryGoods} · ${t('move')} ${unit.movement} · ${t('attack')} ${unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range} · ${t('vision')} ${publicUnit?.vision ?? unit.vision}`;
+      summary.textContent = `HP ${unit.hp}/${unit.maxHp}${proficiencySummary} · ${t('unitFuel')} ${publicUnit?.currentFuel ?? unit.currentFuel}/${publicUnit?.maxFuel ?? unit.maxFuel} · ${t('carriedMilitaryGoods')} ${publicUnit?.currentMilitaryGoods ?? unit.currentMilitaryGoods}/${publicUnit?.maxMilitaryGoods ?? unit.maxMilitaryGoods} · ${t('move')} ${unit.movement} · ${t('attack')} ${publicUnit?.attack ?? unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range} · ${t('vision')} ${publicUnit?.vision ?? unit.vision}`;
       const risk = this.pendingMove?.interceptionRisk;
       const riskText = typeof risk === 'number' ? risk <= 0.2 ? t('low') : risk <= 0.5 ? t('medium') : t('high') : String(risk ?? t('none'));
       const canWait = actions.some((action) => action.type === 'Wait');
       const supplied = isHexSupplied(this.state, unit.position);
       const supplyReason = supplied ? '' : localizeActionError('recovery_out_of_supply', this.locale);
-      body.innerHTML = this.renderUnitSheet(unit, publicUnit, publicTile, actions, riskText, supplied, supplyReason);
+      body.innerHTML = this.renderSameHexTabs(unit.position, selected) + this.renderUnitSheet(unit, publicUnit, publicTile, actions, riskText, supplied, supplyReason);
+      return;
+    }
+    if (selected.kind === 'zombie') {
+      const zombie = findUnit(this.state, selected.id);
+      if (!zombie || zombie.isPlayerUnit) return;
+      const publicZombie = observation.zombies.find((candidate) => candidate.id === zombie.id);
+      const publicTile = mapTileForPosition(observation, zombie.position);
+      title.textContent = `${unitLabel(zombie.type, this.locale)} · ${zombie.id}`;
+      const waveBadge = zombie.hordeKind === 'final'
+        ? t('finalWave')
+        : zombie.hordeKind === 'periodic'
+          ? t('waveMembership')
+          : '';
+      summary.textContent = `HP ${zombie.hp}/${zombie.maxHp} · ${t('attack')} ${publicZombie?.attack ?? zombie.attack} · ${t('movement')} ${publicZombie?.movement ?? zombie.movement} · ${t('range')} ${publicZombie?.effectiveRange ?? zombie.range}`;
+      body.innerHTML = this.renderSameHexTabs(zombie.position, selected) + this.renderZombieSheet(zombie, publicZombie, publicTile, waveBadge);
+      return;
+    }
+    if (selected.kind === 'hex') {
+      const publicTile = mapTileForPosition(observation, selected.position);
+      this.renderHexSheet(selected.position, body, title, summary, publicTile);
       return;
     }
     if (selected.kind === 'road') {
       const publicTile = mapTileForPosition(observation, selected.position);
-      this.renderRoadSheet(selected.position, body, title, summary, publicTile);
+      body.innerHTML = this.renderSameHexTabs(selected.position, selected);
+      const content = document.createElement('div');
+      this.renderRoadSheet(selected.position, content, title, summary, publicTile);
+      body.insertAdjacentHTML('beforeend', content.innerHTML);
       return;
     }
     if (selected.kind === 'checkpoint') {
@@ -3840,7 +4540,10 @@ export class GameUiController {
       if (!checkpoint) return;
       const publicCheckpoint = observation.checkpoints.find((candidate) => candidate.id === checkpoint.id);
       const publicTile = mapTileForPosition(observation, checkpoint.position);
-      this.renderCheckpointSheet(checkpoint, body, title, summary, publicCheckpoint, publicTile);
+      body.innerHTML = this.renderSameHexTabs(checkpoint.position, selected);
+      const content = document.createElement('div');
+      this.renderCheckpointSheet(checkpoint, content, title, summary, publicCheckpoint, publicTile);
+      body.insertAdjacentHTML('beforeend', content.innerHTML);
       return;
     }
     const facility = this.state.facilities.find((candidate) => candidate.id === selected.id);
@@ -3909,7 +4612,7 @@ export class GameUiController {
     const workerEditor = owned && !city
       ? `<section class="population-editor facility-editor" aria-labelledby="workers-heading"><h3 id="workers-heading">${escapeHtml(t('workers'))}</h3><p class="muted">${escapeHtml(t('assignWorkersHint'))}</p><label>${escapeHtml(t('workers'))}<output data-worker-output="true">${bounds.current}/${bounds.maximum}</output><input type="range" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" data-worker-control="true" data-worker-input="true" data-worker-slider="true" aria-label="${escapeHtml(t('workers'))}" /></label><input class="numeric-input" type="number" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" inputmode="numeric" aria-label="${escapeHtml(t('workers'))}" data-worker-control="true" data-worker-input="true" data-worker-number="true" /><p class="warning-text" data-worker-reason="true" ${workerReason ? '' : 'hidden'}>${workerReason ? escapeHtml(workerReason) : ''}</p><button class="secondary-button" data-action="assign-workers" ${workerAction && canOperatePopulation ? '' : 'disabled'}>${escapeHtml(t('assignWorkers'))}</button></section>`
       : '';
-    const recruitment = `<section class="recruitment-editor"><h3>${escapeHtml(t('population'))}</h3><p class="muted">${escapeHtml(city ? t('tipRecruitment') : t('recruitmentDisabled'))}</p><div class="action-row"><button class="secondary-button" data-action="produce-police">${escapeHtml(t('producePolice'))}</button><button class="secondary-button" data-action="produce-guard">${escapeHtml(t('produceGuard'))}</button></div><p class="warning-text" data-recruitment-reason="police" hidden></p><p class="warning-text" data-recruitment-reason="nationalGuard" hidden></p></section>`;
+    const recruitment = `<section class="recruitment-editor"><h3>${escapeHtml(t('population'))}</h3><p class="muted">${escapeHtml(city ? t('tipRecruitment') : t('recruitmentDisabled'))}</p><div class="action-row"><button class="secondary-button" data-action="produce-police">${escapeHtml(t('producePolice'))}</button><button class="secondary-button" data-action="produce-guard">${escapeHtml(t('produceGuard'))}</button><button class="secondary-button" data-action="produce-riot-police">${escapeHtml(t('produceRiotPolice'))} · P10/C25/M25</button></div><p class="warning-text" data-recruitment-reason="police" hidden></p><p class="warning-text" data-recruitment-reason="nationalGuard" hidden></p><p class="warning-text" data-recruitment-reason="riotPolice" hidden></p></section>`;
     const isDecommissionableType = facility.constructible && facility.type === 'civilianDroneBase';
     const decommissionRefund = Math.ceil(this.state.config.facilities.civilianDroneBase.buildCivilianGoods / 2);
     const decommissionAction: Extract<GameAction, { type: 'DecommissionConstructibleFacility' }> = {
@@ -3922,10 +4625,25 @@ export class GameUiController {
     const decommissionControl = isDecommissionableType
       ? `<section class="decommission-editor" data-decommission-editor="true"><h3>${escapeHtml(t('decommissionFacility'))}</h3><p class="muted">${escapeHtml(t('decommissionConditions'))}</p><p>${escapeHtml(t('decommissionRefund'))}: <strong>${decommissionRefund} ${escapeHtml(t('civilianGoods'))}</strong></p><button class="secondary-button" data-action="decommission-facility" data-facility-id="${escapeHtml(facility.id)}" ${decommissionReason ? 'disabled' : ''}>${escapeHtml(t('decommissionFacility'))}</button>${decommissionReason ? `<p class="warning-text" data-decommission-reason="true">${escapeHtml(decommissionReason)}</p>` : '<p class="muted" data-decommission-reason="true"></p>'}</section>`
       : '';
-    body.innerHTML = `${this.renderTerrainDetails(publicTile, publicFacility?.vision ?? 0, publicFacility)}${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
+    body.innerHTML = this.renderSameHexTabs(facility.position, selected) + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
     body.insertAdjacentHTML('beforeend', this.renderFacilityForecast(publicFacility));
     this.updateTransferPreview();
     this.updateRecruitmentReasons();
+  }
+
+  private renderZombieSheet(
+    zombie: UnitState,
+    publicZombie: AgentUnitObservation | undefined,
+    publicTile: AgentMapTileObservation | undefined,
+    waveBadge: string,
+  ): string {
+    const t = this.translator();
+    const publicAttack = publicZombie?.attack ?? zombie.attack;
+    const publicMovement = publicZombie?.movement ?? zombie.movement;
+    const publicRange = publicZombie?.effectiveRange ?? publicZombie?.range ?? zombie.range;
+    const badge = waveBadge ? `<span class="status-chip zombie-wave-badge">${escapeHtml(waveBadge)}</span>` : '';
+    const finalBadge = zombie.hordeKind === 'final' ? `<p class="warning-text">${escapeHtml(t('finalWaveMembership'))}</p>` : '';
+    return `<section class="zombie-detail-panel" data-zombie-panel="true"><div class="section-heading"><h3>${escapeHtml(unitLabel(zombie.type, this.locale))}</h3>${badge}</div><dl class="location-grid"><div><dt>${escapeHtml(t('hp'))}</dt><dd>${zombie.hp}/${zombie.maxHp}</dd></div><div><dt>${escapeHtml(t('attack'))}</dt><dd>${publicAttack}</dd></div><div><dt>${escapeHtml(t('movement'))}</dt><dd>${publicMovement}</dd></div><div><dt>${escapeHtml(t('range'))}</dt><dd>${publicRange}</dd></div></dl>${finalBadge}<p class="muted">${escapeHtml(t('visibleEnemyOnly'))}</p></section>`;
   }
 
   private renderUnitSheet(
@@ -3939,6 +4657,20 @@ export class GameUiController {
   ): string {
     const t = this.translator();
     const canWait = actions.some((action) => action.type === 'Wait');
+    const proficiency = unitProficiencyViewModel(unit, this.state?.config);
+    const proficiencyText = proficiency
+      ? `${proficiencyLabel(proficiency.proficiency, this.locale)}${proficiency.veteranPromotionPending ? ` (${t('veteranPromotionPending')})` : ''}`
+      : '';
+    const proficiencyProgress = proficiency
+      ? proficiency.proficiency === 'recruit'
+        ? `${t('regularIn')} ${Math.max(0, proficiency.recruitSurvivalTurnsRequired - proficiency.recruitSurvivalTurns)} ${t('turns')}`
+        : proficiency.proficiency === 'regular'
+          ? `${t('veteranIn')} ${Math.max(0, proficiency.veteranZombieKillsRequired - proficiency.regularZombieKills)} / ${proficiency.veteranZombieKillsRequired} ${t('kills')}`
+          : `${t('attackCharge')} ${proficiency.attackChargesRemaining} / ${proficiency.maxAttackCharges}`
+      : '';
+    const proficiencySection = proficiency
+      ? `<section class="unit-proficiency" data-unit-proficiency="true"><div class="section-heading"><h3>${escapeHtml(t('proficiency'))}</h3><span class="status-chip">${escapeHtml(proficiencyText)}</span></div><p>${escapeHtml(proficiencyProgress)}</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('attackCharge'))}</dt><dd>${proficiency.attackChargesRemaining}/${proficiency.maxAttackCharges}</dd></div><div><dt>${escapeHtml(t('zombieKills'))}</dt><dd>${proficiency.regularZombieKills}/${proficiency.veteranZombieKillsRequired}</dd></div></dl></section>`
+      : '';
     const recoveryClass = publicUnit?.recoveryClassIfTurnEndsNow ?? (supplied ? 'rest' : 'outOfSupply');
     const recoveryRate = publicUnit?.recoveryRateIfTurnEndsNow ?? (
       recoveryClass === 'combat'
@@ -4008,7 +4740,7 @@ export class GameUiController {
         : this.unitActionMode === 'attack'
           ? t('selectAttackTarget')
           : t('selectUnitAction');
-    return `${this.renderTerrainDetails(publicTile, publicUnit?.vision ?? unit.vision, publicUnit)}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${fuelSection}${militaryGoodsSection}<section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
+    return `<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${proficiencySection}${fuelSection}${militaryGoodsSection}<section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
   }
 
   /**
@@ -4187,7 +4919,7 @@ export class GameUiController {
     const infectionSection = checkpoint.infected > 0
       ? '<section class="infection-forecast"><h3>' + escapeHtml(t('infectionForecast')) + '</h3><p class="' + (publicCheckpoint?.infectionContained ? 'is-contained' : 'warning-text') + '">' + escapeHtml(publicCheckpoint?.infectionContained ? t('infectionContained') : t('infectionNotContained')) + '</p><p class="muted">' + escapeHtml(t('automaticSuppression')) + ': ' + String(publicCheckpoint?.projectedSuppression ?? 0) + '</p>' + ((publicCheckpoint?.projectedCivilianDamage ?? 0) > 0 ? '<p class="warning-text">' + escapeHtml(t('projectedCivilianDamage')) + ': ' + String(publicCheckpoint?.projectedCivilianDamage) + '</p>' : '<p class="muted">' + escapeHtml(t('noCivilianDamage')) + '</p>') + '</section>'
       : '';
-    body.innerHTML = this.renderTerrainDetails(publicTile, publicCheckpoint?.vision ?? 0, publicCheckpoint) + '<section class="checkpoint-card checkpoint-status-' + escapeHtml(checkpoint.status) + '" data-checkpoint-id="' + escapeHtml(checkpoint.id) + '" data-checkpoint-role="' + escapeHtml(role) + '" data-checkpoint-status="' + escapeHtml(checkpoint.status) + '"><div class="checkpoint-heading"><strong>' +
+    body.innerHTML = '<section class="checkpoint-card checkpoint-status-' + escapeHtml(checkpoint.status) + '" data-checkpoint-id="' + escapeHtml(checkpoint.id) + '" data-checkpoint-role="' + escapeHtml(role) + '" data-checkpoint-status="' + escapeHtml(checkpoint.status) + '"><div class="checkpoint-heading"><strong>' +
       escapeHtml(t('checkpointStatus')) + ': ' + escapeHtml(roleLabel) + ' · ' + escapeHtml(statusLabel) + '</strong><span class="status-chip ' + (supplied ? 'is-supplied' : 'is-out-of-supply') +
       '">' + escapeHtml(supplied ? t('supplied') : t('outOfSupply')) + '</span></div><dl class="location-grid"><div><dt>' +
       escapeHtml(t('branch')) + '</dt><dd>' + escapeHtml(branchText) + '</dd></div><div><dt>' + escapeHtml(t('nextArrival')) +

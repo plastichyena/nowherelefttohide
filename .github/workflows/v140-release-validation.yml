@@ -1,4 +1,4 @@
-name: v1.4.5 Release Validation
+name: v1.5.0 Release Validation
 
 on:
   workflow_dispatch:
@@ -7,12 +7,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: v145-release-validation-${{ github.ref }}
+  group: v150-release-validation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  v144-baseline-seeds:
-    name: v1.4.4 baseline ${{ matrix.agent }} seeds ${{ matrix.seed }}-${{ matrix.endSeed }}
+  v145-baseline-seeds:
+    name: v1.4.5 baseline ${{ matrix.agent }} seeds ${{ matrix.seed }}-${{ matrix.endSeed }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -32,10 +32,10 @@ jobs:
             seed: 201
             endSeed: 300
     steps:
-      - name: Check out v1.4.4 stable implementation
+      - name: Check out v1.4.5 stable implementation
         uses: actions/checkout@v4
         with:
-          ref: 3192009f2dd34d2a0b5480618e0a7aed534e7d88
+          ref: 1d88b3688eaffe32fc95adf4f50e713a645de1d7
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -43,18 +43,18 @@ jobs:
           node-version: 22.x
           cache: npm
 
-      - name: Install locked v1.4.4 dependencies
+      - name: Install locked v1.4.5 dependencies
         run: npm ci
 
-      - name: Run v1.4.4 baseline batch
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=${{ matrix.agent }} --games=100 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/v144-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
+      - name: Run v1.4.5 baseline batch
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=${{ matrix.agent }} --games=100 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/v145-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
 
-      - name: Upload v1.4.4 baseline report
+      - name: Upload v1.4.5 baseline report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v144-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }}
-          path: output/simulations/v144-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }}
+          name: v145-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }}
+          path: output/simulations/v145-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }}
           if-no-files-found: error
           retention-days: 30
 
@@ -92,13 +92,13 @@ jobs:
         run: npm ci
 
       - name: Run release batch
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=${{ matrix.agent }} --games=100 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/v145-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=${{ matrix.agent }} --games=100 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/v150-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
 
       - name: Upload release report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v145-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
-          path: output/simulations/v145-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
+          name: v150-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
+          path: output/simulations/v150-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
           if-no-files-found: error
           retention-days: 30

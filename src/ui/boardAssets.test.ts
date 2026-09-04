@@ -49,6 +49,8 @@ describe('board asset registry', () => {
       'hordeZombie',
       'policeZombie',
       'soldierZombie',
+      'riotPolice',
+      'riotZombie',
     ]);
     expect('water' in BOARD_ASSET_REGISTRY.terrain).toBe(false);
     expect(getTerrainAssetPath('water')).toBeNull();
@@ -57,10 +59,13 @@ describe('board asset registry', () => {
     expect(getUnitAssetPath('not-a-unit')).toBeNull();
     expect(getUnitAssetPath('policeZombie')).toBe(BOARD_ASSET_REGISTRY.units.policeZombie);
     expect(getUnitAssetPath('soldierZombie')).toBe(BOARD_ASSET_REGISTRY.units.soldierZombie);
+    expect(getUnitAssetPath('riotPolice')).toBe(BOARD_ASSET_REGISTRY.units.riotPolice);
+    expect(getUnitAssetPath('riotZombie')).toBe(BOARD_ASSET_REGISTRY.units.riotZombie);
     expect(isBoardZombieUnitType('zombie')).toBe(true);
     expect(isBoardZombieUnitType('hordeZombie')).toBe(true);
     expect(isBoardZombieUnitType('policeZombie')).toBe(true);
     expect(isBoardZombieUnitType('soldierZombie')).toBe(true);
+    expect(isBoardZombieUnitType('riotZombie')).toBe(true);
     expect(isBoardZombieUnitType('police')).toBe(false);
     expect(BOARD_ASSET_PATHS.some((path) => /water/iu.test(path))).toBe(false);
   });
@@ -224,6 +229,18 @@ describe('board state asset mappings', () => {
       layers: ['horde', 'final'],
       isHorde: true,
       isFinalHorde: true,
+    });
+    expect(mapUnitAssetLayers({ type: 'riotPolice', hordeKind: null })).toMatchObject({
+      base: BOARD_ASSET_REGISTRY.units.riotPolice,
+      layers: [],
+      isHorde: false,
+      isFinalHorde: false,
+    });
+    expect(mapUnitAssetLayers({ type: 'riotZombie', hordeKind: null })).toMatchObject({
+      base: BOARD_ASSET_REGISTRY.units.riotZombie,
+      layers: [],
+      isHorde: false,
+      isFinalHorde: false,
     });
     expect(getUnitAssetPath('hordeZombie')).toBe(BOARD_ASSET_REGISTRY.units.hordeZombie);
   });

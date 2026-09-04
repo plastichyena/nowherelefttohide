@@ -18,7 +18,7 @@ function escapeHtml(value: string): string {
 }
 
 export function deriveDevelopmentNoiseDebug(
-  state: Pick<Readonly<GameState>, 'events' | 'config' | 'map' | 'units'>,
+  state: Pick<Readonly<GameState>, 'events' | 'config' | 'map' | 'units' | 'pendingNoisePulses'>,
 ): NoiseDebugViewModel | null {
   let emittedIndex = -1;
   for (let index = state.events.length - 1; index >= 0; index -= 1) {
@@ -29,16 +29,19 @@ export function deriveDevelopmentNoiseDebug(
   }
   if (emittedIndex < 0) return null;
   const emitted = state.events[emittedIndex]!;
-  const q = emitted.payload.q;
-  const r = emitted.payload.r;
+  const pending = state.pendingNoisePulses.at(-1);
+  const q = emitted.payload.q ?? pending?.center.q;
+  const r = emitted.payload.r ?? pending?.center.r;
   const sourceUnitType = emitted.payload.sourceUnitType;
   if (
     typeof q !== 'number' ||
     typeof r !== 'number' ||
-    (sourceUnitType !== 'police' && sourceUnitType !== 'nationalGuard')
+    !['police', 'nationalGuard', 'riotPolice', 'hordeZombie'].includes(String(sourceUnitType))
   ) return null;
   const center = { q, r };
-  const radius = state.config.noise[sourceUnitType];
+  const radius = sourceUnitType === 'hordeZombie'
+    ? state.config.horde.movementNoiseRadius
+    : state.config.units[sourceUnitType as 'police' | 'nationalGuard' | 'riotPolice'].noiseRadius;
   const targeted = state.events.slice(emittedIndex + 1).find((event) =>
     event.type === 'noise_targeted' &&
     event.payload.sourceUnitId === emitted.payload.sourceUnitId &&
@@ -56,7 +59,7 @@ export function deriveDevelopmentNoiseDebug(
       .map((tile) => ({ q: tile.q, r: tile.r })),
     affectedNormalZombieIds,
     noiseTargets: state.units
-      .filter((unit) => ['zombie', 'policeZombie', 'soldierZombie'].includes(unit.type))
+      .filter((unit) => ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'].includes(unit.type))
       .sort((left, right) => left.id.localeCompare(right.id))
       .map((unit) => ({ zombieId: unit.id, target: unit.noiseTarget ? { ...unit.noiseTarget } : null })),
   };
@@ -81,7 +84,7 @@ export function renderNoiseDebugOverlay(debug: NoiseDebugViewModel | null, local
 }
 
 export function renderDevelopmentNoiseDebug(
-  state: Pick<Readonly<GameState>, 'events' | 'config' | 'map' | 'units'>,
+  state: Pick<Readonly<GameState>, 'events' | 'config' | 'map' | 'units' | 'pendingNoisePulses'>,
   locale: Locale,
 ): string {
   return renderNoiseDebugOverlay(deriveDevelopmentNoiseDebug(state), locale);

@@ -12,6 +12,7 @@ const HIDDEN_KEYS = new Set([
   'noiseTargetsOverriddenByHorde',
   'noiseTargetsOverriddenByVisiblePopulation',
   'aerialDiscoveriesInGroundBlockedArea',
+  'hordeNoiseRespawnedByType',
 ]);
 
 function assertPublic(value: unknown, path = '$'): void {

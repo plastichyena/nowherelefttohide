@@ -101,15 +101,17 @@ export type BoardFacilityAssetType = (typeof BOARD_FACILITY_ASSET_TYPES)[number]
 export const BOARD_UNIT_TYPES = [
   'police',
   'nationalGuard',
+  'riotPolice',
   'zombie',
   'hordeZombie',
   'policeZombie',
   'soldierZombie',
+  'riotZombie',
 ] as const satisfies readonly UnitType[];
 export type BoardUnitAssetType = (typeof BOARD_UNIT_TYPES)[number];
 
 /** Zombie-side unit types rendered by the Board (including reanimated units). */
-export const BOARD_ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'] as const;
+export const BOARD_ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const;
 export type BoardZombieUnitAssetType = (typeof BOARD_ZOMBIE_UNIT_TYPES)[number];
 
 export const BOARD_COMMON_STATE_LAYERS = ['infected', 'ruined'] as const;
@@ -168,6 +170,8 @@ export const BOARD_ASSET_REGISTRY = {
     hordeZombie: 'units/unit_horde_zombie.png',
     policeZombie: 'units/unit_police_zombie.png',
     soldierZombie: 'units/unit_soldier_zombie.png',
+    riotPolice: 'units/unit_riot_police.png',
+    riotZombie: 'units/unit_riot_zombie.png',
   },
 } as const;
 

@@ -100,11 +100,13 @@ function run(): void {
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
   for (const marker of [
-    '1.4.5', '2.5.0', '5.0.0', '6.1.0', 'fixed-51x51-v1', 'SetPowerSupply',
+    '1.5.0', '3.0.0', '6.0.0', '7.0.0', 'fixed-51x51-v1', 'SetPowerSupply',
     'BuildConstructibleFacility', 'DecommissionConstructibleFacility', 'TurnAwayCheckpointRefugees',
     'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',
     'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates',
     'constructibleFacilityPositionCandidates', 'strategicForecast', 'queuePressureClass',
+    'crisisSummary', 'endTurnRisk', 'proficiency', 'attackChargesRemaining', 'maxAttackCharges',
+    'riotPolice', 'riotZombie', 'possibleNonHordeTypes', 'nonHordeSlotCountPerDirection',
     'currentFuel', 'currentMilitaryGoods', 'maxMilitaryGoods', 'fixedMilitaryGoodsUpkeepPerTurn',
     'attackMilitaryGoodsCostByRange', 'suppressionMilitaryGoodsCost', 'projectedRefillAmountIfTurnEndsNow',
     'projectedMilitaryGoodsAfterFixedConsumption', 'projectedMilitaryGoodsAfterRefill',
@@ -119,7 +121,7 @@ function run(): void {
     'hordeWaves', 'visionMode', 'terrainLosBlocking', 'site_zombies_spawned',
     'groundVisionBlockedHexes', 'infectedPopulationConvertedToZombies',
   ]) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.4.5 schema marker: ${marker}`);
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.5.0 schema marker: ${marker}`);
   }
   // Compatibility validation may legitimately retain the names of removed
   // fields so an old Config can be rejected with a useful reason. Only flag

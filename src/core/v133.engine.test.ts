@@ -37,8 +37,8 @@ function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): 
       arrivalPeopleMax: 1,
     },
     units: {
-      zombie: { movement: 0, attack: 0, vision: 0 },
-      hordeZombie: { movement: 0, attack: 0, vision: 0 },
+      zombie: { movement: 0, attack: 1, vision: 0 },
+      hordeZombie: { movement: 0, attack: 1, vision: 0 },
     },
     ...overrides,
   });
@@ -151,8 +151,8 @@ function makeNoiseScenario(
     units: {
       police: { vision: 2 },
       nationalGuard: { vision: 2 },
-      zombie: { movement: 0, attack: 0, vision: 0 },
-      hordeZombie: { movement: 0, attack: 0, vision: 0 },
+      zombie: { movement: 0, attack: 1, vision: 0 },
+      hordeZombie: { movement: 0, attack: 1, vision: 0 },
     },
   });
   const engine = new GameEngine(700, config);
@@ -450,8 +450,8 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
   ])('uses the internal %s Radius boundary while publishing only its public Noise Class', (unitType, inside, outside) => {
     const scenario = makeNoiseScenario(unitType, inside);
     const stateBefore = scenario.engine.getState();
-    expect(stateBefore.config.noise[unitType]).toBe(unitType === 'police' ? 4 : 8);
-    expect(stateBefore.config.noise.publicClass[unitType]).toBe(unitType === 'police' ? 'medium' : 'large');
+    expect(stateBefore.config.units[unitType].noiseRadius).toBe(unitType === 'police' ? 4 : 8);
+    expect(stateBefore.config.units[unitType].noiseClass).toBe(unitType === 'police' ? 'medium' : 'large');
     // Use a second isolated scenario for the outside boundary so the first pulse cannot target it.
     const outsideScenario = makeNoiseScenario(unitType, outside);
     const outsideState = cloneState(outsideScenario.engine.getState());
@@ -480,7 +480,14 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
     expect(noise?.payload).not.toHaveProperty('radius');
     expect(noise?.payload).not.toHaveProperty('affectedZombieIds');
     expect(noise?.payload).not.toHaveProperty('affectedCount');
-    expect(emitted.state.units.find((unit) => unit.id === scenario.receiver.id)?.noiseTarget).toEqual({ q: 25, r: 25 });
+    // v1.5 queues common Noise and does not retarget a Zombie until the next
+    // Zombie Phase. This prevents the current Phase's already-fixed decision
+    // from changing due to a late Combat.
+    expect(emitted.state.units.find((unit) => unit.id === scenario.receiver.id)?.noiseTarget).toBeNull();
+    expect(emitted.state.pendingNoisePulses).toContainEqual(expect.objectContaining({
+      center: { q: 25, r: 25 }, radius: unitType === 'police' ? 4 : 8,
+      sourceKind: 'humanCombat', sourceUnitType: unitType,
+    }));
     const outsideResult = stepOk(outsideScenario.engine, {
       type: 'Attack',
       attackerId: outsideScenario.human.id,
@@ -489,7 +496,7 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
     expect(outsideResult.state.units.find((unit) => unit.id === boundary.id)?.noiseTarget).toBeNull();
     expect(emitted.state.statistics.noisePulsesEmitted).toBe(1);
     expect(emitted.state.statistics[unitType === 'police' ? 'policeNoisePulses' : 'nationalGuardNoisePulses']).toBe(1);
-    expect(emitted.state.statistics.normalZombiesNoiseTargeted).toBe(1);
+    expect(emitted.state.statistics.normalZombiesNoiseTargeted).toBe(0);
     expect(outsideResult.state.statistics.normalZombiesNoiseTargeted).toBe(0);
   });
 
@@ -520,10 +527,10 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
   it('freezes Zombie Phase decisions before combat Noise, then uses the preserved memory next phase', () => {
     const config = safeConfig({
       units: {
-        police: { attack: 0, vision: 0 },
-        nationalGuard: { attack: 0, vision: 0 },
+        police: { recruitAttack: 1, vision: 0 },
+        nationalGuard: { recruitAttack: 1, vision: 0 },
         zombie: { movement: 0, attack: 5, vision: 0 },
-        hordeZombie: { movement: 0, attack: 0, vision: 0 },
+        hordeZombie: { movement: 0, attack: 1, vision: 0 },
       },
     });
     const engine = new GameEngine(512, config);
@@ -551,9 +558,12 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
     )).toBe(true);
     expect(firstPhase.events.some((event) => event.type === 'noise_emitted')).toBe(true);
     // The receiver had an idle decision in the phase-start snapshot, so late Noise
-    // can only persist as memory and cannot change this phase's movement.
+    // must stay pending and cannot change this phase's movement or Target memory.
     expect(firstReceiver.position).toEqual({ q: 29, r: 25 });
-    expect(firstReceiver.noiseTarget).toEqual(center);
+    expect(firstReceiver.noiseTarget).toBeNull();
+    expect(firstPhase.state.pendingNoisePulses).toContainEqual(expect.objectContaining({
+      center, sourceKind: 'humanCombat', sourceUnitType: 'police',
+    }));
     expect(firstPhase.state.statistics.normalZombieIdleCount).toBeGreaterThanOrEqual(1);
 
     const secondPhase = endTurn(engine);
@@ -637,7 +647,8 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
     stepOk(engine, { type: 'LoadSnapshot', snapshot: state });
     stepOk(engine, { type: 'Attack', attackerId: police.id, targetId: firstTarget.id });
     const second = stepOk(engine, { type: 'Attack', attackerId: guard.id, targetId: secondTarget.id });
-    expect(second.state.units.find((unit) => unit.id === receiver.id)?.noiseTarget).toEqual({ q: 25, r: 25 });
+    expect(second.state.units.find((unit) => unit.id === receiver.id)?.noiseTarget).toBeNull();
+    expect(second.state.pendingNoisePulses).toHaveLength(2);
     expect(second.state.statistics.noisePulsesEmitted).toBe(2);
 
     const arrived = cloneState(second.state);
@@ -673,6 +684,7 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
     expect(noiseEvent?.payload).not.toHaveProperty('radius');
     expect(noiseEvent?.payload).not.toHaveProperty('affectedZombieIds');
     expect(noiseEvent?.payload).not.toHaveProperty('affectedCount');
-    expect(firstAttack.state.units.find((unit) => unit.id === first.receiver.id)?.noiseTarget).toEqual({ q: 25, r: 25 });
+    expect(firstAttack.state.units.find((unit) => unit.id === first.receiver.id)?.noiseTarget).toBeNull();
+    expect(firstAttack.state.pendingNoisePulses).toHaveLength(1);
   });
 });

@@ -19,11 +19,12 @@ import type {
   InitialFacilityPopulationConfig,
   HumanUnitType,
   RejectedRefugeeCounters,
+  UnitProficiency,
   UnitState,
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '2.5.0';
+export const GAME_VERSION = '3.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -83,15 +84,27 @@ export function getUnitAt(state: GameState, position: HexCoord): UnitState | und
   return state.units.find((unit) => positionKey(unit.position) === key);
 }
 
-export function isHumanUnit(unit: UnitState): boolean {
-  return unit.type === 'police' || unit.type === 'nationalGuard';
+export function isHumanUnit(unit: UnitState): unit is UnitState & { type: HumanUnitType } {
+  return unit.type === 'police' || unit.type === 'nationalGuard' || unit.type === 'riotPolice';
 }
 
 export function isZombieUnit(unit: Pick<UnitState, 'type'>): boolean {
   return unit.type === 'zombie'
     || unit.type === 'hordeZombie'
     || unit.type === 'policeZombie'
-    || unit.type === 'soldierZombie';
+    || unit.type === 'soldierZombie'
+    || unit.type === 'riotZombie';
+}
+
+export function effectiveAttackForProficiency(
+  state: Pick<GameState, 'config'>,
+  type: HumanUnitType,
+  proficiency: UnitProficiency,
+): number {
+  const base = state.config.units[type].recruitAttack;
+  return proficiency === 'recruit'
+    ? base
+    : Math.ceil(base * state.config.unitExperience.regularAttackMultiplier);
 }
 
 export function facilityZombieTargetValue(
@@ -108,22 +121,37 @@ export function createUnit(
   type: UnitType,
   position: HexCoord,
   actionState: UnitState['actionState'] = 'ready',
+  proficiency?: UnitProficiency,
 ): UnitState {
   const stats = state.config.units[type];
+  const human = type === 'police' || type === 'nationalGuard' || type === 'riotPolice';
+  const resolvedProficiency = human ? (proficiency ?? 'regular') : null;
+  const attack = human
+    ? effectiveAttackForProficiency(state, type as HumanUnitType, resolvedProficiency!)
+    : (stats as GameConfig['units']['zombie']).attack;
+  const maxAttackCharges = resolvedProficiency === 'veteran'
+    ? state.config.unitExperience.veteranAttackCharges
+    : human ? 1 : 1;
   return {
     id,
     type,
     position: { ...position },
     hp: stats.hp,
     maxHp: stats.hp,
-    attack: stats.attack,
+    attack,
     movement: stats.movement,
     range: stats.range,
     vision: stats.vision,
     population: stats.population,
-    currentFuel: type === 'police' || type === 'nationalGuard' ? stats.maxFuel : 0,
+    proficiency: resolvedProficiency,
+    recruitSurvivalTurns: 0,
+    regularZombieKills: 0,
+    veteranPromotionPending: false,
+    attackChargesRemaining: maxAttackCharges,
+    maxAttackCharges,
+    currentFuel: human ? stats.maxFuel : 0,
     maxFuel: stats.maxFuel,
-    currentMilitaryGoods: type === 'police' || type === 'nationalGuard' ? stats.maxMilitaryGoods : 0,
+    currentMilitaryGoods: human ? stats.maxMilitaryGoods : 0,
     maxMilitaryGoods: stats.maxMilitaryGoods,
     actionState,
     canAttack: true,
@@ -159,6 +187,12 @@ export function synchronizePopulation(state: GameState): void {
     state.pendingUnitProductions
       .filter((order) => order.unitType === 'nationalGuard')
       .reduce((total, order) => total + order.population, 0);
+  const riotPolice = state.units
+    .filter((unit) => unit.type === 'riotPolice')
+    .reduce((total, unit) => total + unit.population, 0) +
+    state.pendingUnitProductions
+      .filter((order) => order.unitType === 'riotPolice')
+      .reduce((total, order) => total + order.population, 0);
   const waiting = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.waiting, 0);
   const screening = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.screening, 0);
   const approved = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.approved, 0);
@@ -169,7 +203,8 @@ export function synchronizePopulation(state: GameState): void {
   state.population.healthyCivilians = cityResidents + productionWorkers;
   state.population.police = police;
   state.population.nationalGuard = nationalGuard;
-  state.population.unitPopulation = police + nationalGuard;
+  state.population.riotPolice = riotPolice;
+  state.population.unitPopulation = police + nationalGuard + riotPolice;
   state.population.waitingRefugees = waiting;
   state.population.screeningRefugees = screening;
   state.population.approvedRefugees = approved;
@@ -182,7 +217,7 @@ export function synchronizePopulation(state: GameState): void {
 
   state.statistics.maxPopulation = Math.max(
     state.statistics.maxPopulation,
-    cityResidents + productionWorkers + waiting + screening + approved + police + nationalGuard,
+    cityResidents + productionWorkers + waiting + screening + approved + police + nationalGuard + riotPolice,
   );
   state.statistics.maxSecuredFacilities = Math.max(
     state.statistics.maxSecuredFacilities,
@@ -436,6 +471,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       healthyCivilians: 0,
       police: 0,
       nationalGuard: 0,
+      riotPolice: 0,
       unitPopulation: 0,
       facilityWorkers: [],
       waitingRefugees: 0,
@@ -466,6 +502,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     checkpoints: [],
     roadBranches,
     rejectedRefugeesByDirection: emptyRejectedRefugeeCounterByDirection(),
+    pendingNoisePulses: [],
     pendingUnitProductions: [],
     nextCheckpointNumber: 1,
     nextConstructibleFacilityNumber: 1,
@@ -589,6 +626,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       soldierZombiesKilled: 0,
       policeZombiesFinal: 0,
       soldierZombiesFinal: 0,
+      riotZombiesFinal: 0,
       policeReanimations: 0,
       nationalGuardReanimations: 0,
       reanimationImmediateInfections: 0,
@@ -600,6 +638,20 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       civilianDroneBasesDecommissioned: 0,
       civilianGoodsRefundedFromDecommission: 0,
       policeLongRangeMoves: 0,
+      recruitsCommissionedByType: { police: 0, nationalGuard: 0, riotPolice: 0 },
+      regularPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0 },
+      veteranPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0 },
+      veteranZombieKillsByType: { police: 0, nationalGuard: 0, riotPolice: 0 },
+      riotPoliceProduced: 0,
+      riotPoliceLost: 0,
+      riotZombiesSpawned: 0,
+      riotZombiesKilled: 0,
+      riotPoliceReanimations: 0,
+      hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
+      finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
+      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, hordeZombie: 0 },
+      hordeMovementNoisePulses: 0,
+      hordeNoiseRespawnedByType: { zombie: 0, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
     },
     gameOver: false,
     result: null,
@@ -621,7 +673,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
 }
 
 export function nextHumanUnitId(state: GameState, type: HumanUnitType): string {
-  const prefix = type === 'police' ? 'police' : 'national-guard';
+  const prefix = type === 'police' ? 'police' : type === 'nationalGuard' ? 'national-guard' : 'riot-police';
   const id = `${prefix}-${state.nextUnitNumber}`;
   state.nextUnitNumber += 1;
   return id;

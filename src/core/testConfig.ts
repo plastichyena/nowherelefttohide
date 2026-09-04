@@ -1,6 +1,6 @@
 import type { HordeComposition, HordeConfig } from './types';
 
-/** Compact valid v1.4.4 schedule for focused Core tests. */
+/** Compact valid v1.5 schedule for focused Core tests. */
 export function singleFinalWave(
   turn: number,
   composition: HordeComposition = { hordeZombie: 1, zombie: 0 },
@@ -9,5 +9,8 @@ export function singleFinalWave(
   return {
     warningLeadTurns: 1,
     waves: [{ turn, directionCount, compositionPerDirection: { ...composition }, final: true }],
+    specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
+    riotZombieCapPerDirection: 1,
+    movementNoiseRadius: 8,
   };
 }

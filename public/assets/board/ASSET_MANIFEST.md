@@ -1,15 +1,15 @@
-# Nowhere Left to Hide v1.4.4 Board Asset Manifest
+# Nowhere Left to Hide v1.5.0 Board Asset Manifest
 
-- Generated: 2026-09-03
+- Generated: 2026-09-04
 - Runtime format: 256×256 PNG
 - Generated source resolutions: 1254×1254 for most sources, 1362×1155 for the
   twelve-Zombie Horde swarm, and 1536×1024 for Capital and Refinery; every
   checked-in runtime image is normalized to 256×256.
-- Runtime total: 32 PNG files, 1,442,395 bytes (approximately 1.38 MiB)
+- Runtime total: 34 PNG files, 1,564,167 bytes (approximately 1.49 MiB)
 - Source: original assets created for this project; no third-party images, real
   logos, seals, flags, or trademarks are included.
 - Provenance / licensing: generated specifically for this repository during
-  the v1.3.1 and v1.4.4 implementations. No third-party asset or external
+  the v1.3.1, v1.4.4, and v1.5.0 implementations. No third-party asset or external
   asset-license obligation is incorporated into these PNGs.
 - Generation: OpenAI built-in image generation. The built-in tool did not
   expose a more specific model identifier for recording.
@@ -56,6 +56,12 @@ middle and rear rows, a compact triangular crowd silhouette, clean transparent
 padding, and no scenery, text, real marks, or photorealistic injury. The final
 approved result contains twelve Zombies.
 
+The v1.5.0 Riot revision adds a five-person Riot Police group and a three-person
+Riot Zombie group. Both use the approved dark-navy protective silhouette and
+large shield motif so the two Riot types remain distinguishable from Police and
+Police Zombie at board scale. Their transparent source files are retained under
+`Art/reference/v1.5.0-unit-concepts/`; only the 256px derivatives are preloaded.
+
 ## Runtime files
 
 | File | Core type / UI state | Purpose |
@@ -82,6 +88,8 @@ approved result contains twelve Zombies.
 | `units/unit_horde_zombie.png` | `hordeZombie` | Dense twelve-Zombie swarm |
 | `units/unit_police_zombie.png` | `policeZombie` | Approved reanimated police silhouette; normal Zombie AI |
 | `units/unit_soldier_zombie.png` | `soldierZombie` | Approved reanimated soldier silhouette; normal Zombie AI |
+| `units/unit_riot_police.png` | `riotPolice` | Approved five-person Riot Police group; shield-focused suppression unit |
+| `units/unit_riot_zombie.png` | `riotZombie` | Approved three-person reanimated Riot group; normal Zombie AI |
 | `overlays/state_unsecured.png` | Unowned facility | Gray dashed perimeter |
 | `overlays/state_secured.png` | Player-owned facility | Teal perimeter |
 | `overlays/state_stopped.png` | Current `operationalStatus === stopped` | Pause bars; not used for forecast warnings |
@@ -111,7 +119,8 @@ warnings, and Horde entrance directions remain dynamic UI overlays.
 4. Run Registry/file tests, production build, and both reference viewports.
 5. Keep the runtime total below 3 MiB and do not add a `water` mapping. The
    v1.4.4 runtime candidate files above are the approved sources for the two
-   replacement human sprites and two reanimated Zombie sprites.
+   replacement human sprites and two reanimated Zombie sprites; v1.5.0 Riot
+   candidates are documented under `Art/reference/v1.5.0-unit-concepts/`.
 
 The original single-Zombie concept, approved three-Zombie normal-unit source,
 approved twelve-Zombie Horde source, and v1.4 facility references live in
@@ -119,3 +128,5 @@ approved twelve-Zombie Horde source, and v1.4 facility references live in
 preloaded and are excluded from the runtime size budget; their 256px derivatives
 are the Registry assets listed above. The v1.4 references are in
 `Art/reference/v1.4-facility-concepts/` and are original project artwork only.
+The v1.5.0 Riot references are in
+`Art/reference/v1.5.0-unit-concepts/` and are original project artwork only.

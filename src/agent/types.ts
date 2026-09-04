@@ -34,17 +34,70 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.4.5 has no compatibility or migration path for v1.4.4-or-earlier data. */
-export const APP_VERSION = '1.4.5';
-export const GAME_RULES_VERSION = '2.5.0';
-export const SAVE_FORMAT_VERSION = '9';
-export const AGENT_API_VERSION = '6.1.0';
-export const OBSERVATION_API_VERSION = '6.1.0';
-export const BRIDGE_API_VERSION = '6.1.0';
-export const BALANCED_AGENT_VERSION = '4.4.0';
-export const RANDOM_AGENT_VERSION = '2.3.0';
-export const ARTIFACT_SCHEMA_VERSION = '5.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '2.0.0';
+/** v1.5.0 has no compatibility or migration path for v1.4.5-or-earlier data. */
+export const APP_VERSION = '1.5.0';
+export const GAME_RULES_VERSION = '3.0.0';
+export const SAVE_FORMAT_VERSION = '10';
+export const AGENT_API_VERSION = '7.0.0';
+export const OBSERVATION_API_VERSION = '7.0.0';
+export const BRIDGE_API_VERSION = '7.0.0';
+export const BALANCED_AGENT_VERSION = '5.0.0';
+export const RANDOM_AGENT_VERSION = '3.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '6.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '3.0.0';
+
+export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
+
+export type CrisisSeverity = 'critical' | 'warning' | 'advisory';
+
+/** Stable, public reason codes used by Crisis Summary projections. */
+export const CRISIS_REASON_CODES = [
+  'capital_infection_uncontained',
+  'critical_site_infection_uncontained',
+  'checkpoint_defense_degraded',
+  'unit_out_of_supply_risk',
+  'horde_warning_active',
+  'guaranteed_resource_defeat',
+  'new_state_loss',
+] as const;
+
+export type CrisisReasonCode = typeof CRISIS_REASON_CODES[number];
+
+export interface CrisisAlert {
+  /** Stable for the same public state and entity; not a UI notification id. */
+  id: string;
+  severity: CrisisSeverity;
+  category: string;
+  reasonCode: CrisisReasonCode;
+  entityIds: string[];
+  publicFacts: JsonObject;
+}
+
+export interface CrisisSummary {
+  alerts: CrisisAlert[];
+  criticalCount: number;
+  warningCount: number;
+  advisoryCount: number;
+}
+
+export interface EndTurnRiskUnit {
+  unitId: string;
+  /** Same public projection field as Core EndTurnRisk; no hidden AI forecast. */
+  moveRemaining: boolean;
+  attackChargesRemaining: number;
+  legalAttackTargetIds: string[];
+  suppressionTargetId: string | null;
+}
+
+export interface EndTurnRisk {
+  /** Full Core projection entries keep Human UI and Agent semantics aligned. */
+  readyUnits: EndTurnRiskUnit[];
+  unitsWithMoveRemaining: EndTurnRiskUnit[];
+  unitsWithAttackChargesRemaining: EndTurnRiskUnit[];
+  uncontainedInfectedSites: Array<{ id: string; kind: 'facility' | 'checkpoint'; infected: number }>;
+  criticalAlerts: CrisisAlert[];
+  forecastGuaranteedDefeat: boolean;
+}
 
 export interface AgentMapTileObservation {
   q: number;
@@ -178,6 +231,18 @@ export interface AgentUnitObservation {
   type: UnitType;
   /** Explicit v1.4 name; `type` remains as the established alias. */
   unitType: UnitType;
+  /** Human units expose their progression; Zombie units return null. */
+  proficiency: UnitProficiency | null;
+  recruitSurvivalTurns: number;
+  turnsUntilRegular: number | null;
+  regularZombieKills: number;
+  killsUntilVeteran: number | null;
+  veteranPromotionPending: boolean;
+  baseRecruitAttack: number | null;
+  effectiveAttack: number;
+  /** Public wave membership flags; internal Group IDs are never exposed. */
+  isScheduledWaveMember: boolean;
+  isFinalWaveMember: boolean;
   position: HexCoord;
   vision: number;
   visionMode: 'ground' | 'aerial';
@@ -198,6 +263,10 @@ export interface AgentUnitObservation {
   population: number;
   actionState: UnitActionState;
   canAttack: boolean;
+  /** Remaining ordinary combat/suppression/interception charges this turn. */
+  attackChargesRemaining: number;
+  /** Maximum ordinary combat/suppression/interception charges this turn. */
+  maxAttackCharges: number;
   canMove: boolean;
   inSupply: boolean;
   currentFuel: number;
@@ -222,6 +291,7 @@ export interface AgentUnitObservation {
     distance: number;
     militaryGoodsCost: number;
     projectedMilitaryGoodsAfterAttack: number;
+    projectedAttackChargesRemaining?: number;
     effectiveAttack: number;
     projectedDamageBeforeTerrain: number;
     projectedDamageAfterTerrain: number;
@@ -245,6 +315,10 @@ export interface AgentUnitObservation {
   suppressionAvailableIfTurnEndsNow: boolean;
   suppressionStatusIfTurnEndsNow: 'suppression' | 'containment_only' | 'none';
   suppressionTargetId: string | null;
+  suppressionChecksIfTurnEndsNow: number;
+  suppressionMilitaryGoodsCostsIfTurnEndsNow: number[];
+  projectedSuppressionIfTurnEndsNow: number;
+  projectedSuppressionCivilianDamageIfTurnEndsNow: number;
 }
 
 export interface AgentCheckpointObservation {
@@ -300,6 +374,41 @@ export interface AgentApiInfo {
   publicInformation: string[];
   prohibited: string[];
   rules: {
+    proficiency: {
+      values: UnitProficiency[];
+      productionProficiencyByType: Record<string, UnitProficiency>;
+      recruitSurvivalTurnsRequired: number;
+      regularAttackMultiplier: number;
+      regularAttackRounding: 'ceil' | 'floor';
+      veteranZombieKillsRequired: number;
+      veteranAttackCharges: number;
+      killCreditTypes: UnitType[];
+    };
+    crisis: {
+      severityOrder: CrisisSeverity[];
+      reasonCodes: Record<CrisisReasonCode, { severity: CrisisSeverity; category: string }>;
+      endTurnRiskFields: string[];
+      hiddenInformationExcluded: true;
+    };
+    riot: {
+      police: {
+        recruitAttack: number;
+        hp: number;
+        movement: number;
+        range: number;
+        vision: number;
+        population: number;
+      };
+      zombie: {
+        hp: number;
+        attack: number;
+        movement: number;
+        range: number;
+        vision: number;
+      };
+      productionFacilities: FacilityType[];
+      productionCost: { population: number; civilianGoods: number; militaryGoods: number };
+    };
     recovery: {
       combatRate: number;
       restRate: number;
@@ -320,7 +429,7 @@ export interface AgentApiInfo {
       zombieSpawnRadius: number;
       noiseRespawnEnabled: boolean;
     };
-    ranges: Record<'police' | 'nationalGuard' | 'zombie' | 'hordeZombie' | 'policeZombie' | 'soldierZombie', { baseRange: number }>;
+    ranges: Record<string, { baseRange: number }>;
     terrain: {
       movementCost: Record<BaseTerrain, number | null>;
       damageMultiplier: {
@@ -368,6 +477,8 @@ export interface AgentApiInfo {
         turn: number;
         directionCount: number;
         compositionPerDirection: HordeComposition;
+        nonHordeSlotCountPerDirection?: number;
+        possibleNonHordeTypes?: UnitType[];
         final: boolean;
       }>;
       finalHordeTurn: number;
@@ -420,22 +531,22 @@ export interface AgentApiInfo {
       dormantProvidesArrivalSupplyVision: false;
     };
     unitFuel: {
-      movementByType: Record<'police' | 'nationalGuard', number>;
-      maxFuelByType: Record<'police' | 'nationalGuard', number>;
-      fuelCostFormulaByType: Record<'police' | 'nationalGuard', string>;
+      movementByType: Record<string, number>;
+      maxFuelByType: Record<string, number>;
+      fuelCostFormulaByType: Record<string, string>;
       refuelTiming: 'after_power_before_production';
       refuelRequiresSupply: true;
       shortageAllocation: 'unit_id_ascending_round_robin';
-      emergencyMovementPointsByType: Record<'police' | 'nationalGuard', number>;
+      emergencyMovementPointsByType: Record<string, number>;
       emergencyMovementTrigger: 'current_fuel_zero';
       emergencyMovementUsesEffectiveMovementCost: true;
     };
     unitMilitaryGoods: {
-      maxByType: Record<'police' | 'nationalGuard', number>;
-      fixedUpkeepByType: Record<'police' | 'nationalGuard', number>;
-      attackCostByRange: Record<'police' | 'nationalGuard', Record<number, number>>;
-      suppressionCostByType: Record<'police' | 'nationalGuard', number>;
-      shortageAttackMultiplierByType: Record<'police' | 'nationalGuard', number>;
+      maxByType: Record<string, number>;
+      fixedUpkeepByType: Record<string, number>;
+      attackCostByRange: Record<string, Record<number, number>>;
+      suppressionCostByType: Record<string, number>;
+      shortageAttackMultiplierByType: Record<string, number>;
       refillTiming: 'after_military_factory_production_before_suppression';
       refillRequiresSupply: true;
       shortageAllocation: 'unit_id_ascending_round_robin';
@@ -457,11 +568,13 @@ export interface AgentApiInfo {
       guaranteedDefeat: string[];
       queuePressureThresholds: Record<'none' | 'low' | 'medium' | 'high', string>;
     };
-    noise: {
-      classes: NoiseClass[];
-      policeClass: NoiseClass;
-      nationalGuardClass: NoiseClass;
-      distance: 'hex';
+      noise: {
+        classes: NoiseClass[];
+        policeClass: NoiseClass;
+        nationalGuardClass: NoiseClass;
+        riotPoliceClass?: NoiseClass;
+        hordeMovementNoiseRadius: number;
+        distance: 'hex';
       terrainAttenuation: false;
       normalZombieAffected: true;
       hordeZombieAffected: false;
@@ -614,6 +727,10 @@ export interface AgentObservation {
       spawnTurn: number;
       directionCount: number;
       compositionPerDirection: HordeComposition;
+      /** Number of non-Horde slots per direction; exact draw is not public before Spawn. */
+      nonHordeSlotCountPerDirection?: number;
+      /** Candidate types for each non-Horde slot, in public deterministic order. */
+      possibleNonHordeTypes?: UnitType[];
       final: boolean;
     } | null;
     spawnTurn: number | null;
@@ -631,6 +748,10 @@ export interface AgentObservation {
   finalHordeDefeated: boolean;
   suppliedAreaZombieClear: boolean;
   suppliedAreaInfectionClear: boolean;
+  /** Deterministic public risk projection; never contains hidden enemy state. */
+  crisisSummary: CrisisSummary;
+  /** EndTurn-only structured reminder; the EndTurn action remains legal. */
+  endTurnRisk: EndTurnRisk;
   endTurnForecast: EndTurnForecast;
   strategicForecast: StrategicForecast;
   gameOver: boolean;
@@ -736,7 +857,7 @@ export interface AgentRunArtifact {
   /** Present for a Session artifact; absent for a standalone run. */
   sessionLineage?: { parentSessionId: string | null; parentCheckpointId: string | null };
   result: AgentGameResult | null;
-  /** Static map projection stored once per game by Artifact Schema 5.0.0. */
+  /** Static map projection stored once per game by Artifact Schema 6.0.0. */
   fixedMap?: AgentMapObservation;
   /** Dynamic public observations at reset and after each accepted action. */
   observationTrace?: AgentArtifactObservation[];
@@ -748,7 +869,7 @@ export interface AgentRunArtifact {
 }
 
 /**
- * Artifact Schema 5.0.0 stores topology once and keeps only dynamic map
+ * Artifact Schema 6.0.0 stores topology once and keeps only dynamic map
  * visibility in each trace entry.  Live observations remain complete.
  */
 export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {
@@ -770,6 +891,7 @@ export const HIDDEN_NOISE_METRIC_KEYS = [
   'aerialDiscoveriesInGroundBlockedArea',
   'policeZombiesFinal',
   'soldierZombiesFinal',
+  'hordeNoiseRespawnedByType',
 ] as const;
 
 export type HiddenNoiseMetricKey = typeof HIDDEN_NOISE_METRIC_KEYS[number];
@@ -786,9 +908,12 @@ export const HIDDEN_REJECTED_REFUGEE_METRIC_KEYS = [
 ] as const;
 
 export type HiddenRejectedRefugeeMetricKey = typeof HIDDEN_REJECTED_REFUGEE_METRIC_KEYS[number];
-export type AgentPublicConfig = Omit<GameConfig, 'noise'> & {
-  noise: Pick<GameConfig['noise'], 'publicClass'>;
-};
+/**
+ * Runtime public Config is a redacted copy (see createAgentPublicConfig).
+ * Keep the compile-time shape aligned with Core's Config so verification
+ * artifacts can still be assembled without a second mutable config model.
+ */
+export type AgentPublicConfig = GameConfig;
 export type AgentPublicMetrics = Omit<GameMetrics, HiddenNoiseMetricKey | HiddenRejectedRefugeeMetricKey | 'config'> & {
   config: AgentPublicConfig;
 };

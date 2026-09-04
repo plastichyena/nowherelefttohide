@@ -46,6 +46,8 @@ export interface BoardRenderState {
   locale?: Locale;
   selectedPosition?: HexCoord | null;
   selectedUnitId?: string | null;
+  /** Visible enemy selection (Human UI only; never a hidden target). */
+  selectedZombieId?: string | null;
   legalDestinations?: readonly HexCoord[];
   attackTargetIds?: readonly string[];
   pendingPath?: readonly HexCoord[];
@@ -395,6 +397,8 @@ function unitColor(unit: UnitState): number {
   if (unit.type === 'hordeZombie') return unit.hordeKind === 'final' ? 0xe07a45 : 0xc8674d;
   if (unit.type === 'policeZombie') return 0x7f4f67;
   if (unit.type === 'soldierZombie') return 0x806b49;
+  if ((unit.type as string) === 'riotZombie') return 0x8f5367;
+  if ((unit.type as string) === 'riotPolice') return 0xc6a7d9;
   return unit.type === 'nationalGuard' ? 0xb6d8ff : 0x7fc7a0;
 }
 
@@ -1074,7 +1078,7 @@ export class HexBoardScene extends Phaser.Scene {
       const tileSelected = selected ? sameHex(selected, tile) : false;
       this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKeys.has(key), reserveKeys.has(key), hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview, constructibleLegalPreview, constructibleInvalidPreview, selectedConstructiblePreview);
       if (facility) this.drawFacilityDynamic(facility, productionByFacility.get(facility.id), center, tileSelected, render, suppliedTiles, key, t);
-      if (checkpoint) this.drawCheckpointDynamic(state, checkpoint, center);
+      if (checkpoint) this.drawCheckpointDynamic(state, checkpoint, center, tileSelected, suppliedTiles, key, t);
       const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
       units.forEach((unit, index) => this.drawUnitDynamic(unit, center, getFacilityUnitOffset(Boolean(facility || checkpoint)), index, units.length, tileSelected, render, suppliedTiles, key, attackTargets, blockedZombies, t));
     }
@@ -1332,11 +1336,47 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.lineStyle(2, 0xef8c7a, 0.85);
       this.graphics.strokeCircle(center.x, center.y, 19);
     }
-    if (tileSelected) this.addLabel(`facility:${facility.id}:detail`, `${facility.id} W${facility.workers} I${facility.infected}`, center.x, center.y + 24, '#f3f7f9', 8, true);
-    void t;
+    if (tileSelected) {
+      const facilityLabels: Record<string, string> = {
+        capital: t('capital'),
+        city: t('city'),
+        farm: t('farm'),
+        civilianFactory: t('civilianFactory'),
+        militaryFactory: t('militaryFactory'),
+        refinery: t('refinery'),
+        powerPlant: t('powerPlant'),
+        windPowerPlant: t('windPowerPlant'),
+        simpleFarm: t('simpleFarm'),
+        civilianDroneBase: t('civilianDroneBase'),
+      };
+      const badges: string[] = [];
+      if (facility.infected > 0) badges.push(`!${facility.infected}`);
+      if (facility.owner !== 'player') badges.push(t('unowned'));
+      if (facility.operationalStatus !== 'operational') {
+        const statusLabels: Record<string, string> = {
+          building: t('stateBuilding'),
+          stopped: t('stopped'),
+          infected: t('infected'),
+          disabled: t('stateDisabled'),
+          recovering: t('stateRecovering'),
+          ruined: t('ruined'),
+        };
+        badges.push(statusLabels[facility.operationalStatus] ?? facility.operationalStatus);
+      }
+      if (facility.owner === 'player' && !suppliedTiles.has(tileKey)) badges.push(t('outOfSupply'));
+      this.addLabel(`facility:${facility.id}:detail`, `${facilityLabels[facility.type] ?? facility.type}${badges.length > 0 ? ` · ${badges.join(' · ')}` : ''}`, center.x, center.y + 24, '#f3f7f9', 8, true);
+    }
   }
 
-  private drawCheckpointDynamic(state: Readonly<GameState>, checkpoint: CheckpointState, center: { x: number; y: number }): void {
+  private drawCheckpointDynamic(
+    state: Readonly<GameState>,
+    checkpoint: CheckpointState,
+    center: { x: number; y: number },
+    tileSelected: boolean,
+    suppliedTiles: ReadonlySet<string>,
+    tileKey: string,
+    t: ReturnType<typeof createTranslator>,
+  ): void {
     const role = deriveCheckpointRole(state, checkpoint);
     const roleColor = role === 'active'
       ? 0x8ff0d4
@@ -1360,6 +1400,13 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.lineStyle(2, 0xff665f, 0.9);
       this.graphics.strokeCircle(center.x, center.y, 18);
     }
+    if (tileSelected) {
+      const roleLabel = t(`checkpointRole.${role}`);
+      const badges = [roleLabel].filter(Boolean);
+      if (checkpoint.infected > 0) badges.push(`!${checkpoint.infected}`);
+      if (!suppliedTiles.has(tileKey)) badges.push(t('outOfSupply'));
+      this.addLabel(`checkpoint:${checkpoint.id}:detail`, `${t('checkpoint')}${badges.length > 0 ? ` · ${badges.join(' · ')}` : ''}`, center.x, center.y + 24, '#f3f7f9', 8, true);
+    }
   }
 
   private drawUnitDynamic(
@@ -1379,7 +1426,7 @@ export class HexBoardScene extends Phaser.Scene {
     const offset = this.stackUnitOffset(facilityOffset, index, total);
     const position = { x: center.x + offset.x, y: center.y + offset.y + 1 };
     const isZombie = isBoardZombieUnitType(unit.type);
-    const selected = render.selectedUnitId === unit.id;
+    const selected = render.selectedUnitId === unit.id || render.selectedZombieId === unit.id;
     const target = attackTargets.has(unit.id);
     if (selected || target || blockedZombies.has(unit.id)) {
       const color = unitLineColor(unit, selected, target, blockedZombies.has(unit.id));
@@ -1388,7 +1435,22 @@ export class HexBoardScene extends Phaser.Scene {
     }
     if (unit.hp < unit.maxHp) this.drawHealth(this.graphics, position, unit.hp / Math.max(unit.maxHp, 1));
     if (render.supplyOverlay && !isZombie && !suppliedTiles.has(tileKey)) this.addLabel(`unit:${unit.id}:status`, '⊘', position.x - 15, position.y - 15, '#ef8c7a', 9, true);
-    if (selected || tileSelected) this.addLabel(`unit:${unit.id}:detail`, `${unit.id} HP ${unit.hp}/${unit.maxHp}`, position.x, position.y + 23, '#f3f7f9', 8, true);
+    if (!isZombie && (selected || tileSelected)) {
+      const unitRecord = unit as unknown as Record<string, unknown>;
+      const proficiency = unitRecord.proficiency === 'recruit' || unitRecord.proficiency === 'regular' || unitRecord.proficiency === 'veteran'
+        ? String(unitRecord.proficiency)
+        : null;
+      const proficiencyLabel = proficiency ? t(`proficiency.${proficiency}`) : null;
+      const maxCharges = typeof unitRecord.maxAttackCharges === 'number' ? Math.max(1, Math.trunc(unitRecord.maxAttackCharges)) : 1;
+      const charges = typeof unitRecord.attackChargesRemaining === 'number' ? Math.max(0, Math.min(maxCharges, Math.trunc(unitRecord.attackChargesRemaining))) : maxCharges;
+      const typeLabel = unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : t('police');
+      const supplyLabel = suppliedTiles.has(tileKey) ? t('supplied') : t('outOfSupply');
+      const details = `${typeLabel}${proficiencyLabel ? ` (${proficiencyLabel})` : ''} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
+      this.addLabel(`unit:${unit.id}:detail`, details, position.x, position.y + 23, '#f3f7f9', 8, true);
+    } else if (isZombie && render.selectedZombieId === unit.id) {
+      const typeLabel = unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : t('zombie');
+      this.addLabel(`unit:${unit.id}:detail`, `${typeLabel} HP ${unit.hp}/${unit.maxHp}`, position.x, position.y + 23, '#f3f7f9', 8, true);
+    }
     void t;
   }
 
@@ -1526,10 +1588,16 @@ export class HexBoardScene extends Phaser.Scene {
   }
 
   private drawUnitSilhouette(graphics: Phaser.GameObjects.Graphics, center: { x: number; y: number }, unit: UnitState): void {
-    const radius = unit.type === 'hordeZombie' || unit.type === 'soldierZombie' ? 11 : 9;
+    const radius = unit.type === 'hordeZombie' || unit.type === 'soldierZombie' || (unit.type as string) === 'riotZombie' || (unit.type as string) === 'riotPolice' ? 11 : 9;
     graphics.fillStyle(unitColor(unit), 0.95);
     graphics.lineStyle(unit.hordeKind === 'final' ? 3 : 2, unit.hordeKind === 'final' ? 0xffcf66 : 0x071019, 1);
-    if (unit.type === 'policeZombie') {
+    if ((unit.type as string) === 'riotZombie') {
+      // Heavy riot silhouette: a broad shield with a central bar remains
+      // readable at the minimum 0.35 zoom even without dedicated art.
+      graphics.fillRoundedRect(center.x - radius, center.y - radius, radius * 2, radius * 2, 6);
+      graphics.strokeRoundedRect(center.x - radius, center.y - radius, radius * 2, radius * 2, 6);
+      graphics.lineBetween(center.x - radius + 2, center.y, center.x + radius - 2, center.y);
+    } else if (unit.type === 'policeZombie') {
       // Distinct shield-like silhouette for a reanimated Police Unit.  It is
       // intentionally drawn without a letter so LOD stays legible at 0.35.
       graphics.fillRoundedRect(center.x - radius, center.y - radius, radius * 2, radius * 2, 4);

@@ -82,28 +82,8 @@ describe('v1.4.1 carried Military Goods combat', () => {
     const engine = quietEngine(402);
     const state = mutableState(engine);
     const guard = state.units.find((unit) => unit.id === 'national-guard-1')!;
-    const zombie = {
-      ...state.units[0]!,
-      id: 'zombie-test',
-      type: 'zombie' as const,
-      position: { q: 28, r: 25 },
-      hp: 10,
-      maxHp: 10,
-      attack: 5,
-      movement: 0,
-      range: 1,
-      vision: 3,
-      population: 0,
-      currentFuel: 0,
-      maxFuel: 0,
-      currentMilitaryGoods: 0,
-      maxMilitaryGoods: 0,
-      isPlayerUnit: false,
-      inheritedTarget: null,
-      noiseTarget: null,
-      spawnGroupId: null,
-      hordeKind: null,
-    };
+    const zombie = createUnit(state, 'zombie-test', 'zombie', { q: 28, r: 25 });
+    Object.assign(zombie, { hp: 10, maxHp: 10, attack: 5, movement: 0, range: 1, vision: 3 });
     state.units.push(zombie);
     guard.currentMilitaryGoods = 1;
     rebalance(state);

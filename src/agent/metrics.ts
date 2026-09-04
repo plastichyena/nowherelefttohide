@@ -68,7 +68,18 @@ export interface HordeWaveMetric {
   index: number;
   spawnTurn: number;
   directions: CardinalDirection[];
-  compositionPerDirection: { hordeZombie: number; zombie: number };
+  compositionPerDirection: {
+    hordeZombie: number;
+    zombie: number;
+    policeZombie?: number;
+    soldierZombie?: number;
+    riotZombie?: number;
+  };
+  /** Publicly declared slot count; the per-slot draw remains hidden until Spawn. */
+  nonHordeSlotCountPerDirection?: number;
+  possibleNonHordeTypes?: string[];
+  specialZombieSpawnedByType?: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  specialZombieKilledByType?: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
   final: boolean;
   hordeZombieSpawned: number;
   normalZombieSpawned: number;
@@ -145,14 +156,19 @@ export interface GameMetrics {
   finalSecuredFacilities: number;
   policeProduced: number;
   nationalGuardProduced: number;
+  riotPoliceProduced: number;
   policeInitial: number;
   nationalGuardInitial: number;
+  riotPoliceInitial: number;
   policeLosses: number;
   nationalGuardLosses: number;
+  riotPoliceLosses: number;
   policeFinal: number;
   nationalGuardFinal: number;
+  riotPoliceFinal: number;
   policeSurvivalRate: number;
   nationalGuardSurvivalRate: number;
+  riotPoliceSurvivalRate: number;
   outOfSupplyUnitLosses: number;
   policeCombatRecoveryHp: number;
   policeCombatRecoveryCount: number;
@@ -201,6 +217,10 @@ export interface GameMetrics {
   soldierZombiesKilled: number;
   policeZombiesFinal: number;
   soldierZombiesFinal: number;
+  riotZombiesSpawned: number;
+  riotZombiesKilled: number;
+  riotZombiesFinal: number;
+  riotPoliceReanimations: number;
   maxVisibleZombies: number;
   turnsAfterFinalHorde: number;
   suppliedAreaZombieClearTurn: number | null;
@@ -217,6 +237,19 @@ export interface GameMetrics {
   noisePulsesEmitted: number;
   policeNoisePulses: number;
   nationalGuardNoisePulses: number;
+  riotPoliceNoisePulses: number;
+  /** v1.5 promotion, charge, Riot, and Horde special-composition metrics. */
+  recruitsCommissionedByType: Record<HumanUnitType, number>;
+  regularPromotionsByType: Record<HumanUnitType, number>;
+  veteranPromotionsByType: Record<HumanUnitType, number>;
+  veteranZombieKillsByType: Record<HumanUnitType, number>;
+  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie', number>;
+  hordeMovementNoisePulses: number;
+  hordeNoiseRespawnedByType: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  /** Balanced-agent audit fields; public artifacts may retain only the aggregate. */
+  unusedAttackChargesByTurn: number;
+  criticalInfectionAlertUnresolvedTurns: number;
   /** Verification-only values; Browser Bridge artifacts remove these keys. */
   normalZombiesNoiseTargeted: number;
   noiseTargetsReached: number;
@@ -452,6 +485,17 @@ const FACILITY_TYPES: readonly string[] = [
   'capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery',
   'powerPlant', 'windPowerPlant', 'civilianDroneBase', 'simpleFarm',
 ];
+const HUMAN_UNIT_TYPES: readonly HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice'];
+const SPECIAL_ZOMBIE_TYPES = ['policeZombie', 'soldierZombie', 'riotZombie'] as const;
+const ZOMBIE_TYPES = ['zombie', ...SPECIAL_ZOMBIE_TYPES] as const;
+
+function isHumanUnitType(value: unknown): value is HumanUnitType {
+  return typeof value === 'string' && HUMAN_UNIT_TYPES.includes(value as HumanUnitType);
+}
+
+function isZombieType(value: unknown): value is typeof ZOMBIE_TYPES[number] {
+  return typeof value === 'string' && ZOMBIE_TYPES.includes(value as typeof ZOMBIE_TYPES[number]);
+}
 
 function zeroResourceRecord(): Record<ResourceType, number> {
   return { food: 0, civilianGoods: 0, militaryGoods: 0, fuel: 0 };
@@ -638,7 +682,9 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     (event) => event.type === 'supply_action_rejected',
   ).length + (input.invalidAttempts ?? []).filter((attempt) => /supply|out_of_supply/i.test(attempt.error.code)).length;
   const destroyedZombieEvents = events.filter(
-    (event) => event.type === 'unit_destroyed' && typeof event.payload.unitId === 'string' && event.payload.unitId.startsWith('zombie-'),
+    (event) => event.type === 'unit_destroyed' && isRecord(event.payload) &&
+      typeof event.payload.unitId === 'string' &&
+      isZombieType(event.payload.unitType),
   ).length;
   const normalZombiesKilled = statisticNumber(statistics, 'normalZombiesKilled') ?? events.filter(
     (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'zombie',
@@ -651,6 +697,13 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   ).length;
   const soldierZombiesKilled = statisticNumber(statistics, 'soldierZombiesKilled') ?? events.filter(
     (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'soldierZombie',
+  ).length;
+  const riotZombiesKilled = statisticNumber(statistics, 'riotZombiesKilled') ?? events.filter(
+    (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'riotZombie',
+  ).length;
+  const riotZombiesSpawned = statisticNumber(statistics, 'riotZombiesSpawned') ?? events.filter(
+    (event) => (event.type === 'human_unit_reanimated' && event.payload.zombieUnitType === 'riotZombie')
+      || (event.type === 'horde_spawned' && event.payload.unitType === 'riotZombie'),
   ).length;
   const finalHordeSpawned = statisticNumber(statistics, 'finalHordeSpawned') ?? events
     .filter((event) => event.type === 'horde_spawned' && event.payload.hordeKind === 'final')
@@ -708,6 +761,19 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const nationalGuardNoisePulses = statisticNumber(statistics, 'nationalGuardNoisePulses') ?? events.filter(
     (event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'nationalGuard',
   ).length;
+  const riotPoliceNoisePulses = statisticNumber(statistics, 'riotPoliceNoisePulses') ?? events.filter(
+    (event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'riotPolice',
+  ).length;
+  const noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie', number> = {
+    police: policeNoisePulses,
+    nationalGuard: nationalGuardNoisePulses,
+    riotPolice: riotPoliceNoisePulses,
+    hordeZombie: statisticNumber(statistics, 'hordeMovementNoisePulses') ?? events.filter(
+      (event) => event.type === 'noise_emitted' && event.payload.sourceKind === 'hordeZombie',
+    ).length,
+  };
+  const hordeMovementNoisePulses = statisticNumber(statistics, 'hordeMovementNoisePulses')
+    ?? noisePulsesBySourceType.hordeZombie;
   const normalZombiesNoiseTargeted = statisticNumber(statistics, 'normalZombiesNoiseTargeted') ?? 0;
   const noiseTargetsReached = statisticNumber(statistics, 'noiseTargetsReached') ?? 0;
   const noiseTargetsOverriddenByHorde = statisticNumber(statistics, 'noiseTargetsOverriddenByHorde') ?? 0;
@@ -748,10 +814,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const eventById = new Map(events.map((event) => [event.id, event] as const));
   const noiseSourceForEvent = (event: AgentPublicEvent): HumanUnitType | null => {
     const direct = event.payload.sourceUnitType;
-    if (direct === 'police' || direct === 'nationalGuard') return direct;
+    if (isHumanUnitType(direct)) return direct;
     const rootId = typeof event.payload.chainOriginEventId === 'string' ? event.payload.chainOriginEventId : null;
     const rootSource = rootId ? eventById.get(rootId)?.payload.sourceUnitType : null;
-    return rootSource === 'police' || rootSource === 'nationalGuard' ? rootSource : null;
+    return isHumanUnitType(rootSource) ? rootSource : null;
   };
   const noiseImmediateEvents = events.filter(
     (event) => event.type === 'site_immediate_infection' && noiseSourceForEvent(event) !== null,
@@ -820,7 +886,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const allUnits = new Map<string, HumanUnitType>();
   for (const observation of observations) {
     for (const unit of observation.units) {
-      if (unit.type === 'police' || unit.type === 'nationalGuard') allUnits.set(unit.id, unit.type);
+      if (isHumanUnitType(unit.type)) allUnits.set(unit.id, unit.type);
     }
   }
   const finalIds = new Set(finalObservation.units.map((unit) => unit.id));
@@ -828,12 +894,16 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     [...allUnits].filter(([id, unitType]) => unitType === type && predicate(id)).length;
   const policeInitial = countUnits('police', (id) => initialIds.has(id));
   const nationalGuardInitial = countUnits('nationalGuard', (id) => initialIds.has(id));
+  const riotPoliceInitial = countUnits('riotPolice', (id) => initialIds.has(id));
   const policeProduced = countUnits('police', (id) => !initialIds.has(id));
   const nationalGuardProduced = countUnits('nationalGuard', (id) => !initialIds.has(id));
+  const riotPoliceProduced = countUnits('riotPolice', (id) => !initialIds.has(id));
   const policeFinal = countUnits('police', (id) => finalIds.has(id));
   const nationalGuardFinal = countUnits('nationalGuard', (id) => finalIds.has(id));
+  const riotPoliceFinal = countUnits('riotPolice', (id) => finalIds.has(id));
   const policeLosses = countUnits('police', (id) => !finalIds.has(id));
   const nationalGuardLosses = countUnits('nationalGuard', (id) => !finalIds.has(id));
+  const riotPoliceLosses = countUnits('riotPolice', (id) => !finalIds.has(id));
   const survivalRate = (finalCount: number, initialCount: number, producedCount: number): number => {
     const denominator = initialCount + producedCount;
     return denominator > 0 ? finalCount / denominator : 0;
@@ -853,6 +923,8 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const policeRestRecovery = recovery('police', 'rest');
   const nationalGuardCombatRecovery = recovery('nationalGuard', 'combat');
   const nationalGuardRestRecovery = recovery('nationalGuard', 'rest');
+  const riotPoliceCombatRecovery = recovery('riotPolice', 'combat');
+  const riotPoliceRestRecovery = recovery('riotPolice', 'rest');
   const combatRecoverySelections = turnObservations.reduce((total, observation) => total + observation.units.filter(
     (unit) => unit.hp < unit.maxHp && unit.recoveryClassIfTurnEndsNow === 'combat',
   ).length, 0);
@@ -876,7 +948,38 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const finalSecuredFacilities = finalObservation.facilities.filter(
     (facility) => facility.owner === 'player' && facility.status === 'owned',
   ).length;
-  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0 });
+  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0, riotPolice: 0 });
+  const statisticHumanRecord = (key: string): Record<HumanUnitType, number> => {
+    const source = numericRecord(isRecord(statistics) ? statistics[key] : undefined);
+    return Object.fromEntries(HUMAN_UNIT_TYPES.map((type) => [type, source[type] ?? 0])) as Record<HumanUnitType, number>;
+  };
+  const eventHumanRecord = (eventType: string, predicate: (event: AgentPublicEvent) => boolean = () => true): Record<HumanUnitType, number> => {
+    const record = byHumanType();
+    for (const event of events) {
+      if (event.type !== eventType || !predicate(event)) continue;
+      const type = event.payload.unitType;
+      if (isHumanUnitType(type)) record[type] += 1;
+    }
+    return record;
+  };
+  const recruitsCommissionedByType = Object.keys(isRecord(statistics) ? statistics.recruitsCommissionedByType ?? {} : {}).length > 0
+    ? statisticHumanRecord('recruitsCommissionedByType')
+    : eventHumanRecord('riot_police_commissioned');
+  // The legacy Core emits the generic production event; use it when available.
+  for (const event of events) {
+    if ((event.type as string) !== 'unit_produced' && (event.type as string) !== 'unit_created') continue;
+    const type = event.payload.unitType;
+    if (isHumanUnitType(type)) recruitsCommissionedByType[type] += 1;
+  }
+  const regularPromotionsByType = Object.keys(isRecord(statistics) ? statistics.regularPromotionsByType ?? {} : {}).length > 0
+    ? statisticHumanRecord('regularPromotionsByType')
+    : eventHumanRecord('unit_promoted', (event) => event.payload.into === 'regular');
+  const veteranPromotionsByType = Object.keys(isRecord(statistics) ? statistics.veteranPromotionsByType ?? {} : {}).length > 0
+    ? statisticHumanRecord('veteranPromotionsByType')
+    : eventHumanRecord('unit_promoted', (event) => event.payload.into === 'veteran');
+  const veteranZombieKillsByType = Object.keys(isRecord(statistics) ? statistics.veteranZombieKillsByType ?? {} : {}).length > 0
+    ? statisticHumanRecord('veteranZombieKillsByType')
+    : eventHumanRecord('unit_kill_credited', (event) => event.payload.proficiency === 'veteran');
   const humanHexesMovedByType = byHumanType();
   const maxSingleMoveDistanceByType = byHumanType();
   const longMoves6PlusByType = byHumanType();
@@ -901,7 +1004,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const humanUnitTypeById = new Map<string, HumanUnitType>();
   for (const observation of observations) {
     for (const unit of observation.units) {
-      if (unit.type === 'police' || unit.type === 'nationalGuard') humanUnitTypeById.set(unit.id, unit.type);
+      if (isHumanUnitType(unit.type)) humanUnitTypeById.set(unit.id, unit.type);
     }
   }
   for (let index = 1; index < observations.length; index += 1) {
@@ -910,7 +1013,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     const action = input.actions[index - 1];
     const previousUnits = new Map(before.units.map((unit) => [unit.id, unit] as const));
     for (const unit of after.units) {
-      if (unit.type !== 'police' && unit.type !== 'nationalGuard') continue;
+      if (!isHumanUnitType(unit.type)) continue;
       const previous = previousUnits.get(unit.id);
       if (!previous) {
         commissioningFuelByType[unit.type] += unit.currentFuel;
@@ -945,7 +1048,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   };
   for (const observation of turnObservations) {
     for (const unit of observation.units) {
-      if (unit.type !== 'police' && unit.type !== 'nationalGuard') continue;
+      if (!isHumanUnitType(unit.type)) continue;
       if (!unit.inSupply) turnsUnitsEndedOutOfSupplyByType[unit.type] += 1;
       if (unit.canMove && unit.currentFuel === 0 && unit.fuelCostByLegalMove.length === 0) unitsUnableToMoveForFuel += 1;
     }
@@ -988,7 +1091,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       : typeof event.payload.attackerId === 'string'
         ? humanUnitTypeById.get(event.payload.attackerId)
         : undefined;
-    const unitType = unitTypeValue === 'police' || unitTypeValue === 'nationalGuard' ? unitTypeValue : null;
+    const unitType = isHumanUnitType(unitTypeValue) ? unitTypeValue : null;
     if (!unitType) continue;
     const militaryGoodsCost = eventPayloadNumber(event, 'militaryGoodsCost');
     if (event.type === 'resource_consumed' && event.payload.resource === 'militaryGoods') {
@@ -1001,7 +1104,11 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       else if (event.payload.counterattack === true) counterattackMilitaryGoodsConsumedByType[unitType] += militaryGoodsCost;
       else attackMilitaryGoodsConsumedByType[unitType] += militaryGoodsCost;
       const effectiveAttack = eventPayloadNumber(event, 'effectiveAttack');
-      if (militaryGoodsCost === 0 && effectiveAttack < input.config.units[unitType].attack) {
+      const configuredRecruitAttack = (input.config.units[unitType] as unknown as Record<string, unknown>).recruitAttack;
+      const configuredAttack = typeof configuredRecruitAttack === 'number'
+        ? configuredRecruitAttack
+        : numberOrZero((input.config.units[unitType] as unknown as Record<string, unknown>).attack);
+      if (militaryGoodsCost === 0 && effectiveAttack < configuredAttack) {
         zeroMilitaryGoodsWeakAttacksByType[unitType] += 1;
       }
       if (unitType === 'nationalGuard') {
@@ -1162,16 +1269,100 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const hordeSpawnEvents = events.filter((event) =>
     event.type === 'horde_spawned' && Number.isSafeInteger(event.payload.waveIndex),
   );
+  const specialRecordFromStatistics = (
+    key: string,
+  ): Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number> => {
+    const source = numericRecord(isRecord(statistics) ? statistics[key] : undefined);
+    return Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [type, source[type] ?? 0])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
+  };
+  const specialRecordFromEvents = (
+    predicate: (event: AgentPublicEvent) => boolean,
+  ): Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number> => {
+    const result = Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [type, 0])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
+    for (const event of events) {
+      if (!predicate(event)) continue;
+      if (Array.isArray(event.payload.units)) {
+        for (const unit of event.payload.units) {
+          if (!isRecord(unit)) continue;
+          const type = unit.unitType;
+          if (SPECIAL_ZOMBIE_TYPES.includes(type as typeof SPECIAL_ZOMBIE_TYPES[number])) {
+            result[type as typeof SPECIAL_ZOMBIE_TYPES[number]] += 1;
+          }
+        }
+        continue;
+      }
+      const type = event.payload.unitType;
+      if (SPECIAL_ZOMBIE_TYPES.includes(type as typeof SPECIAL_ZOMBIE_TYPES[number])) {
+        result[type as typeof SPECIAL_ZOMBIE_TYPES[number]] += 1;
+      }
+    }
+    return result;
+  };
+  const statHordeSpecialSpawned = specialRecordFromStatistics('hordeSpecialSpawnedByType');
+  const eventHordeSpecialSpawned = specialRecordFromEvents((event) => event.type === 'horde_spawned');
+  const hordeSpecialSpawnedByType = Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [
+    type,
+    statHordeSpecialSpawned[type] > 0 ? statHordeSpecialSpawned[type] : eventHordeSpecialSpawned[type],
+  ])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
+  const statHordeNoiseRespawned = (() => {
+    const source = numericRecord(isRecord(statistics) ? statistics.hordeNoiseRespawnedByType : undefined);
+    return Object.fromEntries(ZOMBIE_TYPES.map((type) => [type, source[type] ?? 0])) as Record<typeof ZOMBIE_TYPES[number], number>;
+  })();
+  const eventHordeNoiseRespawned = (() => {
+    const result = Object.fromEntries(ZOMBIE_TYPES.map((type) => [type, 0])) as Record<typeof ZOMBIE_TYPES[number], number>;
+    for (const event of events) {
+      if (event.type !== 'site_noise_respawn') continue;
+      const type = event.payload.spawnedUnitType;
+      if (isZombieType(type)) result[type] += Math.max(0, eventPayloadNumber(event, 'actualSpawnCount'));
+    }
+    return result;
+  })();
+  const hordeNoiseRespawnedByType = Object.fromEntries(ZOMBIE_TYPES.map((type) => [
+    type,
+    statHordeNoiseRespawned[type] > 0 ? statHordeNoiseRespawned[type] : eventHordeNoiseRespawned[type],
+  ])) as Record<typeof ZOMBIE_TYPES[number], number>;
   const hordeWaves: HordeWaveMetric[] = input.config.horde.waves.map((wave, index) => {
     const waveIndex = index + 1;
     const event = hordeSpawnEvents.find((candidate) => candidate.payload.waveIndex === waveIndex);
     const directions = Array.isArray(event?.payload.directions)
       ? event!.payload.directions.filter((direction): direction is CardinalDirection => CARDINAL_DIRECTIONS.includes(direction as CardinalDirection))
       : [];
+    const composition = isRecord((wave as unknown as Record<string, unknown>).compositionPerDirection)
+      ? (wave as unknown as Record<string, unknown>).compositionPerDirection as Record<string, unknown>
+      : {};
+    const baseComposition = {
+      hordeZombie: numberOrZero(composition.hordeZombie),
+      zombie: numberOrZero(composition.zombie),
+      ...(numberOrZero(composition.policeZombie) > 0 ? { policeZombie: numberOrZero(composition.policeZombie) } : {}),
+      ...(numberOrZero(composition.soldierZombie) > 0 ? { soldierZombie: numberOrZero(composition.soldierZombie) } : {}),
+      ...(numberOrZero(composition.riotZombie) > 0 ? { riotZombie: numberOrZero(composition.riotZombie) } : {}),
+    };
+    const eventUnits = Array.isArray(event?.payload.units) ? event?.payload.units : [];
+    const spawnedByType = Object.fromEntries(ZOMBIE_TYPES.map((type) => [type, eventUnits.filter((unit) =>
+      isRecord(unit) && unit.unitType === type,
+    ).length])) as Record<typeof ZOMBIE_TYPES[number], number>;
     const hordeZombieSpawned = numberOrZero(event?.payload.hordeZombieCount)
-      || (event ? directions.length * wave.compositionPerDirection.hordeZombie : 0);
+      || (event ? directions.length * baseComposition.hordeZombie : 0);
     const normalZombieSpawned = numberOrZero(event?.payload.normalZombieCount)
-      || (event ? directions.length * wave.compositionPerDirection.zombie : 0);
+      || (event ? directions.length * baseComposition.zombie : 0);
+    const specialZombieSpawnedByType = Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [
+      type,
+      numberOrZero((isRecord(event?.payload.specialZombieSpawnedByType) ? event?.payload.specialZombieSpawnedByType : {})[type])
+        || spawnedByType[type],
+    ])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
+    const specialZombieKilledByType = Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [
+      type,
+      events.filter((candidate) => candidate.type === 'unit_destroyed'
+        && candidate.payload.unitType === type
+        && candidate.payload.waveIndex === waveIndex).length,
+    ])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
+    const waveRecord = wave as unknown as Record<string, unknown>;
+    const nonHordeSlotCountPerDirection = numberOrZero(
+      waveRecord.nonHordeSlotCountPerDirection ?? waveRecord.nonHordeSlotsPerDirection,
+    ) || (baseComposition.zombie > 0 ? baseComposition.zombie : undefined);
+    const possibleNonHordeTypes = Array.isArray(waveRecord.possibleNonHordeTypes)
+      ? waveRecord.possibleNonHordeTypes.filter((type): type is string => typeof type === 'string')
+      : undefined;
     const hordeZombieKilled = events.filter((candidate) => candidate.type === 'unit_destroyed'
       && candidate.payload.unitType === 'hordeZombie'
       && candidate.payload.waveIndex === waveIndex).reduce((total, candidate) => total + 1, 0);
@@ -1179,14 +1370,18 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       && candidate.payload.unitType === 'zombie'
       && candidate.payload.waveIndex === waveIndex).reduce((total, candidate) => total + 1, 0);
     for (const direction of directions) {
-      hordeDirectionSpawnCounts[direction].hordeZombie += wave.compositionPerDirection.hordeZombie;
-      hordeDirectionSpawnCounts[direction].normalZombie += wave.compositionPerDirection.zombie;
+      hordeDirectionSpawnCounts[direction].hordeZombie += baseComposition.hordeZombie;
+      hordeDirectionSpawnCounts[direction].normalZombie += nonHordeSlotCountPerDirection ?? baseComposition.zombie;
     }
     return {
       index: waveIndex,
       spawnTurn: wave.turn,
       directions,
-      compositionPerDirection: { ...wave.compositionPerDirection },
+      compositionPerDirection: baseComposition,
+      ...(nonHordeSlotCountPerDirection === undefined ? {} : { nonHordeSlotCountPerDirection }),
+      ...(possibleNonHordeTypes === undefined ? {} : { possibleNonHordeTypes }),
+      specialZombieSpawnedByType,
+      specialZombieKilledByType,
       final: wave.final,
       hordeZombieSpawned,
       normalZombieSpawned,
@@ -1202,11 +1397,15 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     if (unitType === 'zombie') hordeDirectionKillCounts[direction as CardinalDirection].normalZombie += 1;
   }
   const finalWaveMetric = hordeWaves.find((wave) => wave.final);
+  const specialZombieTotal = (counts: Readonly<Record<string, number>> | undefined): number =>
+    Object.values(counts ?? {}).reduce((total, count) => total + Math.max(0, numberOrZero(count)), 0);
   const hordeFinalWaveSpawnTotal = finalWaveMetric
     ? finalWaveMetric.hordeZombieSpawned + finalWaveMetric.normalZombieSpawned
+      + specialZombieTotal(finalWaveMetric.specialZombieSpawnedByType)
     : finalHordeSpawned;
   const hordeFinalWaveKillTotal = finalWaveMetric
     ? finalWaveMetric.hordeZombieKilled + finalWaveMetric.normalZombieKilled
+      + specialZombieTotal(finalWaveMetric.specialZombieKilledByType)
     : finalHordeKilled;
   const hordeFinalDefeatedTurn = firstTurnWhere(turnObservations, (observation) => observation.victory.finalHordeDefeated);
   const multiFrontTurns = new Set(
@@ -1221,6 +1420,28 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const hordeMultiFrontFallbacks = events.filter((event) =>
     event.type === 'checkpoint_fallback' && multiFrontTurns.has(event.turn),
   ).length;
+  const riotZombiesFinal = statisticNumber(statistics, 'riotZombiesFinal')
+    ?? Math.max(0, riotZombiesSpawned - riotZombiesKilled);
+  const unusedAttackChargesByTurn = input.actions.reduce((total, action, index) => {
+    if (action.type !== 'EndTurn') return total;
+    const observation = observations[index];
+    return total + (observation?.units
+      .filter((unit) => isHumanUnitType(unit.type))
+      .reduce((sum, unit) => sum + Math.max(0, unit.attackChargesRemaining), 0) ?? 0);
+  }, 0);
+  const criticalInfectionAlertUnresolvedTurns = input.actions.reduce((total, action, index) => {
+    if (action.type !== 'EndTurn') return total;
+    const observation = observations[index];
+    const criticalInfection = observation?.crisisSummary?.alerts?.some((alert) =>
+      alert.severity === 'critical' && alert.category === 'infection',
+    ) ?? false;
+    if (!criticalInfection) return total;
+    const turn = observation?.turn;
+    const suppressed = turn !== undefined && events.some((event) =>
+      event.turn === turn && event.type === 'infection_suppressed',
+    );
+    return total + (suppressed ? 0 : 1);
+  }, 0);
   const outcome: MetricOutcome = input.failure ? 'technical_failure' : input.result?.outcome ?? 'technical_failure';
   const gameOverReason = input.failure ? null : input.result?.reason ?? null;
 
@@ -1290,14 +1511,19 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     finalSecuredFacilities,
     policeProduced,
     nationalGuardProduced,
+    riotPoliceProduced,
     policeInitial,
     nationalGuardInitial,
+    riotPoliceInitial,
     policeLosses,
     nationalGuardLosses,
+    riotPoliceLosses,
     policeFinal,
     nationalGuardFinal,
+    riotPoliceFinal,
     policeSurvivalRate: survivalRate(policeFinal, policeInitial, policeProduced),
     nationalGuardSurvivalRate: survivalRate(nationalGuardFinal, nationalGuardInitial, nationalGuardProduced),
+    riotPoliceSurvivalRate: survivalRate(riotPoliceFinal, riotPoliceInitial, riotPoliceProduced),
     outOfSupplyUnitLosses,
     policeCombatRecoveryHp: policeCombatRecovery.hp,
     policeCombatRecoveryCount: policeCombatRecovery.count,
@@ -1347,6 +1573,12 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     soldierZombiesKilled,
     policeZombiesFinal: statisticNumber(statistics, 'policeZombiesFinal') ?? 0,
     soldierZombiesFinal: statisticNumber(statistics, 'soldierZombiesFinal') ?? 0,
+    riotZombiesSpawned,
+    riotZombiesKilled,
+    riotZombiesFinal,
+    riotPoliceReanimations: statisticNumber(statistics, 'riotPoliceReanimations') ?? events.filter(
+      (event) => event.type === 'human_unit_reanimated' && event.payload.humanUnitType === 'riotPolice',
+    ).length,
     maxVisibleZombies,
     turnsAfterFinalHorde,
     suppliedAreaZombieClearTurn,
@@ -1363,6 +1595,17 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     noisePulsesEmitted,
     policeNoisePulses,
     nationalGuardNoisePulses,
+    riotPoliceNoisePulses,
+    recruitsCommissionedByType,
+    regularPromotionsByType,
+    veteranPromotionsByType,
+    veteranZombieKillsByType,
+    hordeSpecialSpawnedByType,
+    noisePulsesBySourceType,
+    hordeMovementNoisePulses,
+    hordeNoiseRespawnedByType,
+    unusedAttackChargesByTurn,
+    criticalInfectionAlertUnresolvedTurns,
     normalZombiesNoiseTargeted,
     noiseTargetsReached,
     noiseTargetsOverriddenByHorde,
@@ -1610,14 +1853,19 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'finalSecuredFacilities',
   'policeProduced',
   'nationalGuardProduced',
+  'riotPoliceProduced',
   'policeInitial',
   'nationalGuardInitial',
+  'riotPoliceInitial',
   'policeLosses',
   'nationalGuardLosses',
+  'riotPoliceLosses',
   'policeFinal',
   'nationalGuardFinal',
+  'riotPoliceFinal',
   'policeSurvivalRate',
   'nationalGuardSurvivalRate',
+  'riotPoliceSurvivalRate',
   'outOfSupplyUnitLosses',
   'policeCombatRecoveryHp',
   'policeCombatRecoveryCount',
@@ -1664,6 +1912,10 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'soldierZombiesKilled',
   'policeZombiesFinal',
   'soldierZombiesFinal',
+  'riotZombiesSpawned',
+  'riotZombiesKilled',
+  'riotZombiesFinal',
+  'riotPoliceReanimations',
   'maxVisibleZombies',
   'turnsAfterFinalHorde',
   'suppliedAreaZombieClearTurn',
@@ -1679,6 +1931,10 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'noisePulsesEmitted',
   'policeNoisePulses',
   'nationalGuardNoisePulses',
+  'riotPoliceNoisePulses',
+  'hordeMovementNoisePulses',
+  'unusedAttackChargesByTurn',
+  'criticalInfectionAlertUnresolvedTurns',
   'normalZombiesNoiseTargeted',
   'noiseTargetsReached',
   'noiseTargetsOverriddenByHorde',

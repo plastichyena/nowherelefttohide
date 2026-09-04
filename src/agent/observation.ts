@@ -22,6 +22,7 @@ import {
 } from '../core/supply';
 import { effectiveMovementCost, isUrbanHex, terrainDefenseAt } from '../core/terrain';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
+import { deriveCrisisSummary as deriveCoreCrisisSummary, deriveEndTurnRisk as deriveCoreEndTurnRisk } from '../core/crisis';
 import type {
   GameResult,
   GameState,
@@ -31,6 +32,7 @@ import type {
   ResourceType,
   TerrainDefenseSource,
   UnitState,
+  UnitType,
 } from '../core/types';
 import {
   HIDDEN_NOISE_METRIC_KEYS,
@@ -41,7 +43,10 @@ import {
   type AgentMapObservation,
   type AgentObservation,
   type AgentPublicEvent,
+  type CrisisSummary,
+  type EndTurnRisk,
   type AgentUnitObservation,
+  type UnitProficiency,
 } from './types';
 
 function cloneJson<T>(value: T): T {
@@ -104,6 +109,31 @@ function samePosition(left: { q: number; r: number }, right: { q: number; r: num
   return left.q === right.q && left.r === right.r;
 }
 
+type V15UnitState = UnitState & {
+  proficiency?: UnitProficiency | null;
+  recruitSurvivalTurns?: number;
+  regularZombieKills?: number;
+  veteranPromotionPending?: boolean;
+  attackChargesRemaining?: number;
+  maxAttackCharges?: number;
+  recruitAttack?: number;
+  baseRecruitAttack?: number;
+  spawnGroupId?: string | null;
+  hordeKind?: 'periodic' | 'final' | null;
+};
+
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function unitString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function isHumanUnitType(type: string): boolean {
+  return type === 'police' || type === 'nationalGuard' || type === 'riotPolice';
+}
+
 /**
  * A map tile has no attacking unit type, so its defense projection describes
  * the terrain/overlay rule itself. Unit observations below use terrainDefenseAt
@@ -125,6 +155,34 @@ function publicUnit(
   refillByUnitId: ReadonlyMap<string, { demand: number; amount: number }>,
   militaryByUnitId: ReadonlyMap<string, EndTurnForecast['militaryGoods']['units'][number]>,
 ): AgentUnitObservation {
+  const v15Unit = unit as V15UnitState;
+  const unitType = unitString(unit.type);
+  const proficiency = isHumanUnitType(unitType)
+    ? v15Unit.proficiency ?? 'regular'
+    : null;
+  const recruitSurvivalTurns = Math.max(0, Math.floor(finiteNumber(v15Unit.recruitSurvivalTurns, 0)));
+  const regularZombieKills = Math.max(0, Math.floor(finiteNumber(v15Unit.regularZombieKills, 0)));
+  const veteranPromotionPending = Boolean(v15Unit.veteranPromotionPending);
+  const maxAttackCharges = isHumanUnitType(unitType)
+    ? Math.max(1, Math.floor(finiteNumber(v15Unit.maxAttackCharges, 1)))
+    : 0;
+  const attackChargesRemaining = isHumanUnitType(unitType)
+    ? Math.max(0, Math.min(maxAttackCharges, Math.floor(finiteNumber(v15Unit.attackChargesRemaining, unit.canAttack ? 1 : 0))))
+    : 0;
+  const unitConfig = state.config.units[unit.type];
+  const configuredRecruitAttack = isHumanUnitType(unitType) && 'recruitAttack' in unitConfig
+    ? unitConfig.recruitAttack
+    : unit.attack;
+  const baseRecruitAttack = isHumanUnitType(unitType)
+    ? finiteNumber(v15Unit.baseRecruitAttack ?? v15Unit.recruitAttack, configuredRecruitAttack)
+    : null;
+  const effectiveAttack = finiteNumber((v15Unit as unknown as Record<string, unknown>).effectiveAttack, unit.attack);
+  const turnsUntilRegular = proficiency === 'recruit'
+    ? Math.max(0, 5 - recruitSurvivalTurns)
+    : null;
+  const killsUntilVeteran = proficiency === 'regular' || veteranPromotionPending
+    ? Math.max(0, 5 - regularZombieKills)
+    : null;
   const inSupply = isHexSupplied(state, unit.position);
   const suppression = forecastUnitSuppression(state, unit);
   const recovery = unit.isPlayerUnit
@@ -135,7 +193,6 @@ function publicUnit(
   const defense = terrainDefenseAt(state, unit);
   const refill = refillByUnitId.get(unit.id) ?? { demand: 0, amount: 0 };
   const military = militaryByUnitId.get(unit.id);
-  const unitConfig = state.config.units[unit.type];
   const fuelCostByLegalMove = (unit.isPlayerUnit
     ? getUnitLegalMoveFuelProjections(state, unit.id)
     : [])
@@ -147,6 +204,16 @@ function publicUnit(
     id: unit.id,
     type: unit.type,
     unitType: unit.type,
+    proficiency,
+    recruitSurvivalTurns,
+    turnsUntilRegular,
+    regularZombieKills,
+    killsUntilVeteran,
+    veteranPromotionPending,
+    baseRecruitAttack,
+    effectiveAttack,
+    isScheduledWaveMember: !unit.isPlayerUnit && v15Unit.spawnGroupId !== null && v15Unit.spawnGroupId !== undefined,
+    isFinalWaveMember: !unit.isPlayerUnit && v15Unit.hordeKind === 'final',
     position: { ...unit.position },
     vision: unit.vision,
     visionMode: 'ground',
@@ -168,6 +235,8 @@ function publicUnit(
     population: unit.population,
     actionState: unit.actionState,
     canAttack: unit.canAttack,
+    attackChargesRemaining,
+    maxAttackCharges,
     canMove: unit.canMove,
     inSupply,
     currentFuel: unit.currentFuel,
@@ -180,7 +249,10 @@ function publicUnit(
     emergencyMovementPoints: unitConfig.emergencyMovementPoints,
     emergencyMovementAvailable: unit.isPlayerUnit && unit.currentFuel === 0 && unit.canMove,
     fuelCostByLegalMove,
-    attackPreviews,
+    attackPreviews: attackPreviews.map((preview) => ({
+      ...preview,
+      projectedAttackChargesRemaining: Math.max(0, attackChargesRemaining - 1),
+    })),
     projectedRefillDemandIfTurnEndsNow: refill.demand,
     projectedRefillAmountIfTurnEndsNow: refill.amount,
     projectedMilitaryGoodsAfterFixedConsumption: military?.afterFixed ?? unit.currentMilitaryGoods,
@@ -195,17 +267,18 @@ function publicUnit(
       requiresSupplyAtRecovery: recovery?.requiresSupplyAtRecovery ?? false,
     },
     infectionContainmentCapable: unit.isPlayerUnit,
-    suppressionPower: suppression?.suppressionPower ?? (
-      unit.type === 'police'
-        ? state.config.infection.policeSuppression
-        : unit.type === 'nationalGuard'
-          ? state.config.infection.nationalGuardSuppression
-          : 0
-    ),
+    suppressionPower: suppression?.suppressionPower ?? (unit.isPlayerUnit ? effectiveAttack : 0),
     suppressionCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
     suppressionAvailableIfTurnEndsNow: military?.suppressionStatus === 'suppression',
     suppressionStatusIfTurnEndsNow: military?.suppressionStatus ?? 'none',
     suppressionTargetId: suppression?.targetId ?? null,
+    suppressionChecksIfTurnEndsNow: attackChargesRemaining,
+    suppressionMilitaryGoodsCostsIfTurnEndsNow: Array.from(
+      { length: Math.max(0, attackChargesRemaining) },
+      () => unitConfig.suppressionMilitaryGoodsCost,
+    ),
+    projectedSuppressionIfTurnEndsNow: suppression?.projectedSuppression ?? 0,
+    projectedSuppressionCivilianDamageIfTurnEndsNow: suppression?.projectedCivilianDamage ?? 0,
   };
 }
 
@@ -233,6 +306,26 @@ function containingUnitAt(state: Readonly<GameState>, q: number, r: number): Uni
  */
 export interface AgentObservationProjectionCache {
   checkpointPositionCandidates?: ReturnType<typeof getCheckpointPositionCandidates>;
+}
+
+type PublicCheckpoint = AgentObservation['checkpoints'][number];
+
+function publicCrisisSummary(state: Readonly<GameState>): CrisisSummary {
+  const alerts = deriveCoreCrisisSummary(state);
+  return {
+    alerts,
+    criticalCount: alerts.filter((entry) => entry.severity === 'critical').length,
+    warningCount: alerts.filter((entry) => entry.severity === 'warning').length,
+    advisoryCount: alerts.filter((entry) => entry.severity === 'advisory').length,
+  };
+}
+
+function publicEndTurnRisk(state: Readonly<GameState>): EndTurnRisk {
+  const risk = deriveCoreEndTurnRisk(state);
+  // Keep this Projection byte-for-byte compatible with Core. The Adapter may
+  // clone the value at its boundary, but field renaming or ID reduction here
+  // would make Human UI and Agent callers observe different risk semantics.
+  return cloneJson(risk) as unknown as EndTurnRisk;
 }
 
 /**
@@ -444,6 +537,66 @@ export function createAgentObservation(
   const visibleEnemyUnits = orderedUnits.filter(
     (unit) => !unit.isPlayerUnit && visibleTileKeys.has(hexKey(unit.position)),
   );
+  const units = orderedUnits
+    .filter((unit) => unit.isPlayerUnit)
+    .map((unit) => publicUnit(unit, state, refillByUnitId, militaryByUnitId));
+  const zombies = visibleEnemyUnits.map((unit) => publicUnit(unit, state, refillByUnitId, militaryByUnitId));
+  const checkpoints: PublicCheckpoint[] = [...state.checkpoints]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((checkpoint) => {
+      const role = checkpointRoleById.get(checkpoint.id) ?? 'abandoned';
+      const branch = branchStatesById.get(checkpoint.branchId ?? checkpoint.direction);
+      const containingUnit = checkpoint.infected > 0
+        ? containingUnitAt(state, checkpoint.position.q, checkpoint.position.r)
+        : undefined;
+      const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
+      return {
+        id: checkpoint.id,
+        branchId: checkpoint.branchId ?? checkpoint.direction,
+        position: { ...checkpoint.position },
+        direction: checkpoint.direction,
+        vision: role === 'active' ? state.config.vision.operationalCheckpoint : 0,
+        visionMode: 'ground' as const,
+        terrainLosBlocking: true as const,
+        status: checkpoint.status,
+        role,
+        waiting: checkpoint.waiting,
+        screening: checkpoint.screening,
+        approved: checkpoint.approved,
+        queuePeople: checkpoint.waiting + checkpoint.screening + checkpoint.approved,
+        screeningCapacity: state.config.refugees.screeningCapacity,
+        estimatedScreeningThroughput: state.config.refugees.screeningCapacity / Math.max(
+          1,
+          state.config.refugees.policies[branch?.currentPolicy ?? 'normal'].turns,
+        ),
+        arrivalIntervalMin: state.config.refugees.arrivalIntervalMin,
+        arrivalIntervalMax: state.config.refugees.arrivalIntervalMax,
+        arrivalPeopleMin: state.config.refugees.arrivalPeopleMin,
+        arrivalPeopleMax: state.config.refugees.arrivalPeopleMax,
+        queuePressureClass: getQueuePressureClass(
+          checkpoint.waiting + checkpoint.screening + checkpoint.approved,
+          state.config.refugees.screeningCapacity,
+        ),
+        healthyQueueConsumesMaintenance: true as const,
+        queueMaintenanceFood:
+          (checkpoint.waiting + checkpoint.screening + checkpoint.approved) *
+          state.config.economy.populationConsumption.food,
+        queueMaintenanceCivilianGoods:
+          (checkpoint.waiting + checkpoint.screening + checkpoint.approved) *
+          state.config.economy.populationConsumption.civilianGoods,
+        infected: checkpoint.infected,
+        remainingTurns: checkpoint.remainingTurns,
+        currentPolicy: branch?.currentPolicy ?? 'normal',
+        currentPolicyTurns: state.config.refugees.policies[branch?.currentPolicy ?? 'normal'].turns,
+        nextPolicy: checkpoint.screeningPolicy,
+        nextArrivalTurn: checkpoint.nextArrivalTurn,
+        providesSupply: role === 'active',
+        infectionContained: checkpoint.infected > 0 && containingUnit !== undefined,
+        containingUnitId: containingUnit?.id ?? null,
+        projectedSuppression: suppression?.projectedSuppression ?? 0,
+        projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
+      };
+    });
   const victory = deriveVictoryProgress(state);
   const publicFinalHordeStatus = victory.finalHordeDefeated
     ? 'defeated' as const
@@ -451,9 +604,25 @@ export function createAgentObservation(
   const nextWave = state.horde.nextWaveIndex === null
     ? null
     : state.config.horde.waves[state.horde.nextWaveIndex - 1] ?? null;
+  const nextWaveRecord = nextWave as unknown as Record<string, unknown> | null;
+  const compositionRecord = (nextWaveRecord?.compositionPerDirection && typeof nextWaveRecord.compositionPerDirection === 'object'
+    ? nextWaveRecord.compositionPerDirection
+    : {}) as Record<string, unknown>;
+  const nonHordeSlotCountPerDirection = Math.max(0, Math.floor(finiteNumber(
+    nextWaveRecord?.nonHordeSlotCountPerDirection ?? nextWaveRecord?.nonHordeSlotsPerDirection ?? compositionRecord.zombie,
+    0,
+  )));
+  const possibleNonHordeTypes = Array.isArray(nextWaveRecord?.possibleNonHordeTypes)
+    ? nextWaveRecord!.possibleNonHordeTypes.filter((value): value is UnitType => typeof value === 'string')
+    : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'].filter((value) => value in state.config.units) as UnitType[];
   // The schedule turn is public even before a warning starts. The selected
   // directions remain private until the warning event/observation is active.
   const publicSpawnTurn = nextWave?.turn ?? state.horde.lastSpawnTurn;
+  const strategicForecast = deriveStrategicForecast(state);
+  // Crisis and EndTurn projections are owned by Core so Human UI and every
+  // Agent boundary consume exactly the same pure public calculation.
+  const crisisSummary = publicCrisisSummary(state);
+  const endTurnRisk = publicEndTurnRisk(state);
   return cloneJson({
     apiVersion: OBSERVATION_API_VERSION,
     gameRulesVersion: state.gameVersion,
@@ -502,66 +671,9 @@ export function createAgentObservation(
       infected: state.population.facilityInfected + state.population.checkpointInfected,
     },
     facilities,
-    units: orderedUnits
-      .filter((unit) => unit.isPlayerUnit)
-      .map((unit) => publicUnit(unit, state, refillByUnitId, militaryByUnitId)),
-    zombies: visibleEnemyUnits.map((unit) => publicUnit(unit, state, refillByUnitId, militaryByUnitId)),
-    checkpoints: [...state.checkpoints]
-      .sort((left, right) => left.id.localeCompare(right.id))
-      .map((checkpoint) => {
-        const role = checkpointRoleById.get(checkpoint.id) ?? 'abandoned';
-        const branch = branchStatesById.get(checkpoint.branchId ?? checkpoint.direction);
-        const containingUnit = checkpoint.infected > 0
-          ? containingUnitAt(state, checkpoint.position.q, checkpoint.position.r)
-          : undefined;
-        const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
-        return {
-          id: checkpoint.id,
-          branchId: checkpoint.branchId ?? checkpoint.direction,
-          position: { ...checkpoint.position },
-          direction: checkpoint.direction,
-          vision: role === 'active' ? state.config.vision.operationalCheckpoint : 0,
-          visionMode: 'ground' as const,
-          terrainLosBlocking: true as const,
-          status: checkpoint.status,
-          role,
-          waiting: checkpoint.waiting,
-          screening: checkpoint.screening,
-          approved: checkpoint.approved,
-          queuePeople: checkpoint.waiting + checkpoint.screening + checkpoint.approved,
-          screeningCapacity: state.config.refugees.screeningCapacity,
-          estimatedScreeningThroughput: state.config.refugees.screeningCapacity / Math.max(
-            1,
-            state.config.refugees.policies[branch?.currentPolicy ?? 'normal'].turns,
-          ),
-          arrivalIntervalMin: state.config.refugees.arrivalIntervalMin,
-          arrivalIntervalMax: state.config.refugees.arrivalIntervalMax,
-          arrivalPeopleMin: state.config.refugees.arrivalPeopleMin,
-          arrivalPeopleMax: state.config.refugees.arrivalPeopleMax,
-          queuePressureClass: getQueuePressureClass(
-            checkpoint.waiting + checkpoint.screening + checkpoint.approved,
-            state.config.refugees.screeningCapacity,
-          ),
-          healthyQueueConsumesMaintenance: true as const,
-          queueMaintenanceFood:
-            (checkpoint.waiting + checkpoint.screening + checkpoint.approved) *
-            state.config.economy.populationConsumption.food,
-          queueMaintenanceCivilianGoods:
-            (checkpoint.waiting + checkpoint.screening + checkpoint.approved) *
-            state.config.economy.populationConsumption.civilianGoods,
-          infected: checkpoint.infected,
-          remainingTurns: checkpoint.remainingTurns,
-          currentPolicy: branch?.currentPolicy ?? 'normal',
-          currentPolicyTurns: state.config.refugees.policies[branch?.currentPolicy ?? 'normal'].turns,
-          nextPolicy: checkpoint.screeningPolicy,
-          nextArrivalTurn: checkpoint.nextArrivalTurn,
-          providesSupply: role === 'active',
-          infectionContained: checkpoint.infected > 0 && containingUnit !== undefined,
-          containingUnitId: containingUnit?.id ?? null,
-          projectedSuppression: suppression?.projectedSuppression ?? 0,
-          projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
-        };
-      }),
+    units,
+    zombies,
+    checkpoints,
     importantSiteEvents: importantSiteEvents(state),
     checkpointPositionCandidates: projectionCache.checkpointPositionCandidates ?? getCheckpointPositionCandidates(state),
     constructibleFacilityPositionCandidates: (['simpleFarm', 'civilianDroneBase'] as const)
@@ -585,6 +697,8 @@ export function createAgentObservation(
         spawnTurn: nextWave.turn,
         directionCount: nextWave.directionCount,
         compositionPerDirection: cloneJson(nextWave.compositionPerDirection),
+        nonHordeSlotCountPerDirection,
+        possibleNonHordeTypes,
         final: nextWave.final,
       } : null,
       spawnTurn: publicSpawnTurn,
@@ -596,14 +710,16 @@ export function createAgentObservation(
     finalHordeDefeated: victory.finalHordeDefeated,
     suppliedAreaZombieClear: victory.suppliedAreaZombieClear,
     suppliedAreaInfectionClear: victory.suppliedAreaInfectionClear,
+    crisisSummary,
+    endTurnRisk,
     endTurnForecast,
-    strategicForecast: deriveStrategicForecast(state),
+    strategicForecast,
     gameOver: state.gameOver,
     result: publicResult(state.result),
   } satisfies AgentObservation as unknown as JsonValue) as unknown as AgentObservation;
 }
 
-/** Remove fixed topology from one Artifact Schema 5.0.0 trace entry. */
+/** Remove fixed topology from one Artifact Schema 6.0.0 trace entry. */
 export function compactArtifactObservation(observation: AgentObservation): AgentArtifactObservation {
   const copy = cloneJson(observation);
   const { map, ...dynamic } = copy;

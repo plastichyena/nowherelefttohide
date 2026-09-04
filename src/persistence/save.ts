@@ -11,16 +11,17 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.4.5 saves. */
+/** The sole game-rules version accepted by v1.5.0 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 9;
-/** v1.4.5 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v9';
+export const SAVE_FORMAT_VERSION = 10;
+/** v1.5.0 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v10';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v8';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v9';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v8',
   'nowhere-left-to-hide:auto-save:v7',
   'nowhere-left-to-hide:auto-save:v6',
   'nowhere-left-to-hide:auto-save:v5',
@@ -28,7 +29,7 @@ const OLDER_AUTOSAVE_KEYS = [
   'nowhere-left-to-hide:auto-save:v3',
   'nowhere-left-to-hide:auto-save:v2',
 ] as const;
-/** Deprecated metadata exports. They are never migration targets in v1.4.5. */
+/** Deprecated metadata exports. They are never migration targets in v1.5.0. */
 export const V125_GAME_VERSION = '1.2.0';
 export const V126_GAME_VERSION = '1.2.1';
 export const LEGACY_GAME_VERSION = V125_GAME_VERSION;
@@ -67,9 +68,9 @@ export interface StorageLike {
 export type SaveErrorListener = (message: string, error?: unknown) => void;
 
 const BASE_TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const;
-const UNIT_TYPES = ['police', 'nationalGuard', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'] as const;
-const HUMAN_UNIT_TYPES = ['police', 'nationalGuard'] as const;
-const ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie'] as const;
+const UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const;
+const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice'] as const;
+const ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const;
 const FACILITY_TYPES = [
   'capital',
   'city',
@@ -116,8 +117,14 @@ const GAME_EVENT_TYPES = [
   'refugees_screened',
   'latent_infection',
   'infection_spread',
+  'site_infection_started',
   'infection_suppressed',
   'facility_overrun',
+  'site_fallen',
+  'site_zombies_spawned',
+  'site_immediate_infection',
+  'site_chain_fallen',
+  'site_noise_respawn',
   'facility_recovered',
   'checkpoint_built',
   'checkpoint_relocated',
@@ -137,6 +144,7 @@ const GAME_EVENT_TYPES = [
   'terrain_defense_applied',
   'enemy_spotted',
   'enemy_lost',
+  'aerial_enemy_discovered',
   'zombie_idle',
   'horde_target_inherited',
   'horde_target_cleared',
@@ -144,6 +152,11 @@ const GAME_EVENT_TYPES = [
   'noise_targeted',
   'noise_target_reached',
   'noise_target_overridden',
+  'unit_promoted',
+  'unit_promotion_pending',
+  'unit_kill_credited',
+  'attack_charge_consumed',
+  'riot_police_commissioned',
   'victory_progress_changed',
   'horde_warning',
   'horde_spawned',
@@ -244,6 +257,7 @@ const STATISTIC_INTEGER_FIELDS = [
   'soldierZombiesKilled',
   'policeZombiesFinal',
   'soldierZombiesFinal',
+  'riotZombiesFinal',
   'policeReanimations',
   'nationalGuardReanimations',
   'reanimationImmediateInfections',
@@ -255,6 +269,12 @@ const STATISTIC_INTEGER_FIELDS = [
   'civilianDroneBasesDecommissioned',
   'civilianGoodsRefundedFromDecommission',
   'policeLongRangeMoves',
+  'riotPoliceProduced',
+  'riotPoliceLost',
+  'riotZombiesSpawned',
+  'riotZombiesKilled',
+  'riotPoliceReanimations',
+  'hordeMovementNoisePulses',
 ] as const;
 const STATISTIC_NULLABLE_FIELDS = [
   'suppliedAreaZombieClearTurn',
@@ -270,6 +290,14 @@ const STATISTIC_RECORD_FIELDS = [
   'refugeesTurnedAwayByDirection',
   'rejectedBonusZombiesByDirection',
   'rejectedCounterResetsByDirection',
+  'recruitsCommissionedByType',
+  'regularPromotionsByType',
+  'veteranPromotionsByType',
+  'veteranZombieKillsByType',
+  'hordeSpecialSpawnedByType',
+  'finalSpecialZombiesSpawnedByType',
+  'noisePulsesBySourceType',
+  'hordeNoiseRespawnedByType',
 ] as const;
 const REQUIRED_STATISTIC_FIELDS = [
   ...STATISTIC_INTEGER_FIELDS,
@@ -296,6 +324,7 @@ const REQUIRED_STATE_FIELDS = [
   'checkpoints',
   'roadBranches',
   'rejectedRefugeesByDirection',
+  'pendingNoisePulses',
   'pendingUnitProductions',
   'nextCheckpointNumber',
   'nextConstructibleFacilityNumber',
@@ -430,7 +459,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.4.4 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.4.5 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -464,7 +493,7 @@ function validateHordeConfigShape(value: unknown, finalHordeTurn: unknown, error
     errors.push('state.config.horde must be an object');
     return;
   }
-  requireFields(errors, value, 'state.config.horde', ['warningLeadTurns', 'waves']);
+  requireFields(errors, value, 'state.config.horde', ['warningLeadTurns', 'waves', 'specialZombieWeights', 'riotZombieCapPerDirection', 'movementNoiseRadius']);
   for (const retiredField of ['cycle', 'periodicInitial', 'periodicIncrement', 'warningStartTurn', 'spawnOnlyBeforeFinalTurn', 'finalComposition']) {
     if (hasOwn(value, retiredField)) errors.push(`state.config.horde.${retiredField} is obsolete; use horde.waves`);
   }
@@ -522,7 +551,7 @@ function hasCanonicalDirectionOrder(directions: unknown[]): boolean {
 }
 
 /**
- * Reject obsolete or partial v1.4.5 container shapes before casting. The core
+ * Reject obsolete or partial pre-v1.5.0 container shapes before casting. The core
  * invariant checker performs relational validation; this guard makes the Wave
  * schedule, reserved map perimeter, and warning state an explicit save
  * boundary instead of silently accepting a partial snapshot.
@@ -559,6 +588,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       'mapId',
       'maxActionsPerTurn',
       'units',
+      'unitExperience',
       'facilities',
       'economy',
       'initialFacilityPopulation',
@@ -568,7 +598,6 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       'infection',
       'checkpoint',
       'constructibleFacility',
-      'noise',
       'terrain',
       'vision',
     ]);
@@ -581,7 +610,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     if (!isRecord(infection)) {
       errors.push('state.config.infection must be an object');
     } else {
-      // Save Format 9 deliberately has no conversion path for the old
+      // Save Format 10 deliberately has no conversion path for the old
       // fallback-capacity tuning. Reject a hand-edited v1.4.3-shaped
       // container even when its outer version strings were forged as current.
       for (const retiredField of ['fallBackCapacityRate', 'fallBackCapacityRounding']) {
@@ -654,6 +683,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       'healthyCivilians',
       'police',
       'nationalGuard',
+      'riotPolice',
       'unitPopulation',
       'facilityWorkers',
       'waitingRefugees',
@@ -780,6 +810,12 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
         'range',
         'vision',
         'population',
+        'proficiency',
+        'recruitSurvivalTurns',
+        'regularZombieKills',
+        'veteranPromotionPending',
+        'attackChargesRemaining',
+        'maxAttackCharges',
         'currentFuel',
         'maxFuel',
         'currentMilitaryGoods',
@@ -798,6 +834,8 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (!UNIT_TYPES.includes(unit.type as typeof UNIT_TYPES[number])) errors.push(`${path}.type is invalid`);
       validateCoordinate(errors, unit.position, `${path}.position`);
       for (const field of ['hp', 'maxHp', 'attack', 'movement', 'range', 'vision', 'population', 'currentFuel', 'maxFuel', 'currentMilitaryGoods', 'maxMilitaryGoods'] as const) if (!isInteger(unit[field])) errors.push(`${path}.${field} is invalid`);
+      for (const field of ['recruitSurvivalTurns', 'regularZombieKills', 'attackChargesRemaining', 'maxAttackCharges'] as const) if (!isInteger(unit[field])) errors.push(`${path}.${field} is invalid`);
+      if (typeof unit.veteranPromotionPending !== 'boolean') errors.push(`${path}.veteranPromotionPending is invalid`);
       if (isInteger(unit.currentFuel) && isInteger(unit.maxFuel) && unit.currentFuel > unit.maxFuel) errors.push(`${path}.currentFuel exceeds maxFuel`);
       if (isInteger(unit.currentMilitaryGoods) && isInteger(unit.maxMilitaryGoods) && unit.currentMilitaryGoods > unit.maxMilitaryGoods) errors.push(`${path}.currentMilitaryGoods exceeds maxMilitaryGoods`);
       const configuredUnit = isRecord(config) && isRecord(config.units)
@@ -808,10 +846,13 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (ZOMBIE_UNIT_TYPES.includes(unit.type as typeof ZOMBIE_UNIT_TYPES[number])) {
         if (unit.currentFuel !== 0 || unit.maxFuel !== 0) errors.push(`${path} Zombie Fuel must be zero`);
         if (unit.currentMilitaryGoods !== 0 || unit.maxMilitaryGoods !== 0) errors.push(`${path} Zombie Military Goods must be zero`);
+        if (unit.proficiency !== null || unit.recruitSurvivalTurns !== 0 || unit.regularZombieKills !== 0 || unit.veteranPromotionPending !== false) errors.push(`${path} Zombie proficiency must be empty`);
       } else if (!HUMAN_UNIT_TYPES.includes(unit.type as typeof HUMAN_UNIT_TYPES[number])
         || (isInteger(unit.maxFuel) && unit.maxFuel < 1)
         || (isInteger(unit.maxMilitaryGoods) && unit.maxMilitaryGoods < 1)) {
         errors.push(`${path} human unit capacity is invalid`);
+      } else if (!['recruit', 'regular', 'veteran'].includes(unit.proficiency as string)) {
+        errors.push(`${path}.proficiency is invalid`);
       }
       if (!['ready', 'moved', 'acted', 'destroyed'].includes(unit.actionState as string)) errors.push(`${path}.actionState is invalid`);
       for (const field of ['canAttack', 'canMove', 'isPlayerUnit'] as const) if (typeof unit[field] !== 'boolean') errors.push(`${path}.${field} is invalid`);
@@ -904,6 +945,25 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (typeof order.id !== 'string' || order.id.length === 0 || typeof order.cityFacilityId !== 'string' || order.cityFacilityId.length === 0) errors.push(`${path} identifiers are invalid`);
       if (!HUMAN_UNIT_TYPES.includes(order.unitType as typeof HUMAN_UNIT_TYPES[number])) errors.push(`${path}.unitType is invalid`);
       if (!isInteger(order.population) || !isInteger(order.readyTurn, 1)) errors.push(`${path}.population or readyTurn is invalid`);
+    }
+  }
+
+  const pendingNoise = state.pendingNoisePulses;
+  if (!Array.isArray(pendingNoise)) {
+    errors.push('state.pendingNoisePulses must be an array');
+  } else {
+    for (const [index, pulse] of pendingNoise.entries()) {
+      const path = `state.pendingNoisePulses[${index}]`;
+      if (!isRecord(pulse)) {
+        errors.push(`${path} must be an object`);
+        continue;
+      }
+      requireFields(errors, pulse, path, ['id', 'center', 'radius', 'sourceKind', 'sourceUnitType', 'emittedTurn']);
+      if (typeof pulse.id !== 'string' || pulse.id.length === 0) errors.push(`${path}.id is invalid`);
+      validateCoordinate(errors, pulse.center, `${path}.center`);
+      if (!isInteger(pulse.radius) || !isInteger(pulse.emittedTurn, 1)) errors.push(`${path}.radius or emittedTurn is invalid`);
+      if (!['humanCombat', 'hordeMovement'].includes(pulse.sourceKind as string)) errors.push(`${path}.sourceKind is invalid`);
+      if (!['police', 'nationalGuard', 'riotPolice', 'hordeZombie'].includes(pulse.sourceUnitType as string)) errors.push(`${path}.sourceUnitType is invalid`);
     }
   }
 
@@ -1097,14 +1157,14 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   return { valid: true, errors: [], state: clone(state), envelope };
 }
 
-/** Create a checksummed, URL-safe v1.4.5 Save Format 9 code. */
+/** Create a checksummed, URL-safe v1.5.0 Save Format 10 code. */
 export function encodeSaveCode(state: GameState): string {
   const errors = validateStateForSave(state);
   if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
   return toBase64Url(gzipSync(strToU8(canonicalJson(makeEnvelope(state))), { level: 9 }));
 }
 
-/** Decode and validate a v1.4.5 save code without changing caller-owned state. */
+/** Decode and validate a v1.5.0 save code without changing caller-owned state. */
 export function decodeSaveCode(code: string): SaveValidationResult {
   if (typeof code !== 'string' || code.trim().length === 0) return reject(['Save code is empty']);
   try {
@@ -1194,7 +1254,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the current v1.4.5/v9 key; legacy data is deliberately preserved. */
+  /** Clears only the current v1.5.0/v10 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

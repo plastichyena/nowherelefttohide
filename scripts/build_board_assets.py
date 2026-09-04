@@ -51,6 +51,11 @@ V144_SOURCE_FILES = {
     "units/unit_soldier_zombie.png": "soldier_zombie_5_group_approved_transparent_source.png",
 }
 
+V150_SOURCE_FILES = {
+    "units/unit_riot_police.png": "riot_police_5_group_approved_transparent_source.png",
+    "units/unit_riot_zombie.png": "riot_zombie_3_group_approved_transparent_source.png",
+}
+
 
 def contain(source: Image.Image, bounds: tuple[int, int], y_offset: int = 0) -> Image.Image:
     image = source.convert("RGBA")
@@ -195,6 +200,19 @@ def build_v144(source_root: Path, output_root: Path) -> None:
         )
 
 
+def build_v150(source_root: Path, output_root: Path) -> None:
+    """Post-process approved v1.5.0 Riot unit concepts without changing other assets."""
+    for relative, source_name in V150_SOURCE_FILES.items():
+        destination = output_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source = Image.open(source_root / source_name)
+        contain(source, (202, 202)).save(
+            destination,
+            optimize=True,
+            compress_level=9,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source_root", type=Path)
@@ -202,11 +220,14 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--v140-only", action="store_true")
     mode.add_argument("--v144-only", action="store_true")
+    mode.add_argument("--v150-only", action="store_true")
     args = parser.parse_args()
     if args.v140_only:
         build_v140(args.source_root, args.output_root)
     elif args.v144_only:
         build_v144(args.source_root, args.output_root)
+    elif args.v150_only:
+        build_v150(args.source_root, args.output_root)
     else:
         build(args.source_root, args.output_root)
 
