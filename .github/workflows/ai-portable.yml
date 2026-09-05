@@ -325,7 +325,10 @@ jobs:
           if ($LASTEXITCODE -gt 7) { throw "robocopy failed with exit code $LASTEXITCODE" }
           Copy-Item -Recurse -Force node_modules (Join-Path $gameRoot 'node_modules')
           Push-Location $gameRoot
-          try { node scripts/build-portable.mjs --out=dist/portable/session-cli.mjs }
+          try {
+            node scripts/build-portable.mjs --out=dist/portable/session-cli.mjs
+            if ($LASTEXITCODE -ne 0) { throw "Portable CLI build failed with exit code $LASTEXITCODE" }
+          }
           finally { Pop-Location }
 
           $nodeRoot = Split-Path -Parent (Get-Command node).Source
@@ -336,6 +339,7 @@ jobs:
           )
           Set-Content -Encoding ascii (Join-Path $packageRoot 'run-npm.cmd') @(
             '@echo off', 'setlocal', 'set "ROOT=%~dp0"', 'call "%ROOT%runtime\identity.cmd"',
+            'set "PATH=%ROOT%runtime\node;%PATH%"',
             'cd /d "%ROOT%game"', 'call "%ROOT%runtime\node\npm.cmd" %*', 'exit /b %ERRORLEVEL%'
           )
           Set-Content -Encoding ascii (Join-Path $packageRoot 'run-vite-node.cmd') @(
@@ -361,7 +365,7 @@ jobs:
           $root = '${{ steps.package_windows.outputs.package_root }}'
           @('PLAY_WITH_AI.md', 'BUILD_INFO.txt', 'runtime/identity.cmd', 'runtime/node/node.exe', 'run-npm.cmd', 'run-vite-node.cmd', 'run-session.cmd', 'game/package.json', 'game/package-lock.json', 'game/dist/portable/session-cli.mjs') |
             ForEach-Object { if (-not (Test-Path (Join-Path $root $_))) { throw "Missing portable package entry: $_" } }
-          $version = node -p "require('$root/game/package.json').version"
+          $version = (Get-Content -Raw -LiteralPath (Join-Path $root 'game/package.json') | ConvertFrom-Json).version
           if ($version -ne '1.5.2') { throw "Expected app version 1.5.2, received $version" }
           if (-not (Select-String -Quiet -Path (Join-Path $root 'BUILD_INFO.txt') -Pattern 'Platform: win-x64')) { throw 'BUILD_INFO platform is missing' }
 
