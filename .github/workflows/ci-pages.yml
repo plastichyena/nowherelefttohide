@@ -40,8 +40,9 @@ jobs:
 
       - name: Run unit and invariant tests
         # The full 1..30 deterministic regression is split into the matrix job
-        # below so this Pages gate stays responsive.
-        run: npx --no-install vitest run --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts
+        # below so this Pages gate stays responsive. Worker threads avoid fork IPC
+        # task-update timeouts during CPU-heavy deterministic simulations.
+        run: npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts
 
       - name: Test v1.5.0 baseline report normalization
         run: node --test scripts/normalize-baseline-report.test.mjs
@@ -126,7 +127,7 @@ jobs:
           BALANCED_SEED_START: ${{ matrix.start }}
           BALANCED_SEED_END: ${{ matrix.end }}
           BALANCED_BATCH_TIMEOUT_MS: 1500000
-        run: npx --no-install vitest run src/agent/balancedAgent.batch.test.ts --maxWorkers=1
+        run: npx --no-install vitest run src/agent/balancedAgent.batch.test.ts --pool=threads --maxWorkers=1
 
   session-release-validation:
     name: Session v1.5.1 normal 1,000-action validation
