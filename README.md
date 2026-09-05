@@ -2,7 +2,7 @@
 
 v1.5.2は、同一Revisionの読み取りQuery共有、盤面Object再利用、人間側のターン終了時保存と明示的な手動保存、AI Portableの`play-turn`、AI向け生産余力を追加します。ゲームルール・バランスと通常Save 11を維持します。
 
-PC Chromeでの比較証跡は[`v152-performance-evidence.json`](src/testing/fixtures/v152-performance-evidence.json)、AI CLIは[`play-turn-performance-evidence.json`](src/session/play-turn-performance-evidence.json)に記録しています。390×844の同一Saveで、序盤の選択中央値は849→85ms、Turn 51の移動先確認は4,146→133ms、ターン終了操作全体は6,881→972msでした。Core単体のTurn 51は683→372msで、旧新版144回のStepResult hashが一致しています。ブラウザ値には自動操作と描画待ちが含まれ、SOG05の実測値ではありません。パン・ピンチ・人口スライダーは概ね横ばいで、選択・プレビュー・確定・資源／シート表示が主に改善しました。
+PC Chromeでの比較証跡は[`v152-performance-evidence.json`](src/testing/fixtures/v152-performance-evidence.json)、AI CLIは[`play-turn-performance-evidence.json`](src/session/play-turn-performance-evidence.json)に記録しています。390×844の同一Saveで、序盤の選択中央値は849→98ms、Turn 51の移動先確認は4,146→108ms、ターン終了操作全体は6,881→987msでした。Core単体のTurn 51は683→372msで、旧新版144回のStepResult hashが一致しています。ブラウザ値には自動操作と描画待ちが含まれ、SOG05の実測値ではありません。パン・ピンチ・人口スライダーは概ね横ばいで、選択・プレビュー・確定・資源／シート表示が主に改善しました。
 
 AI CLIの同一30手は起動30→10回、約92→49秒でした。一方、10ターン比較のpeak exit RSSは旧経路144.6MBに対して対話156.9MB／有限計画174.9MBでした。観測範囲では大きなターン間累積増加はありませんが、ピーク削減や他アプリとの併用時のメモリ不足解消を保証しません。入力・出力・履歴保持の上限と測定条件は証跡を参照してください。
 

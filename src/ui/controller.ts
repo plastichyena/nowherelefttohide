@@ -258,9 +258,13 @@ function crisisSeverity(value: unknown): CrisisAlertViewModel['severity'] {
 /** Normalize the Core's public crisis projection for Human UI rendering. */
 export function crisisSummaryViewModel(observation: Readonly<AgentObservation> | UnknownRecord): CrisisSummaryViewModel {
   const source = unknownRecord(observation);
-  const summary = unknownRecord(source.crisisSummary ?? source.crisis);
-  const rawAlerts = Array.isArray(summary.alerts)
-    ? summary.alerts
+  // Core Query returns the alert array directly; Agent Observation wraps it.
+  const rawSummary = source.crisisSummary ?? source.crisis;
+  const summary = unknownRecord(rawSummary);
+  const rawAlerts = Array.isArray(rawSummary)
+    ? rawSummary
+    : Array.isArray(summary.alerts)
+      ? summary.alerts
     : Array.isArray(source.crisisAlerts)
       ? source.crisisAlerts
       : [];
@@ -348,8 +352,10 @@ export interface EndTurnRiskViewModel {
 export function endTurnRiskViewModel(observation: Readonly<AgentObservation> | UnknownRecord): EndTurnRiskViewModel {
   const source = unknownRecord(observation);
   const risk = unknownRecord(source.endTurnRisk ?? source.endTurn);
+  // Preserve the Core object collections as well as older UI fixture shapes.
   const ids = (value: unknown): string[] => Array.isArray(value)
-    ? value.filter((id): id is string => typeof id === 'string').slice(0, 128)
+    ? value.map(entry => typeof entry === 'string' ? entry : unknownRecord(entry).unitId ?? unknownRecord(entry).id)
+      .filter((id): id is string => typeof id === 'string').slice(0, 128)
     : [];
   const attackChargeUnits = Array.isArray(risk.unitsWithAttackChargesRemaining)
     ? risk.unitsWithAttackChargesRemaining.map((entry, index) => {
@@ -365,16 +371,18 @@ export function endTurnRiskViewModel(observation: Readonly<AgentObservation> | U
       const unit = unknownRecord(entry);
       return {
         unitId: typeof unit.unitId === 'string' ? unit.unitId : `unit-${index}`,
-        remainingMove: boundedCount(unit.remainingMove),
-        remainingAttackCharges: boundedCount(unit.remainingAttackCharges),
-        legalAttackCount: boundedCount(unit.legalAttackCount),
+        remainingMove: boundedCount(unit.remainingMove ?? (unit.moveRemaining === true ? 1 : 0)),
+        remainingAttackCharges: boundedCount(unit.remainingAttackCharges ?? unit.attackChargesRemaining),
+        legalAttackCount: boundedCount(unit.legalAttackCount ?? (Array.isArray(unit.legalAttackTargetIds) ? unit.legalAttackTargetIds.length : 0)),
         automaticSuppressionTargetId: typeof unit.automaticSuppressionTargetId === 'string'
           ? unit.automaticSuppressionTargetId
-          : null,
+          : typeof unit.suppressionTargetId === 'string' ? unit.suppressionTargetId : null,
       };
     }).filter((entry) => entry.unitId.length > 0).slice(0, 128)
     : [];
-  const crisis = crisisSummaryViewModel(observation);
+  const crisis = Array.isArray(risk.criticalAlerts)
+    ? crisisSummaryViewModel({ crisisSummary: risk.criticalAlerts })
+    : crisisSummaryViewModel(observation);
   const criticalIds = new Set(crisis.alerts.filter((alert) => alert.severity === 'critical').map((alert) => alert.id));
   const criticalAlerts = crisis.alerts.filter((alert) => criticalIds.has(alert.id));
   return {

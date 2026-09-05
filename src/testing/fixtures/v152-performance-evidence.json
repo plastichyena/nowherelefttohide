@@ -11422,175 +11422,175 @@
           "fixture": "standard-early",
           "session": 0,
           "operation": "select-unit",
-          "completedMs": 150,
-          "firstMutationMs": 82.40000000037253,
-          "firstPaintMs": 103.70000000111759
+          "completedMs": 246,
+          "firstMutationMs": 162.2000000011176,
+          "firstPaintMs": 207.5
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "select-unit",
-          "completedMs": 122,
-          "firstMutationMs": 56.09999999962747,
-          "firstPaintMs": 67.29999999888241
+          "completedMs": 107,
+          "firstMutationMs": 47.5,
+          "firstPaintMs": 81.80000000074506
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "select-unit",
-          "completedMs": 85,
-          "firstMutationMs": 27,
-          "firstPaintMs": 38.09999999962747
+          "completedMs": 96,
+          "firstMutationMs": 39.90000000037253,
+          "firstPaintMs": 49.600000001490116
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "select-unit",
-          "completedMs": 80,
-          "firstMutationMs": 24.5,
-          "firstPaintMs": 35.90000000037253
+          "completedMs": 98,
+          "firstMutationMs": 23.90000000037253,
+          "firstPaintMs": 33.59999999962747
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "select-unit",
-          "completedMs": 85,
-          "firstMutationMs": 25.399999998509884,
-          "firstPaintMs": 36.29999999888241
-        },
-        {
-          "fixture": "standard-early",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 80,
-          "firstMutationMs": 23.5,
-          "firstPaintMs": 34.80000000074506
-        },
-        {
-          "fixture": "standard-early",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 26.90000000037253,
-          "firstPaintMs": 39.09999999962747
+          "completedMs": 99,
+          "firstMutationMs": 24.799999998882413,
+          "firstPaintMs": 34.90000000037253
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "select-unit",
           "completedMs": 82,
-          "firstMutationMs": 24.700000001117587,
-          "firstPaintMs": 36.30000000074506
+          "firstMutationMs": 23.40000000037253,
+          "firstPaintMs": 33.09999999962747
+        },
+        {
+          "fixture": "standard-early",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 99,
+          "firstMutationMs": 23.59999999962747,
+          "firstPaintMs": 35
+        },
+        {
+          "fixture": "standard-early",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 84,
+          "firstMutationMs": 23.40000000037253,
+          "firstPaintMs": 33.90000000037253
+        },
+        {
+          "fixture": "standard-early",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 81,
+          "firstMutationMs": 25.59999999962747,
+          "firstPaintMs": 35.19999999925494
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "select-unit",
           "completedMs": 82,
-          "firstMutationMs": 24.700000001117587,
-          "firstPaintMs": 36
-        },
-        {
-          "fixture": "standard-early",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 24.800000000745058,
-          "firstPaintMs": 36
+          "firstMutationMs": 23,
+          "firstPaintMs": 32.80000000074506
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "move-mode",
-          "completedMs": 203,
-          "firstMutationMs": 76,
-          "firstPaintMs": 91.59999999962747
+          "completedMs": 202,
+          "firstMutationMs": 68.59999999962747,
+          "firstPaintMs": 83.40000000037253
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "move-preview",
-          "completedMs": 94,
-          "firstMutationMs": 32,
-          "firstPaintMs": 47.5
+          "completedMs": 101,
+          "firstMutationMs": 41.40000000037253,
+          "firstPaintMs": 56.5
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "move-commit",
-          "completedMs": 270,
-          "firstMutationMs": 201.69999999925494,
-          "firstPaintMs": 223.09999999962747
+          "completedMs": 213,
+          "firstMutationMs": 116.59999999962747,
+          "firstPaintMs": 161.2999999988824
+        },
+        {
+          "fixture": "standard-early",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 141,
+          "firstMutationMs": 60.90000000037253,
+          "firstPaintMs": 71.30000000074506
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "resource-panel",
           "completedMs": 133,
-          "firstMutationMs": 59.40000000037253,
-          "firstPaintMs": 70.29999999888241
-        },
-        {
-          "fixture": "standard-early",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 131,
-          "firstMutationMs": 33.80000000074506,
-          "firstPaintMs": 47.70000000111759
+          "firstMutationMs": 56.5,
+          "firstPaintMs": 67.79999999888241
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "resource-panel",
           "completedMs": 132,
-          "firstMutationMs": 56.5,
-          "firstPaintMs": 68.09999999962747
+          "firstMutationMs": 54.79999999888241,
+          "firstPaintMs": 68.89999999850988
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "resource-panel",
-          "completedMs": 133,
-          "firstMutationMs": 55.90000000037253,
-          "firstPaintMs": 67.5
+          "completedMs": 132,
+          "firstMutationMs": 56.20000000111759,
+          "firstPaintMs": 66.90000000037253
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "sheet-toggle",
-          "completedMs": 149,
-          "firstMutationMs": 66.80000000074506,
-          "firstPaintMs": 80.30000000074506
+          "completedMs": 134,
+          "firstMutationMs": 54.5,
+          "firstPaintMs": 67.19999999925494
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "sheet-toggle",
-          "completedMs": 249,
-          "firstMutationMs": 168.7000000011176,
-          "firstPaintMs": 180.5
+          "completedMs": 233,
+          "firstMutationMs": 67.19999999925494,
+          "firstPaintMs": 81.29999999888241
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "sheet-toggle",
-          "completedMs": 232,
-          "firstMutationMs": 132.19999999925494,
-          "firstPaintMs": 166.30000000074506
+          "completedMs": 216,
+          "firstMutationMs": 136.30000000074506,
+          "firstPaintMs": 147.19999999925494
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "end-turn",
-          "completedMs": 858,
-          "firstMutationMs": 1.900000000372529,
-          "firstPaintMs": 21.40000000037253
+          "completedMs": 683,
+          "firstMutationMs": 0.30000000074505806,
+          "firstPaintMs": 1.300000000745058
         },
         {
           "fixture": "standard-early",
           "session": 0,
           "operation": "pan",
-          "completedMs": 181,
+          "completedMs": 182,
           "firstMutationMs": null,
           "firstPaintMs": null
         },
@@ -11606,175 +11606,175 @@
           "fixture": "standard-early",
           "session": 1,
           "operation": "select-unit",
-          "completedMs": 158,
-          "firstMutationMs": 84,
-          "firstPaintMs": 105.29999999888241
+          "completedMs": 148,
+          "firstMutationMs": 80.59999999962747,
+          "firstPaintMs": 100.09999999962747
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "select-unit",
-          "completedMs": 99,
-          "firstMutationMs": 46,
-          "firstPaintMs": 56.90000000037253
+          "completedMs": 97,
+          "firstMutationMs": 43.59999999962747,
+          "firstPaintMs": 55.19999999925494
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "select-unit",
           "completedMs": 83,
-          "firstMutationMs": 27.299999998882413,
-          "firstPaintMs": 38.29999999888241
+          "firstMutationMs": 26.200000001117587,
+          "firstPaintMs": 36.90000000037253
+        },
+        {
+          "fixture": "standard-early",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 100,
+          "firstMutationMs": 23,
+          "firstPaintMs": 33.80000000074506
+        },
+        {
+          "fixture": "standard-early",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 99,
+          "firstMutationMs": 24.200000001117587,
+          "firstPaintMs": 35.40000000037253
+        },
+        {
+          "fixture": "standard-early",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 100,
+          "firstMutationMs": 22.700000001117587,
+          "firstPaintMs": 33.70000000111759
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "select-unit",
           "completedMs": 82,
+          "firstMutationMs": 22.799999998882413,
+          "firstPaintMs": 34.19999999925494
+        },
+        {
+          "fixture": "standard-early",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 99,
+          "firstMutationMs": 22.09999999962747,
+          "firstPaintMs": 33
+        },
+        {
+          "fixture": "standard-early",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 99,
           "firstMutationMs": 23,
-          "firstPaintMs": 33.30000000074506
+          "firstPaintMs": 33.69999999925494
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 25.699999999254942,
-          "firstPaintMs": 36.69999999925494
-        },
-        {
-          "fixture": "standard-early",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 99,
-          "firstMutationMs": 24.09999999962747,
-          "firstPaintMs": 34.69999999925494
-        },
-        {
-          "fixture": "standard-early",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 99,
-          "firstMutationMs": 25,
-          "firstPaintMs": 35.69999999925494
-        },
-        {
-          "fixture": "standard-early",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 99,
-          "firstMutationMs": 23.40000000037253,
-          "firstPaintMs": 34.5
-        },
-        {
-          "fixture": "standard-early",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 99,
-          "firstMutationMs": 24.5,
-          "firstPaintMs": 34.80000000074506
-        },
-        {
-          "fixture": "standard-early",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 99,
-          "firstMutationMs": 23.59999999962747,
-          "firstPaintMs": 34.40000000037253
+          "completedMs": 84,
+          "firstMutationMs": 22.59999999962747,
+          "firstPaintMs": 32.899999998509884
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "move-mode",
-          "completedMs": 170,
-          "firstMutationMs": 78.40000000037253,
-          "firstPaintMs": 92
+          "completedMs": 184,
+          "firstMutationMs": 73.59999999962747,
+          "firstPaintMs": 88.29999999888241
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "move-preview",
-          "completedMs": 106,
-          "firstMutationMs": 45.899999998509884,
-          "firstPaintMs": 60.79999999888241
+          "completedMs": 90,
+          "firstMutationMs": 29.800000000745058,
+          "firstPaintMs": 45.5
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "move-commit",
           "completedMs": 210,
-          "firstMutationMs": 143.10000000149012,
-          "firstPaintMs": 166.60000000149012
+          "firstMutationMs": 137.7000000011176,
+          "firstPaintMs": 157.80000000074506
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "resource-panel",
-          "completedMs": 116,
-          "firstMutationMs": 59.59999999962747,
-          "firstPaintMs": 70.40000000037253
+          "completedMs": 120,
+          "firstMutationMs": 56.5,
+          "firstPaintMs": 65.70000000111759
+        },
+        {
+          "fixture": "standard-early",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 128,
+          "firstMutationMs": 69.79999999888241,
+          "firstPaintMs": 79.39999999850988
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "resource-panel",
           "completedMs": 117,
-          "firstMutationMs": 19,
-          "firstPaintMs": 33.20000000111759
+          "firstMutationMs": 55,
+          "firstPaintMs": 65.79999999888241
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "resource-panel",
-          "completedMs": 132,
-          "firstMutationMs": 57,
-          "firstPaintMs": 68.30000000074506
-        },
-        {
-          "fixture": "standard-early",
-          "session": 1,
-          "operation": "resource-panel",
-          "completedMs": 132,
-          "firstMutationMs": 55.29999999888241,
-          "firstPaintMs": 66
+          "completedMs": 116,
+          "firstMutationMs": 53.80000000074506,
+          "firstPaintMs": 64
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "sheet-toggle",
           "completedMs": 132,
-          "firstMutationMs": 53.19999999925494,
-          "firstPaintMs": 65.09999999962747
+          "firstMutationMs": 51,
+          "firstPaintMs": 62.19999999925494
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "sheet-toggle",
-          "completedMs": 199,
-          "firstMutationMs": 134.09999999962747,
-          "firstPaintMs": 145.30000000074506
+          "completedMs": 200,
+          "firstMutationMs": 134.2999999988824,
+          "firstPaintMs": 144.90000000037253
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "sheet-toggle",
-          "completedMs": 233,
-          "firstMutationMs": 152.2999999988824,
-          "firstPaintMs": 164.19999999925494
+          "completedMs": 450,
+          "firstMutationMs": 233.40000000037253,
+          "firstPaintMs": 261.5
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "end-turn",
-          "completedMs": 706,
-          "firstMutationMs": 3.900000000372529,
-          "firstPaintMs": 20.90000000037253
+          "completedMs": 753,
+          "firstMutationMs": 2.099999999627471,
+          "firstPaintMs": 17.299999998882413
         },
         {
           "fixture": "standard-early",
           "session": 1,
           "operation": "pan",
-          "completedMs": 183,
+          "completedMs": 182,
           "firstMutationMs": null,
           "firstPaintMs": null
         },
@@ -11790,73 +11790,33 @@
           "fixture": "standard-early",
           "session": 2,
           "operation": "select-unit",
-          "completedMs": 142,
-          "firstMutationMs": 86.30000000074506,
-          "firstPaintMs": 108.10000000149012
+          "completedMs": 155,
+          "firstMutationMs": 81.69999999925494,
+          "firstPaintMs": 103.09999999962747
         },
         {
           "fixture": "standard-early",
           "session": 2,
           "operation": "select-unit",
-          "completedMs": 114,
-          "firstMutationMs": 48.100000001490116,
-          "firstPaintMs": 60.5
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 27.5,
-          "firstPaintMs": 39.19999999925494
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 98,
-          "firstMutationMs": 23.199999999254942,
-          "firstPaintMs": 34.30000000074506
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 85,
-          "firstMutationMs": 25.199999999254942,
-          "firstPaintMs": 35.90000000037253
+          "completedMs": 111,
+          "firstMutationMs": 55.80000000074506,
+          "firstPaintMs": 67.59999999962747
         },
         {
           "fixture": "standard-early",
           "session": 2,
           "operation": "select-unit",
           "completedMs": 82,
-          "firstMutationMs": 23.800000000745058,
-          "firstPaintMs": 35.59999999962747
+          "firstMutationMs": 27.200000001117587,
+          "firstPaintMs": 39.40000000037253
         },
         {
           "fixture": "standard-early",
           "session": 2,
           "operation": "select-unit",
-          "completedMs": 98,
-          "firstMutationMs": 25.700000001117587,
-          "firstPaintMs": 38
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 24.09999999962747,
-          "firstPaintMs": 37.19999999925494
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
+          "completedMs": 101,
           "firstMutationMs": 23.40000000037253,
-          "firstPaintMs": 36
+          "firstPaintMs": 35.5
         },
         {
           "fixture": "standard-early",
@@ -11864,1202 +11824,138 @@
           "operation": "select-unit",
           "completedMs": 82,
           "firstMutationMs": 24,
-          "firstPaintMs": 35.40000000037253
+          "firstPaintMs": 36.399999998509884
         },
         {
           "fixture": "standard-early",
-          "session": 2,
-          "operation": "move-mode",
-          "completedMs": 220,
-          "firstMutationMs": 76.69999999925494,
-          "firstPaintMs": 91.40000000037253
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "move-preview",
-          "completedMs": 112,
-          "firstMutationMs": 46.59999999962747,
-          "firstPaintMs": 61.69999999925494
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "move-commit",
-          "completedMs": 299,
-          "firstMutationMs": 222.2999999988824,
-          "firstPaintMs": 244.2999999988824
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 149,
-          "firstMutationMs": 56.5,
-          "firstPaintMs": 67.09999999962747
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 132,
-          "firstMutationMs": 57.90000000037253,
-          "firstPaintMs": 68.80000000074506
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 132,
-          "firstMutationMs": 55,
-          "firstPaintMs": 66.19999999925494
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 133,
-          "firstMutationMs": 57.59999999962747,
-          "firstPaintMs": 69
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "sheet-toggle",
-          "completedMs": 134,
-          "firstMutationMs": 53.30000000074506,
-          "firstPaintMs": 66.5
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "sheet-toggle",
-          "completedMs": 282,
-          "firstMutationMs": 154.5,
-          "firstPaintMs": 168
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "sheet-toggle",
-          "completedMs": 167,
-          "firstMutationMs": 34.19999999925494,
-          "firstPaintMs": 47.59999999962747
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "end-turn",
-          "completedMs": 864,
-          "firstMutationMs": 2.800000000745058,
-          "firstPaintMs": 4.199999999254942
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "pan",
-          "completedMs": 182,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "standard-early",
-          "session": 2,
-          "operation": "pinch",
-          "completedMs": 347,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 192,
-          "firstMutationMs": 123.89999999850988,
-          "firstPaintMs": 149.19999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 125,
-          "firstMutationMs": 58.40000000037253,
-          "firstPaintMs": 69.5
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 98,
-          "firstMutationMs": 33.80000000074506,
-          "firstPaintMs": 43.90000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 85,
-          "firstMutationMs": 28.5,
-          "firstPaintMs": 39.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 96,
-          "firstMutationMs": 29.40000000037253,
-          "firstPaintMs": 40
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 100,
-          "firstMutationMs": 30.09999999962747,
-          "firstPaintMs": 41
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 97,
-          "firstMutationMs": 29.59999999962747,
-          "firstPaintMs": 41.30000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 29.59999999962747,
-          "firstPaintMs": 42.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 29.699999999254942,
-          "firstPaintMs": 40.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 81,
-          "firstMutationMs": 29.300000000745058,
-          "firstPaintMs": 40.20000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "move-mode",
-          "completedMs": 204,
-          "firstMutationMs": 84.40000000037253,
-          "firstPaintMs": 99.5
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "move-preview",
-          "completedMs": 149,
-          "firstMutationMs": 44.90000000037253,
-          "firstPaintMs": 60
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "move-commit",
-          "completedMs": 230,
-          "firstMutationMs": 163.2999999988824,
-          "firstPaintMs": 185.69999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 117,
-          "firstMutationMs": 62.19999999925494,
-          "firstPaintMs": 72.39999999850988
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 120,
-          "firstMutationMs": 60.70000000111759,
-          "firstPaintMs": 70.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 132,
-          "firstMutationMs": 75.80000000074506,
-          "firstPaintMs": 85.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 116,
-          "firstMutationMs": 60.30000000074506,
-          "firstPaintMs": 71.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "sheet-toggle",
-          "completedMs": 146,
-          "firstMutationMs": 68.60000000149012,
-          "firstPaintMs": 79.90000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "sheet-toggle",
-          "completedMs": 216,
-          "firstMutationMs": 137.30000000074506,
-          "firstPaintMs": 147.60000000149012
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "sheet-toggle",
-          "completedMs": 217,
-          "firstMutationMs": 135.89999999850988,
-          "firstPaintMs": 148.19999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "end-turn",
-          "completedMs": 1002,
-          "firstMutationMs": 2.299999998882413,
-          "firstPaintMs": 15.599999999627471
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "pan",
-          "completedMs": 192,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 0,
-          "operation": "pinch",
-          "completedMs": 347,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 199,
-          "firstMutationMs": 129.40000000037253,
-          "firstPaintMs": 154.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 115,
-          "firstMutationMs": 48,
-          "firstPaintMs": 59
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 30.699999999254942,
-          "firstPaintMs": 41.79999999888241
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 29.09999999962747,
-          "firstPaintMs": 40.399999998509884
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 28.199999999254942,
-          "firstPaintMs": 39
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 26.90000000037253,
-          "firstPaintMs": 36.70000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 28.399999998509884,
-          "firstPaintMs": 40.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 28.699999999254942,
-          "firstPaintMs": 39.79999999888241
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 28,
-          "firstPaintMs": 39.20000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 81,
-          "firstMutationMs": 27.699999999254942,
-          "firstPaintMs": 37.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "move-mode",
-          "completedMs": 187,
-          "firstMutationMs": 79.80000000074506,
-          "firstPaintMs": 93.90000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "move-preview",
-          "completedMs": 90,
-          "firstMutationMs": 32.70000000111759,
-          "firstPaintMs": 47.100000001490116
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "move-commit",
-          "completedMs": 263,
-          "firstMutationMs": 189.90000000037253,
-          "firstPaintMs": 212.5
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "resource-panel",
-          "completedMs": 131,
-          "firstMutationMs": 61.40000000037253,
-          "firstPaintMs": 73.19999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "resource-panel",
-          "completedMs": 134,
-          "firstMutationMs": 64.69999999925494,
-          "firstPaintMs": 74.89999999850988
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "resource-panel",
-          "completedMs": 115,
-          "firstMutationMs": 59.70000000111759,
-          "firstPaintMs": 71.30000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "resource-panel",
-          "completedMs": 115,
-          "firstMutationMs": 60,
-          "firstPaintMs": 71.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "sheet-toggle",
-          "completedMs": 133,
-          "firstMutationMs": 53.40000000037253,
-          "firstPaintMs": 66.30000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "sheet-toggle",
-          "completedMs": 215,
-          "firstMutationMs": 15.899999998509884,
-          "firstPaintMs": 31
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "sheet-toggle",
-          "completedMs": 234,
-          "firstMutationMs": 152.7000000011176,
-          "firstPaintMs": 164
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "end-turn",
-          "completedMs": 790,
-          "firstMutationMs": 2.799999998882413,
-          "firstPaintMs": 21.299999998882413
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "pan",
-          "completedMs": 184,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 1,
-          "operation": "pinch",
-          "completedMs": 348,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 196,
-          "firstMutationMs": 127.79999999888241,
-          "firstPaintMs": 149.90000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 125,
-          "firstMutationMs": 58.40000000037253,
-          "firstPaintMs": 68.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
           "session": 2,
           "operation": "select-unit",
           "completedMs": 83,
-          "firstMutationMs": 30.300000000745058,
-          "firstPaintMs": 40.70000000111759
+          "firstMutationMs": 23.699999999254942,
+          "firstPaintMs": 35.29999999888241
         },
         {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 29.40000000037253,
-          "firstPaintMs": 40
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 27.799999998882413,
-          "firstPaintMs": 38.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
+          "fixture": "standard-early",
           "session": 2,
           "operation": "select-unit",
           "completedMs": 82,
-          "firstMutationMs": 26.59999999962747,
-          "firstPaintMs": 37.40000000037253
+          "firstMutationMs": 23,
+          "firstPaintMs": 35.30000000074506
         },
         {
-          "fixture": "reachable-wave-turn-20",
+          "fixture": "standard-early",
           "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 28.100000001490116,
-          "firstPaintMs": 39.5
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 27.799999998882413,
-          "firstPaintMs": 37.899999998509884
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 27.600000001490116,
-          "firstPaintMs": 37.70000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 26.700000001117587,
-          "firstPaintMs": 37.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "move-mode",
-          "completedMs": 168,
-          "firstMutationMs": 78.19999999925494,
-          "firstPaintMs": 92.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "move-preview",
-          "completedMs": 116,
-          "firstMutationMs": 31,
-          "firstPaintMs": 44.70000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "move-commit",
-          "completedMs": 232,
-          "firstMutationMs": 162.19999999925494,
-          "firstPaintMs": 183.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 117,
-          "firstMutationMs": 62.19999999925494,
-          "firstPaintMs": 72.5
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 116,
-          "firstMutationMs": 60.899999998509884,
-          "firstPaintMs": 71.39999999850988
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 120,
-          "firstMutationMs": 60.30000000074506,
-          "firstPaintMs": 70.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 127,
-          "firstMutationMs": 71.70000000111759,
-          "firstPaintMs": 83.60000000149012
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "sheet-toggle",
-          "completedMs": 134,
-          "firstMutationMs": 55.5,
-          "firstPaintMs": 66.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "sheet-toggle",
-          "completedMs": 216,
-          "firstMutationMs": 134.69999999925494,
-          "firstPaintMs": 147.2999999988824
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "sheet-toggle",
-          "completedMs": 233,
-          "firstMutationMs": 151.7999999988824,
-          "firstPaintMs": 163.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "end-turn",
-          "completedMs": 812,
-          "firstMutationMs": 0.6000000014901161,
-          "firstPaintMs": 12.100000001490116
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "pan",
-          "completedMs": 182,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-20",
-          "session": 2,
-          "operation": "pinch",
-          "completedMs": 350,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 190,
-          "firstMutationMs": 123.19999999925494,
-          "firstPaintMs": 145.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 115,
-          "firstMutationMs": 51.79999999888241,
-          "firstPaintMs": 63.5
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 30.199999999254942,
-          "firstPaintMs": 41.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 81,
-          "firstMutationMs": 29,
-          "firstPaintMs": 39.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 84,
-          "firstMutationMs": 29.199999999254942,
-          "firstPaintMs": 40.29999999888241
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 29.200000001117587,
-          "firstPaintMs": 41
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 28,
-          "firstPaintMs": 39.5
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 29.300000000745058,
-          "firstPaintMs": 39.30000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 84,
-          "firstMutationMs": 28.40000000037253,
-          "firstPaintMs": 39.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 28,
-          "firstPaintMs": 38.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "move-mode",
-          "completedMs": 340,
-          "firstMutationMs": 198.09999999962747,
-          "firstPaintMs": 211.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "move-preview",
-          "completedMs": 119,
-          "firstMutationMs": 46.70000000111759,
-          "firstPaintMs": 60.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "move-commit",
-          "completedMs": 287,
-          "firstMutationMs": 214.19999999925494,
-          "firstPaintMs": 238.2999999988824
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 117,
-          "firstMutationMs": 62.5,
-          "firstPaintMs": 72.79999999888241
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 132,
-          "firstMutationMs": 19.59999999962747,
-          "firstPaintMs": 33.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 116,
-          "firstMutationMs": 61,
-          "firstPaintMs": 72.69999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 117,
-          "firstMutationMs": 61.19999999925494,
-          "firstPaintMs": 73.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "sheet-toggle",
-          "completedMs": 146,
-          "firstMutationMs": 66.69999999925494,
-          "firstPaintMs": 78.5
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "sheet-toggle",
-          "completedMs": 232,
-          "firstMutationMs": 155.2999999988824,
-          "firstPaintMs": 165.2999999988824
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "sheet-toggle",
-          "completedMs": 216,
-          "firstMutationMs": 137,
-          "firstPaintMs": 148.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "end-turn",
-          "completedMs": 970,
-          "firstMutationMs": 2.400000000372529,
-          "firstPaintMs": 16.699999999254942
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "pan",
-          "completedMs": 183,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 0,
-          "operation": "pinch",
-          "completedMs": 347,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 186,
-          "firstMutationMs": 119.90000000037253,
-          "firstPaintMs": 141.5
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 129,
-          "firstMutationMs": 59.30000000074506,
-          "firstPaintMs": 71.90000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
           "operation": "select-unit",
           "completedMs": 99,
-          "firstMutationMs": 32,
-          "firstPaintMs": 42.59999999962747
+          "firstMutationMs": 23.09999999962747,
+          "firstPaintMs": 34.90000000037253
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 85,
-          "firstMutationMs": 29,
-          "firstPaintMs": 40.399999998509884
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 81,
-          "firstMutationMs": 28.699999999254942,
-          "firstPaintMs": 38.90000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
+          "fixture": "standard-early",
+          "session": 2,
           "operation": "select-unit",
           "completedMs": 83,
-          "firstMutationMs": 28.5,
-          "firstPaintMs": 39.399999998509884
+          "firstMutationMs": 24.40000000037253,
+          "firstPaintMs": 36.19999999925494
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
+          "fixture": "standard-early",
+          "session": 2,
           "operation": "select-unit",
           "completedMs": 82,
-          "firstMutationMs": 27.59999999962747,
-          "firstPaintMs": 38.59999999962747
+          "firstMutationMs": 23.90000000037253,
+          "firstPaintMs": 35.5
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 84,
-          "firstMutationMs": 27.09999999962747,
-          "firstPaintMs": 39.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 81,
-          "firstMutationMs": 28.199999999254942,
-          "firstPaintMs": 39.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 28.399999998509884,
-          "firstPaintMs": 39.899999998509884
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
+          "fixture": "standard-early",
+          "session": 2,
           "operation": "move-mode",
-          "completedMs": 169,
-          "firstMutationMs": 79.20000000111759,
-          "firstPaintMs": 92.40000000037253
+          "completedMs": 203,
+          "firstMutationMs": 76,
+          "firstPaintMs": 91.19999999925494
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
+          "fixture": "standard-early",
+          "session": 2,
           "operation": "move-preview",
-          "completedMs": 118,
-          "firstMutationMs": 32.90000000037253,
-          "firstPaintMs": 46.20000000111759
+          "completedMs": 96,
+          "firstMutationMs": 31.59999999962747,
+          "firstPaintMs": 46.79999999888241
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
+          "fixture": "standard-early",
+          "session": 2,
           "operation": "move-commit",
-          "completedMs": 279,
+          "completedMs": 269,
           "firstMutationMs": 199.5,
-          "firstPaintMs": 220.7999999988824
+          "firstPaintMs": 219
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
+          "fixture": "standard-early",
+          "session": 2,
           "operation": "resource-panel",
-          "completedMs": 133,
-          "firstMutationMs": 64,
-          "firstPaintMs": 75.40000000037253
+          "completedMs": 136,
+          "firstMutationMs": 56.90000000037253,
+          "firstPaintMs": 66.90000000037253
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
+          "fixture": "standard-early",
+          "session": 2,
           "operation": "resource-panel",
-          "completedMs": 132,
-          "firstMutationMs": 65,
-          "firstPaintMs": 75.29999999888241
+          "completedMs": 129,
+          "firstMutationMs": 68.09999999962747,
+          "firstPaintMs": 77.69999999925494
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
+          "fixture": "standard-early",
+          "session": 2,
           "operation": "resource-panel",
           "completedMs": 117,
-          "firstMutationMs": 18.90000000037253,
-          "firstPaintMs": 31.90000000037253
+          "firstMutationMs": 54.19999999925494,
+          "firstPaintMs": 64.19999999925494
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
+          "fixture": "standard-early",
+          "session": 2,
           "operation": "resource-panel",
-          "completedMs": 114,
-          "firstMutationMs": 60.40000000037253,
-          "firstPaintMs": 72
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "sheet-toggle",
-          "completedMs": 165,
-          "firstMutationMs": 69.59999999962747,
-          "firstPaintMs": 81.70000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "sheet-toggle",
-          "completedMs": 233,
-          "firstMutationMs": 31.800000000745058,
-          "firstPaintMs": 46.20000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "sheet-toggle",
-          "completedMs": 249,
-          "firstMutationMs": 169.59999999962747,
-          "firstPaintMs": 181.19999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "end-turn",
-          "completedMs": 925,
-          "firstMutationMs": 3.5,
-          "firstPaintMs": 26.199999999254942
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "pan",
-          "completedMs": 183,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 1,
-          "operation": "pinch",
-          "completedMs": 347,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 201,
-          "firstMutationMs": 133.59999999962747,
-          "firstPaintMs": 154.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 115,
-          "firstMutationMs": 46.5,
-          "firstPaintMs": 58.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 97,
-          "firstMutationMs": 31.40000000037253,
-          "firstPaintMs": 42.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 84,
-          "firstMutationMs": 28.300000000745058,
-          "firstPaintMs": 40.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 97,
-          "firstMutationMs": 28.40000000037253,
-          "firstPaintMs": 40.70000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 26.699999999254942,
-          "firstPaintMs": 38
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 28.09999999962747,
-          "firstPaintMs": 40.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 26.300000000745058,
-          "firstPaintMs": 38.19999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 27.399999998509884,
-          "firstPaintMs": 39.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 27.40000000037253,
-          "firstPaintMs": 39.19999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "move-mode",
-          "completedMs": 247,
-          "firstMutationMs": 82.60000000149012,
-          "firstPaintMs": 97.20000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "move-preview",
           "completedMs": 116,
-          "firstMutationMs": 50.20000000111759,
-          "firstPaintMs": 66.30000000074506
+          "firstMutationMs": 55.09999999962747,
+          "firstPaintMs": 64.70000000111759
         },
         {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "move-commit",
-          "completedMs": 308,
-          "firstMutationMs": 225,
-          "firstPaintMs": 246.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 133,
-          "firstMutationMs": 75.09999999962747,
-          "firstPaintMs": 86.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 150,
-          "firstMutationMs": 77.5,
-          "firstPaintMs": 89.69999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 336,
-          "firstMutationMs": 214.80000000074506,
-          "firstPaintMs": 227.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 168,
-          "firstMutationMs": 109.30000000074506,
-          "firstPaintMs": 121.5
-        },
-        {
-          "fixture": "reachable-wave-turn-50",
+          "fixture": "standard-early",
           "session": 2,
           "operation": "sheet-toggle",
-          "completedMs": 182,
-          "firstMutationMs": 70.30000000074506,
-          "firstPaintMs": 84.40000000037253
+          "completedMs": 115,
+          "firstMutationMs": 52,
+          "firstPaintMs": 62.90000000037253
         },
         {
-          "fixture": "reachable-wave-turn-50",
+          "fixture": "standard-early",
           "session": 2,
           "operation": "sheet-toggle",
-          "completedMs": 249,
-          "firstMutationMs": 33.30000000074506,
-          "firstPaintMs": 47.5
+          "completedMs": 332,
+          "firstMutationMs": 267.6000000014901,
+          "firstPaintMs": 277.40000000037253
         },
         {
-          "fixture": "reachable-wave-turn-50",
+          "fixture": "standard-early",
           "session": 2,
           "operation": "sheet-toggle",
-          "completedMs": 266,
-          "firstMutationMs": 168.90000000037253,
-          "firstPaintMs": 182.19999999925494
+          "completedMs": 333,
+          "firstMutationMs": 117,
+          "firstPaintMs": 130.89999999850988
         },
         {
-          "fixture": "reachable-wave-turn-50",
+          "fixture": "standard-early",
           "session": 2,
           "operation": "end-turn",
-          "completedMs": 961,
-          "firstMutationMs": 1.099999999627471,
-          "firstPaintMs": 8.800000000745058
+          "completedMs": 667,
+          "firstMutationMs": 2,
+          "firstPaintMs": 9.599999999627471
         },
         {
-          "fixture": "reachable-wave-turn-50",
+          "fixture": "standard-early",
           "session": 2,
           "operation": "pan",
           "completedMs": 182,
@@ -13067,7 +11963,7 @@
           "firstPaintMs": null
         },
         {
-          "fixture": "reachable-wave-turn-50",
+          "fixture": "standard-early",
           "session": 2,
           "operation": "pinch",
           "completedMs": 349,
@@ -13075,175 +11971,175 @@
           "firstPaintMs": null
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "select-unit",
-          "completedMs": 191,
-          "firstMutationMs": 122.79999999888241,
-          "firstPaintMs": 143.40000000037253
+          "completedMs": 180,
+          "firstMutationMs": 117.90000000037253,
+          "firstPaintMs": 140.60000000149012
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "select-unit",
-          "completedMs": 113,
-          "firstMutationMs": 48.09999999962747,
-          "firstPaintMs": 58.79999999888241
+          "completedMs": 115,
+          "firstMutationMs": 47.5,
+          "firstPaintMs": 59
         },
         {
-          "fixture": "reachable-wave-turn-51",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 30.90000000037253,
-          "firstPaintMs": 40.69999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "select-unit",
           "completedMs": 83,
-          "firstMutationMs": 27.199999999254942,
-          "firstPaintMs": 37.899999998509884
+          "firstMutationMs": 29.40000000037253,
+          "firstPaintMs": 40.5
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "select-unit",
           "completedMs": 82,
-          "firstMutationMs": 28.40000000037253,
-          "firstPaintMs": 39
+          "firstMutationMs": 26.59999999962747,
+          "firstPaintMs": 37.19999999925494
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 28.200000001117587,
+          "firstPaintMs": 38.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 26.699999999254942,
+          "firstPaintMs": 37
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 26.59999999962747,
+          "firstPaintMs": 38.20000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 26.90000000037253,
+          "firstPaintMs": 37.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "select-unit",
           "completedMs": 84,
-          "firstMutationMs": 26.800000000745058,
-          "firstPaintMs": 36.5
+          "firstMutationMs": 27.40000000037253,
+          "firstPaintMs": 38
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "select-unit",
           "completedMs": 83,
-          "firstMutationMs": 28,
-          "firstPaintMs": 39
+          "firstMutationMs": 26.699999999254942,
+          "firstPaintMs": 37.5
         },
         {
-          "fixture": "reachable-wave-turn-51",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 26.90000000037253,
-          "firstPaintMs": 36.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 28.09999999962747,
-          "firstPaintMs": 37.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 0,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 27.59999999962747,
-          "firstPaintMs": 38.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "move-mode",
-          "completedMs": 169,
-          "firstMutationMs": 79.40000000037253,
-          "firstPaintMs": 92.5
+          "completedMs": 167,
+          "firstMutationMs": 77.09999999962747,
+          "firstPaintMs": 91.5
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "move-preview",
-          "completedMs": 133,
-          "firstMutationMs": 33.5,
-          "firstPaintMs": 48.100000001490116
+          "completedMs": 117,
+          "firstMutationMs": 31,
+          "firstPaintMs": 45.5
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "move-commit",
-          "completedMs": 246,
-          "firstMutationMs": 165.40000000037253,
-          "firstPaintMs": 187.40000000037253
+          "completedMs": 228,
+          "firstMutationMs": 159,
+          "firstPaintMs": 178.2000000011176
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "resource-panel",
           "completedMs": 116,
-          "firstMutationMs": 61.69999999925494,
-          "firstPaintMs": 72.59999999962747
+          "firstMutationMs": 61,
+          "firstPaintMs": 71.30000000074506
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "resource-panel",
-          "completedMs": 115,
-          "firstMutationMs": 62,
-          "firstPaintMs": 72.90000000037253
+          "completedMs": 116,
+          "firstMutationMs": 61.19999999925494,
+          "firstPaintMs": 70.90000000037253
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "resource-panel",
-          "completedMs": 119,
-          "firstMutationMs": 62.5,
-          "firstPaintMs": 73.30000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 0,
-          "operation": "resource-panel",
-          "completedMs": 130,
-          "firstMutationMs": 73.90000000037253,
-          "firstPaintMs": 83.70000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 0,
-          "operation": "sheet-toggle",
           "completedMs": 133,
-          "firstMutationMs": 53.59999999962747,
-          "firstPaintMs": 65
+          "firstMutationMs": 58.59999999962747,
+          "firstPaintMs": 68.59999999962747
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 133,
+          "firstMutationMs": 36.19999999925494,
+          "firstPaintMs": 49.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "sheet-toggle",
-          "completedMs": 214,
-          "firstMutationMs": 115.09999999962747,
-          "firstPaintMs": 129.19999999925494
+          "completedMs": 128,
+          "firstMutationMs": 63.90000000037253,
+          "firstPaintMs": 74.40000000037253
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "sheet-toggle",
-          "completedMs": 351,
-          "firstMutationMs": 270.5,
-          "firstPaintMs": 281.90000000037253
+          "completedMs": 150,
+          "firstMutationMs": 84.59999999962747,
+          "firstPaintMs": 95.59999999962747
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
+          "session": 0,
+          "operation": "sheet-toggle",
+          "completedMs": 333,
+          "firstMutationMs": 32.80000000074506,
+          "firstPaintMs": 47
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "end-turn",
-          "completedMs": 927,
-          "firstMutationMs": 3.300000000745058,
-          "firstPaintMs": 24.300000000745058
+          "completedMs": 746,
+          "firstMutationMs": 1.699999999254942,
+          "firstPaintMs": 13.099999999627471
         },
         {
-          "fixture": "reachable-wave-turn-51",
+          "fixture": "reachable-wave-turn-20",
           "session": 0,
           "operation": "pan",
           "completedMs": 183,
@@ -13251,8 +12147,1296 @@
           "firstPaintMs": null
         },
         {
+          "fixture": "reachable-wave-turn-20",
+          "session": 0,
+          "operation": "pinch",
+          "completedMs": 349,
+          "firstMutationMs": 51.29999999888241,
+          "firstPaintMs": 64.5
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 182,
+          "firstMutationMs": 129.69999999925494,
+          "firstPaintMs": 153.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 111,
+          "firstMutationMs": 58.5,
+          "firstPaintMs": 69.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 29.40000000037253,
+          "firstPaintMs": 39.5
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 100,
+          "firstMutationMs": 27.699999999254942,
+          "firstPaintMs": 37
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 28.800000000745058,
+          "firstPaintMs": 38.70000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 27.800000000745058,
+          "firstPaintMs": 37.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 27.200000001117587,
+          "firstPaintMs": 37.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 100,
+          "firstMutationMs": 27,
+          "firstPaintMs": 36.69999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 27.40000000037253,
+          "firstPaintMs": 37.09999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 100,
+          "firstMutationMs": 26.09999999962747,
+          "firstPaintMs": 36
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "move-mode",
+          "completedMs": 151,
+          "firstMutationMs": 63,
+          "firstPaintMs": 76.20000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "move-preview",
+          "completedMs": 172,
+          "firstMutationMs": 31.59999999962747,
+          "firstPaintMs": 44.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "move-commit",
+          "completedMs": 241,
+          "firstMutationMs": 177.90000000037253,
+          "firstPaintMs": 196.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 149,
+          "firstMutationMs": 63.09999999962747,
+          "firstPaintMs": 73.29999999888241
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 116,
+          "firstMutationMs": 60.70000000111759,
+          "firstPaintMs": 71
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 133,
+          "firstMutationMs": 58.80000000074506,
+          "firstPaintMs": 68.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 132,
+          "firstMutationMs": 58.5,
+          "firstPaintMs": 69
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "sheet-toggle",
+          "completedMs": 113,
+          "firstMutationMs": 50.29999999888241,
+          "firstPaintMs": 60.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "sheet-toggle",
+          "completedMs": 150,
+          "firstMutationMs": 85.40000000037253,
+          "firstPaintMs": 96
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "sheet-toggle",
+          "completedMs": 333,
+          "firstMutationMs": 199.5,
+          "firstPaintMs": 213.89999999850988
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "end-turn",
+          "completedMs": 822,
+          "firstMutationMs": 2.699999999254942,
+          "firstPaintMs": 25.299999998882413
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "pan",
+          "completedMs": 184,
+          "firstMutationMs": 182.89999999850988,
+          "firstPaintMs": null
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 1,
+          "operation": "pinch",
+          "completedMs": 346,
+          "firstMutationMs": null,
+          "firstPaintMs": 11.199999999254942
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 183,
+          "firstMutationMs": 116.20000000111759,
+          "firstPaintMs": 139.60000000149012
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 115,
+          "firstMutationMs": 47.30000000074506,
+          "firstPaintMs": 59.59999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 30,
+          "firstPaintMs": 41.20000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 27.09999999962747,
+          "firstPaintMs": 37.899999998509884
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 28.300000000745058,
+          "firstPaintMs": 39.30000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 26.699999999254942,
+          "firstPaintMs": 37.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 27.90000000037253,
+          "firstPaintMs": 39.09999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 84,
+          "firstMutationMs": 27.299999998882413,
+          "firstPaintMs": 40.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 28.59999999962747,
+          "firstPaintMs": 39.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 26.300000000745058,
+          "firstPaintMs": 36.59999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "move-mode",
+          "completedMs": 185,
+          "firstMutationMs": 79.59999999962747,
+          "firstPaintMs": 94.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "move-preview",
+          "completedMs": 117,
+          "firstMutationMs": 31.300000000745058,
+          "firstPaintMs": 44.59999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "move-commit",
+          "completedMs": 231,
+          "firstMutationMs": 154.90000000037253,
+          "firstPaintMs": 177
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "resource-panel",
+          "completedMs": 117,
+          "firstMutationMs": 60.79999999888241,
+          "firstPaintMs": 71.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "resource-panel",
+          "completedMs": 116,
+          "firstMutationMs": 59.19999999925494,
+          "firstPaintMs": 69.5
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "resource-panel",
+          "completedMs": 118,
+          "firstMutationMs": 58.09999999962747,
+          "firstPaintMs": 68.29999999888241
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "resource-panel",
+          "completedMs": 127,
+          "firstMutationMs": 72.09999999962747,
+          "firstPaintMs": 83
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "sheet-toggle",
+          "completedMs": 147,
+          "firstMutationMs": 67.09999999962747,
+          "firstPaintMs": 78.59999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "sheet-toggle",
+          "completedMs": 150,
+          "firstMutationMs": 86.30000000074506,
+          "firstPaintMs": 96.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "sheet-toggle",
+          "completedMs": 232,
+          "firstMutationMs": 153.10000000149012,
+          "firstPaintMs": 164.5
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "end-turn",
+          "completedMs": 760,
+          "firstMutationMs": 2.599999999627471,
+          "firstPaintMs": 3.699999999254942
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "pan",
+          "completedMs": 184,
+          "firstMutationMs": null,
+          "firstPaintMs": null
+        },
+        {
+          "fixture": "reachable-wave-turn-20",
+          "session": 2,
+          "operation": "pinch",
+          "completedMs": 350,
+          "firstMutationMs": 51.29999999888241,
+          "firstPaintMs": 66.79999999888241
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 182,
+          "firstMutationMs": 127.20000000111759,
+          "firstPaintMs": 149.7000000011176
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 113,
+          "firstMutationMs": 48,
+          "firstPaintMs": 58.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 88,
+          "firstMutationMs": 30.300000000745058,
+          "firstPaintMs": 40.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 101,
+          "firstMutationMs": 27.40000000037253,
+          "firstPaintMs": 37.70000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 28,
+          "firstPaintMs": 39.100000001490116
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 27.199999999254942,
+          "firstPaintMs": 37.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 27.09999999962747,
+          "firstPaintMs": 37.80000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 27.299999998882413,
+          "firstPaintMs": 37.69999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 27.90000000037253,
+          "firstPaintMs": 37.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 99,
+          "firstMutationMs": 26.5,
+          "firstPaintMs": 36.09999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "move-mode",
+          "completedMs": 168,
+          "firstMutationMs": 79,
+          "firstPaintMs": 91.70000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "move-preview",
+          "completedMs": 133,
+          "firstMutationMs": 32.5,
+          "firstPaintMs": 45.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "move-commit",
+          "completedMs": 230,
+          "firstMutationMs": 161.90000000037253,
+          "firstPaintMs": 180.80000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 133,
+          "firstMutationMs": 61.29999999888241,
+          "firstPaintMs": 74.69999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 116,
+          "firstMutationMs": 61.69999999925494,
+          "firstPaintMs": 72.80000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 116,
+          "firstMutationMs": 59.70000000111759,
+          "firstPaintMs": 70.09999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 115,
+          "firstMutationMs": 59.80000000074506,
+          "firstPaintMs": 70.30000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "sheet-toggle",
+          "completedMs": 129,
+          "firstMutationMs": 64.90000000037253,
+          "firstPaintMs": 76
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "sheet-toggle",
+          "completedMs": 149,
+          "firstMutationMs": 84.90000000037253,
+          "firstPaintMs": 95.10000000149012
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "sheet-toggle",
+          "completedMs": 332,
+          "firstMutationMs": 216.40000000037253,
+          "firstPaintMs": 230.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "end-turn",
+          "completedMs": 852,
+          "firstMutationMs": 2.199999999254942,
+          "firstPaintMs": 14.199999999254942
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "pan",
+          "completedMs": 182,
+          "firstMutationMs": null,
+          "firstPaintMs": null
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 0,
+          "operation": "pinch",
+          "completedMs": 349,
+          "firstMutationMs": 34.59999999962747,
+          "firstPaintMs": 47.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 184,
+          "firstMutationMs": 116.59999999962747,
+          "firstPaintMs": 137.5
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 122,
+          "firstMutationMs": 57.80000000074506,
+          "firstPaintMs": 69.30000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 29.5,
+          "firstPaintMs": 40.5
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 26.699999999254942,
+          "firstPaintMs": 38.59999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 27.799999998882413,
+          "firstPaintMs": 38.69999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 80,
+          "firstMutationMs": 27,
+          "firstPaintMs": 38.20000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 84,
+          "firstMutationMs": 26.699999999254942,
+          "firstPaintMs": 38.80000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 26.90000000037253,
+          "firstPaintMs": 38.5
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 26.5,
+          "firstPaintMs": 38.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 27.100000001490116,
+          "firstPaintMs": 38.600000001490116
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "move-mode",
+          "completedMs": 186,
+          "firstMutationMs": 80.19999999925494,
+          "firstPaintMs": 94.69999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "move-preview",
+          "completedMs": 136,
+          "firstMutationMs": 32.09999999962747,
+          "firstPaintMs": 47
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "move-commit",
+          "completedMs": 246,
+          "firstMutationMs": 170,
+          "firstPaintMs": 191.2999999988824
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 115,
+          "firstMutationMs": 61.40000000037253,
+          "firstPaintMs": 71.59999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 116,
+          "firstMutationMs": 61.40000000037253,
+          "firstPaintMs": 72.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 117,
+          "firstMutationMs": 60.90000000037253,
+          "firstPaintMs": 75.69999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 132,
+          "firstMutationMs": 58.30000000074506,
+          "firstPaintMs": 69.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "sheet-toggle",
+          "completedMs": 118,
+          "firstMutationMs": 54.29999999888241,
+          "firstPaintMs": 65.39999999850988
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "sheet-toggle",
+          "completedMs": 166,
+          "firstMutationMs": 85.40000000037253,
+          "firstPaintMs": 95.80000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "sheet-toggle",
+          "completedMs": 215,
+          "firstMutationMs": 151.7000000011176,
+          "firstPaintMs": 162.30000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "end-turn",
+          "completedMs": 904,
+          "firstMutationMs": 3,
+          "firstPaintMs": 19.399999998509884
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "pan",
+          "completedMs": 181,
+          "firstMutationMs": null,
+          "firstPaintMs": null
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 1,
+          "operation": "pinch",
+          "completedMs": 349,
+          "firstMutationMs": 18.59999999962747,
+          "firstPaintMs": 31.199999999254942
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 186,
+          "firstMutationMs": 120.80000000074506,
+          "firstPaintMs": 142.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 97,
+          "firstMutationMs": 45.90000000037253,
+          "firstPaintMs": 56.09999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 29.800000000745058,
+          "firstPaintMs": 40.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 28.90000000037253,
+          "firstPaintMs": 40
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 28,
+          "firstPaintMs": 38.70000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 27.40000000037253,
+          "firstPaintMs": 38.59999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 27.90000000037253,
+          "firstPaintMs": 39
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 26.800000000745058,
+          "firstPaintMs": 37.30000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 27.09999999962747,
+          "firstPaintMs": 37.79999999888241
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 81,
+          "firstMutationMs": 26.299999998882413,
+          "firstPaintMs": 36.29999999888241
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "move-mode",
+          "completedMs": 153,
+          "firstMutationMs": 63.20000000111759,
+          "firstPaintMs": 76.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "move-preview",
+          "completedMs": 133,
+          "firstMutationMs": 32.19999999925494,
+          "firstPaintMs": 46
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "move-commit",
+          "completedMs": 228,
+          "firstMutationMs": 163,
+          "firstPaintMs": 182.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "resource-panel",
+          "completedMs": 116,
+          "firstMutationMs": 60.80000000074506,
+          "firstPaintMs": 70.5
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "resource-panel",
+          "completedMs": 115,
+          "firstMutationMs": 59.90000000037253,
+          "firstPaintMs": 70.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "resource-panel",
+          "completedMs": 116,
+          "firstMutationMs": 59.90000000037253,
+          "firstPaintMs": 70.20000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "resource-panel",
+          "completedMs": 136,
+          "firstMutationMs": 58.09999999962747,
+          "firstPaintMs": 68
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "sheet-toggle",
+          "completedMs": 117,
+          "firstMutationMs": 53,
+          "firstPaintMs": 63.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "sheet-toggle",
+          "completedMs": 149,
+          "firstMutationMs": 85.10000000149012,
+          "firstPaintMs": 95.80000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "sheet-toggle",
+          "completedMs": 333,
+          "firstMutationMs": 134.10000000149012,
+          "firstPaintMs": 148.30000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "end-turn",
+          "completedMs": 852,
+          "firstMutationMs": 2.599999999627471,
+          "firstPaintMs": 18.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "pan",
+          "completedMs": 182,
+          "firstMutationMs": null,
+          "firstPaintMs": null
+        },
+        {
+          "fixture": "reachable-wave-turn-50",
+          "session": 2,
+          "operation": "pinch",
+          "completedMs": 350,
+          "firstMutationMs": 51.30000000074506,
+          "firstPaintMs": 64.5
+        },
+        {
           "fixture": "reachable-wave-turn-51",
           "session": 0,
+          "operation": "select-unit",
+          "completedMs": 194,
+          "firstMutationMs": 127.40000000037253,
+          "firstPaintMs": 147.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 107,
+          "firstMutationMs": 56.29999999888241,
+          "firstPaintMs": 66.09999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 29.90000000037253,
+          "firstPaintMs": 39.59999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 81,
+          "firstMutationMs": 29.09999999962747,
+          "firstPaintMs": 39.09999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 100,
+          "firstMutationMs": 26.799999998882413,
+          "firstPaintMs": 36.399999998509884
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 99,
+          "firstMutationMs": 26,
+          "firstPaintMs": 35.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 26.600000001490116,
+          "firstPaintMs": 36.70000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 99,
+          "firstMutationMs": 26.300000000745058,
+          "firstPaintMs": 36.09999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 100,
+          "firstMutationMs": 26.699999999254942,
+          "firstPaintMs": 36.30000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 26.90000000037253,
+          "firstPaintMs": 36.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "move-mode",
+          "completedMs": 136,
+          "firstMutationMs": 61.69999999925494,
+          "firstPaintMs": 74.5
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "move-preview",
+          "completedMs": 116,
+          "firstMutationMs": 32.90000000037253,
+          "firstPaintMs": 45.80000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "move-commit",
+          "completedMs": 229,
+          "firstMutationMs": 159.19999999925494,
+          "firstPaintMs": 180.30000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 116,
+          "firstMutationMs": 60.30000000074506,
+          "firstPaintMs": 70.5
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 120,
+          "firstMutationMs": 59.69999999925494,
+          "firstPaintMs": 70.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 145,
+          "firstMutationMs": 71.80000000074506,
+          "firstPaintMs": 81.20000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "resource-panel",
+          "completedMs": 133,
+          "firstMutationMs": 59.90000000037253,
+          "firstPaintMs": 69.60000000149012
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "sheet-toggle",
+          "completedMs": 115,
+          "firstMutationMs": 50.29999999888241,
+          "firstPaintMs": 61
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "sheet-toggle",
+          "completedMs": 332,
+          "firstMutationMs": 15.899999998509884,
+          "firstPaintMs": 31
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "sheet-toggle",
+          "completedMs": 333,
+          "firstMutationMs": 182.90000000037253,
+          "firstPaintMs": 197.80000000074506
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "end-turn",
+          "completedMs": 897,
+          "firstMutationMs": 3.599999999627471,
+          "firstPaintMs": 16.899999998509884
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "pan",
+          "completedMs": 182,
+          "firstMutationMs": null,
+          "firstPaintMs": null
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 0,
+          "operation": "pinch",
+          "completedMs": 349,
+          "firstMutationMs": null,
+          "firstPaintMs": null
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 199,
+          "firstMutationMs": 130.40000000037253,
+          "firstPaintMs": 151.5
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 99,
+          "firstMutationMs": 48.20000000111759,
+          "firstPaintMs": 59.100000001490116
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 29.800000000745058,
+          "firstPaintMs": 40.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 84,
+          "firstMutationMs": 27,
+          "firstPaintMs": 37.19999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 28.59999999962747,
+          "firstPaintMs": 38.69999999925494
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 84,
+          "firstMutationMs": 26.5,
+          "firstPaintMs": 36.59999999962747
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 82,
+          "firstMutationMs": 27.199999999254942,
+          "firstPaintMs": 37.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 84,
+          "firstMutationMs": 27.09999999962747,
+          "firstPaintMs": 38.29999999888241
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 98,
+          "firstMutationMs": 31.200000001117587,
+          "firstPaintMs": 43.5
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "select-unit",
+          "completedMs": 84,
+          "firstMutationMs": 29.799999998882413,
+          "firstPaintMs": 41
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "move-mode",
+          "completedMs": 201,
+          "firstMutationMs": 81.69999999925494,
+          "firstPaintMs": 97
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "move-preview",
+          "completedMs": 99,
+          "firstMutationMs": 35.20000000111759,
+          "firstPaintMs": 51
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "move-commit",
+          "completedMs": 248,
+          "firstMutationMs": 177,
+          "firstPaintMs": 198.2000000011176
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 132,
+          "firstMutationMs": 65.19999999925494,
+          "firstPaintMs": 76.5
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 132,
+          "firstMutationMs": 63.69999999925494,
+          "firstPaintMs": 74.5
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 133,
+          "firstMutationMs": 63,
+          "firstPaintMs": 73.70000000111759
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "resource-panel",
+          "completedMs": 117,
+          "firstMutationMs": 61.30000000074506,
+          "firstPaintMs": 72
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "sheet-toggle",
+          "completedMs": 146,
+          "firstMutationMs": 68.69999999925494,
+          "firstPaintMs": 79.90000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "sheet-toggle",
+          "completedMs": 232,
+          "firstMutationMs": 84.39999999850988,
+          "firstPaintMs": 97.89999999850988
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "sheet-toggle",
+          "completedMs": 250,
+          "firstMutationMs": 153.5,
+          "firstPaintMs": 166
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "end-turn",
+          "completedMs": 987,
+          "firstMutationMs": 0.900000000372529,
+          "firstPaintMs": 14.699999999254942
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
+          "operation": "pan",
+          "completedMs": 183,
+          "firstMutationMs": null,
+          "firstPaintMs": null
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 1,
           "operation": "pinch",
           "completedMs": 350,
           "firstMutationMs": null,
@@ -13260,361 +13444,177 @@
         },
         {
           "fixture": "reachable-wave-turn-51",
-          "session": 1,
+          "session": 2,
           "operation": "select-unit",
-          "completedMs": 198,
-          "firstMutationMs": 123,
-          "firstPaintMs": 144.7000000011176
+          "completedMs": 215,
+          "firstMutationMs": 139.2999999988824,
+          "firstPaintMs": 161.5
         },
         {
           "fixture": "reachable-wave-turn-51",
-          "session": 1,
+          "session": 2,
           "operation": "select-unit",
-          "completedMs": 138,
-          "firstMutationMs": 63.90000000037253,
-          "firstPaintMs": 74.5
+          "completedMs": 129,
+          "firstMutationMs": 64.09999999962747,
+          "firstPaintMs": 76.09999999962747
         },
         {
           "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 32.100000001490116,
-          "firstPaintMs": 42.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 27.5,
-          "firstPaintMs": 37.90000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 28.699999999254942,
-          "firstPaintMs": 39.5
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 26.799999998882413,
-          "firstPaintMs": 37.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 27.800000000745058,
-          "firstPaintMs": 39.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 27.899999998509884,
-          "firstPaintMs": 38.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 27.90000000037253,
-          "firstPaintMs": 38.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
+          "session": 2,
           "operation": "select-unit",
           "completedMs": 84,
-          "firstMutationMs": 27.300000000745058,
-          "firstPaintMs": 38.70000000111759
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "move-mode",
-          "completedMs": 170,
-          "firstMutationMs": 78.30000000074506,
-          "firstPaintMs": 91.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "move-preview",
-          "completedMs": 151,
-          "firstMutationMs": 48.69999999925494,
-          "firstPaintMs": 61.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "move-commit",
-          "completedMs": 245,
-          "firstMutationMs": 176.90000000037253,
-          "firstPaintMs": 199.5
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "resource-panel",
-          "completedMs": 115,
-          "firstMutationMs": 62.399999998509884,
-          "firstPaintMs": 73.19999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "resource-panel",
-          "completedMs": 116,
-          "firstMutationMs": 61.40000000037253,
-          "firstPaintMs": 71.79999999888241
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "resource-panel",
-          "completedMs": 134,
-          "firstMutationMs": 61.5,
-          "firstPaintMs": 76.30000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "resource-panel",
-          "completedMs": 117,
-          "firstMutationMs": 60,
-          "firstPaintMs": 70.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "sheet-toggle",
-          "completedMs": 133,
-          "firstMutationMs": 53.19999999925494,
-          "firstPaintMs": 64.19999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "sheet-toggle",
-          "completedMs": 214,
-          "firstMutationMs": 65.60000000149012,
-          "firstPaintMs": 80.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "sheet-toggle",
-          "completedMs": 233,
-          "firstMutationMs": 152.90000000037253,
-          "firstPaintMs": 163.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "end-turn",
-          "completedMs": 972,
-          "firstMutationMs": 3.099999999627471,
-          "firstPaintMs": 23.399999998509884
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "pan",
-          "completedMs": 184,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 1,
-          "operation": "pinch",
-          "completedMs": 348,
-          "firstMutationMs": null,
-          "firstPaintMs": null
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 197,
-          "firstMutationMs": 124,
-          "firstPaintMs": 145.2000000011176
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 126,
-          "firstMutationMs": 59.70000000111759,
-          "firstPaintMs": 69.59999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 81,
-          "firstMutationMs": 30.299999998882413,
+          "firstMutationMs": 32,
           "firstPaintMs": 41.79999999888241
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 27.700000001117587,
-          "firstPaintMs": 39.30000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 29.299999998882413,
-          "firstPaintMs": 41.09999999962747
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 26.40000000037253,
-          "firstPaintMs": 37.40000000037253
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 82,
-          "firstMutationMs": 28.199999999254942,
-          "firstPaintMs": 39.69999999925494
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 2,
-          "operation": "select-unit",
-          "completedMs": 83,
-          "firstMutationMs": 26.299999998882413,
-          "firstPaintMs": 37.19999999925494
+          "completedMs": 81,
+          "firstMutationMs": 30.800000000745058,
+          "firstPaintMs": 41.19999999925494
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "select-unit",
           "completedMs": 84,
-          "firstMutationMs": 27.199999999254942,
-          "firstPaintMs": 36.79999999888241
+          "firstMutationMs": 30.40000000037253,
+          "firstPaintMs": 41.19999999925494
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "select-unit",
-          "completedMs": 81,
-          "firstMutationMs": 27.09999999962747,
-          "firstPaintMs": 36.899999998509884
+          "completedMs": 84,
+          "firstMutationMs": 28.09999999962747,
+          "firstPaintMs": 39.79999999888241
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 97,
+          "firstMutationMs": 28.59999999962747,
+          "firstPaintMs": 40
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 30.200000001117587,
+          "firstPaintMs": 42
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 83,
+          "firstMutationMs": 28.200000001117587,
+          "firstPaintMs": 39.40000000037253
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 2,
+          "operation": "select-unit",
+          "completedMs": 84,
+          "firstMutationMs": 27.300000000745058,
+          "firstPaintMs": 37.30000000074506
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "move-mode",
-          "completedMs": 186,
-          "firstMutationMs": 81.19999999925494,
-          "firstPaintMs": 95.40000000037253
+          "completedMs": 203,
+          "firstMutationMs": 80.5,
+          "firstPaintMs": 96.19999999925494
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "move-preview",
-          "completedMs": 132,
-          "firstMutationMs": 33.29999999888241,
-          "firstPaintMs": 46.09999999962747
+          "completedMs": 108,
+          "firstMutationMs": 49.29999999888241,
+          "firstPaintMs": 62.69999999925494
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "move-commit",
-          "completedMs": 262,
-          "firstMutationMs": 184.5,
-          "firstPaintMs": 204.5
+          "completedMs": 264,
+          "firstMutationMs": 181.90000000037253,
+          "firstPaintMs": 205.30000000074506
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "resource-panel",
-          "completedMs": 115,
-          "firstMutationMs": 61.90000000037253,
-          "firstPaintMs": 72.80000000074506
-        },
-        {
-          "fixture": "reachable-wave-turn-51",
-          "session": 2,
-          "operation": "resource-panel",
-          "completedMs": 116,
-          "firstMutationMs": 62.90000000037253,
-          "firstPaintMs": 73.40000000037253
+          "completedMs": 145,
+          "firstMutationMs": 78.69999999925494,
+          "firstPaintMs": 89.39999999850988
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "resource-panel",
           "completedMs": 117,
-          "firstMutationMs": 60.79999999888241,
-          "firstPaintMs": 71.39999999850988
+          "firstMutationMs": 62.40000000037253,
+          "firstPaintMs": 73.59999999962747
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "resource-panel",
-          "completedMs": 132,
-          "firstMutationMs": 59.09999999962747,
-          "firstPaintMs": 72.39999999850988
+          "completedMs": 134,
+          "firstMutationMs": 35.09999999962747,
+          "firstPaintMs": 48
+        },
+        {
+          "fixture": "reachable-wave-turn-51",
+          "session": 2,
+          "operation": "resource-panel",
+          "completedMs": 114,
+          "firstMutationMs": 61.5,
+          "firstPaintMs": 73.80000000074506
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "sheet-toggle",
-          "completedMs": 135,
-          "firstMutationMs": 54.399999998509884,
-          "firstPaintMs": 65.79999999888241
+          "completedMs": 136,
+          "firstMutationMs": 53.5,
+          "firstPaintMs": 65.5
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "sheet-toggle",
-          "completedMs": 247,
-          "firstMutationMs": 115.69999999925494,
-          "firstPaintMs": 129
+          "completedMs": 214,
+          "firstMutationMs": 64.30000000074506,
+          "firstPaintMs": 78.40000000037253
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "sheet-toggle",
-          "completedMs": 217,
-          "firstMutationMs": 136.5,
-          "firstPaintMs": 147
+          "completedMs": 351,
+          "firstMutationMs": 269.19999999925494,
+          "firstPaintMs": 280.2999999988824
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "end-turn",
-          "completedMs": 974,
-          "firstMutationMs": 1.099999999627471,
-          "firstPaintMs": 17.59999999962747
+          "completedMs": 997,
+          "firstMutationMs": 2,
+          "firstPaintMs": 16.100000001490116
         },
         {
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "pan",
-          "completedMs": 185,
+          "completedMs": 182,
           "firstMutationMs": null,
           "firstPaintMs": null
         },
@@ -13622,7 +13622,7 @@
           "fixture": "reachable-wave-turn-51",
           "session": 2,
           "operation": "pinch",
-          "completedMs": 348,
+          "completedMs": 349,
           "firstMutationMs": null,
           "firstPaintMs": null
         }
@@ -13631,11 +13631,11 @@
         "metrics": [
           {
             "name": "Timestamp",
-            "value": 10269.125263
+            "value": 11802.631024
           },
           {
             "name": "AudioHandlers",
-            "value": 12
+            "value": 24
           },
           {
             "name": "AudioWorkletProcessors",
@@ -13643,19 +13643,19 @@
           },
           {
             "name": "Documents",
-            "value": 5
+            "value": 11
           },
           {
             "name": "Frames",
-            "value": 6
+            "value": 14
           },
           {
             "name": "JSEventListeners",
-            "value": 793
+            "value": 1726
           },
           {
             "name": "LayoutObjects",
-            "value": 4469
+            "value": 8995
           },
           {
             "name": "MediaKeySessions",
@@ -13667,19 +13667,19 @@
           },
           {
             "name": "Nodes",
-            "value": 11434
+            "value": 24868
           },
           {
             "name": "Resources",
-            "value": 193
+            "value": 422
           },
           {
             "name": "ContextLifecycleStateObservers",
-            "value": 64
+            "value": 135
           },
           {
             "name": "V8PerContextDatas",
-            "value": 4
+            "value": 8
           },
           {
             "name": "WorkerGlobalScopes",
@@ -13695,7 +13695,7 @@
           },
           {
             "name": "ResourceFetchers",
-            "value": 5
+            "value": 11
           },
           {
             "name": "AdSubframes",
@@ -13707,59 +13707,59 @@
           },
           {
             "name": "ArrayBufferContents",
-            "value": 907
+            "value": 1834
           },
           {
             "name": "LayoutCount",
-            "value": 17
+            "value": 16
           },
           {
             "name": "RecalcStyleCount",
-            "value": 29
+            "value": 28
           },
           {
             "name": "LayoutDuration",
-            "value": 0.00488
+            "value": 0.004685
           },
           {
             "name": "RecalcStyleDuration",
-            "value": 0.003443
+            "value": 0.003231
           },
           {
             "name": "DevToolsCommandDuration",
-            "value": 0.060867
+            "value": 0.059017
           },
           {
             "name": "ScriptDuration",
-            "value": 1.895215
+            "value": 1.992836
           },
           {
             "name": "V8CompileDuration",
-            "value": 0.000452
+            "value": 0.000364
           },
           {
             "name": "TaskDuration",
-            "value": 2.053733
+            "value": 2.14622
           },
           {
             "name": "TaskOtherDuration",
-            "value": 0.088876
+            "value": 0.086087
           },
           {
             "name": "ThreadTime",
-            "value": 1.955424
+            "value": 2.043384
           },
           {
             "name": "ProcessTime",
-            "value": 1384.740049
+            "value": 94.789349
           },
           {
             "name": "JSHeapUsedSize",
-            "value": 142266924
+            "value": 251473388
           },
           {
             "name": "JSHeapTotalSize",
-            "value": 323637248
+            "value": 330391552
           },
           {
             "name": "FirstMeaningfulPaint",
@@ -13767,100 +13767,100 @@
           },
           {
             "name": "DomContentLoaded",
-            "value": 10267.109592
+            "value": 11800.56728
           },
           {
             "name": "NavigationStart",
-            "value": 10266.465615
+            "value": 11799.774178
           }
         ]
       },
       "errors": [],
       "cpuProfileSummary": {
-        "sampledDurationUs": 2587452,
+        "sampledDurationUs": 2794527,
         "selfTimeTop20Us": [
           [
             "(program)",
-            336356
+            506782
           ],
           [
             "(idle)",
-            331900
+            288847
           ],
           [
             "(anonymous)",
-            220752
+            258761
           ],
           [
             "Qt",
-            175308
-          ],
-          [
-            "batch",
-            120664
+            186402
           ],
           [
             "run",
-            114446
+            124869
+          ],
+          [
+            "batch",
+            109472
           ],
           [
             "ri",
-            95933
-          ],
-          [
-            "lp",
-            55414
+            98411
           ],
           [
             "f",
-            48086
+            59771
           ],
           [
-            "Nd",
-            40826
-          ],
-          [
-            "getProgramParameter",
-            39596
+            "lp",
+            55847
           ],
           [
             "(garbage collector)",
-            37432
-          ],
-          [
-            "Ep",
-            35845
+            49198
           ],
           [
             "l",
-            32550
+            41571
           ],
           [
-            "Na",
-            32035
-          ],
-          [
-            "Oo",
-            31187
+            "getProgramParameter",
+            40278
           ],
           [
             "J",
-            30625
+            36241
           ],
           [
-            "Ur",
-            29269
+            "Oo",
+            33899
+          ],
+          [
+            "Nd",
+            33189
           ],
           [
             "Fp",
-            27627
+            32478
           ],
           [
-            "d",
-            24946
+            "_n",
+            30782
+          ],
+          [
+            "Ga",
+            30724
+          ],
+          [
+            "Ep",
+            28706
+          ],
+          [
+            "Ur",
+            26477
           ]
         ],
-        "gcSelfTimeUs": 37432
+        "gcSelfTimeUs": 49198
       }
     }
   },
@@ -15450,6 +15450,18 @@
     "status": "保存済み · 最終保存Turn 2",
     "errors": []
   },
+  "crisisQueryUi": {
+    "summary": "Crisis0 重大 · 1 警告 · 0 注意›警告 1⚠Horde Waveが接近しています。",
+    "details": "Crisis0 重大 · 1 警告 · 0 注意⌄警告 1⚠Horde Waveが接近しています。",
+    "expectedAlerts": [
+      {
+        "id": "horde_warning_active:state",
+        "reasonCode": "horde_warning_active",
+        "severity": "warning"
+      }
+    ],
+    "confirmation": "End Turn確認このままEnd Turnすると、公開状態からCrisisまたは攻撃権のリスクが発生します。続行しますか？End Turnリスク未使用攻撃権Unit: 2無視して進行戻る"
+  },
   "browserBridgeLocal": {
     "url": "http://127.0.0.1:4173/",
     "appVersion": "1.5.2",
@@ -15628,6 +15640,7 @@
   "validation": {
     "unitFilesPassed": 58,
     "unitTestsPassed": 545,
+    "additionalQueryIntegrationTestsPassed": 2,
     "skippedOptInTests": 11,
     "typecheck": true,
     "productionBuild": true,
