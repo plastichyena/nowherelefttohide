@@ -1280,7 +1280,7 @@ export interface BoardLegendViewModel {
 
 const LEGEND_TERRAINS = ['plain', 'forest', 'mountain'] as const;
 const LEGEND_OVERLAYS = ['road', 'urban'] as const;
-const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const;
+const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
 const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'checkpoint'] as const;
 
 function legendAssetFromRegistry(
@@ -1307,8 +1307,6 @@ function legendAssetFromRegistry(
       ? { operational: 'checkpointOperational', abandoned: 'checkpointAbandoned', remnant: 'checkpointRemnant' }
       : category === 'horde'
         ? { periodic: 'horde', final: 'final' }
-        : category === 'unit'
-          ? { riotPolice: 'police', riotZombie: 'policeZombie' }
         : {};
   const candidateKey = aliases[key] ?? key;
   const candidate = categoryEntries?.[candidateKey];
@@ -1397,7 +1395,10 @@ function configLegendEntries(
     const unit = unknownRecord((config.units as unknown as UnknownRecord)[key]);
     if (Object.keys(unit).length === 0) continue;
     const attack = unit.attack ?? unit.recruitAttack ?? 0;
-    add(`unit.${key}`, unitLabel(key, locale), `${t('legendHp')} ${unit.hp ?? 0} · ${t('legendAttack')} ${attack} · ${t('legendMovement')} ${unit.movement ?? 0} · ${t('legendRange')} ${unit.range ?? 0} · ${t('legendVision')} ${unit.vision ?? 0} · ${t('legendPopulation')} ${unit.population ?? 0}`);
+    const attackCharges = typeof unit.maxAttackCharges === 'number'
+      ? String(Math.max(0, Math.trunc(unit.maxAttackCharges)))
+      : `${t('proficiency.recruit')} 1 / ${t('proficiency.regular')} 1 / ${t('proficiency.veteran')} ${config.unitExperience.veteranAttackCharges}`;
+    add(`unit.${key}`, unitLabel(key, locale), `${t('legendHp')} ${unit.hp ?? 0} · ${t('legendAttack')} ${attack} · ${t('legendMovement')} ${unit.movement ?? 0} · ${t('legendRange')} ${unit.range ?? 0} · ${t('legendVision')} ${unit.vision ?? 0} · ${t('legendPopulation')} ${unit.population ?? 0} · ${t('legendAttackCharges')} ${attackCharges}`);
   }
   for (const key of LEGEND_FACILITIES) {
     if (key === 'checkpoint') continue;
@@ -1423,7 +1424,7 @@ function configLegendEntries(
   add('maxActionsPerTurn', t('maxActionsPerTurn'), String(config.maxActionsPerTurn));
   add('hordeWarningLeadTurns', t('hordeWarningLeadTurns'), String(config.horde.warningLeadTurns));
   config.horde.waves.forEach((wave, index) => {
-    const composition = `${t('hordeZombie')} ${wave.compositionPerDirection.hordeZombie} / ${unitLabel('zombie', locale)} ${wave.compositionPerDirection.zombie}`;
+    const composition = hordeCompositionLabel(wave, locale, config);
     const waveKind = wave.final ? t('finalHorde') : t('periodicHorde');
     add(
       `hordeWave.${index + 1}`,
@@ -1431,6 +1432,14 @@ function configLegendEntries(
       `${waveKind} · ${t('spawnTurn')} ${wave.turn} · ${t('directionCount')} ${wave.directionCount} · ${t('composition')} ${composition}`,
     );
   });
+  const mixedSlotTypes = ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
+  const specialWeights = mixedSlotTypes
+    .map((key) => `${unitLabel(key, locale)} ${config.horde.specialZombieWeights[key]}`)
+    .join(' / ');
+  add('specialSlotWeights', t('legendSpecialSlotWeights'), specialWeights);
+  add('specialSlotCaps', t('legendSpecialSlotCaps'), `${unitLabel('riotZombie', locale)} ${config.horde.riotZombieCapPerDirection} · ${unitLabel('hunterZombie', locale)} ${config.horde.hunterZombieCapPerDirection}`);
+  add('initialHunterCount', t('legendInitialHunterCount'), `${config.economy.initialHunterCount.min}–${config.economy.initialHunterCount.max}`);
+  add('initialHunterDistance', t('legendInitialHunterDistance'), String(config.economy.initialHunterMinDistance));
   add('spawnReserve', t('spawnReserve'), `${t('spawnReserveTileCount')} 200 · ${t('spawnReserveReason')}`);
   add('initialSupplyRadius', t('initialSupplyRadius'), String(config.checkpoint.initialSupplyRadius));
   add('checkpointMaxPerDirection', t('checkpointMaxPerDirection'), String(config.checkpoint.maxPreparedPostsPerDirection));
@@ -1468,6 +1477,7 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
     hordeZombie: ['高HPでCapitalをStrategic TargetにするHorde中核。所属に応じたHorde Markerと併記します。', 'A high-HP Horde core that uses the Capital as a strategic target, shown with its Horde marker.'],
     policeZombie: ['Police由来の再活性化通常Zombie。Policeの外見を識別できますが、AIとScheduleは通常Zombieです。', 'A reanimated Police-derived normal Zombie. Its Police silhouette is identifiable, but its AI and schedule are normal Zombie behavior.'],
     soldierZombie: ['National Guard由来の再活性化通常Zombie。兵士の外見を識別できますが、Horde中核ではありません。', 'A reanimated National Guard-derived normal Zombie. Its soldier silhouette is identifiable, but it is not a Horde core.'],
+    hunterZombie: ['筋骨隆々で長い爪を持つ高速のNormal AI系Zombie。性能値は表示中のConfigを使用し、専用TargetやCapital常時知識は持ちません。', 'A fast Normal AI Zombie with a powerful build and long claws. Its performance comes from the current Config; it has no special target or permanent Capital knowledge.'],
     periodic: ['Horde ZombieとNormal Zombieが混在できる周期集団。MarkerはUnit Typeではなく所属を示します。', 'A periodic group that may mix Horde and Normal Zombies. Its marker shows membership, not Unit Type.'],
     final: ['Final Spawn Group所属を示すMarker。Normal Zombieも含め、Group全滅がVictory条件の一つです。', 'Marks Final Spawn Group membership. Every member, including Normal Zombies, must be defeated for Victory.'],
     capital: ['州都。人口の基点、編成、初期Supply、Capital Ground Visionを担います。', 'The capital anchors population, recruitment, initial Supply, and Capital Ground Vision.'],
@@ -1499,7 +1509,7 @@ function legendSections(
   const t = createTranslator(locale);
   const terrain = LEGEND_TERRAINS.map((key) => legendAssetEntry(registry, 'terrain', key, terrainLabel(key, locale), legendDescription(key, locale, t), key === 'plain' ? '◇' : key === 'forest' ? '♣' : '△'));
   const overlays = LEGEND_OVERLAYS.map((key) => legendAssetEntry(registry, 'overlay', key, key === 'road' ? t('roadOverlay') : t('urbanOverlay'), legendDescription(key, locale, t), key === 'road' ? '═' : '▦'));
-  const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'riotPolice' ? 'RP' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : key === 'soldierZombie' ? 'SZ' : 'RZ'));
+  const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'riotPolice' ? 'RP' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : key === 'soldierZombie' ? 'SZ' : key === 'riotZombie' ? 'RZ' : 'HZ'));
   const horde = (['periodic', 'final'] as const).map((key) => legendAssetEntry(registry, 'horde', key, key === 'periodic' ? t('periodicHorde') : t('finalHorde'), legendDescription(key, locale, t), key === 'periodic' ? '↝' : '✹'));
   const facilities = LEGEND_FACILITIES.map((key) => legendAssetEntry(registry, 'facility', key, key === 'checkpoint' ? t('checkpoint') : facilityLabel(key, locale), legendDescription(key, locale, t), key === 'capital' ? '★' : key === 'city' ? '⌂' : key === 'checkpoint' ? '⊞' : '▣'));
   const facilityStates = ['unowned', 'owned', 'stopped', 'infected', 'ruined'].map((key) => legendAssetEntry(registry, 'facilityState', key, t(key), legendDescription(key, locale, t), key === 'owned' ? '✓' : key === 'infected' ? '☣' : key === 'ruined' ? '×' : '•'));
@@ -1635,10 +1645,17 @@ type AgentNextWave = NonNullable<AgentObservation['horde']['nextWave']>;
 function hordeCompositionLabel(
   wave: GameConfig['horde']['waves'][number] | AgentNextWave | undefined,
   locale: Locale,
+  config?: Readonly<GameConfig>,
 ): string {
   if (!wave) return createTranslator(locale)('none');
   const t = createTranslator(locale);
-  return `${t('hordeZombie')} ${wave.compositionPerDirection.hordeZombie} / ${unitLabel('zombie', locale)} ${wave.compositionPerDirection.zombie}`;
+  const base = `${t('hordeZombie')} ${wave.compositionPerDirection.hordeZombie} / ${unitLabel('zombie', locale)} ${wave.compositionPerDirection.zombie}`;
+  if (!config) return base;
+  const mixedSlotTypes = ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
+  const possible = mixedSlotTypes
+    .map((key) => `${unitLabel(key, locale)} ${config.horde.specialZombieWeights[key]}`)
+    .join(' / ');
+  return `${base} · ${t('mixedSlotTypes')} ${possible}`;
 }
 
 function hordeWaveSpawnTurn(wave: GameConfig['horde']['waves'][number] | AgentNextWave | undefined): number | null {
@@ -1697,6 +1714,7 @@ function unitLabel(type: string, locale: Locale): string {
     policeZombie: ['警察ゾンビ', 'Police Zombie'],
     soldierZombie: ['兵士ゾンビ', 'Soldier Zombie'],
     riotZombie: ['暴動鎮圧ゾンビ', 'Riot Zombie'],
+    hunterZombie: ['ハンターゾンビ', 'Hunter Zombie'],
   };
   return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
 }
@@ -2297,7 +2315,7 @@ export class GameUiController {
     const t = this.translator();
     const defaults = createDefaultConfig();
     const schedule = defaults.horde.waves.map((wave, index) => {
-      const composition = `${t('hordeZombie')} ${wave.compositionPerDirection.hordeZombie} / ${unitLabel('zombie', this.locale)} ${wave.compositionPerDirection.zombie}`;
+      const composition = hordeCompositionLabel(wave, this.locale, defaults);
       return `<li><strong>${escapeHtml(t('wave'))} ${index + 1}</strong> · ${escapeHtml(t('spawnTurn'))} ${wave.turn} · ${escapeHtml(t('directionCount'))} ${wave.directionCount} · ${escapeHtml(composition)}${wave.final ? ` · ${escapeHtml(t('finalWave'))}` : ''}</li>`;
     }).join('');
     this.root.className = 'app-shell modal-screen';
@@ -2776,7 +2794,7 @@ export class GameUiController {
       ? warnedDirections.map((direction) => formatDirection(direction, this.locale)).join(' / ')
       : '—';
     const scheduledSpawnTurn = horde.spawnTurn ?? hordeWaveSpawnTurn(nextWave);
-    const composition = hordeCompositionLabel(nextWave, this.locale);
+    const composition = hordeCompositionLabel(nextWave, this.locale, this.state.config);
     const remainingTurns = warningType === 'none' && !finalHordeVisible && scheduledSpawnTurn !== null
       ? Math.max(0, scheduledSpawnTurn - this.state.turn)
       : horde.turnsRemaining;
@@ -4182,7 +4200,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipRiotPolice', 'tipProficiency', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipDecommission', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipCrisis', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipRiotPolice', 'tipHunterZombie', 'tipProficiency', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipDecommission', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipCrisis', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
@@ -4612,7 +4630,9 @@ export class GameUiController {
     const workerEditor = owned && !city
       ? `<section class="population-editor facility-editor" aria-labelledby="workers-heading"><h3 id="workers-heading">${escapeHtml(t('workers'))}</h3><p class="muted">${escapeHtml(t('assignWorkersHint'))}</p><label>${escapeHtml(t('workers'))}<output data-worker-output="true">${bounds.current}/${bounds.maximum}</output><input type="range" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" data-worker-control="true" data-worker-input="true" data-worker-slider="true" aria-label="${escapeHtml(t('workers'))}" /></label><input class="numeric-input" type="number" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" inputmode="numeric" aria-label="${escapeHtml(t('workers'))}" data-worker-control="true" data-worker-input="true" data-worker-number="true" /><p class="warning-text" data-worker-reason="true" ${workerReason ? '' : 'hidden'}>${workerReason ? escapeHtml(workerReason) : ''}</p><button class="secondary-button" data-action="assign-workers" ${workerAction && canOperatePopulation ? '' : 'disabled'}>${escapeHtml(t('assignWorkers'))}</button></section>`
       : '';
-    const recruitment = `<section class="recruitment-editor"><h3>${escapeHtml(t('population'))}</h3><p class="muted">${escapeHtml(city ? t('tipRecruitment') : t('recruitmentDisabled'))}</p><div class="action-row"><button class="secondary-button" data-action="produce-police">${escapeHtml(t('producePolice'))}</button><button class="secondary-button" data-action="produce-guard">${escapeHtml(t('produceGuard'))}</button><button class="secondary-button" data-action="produce-riot-police">${escapeHtml(t('produceRiotPolice'))} · P10/C25/M25</button></div><p class="warning-text" data-recruitment-reason="police" hidden></p><p class="warning-text" data-recruitment-reason="nationalGuard" hidden></p><p class="warning-text" data-recruitment-reason="riotPolice" hidden></p></section>`;
+    const riotConfig = this.state.config.units.riotPolice;
+    const riotRecruitmentCost = `P${riotConfig.population}/C${riotConfig.productionCivilianGoods}/M${riotConfig.productionMilitaryGoods}`;
+    const recruitment = `<section class="recruitment-editor"><h3>${escapeHtml(t('population'))}</h3><p class="muted">${escapeHtml(city ? t('tipRecruitment') : t('recruitmentDisabled'))}</p><div class="action-row"><button class="secondary-button" data-action="produce-police">${escapeHtml(t('producePolice'))}</button><button class="secondary-button" data-action="produce-guard">${escapeHtml(t('produceGuard'))}</button><button class="secondary-button" data-action="produce-riot-police">${escapeHtml(t('produceRiotPolice'))} · ${escapeHtml(riotRecruitmentCost)}</button></div><p class="warning-text" data-recruitment-reason="police" hidden></p><p class="warning-text" data-recruitment-reason="nationalGuard" hidden></p><p class="warning-text" data-recruitment-reason="riotPolice" hidden></p></section>`;
     const isDecommissionableType = facility.constructible && facility.type === 'civilianDroneBase';
     const decommissionRefund = Math.ceil(this.state.config.facilities.civilianDroneBase.buildCivilianGoods / 2);
     const decommissionAction: Extract<GameAction, { type: 'DecommissionConstructibleFacility' }> = {

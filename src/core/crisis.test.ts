@@ -6,7 +6,7 @@ import { createInitialState, createUnit } from './state';
 
 describe('v1.5.0 Core Crisis / EndTurn Risk projections', () => {
   it('is deterministic, public-only, and read-only for uncontained Capital infection', () => {
-    const state = createInitialState(15021, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = createInitialState(15021, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const capital = state.facilities.find((facility) => facility.type === 'capital')!;
     capital.infected = 3;
     capital.operationalStatus = 'infected';
@@ -27,7 +27,7 @@ describe('v1.5.0 Core Crisis / EndTurn Risk projections', () => {
   });
 
   it('lists public legal Attack Charges without changing EndTurn legality', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0 } });
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } });
     const engine = new GameEngine(15022, config);
     const state = engine.getState() as ReturnType<typeof createInitialState>;
     const police = state.units.find((unit) => unit.type === 'police')!;

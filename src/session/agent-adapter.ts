@@ -27,6 +27,7 @@ type SessionCapableAgentGame = AgentGame & {
 
 function adapt(game: SessionCapableAgentGame): SessionGameRuntime {
   return {
+    getApiInfo: () => game.getApiInfo(),
     getObservation: () => game.getObservation(),
     getLegalActions: () => game.getLegalActions(),
     // Session owns decisionSummary validation and persistence. GameEngine still

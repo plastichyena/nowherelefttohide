@@ -6,7 +6,7 @@ describe('Agent replay version boundaries', () => {
   it('accepts release-only App metadata changes and rejects missing App metadata', () => {
     const config = createDefaultConfig({
       maxActionsPerTurn: 4,
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { hordeZombie: { movement: 20, attack: 100 } },
       horde: {
         warningLeadTurns: 1,

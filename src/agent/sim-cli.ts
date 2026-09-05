@@ -1,3 +1,4 @@
+import { writeJsonStream } from './json-stream';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -67,7 +68,7 @@ export interface SimulationRunOptions {
 
 export interface SimulationReport {
   /** Mirrors the current public Artifact contract; reports are not replay inputs. */
-  schemaVersion: '6.0.0';
+  schemaVersion: '7.0.0';
   appVersion: string;
   artifactSchemaVersion: string;
   execution: {
@@ -88,6 +89,7 @@ export interface SimulationReport {
     code: string;
     message: string;
   }>;
+  limitReachedCount: number;
   technicalFailureCount: number;
   exitCode: 0 | 1;
   /** Internal hand-off for the writer; intentionally non-enumerable in JSON. */
@@ -315,7 +317,7 @@ function createSimulationReport(
     aggregate[agent] = aggregateMetrics(rows);
   }
   return {
-    schemaVersion: '6.0.0',
+    schemaVersion: '7.0.0',
     appVersion: APP_VERSION,
     artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
     execution: {
@@ -339,6 +341,7 @@ function createSimulationReport(
     aggregate,
     comparisons: compareMetricsBySeed(games, normalized.agents),
     failures,
+    limitReachedCount: games.filter((game) => game.outcome === 'limit_reached').length,
     technicalFailureCount: failures.length,
     exitCode: failures.length > 0 ? 1 : 0,
   };
@@ -348,7 +351,7 @@ export const runBatch = runSimulation;
 
 const CSV_COLUMNS: readonly string[] = [
   'appVersion', 'gameRulesVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion',
-  'buildId', 'mapId', 'agentId', 'agentVersion', 'strategy', 'seed', 'outcome', 'gameOverReason', 'finalTurn',
+  'buildId', 'mapId', 'agentId', 'agentVersion', 'strategy', 'seed', 'outcome', 'limitReached', 'gameOverReason', 'finalTurn',
   'totalAgentDecisions', 'acceptedActionCount', 'invalidAttemptCount', 'initialPopulation',
   'finalHealthyCivilianPopulation', 'maxPopulation', 'civilianLosses', 'infectionLosses',
   'resourceShortageLosses', 'refugeesAccepted', 'totalRefugeeArrivals', 'unmanagedPassThrough',
@@ -371,7 +374,7 @@ const CSV_COLUMNS: readonly string[] = [
   'regularPromotions.police', 'regularPromotions.nationalGuard', 'regularPromotions.riotPolice',
   'veteranPromotions.police', 'veteranPromotions.nationalGuard', 'veteranPromotions.riotPolice',
   'veteranZombieKills.police', 'veteranZombieKills.nationalGuard', 'veteranZombieKills.riotPolice',
-  'hordeSpecialSpawned.policeZombie', 'hordeSpecialSpawned.soldierZombie', 'hordeSpecialSpawned.riotZombie',
+  'hordeSpecialSpawned.policeZombie', 'hordeSpecialSpawned.soldierZombie', 'hordeSpecialSpawned.riotZombie', 'hordeSpecialSpawned.hunterZombie',
   'policeCombatRecoveryHp', 'policeCombatRecoveryCount', 'policeRestRecoveryHp', 'policeRestRecoveryCount',
   'nationalGuardCombatRecoveryHp', 'nationalGuardCombatRecoveryCount', 'nationalGuardRestRecoveryHp', 'nationalGuardRestRecoveryCount',
   'combatRecoverySelections', 'restRecoverySelections', 'maxWorkersInSingleFacility', 'maxTotalProductionWorkers',
@@ -386,7 +389,7 @@ const CSV_COLUMNS: readonly string[] = [
   'finalHordeZombiesSpawned', 'finalNormalZombiesSpawned',
   'normalZombiesKilled', 'hordeZombiesKilled',
   'policeZombiesSpawned', 'soldierZombiesSpawned', 'policeZombiesKilled', 'soldierZombiesKilled',
-  'policeZombiesFinal', 'soldierZombiesFinal', 'riotZombiesSpawned', 'riotZombiesKilled', 'riotZombiesFinal', 'riotPoliceReanimations',
+  'policeZombiesFinal', 'soldierZombiesFinal', 'riotZombiesSpawned', 'riotZombiesKilled', 'riotZombiesFinal', 'hunterZombiesSpawned', 'hunterZombiesKilled', 'hunterZombiesFinal', 'riotPoliceReanimations',
   'maxVisibleZombies', 'turnsAfterFinalHorde', 'suppliedAreaZombieClearTurn', 'suppliedAreaInfectionClearTurn', 'victoryTurn',
   'terrainEntriesByType.plain', 'terrainEntriesByType.forest', 'terrainEntriesByType.mountain', 'terrainEntriesByType.water',
   'urbanDefenseApplications', 'urbanDefenseDamagePrevented', 'forestDefenseApplications', 'forestDefenseDamagePrevented',
@@ -476,8 +479,8 @@ const CSV_COLUMNS: readonly string[] = [
     `hordeWave.${index}.hordeZombieSpawned`, `hordeWave.${index}.normalZombieSpawned`,
     `hordeWave.${index}.hordeZombieKilled`, `hordeWave.${index}.normalZombieKilled`,
     `hordeWave.${index}.nonHordeSlotCountPerDirection`,
-    `hordeWave.${index}.specialZombieSpawned.policeZombie`, `hordeWave.${index}.specialZombieSpawned.soldierZombie`, `hordeWave.${index}.specialZombieSpawned.riotZombie`,
-    `hordeWave.${index}.specialZombieKilled.policeZombie`, `hordeWave.${index}.specialZombieKilled.soldierZombie`, `hordeWave.${index}.specialZombieKilled.riotZombie`,
+    `hordeWave.${index}.specialZombieSpawned.policeZombie`, `hordeWave.${index}.specialZombieSpawned.soldierZombie`, `hordeWave.${index}.specialZombieSpawned.riotZombie`, `hordeWave.${index}.specialZombieSpawned.hunterZombie`,
+    `hordeWave.${index}.specialZombieKilled.policeZombie`, `hordeWave.${index}.specialZombieKilled.soldierZombie`, `hordeWave.${index}.specialZombieKilled.riotZombie`, `hordeWave.${index}.specialZombieKilled.hunterZombie`,
   ]),
   'hordeFinalWaveSpawnTotal', 'hordeFinalWaveKillTotal', 'hordeFinalDefeatedTurn',
   'hordeTurnsAfterFinal', 'hordeMultiFrontCheckpointLosses', 'hordeMultiFrontFallbacks',
@@ -499,7 +502,7 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
   for (const game of games) {
     const values: unknown[] = [
       game.appVersion, game.gameRulesVersion, game.agentApiVersion, game.observationApiVersion, game.bridgeApiVersion,
-      game.buildId, game.mapId, game.agentId, game.agentVersion, game.strategy, game.seed, game.outcome, game.gameOverReason, game.finalTurn,
+      game.buildId, game.mapId, game.agentId, game.agentVersion, game.strategy, game.seed, game.outcome, game.limitReached, game.gameOverReason, game.finalTurn,
       game.totalAgentDecisions, game.acceptedActionCount, game.invalidAttemptCount, game.initialPopulation,
       game.finalHealthyCivilianPopulation, game.maxPopulation, game.civilianLosses, game.infectionLosses,
       game.resourceShortageLosses, game.refugeesAccepted, game.totalRefugeeArrivals, game.unmanagedPassThrough,
@@ -527,7 +530,7 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
       game.regularPromotionsByType.police, game.regularPromotionsByType.nationalGuard, game.regularPromotionsByType.riotPolice,
       game.veteranPromotionsByType.police, game.veteranPromotionsByType.nationalGuard, game.veteranPromotionsByType.riotPolice,
       game.veteranZombieKillsByType.police, game.veteranZombieKillsByType.nationalGuard, game.veteranZombieKillsByType.riotPolice,
-      game.hordeSpecialSpawnedByType.policeZombie, game.hordeSpecialSpawnedByType.soldierZombie, game.hordeSpecialSpawnedByType.riotZombie,
+      game.hordeSpecialSpawnedByType.policeZombie, game.hordeSpecialSpawnedByType.soldierZombie, game.hordeSpecialSpawnedByType.riotZombie, game.hordeSpecialSpawnedByType.hunterZombie,
       game.policeCombatRecoveryHp, game.policeCombatRecoveryCount, game.policeRestRecoveryHp, game.policeRestRecoveryCount,
       game.nationalGuardCombatRecoveryHp, game.nationalGuardCombatRecoveryCount, game.nationalGuardRestRecoveryHp, game.nationalGuardRestRecoveryCount,
       game.combatRecoverySelections, game.restRecoverySelections, game.maxWorkersInSingleFacility, game.maxTotalProductionWorkers,
@@ -544,7 +547,7 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
        game.normalZombiesKilled, game.hordeZombiesKilled,
        game.policeZombiesSpawned, game.soldierZombiesSpawned, game.policeZombiesKilled, game.soldierZombiesKilled,
         game.policeZombiesFinal, game.soldierZombiesFinal,
-        game.riotZombiesSpawned, game.riotZombiesKilled, game.riotZombiesFinal, game.riotPoliceReanimations,
+        game.riotZombiesSpawned, game.riotZombiesKilled, game.riotZombiesFinal, game.hunterZombiesSpawned, game.hunterZombiesKilled, game.hunterZombiesFinal, game.riotPoliceReanimations,
        game.maxVisibleZombies, game.turnsAfterFinalHorde,
       game.suppliedAreaZombieClearTurn, game.suppliedAreaInfectionClearTurn, game.victoryTurn,
       game.terrainEntriesByType.plain, game.terrainEntriesByType.forest,
@@ -670,9 +673,11 @@ export function metricsToCsv(games: readonly GameMetrics[]): string {
             wave?.specialZombieSpawnedByType?.policeZombie ?? 0,
             wave?.specialZombieSpawnedByType?.soldierZombie ?? 0,
             wave?.specialZombieSpawnedByType?.riotZombie ?? 0,
+            wave?.specialZombieSpawnedByType?.hunterZombie ?? 0,
             wave?.specialZombieKilledByType?.policeZombie ?? 0,
             wave?.specialZombieKilledByType?.soldierZombie ?? 0,
             wave?.specialZombieKilledByType?.riotZombie ?? 0,
+            wave?.specialZombieKilledByType?.hunterZombie ?? 0,
          ];
        }),
        game.hordeFinalWaveSpawnTotal,
@@ -740,10 +745,10 @@ export function writeSimulationOutput(
     const path = join(artifactDirectory, artifactFileName(index, run));
     if (!options.overwrite && existsSync(path)) throw new Error(`Refusing to overwrite existing artifact: ${path}`);
     const artifact = fullRuns[index]!.artifact;
-    writeFileSync(path, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+    writeJsonStream(path, artifact);
     artifactPaths.push(path);
   }
-  writeFileSync(runJson, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  writeJsonStream(runJson, report);
   writeFileSync(gamesCsv, metricsToCsv(report.games), 'utf8');
   return { runJson, gamesCsv, artifacts: artifactPaths };
 }
@@ -766,10 +771,10 @@ export function writeSimulationRuns(
   for (const [index, run] of runs.entries()) {
     const path = join(artifactDirectory, artifactFileName(index, run.metrics));
     if (!options.overwrite && existsSync(path)) throw new Error(`Refusing to overwrite existing artifact: ${path}`);
-    writeFileSync(path, `${JSON.stringify(run.artifact, null, 2)}\n`, 'utf8');
+    writeJsonStream(path, run.artifact);
     artifactPaths.push(path);
   }
-  writeFileSync(runJson, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  writeJsonStream(runJson, report);
   writeFileSync(gamesCsv, metricsToCsv(report.games), 'utf8');
   return { runJson, gamesCsv, artifacts: artifactPaths };
 }
@@ -826,7 +831,7 @@ export function runSimulationToDirectory(
       if (!summaryOnly) {
         const path = join(artifactDirectory, artifactFileName(artifactIndex, run.metrics));
         if (!overwrite && existsSync(path)) throw new Error(`Refusing to overwrite existing artifact: ${path}`);
-        writeFileSync(path, `${JSON.stringify(run.artifact, null, 2)}\n`, 'utf8');
+        writeJsonStream(path, run.artifact);
         artifactPaths.push(path);
       }
       if (normalized.failFast && run.technicalFailure) break simulation;
@@ -834,7 +839,7 @@ export function runSimulationToDirectory(
   }
 
   const report = createSimulationReport(normalized, games, failures);
-  writeFileSync(runJson, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  writeJsonStream(runJson, report);
   writeFileSync(gamesCsv, metricsToCsv(report.games), 'utf8');
   return { report, paths: { runJson, gamesCsv, artifacts: artifactPaths } };
 }
@@ -877,7 +882,7 @@ export function runCli(argv: readonly string[] = process.argv.slice(2)): number 
     failFast: parsed.failFast,
     buildId: parsed.buildId,
   }, parsed.out, { overwrite: parsed.overwrite, summaryOnly: parsed.summaryOnly });
-  process.stdout.write(`${JSON.stringify({ output: resolve(parsed.out), games: report.games.length, technicalFailures: report.technicalFailureCount, exitCode: report.exitCode })}\n`);
+  process.stdout.write(`${JSON.stringify({ output: resolve(parsed.out), games: report.games.length, limitReached: report.limitReachedCount, technicalFailures: report.technicalFailureCount, exitCode: report.exitCode })}\n`);
   return report.exitCode;
 }
 

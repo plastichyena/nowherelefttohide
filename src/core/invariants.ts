@@ -228,6 +228,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     'policeZombiesFinal',
     'soldierZombiesFinal',
     'riotZombiesFinal',
+    'hunterZombiesFinal',
     'policeReanimations',
     'nationalGuardReanimations',
     'reanimationImmediateInfections',
@@ -242,7 +243,9 @@ export function validateInvariants(state: GameState): InvariantResult {
     'riotPoliceProduced',
     'riotPoliceLost',
     'riotZombiesSpawned',
+    'hunterZombiesSpawned',
     'riotZombiesKilled',
+    'hunterZombiesKilled',
     'riotPoliceReanimations',
     'hordeMovementNoisePulses',
   ] as const) {
@@ -284,7 +287,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.[unitType])) errors.push(`Statistic noisePulsesBySourceType.${unitType} must be a non-negative integer`);
   }
   if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.hordeZombie)) errors.push('Statistic noisePulsesBySourceType.hordeZombie must be a non-negative integer');
-  for (const unitType of ['policeZombie', 'soldierZombie', 'riotZombie'] as const) {
+  for (const unitType of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const) {
     if (!isNonNegativeInteger(state.statistics.hordeSpecialSpawnedByType?.[unitType])) errors.push(`Statistic hordeSpecialSpawnedByType.${unitType} must be a non-negative integer`);
     if (!isNonNegativeInteger(state.statistics.finalSpecialZombiesSpawnedByType?.[unitType])) errors.push(`Statistic finalSpecialZombiesSpawnedByType.${unitType} must be a non-negative integer`);
   }
@@ -423,7 +426,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       && (unit.currentMilitaryGoods !== 0 || unit.maxMilitaryGoods !== 0)) {
       errors.push(`Zombie unit ${unit.id} cannot store Military Goods`);
     }
-    if (!['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'].includes(unit.type)) {
+    if (!['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'].includes(unit.type)) {
       errors.push(`Unit ${unit.id} has an invalid type`);
     }
     const shouldBePlayerUnit = unit.type === 'police' || unit.type === 'nationalGuard' || unit.type === 'riotPolice';
@@ -460,7 +463,8 @@ export function validateInvariants(state: GameState): InvariantResult {
     } else if (unit.proficiency !== null || unit.recruitSurvivalTurns !== 0 || unit.regularZombieKills !== 0 || unit.veteranPromotionPending) {
       errors.push(`Zombie unit ${unit.id} cannot store proficiency`);
     }
-    if (unit.type === 'zombie' || unit.type === 'policeZombie' || unit.type === 'soldierZombie' || unit.type === 'riotZombie') {
+    if (!shouldBePlayerUnit && unit.maxAttackCharges !== state.config.units[unit.type as import('./types').ZombieUnitType]?.maxAttackCharges) errors.push(`Zombie unit ${unit.id} max attack charges do not match Config`);
+    if (unit.type === 'zombie' || unit.type === 'policeZombie' || unit.type === 'soldierZombie' || unit.type === 'riotZombie' || unit.type === 'hunterZombie') {
       const hasKind = ['periodic', 'final'].includes(unit.hordeKind ?? '');
       const hasGroup = typeof unit.spawnGroupId === 'string' && unit.spawnGroupId.length > 0;
       if (hasKind !== hasGroup) errors.push(`Normal-AI Zombie ${unit.id} must have both Horde kind and spawn group, or neither`);

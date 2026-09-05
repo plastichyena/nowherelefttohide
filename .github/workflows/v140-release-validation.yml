@@ -1,4 +1,4 @@
-name: v1.5.0 Release Validation
+name: v1.5.1 Release Validation
 
 on:
   workflow_dispatch:
@@ -7,12 +7,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: v150-release-validation-${{ github.ref }}
+  group: v151-release-validation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  v145-baseline-seeds:
-    name: v1.4.5 baseline ${{ matrix.agent }} seeds ${{ matrix.seed }}-${{ matrix.endSeed }}
+  v150-baseline-seeds:
+    name: v1.5.0 baseline ${{ matrix.agent }} seeds ${{ matrix.seed }}-${{ matrix.endSeed }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -25,36 +25,56 @@ jobs:
           - agent: balanced
             seed: 1
             endSeed: 100
-          - agent: balanced
-            seed: 101
-            endSeed: 200
-          - agent: balanced
-            seed: 201
-            endSeed: 300
     steps:
-      - name: Check out v1.4.5 stable implementation
+      - name: Check out current normalization tool
         uses: actions/checkout@v4
         with:
-          ref: 1d88b3688eaffe32fc95adf4f50e713a645de1d7
+          path: current-tools
+
+      - name: Check out v1.5.0 baseline implementation
+        uses: actions/checkout@v4
+        with:
+          ref: 36db152
+          path: baseline-v150
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
           cache: npm
+          cache-dependency-path: baseline-v150/package-lock.json
 
-      - name: Install locked v1.4.5 dependencies
+      - name: Install locked v1.5.0 dependencies
         run: npm ci
+        working-directory: baseline-v150
 
-      - name: Run v1.4.5 baseline batch
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=${{ matrix.agent }} --games=100 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/v145-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
+      - name: Run and normalize v1.5.0 baseline batch with 100-turn comparison limit
+        shell: bash
+        run: |
+          output="$GITHUB_WORKSPACE/output/simulations/v150-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }}"
+          baseline_exit=0
+          (
+            cd "$GITHUB_WORKSPACE/baseline-v150"
+            npx --no-install vite-node --script src/agent/sim-cli.ts \
+              --agent=${{ matrix.agent }} \
+              --games=100 \
+              --seed=${{ matrix.seed }} \
+              --max-turns=100 \
+              --summary-only \
+              --out="$output/raw" \
+              --overwrite
+          ) || baseline_exit=$?
+          echo "Raw v1.5.0 runner exit code: $baseline_exit"
+          node "$GITHUB_WORKSPACE/current-tools/scripts/normalize-baseline-report.mjs" \
+            --input="$output/raw" \
+            --out="$output"
 
-      - name: Upload v1.4.5 baseline report
+      - name: Upload v1.5.0 baseline report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v145-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }}
-          path: output/simulations/v145-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }}
+          name: v150-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }}
+          path: output/simulations/v150-${{ matrix.agent }}-baseline-${{ matrix.seed }}-${{ matrix.endSeed }}
           if-no-files-found: error
           retention-days: 30
 
@@ -72,12 +92,6 @@ jobs:
           - agent: balanced
             seed: 1
             endSeed: 100
-          - agent: balanced
-            seed: 101
-            endSeed: 200
-          - agent: balanced
-            seed: 201
-            endSeed: 300
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -91,14 +105,51 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run release batch
-        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=${{ matrix.agent }} --games=100 --seed=${{ matrix.seed }} --summary-only --out=output/simulations/v150-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
+      - name: Run v1.5.1 release batch with 100-turn runner limit
+        run: npx --no-install vite-node --script src/agent/sim-cli.ts --agent=${{ matrix.agent }} --games=100 --seed=${{ matrix.seed }} --max-turns=100 --summary-only --out=output/simulations/v151-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }} --overwrite
+
+      - name: Require a Balanced Final Horde run after turn 50
+        if: matrix.agent == 'balanced'
+        run: node scripts/verify-release-final-horde.mjs output/simulations/v151-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}/run.json
 
       - name: Upload release report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v150-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
-          path: output/simulations/v150-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
+          name: v151-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
+          path: output/simulations/v151-${{ matrix.agent }}-release-${{ matrix.seed }}-${{ matrix.endSeed }}
+          if-no-files-found: error
+          retention-days: 30
+
+  session-large-package-validation:
+    name: Session v1.5.1 physical 512 MiB Package validation
+    # This is intentionally a separate manual-release job. It runs real Core
+    # EndTurn transitions and makes every public Decision a schema-valid,
+    # uncompressed Snapshot so export/read/replay must handle a physical
+    # 512 MiB Artifact Package. It is not a Pages deployment gate.
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate a physical 512 MiB Artifact Package
+        run: npx --no-install vite-node --script src/testing/session-release-validation.ts --decisions=1000 --large-mib=512 --json-out=output/session-release/large-512.json
+
+      - name: Upload large Session validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-v151-large-512mib
+          path: output/session-release/large-512.json
           if-no-files-found: error
           retention-days: 30

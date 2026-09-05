@@ -59,7 +59,7 @@ export function deriveDevelopmentNoiseDebug(
       .map((tile) => ({ q: tile.q, r: tile.r })),
     affectedNormalZombieIds,
     noiseTargets: state.units
-      .filter((unit) => ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'].includes(unit.type))
+      .filter((unit) => ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'].includes(unit.type))
       .sort((left, right) => left.id.localeCompare(right.id))
       .map((unit) => ({ zombieId: unit.id, target: unit.noiseTarget ? { ...unit.noiseTarget } : null })),
   };

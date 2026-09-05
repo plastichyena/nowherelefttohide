@@ -13,6 +13,7 @@ const PUBLIC_METHODS = [
   'isGameOver',
   'getResult',
   'getRunArtifact',
+  'getArtifactPage',
 ] as const;
 
 function argumentValue(name: string): string | undefined {
@@ -100,20 +101,20 @@ function run(): void {
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
   for (const marker of [
-    '1.5.0', '3.0.0', '6.0.0', '7.0.0', 'fixed-51x51-v1', 'SetPowerSupply',
+    '1.5.1', '4.0.0', '7.0.0', '8.0.0', 'fixed-51x51-v1', 'SetPowerSupply',
     'BuildConstructibleFacility', 'DecommissionConstructibleFacility', 'TurnAwayCheckpointRefugees',
     'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',
     'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates',
     'constructibleFacilityPositionCandidates', 'strategicForecast', 'queuePressureClass',
     'crisisSummary', 'endTurnRisk', 'proficiency', 'attackChargesRemaining', 'maxAttackCharges',
-    'riotPolice', 'riotZombie', 'possibleNonHordeTypes', 'nonHordeSlotCountPerDirection',
+    'riotPolice', 'riotZombie', 'hunterZombie', 'possibleNonHordeTypes', 'nonHordeSlotCountPerDirection',
     'currentFuel', 'currentMilitaryGoods', 'maxMilitaryGoods', 'fixedMilitaryGoodsUpkeepPerTurn',
     'attackMilitaryGoodsCostByRange', 'suppressionMilitaryGoodsCost', 'projectedRefillAmountIfTurnEndsNow',
     'projectedMilitaryGoodsAfterFixedConsumption', 'projectedMilitaryGoodsAfterRefill',
     'projectedMilitaryGoodsAfterSuppression', 'emergencyMovementPoints', 'emergencyMovementAvailable',
     'movementMode', 'effectiveMovementCost', 'attackPreviews', 'projectedMilitaryGoodsAfterAttack',
     'effectiveAttack', 'projectedDamageBeforeTerrain', 'projectedDamageAfterTerrain', 'zombieTargetValue',
-    'noiseClass', 'artifactSchemaVersion', 'fixedMap', 'hordeSpawnReserve', 'playerOccupancyAllowed',
+    'noiseClass', 'artifactSchemaVersion', 'getArtifactPage', 'fixedMap', 'hordeSpawnReserve', 'playerOccupancyAllowed',
     'warningLeadTurns', 'waves', 'warningDirections', 'nextWaveIndex', 'compositionPerDirection',
     'screeningCapacity', 'powerModes', 'requiredPowerCapacity', 'standardOutputRule',
     'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression',
@@ -121,7 +122,7 @@ function run(): void {
     'hordeWaves', 'visionMode', 'terrainLosBlocking', 'site_zombies_spawned',
     'groundVisionBlockedHexes', 'infectedPopulationConvertedToZombies',
   ]) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.5.0 schema marker: ${marker}`);
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.5.1 schema marker: ${marker}`);
   }
   // Compatibility validation may legitimately retain the names of removed
   // fields so an old Config can be rejected with a useful reason. Only flag

@@ -71,8 +71,8 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.5.0 Save Format 10', () => {
-  it('round-trips a detached complete Save Format 10 GameState through code and JSON', () => {
+describe('v1.5.1 Save Format 11', () => {
+  it('round-trips a detached complete Save Format 11 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -80,7 +80,7 @@ describe('v1.5.0 Save Format 10', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 10,
+      formatVersion: 11,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-51x51-v1',
       seed: 77,
@@ -102,7 +102,7 @@ describe('v1.5.0 Save Format 10', () => {
       type: 'riotPolice' as const,
       hp: 75,
       maxHp: 75,
-      attack: 13,
+      attack: 12,
       movement: 10,
       range: 1,
       vision: 5,
@@ -139,15 +139,15 @@ describe('v1.5.0 Save Format 10', () => {
     expect(loaded.state?.pendingNoisePulses).toEqual(state.pendingNoisePulses);
   });
 
-  it('writes the v1.5.0 version boundaries and complete v1.5 Config / Statistics / Event state', () => {
+  it('writes the v1.5.1 version boundaries and complete v1.5.1 Config / Statistics / Event state', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(10);
-    expect(envelope.gameVersion).toBe('3.0.0');
-    expect(config.version).toBe('3.0.0');
+    expect(envelope.formatVersion).toBe(11);
+    expect(envelope.gameVersion).toBe('4.0.0');
+    expect(config.version).toBe('4.0.0');
     expect(config.mapId).toBe('fixed-51x51-v1');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
@@ -157,7 +157,11 @@ describe('v1.5.0 Save Format 10', () => {
     expect(config).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('finalHordeTurn');
     expect(config).toMatchObject({
-      economy: { initialZombieCount: 25 },
+      economy: {
+        initialZombieCount: 25,
+        initialHunterCount: { min: 1, max: 4 },
+        initialHunterMinDistance: 20,
+      },
       infection: {
         zombieSpawnPopulationPerUnit: 5,
         maxZombieSpawnPerResolution: 6,
@@ -173,18 +177,23 @@ describe('v1.5.0 Save Format 10', () => {
         veteranAttackCharges: 2,
       },
       horde: {
-        specialZombieWeights: { zombie: 70, policeZombie: 15, soldierZombie: 10, riotZombie: 5 },
+        specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5 },
         riotZombieCapPerDirection: 1,
+        hunterZombieCapPerDirection: 1,
         movementNoiseRadius: 8,
       },
       units: {
-        police: { recruitAttack: 4, noiseClass: 'medium', noiseRadius: 4 },
-        riotPolice: { hp: 75, recruitAttack: 10, reanimationUnitType: 'riotZombie', noiseRadius: 5 },
-        riotZombie: { hp: 50, attack: 5 },
+        police: { recruitAttack: 6, noiseClass: 'medium', noiseRadius: 4 },
+        riotPolice: { hp: 75, recruitAttack: 9, reanimationUnitType: 'riotZombie', noiseRadius: 5 },
+        riotZombie: { hp: 60, attack: 5 },
+        hunterZombie: { hp: 20, attack: 15, movement: 15, range: 1, vision: 5 },
       },
     });
     expect(state).toHaveProperty('pendingNoisePulses', []);
     expect((state.map as Record<string, unknown>).initialZombiePositions).toHaveLength(25);
+    expect(state).toHaveProperty('initialHunterPositions');
+    expect((state.initialHunterPositions as unknown[]).length).toBeGreaterThanOrEqual(1);
+    expect((state.initialHunterPositions as unknown[]).length).toBeLessThanOrEqual(4);
     expect(state.statistics).toMatchObject({
       initialNormalZombies: 25,
       noiseRespawnAttempts: 0,
@@ -193,6 +202,8 @@ describe('v1.5.0 Save Format 10', () => {
       civilianDroneBasesBuilt: 0,
       riotPoliceProduced: 0,
       riotZombiesSpawned: 0,
+      hunterZombiesSpawned: (state.initialHunterPositions as unknown[]).length,
+      hunterZombiesKilled: 0,
       hordeMovementNoisePulses: 0,
     });
   });
@@ -208,6 +219,7 @@ describe('v1.5.0 Save Format 10', () => {
     delete horde.warningDirections;
     delete horde.spawnGroupIdsByWave;
     delete map.hordeSpawnReserve;
+    delete state.initialHunterPositions;
     delete ((map.tiles as Array<Record<string, unknown>>)[0]!).playerOccupancyAllowed;
     delete (state.statistics as Record<string, unknown>).noiseRespawnAttempts;
     delete config.unitExperience;
@@ -218,7 +230,7 @@ describe('v1.5.0 Save Format 10', () => {
 
     const result = importSaveJson(JSON.stringify(resign(envelope)));
     expect(result.valid).toBe(false);
-    expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|hordeSpawnReserve|playerOccupancyAllowed|noiseRespawnAttempts|unitExperience|specialZombieWeights|pendingNoisePulses|proficiency|riotPoliceProduced/i);
+    expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|hordeSpawnReserve|playerOccupancyAllowed|initialHunterPositions|noiseRespawnAttempts|unitExperience|specialZombieWeights|pendingNoisePulses|proficiency|riotPoliceProduced/i);
   });
 
   it('requires current Checkpoint history, Rejected Refugee counters, and reanimation statistics', () => {
@@ -251,7 +263,7 @@ describe('v1.5.0 Save Format 10', () => {
 
   it('preserves terrain, Horde Zombie target state, Final Horde group, and Victory fields', () => {
     const config = createDefaultConfig({
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: {
         warningLeadTurns: 1,
         waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 1 }, final: true }],
@@ -390,7 +402,7 @@ describe('v1.5.0 Save Format 10', () => {
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Save Format 10', () => {
+  it('rejects a stale state/config version even when the envelope has Save Format 11', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     state.gameVersion = '2.4.0';
@@ -428,14 +440,14 @@ describe('v1.5.0 Save Format 10', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v10 autosave key and never rewrites or removes a v9 legacy key', () => {
+  it('uses the v11 autosave key and never rewrites or removes a v10 legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
-    legacy.formatVersion = 9;
-    legacy.gameVersion = '2.5.0';
+    legacy.formatVersion = 10;
+    legacy.gameVersion = '3.0.0';
     const legacyState = legacy.state as Record<string, unknown>;
-    legacyState.gameVersion = '2.5.0';
-    (legacyState.config as Record<string, unknown>).version = '2.5.0';
+    legacyState.gameVersion = '3.0.0';
+    (legacyState.config as Record<string, unknown>).version = '3.0.0';
     storage.setItem(LEGACY_AUTOSAVE_KEY, codeForEnvelope(legacy));
     const beforeLegacy = storage.getItem(LEGACY_AUTOSAVE_KEY);
     const store = new AutoSaveStore({ storage });

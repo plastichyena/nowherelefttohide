@@ -45,8 +45,8 @@ function siteEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.5.0');
-    expect(titleVersionLabel('en')).toContain('1.5.0');
+    expect(titleVersionLabel('ja')).toContain('1.5.1');
+    expect(titleVersionLabel('en')).toContain('1.5.1');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -167,26 +167,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.4.5-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.5.0-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.5以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.4.5');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.0以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.0');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.5 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.4.5');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.0 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.0');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 3.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 10');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 3.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 10');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 4.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 11');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 4.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 11');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.4.5以前' : 'v1.4.5 or earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0 or earlier');
     }
   });
 
@@ -379,7 +379,7 @@ describe('controller view models', () => {
     expect(localizeActionError('invalid_action_input', 'en')).toContain('legal action');
   });
 
-  it('localizes v1.4.5 refugee and decommission action errors', () => {
+  it('localizes v1.5.0 refugee and decommission action errors', () => {
     expect(localizeActionError('checkpoint_not_eligible_for_turn_away', 'ja')).toContain('Active');
     expect(localizeActionError('invalid_refugee_turn_away_count', 'en')).toContain('Waiting');
     expect(localizeActionError('facility_not_decommissionable', 'ja')).toContain('Civilian Drone Base');
@@ -509,7 +509,7 @@ describe('controller view models', () => {
       'tipMilitaryGoods', 'tipEmergencyMovement', 'carriedMilitaryGoods', 'emergencyMovement',
       'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'recoveryTiming', 'effectiveRange', 'projectedSuppression', 'powerRequirement', 'projectedPower', 'lastPowerSupplied', 'productionMultiplier', 'policyTradeoff', 'migratedSaveNotice', 'migrationSaveError',
       'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipDecommission',
-      'tipRiotPolice', 'tipProficiency', 'tipCrisis',
+      'tipRiotPolice', 'tipHunterZombie', 'tipProficiency', 'tipCrisis',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);
@@ -643,13 +643,28 @@ describe('controller view models', () => {
     expect(english).not.toContain('Industrial boost');
     expect(english).toContain('Mixed-Horde members');
     expect(english).toContain('HP 20');
+    expect(english).toContain('Hunter Zombie');
+    expect(english).toContain('Attack 15');
+    expect(english).toContain('Movement 15');
+    expect(english).toContain('Max Attack Charges 1');
     expect(english).toContain('Police Zombie');
     expect(english).toContain('Soldier Zombie');
+    expect(english).toContain('Special Slot weights');
+    expect(english).toContain('Zombie 70 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5');
+    expect(english).toContain('Special Slot caps');
+    expect(english).toContain('Riot Zombie 1 · Hunter Zombie 1');
+    expect(english).toContain('Initial Hunter count');
+    expect(english).toContain('1–4');
+    expect(english).toContain('Initial Hunter minimum Capital distance');
+    expect(english).toContain('unit.hunterZombie');
     expect(english).toContain('0 / 3 / 6 / 9 / 12 / 15');
     expect(english).toContain('unit.policeZombie');
     const registryLegend = renderBoardLegend(null, 'en', ASSET_REGISTRY);
     expect(registryLegend).toContain('/assets/board/terrain/terrain_plain.png');
     expect(registryLegend).toContain('/assets/board/units/unit_police_zombie.png');
     expect(registryLegend).toContain('/assets/board/units/unit_soldier_zombie.png');
+    expect(registryLegend).toContain('/assets/board/units/unit_riot_police.png');
+    expect(registryLegend).toContain('/assets/board/units/unit_riot_zombie.png');
+    expect(registryLegend).toContain('/assets/board/units/unit_hunter_zombie.png');
   });
 });

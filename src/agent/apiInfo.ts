@@ -16,7 +16,7 @@ import { cloneJson } from './action';
 
 const PUBLIC_METHODS = [
   'getApiInfo', 'reset', 'getObservation', 'getLegalActions', 'step',
-  'isGameOver', 'getResult', 'getRunArtifact',
+  'isGameOver', 'getResult', 'getRunArtifact', 'getArtifactPage',
 ] as const;
 
 const CHECKPOINT_REASON_CODES: Readonly<Record<string, string>> = Object.freeze({
@@ -93,6 +93,7 @@ export function createAgentApiInfo(
     buildId,
     methods: [...PUBLIC_METHODS],
     methodSchemas: {
+      getArtifactPage: { arguments: 'AgentArtifactPageOptions? { target?, offset?, pageSize? (1..500; default 100), expectedRevision? }', returns: 'AgentArtifactPage', description: 'Read a bounded public manifest, observations, actions, events or invalid-attempts page. Continue using nextOffset and expectedRevision; stale_revision rejects changed runs. No network or filesystem access.' },
       getApiInfo: { arguments: 'none', returns: 'AgentApiInfo', description: 'Returns versions, public methods, fair-play boundaries, and static rules.' },
       reset: { arguments: 'AgentResetOptions? { seed?, configOverrides?, agent?: { id } }', returns: 'AgentObservation', description: 'Replaces the in-memory Agent session.' },
       getObservation: { arguments: 'none', returns: `AgentObservation ${OBSERVATION_API_VERSION}`, description: 'Returns a deterministic JSON copy of current public information, including Ground/Aerial visibility, the last 50 important public site events, checkpoint candidates, Horde status, and Victory progress.' },
@@ -123,7 +124,7 @@ export function createAgentApiInfo(
       'Ground Vision uses deterministic hex-line LOS: Forest and Mountain are visible blockers and hide Hexes beyond them. Civilian Drone Base provides terrain-ignoring Aerial Vision.',
       'Public site events report infection onset, fall, requested/actual adjacent Spawn counts, remaining infected population, Noise outflow, and chain origin without hidden Zombie IDs or positions.',
       'importantSiteEvents repeats the latest 50 of those public site events in every Observation, including off-screen site coordinates and status facts.',
-      'The enemy list contains only currently visible Normal, Horde, Police, Soldier, and Riot Zombies; hidden enemies are omitted.',
+      'The enemy list contains only currently visible Normal, Horde, Police, Soldier, Riot, and Hunter Zombies; hidden enemies are omitted.',
       'Crisis Summary and EndTurn Risk are deterministic read-only projections of public State, Legal Actions, and Forecast; they never alter State or PRNG.',
       'Human Units expose recruit/regular/veteran proficiency, survival and kill counters, Veteran promotion pending state, and shared Attack Charges.',
       'Scheduled Horde special Zombie Types are not drawn until Spawn. Warning exposes only possible Types and non-Horde Slot count; actual visible members carry public Wave flags.',
@@ -143,6 +144,10 @@ export function createAgentApiInfo(
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
     rules: {
+      zombies: Object.fromEntries((['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const).map((type) => {
+        const { hp, attack, movement, range, vision, maxAttackCharges } = config.units[type];
+        return [type, { hp, attack, movement, range, vision, maxAttackCharges, ai: type === 'hordeZombie' ? 'horde' : 'normal' }];
+      })) as AgentApiInfo['rules']['zombies'],
       proficiency: {
         values: ['recruit', 'regular', 'veteran'],
         productionProficiencyByType: publicProductionProficiency,
@@ -151,7 +156,7 @@ export function createAgentApiInfo(
         regularAttackRounding: unitExperience.regularAttackRounding === 'floor' ? 'floor' : 'ceil',
         veteranZombieKillsRequired: getNumber(unitExperience, 'veteranZombieKillsRequired', 5),
         veteranAttackCharges: getNumber(unitExperience, 'veteranAttackCharges', 2),
-        killCreditTypes: ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as never,
+        killCreditTypes: ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as never,
       },
       crisis: {
         severityOrder: ['critical', 'warning', 'advisory'],
@@ -168,7 +173,7 @@ export function createAgentApiInfo(
       },
       riot: {
         police: {
-          recruitAttack: getNumber(riotPolice, 'recruitAttack', 10),
+          recruitAttack: getNumber(riotPolice, 'recruitAttack', 9),
           hp: getNumber(riotPolice, 'hp', 75),
           movement: getNumber(riotPolice, 'movement', 10),
           range: getNumber(riotPolice, 'range', 1),
@@ -176,7 +181,7 @@ export function createAgentApiInfo(
           population: getNumber(riotPolice, 'population', 10),
         },
         zombie: {
-          hp: getNumber(riotZombie, 'hp', 50),
+          hp: getNumber(riotZombie, 'hp', 60),
           attack: getNumber(riotZombie, 'attack', 5),
           movement: getNumber(riotZombie, 'movement', 3),
           range: getNumber(riotZombie, 'range', 1),
@@ -218,6 +223,7 @@ export function createAgentApiInfo(
         soldierZombie: { baseRange: getNumber(units.soldierZombie, 'range', 1) },
         riotPolice: { baseRange: getNumber(riotPolice, 'range', 1) },
         riotZombie: { baseRange: getNumber(riotZombie, 'range', 1) },
+        hunterZombie: { baseRange: config.units.hunterZombie.range },
       },
       terrain: {
         movementCost: cloneJson(config.terrain.movementCost),
@@ -259,6 +265,9 @@ export function createAgentApiInfo(
         playerOccupancyRule: 'playerOccupancyAllowed=false forbids Player Unit entry/traversal/stopping and Player placement; Zombie entry, attacks, and damage remain allowed',
       },
       horde: {
+        specialZombieWeights: cloneJson(config.horde.specialZombieWeights),
+        riotZombieCapPerDirection: config.horde.riotZombieCapPerDirection,
+        hunterZombieCapPerDirection: config.horde.hunterZombieCapPerDirection,
         warningLeadTurns: config.horde.warningLeadTurns,
         waves: config.horde.waves.map((wave, index) => {
           const waveRecord = wave as unknown as Record<string, unknown>;
@@ -270,7 +279,7 @@ export function createAgentApiInfo(
           );
           const possibleNonHordeTypes = Array.isArray(waveRecord.possibleNonHordeTypes)
             ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
-            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'].filter((type) => Object.prototype.hasOwnProperty.call(units, type));
+            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'].filter((type) => Object.prototype.hasOwnProperty.call(units, type));
           return {
             index: index + 1,
             turn: wave.turn,

@@ -5,6 +5,7 @@ import {
   FIXED_INITIAL_UNIT_POSITIONS,
   FIXED_MAP_ID,
   generateInitialZombiePositions,
+  generateInitialHunterPositions,
 } from './map';
 import { SeededRng } from './rng';
 import { getBranchSupplyRadius, isHexSupplied } from './supply';
@@ -24,7 +25,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '3.0.0';
+export const GAME_VERSION = '4.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -93,7 +94,8 @@ export function isZombieUnit(unit: Pick<UnitState, 'type'>): boolean {
     || unit.type === 'hordeZombie'
     || unit.type === 'policeZombie'
     || unit.type === 'soldierZombie'
-    || unit.type === 'riotZombie';
+    || unit.type === 'riotZombie'
+    || unit.type === 'hunterZombie';
 }
 
 export function effectiveAttackForProficiency(
@@ -131,7 +133,7 @@ export function createUnit(
     : (stats as GameConfig['units']['zombie']).attack;
   const maxAttackCharges = resolvedProficiency === 'veteran'
     ? state.config.unitExperience.veteranAttackCharges
-    : human ? 1 : 1;
+    : human ? 1 : (stats as GameConfig['units']['zombie']).maxAttackCharges;
   return {
     id,
     type,
@@ -428,6 +430,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   // canonical set even when a test Config requests fewer initial Zombies so
   // the map snapshot and replay contract remain stable.
   map.initialZombiePositions = generateInitialZombiePositions(map, rng);
+  const initialHunterPositions = generateInitialHunterPositions(map, rng, stateConfig.economy);
   let securedOrder = 0;
   const facilities = map.facilities.map((definition) =>
     facilityStateFromDefinition(
@@ -452,6 +455,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       hasBuiltCheckpoint: false,
     }));
   const state: GameState = {
+    initialHunterPositions,
     gameVersion: GAME_VERSION,
     config: stateConfig,
     seed,
@@ -497,6 +501,9 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       createUnit({ config: stateConfig }, 'national-guard-1', 'nationalGuard', { ...FIXED_INITIAL_UNIT_POSITIONS.nationalGuard }),
       ...map.initialZombiePositions.slice(0, stateConfig.economy.initialZombieCount).map((position, index) =>
         createUnit({ config: stateConfig }, `zombie-${index + 1}`, 'zombie', position),
+      ),
+      ...initialHunterPositions.map((position, index) =>
+        createUnit({ config: stateConfig }, `hunter-zombie-initial-${index + 1}`, 'hunterZombie', position),
       ),
     ],
     checkpoints: [],
@@ -627,6 +634,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       policeZombiesFinal: 0,
       soldierZombiesFinal: 0,
       riotZombiesFinal: 0,
+      hunterZombiesFinal: 0,
       policeReanimations: 0,
       nationalGuardReanimations: 0,
       reanimationImmediateInfections: 0,
@@ -645,10 +653,12 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       riotPoliceProduced: 0,
       riotPoliceLost: 0,
       riotZombiesSpawned: 0,
+      hunterZombiesSpawned: initialHunterPositions.length,
       riotZombiesKilled: 0,
+      hunterZombiesKilled: 0,
       riotPoliceReanimations: 0,
-      hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
-      finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
+      hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0 },
+      finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0 },
       noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, hordeZombie: 0 },
       hordeMovementNoisePulses: 0,
       hordeNoiseRespawnedByType: { zombie: 0, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },

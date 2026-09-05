@@ -5,10 +5,10 @@ import {
   validateGameConfig,
 } from './config';
 
-describe('v1.5.0 GameConfig', () => {
+describe('v1.5.1 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('3.0.0');
+    expect(DEFAULT_CONFIG.version).toBe('4.0.0');
     expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v1');
     expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(25);
     expect(DEFAULT_CONFIG.economy.initialResources).toMatchObject({
@@ -23,11 +23,11 @@ describe('v1.5.0 GameConfig', () => {
     expect(DEFAULT_CONFIG.facilities.simpleFarm.production).toMatchObject({ outputs: { food: 5 }, powerMode: 'none', powerCapacity: 0 });
     expect(DEFAULT_CONFIG.horde.warningLeadTurns).toBe(2);
     expect(DEFAULT_CONFIG.horde.waves).toEqual([
-      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 3 }, final: false },
-      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 5 }, final: false },
-      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, final: false },
-      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 7 }, final: false },
-      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 8 }, final: true },
+      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 3 }, final: false },
+      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 2, zombie: 5 }, final: false },
+      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, final: false },
+      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 3, zombie: 7 }, final: false },
+      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 5, zombie: 8 }, final: true },
     ]);
     expect(DEFAULT_CONFIG.terrain).toEqual({
       movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
@@ -63,12 +63,12 @@ describe('v1.5.0 GameConfig', () => {
       noiseRespawnEnabled: true,
     });
     expect(DEFAULT_CONFIG.vision).toEqual({ capital: 5, ownedFacility: 1, operationalCheckpoint: 1 });
-    expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, recruitAttack: 4, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 12, noiseClass: 'medium', noiseRadius: 4 });
-    expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, recruitAttack: 8, movement: 10, range: 2, population: 10, maxFuel: 22, noiseClass: 'large', noiseRadius: 8 });
-    expect(DEFAULT_CONFIG.units.riotPolice).toMatchObject({ hp: 75, recruitAttack: 10, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 12, noiseClass: 'medium', noiseRadius: 5 });
-    expect(DEFAULT_CONFIG.units.riotZombie).toMatchObject({ hp: 50, attack: 5, movement: 3, range: 1, vision: 5 });
+    expect(DEFAULT_CONFIG.units.police).toMatchObject({ hp: 25, recruitAttack: 6, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 12, noiseClass: 'medium', noiseRadius: 4 });
+    expect(DEFAULT_CONFIG.units.nationalGuard).toMatchObject({ hp: 50, recruitAttack: 12, movement: 10, range: 2, population: 10, maxFuel: 22, noiseClass: 'large', noiseRadius: 8 });
+    expect(DEFAULT_CONFIG.units.riotPolice).toMatchObject({ hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 12, noiseClass: 'medium', noiseRadius: 5 });
+    expect(DEFAULT_CONFIG.units.riotZombie).toMatchObject({ hp: 60, attack: 5, movement: 3, range: 1, vision: 5 });
     expect(DEFAULT_CONFIG.horde).toMatchObject({
-      specialZombieWeights: { zombie: 70, policeZombie: 15, soldierZombie: 10, riotZombie: 5 },
+      specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5 },
       riotZombieCapPerDirection: 1,
       movementNoiseRadius: 8,
     });
@@ -122,7 +122,7 @@ describe('v1.5.0 GameConfig', () => {
   });
 
   it('accepts zero initial Zombies but rejects more than the 25 fixed-map positions', () => {
-    expect(validateGameConfig(createDefaultConfig({ economy: { initialZombieCount: 0 } }))).toEqual({
+    expect(validateGameConfig(createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }))).toEqual({
       valid: true,
       errors: [],
     });

@@ -13,7 +13,7 @@ function reserveEngine(seed: number): GameEngine {
   return new GameEngine(seed, createDefaultConfig({
     horde: singleFinalWave(100),
     economy: {
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 10_000, civilianGoods: 10_000, militaryGoods: 10_000, fuel: 10_000 },
     },
   }));

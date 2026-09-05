@@ -6,21 +6,23 @@ import {
   FIXED_MAP_ID,
   FIXED_MAP_WIDTH,
   initialZombiePositionsMatchSeed,
+  initialHunterPositionsMatchSeed,
   validateFixedMap,
 } from '../core/map';
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.5.0 saves. */
+/** The sole game-rules version accepted by v1.5.1 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 10;
-/** v1.5.0 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v10';
+export const SAVE_FORMAT_VERSION = 11;
+/** v1.5.1 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v11';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v9';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v10';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v9',
   'nowhere-left-to-hide:auto-save:v8',
   'nowhere-left-to-hide:auto-save:v7',
   'nowhere-left-to-hide:auto-save:v6',
@@ -29,7 +31,7 @@ const OLDER_AUTOSAVE_KEYS = [
   'nowhere-left-to-hide:auto-save:v3',
   'nowhere-left-to-hide:auto-save:v2',
 ] as const;
-/** Deprecated metadata exports. They are never migration targets in v1.5.0. */
+/** Deprecated metadata exports. They are never migration targets in v1.5.1. */
 export const V125_GAME_VERSION = '1.2.0';
 export const V126_GAME_VERSION = '1.2.1';
 export const LEGACY_GAME_VERSION = V125_GAME_VERSION;
@@ -68,9 +70,9 @@ export interface StorageLike {
 export type SaveErrorListener = (message: string, error?: unknown) => void;
 
 const BASE_TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const;
-const UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const;
+const UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
 const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice'] as const;
-const ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const;
+const ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
 const FACILITY_TYPES = [
   'capital',
   'city',
@@ -258,6 +260,7 @@ const STATISTIC_INTEGER_FIELDS = [
   'policeZombiesFinal',
   'soldierZombiesFinal',
   'riotZombiesFinal',
+  'hunterZombiesFinal',
   'policeReanimations',
   'nationalGuardReanimations',
   'reanimationImmediateInfections',
@@ -272,7 +275,9 @@ const STATISTIC_INTEGER_FIELDS = [
   'riotPoliceProduced',
   'riotPoliceLost',
   'riotZombiesSpawned',
+  'hunterZombiesSpawned',
   'riotZombiesKilled',
+  'hunterZombiesKilled',
   'riotPoliceReanimations',
   'hordeMovementNoisePulses',
 ] as const;
@@ -318,6 +323,7 @@ const REQUIRED_STATE_FIELDS = [
   'map',
   'facilities',
   'population',
+  'initialHunterPositions',
   'cityPopulationSnapshot',
   'resources',
   'units',
@@ -493,7 +499,7 @@ function validateHordeConfigShape(value: unknown, finalHordeTurn: unknown, error
     errors.push('state.config.horde must be an object');
     return;
   }
-  requireFields(errors, value, 'state.config.horde', ['warningLeadTurns', 'waves', 'specialZombieWeights', 'riotZombieCapPerDirection', 'movementNoiseRadius']);
+  requireFields(errors, value, 'state.config.horde', ['warningLeadTurns', 'waves', 'specialZombieWeights', 'riotZombieCapPerDirection', 'hunterZombieCapPerDirection', 'movementNoiseRadius']);
   for (const retiredField of ['cycle', 'periodicInitial', 'periodicIncrement', 'warningStartTurn', 'spawnOnlyBeforeFinalTurn', 'finalComposition']) {
     if (hasOwn(value, retiredField)) errors.push(`state.config.horde.${retiredField} is obsolete; use horde.waves`);
   }
@@ -551,7 +557,7 @@ function hasCanonicalDirectionOrder(directions: unknown[]): boolean {
 }
 
 /**
- * Reject obsolete or partial pre-v1.5.0 container shapes before casting. The core
+ * Reject obsolete or partial pre-v1.5.1 container shapes before casting. The core
  * invariant checker performs relational validation; this guard makes the Wave
  * schedule, reserved map perimeter, and warning state an explicit save
  * boundary instead of silently accepting a partial snapshot.
@@ -610,7 +616,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     if (!isRecord(infection)) {
       errors.push('state.config.infection must be an object');
     } else {
-      // Save Format 10 deliberately has no conversion path for the old
+      // Save Format 11 deliberately has no conversion path for the old
       // fallback-capacity tuning. Reject a hand-edited v1.4.3-shaped
       // container even when its outer version strings were forged as current.
       for (const retiredField of ['fallBackCapacityRate', 'fallBackCapacityRounding']) {
@@ -1097,7 +1103,7 @@ function validateStateForSave(state: GameState): string[] {
     const mapResult = validateFixedMap(map as unknown as GameState['map']);
     if (!mapResult.valid) errors.push(...mapResult.errors.map((error) => `map: ${error}`));
     if (Number.isSafeInteger(raw.seed)
-      && !initialZombiePositionsMatchSeed(map as unknown as GameState['map'], raw.seed as number)) {
+      && (!initialZombiePositionsMatchSeed(map as unknown as GameState['map'], raw.seed as number) || !initialHunterPositionsMatchSeed(raw as unknown as GameState))) {
       errors.push('map: initial Zombie positions and order must match the deterministic state seed');
     }
   } catch (error) {
@@ -1157,14 +1163,14 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   return { valid: true, errors: [], state: clone(state), envelope };
 }
 
-/** Create a checksummed, URL-safe v1.5.0 Save Format 10 code. */
+/** Create a checksummed, URL-safe v1.5.1 Save Format 11 code. */
 export function encodeSaveCode(state: GameState): string {
   const errors = validateStateForSave(state);
   if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
   return toBase64Url(gzipSync(strToU8(canonicalJson(makeEnvelope(state))), { level: 9 }));
 }
 
-/** Decode and validate a v1.5.0 save code without changing caller-owned state. */
+/** Decode and validate a v1.5.1 save code without changing caller-owned state. */
 export function decodeSaveCode(code: string): SaveValidationResult {
   if (typeof code !== 'string' || code.trim().length === 0) return reject(['Save code is empty']);
   try {
@@ -1254,7 +1260,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the current v1.5.0/v10 key; legacy data is deliberately preserved. */
+  /** Clears only the current v1.5.1/v11 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

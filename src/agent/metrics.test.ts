@@ -43,7 +43,7 @@ describe('Agent Metrics', () => {
   it('collects required game-level values and deterministic action counts', () => {
     const config = createDefaultConfig({
       maxActionsPerTurn: 4,
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { hordeZombie: { movement: 20, attack: 100 } },
       horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 4, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
     });
@@ -54,7 +54,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('7.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('8.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -196,7 +196,7 @@ describe('Agent Metrics', () => {
   });
 
   it('classifies every Military Goods and Emergency Movement metric from public facts', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0 } });
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } });
     const observation = createAgentObservation(createInitialState(145, config));
     const policeForecast = observation.endTurnForecast.militaryGoods.units.find((unit) => unit.unitType === 'police')!;
     policeForecast.unfilledRefillDemand = 3;
@@ -271,7 +271,7 @@ describe('Agent Metrics', () => {
   it('aggregates averages, percentiles, outcomes, and action totals', () => {
     const config = createDefaultConfig({
       maxActionsPerTurn: 4,
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { hordeZombie: { movement: 20, attack: 100 } },
       horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 4, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
     });
@@ -290,10 +290,32 @@ describe('Agent Metrics', () => {
     const run = runAgentGame(3, {
       strategy: 'random',
       config,
-      limits: { maxTurns: 1, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 1 },
+      limits: { maxTurns: 100, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 1 },
     });
     expect(run.metrics.outcome).toBe('technical_failure');
+    expect(run.metrics.limitReached).toBe(false);
     expect(run.metrics.failure?.code).toBeTruthy();
     expect(run.metrics.gameOverReason).toBeNull();
+  });
+
+  it('keeps turn-limit rows separate from completed games and technical failures', () => {
+    const state = createInitialState(304, createDefaultConfig({ economy: { initialHunterCount: { min: 0, max: 0 } } }));
+    const observation = createAgentObservation(state);
+    const base = {
+      initialObservation: observation,
+      finalObservation: observation,
+      observations: [observation],
+      actions: [],
+      result: null,
+      agent: { id: 'metrics-test', version: '1' },
+      config: state.config,
+    } as const;
+    const limited = collectGameMetrics({ ...base, limitReached: true });
+    const technical = collectGameMetrics({ ...base, failure: { code: 'TEST_FAILURE', message: 'test' } });
+    const won = { ...limited, outcome: 'won' as const, limitReached: false, gameOverReason: 'stateSecured' };
+    const aggregate = aggregateMetrics([won, limited, technical]);
+    expect(limited).toMatchObject({ outcome: 'limit_reached', limitReached: true, gameOverReason: null });
+    expect(technical).toMatchObject({ outcome: 'technical_failure', limitReached: false });
+    expect(aggregate).toMatchObject({ executions: 3, completed: 1, wins: 1, losses: 0, limitReached: 1, technicalFailures: 1, winRate: 1 });
   });
 });

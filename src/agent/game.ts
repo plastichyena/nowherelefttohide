@@ -1,3 +1,4 @@
+import { ObservationHistory, metricObservation } from './history';
 import { assertValidGameConfig, cloneConfig, createDefaultConfig, DEFAULT_MAP_ID } from '../core/config';
 import { GameEngine, getCheckpointPositionCandidates, validateAction } from '../core/engine';
 import { hexKey } from '../core/hex';
@@ -23,6 +24,8 @@ import {
   type AgentResetOptions,
   type AgentRunArtifact,
   type AgentStepResult,
+  type AgentArtifactPage,
+  type AgentArtifactPageOptions,
 } from './types';
 import { collectGameMetrics } from './metrics';
 import { createAgentApiInfo } from './apiInfo';
@@ -362,9 +365,10 @@ export class AgentGameAdapter implements AgentGame {
   private config = createDefaultConfig();
   private agentId = 'external-agent';
   private acceptedActions: GameAction[] = [];
+  private resetGeneration = 0;
   private invalidAttempts: AgentRunArtifact['invalidAttempts'] = [];
   private initialObservation: AgentObservation | null = null;
-  private observations: AgentObservation[] = [];
+  private observations = new ObservationHistory();
   private events: AgentPublicEvent[] = [];
   /** State changes only through this Adapter, so this avoids duplicate Core enumeration. */
   private cachedLegalActions: GameAction[] | null = null;
@@ -390,7 +394,8 @@ export class AgentGameAdapter implements AgentGame {
     this.recordHistory = options.recordHistory ?? true;
     const observation = this.getObservation();
     this.initialObservation = cloneJson(observation);
-    this.observations = [cloneJson(observation)];
+    this.observations = new ObservationHistory();
+    this.observations.push(observation);
   }
 
   public getApiInfo() {
@@ -402,6 +407,7 @@ export class AgentGameAdapter implements AgentGame {
     const config = buildConfig(normalized.configOverrides);
     const next = new GameEngine(normalized.seed, config);
     this.engine = next;
+    this.resetGeneration += 1;
     this.seed = normalized.seed;
     this.config = cloneConfig(config);
     this.agentId = normalized.agent?.id ?? 'external-agent';
@@ -413,7 +419,8 @@ export class AgentGameAdapter implements AgentGame {
     this.cachedCheckpointPositionCandidates = null;
     const observation = this.getObservation();
     this.initialObservation = cloneJson(observation);
-    this.observations = [cloneJson(observation)];
+    this.observations = new ObservationHistory();
+    this.observations.push(observation);
     return observation;
   }
 
@@ -503,7 +510,7 @@ export class AgentGameAdapter implements AgentGame {
     const observation = this.currentObservation();
     const events = publicEvents(before, result.state, result.events);
     this.events.push(...events);
-    if (this.recordHistory) this.observations.push(cloneJson(observation));
+    if (this.recordHistory) this.observations.push(observation);
     return {
       observation: cloneJson(observation),
       events,
@@ -528,19 +535,19 @@ export class AgentGameAdapter implements AgentGame {
     const metrics = collectGameMetrics({
       initialObservation,
       finalObservation: observation,
-      observations: this.observations.length > 0 ? this.observations : [observation],
+      observations: this.observations.length > 0 ? this.observations.metricView() : [metricObservation(observation)],
       actions: this.acceptedActions,
       events: this.events,
       result: this.getResult(),
       invalidAttemptCount: this.invalidAttempts.length,
-      invalidAttempts: this.invalidAttempts,
+      invalidAttempts: cloneJson(this.invalidAttempts),
       totalAgentDecisions: this.acceptedActions.length + this.invalidAttempts.length,
       agent: { id: this.agentId, version: 'external' },
       config: this.config,
       buildId: this.buildId,
       seed: this.seed,
     });
-    return cloneJson({
+    return {
       artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION,
       appVersion: APP_VERSION,
       gameRulesVersion: observation.gameRulesVersion,
@@ -556,15 +563,50 @@ export class AgentGameAdapter implements AgentGame {
         branchId: branch.branchId,
         nextArrivalTurn: branch.nextArrivalTurn,
       })),
-      acceptedActions: this.acceptedActions,
-      invalidAttempts: this.invalidAttempts,
+      acceptedActions: cloneJson(this.acceptedActions),
+      invalidAttempts: cloneJson(this.invalidAttempts),
       decisionTrace: [],
       result: this.getResult(),
       fixedMap: cloneJson(initialObservation.map),
-      observationTrace: this.observations.map(compactArtifactObservation),
+      observationTrace: this.observations.compactView(),
       metrics: publicMetrics(metrics),
-      events: this.events,
-    });
+      events: cloneJson(this.events),
+    };
+  }
+
+  /** Bounded in-memory public export; no network, file, or private-state access. */
+  public getArtifactPage(options: AgentArtifactPageOptions = {}): AgentArtifactPage {
+    if (!options || typeof options !== 'object' || Array.isArray(options)
+      || Object.keys(options).some((key) => !['target', 'offset', 'pageSize', 'expectedRevision'].includes(key))) throw new Error('invalid_artifact_query');
+    const target = options.target ?? 'manifest';
+    const offset = options.offset ?? 0;
+    const pageSize = options.pageSize ?? 100;
+    const revision = `${this.resetGeneration}:${this.acceptedActions.length}:${this.invalidAttempts.length}`;
+    if (options.expectedRevision !== undefined && options.expectedRevision !== revision) throw new Error('stale_revision');
+    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500) throw new Error('invalid_pagination');
+    let items: unknown[];
+    let total: number;
+    if (target === 'manifest') {
+      const observation = this.currentObservation();
+      const manifest = { artifactSchemaVersion: ARTIFACT_SCHEMA_VERSION, appVersion: APP_VERSION,
+        gameRulesVersion: observation.gameRulesVersion, agentApiVersion: AGENT_API_VERSION,
+        observationApiVersion: OBSERVATION_API_VERSION, bridgeApiVersion: this.bridgeApiVersion,
+        buildId: this.buildId, seed: this.seed, mapId: observation.map.id,
+        config: createAgentPublicConfig(this.config), result: this.getResult(),
+        counts: { observations: this.observations.length, actions: this.acceptedActions.length,
+          events: this.events.length, invalidAttempts: this.invalidAttempts.length } };
+      total = 1; items = offset === 0 ? [manifest] : [];
+    } else if (target === 'observations') {
+      total = this.observations.length;
+      items = Array.from({ length: Math.max(0, Math.min(pageSize, total - offset)) }, (_, index) => this.observations.at(offset + index));
+    } else {
+      const source = target === 'actions' ? this.acceptedActions : target === 'events' ? this.events
+        : target === 'invalid-attempts' ? this.invalidAttempts : null;
+      if (!source) throw new Error('invalid_artifact_target');
+      total = source.length; items = cloneJson(source.slice(offset, offset + pageSize));
+    }
+    const hasMore = offset + items.length < total;
+    return { revision, target, count: items.length, total, hasMore, nextOffset: hasMore ? offset + items.length : null, items };
   }
 
   /**
@@ -603,7 +645,8 @@ export class AgentGameAdapter implements AgentGame {
     this.cachedCheckpointPositionCandidates = null;
     const observation = this.getObservation();
     this.initialObservation = cloneJson(observation);
-    this.observations = [cloneJson(observation)];
+    this.observations = new ObservationHistory();
+    this.observations.push(observation);
     return cloneJson(observation);
   }
 

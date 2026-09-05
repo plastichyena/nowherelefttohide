@@ -270,10 +270,12 @@ const FALLBACK_FACILITY_SYMBOL: Record<string, string> = {
 const FALLBACK_UNIT_SYMBOL: Record<string, string> = {
   police: 'P',
   nationalGuard: 'G',
+  riotPolice: 'RP',
   zombie: 'Z',
   hordeZombie: 'H',
   policeZombie: 'PZ',
   soldierZombie: 'SZ',
+  hunterZombie: 'HZ',
 };
 
 function sameHex(a: HexCoord, b: HexCoord): boolean {
@@ -398,6 +400,7 @@ function unitColor(unit: UnitState): number {
   if (unit.type === 'policeZombie') return 0x7f4f67;
   if (unit.type === 'soldierZombie') return 0x806b49;
   if ((unit.type as string) === 'riotZombie') return 0x8f5367;
+  if ((unit.type as string) === 'hunterZombie') return 0xd86c56;
   if ((unit.type as string) === 'riotPolice') return 0xc6a7d9;
   return unit.type === 'nationalGuard' ? 0xb6d8ff : 0x7fc7a0;
 }
@@ -1448,7 +1451,7 @@ export class HexBoardScene extends Phaser.Scene {
       const details = `${typeLabel}${proficiencyLabel ? ` (${proficiencyLabel})` : ''} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
       this.addLabel(`unit:${unit.id}:detail`, details, position.x, position.y + 23, '#f3f7f9', 8, true);
     } else if (isZombie && render.selectedZombieId === unit.id) {
-      const typeLabel = unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : t('zombie');
+      const typeLabel = unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : (unit.type as string) === 'hunterZombie' ? t('hunterZombie') : t('zombie');
       this.addLabel(`unit:${unit.id}:detail`, `${typeLabel} HP ${unit.hp}/${unit.maxHp}`, position.x, position.y + 23, '#f3f7f9', 8, true);
     }
     void t;
@@ -1588,7 +1591,7 @@ export class HexBoardScene extends Phaser.Scene {
   }
 
   private drawUnitSilhouette(graphics: Phaser.GameObjects.Graphics, center: { x: number; y: number }, unit: UnitState): void {
-    const radius = unit.type === 'hordeZombie' || unit.type === 'soldierZombie' || (unit.type as string) === 'riotZombie' || (unit.type as string) === 'riotPolice' ? 11 : 9;
+    const radius = unit.type === 'hordeZombie' || unit.type === 'soldierZombie' || (unit.type as string) === 'riotZombie' || (unit.type as string) === 'riotPolice' || (unit.type as string) === 'hunterZombie' ? 11 : 9;
     graphics.fillStyle(unitColor(unit), 0.95);
     graphics.lineStyle(unit.hordeKind === 'final' ? 3 : 2, unit.hordeKind === 'final' ? 0xffcf66 : 0x071019, 1);
     if ((unit.type as string) === 'riotZombie') {
@@ -1609,6 +1612,15 @@ export class HexBoardScene extends Phaser.Scene {
       graphics.fillTriangle(center.x, center.y - radius, center.x, center.y + radius - 6, center.x + radius, center.y + radius - 2);
       graphics.strokeTriangle(center.x, center.y - radius, center.x - radius, center.y + radius - 2, center.x, center.y + radius - 6);
       graphics.strokeTriangle(center.x, center.y - radius, center.x, center.y + radius - 6, center.x + radius, center.y + radius - 2);
+    } else if ((unit.type as string) === 'hunterZombie') {
+      // Hunter's forward-leaning silhouette and extended claws remain
+      // distinguishable at the minimum zoom when its PNG is unavailable.
+      graphics.fillTriangle(center.x + 2, center.y - radius, center.x - radius, center.y + radius - 1, center.x + radius, center.y + radius - 1);
+      graphics.strokeTriangle(center.x + 2, center.y - radius, center.x - radius, center.y + radius - 1, center.x + radius, center.y + radius - 1);
+      graphics.lineBetween(center.x - radius + 1, center.y + 2, center.x - radius - 5, center.y + 8);
+      graphics.lineBetween(center.x + radius - 1, center.y + 2, center.x + radius + 5, center.y + 8);
+      graphics.lineBetween(center.x - radius - 5, center.y + 8, center.x - radius - 2, center.y + 5);
+      graphics.lineBetween(center.x + radius + 5, center.y + 8, center.x + radius + 2, center.y + 5);
     } else if (isBoardZombieUnitType(unit.type)) {
       graphics.fillTriangle(center.x, center.y - radius, center.x - radius, center.y + radius, center.x + radius, center.y + radius);
       graphics.strokeTriangle(center.x, center.y - radius, center.x - radius, center.y + radius, center.x + radius, center.y + radius);

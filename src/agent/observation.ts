@@ -614,7 +614,7 @@ export function createAgentObservation(
   )));
   const possibleNonHordeTypes = Array.isArray(nextWaveRecord?.possibleNonHordeTypes)
     ? nextWaveRecord!.possibleNonHordeTypes.filter((value): value is UnitType => typeof value === 'string')
-    : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'].filter((value) => value in state.config.units) as UnitType[];
+    : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'].filter((value) => value in state.config.units) as UnitType[];
   // The schedule turn is public even before a warning starts. The selected
   // directions remain private until the warning event/observation is active.
   const publicSpawnTurn = nextWave?.turn ?? state.horde.lastSpawnTurn;

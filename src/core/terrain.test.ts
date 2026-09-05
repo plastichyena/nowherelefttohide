@@ -30,7 +30,7 @@ describe('v1.4 terrain defense', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const result = engine.step({ type: 'Attack', attackerId: police.id, targetId: zombie.id });
     expect(result.error).toBeNull();
-    expect(result.state.units.find((unit) => unit.id === zombie.id)?.hp).toBe(7);
+    expect(result.state.units.find((unit) => unit.id === zombie.id)?.hp).toBe(11);
     expect(result.state.statistics.forestDefenseApplications).toBe(1);
     expect(result.events.some((event) => event.type === 'terrain_defense_applied')).toBe(true);
   });

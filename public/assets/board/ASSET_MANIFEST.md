@@ -62,6 +62,11 @@ large shield motif so the two Riot types remain distinguishable from Police and
 Police Zombie at board scale. Their transparent source files are retained under
 `Art/reference/v1.5.0-unit-concepts/`; only the 256px derivatives are preloaded.
 
+The v1.5.1 Hunter Zombie uses a single hooded, forward-leaning athletic
+silhouette with unusually long claws so the Normal AI type remains identifiable
+at low Zoom. Its transparent source and generation record are retained under
+`Art/reference/v1.5.1-hunter-concept/`; only the 256px derivative is preloaded.
+
 ## Runtime files
 
 | File | Core type / UI state | Purpose |
@@ -90,6 +95,7 @@ Police Zombie at board scale. Their transparent source files are retained under
 | `units/unit_soldier_zombie.png` | `soldierZombie` | Approved reanimated soldier silhouette; normal Zombie AI |
 | `units/unit_riot_police.png` | `riotPolice` | Approved five-person Riot Police group; shield-focused suppression unit |
 | `units/unit_riot_zombie.png` | `riotZombie` | Approved three-person reanimated Riot group; normal Zombie AI |
+| `units/unit_hunter_zombie.png` | `hunterZombie` | v1.5.1 single Hunter Zombie; hooded athletic silhouette with long claws; normal Zombie AI |
 | `overlays/state_unsecured.png` | Unowned facility | Gray dashed perimeter |
 | `overlays/state_secured.png` | Player-owned facility | Teal perimeter |
 | `overlays/state_stopped.png` | Current `operationalStatus === stopped` | Pause bars; not used for forecast warnings |

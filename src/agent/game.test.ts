@@ -7,7 +7,7 @@ import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.5.0');
+    expect(APP_VERSION).toBe('1.5.1');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -48,7 +48,7 @@ describe('AgentGame public boundary', () => {
       typeof tile.playerOccupancyAllowed === 'boolean',
     )).toBe(true);
     expect(first.map.hordeSpawnReserve).toHaveLength(200);
-    expect(first.zombies.every((unit) => ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie'].includes(unit.type))).toBe(true);
+    expect(first.zombies.every((unit) => ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'].includes(unit.type))).toBe(true);
     // The fixed v1.5 initial Zombies are outside initial shared vision; only
     // visible enemies may enter the public Observation.
     expect(first.zombies).toHaveLength(0);
@@ -114,7 +114,7 @@ describe('AgentGame public boundary', () => {
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('10');
+    expect(info.saveFormatVersion).toBe('11');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -133,8 +133,8 @@ describe('AgentGame public boundary', () => {
     });
     expect(info.rules.crisis.reasonCodes).toHaveProperty('horde_warning_active');
     expect(info.rules.riot).toMatchObject({
-      police: { recruitAttack: 10, hp: 75, movement: 10, range: 1, vision: 5, population: 10 },
-      zombie: { hp: 50, attack: 5, movement: 3, range: 1, vision: 5 },
+      police: { recruitAttack: 9, hp: 75, movement: 10, range: 1, vision: 5, population: 10 },
+      zombie: { hp: 60, attack: 5, movement: 3, range: 1, vision: 5 },
       productionFacilities: ['capital', 'city'],
       productionCost: { population: 10, civilianGoods: 25, militaryGoods: 25 },
     });
@@ -166,11 +166,11 @@ describe('AgentGame public boundary', () => {
     expect(info.rules.map.hordeSpawnReserve).toHaveLength(200);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 50 });
     expect(info.rules.horde.waves).toEqual([
-      expect.objectContaining({ index: 1, turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 3 }, final: false }),
-      expect.objectContaining({ index: 2, turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 5 }, nonHordeSlotCountPerDirection: 5, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'], final: false }),
-      expect.objectContaining({ index: 3, turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'], final: false }),
-      expect.objectContaining({ index: 4, turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'], final: false }),
-      expect.objectContaining({ index: 5, turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 8 }, nonHordeSlotCountPerDirection: 8, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'], final: true }),
+      expect.objectContaining({ index: 1, turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 3 }, final: false }),
+      expect.objectContaining({ index: 2, turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 2, zombie: 5 }, nonHordeSlotCountPerDirection: 5, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'], final: false }),
+      expect.objectContaining({ index: 3, turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'], final: false }),
+      expect.objectContaining({ index: 4, turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 3, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'], final: false }),
+      expect.objectContaining({ index: 5, turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 5, zombie: 8 }, nonHordeSlotCountPerDirection: 8, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'], final: true }),
     ]);
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',
@@ -299,7 +299,7 @@ describe('AgentGame public boundary', () => {
           warningLeadTurns: 1,
           waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 3 }, final: true }],
         },
-        economy: { initialZombieCount: 0 },
+        economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
         units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       },
     });
@@ -331,7 +331,7 @@ describe('AgentGame public boundary', () => {
           warningLeadTurns: 1,
           waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 3 }, final: true }],
         },
-        economy: { initialZombieCount: 0 },
+        economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
         refugees: { arrivalIntervalMin: 1, arrivalIntervalMax: 1, arrivalPeopleMin: 1, arrivalPeopleMax: 1 },
         units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       },
@@ -381,7 +381,7 @@ describe('AgentGame public boundary', () => {
     game.reset({
       seed: 23,
       configOverrides: {
-        economy: { initialZombieCount: 0 },
+        economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
         refugees: { arrivalIntervalMin: 1, arrivalIntervalMax: 1, arrivalPeopleMin: 1, arrivalPeopleMax: 1 },
       },
     });
@@ -404,7 +404,7 @@ describe('AgentGame public boundary', () => {
 
   it('does not canonicalize a checkpoint action with the wrong branch', () => {
     const game = createAgentGame();
-    const before = game.reset({ seed: 12, configOverrides: { economy: { initialZombieCount: 0 } } });
+    const before = game.reset({ seed: 12, configOverrides: { economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const privateBefore = game.getDebugState();
     const legalBuild = game.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
     expect(legalBuild).toBeDefined();

@@ -27,7 +27,7 @@ function load(engine: GameEngine, snapshot: Snapshot): void {
 function noInitialZombies() {
   return createDefaultConfig({
     economy: {
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 5_000, civilianGoods: 5_000, militaryGoods: 5_000, fuel: 5_000 },
     },
     vision: { capital: 30 },
@@ -108,7 +108,7 @@ describe('v1.4.5 checkpoint and rejection rules', () => {
 
   it('adds ceil(rejected/5) normal Zombies on the participating front, resets it, and ends arrivals', () => {
     const config = createDefaultConfig({
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: singleFinalWave(1, { hordeZombie: 1, zombie: 0 }, 1),
     });
     const engine = new GameEngine(14403, config);

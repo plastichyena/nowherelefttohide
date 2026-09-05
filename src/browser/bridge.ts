@@ -13,6 +13,8 @@ import {
   type AgentObservation,
   type AgentResetOptions,
   type AgentStepResult,
+  type AgentArtifactPage,
+  type AgentArtifactPageOptions,
 } from '../agent/types';
 import type { GameAction, JsonValue } from '../core/types';
 
@@ -30,6 +32,7 @@ export interface BrowserBridgeApi {
   readonly isGameOver: () => boolean;
   readonly getResult: () => AgentGameResult | null;
   readonly getRunArtifact: () => BrowserBridgeArtifact;
+  readonly getArtifactPage: (options?: AgentArtifactPageOptions) => AgentArtifactPage;
 }
 
 /** Production artifact config: Noise classes are public; exact radii are not. */
@@ -269,6 +272,7 @@ function publicMetrics(
 export function createBrowserBridge(options: BrowserBridgeOptions = {}): BrowserBridgeApi {
   const game = createAgentGame({ buildId: resolveBuildId(options.buildId), bridgeApiVersion: BRIDGE_API_VERSION });
   let decision = 0;
+  let resetGeneration = 0;
   let invalidAttempts: BridgeInvalidAttempt[] = [];
 
   const getApiInfo = (): AgentApiInfo => cloneJson(game.getApiInfo());
@@ -280,6 +284,7 @@ export function createBrowserBridge(options: BrowserBridgeOptions = {}): Browser
       }
     }
     const observation = game.reset(input);
+    resetGeneration += 1;
     decision = 0;
     invalidAttempts = [];
     return cloneJson(observation);
@@ -307,11 +312,29 @@ export function createBrowserBridge(options: BrowserBridgeOptions = {}): Browser
     // list with the bridge-level chronological list so malformed boundary
     // inputs are visible too, without exposing GameState.
     const actions = artifact.acceptedActions ?? [];
-    return cloneJson({
+    return {
       ...artifact,
-      invalidAttempts,
+      invalidAttempts: cloneJson(invalidAttempts),
       metrics: artifact.metrics ? publicMetrics(artifact.metrics, actions.length, invalidAttempts.length) : undefined,
-    }) as BrowserBridgeArtifact;
+    } as BrowserBridgeArtifact;
+  };
+
+  const getArtifactPage = (input: AgentArtifactPageOptions = {}): AgentArtifactPage => {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || !isBoundedJson(input as unknown)) throw new Error('invalid_artifact_query');
+    const revision = `${resetGeneration}:${decision}`;
+    if (input.expectedRevision !== undefined && input.expectedRevision !== revision) throw new Error('stale_revision');
+    const page = { ...game.getArtifactPage({ ...input, expectedRevision: undefined }), revision };
+    if (page.target === 'invalid-attempts') {
+      const offset = input.offset ?? 0;
+      const items = cloneJson(invalidAttempts.slice(offset, offset + (input.pageSize ?? 100)));
+      const hasMore = offset + items.length < invalidAttempts.length;
+      return { ...page, count: items.length, total: invalidAttempts.length, items, hasMore, nextOffset: hasMore ? offset + items.length : null };
+    }
+    if (page.target === 'manifest' && page.items.length) {
+      const manifest = page.items[0] as { counts: { invalidAttempts: number } };
+      manifest.counts.invalidAttempts = invalidAttempts.length;
+    }
+    return page;
   };
 
   return Object.freeze({
@@ -323,6 +346,7 @@ export function createBrowserBridge(options: BrowserBridgeOptions = {}): Browser
     isGameOver,
     getResult,
     getRunArtifact,
+    getArtifactPage,
   });
 }
 

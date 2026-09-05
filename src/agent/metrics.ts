@@ -8,6 +8,7 @@ import type {
   ResourceType,
 } from '../core/types';
 import { hexDistance } from '../core/hex';
+import { lazyArray } from './history';
 import {
   APP_VERSION,
   AGENT_API_VERSION,
@@ -55,7 +56,7 @@ export const PRIORITY_GOALS = [
   'end_turn',
 ] as const;
 
-export type MetricOutcome = 'won' | 'lost' | 'technical_failure';
+export type MetricOutcome = 'won' | 'lost' | 'limit_reached' | 'technical_failure';
 
 export interface FacilityPowerMetric {
   requested: number;
@@ -74,12 +75,13 @@ export interface HordeWaveMetric {
     policeZombie?: number;
     soldierZombie?: number;
     riotZombie?: number;
+    hunterZombie?: number;
   };
   /** Publicly declared slot count; the per-slot draw remains hidden until Spawn. */
   nonHordeSlotCountPerDirection?: number;
   possibleNonHordeTypes?: string[];
-  specialZombieSpawnedByType?: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
-  specialZombieKilledByType?: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  specialZombieSpawnedByType?: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
+  specialZombieKilledByType?: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
   final: boolean;
   hordeZombieSpawned: number;
   normalZombieSpawned: number;
@@ -106,6 +108,8 @@ export interface GameMetrics {
   seed: number;
   config: GameConfig;
   outcome: MetricOutcome;
+  /** True when the runner stopped at maxTurns before Game Over. */
+  limitReached: boolean;
   gameOverReason: string | null;
   finalTurn: number;
   totalAgentDecisions: number;
@@ -218,8 +222,11 @@ export interface GameMetrics {
   policeZombiesFinal: number;
   soldierZombiesFinal: number;
   riotZombiesSpawned: number;
+  hunterZombiesSpawned: number;
   riotZombiesKilled: number;
+  hunterZombiesKilled: number;
   riotZombiesFinal: number;
+  hunterZombiesFinal: number;
   riotPoliceReanimations: number;
   maxVisibleZombies: number;
   turnsAfterFinalHorde: number;
@@ -243,7 +250,7 @@ export interface GameMetrics {
   regularPromotionsByType: Record<HumanUnitType, number>;
   veteranPromotionsByType: Record<HumanUnitType, number>;
   veteranZombieKillsByType: Record<HumanUnitType, number>;
-  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
   noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie', number>;
   hordeMovementNoisePulses: number;
   hordeNoiseRespawnedByType: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
@@ -408,6 +415,8 @@ export interface GameMetricsInput {
   buildId?: string;
   seed?: number;
   failure?: MetricFailureInfo | null;
+  /** Runner-owned neutral stop; mutually exclusive with failure. */
+  limitReached?: boolean;
   appVersion?: string;
   gameRulesVersion?: string;
   agentApiVersion?: string;
@@ -486,8 +495,8 @@ const FACILITY_TYPES: readonly string[] = [
   'powerPlant', 'windPowerPlant', 'civilianDroneBase', 'simpleFarm',
 ];
 const HUMAN_UNIT_TYPES: readonly HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice'];
-const SPECIAL_ZOMBIE_TYPES = ['policeZombie', 'soldierZombie', 'riotZombie'] as const;
-const ZOMBIE_TYPES = ['zombie', ...SPECIAL_ZOMBIE_TYPES] as const;
+const SPECIAL_ZOMBIE_TYPES = ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
+const ZOMBIE_TYPES = ['zombie', 'hordeZombie', ...SPECIAL_ZOMBIE_TYPES] as const;
 
 function isHumanUnitType(value: unknown): value is HumanUnitType {
   return typeof value === 'string' && HUMAN_UNIT_TYPES.includes(value as HumanUnitType);
@@ -705,6 +714,11 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     (event) => (event.type === 'human_unit_reanimated' && event.payload.zombieUnitType === 'riotZombie')
       || (event.type === 'horde_spawned' && event.payload.unitType === 'riotZombie'),
   ).length;
+  const hunterZombiesKilled = statisticNumber(statistics, 'hunterZombiesKilled') ?? events.filter(
+    (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'hunterZombie',
+  ).length;
+  const hunterZombiesSpawned = statisticNumber(statistics, 'hunterZombiesSpawned') ?? 0;
+  const hunterZombiesFinal = statisticNumber(statistics, 'hunterZombiesFinal') ?? Math.max(0, hunterZombiesSpawned - hunterZombiesKilled);
   const finalHordeSpawned = statisticNumber(statistics, 'finalHordeSpawned') ?? events
     .filter((event) => event.type === 'horde_spawned' && event.payload.hordeKind === 'final')
     .reduce((total, event) => total + eventPayloadNumber(event, 'count'), 0);
@@ -718,8 +732,12 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const maxAdditionalFood = Math.max(...observations.map((observation) => numberOrZero(observation.endTurnForecast.overcrowding.additionalFood)), 0);
   const maxAdditionalCivilianGoods = Math.max(...observations.map((observation) => numberOrZero(observation.endTurnForecast.overcrowding.additionalCivilianGoods)), 0);
   const maxPopulation = Math.max(statisticNumber(statistics, 'maxPopulation') ?? 0, maxPopulationObservation);
-  const turnObservations = [...new Map(observations.map((observation) => [observation.turn, observation])).values()]
-    .sort((left, right) => left.turn - right.turn);
+  // Retain only indices: a compressed/lazy history must not expand into one
+  // full Observation per turn just to choose the last sample of each turn.
+  const lastIndexByTurn = new Map<number, number>();
+  for (let index = 0; index < observations.length; index += 1) lastIndexByTurn.set(observations[index]!.turn, index);
+  const turnIndices = [...lastIndexByTurn].sort(([left], [right]) => left - right).map(([, index]) => index);
+  const turnObservations = lazyArray(turnIndices.length, (index) => observations[turnIndices[index]!]!);
   const finalHordeDefeated = statisticBoolean(statistics, 'finalHordeDefeated')
     ?? finalObservation.victory.finalHordeDefeated;
   const maxVisibleZombies = Math.max(
@@ -854,10 +872,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const noiseSiteZombieSpawns = siteResolutionEvents
     .filter((event) => event.type === 'site_noise_respawn')
     .reduce((total, event) => total + eventPayloadNumber(event, 'actualSpawnCount'), 0);
-  const productionFacilities = observations.flatMap((observation) => observation.facilities.filter(
-    (facility) => facility.type !== 'capital' && facility.type !== 'city',
-  ));
-  const maxWorkersInSingleFacility = Math.max(...productionFacilities.map((facility) => facility.healthyPopulation), 0);
+  let maxWorkersInSingleFacility = 0;
+  for (const observation of observations) for (const facility of observation.facilities) {
+    if (facility.type !== 'capital' && facility.type !== 'city') maxWorkersInSingleFacility = Math.max(maxWorkersInSingleFacility, facility.healthyPopulation);
+  }
   const maxTotalProductionWorkers = Math.max(...turnObservations.map((observation) => observation.facilities
     .filter((facility) => facility.type !== 'capital' && facility.type !== 'city')
     .reduce((total, facility) => total + facility.healthyPopulation, 0)), 0);
@@ -867,7 +885,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const powerPlantStoppedTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
     (facility) => facility.type === 'powerPlant' && facility.owner === 'player' && facility.healthyPopulation > 0 && facility.production.stoppedReason !== null,
   ).length, 0);
-  const powerShortageTurns = turnObservations.filter((observation) => observation.endTurnForecast.electricity.shortage > 0).length;
+  const powerShortageTurns = turnObservations.reduce((total, observation) => total + (observation.endTurnForecast.electricity.shortage > 0 ? 1 : 0), 0);
   const poweredIndustrialFacilityTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
     (facility) => ['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type) && facility.production.projectedPowerSupplied,
   ).length, 0);
@@ -1123,7 +1141,8 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       emergencyMovementHexesByType[unitType] += eventPayloadNumber(event, 'hexesMoved');
       emergencyMovementPointsByType[unitType] += eventPayloadNumber(event, 'effectiveMovementCost');
       const destinationKey = `${String(event.payload.q)},${String(event.payload.r)}`;
-      const observationAtTurn = [...observations].reverse().find((observation) => observation.turn === event.turn);
+      const indexAtTurn = lastIndexByTurn.get(event.turn);
+      const observationAtTurn = indexAtTurn === undefined ? undefined : observations[indexAtTurn];
       if (observationAtTurn?.supply.suppliedTileKeys.includes(destinationKey)) emergencyReturnsToSupplyByType[unitType] += 1;
     }
   }
@@ -1271,13 +1290,13 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   );
   const specialRecordFromStatistics = (
     key: string,
-  ): Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number> => {
+  ): Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number> => {
     const source = numericRecord(isRecord(statistics) ? statistics[key] : undefined);
     return Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [type, source[type] ?? 0])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
   };
   const specialRecordFromEvents = (
     predicate: (event: AgentPublicEvent) => boolean,
-  ): Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number> => {
+  ): Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number> => {
     const result = Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [type, 0])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
     for (const event of events) {
       if (!predicate(event)) continue;
@@ -1335,6 +1354,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       zombie: numberOrZero(composition.zombie),
       ...(numberOrZero(composition.policeZombie) > 0 ? { policeZombie: numberOrZero(composition.policeZombie) } : {}),
       ...(numberOrZero(composition.soldierZombie) > 0 ? { soldierZombie: numberOrZero(composition.soldierZombie) } : {}),
+      ...(numberOrZero(composition.hunterZombie) > 0 ? { hunterZombie: numberOrZero(composition.hunterZombie) } : {}),
       ...(numberOrZero(composition.riotZombie) > 0 ? { riotZombie: numberOrZero(composition.riotZombie) } : {}),
     };
     const eventUnits = Array.isArray(event?.payload.units) ? event?.payload.units : [];
@@ -1408,11 +1428,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       + specialZombieTotal(finalWaveMetric.specialZombieKilledByType)
     : finalHordeKilled;
   const hordeFinalDefeatedTurn = firstTurnWhere(turnObservations, (observation) => observation.victory.finalHordeDefeated);
-  const multiFrontTurns = new Set(
-    turnObservations
-      .filter((observation) => observation.horde.warningDirections.length > 1 || (observation.horde.nextWave?.directionCount ?? 0) > 1)
-      .map((observation) => observation.turn),
-  );
+  const multiFrontTurns = new Set<number>();
+  for (const observation of turnObservations) {
+    if (observation.horde.warningDirections.length > 1 || (observation.horde.nextWave?.directionCount ?? 0) > 1) multiFrontTurns.add(observation.turn);
+  }
   const hordeMultiFrontCheckpointLosses = events.filter((event) =>
     (event.type === 'checkpoint_removed' || event.type === 'facility_overrun')
     && multiFrontTurns.has(event.turn),
@@ -1442,8 +1461,13 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     );
     return total + (suppressed ? 0 : 1);
   }, 0);
-  const outcome: MetricOutcome = input.failure ? 'technical_failure' : input.result?.outcome ?? 'technical_failure';
-  const gameOverReason = input.failure ? null : input.result?.reason ?? null;
+  const outcome: MetricOutcome = input.failure
+    ? 'technical_failure'
+    : input.limitReached
+      ? 'limit_reached'
+      : input.result?.outcome ?? 'technical_failure';
+  const limitReached = outcome === 'limit_reached';
+  const gameOverReason = input.failure || limitReached ? null : input.result?.reason ?? null;
 
   return {
     appVersion: input.appVersion ?? APP_VERSION,
@@ -1459,6 +1483,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     seed: input.seed ?? 0,
     config: cloneConfig(input.config),
     outcome,
+    limitReached,
     gameOverReason,
     finalTurn: numberOrZero(finalObservation.turn),
     totalAgentDecisions: input.totalAgentDecisions ?? input.actions.length + numberOrZero(input.invalidAttemptCount),
@@ -1556,7 +1581,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     unitLosses: statisticNumber(statistics, 'unitLosses') ?? 0,
     zombiesKilled: statisticNumber(statistics, 'normalZombiesKilled') === null && statisticNumber(statistics, 'hordeZombiesKilled') === null
       ? destroyedZombieEvents
-      : normalZombiesKilled + hordeZombiesKilled + policeZombiesKilled + soldierZombiesKilled,
+      : normalZombiesKilled + hordeZombiesKilled + policeZombiesKilled + soldierZombiesKilled + riotZombiesKilled + hunterZombiesKilled,
     hordeInterceptions: statisticNumber(statistics, 'hordeInterceptions') ?? 0,
     finalHordeSpawned,
     finalHordeKilled,
@@ -1576,6 +1601,9 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     riotZombiesSpawned,
     riotZombiesKilled,
     riotZombiesFinal,
+    hunterZombiesKilled,
+    hunterZombiesSpawned,
+    hunterZombiesFinal,
     riotPoliceReanimations: statisticNumber(statistics, 'riotPoliceReanimations') ?? events.filter(
       (event) => event.type === 'human_unit_reanimated' && event.payload.humanUnitType === 'riotPolice',
     ).length,
@@ -1775,6 +1803,7 @@ export interface NumericSummary {
 export interface AgentMetricsSummary {
   executions: number;
   completed: number;
+  limitReached: number;
   technicalFailures: number;
   wins: number;
   losses: number;
@@ -1792,12 +1821,14 @@ export interface SeedComparison {
     finalTurn: number;
     acceptedActionCount: number;
     technicalFailure: boolean;
+    limitReached: boolean;
   }>;
 }
 
 export interface MetricsAggregation {
   executions: number;
   completed: number;
+  limitReached: number;
   technicalFailures: number;
   wins: number;
   losses: number;
@@ -1913,8 +1944,11 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'policeZombiesFinal',
   'soldierZombiesFinal',
   'riotZombiesSpawned',
+  'hunterZombiesSpawned',
   'riotZombiesKilled',
+  'hunterZombiesKilled',
   'riotZombiesFinal',
+  'hunterZombiesFinal',
   'riotPoliceReanimations',
   'maxVisibleZombies',
   'turnsAfterFinalHorde',
@@ -2061,12 +2095,15 @@ export function aggregateMetrics(games: readonly GameMetrics[]): MetricsAggregat
   for (const key of SUMMARY_NUMERIC_KEYS) {
     metrics[key] = summarize(games.map((game) => numberOrZero(game[key])));
   }
-  const completed = games.filter((game) => game.outcome !== 'technical_failure').length;
+  const completed = games.filter((game) => game.outcome === 'won' || game.outcome === 'lost').length;
+  const limitReached = games.filter((game) => game.outcome === 'limit_reached').length;
+  const technicalFailures = games.filter((game) => game.outcome === 'technical_failure').length;
   const wins = games.filter((game) => game.outcome === 'won').length;
   return {
     executions: games.length,
     completed,
-    technicalFailures: games.length - completed,
+    limitReached,
+    technicalFailures,
     wins,
     losses: games.filter((game) => game.outcome === 'lost').length,
     winRate: completed > 0 ? wins / completed : 0,
@@ -2108,12 +2145,14 @@ export function compareMetricsBySeed(
                 finalTurn: game.finalTurn,
                 acceptedActionCount: game.acceptedActionCount,
                 technicalFailure: game.outcome === 'technical_failure',
+                limitReached: game.outcome === 'limit_reached',
               }
               : {
                 outcome: 'technical_failure' as const,
                 finalTurn: 0,
                 acceptedActionCount: 0,
                 technicalFailure: true,
+                limitReached: false,
               }];
           }),
       ),

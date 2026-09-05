@@ -15,7 +15,7 @@ import type {
 } from './types';
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 
-export const CONFIG_VERSION = '3.0.0';
+export const CONFIG_VERSION = '4.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v1';
 
 const facilityIds: FacilityId[] = [
@@ -66,7 +66,7 @@ function production(
 
 const defaultUnitConfig: UnitConfigMap = {
   police: {
-    hp: 25, recruitAttack: 4, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 12,
+    hp: 25, recruitAttack: 6, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 12,
     maxMilitaryGoods: 5, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 1: 1 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 3,
@@ -75,7 +75,7 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0, reanimationUnitType: 'policeZombie', noiseClass: 'medium', noiseRadius: 4,
   },
   nationalGuard: {
-    hp: 50, recruitAttack: 8, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 22,
+    hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 22,
     maxMilitaryGoods: 20, fixedMilitaryGoodsUpkeepPerTurn: 1,
     attackMilitaryGoodsCostByRange: { 1: 1, 2: 2 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
@@ -84,7 +84,7 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0.5, reanimationUnitType: 'soldierZombie', noiseClass: 'large', noiseRadius: 8,
   },
   riotPolice: {
-    hp: 75, recruitAttack: 10, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 12,
+    hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 12,
     maxMilitaryGoods: 5, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 1: 1 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
@@ -93,31 +93,43 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0, reanimationUnitType: 'riotZombie', noiseClass: 'medium', noiseRadius: 5,
   },
   zombie: {
-    hp: 10, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
+    maxAttackCharges: 1,
+    hp: 15, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   hordeZombie: {
-    hp: 20, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
+    maxAttackCharges: 2,
+    hp: 40, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   policeZombie: {
+    maxAttackCharges: 1,
     hp: 10, attack: 5, movement: 3, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   soldierZombie: {
+    maxAttackCharges: 1,
     hp: 20, attack: 5, movement: 5, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   riotZombie: {
-    hp: 50, attack: 5, movement: 3, range: 1, vision: 5, population: 0, maxFuel: 0,
+    maxAttackCharges: 1,
+    hp: 60, attack: 5, movement: 3, range: 1, vision: 5, population: 0, maxFuel: 0,
+    maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
+    militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
+  },
+  hunterZombie: {
+    maxAttackCharges: 1,
+    hp: 20, attack: 15, movement: 15, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
@@ -231,6 +243,8 @@ const defaultEconomy: EconomyConfig = {
   initialResources,
   initialWorkersByFacility,
   initialZombieCount: 25,
+  initialHunterCount: { min: 1, max: 4 },
+  initialHunterMinDistance: 20,
 };
 
 const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopulationConfig> =
@@ -282,14 +296,15 @@ export const DEFAULT_CONFIG: GameConfig = {
   horde: {
     warningLeadTurns: 2,
     waves: [
-      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 2, zombie: 3 }, final: false },
-      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 1, zombie: 5 }, final: false },
-      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 4, zombie: 7 }, final: false },
-      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 2, zombie: 7 }, final: false },
-      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 4, zombie: 8 }, final: true },
+      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 3 }, final: false },
+      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 2, zombie: 5 }, final: false },
+      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, final: false },
+      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 3, zombie: 7 }, final: false },
+      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 5, zombie: 8 }, final: true },
     ],
-    specialZombieWeights: { zombie: 70, policeZombie: 15, soldierZombie: 10, riotZombie: 5 },
+    specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5 },
     riotZombieCapPerDirection: 1,
+    hunterZombieCapPerDirection: 1,
     movementNoiseRadius: 8,
   },
   refugees: {
@@ -431,7 +446,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   requireInteger(errors, config.maxActionsPerTurn, 'maxActionsPerTurn', 1);
 
   const unitTypes: UnitType[] = [
-    'police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie',
+    'police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie',
   ];
   for (const type of unitTypes) {
     const unit = config.units?.[type];
@@ -468,6 +483,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
         errors.push(`units.${type}.suppressionCivilianDamageRate must be between 0 and 1`);
       }
     } else {
+      requireInteger(errors, (unit as GameConfig['units']['zombie']).maxAttackCharges, `units.${type}.maxAttackCharges`, 1);
       requireInteger(errors, (unit as GameConfig['units']['zombie']).attack, `units.${type}.attack`, 1);
     }
     if (typeof unit.militaryGoodsShortageAttackMultiplier !== 'number'
@@ -657,6 +673,10 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (!economy || typeof economy !== 'object') {
     errors.push('economy is required');
   } else {
+    requireInteger(errors, economy.initialHunterCount?.min, 'economy.initialHunterCount.min', 0);
+    requireInteger(errors, economy.initialHunterCount?.max, 'economy.initialHunterCount.max', 0);
+    if (economy.initialHunterCount?.min > economy.initialHunterCount?.max) errors.push('economy.initialHunterCount.min cannot exceed max');
+    requireInteger(errors, economy.initialHunterMinDistance, 'economy.initialHunterMinDistance', 0);
     requireInteger(errors, economy.initialZombieCount, 'economy.initialZombieCount', 0);
     if (economy.initialZombieCount > FIXED_INITIAL_ZOMBIE_COUNT) {
       errors.push(`economy.initialZombieCount cannot exceed the ${FIXED_INITIAL_ZOMBIE_COUNT} fixed-map positions`);
@@ -684,9 +704,10 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       }
     }
     requireInteger(errors, horde.warningLeadTurns, 'horde.warningLeadTurns', 1);
+    requireInteger(errors, horde.hunterZombieCapPerDirection, 'horde.hunterZombieCapPerDirection', 0);
     requireInteger(errors, horde.riotZombieCapPerDirection, 'horde.riotZombieCapPerDirection', 0);
     requireInteger(errors, horde.movementNoiseRadius, 'horde.movementNoiseRadius', 0);
-    for (const type of ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const) {
+    for (const type of ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const) {
       requireInteger(errors, horde.specialZombieWeights?.[type], `horde.specialZombieWeights.${type}`, 0);
     }
     if (horde.specialZombieWeights

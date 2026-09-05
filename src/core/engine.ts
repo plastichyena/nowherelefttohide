@@ -6,6 +6,7 @@ import {
   getHordeEntrance,
   getTile,
   initialZombiePositionsMatchSeed,
+  initialHunterPositionsMatchSeed,
   isHordeSpawnReserve,
 } from './map';
 import { findNearestOpenTiles, findReachablePaths, findShortestPath, pathMovementCost } from './path';
@@ -146,7 +147,7 @@ function isZombieFaction(unit: Pick<UnitState, 'isPlayerUnit'>): boolean {
 }
 
 function isNormalAiZombie(unit: Pick<UnitState, 'type'>): boolean {
-  return unit.type === 'zombie' || unit.type === 'policeZombie' || unit.type === 'soldierZombie' || unit.type === 'riotZombie';
+  return unit.type === 'zombie' || unit.type === 'policeZombie' || unit.type === 'soldierZombie' || unit.type === 'riotZombie' || unit.type === 'hunterZombie';
 }
 
 export function unitMoveFuelCost(unitType: HumanUnitType, distance: number): number {
@@ -422,6 +423,7 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string, rng: Seed
   if (unit.type === 'policeZombie') state.statistics.policeZombiesKilled += 1;
   if (unit.type === 'soldierZombie') state.statistics.soldierZombiesKilled += 1;
   if (unit.type === 'riotZombie') state.statistics.riotZombiesKilled += 1;
+  if (unit.type === 'hunterZombie') state.statistics.hunterZombiesKilled += 1;
   if (!unit.isPlayerUnit && unit.hordeKind === 'final') state.statistics.finalHordeKilled += 1;
   emit(state, 'unit_destroyed', {
     unitId: unit.id,
@@ -2023,7 +2025,7 @@ function spawnZombies(
     const prefix = unitType === 'hordeZombie' ? 'horde-zombie'
       : unitType === 'policeZombie' ? 'police-zombie'
         : unitType === 'soldierZombie' ? 'soldier-zombie'
-          : unitType === 'riotZombie' ? 'riot-zombie' : 'zombie';
+          : unitType === 'riotZombie' ? 'riot-zombie' : unitType === 'hunterZombie' ? 'hunter-zombie' : 'zombie';
     let id = `${prefix}-${state.nextUnitNumber}`;
     while (state.units.some((unit) => unit.id === id)) {
       state.nextUnitNumber += 1;
@@ -2044,9 +2046,11 @@ function chooseHordeSlotType(
   state: Readonly<GameState>,
   rng: SeededRng,
   riotCount: number,
+  hunterCount: number,
 ): Exclude<ZombieUnitType, 'hordeZombie'> {
-  const entries = (['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const)
+  const entries = (['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const)
     .filter((type) => type !== 'riotZombie' || riotCount < state.config.horde.riotZombieCapPerDirection)
+    .filter((type) => type !== 'hunterZombie' || hunterCount < state.config.horde.hunterZombieCapPerDirection)
     .map((type) => ({ type, weight: state.config.horde.specialZombieWeights[type] }))
     .filter((entry) => entry.weight > 0);
   const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
@@ -2073,9 +2077,11 @@ function spawnHordeComposition(
   );
   const slotUnits: UnitState[] = [];
   let riotCount = 0;
+  let hunterCount = 0;
   for (let slot = 0; slot < composition.zombie; slot += 1) {
-    const unitType = chooseHordeSlotType(state, rng, riotCount);
+    const unitType = chooseHordeSlotType(state, rng, riotCount, hunterCount);
     if (unitType === 'riotZombie') riotCount += 1;
+    if (unitType === 'hunterZombie') hunterCount += 1;
     const spawned = spawnZombies(
       state,
       origin,
@@ -3030,6 +3036,18 @@ function targetDecisionSnapshot(
   return decisions;
 }
 
+/** Re-evaluate after each resolved combat; counters and interceptions share these charges. */
+function resolveZombieAttacks(state: GameState, zombieId: string, rng: SeededRng): void {
+  while (!state.gameOver) {
+    const zombie = getUnit(state, zombieId);
+    if (!zombie || !zombie.canAttack || zombie.attackChargesRemaining <= 0) return;
+    const target = nearestAttackableHuman(state, zombie);
+    if (!target) return;
+    resolveCombat(state, zombie, target, 'attack', rng);
+    if (checkImmediateDefeat(state)) return;
+  }
+}
+
 function processZombieTurn(state: GameState, rng: SeededRng): void {
   const pendingPulses = state.pendingNoisePulses.map((pulse) => ({ ...pulse, center: { ...pulse.center } }));
   state.pendingNoisePulses = [];
@@ -3083,7 +3101,8 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
     }
     const immediateTarget = zombie.canAttack ? nearestAttackableHuman(state, zombie) : null;
     if (immediateTarget) {
-      resolveCombat(state, zombie, immediateTarget, 'attack', rng);
+      resolveZombieAttacks(state, zombieId, rng);
+      if (state.gameOver || checkImmediateDefeat(state)) return;
       continue;
     }
     if (!decision.target) {
@@ -3114,7 +3133,8 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
     }
     const afterMoveTarget = survivor?.canAttack ? nearestAttackableHuman(state, survivor) : null;
     if (survivor && afterMoveTarget) {
-      resolveCombat(state, survivor, afterMoveTarget, 'attack', rng);
+      resolveZombieAttacks(state, zombieId, rng);
+      if (state.gameOver || checkImmediateDefeat(state)) return;
     }
     const movedHorde = getUnit(state, zombieId) ?? zombie;
     if (zombie.type === 'hordeZombie' && hexKey(beforeMove) !== hexKey(zombie.position)) {
@@ -3204,7 +3224,7 @@ function beginHordeWarningIfDue(state: GameState, rng: SeededRng): void {
     directions: [...state.horde.warningDirections],
     hordeZombieCountPerDirection: wave.compositionPerDirection.hordeZombie,
     nonHordeSlotCountPerDirection: wave.compositionPerDirection.zombie,
-    possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'],
+    possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'],
   });
 }
 
@@ -3259,12 +3279,15 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
   const policeZombieCount = allSpawned.filter((unit) => unit.type === 'policeZombie').length;
   const soldierZombieCount = allSpawned.filter((unit) => unit.type === 'soldierZombie').length;
   const riotZombieCount = allSpawned.filter((unit) => unit.type === 'riotZombie').length;
+  const hunterZombieCount = allSpawned.filter((unit) => unit.type === 'hunterZombie').length;
   state.statistics.policeZombiesSpawned += policeZombieCount;
   state.statistics.soldierZombiesSpawned += soldierZombieCount;
   state.statistics.riotZombiesSpawned += riotZombieCount;
+  state.statistics.hunterZombiesSpawned += hunterZombieCount;
   state.statistics.hordeSpecialSpawnedByType.policeZombie += policeZombieCount;
   state.statistics.hordeSpecialSpawnedByType.soldierZombie += soldierZombieCount;
   state.statistics.hordeSpecialSpawnedByType.riotZombie += riotZombieCount;
+  state.statistics.hordeSpecialSpawnedByType.hunterZombie += hunterZombieCount;
   const count = allSpawned.length;
   state.horde.spawnedWaveIndices.push(waveIndex);
   state.horde.spawnGroupIdsByWave[String(waveIndex)] = groupIds;
@@ -3297,6 +3320,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
     state.statistics.finalSpecialZombiesSpawnedByType.policeZombie += policeZombieCount;
     state.statistics.finalSpecialZombiesSpawnedByType.soldierZombie += soldierZombieCount;
     state.statistics.finalSpecialZombiesSpawnedByType.riotZombie += riotZombieCount;
+    state.statistics.finalSpecialZombiesSpawnedByType.hunterZombie += hunterZombieCount;
     for (const branch of state.roadBranches) branch.nextArrivalTurn = null;
     emit(state, 'refugee_arrivals_ended', { finalWaveIndex: waveIndex, spawnTurn: state.turn });
   } else {
@@ -3316,6 +3340,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
     policeZombieCount,
     soldierZombieCount,
     riotZombieCount,
+    hunterZombieCount,
     units: allSpawned.map((unit) => ({
       unitId: unit.id,
       unitType: unit.type,
@@ -3341,6 +3366,7 @@ function finishGame(state: GameState, outcome: 'won' | 'lost', reason: GameOverR
   state.statistics.policeZombiesFinal = state.units.filter((unit) => unit.type === 'policeZombie').length;
   state.statistics.soldierZombiesFinal = state.units.filter((unit) => unit.type === 'soldierZombie').length;
   state.statistics.riotZombiesFinal = state.units.filter((unit) => unit.type === 'riotZombie').length;
+  state.statistics.hunterZombiesFinal = state.units.filter((unit) => unit.type === 'hunterZombie').length;
   state.gameOver = true;
   state.phase = 'gameOver';
   state.result = { outcome, reason, turn: state.turn, statistics: JSON.parse(JSON.stringify(state.statistics)) as GameState['statistics'] };
@@ -3508,8 +3534,8 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
   }
   for (const zombie of state.units.filter(isZombieFaction)) {
     zombie.canAttack = true;
-    zombie.attackChargesRemaining = 1;
-    zombie.maxAttackCharges = 1;
+    zombie.maxAttackCharges = state.config.units[zombie.type as ZombieUnitType].maxAttackCharges;
+    zombie.attackChargesRemaining = zombie.maxAttackCharges;
   }
   const orders = [...state.pendingUnitProductions].sort((left, right) => left.id.localeCompare(right.id));
   state.pendingUnitProductions = [];
@@ -4535,7 +4561,7 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   }
   if (action.type === 'LoadSnapshot') {
     const valid = validateInvariants(action.snapshot);
-    const seededInitialZombiesValid = initialZombiePositionsMatchSeed(action.snapshot.map, action.snapshot.seed);
+    const seededInitialZombiesValid = initialZombiePositionsMatchSeed(action.snapshot.map, action.snapshot.seed) && initialHunterPositionsMatchSeed(action.snapshot);
     if (action.snapshot.gameVersion !== state.gameVersion || !valid.valid || !seededInitialZombiesValid) {
       if (!seededInitialZombiesValid) valid.errors.push('Map initial Zombie positions and order must match the deterministic state seed');
       return error(action, 'invalid_snapshot', valid.errors.join('; ') || 'Unsupported game version');
@@ -4963,7 +4989,7 @@ export class GameEngine implements HeadlessGame {
       try {
         const candidate = cloneState(action.snapshot);
         const valid = validateInvariants(candidate);
-        const seededInitialZombiesValid = initialZombiePositionsMatchSeed(candidate.map, candidate.seed);
+        const seededInitialZombiesValid = initialZombiePositionsMatchSeed(candidate.map, candidate.seed) && initialHunterPositionsMatchSeed(candidate);
         if (candidate.gameVersion !== original.gameVersion || !valid.valid || !seededInitialZombiesValid) {
           if (!seededInitialZombiesValid) valid.errors.push('Map initial Zombie positions and order must match the deterministic state seed');
           return { state: this.getState(), events: [], error: error(action, 'invalid_snapshot', valid.errors.join('; ') || 'Unsupported game version'), gameOver: false, result: null };

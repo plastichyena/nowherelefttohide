@@ -1,3 +1,4 @@
+import { ObservationHistory, metricObservation } from './history';
 import { assertValidGameConfig, cloneConfig, createDefaultConfig } from '../core/config';
 import type { GameAction, GameConfig, GameEvent } from '../core/types';
 import { actionKey, cloneAction, cloneJson, sortActions } from './action';
@@ -74,6 +75,8 @@ export interface AgentRun {
   artifact: AgentReplayArtifact | AgentFailureArtifact;
   failure: AgentTechnicalFailure | null;
   technicalFailure: boolean;
+  /** The runner stopped at maxTurns before the game produced a Result. */
+  limitReached: boolean;
 }
 
 export interface AgentRunnerLimits {
@@ -121,6 +124,7 @@ export interface AgentBatchRun {
   seeds: number[];
   games: AgentRun[];
   completed: number;
+  limitReached: number;
   technicalFailures: number;
   stoppedEarly: boolean;
 }
@@ -184,16 +188,6 @@ function defaultFactory(buildId: string | undefined, recordHistory = true): Agen
   return () => createAgentGame({ buildId, recordHistory });
 }
 
-function metricObservation(observation: AgentObservation): AgentObservation {
-  const recorded = clone(observation);
-  // These projections dominate a 31x31 observation but collectGameMetrics
-  // intentionally never reads them. Dropping them keeps long summary batches
-  // bounded without changing Agent decisions or full Replay runs.
-  recorded.map.tiles = [];
-  recorded.supply.suppliedTileKeys = [];
-  recorded.constructibleFacilityPositionCandidates = [];
-  return recorded;
-}
 
 function defaultAgent(strategy: AgentStrategyId, seed: number): GameAgent {
   if (strategy === 'random') return new RandomAgent(seed);
@@ -273,7 +267,7 @@ function enrichArtifact(
   strategy: string,
 ): AgentRunArtifact {
   const artifact: AgentRunArtifact = source && isRecord(source)
-    ? clone(source) as unknown as AgentRunArtifact
+    ? { ...clone({ ...source, observationTrace: undefined }), observationTrace: source.observationTrace } as unknown as AgentRunArtifact
     : fallback;
   artifact.artifactSchemaVersion = ARTIFACT_SCHEMA_VERSION;
   artifact.appVersion = APP_VERSION;
@@ -351,10 +345,10 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
   const agent = options.agent ?? defaultAgent(strategy, seed);
   const buildId = options.buildId ?? 'local-unknown';
   const limits = normalizeLimits(config, options.limits);
-  const gameFactory = options.gameFactory ?? defaultFactory(buildId, !options.summaryOnly);
+  const gameFactory = options.gameFactory ?? defaultFactory(buildId, false);
   const actions: GameAction[] = [];
   const events: AgentPublicEvent[] = [];
-  const observations: AgentObservation[] = [];
+  const observationHistory = new ObservationHistory();
   const decisionTrace: AgentDecisionTrace[] = [];
   const invalidAttempts: InvalidActionAttempt[] = [];
   let observation: AgentObservation | null = null;
@@ -362,6 +356,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
   let result: AgentGameResult | null = null;
   let game: AgentGame | null = null;
   let runFailure: AgentTechnicalFailure | null = null;
+  let limitReached = false;
   let debugBefore: unknown;
   let debugAfter: unknown;
   let currentTurn = -1;
@@ -416,7 +411,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     }));
     currentTurn = observation.turn;
     decisionsThisTurn = 0;
-    observations.push(options.summaryOnly ? metricObservation(observation) : clone(observation));
+    observationHistory.push(options.summaryOnly ? metricObservation(observation) : observation);
     snapshotFromGame('before');
   } catch (thrown) {
     fail('RESET_THREW', thrown instanceof Error ? thrown.message : String(thrown), null, thrown);
@@ -432,17 +427,22 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       }
       break;
     }
+    if (actions.length >= limits.maxDecisionsPerGame) {
+      fail('GAME_DECISION_SAFETY_LIMIT', `Runner maximum game decisions (${limits.maxDecisionsPerGame}) reached`);
+      break;
+    }
     if (observation.turn > limits.maxTurns) {
-      fail('TURN_SAFETY_LIMIT', `Runner maximum turn limit (${limits.maxTurns}) reached`);
+      // maxTurns is a neutral evaluation ceiling. A game that is still in
+      // progress has neither won nor lost, and reaching this ceiling is not a
+      // runner malfunction. Keep the last public observation for metrics and
+      // artifact consumers, then stop before requesting another action.
+      limitReached = true;
+      finalObservation = clone(observation);
       break;
     }
     if (observation.turn !== currentTurn) {
       currentTurn = observation.turn;
       decisionsThisTurn = 0;
-    }
-    if (actions.length >= limits.maxDecisionsPerGame) {
-      fail('GAME_DECISION_SAFETY_LIMIT', `Runner maximum game decisions (${limits.maxDecisionsPerGame}) reached`);
-      break;
     }
 
     let legal: GameAction[];
@@ -542,7 +542,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     actions.push(cloneAction(selected));
     events.push(...asPublicEvents(stepResult.events ?? []));
     observation = nextObservation;
-    observations.push(options.summaryOnly ? metricObservation(observation) : clone(observation));
+    observationHistory.push(options.summaryOnly ? metricObservation(observation) : observation);
     finalObservation = clone(observation);
     decisionsThisTurn += 1;
     snapshotFromGame('after');
@@ -571,11 +571,12 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
   let sourceArtifact: AgentPublicRunArtifact | null = null;
   if (game && !options.summaryOnly) {
     try {
-      sourceArtifact = clone(game.getRunArtifact());
+      sourceArtifact = game.getRunArtifact();
     } catch (thrown) {
       if (!runFailure) fail('ARTIFACT_THREW', thrown instanceof Error ? thrown.message : String(thrown), null, thrown);
     }
   }
+  const observations = options.summaryOnly ? observationHistory.view() : observationHistory.metricView();
   const fallback = placeholderArtifact(seed, config, agent, buildId, actions, decisionTrace, result, observations[0] ?? null);
   const strategyName = strategyForAgent(agent, options.strategy);
   const baseArtifact = enrichArtifact(sourceArtifact, fallback, actions, decisionTrace, result, agent, strategyName);
@@ -583,8 +584,8 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     ? observations.length > 0
       ? [compactArtifactObservation(observations[0]), compactArtifactObservation(observations.at(-1) ?? observations[0])]
       : []
-    : observations.map(compactArtifactObservation);
-  if (observations[0] && !options.summaryOnly) baseArtifact.fixedMap = clone(observations[0].map);
+    : observationHistory.compactView();
+  if (observations[0] && !options.summaryOnly) baseArtifact.fixedMap = clone(observationHistory.at(0).map);
   else delete baseArtifact.fixedMap;
   delete baseArtifact.verificationEvents;
   const verificationEvents = verificationEventsFromSnapshot(debugAfter);
@@ -679,6 +680,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     buildId,
     seed,
     failure: metricFailure,
+    limitReached,
     verificationStatistics: verificationStatisticsFromSnapshot(debugAfter),
   });
 
@@ -701,9 +703,9 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       seed,
       agent: { id: agent.id, version: agent.version, strategy: strategyName },
       config,
-      initialObservation: observations[0] ?? null,
+      initialObservation: !options.summaryOnly && observationHistory.length ? observationHistory.at(0) : observations[0] ?? null,
       finalObservation,
-      observations,
+      observations: options.summaryOnly ? observations : observationHistory.view(),
       actions,
       events,
       decisionTrace,
@@ -712,15 +714,16 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
       artifact: failureArtifact,
       failure: recordedFailure,
       technicalFailure: true,
+      limitReached: false,
     };
   }
   return {
     seed,
     agent: { id: agent.id, version: agent.version, strategy: strategyName },
     config,
-    initialObservation: observations[0] ?? null,
+    initialObservation: !options.summaryOnly && observationHistory.length ? observationHistory.at(0) : observations[0] ?? null,
     finalObservation,
-    observations,
+    observations: options.summaryOnly ? observations : observationHistory.view(),
     actions,
     events,
     decisionTrace,
@@ -729,6 +732,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     artifact: replayArtifact,
     failure: null,
     technicalFailure: false,
+    limitReached,
   };
 }
 
@@ -744,7 +748,8 @@ export function runAgentGames(seeds: readonly number[], options: AgentRunnerGame
   return {
     seeds: normalizedSeeds,
     games,
-    completed: games.filter((game) => !game.technicalFailure).length,
+    completed: games.filter((game) => game.metrics.outcome === 'won' || game.metrics.outcome === 'lost').length,
+    limitReached: games.filter((game) => game.limitReached).length,
     technicalFailures: games.filter((game) => game.technicalFailure).length,
     stoppedEarly: games.length < normalizedSeeds.length,
   };
@@ -872,7 +877,7 @@ export function replayArtifact(
     return { result: null, observation: null, actionsReplayed: 0, error: publicActionError('artifact_invalid', message), reproduced: false, mismatch: message };
   }
   const agent = artifact.agent.strategy === 'random' ? new RandomAgent(artifact.seed) : new BalancedAgent();
-  const game = (options.gameFactory ?? defaultFactory(options.buildId ?? artifact.buildId))(artifact.seed, config, agent);
+  const game = (options.gameFactory ?? defaultFactory(options.buildId ?? artifact.buildId, false))(artifact.seed, config, agent);
   let observation: AgentObservation;
   try {
     observation = clone(game.reset({ seed: artifact.seed, configOverrides: config, agent: { id: agent.id } }));
@@ -892,9 +897,10 @@ export function replayArtifact(
       mismatch: 'Replay initial road-arrival schedule differs from the artifact',
     };
   }
-  let expectedObservations: AgentObservation[] | undefined;
+  let expectedObservation: ((index: number) => AgentObservation) | undefined;
   try {
-    expectedObservations = artifact.observationTrace?.map((trace) => restoreArtifactObservation(trace, artifact.fixedMap!));
+    expectedObservation = artifact.observationTrace ? (index: number) => restoreArtifactObservation(artifact.observationTrace![index]!, artifact.fixedMap!) : undefined;
+    if (expectedObservation) expectedObservation(0);
   } catch (thrown) {
     const message = thrown instanceof Error ? thrown.message : 'Replay artifact observation trace is invalid';
     return {
@@ -906,7 +912,7 @@ export function replayArtifact(
       mismatch: message,
     };
   }
-  if (expectedObservations && !jsonEquivalent(expectedObservations[0], observation)) {
+  if (expectedObservation && !jsonEquivalent(expectedObservation(0), observation)) {
     return {
       result: null,
       observation,
@@ -956,7 +962,7 @@ export function replayArtifact(
     };
     actionsReplayed += 1;
     observation = clone(step.observation);
-    if (expectedObservations && !jsonEquivalent(expectedObservations[actionsReplayed], observation)) {
+    if (expectedObservation && !jsonEquivalent(expectedObservation(actionsReplayed), observation)) {
       return {
         result: clone(game.getResult()),
         observation,

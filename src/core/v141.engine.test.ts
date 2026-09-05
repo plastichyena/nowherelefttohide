@@ -27,7 +27,7 @@ function quietEngine(seed = 1): GameEngine {
   return new GameEngine(seed, createDefaultConfig({
     horde: singleFinalWave(30),
     economy: {
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 10_000, civilianGoods: 10_000, militaryGoods: 10_000, fuel: 10_000 },
     },
   }));
@@ -45,20 +45,20 @@ describe('v1.4.1 carried Military Goods combat', () => {
       canAttack: true,
       militaryGoodsCost: 1,
       projectedMilitaryGoodsAfterAttack: 0,
-      effectiveAttack: 5,
+      effectiveAttack: 8,
     });
     police.currentMilitaryGoods = 0;
     expect(forecastUnitCombatAtDistance(state, police, 1)).toMatchObject({
       canAttack: true,
       militaryGoodsCost: 0,
-      effectiveAttack: 1,
+      effectiveAttack: 2,
     });
 
     guard.currentMilitaryGoods = 2;
     expect(forecastUnitCombatAtDistance(state, guard, 2)).toMatchObject({
       canAttack: true,
       militaryGoodsCost: 2,
-      effectiveAttack: 10,
+      effectiveAttack: 15,
     });
     guard.currentMilitaryGoods = 1;
     expect(forecastUnitCombatAtDistance(state, guard, 2)).toMatchObject({
@@ -68,13 +68,13 @@ describe('v1.4.1 carried Military Goods combat', () => {
     expect(forecastUnitCombatAtDistance(state, guard, 1)).toMatchObject({
       canAttack: true,
       militaryGoodsCost: 1,
-      effectiveAttack: 10,
+      effectiveAttack: 15,
     });
     guard.currentMilitaryGoods = 0;
     expect(forecastUnitCombatAtDistance(state, guard, 1)).toMatchObject({
       canAttack: true,
       militaryGoodsCost: 0,
-      effectiveAttack: 2,
+      effectiveAttack: 3,
     });
   });
 
@@ -97,7 +97,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
     ready.units.find((unit) => unit.id === guard.id)!.currentMilitaryGoods = 2;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: ready }).error).toBeNull();
     const preview = getUnitLegalAttackProjections(engine.getState(), guard.id)[0]!;
-    expect(preview).toMatchObject({ targetUnitId: zombie.id, distance: 2, militaryGoodsCost: 2, effectiveAttack: 10 });
+    expect(preview).toMatchObject({ targetUnitId: zombie.id, distance: 2, militaryGoodsCost: 2, effectiveAttack: 15 });
     const result = engine.step({ type: 'Attack', attackerId: guard.id, targetId: zombie.id });
     expect(result.error).toBeNull();
     expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(0);
@@ -123,7 +123,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
       attackerId: counterGuard.id,
       distance: 1,
       militaryGoodsCost: 1,
-      effectiveAttack: 10,
+      effectiveAttack: 15,
     });
     expect(counterResult.state.units.find((unit) => unit.id === counterGuard.id)?.currentMilitaryGoods).toBe(0);
 
@@ -143,7 +143,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
     expect(interceptionEvent?.payload).toMatchObject({
       distance: 2,
       militaryGoodsCost: 2,
-      effectiveAttack: 10,
+      effectiveAttack: 15,
     });
     expect(interceptionResult.state.units.find((unit) => unit.id === interceptingGuard.id)?.currentMilitaryGoods).toBe(0);
   });

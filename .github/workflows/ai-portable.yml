@@ -1,4 +1,4 @@
-name: AI Portable Package v1.5.0
+name: AI Portable Package v1.5.1
 
 on:
   workflow_run:
@@ -65,6 +65,14 @@ jobs:
             ./ "${PACKAGE_ROOT}/game/"
           cp -a node_modules "${PACKAGE_ROOT}/game/node_modules"
 
+          # Bundle the Session CLI before distribution.  A player may invoke
+          # one `step` per process, so run-session must never invoke Vite or
+          # transform TypeScript on every action.
+          (
+            cd "${PACKAGE_ROOT}/game"
+            node scripts/build-portable.mjs --out=dist/portable/session-cli.mjs
+          )
+
           # actions/setup-node installs a self-contained Node distribution in
           # the runner tool cache. Copy that distribution so the downloaded
           # package does not require Node.js to be installed separately.
@@ -116,8 +124,7 @@ jobs:
           source "${ROOT}/runtime/identity.env"
           cd "${ROOT}/game"
           exec "${ROOT}/runtime/node/bin/node" \
-            "${ROOT}/game/node_modules/vite-node/vite-node.mjs" \
-            --script "${ROOT}/game/src/session/session-cli.ts" "$@"
+            "${ROOT}/game/dist/portable/session-cli.mjs" "$@"
           EOF
 
           chmod +x \
@@ -142,6 +149,7 @@ jobs:
           test -d "${ROOT}/game/node_modules"
           test -f "${ROOT}/game/src/agent/game.ts"
           test -f "${ROOT}/game/src/session/session-cli.ts"
+          test -f "${ROOT}/game/dist/portable/session-cli.mjs"
           test -f "${ROOT}/game/public/assets/board/ASSET_MANIFEST.md"
           test -f "${ROOT}/game/public/assets/board/units/unit_police.png"
           test -f "${ROOT}/game/public/assets/board/units/unit_riot_police.png"
@@ -149,13 +157,14 @@ jobs:
           test -f "${ROOT}/game/public/assets/board/units/unit_police_zombie.png"
           test -f "${ROOT}/game/public/assets/board/units/unit_soldier_zombie.png"
           test -f "${ROOT}/game/public/assets/board/units/unit_riot_zombie.png"
+          test -f "${ROOT}/game/public/assets/board/units/unit_hunter_zombie.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_wind_power_plant.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_simple_farm.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_civilian_drone_base.png"
           test -x "${ROOT}/runtime/node/bin/node"
           test -x "${ROOT}/run-session.sh"
           VERSION="$(node -p "require('${ROOT}/game/package.json').version")"
-          test "${VERSION}" = "1.5.0"
+          test "${VERSION}" = "1.5.1"
           grep -F "App version: ${VERSION}" "${ROOT}/BUILD_INFO.txt"
           grep -F "Build ID:" "${ROOT}/BUILD_INFO.txt"
           grep -F "Platform: linux-x64" "${ROOT}/BUILD_INFO.txt"
@@ -172,7 +181,7 @@ jobs:
             --out="${RUNNER_TEMP}/portable-ai-smoke" \
             --overwrite
 
-      - name: Smoke test all Session CLI commands with bundled Node
+      - name: Smoke test all Session CLI commands and compact query with bundled Node
         shell: bash
         run: |
           set -euo pipefail
@@ -180,6 +189,7 @@ jobs:
           SESSION_ROOT="${RUNNER_TEMP}/portable-session-smoke"
           SESSION_ID="portable-smoke"
           CHILD_SESSION_ID="portable-smoke-child"
+          ARTIFACT_PATH="${SESSION_ROOT}/portable-smoke-child.nlth-artifact"
 
           NEW_JSON="$("${ROOT}/run-session.sh" new \
             --root="${SESSION_ROOT}" \
@@ -188,7 +198,7 @@ jobs:
             --checkpoint-interval=1 \
             --agent-id=portable-smoke)"
           STATUS_JSON="$("${ROOT}/run-session.sh" status --root="${SESSION_ROOT}" --session="${SESSION_ID}")"
-          STEP_JSON="$(printf '%s\n' '{"action":{"type":"EndTurn"},"decisionSummary":"Portable package Session CLI smoke"}' | \
+          STEP_JSON="$(printf '%s\n' '{"action":{"type":"EndTurn"},"decisionSummary":"Portable package Session CLI smoke","expectedRevision":0}' | \
             "${ROOT}/run-session.sh" step --root="${SESSION_ROOT}" --session="${SESSION_ID}")"
           SAVE_JSON="$("${ROOT}/run-session.sh" save-checkpoint --root="${SESSION_ROOT}" --session="${SESSION_ID}")"
           LIST_JSON="$("${ROOT}/run-session.sh" list-checkpoints --root="${SESSION_ROOT}" --session="${SESSION_ID}")"
@@ -199,30 +209,59 @@ jobs:
             --session="${SESSION_ID}" \
             --checkpoint="${CHECKPOINT_ID}" \
             --new-session-id="${CHILD_SESSION_ID}")"
-          ARTIFACT_JSON="$("${ROOT}/run-session.sh" artifact --root="${SESSION_ROOT}" --session="${CHILD_SESSION_ID}")"
+          QUERY_JSON="$("${ROOT}/run-session.sh" query \
+            --root="${SESSION_ROOT}" \
+            --session="${CHILD_SESSION_ID}" \
+            --target=full-snapshot \
+            --page-size=100)"
+          ARTIFACT_JSON="$("${ROOT}/run-session.sh" artifact \
+            --root="${SESSION_ROOT}" \
+            --session="${CHILD_SESSION_ID}" \
+            --out="${ARTIFACT_PATH}")"
 
-          printf '%s\n' "${NEW_JSON}" "${STATUS_JSON}" "${STEP_JSON}" "${SAVE_JSON}" "${LIST_JSON}" "${LOAD_JSON}" "${ARTIFACT_JSON}" | \
+          printf '%s\n' "${NEW_JSON}" "${STATUS_JSON}" "${STEP_JSON}" "${SAVE_JSON}" "${LIST_JSON}" "${LOAD_JSON}" "${QUERY_JSON}" "${ARTIFACT_JSON}" | \
             "${ROOT}/runtime/node/bin/node" -e '
               let text = "";
               process.stdin.on("data", chunk => text += chunk);
               process.stdin.on("end", () => {
-                const expected = ["new", "status", "step", "save-checkpoint", "list-checkpoints", "load-checkpoint", "artifact"];
+                const expected = ["new", "status", "step", "save-checkpoint", "list-checkpoints", "load-checkpoint", "query", "artifact"];
                 const values = text.trim().split(/\n/u).map(line => JSON.parse(line));
                 if (values.length !== expected.length || values.some((value, index) => value.ok !== true || value.command !== expected[index])) process.exit(1);
               });'
+          test -f "${ARTIFACT_PATH}/manifest.json"
+          test -s "${ARTIFACT_PATH}/artifact.ndjson"
 
-      - name: Run external AI Seed 1 to Game Over and replay with bundled Node
+      - name: Run external AI Seeds 1 and 7 to Game Over and replay with bundled Node
         shell: bash
         run: |
           set -euo pipefail
           ROOT="${{ steps.package.outputs.package_root }}"
-          "${ROOT}/run-vite-node.sh" "${ROOT}/game/src/testing/external-ai-e2e.ts" \
-            --out="${ROOT}/EXTERNAL_AI_E2E.json"
-          test -s "${ROOT}/EXTERNAL_AI_E2E.json"
+          for SEED in 1 7; do
+            REPORT="${ROOT}/EXTERNAL_AI_E2E_${SEED}.json"
+            "${ROOT}/run-vite-node.sh" "${ROOT}/game/src/testing/external-ai-e2e.ts" \
+              --seed="${SEED}" \
+              --out="${REPORT}"
+            test -s "${REPORT}"
+            "${ROOT}/runtime/node/bin/node" -e '
+              const report = require(process.argv[1]);
+              const expectedSeed = Number(process.argv[2]);
+              if (report.ok !== true || report.seed !== expectedSeed || report.gameOver !== true || report.replayMatched !== true) process.exit(1);
+            ' "${REPORT}" "${SEED}"
+          done
+
+      - name: Complete persistent Sessions for Seeds 1 and 7 with the bundled CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="${{ steps.package.outputs.package_root }}"
+          "${ROOT}/run-vite-node.sh" "${ROOT}/game/src/testing/portable-session-e2e.ts" \
+            --cli="${ROOT}/game/dist/portable/session-cli.mjs" \
+            --root="${RUNNER_TEMP}/portable-session-completion" \
+            --out="${ROOT}/PORTABLE_SESSION_E2E.json"
           "${ROOT}/runtime/node/bin/node" -e '
             const report = require(process.argv[1]);
-            if (report.ok !== true || report.seed !== 1 || report.gameOver !== true || report.replayMatched !== true) process.exit(1);
-          ' "${ROOT}/EXTERNAL_AI_E2E.json"
+            if (!report.ok || !report.replayMatched || report.seeds.length !== 2) process.exit(1);
+          ' "${ROOT}/PORTABLE_SESSION_E2E.json"
 
       - name: Create distributable ZIP
         shell: bash

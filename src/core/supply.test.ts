@@ -135,7 +135,7 @@ describe('road branches and supply network', () => {
   it('processes all unmanaged road arrivals immediately without hidden checkpoint pools', () => {
     const config = createDefaultConfig({
       horde: singleFinalWave(3),
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       refugees: {
         arrivalIntervalMin: 1,
         arrivalIntervalMax: 1,
@@ -155,7 +155,7 @@ describe('road branches and supply network', () => {
   });
 
   it('allows existing out-of-supply production but rejects worker increases and natural recovery', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0 }, horde: singleFinalWave(3) });
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } }, horde: singleFinalWave(3) });
     const engine = new GameEngine(4, config);
     const snapshot = engine.getState();
     const power = snapshot.facilities.find((facility) => facility.id === 'power-plant-2')!;
@@ -178,7 +178,7 @@ describe('road branches and supply network', () => {
 
   it('ruins an empty occupied checkpoint and allows a forward replacement once the Zombie is cleared', () => {
     const config = createDefaultConfig({
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: singleFinalWave(4),
       vision: { capital: 50 },
     });

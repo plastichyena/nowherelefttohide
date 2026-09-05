@@ -14,7 +14,7 @@ function cloneState(state: Readonly<GameState>): GameState {
 function safeScenarioConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}) {
   return createDefaultConfig({
     economy: {
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: {
         food: 100_000,
         civilianGoods: 100_000,
@@ -72,16 +72,16 @@ function createGroupedZombie(
 }
 
 describe('v1.4 Horde composition and combat', () => {
-  it('keeps Normal Zombie HP at 10 and requires two plain hits or four forest hits for a 20 HP Horde Zombie', () => {
-    expect(createDefaultConfig().units.zombie.hp).toBe(10);
-    expect(createDefaultConfig().units.hordeZombie.hp).toBe(20);
+  it('keeps Normal Zombie HP at 15 and requires three plain hits or five forest hits for a 40 HP Horde Zombie', () => {
+    expect(createDefaultConfig().units.zombie.hp).toBe(15);
+    expect(createDefaultConfig().units.hordeZombie.hp).toBe(40);
     expect(new GameEngine(300, createDefaultConfig()).getState().units
       .filter((unit) => unit.type === 'zombie')
       .every((unit) => unit.spawnGroupId === null && unit.hordeKind === null)).toBe(true);
 
     for (const [terrain, expectedHp] of [
-      ['plain', [10, 0]],
-      ['forest', [15, 10, 5, 0]],
+      ['plain', [25, 10, 0]],
+      ['forest', [32, 24, 16, 8, 0]],
     ] as const) {
       const engine = new GameEngine(301, safeScenarioConfig());
       const editable = cloneState(engine.getState());
@@ -115,7 +115,7 @@ describe('v1.4 Horde composition and combat', () => {
     // integration tests; this unit test isolates spawn composition.
     const acceleratedSchedule = defaultSchedule.map((wave, index) => ({ ...wave, turn: index + 3 }));
     const engine = new GameEngine(302, safeScenarioConfig({
-      horde: { waves: acceleratedSchedule },
+      horde: { waves: acceleratedSchedule, specialZombieWeights: { hunterZombie: 0 } },
       units: {
         zombie: { movement: 0 }, hordeZombie: { movement: 0 }, policeZombie: { movement: 0 },
         soldierZombie: { movement: 0 }, riotZombie: { movement: 0 },
@@ -186,7 +186,7 @@ describe('v1.4 Horde composition and combat', () => {
     const engine = new GameEngine(303, safeScenarioConfig({
       horde: {
         warningLeadTurns: 1,
-        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
+        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0 },
         waves: [
           { turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 2 }, final: false },
           { turn: 2, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 3 }, final: false },
@@ -210,7 +210,7 @@ describe('v1.4 Horde composition and combat', () => {
     const engine = new GameEngine(304, safeScenarioConfig({
       horde: {
         ...singleFinalWave(1, { hordeZombie: 1, zombie: 1 }),
-        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
+        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0 },
       },
       units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
     }));

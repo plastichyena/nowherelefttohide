@@ -5,9 +5,9 @@ import { createInitialState, createUnit } from '../core/state';
 import { compactArtifactObservation, createAgentObservation, restoreArtifactObservation } from './observation';
 import { createAgentGame } from './game';
 
-describe('Agent Observation 7.0.0 rule projections', () => {
+describe('Agent Observation 8.0.0 rule projections', () => {
   it('publishes effective range, automatic suppression, recovery, production, and power facts', () => {
-    const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = createInitialState(126, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
     guard.position = { ...farm.position };
@@ -33,13 +33,13 @@ describe('Agent Observation 7.0.0 rule projections', () => {
       suppressionStatusIfTurnEndsNow: 'suppression',
       suppressionTargetId: farm.id,
     });
-    expect(publicGuard.suppressionCivilianDamage).toBe(5);
+    expect(publicGuard.suppressionCivilianDamage).toBe(8);
     expect(publicFarm).toMatchObject({
       populationCapacity: 30,
       infectionContained: true,
       containingUnitId: guard.id,
       projectedSuppression: 4,
-      projectedCivilianDamage: 5,
+      projectedCivilianDamage: 8,
     });
     expect(publicFarm.production).toMatchObject({
       inputsPerWorker: {},
@@ -53,7 +53,7 @@ describe('Agent Observation 7.0.0 rule projections', () => {
   });
 
   it('publishes carried Military Goods and exact legal Attack previews by distance', () => {
-    const state = createInitialState(142, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = createInitialState(142, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
     guard.currentMilitaryGoods = 2;
     state.units.push(createUnit(state, 'zombie-range-2', 'zombie', {
@@ -75,10 +75,10 @@ describe('Agent Observation 7.0.0 rule projections', () => {
         distance: 2,
         militaryGoodsCost: 2,
         projectedMilitaryGoodsAfterAttack: 0,
-        effectiveAttack: 10,
+        effectiveAttack: 15,
       }),
     ]);
-    expect(publicGuard.attackPreviews[0]!.projectedDamageBeforeTerrain).toBe(10);
+    expect(publicGuard.attackPreviews[0]!.projectedDamageBeforeTerrain).toBe(15);
     expect(publicGuard.attackPreviews[0]!.projectedDamageAfterTerrain).toBeGreaterThan(0);
 
     guard.currentMilitaryGoods = 1;
@@ -91,7 +91,7 @@ describe('Agent Observation 7.0.0 rule projections', () => {
   });
 
   it('publishes fixed consumption, refill, and post-refill suppression Military Goods projections', () => {
-    const state = createInitialState(143, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = createInitialState(143, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
     const police = state.units.find((unit) => unit.type === 'police')!;
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
@@ -135,7 +135,7 @@ describe('Agent Observation 7.0.0 rule projections', () => {
   });
 
   it('publishes Fuel-zero Emergency Move mode and effective-MP limits', () => {
-    const state = createInitialState(144, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = createInitialState(144, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const police = state.units.find((unit) => unit.id === 'police-1')!;
     const guard = state.units.find((unit) => unit.id === 'national-guard-1')!;
     police.currentFuel = 0;
@@ -181,7 +181,7 @@ describe('Agent Observation 7.0.0 rule projections', () => {
   });
 
   it('reports unpowered required industry as stopped with zero projected output', () => {
-    const state = createInitialState(128, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = createInitialState(128, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
     const powerPlant = state.facilities.find((facility) => facility.id === 'power-plant-1')!;
     const wind = state.facilities.find((facility) => facility.type === 'windPowerPlant')!;
@@ -205,7 +205,7 @@ describe('Agent Observation 7.0.0 rule projections', () => {
   });
 
   it('stops Farm production when Fuel-limited power is unavailable', () => {
-    const state = createInitialState(129, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = createInitialState(129, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
     const wind = state.facilities.find((facility) => facility.type === 'windPowerPlant')!;
     state.resources.fuel = 0;
@@ -224,7 +224,7 @@ describe('Agent Observation 7.0.0 rule projections', () => {
   });
 
   it('leaves the stop reason empty for a fully operating facility', () => {
-    const state = createInitialState(130, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = createInitialState(130, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const capital = state.facilities.find((facility) => facility.id === 'capital')!;
     const publicCapital = createAgentObservation(state).facilities.find((facility) => facility.id === capital.id)!;
 
@@ -294,7 +294,7 @@ describe('Agent Observation 7.0.0 rule projections', () => {
 
   it('publishes the detached Core checkpoint candidates without leaking hidden blockers', () => {
     const config = createDefaultConfig({
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
     });
     const clearState = createInitialState(132, config);
@@ -313,7 +313,7 @@ describe('Agent Observation 7.0.0 rule projections', () => {
 
   it('projects Fuel, special Facility state, Queue Pressure, and the Core strategic forecast', () => {
     const game = createAgentGame();
-    const observation = game.reset({ seed: 140, configOverrides: { economy: { initialZombieCount: 0 } } });
+    const observation = game.reset({ seed: 140, configOverrides: { economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const police = observation.units.find((unit) => unit.type === 'police')!;
     expect(police).toMatchObject({ currentFuel: 12, maxFuel: 12, inSupply: true });
     expect(police.fuelCostByLegalMove.length).toBeGreaterThan(0);
@@ -336,7 +336,7 @@ describe('Agent Observation 7.0.0 rule projections', () => {
   });
 
   it('includes off-screen public site history without generated Zombie identities or Spawn hexes', () => {
-    const state = createInitialState(143, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const state = createInitialState(143, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     state.events.push({
       id: 'event-site-history',
       turn: 3,

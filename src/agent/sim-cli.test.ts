@@ -39,8 +39,8 @@ describe('Batch Simulation CLI', () => {
     expect(report.comparisons).toHaveLength(1);
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.technicalFailureCount).toBeGreaterThanOrEqual(0);
-    expect(report.schemaVersion).toBe('6.0.0');
-    expect(report.appVersion).toBe('1.5.0');
+    expect(report.schemaVersion).toBe('7.0.0');
+    expect(report.appVersion).toBe('1.5.1');
   // The v1.4.4 fixed 51×51 board deliberately raises deterministic run cost;
   // one shared seed still exercises both strategies and their comparison without
   // blocking Vitest's worker RPC heartbeat.
@@ -65,6 +65,37 @@ describe('Batch Simulation CLI', () => {
       gameFactory: failingFactory,
     });
     expect(report.execution.limits).toMatchObject({ maxTurns: 100, maxDecisionsPerTurn: 2, maxDecisionsPerGame: 301 });
+  });
+
+  it('reports a maxTurns stop separately from losses and technical failures in JSON and CSV', () => {
+    const initial = createAgentGame().reset({ seed: 1 });
+    const overRunnerLimit = { ...initial, turn: 101, finalHordeTurn: 250 };
+    const limitedFactory = (): AgentGame => ({
+      getApiInfo: () => createAgentGame().getApiInfo(),
+      reset: () => overRunnerLimit,
+      getObservation: () => overRunnerLimit,
+      getLegalActions: () => [{ type: 'EndTurn' }],
+      step: () => { throw new Error('unreachable after the turn ceiling'); },
+      isGameOver: () => false,
+      getResult: () => null,
+      getRunArtifact: () => ({}) as never,
+    });
+    const report = runSimulation({
+      agents: ['random'],
+      seeds: [1],
+      config: createDefaultConfig(),
+      gameFactory: limitedFactory,
+    });
+    expect(report.games[0]).toMatchObject({ outcome: 'limit_reached', limitReached: true, gameOverReason: null });
+    expect(report.failures).toHaveLength(0);
+    expect(report.limitReachedCount).toBe(1);
+    expect(report.technicalFailureCount).toBe(0);
+    expect(report.aggregate.random).toMatchObject({ completed: 0, limitReached: 1, technicalFailures: 0, wins: 0, losses: 0 });
+    expect(report.exitCode).toBe(0);
+    const [header, row] = metricsToCsv(report.games).trim().split('\n').map((line) => line.split(','));
+    expect(header).toContain('limitReached');
+    expect(row![header!.indexOf('outcome')]).toBe('limit_reached');
+    expect(row![header!.indexOf('limitReached')]).toBe('true');
   });
 
   it('continues after a technical failure by default and stops only with fail-fast', () => {
@@ -105,6 +136,7 @@ describe('Batch Simulation CLI', () => {
       'refineryFacilitiesCaptured',
       'powerPlantFacilitiesCaptured',
       'finalHordeSpawned',
+      'limitReached',
       'periodicHordeZombiesSpawned',
       'periodicNormalZombiesSpawned',
       'finalHordeZombiesSpawned',

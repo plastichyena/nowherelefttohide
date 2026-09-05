@@ -9,7 +9,7 @@ type MutableState = GameState;
 function quietConfig() {
   return createDefaultConfig({
     economy: {
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 10_000, civilianGoods: 10_000, militaryGoods: 10_000, fuel: 10_000 },
     },
     refugees: {
@@ -23,6 +23,7 @@ function quietConfig() {
         compositionPerDirection: { hordeZombie: 1, zombie: 0 },
         final: true,
       }],
+      specialZombieWeights: { hunterZombie: 0 },
     },
     units: {
       zombie: { attack: 1, movement: 0, vision: 0 },
@@ -44,21 +45,21 @@ function rebalance(state: MutableState): void {
     + state.population.cumulativeDepartures;
 }
 
-describe('v1.5.0 Human Unit progression and Riot defaults', () => {
+describe('v1.5.1 Human Unit progression and Riot defaults', () => {
   it('creates regular initial units, recruit production data, Riot Police, and the configured mixed-Horde rule', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0 } });
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } });
     const state = createInitialState(15001, config);
     const police = state.units.find((unit) => unit.type === 'police')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
 
-    expect(state.gameVersion).toBe('3.0.0');
-    expect(config.version).toBe('3.0.0');
+    expect(state.gameVersion).toBe('4.0.0');
+    expect(config.version).toBe('4.0.0');
     expect(police).toMatchObject({
       proficiency: 'regular', recruitSurvivalTurns: 0, regularZombieKills: 0,
-      veteranPromotionPending: false, attack: 5, maxAttackCharges: 1, attackChargesRemaining: 1,
+      veteranPromotionPending: false, attack: 8, maxAttackCharges: 1, attackChargesRemaining: 1,
     });
     expect(guard).toMatchObject({
-      proficiency: 'regular', attack: 10, maxAttackCharges: 1, attackChargesRemaining: 1,
+      proficiency: 'regular', attack: 15, maxAttackCharges: 1, attackChargesRemaining: 1,
     });
     expect(config.unitExperience).toMatchObject({
       productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit' },
@@ -69,24 +70,24 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
       veteranAttackCharges: 2,
     });
     expect(config.units).toMatchObject({
-      police: { recruitAttack: 4 },
-      nationalGuard: { recruitAttack: 8 },
+      police: { recruitAttack: 6 },
+      nationalGuard: { recruitAttack: 12 },
       riotPolice: {
-        hp: 75, recruitAttack: 10, movement: 10, range: 1, vision: 5, population: 10,
+        hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10,
         maxFuel: 12, emergencyMovementPoints: 2, maxMilitaryGoods: 5,
         productionCivilianGoods: 25, productionMilitaryGoods: 25,
         recruitmentFacilityTypes: ['capital', 'city'],
         reanimationUnitType: 'riotZombie', noiseClass: 'medium', noiseRadius: 5,
       },
-      riotZombie: { hp: 50, attack: 5, movement: 3, range: 1, vision: 5 },
+      riotZombie: { hp: 60, attack: 5, movement: 3, range: 1, vision: 5 },
     });
     expect(config.horde).toMatchObject({
-      specialZombieWeights: { zombie: 70, policeZombie: 15, soldierZombie: 10, riotZombie: 5 },
+      specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5 },
       riotZombieCapPerDirection: 1,
       movementNoiseRadius: 8,
     });
     expect(config.horde.waves.map((wave) => [wave.turn, wave.compositionPerDirection.hordeZombie, wave.compositionPerDirection.zombie]))
-      .toEqual([[5, 2, 3], [10, 1, 5], [20, 4, 7], [35, 2, 7], [50, 4, 8]]);
+      .toEqual([[5, 3, 3], [10, 2, 5], [20, 5, 7], [35, 3, 7], [50, 5, 8]]);
   });
 
   it('promotes a surviving Recruit at Player Turn Start with ceiling-rounded Regular attack', () => {
@@ -97,7 +98,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     police.recruitSurvivalTurns = 4;
     police.regularZombieKills = 0;
     police.veteranPromotionPending = false;
-    police.attack = 4;
+    police.attack = 6;
     police.maxAttackCharges = 1;
     police.attackChargesRemaining = 1;
     rebalance(setup);
@@ -107,7 +108,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     expect(result.error, result.error?.message).toBeNull();
     const promoted = result.state.units.find((unit) => unit.id === police.id)!;
     expect(promoted).toMatchObject({
-      proficiency: 'regular', recruitSurvivalTurns: 5, attack: 5,
+      proficiency: 'regular', recruitSurvivalTurns: 5, attack: 8,
       maxAttackCharges: 1, attackChargesRemaining: 1,
     });
     expect(result.events).toContainEqual(expect.objectContaining({
@@ -123,7 +124,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     police.proficiency = 'regular';
     police.regularZombieKills = 4;
     police.veteranPromotionPending = false;
-    police.attack = 5;
+    police.attack = 8;
     police.attackChargesRemaining = 1;
     police.maxAttackCharges = 1;
     const target = createUnit(setup, 'promotion-target', 'zombie', { q: police.position.q + 1, r: police.position.r });
@@ -147,7 +148,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     expect(start.error, start.error?.message).toBeNull();
     expect(start.state.units.find((unit) => unit.id === police.id)).toMatchObject({
       proficiency: 'veteran', veteranPromotionPending: false,
-      maxAttackCharges: 2, attackChargesRemaining: 2, attack: 5,
+      maxAttackCharges: 2, attackChargesRemaining: 2, attack: 8,
     });
   });
 
@@ -156,7 +157,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     const setup = engine.getState() as MutableState;
     const police = setup.units.find((unit) => unit.type === 'police')!;
     police.proficiency = 'recruit';
-    police.attack = 4;
+    police.attack = 6;
     police.regularZombieKills = 0;
     const target = createUnit(setup, 'recruit-kill-target', 'zombie', { q: police.position.q + 1, r: police.position.r });
     target.hp = 1;
@@ -182,7 +183,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     police.proficiency = 'veteran';
     police.maxAttackCharges = 2;
     police.attackChargesRemaining = 2;
-    police.attack = 5;
+    police.attack = 8;
     police.position = { q: 24, r: 24 };
     const target = createUnit(setup, 'veteran-target', 'zombie', { q: police.position.q + 1, r: police.position.r });
     target.hp = 10;
@@ -222,7 +223,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     const completed = engine.step({ type: 'EndTurn' });
     expect(completed.error, completed.error?.message).toBeNull();
     expect(completed.state.units.find((unit) => unit.type === 'riotPolice')).toMatchObject({
-      proficiency: 'recruit', attack: 10, hp: 75, maxHp: 75, movement: 10,
+      proficiency: 'recruit', attack: 9, hp: 75, maxHp: 75, movement: 10,
       range: 1, vision: 5, population: 10, maxAttackCharges: 1, attackChargesRemaining: 1,
     });
     expect(completed.state.statistics).toMatchObject({
@@ -241,7 +242,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     const completed = engine.step({ type: 'EndTurn' });
     expect(completed.error, completed.error?.message).toBeNull();
     expect(completed.state.units.find((unit) => unit.type === 'riotPolice')).toMatchObject({
-      proficiency: 'veteran', attack: 13, maxAttackCharges: 2, attackChargesRemaining: 2,
+      proficiency: 'veteran', attack: 12, maxAttackCharges: 2, attackChargesRemaining: 2,
     });
     expect(completed.state.statistics.recruitsCommissionedByType.riotPolice).toBe(0);
   });
@@ -266,7 +267,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     expect(result.error, result.error?.message).toBeNull();
     expect(result.state.units.some((unit) => unit.id === riot.id)).toBe(false);
     expect(result.state.units.find((unit) => unit.type === 'riotZombie')).toMatchObject({
-      position: riot.position, hp: 50, maxHp: 50, canMove: false, canAttack: false,
+      position: riot.position, hp: 60, maxHp: 60, canMove: false, canAttack: false,
       currentFuel: 0, currentMilitaryGoods: 0, proficiency: null,
       spawnGroupId: null, hordeKind: null,
     });
@@ -275,7 +276,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
 
   it('fills scheduled Horde Zombie slots deterministically and applies the per-direction Riot cap', () => {
     const config = createDefaultConfig({
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: {
         waves: [{
           turn: 1,
@@ -283,7 +284,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
           compositionPerDirection: { hordeZombie: 1, zombie: 3 },
           final: true,
         }],
-        specialZombieWeights: { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100 },
+        specialZombieWeights: { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100, hunterZombie: 0 },
         riotZombieCapPerDirection: 1,
       },
     });
@@ -342,7 +343,7 @@ describe('v1.5.0 Human Unit progression and Riot defaults', () => {
     const farm = setup.facilities.find((facility) => facility.id === 'farm-1')!;
     police.position = { ...farm.position };
     police.proficiency = 'veteran';
-    police.attack = 5;
+    police.attack = 8;
     police.maxAttackCharges = 2;
     police.attackChargesRemaining = 2;
     police.currentMilitaryGoods = 2;

@@ -43,6 +43,9 @@ jobs:
         # below so this Pages gate stays responsive.
         run: npx --no-install vitest run --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts
 
+      - name: Test v1.5.0 baseline report normalization
+        run: node --test scripts/normalize-baseline-report.test.mjs
+
       - name: Build production bundle
         run: npm run build
         env:
@@ -117,7 +120,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run v1.5.0 Balanced seed regression
+      - name: Run v1.5.1 Balanced seed regression
         env:
           AGENT_STRATEGY: balanced
           BALANCED_SEED_START: ${{ matrix.start }}
@@ -125,11 +128,42 @@ jobs:
           BALANCED_BATCH_TIMEOUT_MS: 1500000
         run: npx --no-install vitest run src/agent/balancedAgent.batch.test.ts --maxWorkers=1
 
+  session-release-validation:
+    name: Session v1.5.1 normal 1,000-action validation
+    # This long-running job is independent of verify: Pages deployment must
+    # not wait for release persistence validation.
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate 1,000 accepted Core actions through SessionService
+        run: npx --no-install vite-node --script src/testing/session-release-validation.ts --decisions=1000 --json-out=output/session-release/normal-1000.json
+
+      - name: Upload Session validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-v151-normal-1000
+          path: output/session-release/normal-1000.json
+          if-no-files-found: error
+          retention-days: 30
+
   deploy:
     name: Deploy to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Long fixed-seed release batches live in the separately dispatched
-    # v1.5.0 Release Validation workflow and never delay Pages or AI Portable.
+    # v1.5.1 Release Validation workflow and never delay Pages or AI Portable.
     needs: verify
     runs-on: ubuntu-latest
     permissions:

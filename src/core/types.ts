@@ -74,7 +74,8 @@ export type UnitType =
   | 'hordeZombie'
   | 'policeZombie'
   | 'soldierZombie'
-  | 'riotZombie';
+  | 'riotZombie'
+  | 'hunterZombie';
 
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
@@ -582,6 +583,7 @@ export interface GameStatistics {
   policeZombiesFinal: number;
   soldierZombiesFinal: number;
   riotZombiesFinal: number;
+  hunterZombiesFinal: number;
   policeReanimations: number;
   nationalGuardReanimations: number;
   reanimationImmediateInfections: number;
@@ -600,10 +602,12 @@ export interface GameStatistics {
   riotPoliceProduced: number;
   riotPoliceLost: number;
   riotZombiesSpawned: number;
+  hunterZombiesSpawned: number;
   riotZombiesKilled: number;
+  hunterZombiesKilled: number;
   riotPoliceReanimations: number;
-  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
-  finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
+  finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
   noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie', number>;
   hordeMovementNoisePulses: number;
   hordeNoiseRespawnedByType: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
@@ -788,6 +792,8 @@ export interface EndTurnRisk {
 }
 
 export interface GameState {
+  /** Private seed-bound initial Hunter placement; never part of Agent map. */
+  initialHunterPositions: HexCoord[];
   gameVersion: string;
   config: GameConfig;
   seed: number;
@@ -1002,6 +1008,7 @@ export interface HumanUnitConfig extends BaseUnitConfig {
 }
 
 export interface ZombieUnitConfig extends BaseUnitConfig {
+  maxAttackCharges: number;
   attack: number;
 }
 
@@ -1016,6 +1023,7 @@ export interface UnitConfigMap {
   policeZombie: ZombieUnitConfig;
   soldierZombie: ZombieUnitConfig;
   riotZombie: ZombieUnitConfig;
+  hunterZombie: ZombieUnitConfig;
 }
 
 export interface ProductionRule {
@@ -1060,8 +1068,9 @@ export interface HordeWaveConfig {
 export interface HordeConfig {
   warningLeadTurns: number;
   waves: HordeWaveConfig[];
-  specialZombieWeights: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
+  specialZombieWeights: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
   riotZombieCapPerDirection: number;
+  hunterZombieCapPerDirection: number;
   movementNoiseRadius: number;
 }
 
@@ -1125,6 +1134,8 @@ export interface CheckpointConfig {
 }
 
 export interface EconomyConfig {
+  initialHunterCount: { min: number; max: number };
+  initialHunterMinDistance: number;
   populationConsumption: {
     food: number;
     civilianGoods: number;

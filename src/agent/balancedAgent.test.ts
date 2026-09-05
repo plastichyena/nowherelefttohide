@@ -236,7 +236,7 @@ describe('Balanced Agent scenario intentions', () => {
   it('uses the public terrain multiplier when evaluating a lethal attack', () => {
     const guard = observation.units.find((unit) => unit.type === 'nationalGuard')!;
     const template = visibleZombieTemplate(observation);
-    const forest = { ...clone(template), id: 'forest-zombie', hp: 6, terrainDefenseSource: 'forest' as const, terrainDamageMultiplier: 0.5 };
+    const forest = { ...clone(template), id: 'forest-zombie', hp: Math.ceil(guard.attack * 0.5) + 1, terrainDefenseSource: 'forest' as const, terrainDamageMultiplier: 0.5 };
     const plain = { ...clone(template), id: 'plain-zombie', hp: 10, terrainDefenseSource: 'none' as const, terrainDamageMultiplier: 1 };
     const result = decide([
       { type: 'Attack', attackerId: guard.id, targetId: forest.id },

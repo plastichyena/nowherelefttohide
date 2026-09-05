@@ -13,7 +13,7 @@ describe('Agent Runner replay artifacts', () => {
   it('runs a deterministic random game and records a replay artifact', () => {
     const config = createDefaultConfig({
       maxActionsPerTurn: 4,
-      economy: { initialZombieCount: 0 },
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { hordeZombie: { movement: 20, attack: 100 } },
       horde: {
         warningLeadTurns: 1,

@@ -34,17 +34,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.5.0 has no compatibility or migration path for v1.4.5-or-earlier data. */
-export const APP_VERSION = '1.5.0';
-export const GAME_RULES_VERSION = '3.0.0';
-export const SAVE_FORMAT_VERSION = '10';
-export const AGENT_API_VERSION = '7.0.0';
-export const OBSERVATION_API_VERSION = '7.0.0';
-export const BRIDGE_API_VERSION = '7.0.0';
+/** v1.5.1 rejects v1.5.0-or-earlier data without migration. */
+export const APP_VERSION = '1.5.1';
+export const GAME_RULES_VERSION = '4.0.0';
+export const SAVE_FORMAT_VERSION = '11';
+export const AGENT_API_VERSION = '8.0.0';
+export const OBSERVATION_API_VERSION = '8.0.0';
+export const BRIDGE_API_VERSION = '8.0.0';
 export const BALANCED_AGENT_VERSION = '5.0.0';
 export const RANDOM_AGENT_VERSION = '3.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '6.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '3.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '7.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '4.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -374,6 +374,7 @@ export interface AgentApiInfo {
   publicInformation: string[];
   prohibited: string[];
   rules: {
+    zombies: Record<import('../core/types').ZombieUnitType, { hp: number; attack: number; movement: number; range: number; vision: number; maxAttackCharges: number; ai: 'normal' | 'horde' }>;
     proficiency: {
       values: UnitProficiency[];
       productionProficiencyByType: Record<string, UnitProficiency>;
@@ -471,6 +472,9 @@ export interface AgentApiInfo {
       playerOccupancyRule: string;
     };
     horde: {
+      specialZombieWeights: GameConfig['horde']['specialZombieWeights'];
+      riotZombieCapPerDirection: number;
+      hunterZombieCapPerDirection: number;
       warningLeadTurns: number;
       waves: Array<{
         index: number;
@@ -890,6 +894,8 @@ export const HIDDEN_NOISE_METRIC_KEYS = [
   'noiseTargetsOverriddenByVisiblePopulation',
   'aerialDiscoveriesInGroundBlockedArea',
   'policeZombiesFinal',
+  'hunterZombiesSpawned',
+  'hunterZombiesFinal',
   'soldierZombiesFinal',
   'hordeNoiseRespawnedByType',
 ] as const;
@@ -934,6 +940,23 @@ export interface AgentGame {
   isGameOver(): boolean;
   getResult(): AgentGameResult | null;
   getRunArtifact(): AgentPublicRunArtifact;
+  getArtifactPage?(options?: AgentArtifactPageOptions): AgentArtifactPage;
+}
+
+export interface AgentArtifactPageOptions {
+  target?: 'manifest' | 'observations' | 'actions' | 'events' | 'invalid-attempts';
+  offset?: number;
+  pageSize?: number;
+  expectedRevision?: string;
+}
+export interface AgentArtifactPage {
+  revision: string;
+  target: NonNullable<AgentArtifactPageOptions['target']>;
+  count: number;
+  total: number;
+  hasMore: boolean;
+  nextOffset: number | null;
+  items: unknown[];
 }
 
 export type AgentStrategyId = 'random' | 'balanced';

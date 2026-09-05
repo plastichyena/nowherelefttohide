@@ -17,7 +17,7 @@ function quietConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}):
   return createDefaultConfig({
     horde: singleFinalWave(100),
     economy: {
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 100_000, civilianGoods: 100_000, militaryGoods: 100_000, fuel: 100_000 },
     },
     refugees: {
@@ -76,10 +76,10 @@ function movePlayersAway(state: MutableState): void {
   if (guard) guard.position = { q: 2, r: 1 };
 }
 
-describe('v1.4.5 Core version, map, and initial state', () => {
-  it('creates a v3.0.0 state on fixed-51x51-v1 with all 25 initial Normal Zombies', () => {
+describe('v1.5.1 Core version, map, and initial state', () => {
+  it('creates a v4.0.0 state on fixed-51x51-v1 with all 25 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('3.0.0');
+    expect(state.gameVersion).toBe('4.0.0');
     expect(state.mapId).toBe('fixed-51x51-v1');
     expect(state.map.id).toBe('fixed-51x51-v1');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');

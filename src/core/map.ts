@@ -425,6 +425,47 @@ export function initialZombiePositionsMatchSeed(map: FixedMap, seed: number): bo
     });
 }
 
+/** Normal placement consumes its draws first; Hunters then use the same stream. */
+export function generateInitialHunterPositions(
+  map: FixedMap,
+  rng: SeededRng,
+  options: { initialHunterCount: { min: number; max: number }; initialHunterMinDistance: number },
+): HexCoord[] {
+  const capital = map.facilities.find((facility) => facility.type === 'capital');
+  if (!capital) throw new Error('Initial Hunter placement requires a Capital');
+  const occupied = new Set([
+    ...map.facilities.map((facility) => hexKey(facility.position)),
+    ...Object.values(FIXED_INITIAL_UNIT_POSITIONS).map(hexKey),
+    ...map.initialZombiePositions.map(hexKey),
+  ]);
+  const candidates = map.tiles.filter((tile) => tile.movementCost !== null
+    && !isHordeSpawnReserve(map, tile) && !occupied.has(tile.key)
+    && hexDistance(capital.position, tile) >= options.initialHunterMinDistance)
+    .map(({ q, r }) => ({ q, r })).sort((a, b) => a.q - b.q || a.r - b.r);
+  const count = rng.nextInt(options.initialHunterCount.min, options.initialHunterCount.max);
+  if (candidates.length < count) throw new Error(`Initial Hunter count ${count} exceeds ${candidates.length} valid candidates`);
+  const selected: HexCoord[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const pick = rng.nextInt(index, candidates.length - 1);
+    [candidates[index], candidates[pick]] = [candidates[pick]!, candidates[index]!];
+    selected.push({ ...candidates[index]! });
+  }
+  return selected;
+}
+
+export function initialHunterPositionsMatchSeed(
+  state: Pick<import('./types').GameState, 'map' | 'seed' | 'config' | 'initialHunterPositions'>,
+): boolean {
+  try {
+    const rng = new SeededRng(state.seed);
+    const normal = generateInitialZombiePositions(state.map, rng);
+    const expected = generateInitialHunterPositions({ ...state.map, initialZombiePositions: normal }, rng, state.config.economy);
+    return Array.isArray(state.initialHunterPositions) && expected.length === state.initialHunterPositions.length
+      && expected.every((position, index) => position.q === state.initialHunterPositions[index]?.q
+        && position.r === state.initialHunterPositions[index]?.r);
+  } catch { return false; }
+}
+
 const mapWithoutInitialZombies = buildFixedMap();
 
 /** Canonical seed-0 positions are only a template; new games reseed them. */

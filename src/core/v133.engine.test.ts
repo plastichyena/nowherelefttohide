@@ -22,7 +22,7 @@ function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): 
   return createDefaultConfig({
     horde: singleFinalWave(100),
     economy: {
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: {
         food: 100_000,
         civilianGoods: 100_000,

@@ -224,10 +224,10 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '3.0.0',
+      gameVersion: '4.0.0',
       mapId: 'fixed-51x51-v1',
       config: {
-        version: '3.0.0',
+        version: '4.0.0',
         mapId: 'fixed-51x51-v1',
         infection: {
           zombieSpawnPopulationPerUnit: 5,
@@ -350,6 +350,7 @@ describe('AI Portable Session lifecycle', () => {
     inject = false;
     expect(api.status('atomic').active.decision).toBe(0);
     expect(api.step('atomic', { action: { type: 'EndTurn' }, decisionSummary: 'crash me' }).active.decision).toBe(1);
+    expect(api.step('atomic', { action: { type: 'EndTurn' }, decisionSummary: 'continue after recovered orphan' }).active.decision).toBe(2);
   });
 
   it('rejects active corruption without rollback while checkpoint listing and explicit branching remain available', () => {
@@ -359,9 +360,10 @@ describe('AI Portable Session lifecycle', () => {
     api.step('corrupt', { action: { type: 'EndTurn' }, decisionSummary: 'checkpoint this' });
     const checkpoint = api.saveCheckpoint('corrupt');
     const loaded = api.store.load('corrupt');
-    writeFileSync(join(loaded.directory, loaded.active.privateState.relativePath), '{}\n', 'utf8');
+    const publicChunk = loaded.active.publicState.chunks[0]!;
+    writeFileSync(join(root, 'pool', 'public', 'chunks', publicChunk.hash.slice(0, 2), `${publicChunk.hash}.gz`), '{}\n', 'utf8');
 
-    expect(() => api.status('corrupt')).toThrow(/SHA-256/u);
+    expect(() => api.status('corrupt')).toThrow(/hash mismatch/u);
     expect(api.listCheckpoints('corrupt').map((entry) => entry.checkpointId)).toContain(checkpoint.checkpointId);
     expect(api.loadCheckpoint('corrupt', checkpoint.checkpointId, 'recovered').active.decision).toBe(1);
   });
@@ -512,7 +514,8 @@ describe('AI Portable Session lifecycle', () => {
     const hashApi = service(hashRoot);
     hashApi.newSession({ sessionId: 'metric-hash' });
     const hashLoaded = hashApi.store.load('metric-hash');
-    writeFileSync(join(hashLoaded.directory, hashLoaded.active.privateState.relativePath), '{}\n', 'utf8');
+    const privateChunk = hashLoaded.active.privateState.chunks[0]!;
+    writeFileSync(join(hashRoot, 'pool', 'private', 'chunks', privateChunk.hash.slice(0, 2), `${privateChunk.hash}.gz`), '{}\n', 'utf8');
     try {
       hashApi.status('metric-hash');
     } catch (error) {
