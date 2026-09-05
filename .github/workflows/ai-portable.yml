@@ -344,6 +344,7 @@ jobs:
           )
           Set-Content -Encoding ascii (Join-Path $packageRoot 'run-vite-node.cmd') @(
             '@echo off', 'setlocal', 'set "ROOT=%~dp0"', 'call "%ROOT%runtime\identity.cmd"',
+            'cd /d "%ROOT%game"',
             '"%ROOT%runtime\node\node.exe" "%ROOT%game\node_modules\vite-node\vite-node.mjs" --script %*', 'exit /b %ERRORLEVEL%'
           )
           Set-Content -Encoding ascii (Join-Path $packageRoot 'run-session.cmd') @(

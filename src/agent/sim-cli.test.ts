@@ -8,6 +8,7 @@ import {
   csvColumns,
   metricsToCsv,
   parseSimulationArgs,
+  resolveSimulationBuildId,
   runSimulation,
   runSimulationToDirectory,
   writeSimulationOutput,
@@ -30,6 +31,19 @@ describe('Batch Simulation CLI', () => {
     expect(parsed.limits).toEqual({ maxDecisionsPerTurn: 3, maxDecisionsPerGame: 30, maxTurns: 8 });
     expect(parsed.failFast).toBe(true);
     expect(parsed.summaryOnly).toBe(true);
+  });
+
+  it('uses Portable identity metadata without invoking Git', () => {
+    let fallbackCalls = 0;
+    const fallback = (): string => {
+      fallbackCalls += 1;
+      return 'git-fallback';
+    };
+    expect(resolveSimulationBuildId({ NLTH_BUILD_ID: 'portable-build', NLTH_GIT_COMMIT: 'portable-commit' }, fallback)).toBe('portable-build');
+    expect(resolveSimulationBuildId({ NLTH_GIT_COMMIT: 'portable-commit' }, fallback)).toBe('portable-commit');
+    expect(fallbackCalls).toBe(0);
+    expect(resolveSimulationBuildId({}, fallback)).toBe('git-fallback');
+    expect(fallbackCalls).toBe(1);
   });
 
   it('runs multiple strategies against the same seed set and reports comparisons', () => {

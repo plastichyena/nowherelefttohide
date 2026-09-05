@@ -247,13 +247,25 @@ function readConfig(parsed: Pick<ParsedSimulationArguments, 'configPath' | 'conf
 
 function buildIdFromGit(): string {
   try {
-    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (!sha) return 'local-unknown';
-    const dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0;
+    const dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().length > 0;
     return dirty ? `${sha}-dirty` : sha;
   } catch {
     return 'local-unknown';
   }
+}
+
+/** Use the injected Portable identity before consulting a local Git checkout. */
+export function resolveSimulationBuildId(
+  environment: NodeJS.ProcessEnv = process.env,
+  fallback: () => string = buildIdFromGit,
+): string {
+  const buildId = environment.NLTH_BUILD_ID?.trim();
+  if (buildId) return buildId;
+  const commit = environment.NLTH_GIT_COMMIT?.trim();
+  if (commit) return commit;
+  return fallback();
 }
 
 function normalizeRunOptions(options: SimulationRunOptions): {
@@ -270,7 +282,7 @@ function normalizeRunOptions(options: SimulationRunOptions): {
   if (seeds.some((seed) => !Number.isSafeInteger(seed))) throw new Error('seeds must contain safe integers');
   const config = createDefaultConfig(options.config ?? {});
   assertValidGameConfig(config);
-  return { agents, seeds, config, limits: { ...(options.limits ?? {}) }, failFast: options.failFast ?? false, buildId: options.buildId ?? buildIdFromGit() };
+  return { agents, seeds, config, limits: { ...(options.limits ?? {}) }, failFast: options.failFast ?? false, buildId: options.buildId ?? resolveSimulationBuildId() };
 }
 
 /** Execute all requested games; this function deliberately performs no I/O. */

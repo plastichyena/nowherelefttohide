@@ -125,6 +125,13 @@ For custom TypeScript driver scripts, use the bundled `vite-node` launcher inste
 ./run-vite-node.sh game/path/to/your-driver.ts
 ```
 
+On Windows, the launcher runs from the package's `game` directory so Vite resolves
+the bundled dependencies. Pass an absolute driver path or a path relative to `game`:
+
+```powershell
+.\run-vite-node.cmd path/to/your-driver.ts
+```
+
 A custom LLM player should import `createAgentGame` from `game/src/agent/game.ts` and interact only through the public AgentGame methods:
 
 - `getApiInfo()`
