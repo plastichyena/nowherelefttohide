@@ -11,6 +11,10 @@ import type {
 } from './types';
 import { hexDistance, hexKey, hexWithinBounds } from './hex';
 import { SeededRng } from './rng';
+import { FIXED_INITIAL_UNIT_POSITIONS } from './initial-deployment';
+export { FIXED_INITIAL_UNIT_POSITIONS } from './initial-deployment';
+import { getTile, isRoad, isHordeSpawnReserve } from './map-reference';
+export { getTile, getFacility, getHordeEntrance, isRoad, isHordeSpawnReserve, canPlayerOccupyHex } from './map-reference';
 
 /**
  * The v1.4.4 map is intentionally data-only and deterministic. Keep the
@@ -22,14 +26,6 @@ export const FIXED_MAP_WIDTH = 51 as const;
 export const FIXED_MAP_HEIGHT = 51 as const;
 export const FIXED_FACILITY_COUNT = 29 as const;
 export const FIXED_INITIAL_ZOMBIE_COUNT = 25 as const;
-
-/** Starting human unit locations belong to the initial-state contract rather
- * than the FixedMap shape, but exporting them keeps state creation and tests
- * on the same canonical coordinates. */
-export const FIXED_INITIAL_UNIT_POSITIONS = {
-  police: { q: 24, r: 25 },
-  nationalGuard: { q: 26, r: 25 },
-} as const;
 
 /**
  * Initial Zombies are seed-selected at new-game creation. This exported
@@ -522,36 +518,6 @@ export function createFixedMap(
   const map = buildFixedMap(capacities);
   map.initialZombiePositions = FIXED_INITIAL_ZOMBIE_POSITIONS.map((position) => ({ ...position }));
   return cloneMap(map);
-}
-
-export function getTile(map: FixedMap, position: HexCoord): HexTile | undefined {
-  if (!hexWithinBounds(position, map.width, map.height)) return undefined;
-  return map.tiles.find((tile) => tile.q === position.q && tile.r === position.r);
-}
-
-export function getFacility(map: FixedMap, facilityId: string): FacilityDefinition | undefined {
-  return map.facilities.find((facility) => facility.id === facilityId);
-}
-
-export function getHordeEntrance(
-  map: FixedMap,
-  direction: CardinalDirection,
-): HordeEntrance | undefined {
-  return map.hordeEntrances.find((entrance) => entrance.direction === direction);
-}
-
-export function isRoad(map: FixedMap, position: HexCoord): boolean {
-  return getTile(map, position)?.road === true;
-}
-
-/** Static public Map Rule shared by movement, placement, UI, and Agent APIs. */
-export function isHordeSpawnReserve(map: FixedMap, position: HexCoord): boolean {
-  const key = hexKey(position);
-  return map.hordeSpawnReserve.some((candidate) => hexKey(candidate) === key);
-}
-
-export function canPlayerOccupyHex(map: FixedMap, position: HexCoord): boolean {
-  return getTile(map, position) !== undefined && !isHordeSpawnReserve(map, position);
 }
 
 export interface FixedMapValidationResult {

@@ -35,16 +35,16 @@ import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
 /** v1.5.1 rejects v1.5.0-or-earlier data without migration. */
-export const APP_VERSION = '1.5.1';
+export const APP_VERSION = '1.5.2';
 export const GAME_RULES_VERSION = '4.0.0';
 export const SAVE_FORMAT_VERSION = '11';
-export const AGENT_API_VERSION = '8.0.0';
-export const OBSERVATION_API_VERSION = '8.0.0';
-export const BRIDGE_API_VERSION = '8.0.0';
+export const AGENT_API_VERSION = '9.0.0';
+export const OBSERVATION_API_VERSION = '9.0.0';
+export const BRIDGE_API_VERSION = '9.0.0';
 export const BALANCED_AGENT_VERSION = '5.0.0';
 export const RANDOM_AGENT_VERSION = '3.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '7.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '4.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '8.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '5.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -372,6 +372,12 @@ export interface AgentApiInfo {
   methodSchemas: Record<string, { arguments: string; returns: string; description: string }>;
   recommendedCallOrder: string[];
   publicInformation: string[];
+  productionCapacitySchema: {
+    path: 'strategicForecast.productionCapacity';
+    resourceFields: string[];
+    assumptions: string[];
+    details: string;
+  };
   prohibited: string[];
   rules: {
     zombies: Record<import('../core/types').ZombieUnitType, { hp: number; attack: number; movement: number; range: number; vision: number; maxAttackCharges: number; ai: 'normal' | 'horde' }>;

@@ -1,3 +1,4 @@
+import { HUMAN_UNIT_TYPES, UNIT_TYPES, UNIT_CATALOG, WAVE_NON_HORDE_TYPES, isHumanUnitType, isUnitType } from './unit-catalog';
 import type {
   DeepPartial,
   EconomyConfig,
@@ -5,15 +6,14 @@ import type {
   FacilityId,
   FacilityType,
   GameConfig,
-  HumanUnitType,
   InitialFacilityPopulationConfig,
   InitialPopulationRange,
   ProductionRule,
   ResourceStock,
   UnitConfigMap,
-  UnitType,
 } from './types';
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
+export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
 export const CONFIG_VERSION = '4.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v1';
@@ -72,7 +72,7 @@ const defaultUnitConfig: UnitConfigMap = {
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 3,
     recruitmentFacilityTypes: ['capital', 'city'],
     productionCivilianGoods: 10, productionMilitaryGoods: 10, fuelCostRule: 'policeLike',
-    suppressionCivilianDamageRate: 0, reanimationUnitType: 'policeZombie', noiseClass: 'medium', noiseRadius: 4,
+    suppressionCivilianDamageRate: 0, reanimationUnitType: UNIT_CATALOG.police.reanimation, noiseClass: 'medium', noiseRadius: 4,
   },
   nationalGuard: {
     hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 22,
@@ -81,7 +81,7 @@ const defaultUnitConfig: UnitConfigMap = {
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
     recruitmentFacilityTypes: ['capital'],
     productionCivilianGoods: 20, productionMilitaryGoods: 25, fuelCostRule: 'nationalGuardLike',
-    suppressionCivilianDamageRate: 0.5, reanimationUnitType: 'soldierZombie', noiseClass: 'large', noiseRadius: 8,
+    suppressionCivilianDamageRate: 0.5, reanimationUnitType: UNIT_CATALOG.nationalGuard.reanimation, noiseClass: 'large', noiseRadius: 8,
   },
   riotPolice: {
     hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 12,
@@ -90,7 +90,7 @@ const defaultUnitConfig: UnitConfigMap = {
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
     recruitmentFacilityTypes: ['capital', 'city'],
     productionCivilianGoods: 25, productionMilitaryGoods: 25, fuelCostRule: 'policeLike',
-    suppressionCivilianDamageRate: 0, reanimationUnitType: 'riotZombie', noiseClass: 'medium', noiseRadius: 5,
+    suppressionCivilianDamageRate: 0, reanimationUnitType: UNIT_CATALOG.riotPolice.reanimation, noiseClass: 'medium', noiseRadius: 5,
   },
   zombie: {
     maxAttackCharges: 1,
@@ -445,10 +445,10 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   }
   requireInteger(errors, config.maxActionsPerTurn, 'maxActionsPerTurn', 1);
 
-  const unitTypes: UnitType[] = [
-    'police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie',
-  ];
-  for (const type of unitTypes) {
+  for (const type of Object.keys(config.units ?? {})) {
+    if (!isUnitType(type)) errors.push(`units.${type} is not a supported unit type`);
+  }
+  for (const type of UNIT_TYPES) {
     const unit = config.units?.[type];
     if (!unit) {
       errors.push(`units.${type} is required`);
@@ -461,7 +461,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     ] as const) {
       requireInteger(errors, unit[key], `units.${type}.${key}`, 0);
     }
-    const human = type === 'police' || type === 'nationalGuard' || type === 'riotPolice';
+    const human = isHumanUnitType(type);
     if (human) {
       const humanUnit = unit as GameConfig['units']['police'];
       requireInteger(errors, humanUnit.recruitAttack, `units.${type}.recruitAttack`, 1);
@@ -707,7 +707,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     requireInteger(errors, horde.hunterZombieCapPerDirection, 'horde.hunterZombieCapPerDirection', 0);
     requireInteger(errors, horde.riotZombieCapPerDirection, 'horde.riotZombieCapPerDirection', 0);
     requireInteger(errors, horde.movementNoiseRadius, 'horde.movementNoiseRadius', 0);
-    for (const type of ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const) {
+    for (const type of WAVE_NON_HORDE_TYPES) {
       requireInteger(errors, horde.specialZombieWeights?.[type], `horde.specialZombieWeights.${type}`, 0);
     }
     if (horde.specialZombieWeights
@@ -861,4 +861,3 @@ export function assertValidGameConfig(config: GameConfig): void {
 }
 
 export const DEFAULT_GAME_CONFIG = DEFAULT_CONFIG;
-export const HUMAN_UNIT_TYPES: HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice'];

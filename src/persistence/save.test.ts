@@ -16,6 +16,7 @@ import {
   encodeSaveCode,
   exportSaveJson,
   importSaveJson,
+  measureSaveEncoding,
   type StorageLike,
 } from './save';
 
@@ -72,6 +73,18 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
 }
 
 describe('v1.5.1 Save Format 11', () => {
+  it('exposes stable per-stage timings without changing Save Format 11 bytes', () => {
+    const state = initialState(15152);
+    const measured = measureSaveEncoding(state);
+    expect(measured.code).toBe(encodeSaveCode(state));
+    expect(measured.timing.normalizedBytes).toBeGreaterThan(0);
+    expect(measured.timing.compressedBytes).toBeGreaterThan(0);
+    expect(measured.timing.codeChars).toBe(measured.code.length);
+    for (const key of ['validationMs', 'normalizationMs', 'checksumMs', 'gzipMs', 'base64Ms', 'totalMs'] as const) {
+      expect(measured.timing[key]).toBeGreaterThanOrEqual(0);
+    }
+  });
+
   it('round-trips a detached complete Save Format 11 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
@@ -461,6 +474,7 @@ describe('v1.5.1 Save Format 11', () => {
 
     const saved = store.save(initialState(10));
     expect(saved.ok).toBe(true);
+    expect(saved.timing?.storageWriteMs).toBeGreaterThanOrEqual(0);
     expect(storage.getItem(DEFAULT_AUTOSAVE_KEY)).toBe(saved.code);
     expect(storage.getItem(LEGACY_AUTOSAVE_KEY)).toBe(beforeLegacy);
     expect(store.load()).toMatchObject({ valid: true, state: expect.any(Object) });

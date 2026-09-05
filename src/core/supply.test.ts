@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
 import { GameEngine, validateAction } from './engine';
 import { hexDistance } from './hex';
+import { createFixedMap } from './map';
 import { createUnit } from './state';
 import { singleFinalWave } from './testConfig';
 import type { GameState } from './types';
 import {
   getBlockingZombiesForCheckpoint,
+  getCapitalPosition,
   getBranchSupplyRadius,
   getSectorBranchIds,
   isHexSupplied,
@@ -25,6 +27,23 @@ function engineWithoutZombies(): GameEngine {
 }
 
 describe('road branches and supply network', () => {
+  it('does not share static geometry between different maps with the same public ID', () => {
+    const original = createFixedMap();
+    const alternate = createFixedMap();
+    const position = { q: 28, r: 22 };
+    const originalSector = getSectorBranchIds(original, position);
+    alternate.facilities.find((facility) => facility.type === 'capital')!.position = { q: 1, r: 1 };
+    alternate.roadBranches = [{ ...alternate.roadBranches[0]!, id: 'west', roadTiles: [{ ...position }] }];
+    expect(alternate.id).toBe(original.id);
+    expect(getSectorBranchIds(alternate, position)).toEqual(['west']);
+    expect(getCapitalPosition(alternate)).toEqual({ q: 1, r: 1 });
+    expect(getSectorBranchIds(original, position)).toEqual(originalSector);
+    expect(getCapitalPosition(original)).toEqual({ q: 25, r: 25 });
+    const returned = getSectorBranchIds(alternate, position);
+    returned.length = 0;
+    expect(getSectorBranchIds(alternate, position)).toEqual(['west']);
+  });
+
   it('defines four capital-outward branches and supplies radius five without checkpoints', () => {
     const state = new GameEngine(1).getState();
     expect(state.map.roadBranches.map((branch) => branch.id).sort()).toEqual([

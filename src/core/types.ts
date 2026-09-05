@@ -721,6 +721,56 @@ export type QueuePressureClass = 'none' | 'low' | 'medium' | 'high';
 export interface StrategicForecast {
   resources: Record<StrategicResourceType, CriticalResourceDependencyForecast>;
   guaranteedDefeat: GuaranteedDefeatForecast;
+  productionCapacity: ProductionCapacityForecast;
+}
+
+export interface ResourceProductionCapacity {
+  projectedEndTurnOutput: number;
+  installedFacilityRatedCapacity: number;
+  residentRatedOutputAtCurrentPopulation: number;
+  ratedUpperBoundAtCurrentCityPopulation: number;
+  currentFacilityWorkerRatedCapacity: number;
+  currentTotalRatedCapacity: number;
+  currentPlanPrePowerOutput: number;
+  ratedGapUpperBound: number;
+  utilizationRatio: number | null;
+  utilizationUnavailableReason: 'no_rated_capacity' | null;
+  blockingReasonCounts: Record<string, number>;
+  feasibleHeadroom: 'not_computed';
+}
+
+export interface ProductionCapacityForecast {
+  targetTurn: number;
+  cityPopulationBasis: 'current_healthy_residents';
+  facilityScope: 'player_owned_completed_not_ruined_including_temporarily_unavailable';
+  boundsSimultaneouslyAchievable: false;
+  blockingReasonsOverlap: true;
+  exactReallocationCapacityComputed: false;
+  availableCityPopulation: number;
+  remainingActions: number;
+  resources: Record<ResourceType, ResourceProductionCapacity>;
+  electricity: {
+    installedFacilityRatedCapacity: number;
+    currentFacilityWorkerRatedCapacity: number;
+    currentPlanPhysicalCapacity: number;
+    availableGenerationCapacity: number;
+    demand: number;
+    allocated: number;
+    unallocatedAvailableCapacity: number;
+    storable: false;
+    fuelBasis: 'turn_start_stock';
+  };
+  facilities: Array<{
+    facilityId: string;
+    inactiveReasons: string[];
+    installedRatedOutputs: Partial<Record<ResourceType, number>>;
+    currentWorkerRatedOutputs: Partial<Record<ResourceType, number>>;
+    residentRatedOutputs: Partial<Record<ResourceType, number>>;
+    residentSoftCapRatedCeiling: Partial<Record<ResourceType, number>>;
+    residentSoftCapGap: Partial<Record<ResourceType, number>>;
+    installedPowerCapacity: number;
+    currentWorkerPowerCapacity: number;
+  }>;
 }
 
 export interface UnpoweredFacilityForecast {

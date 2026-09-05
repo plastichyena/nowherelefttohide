@@ -101,11 +101,16 @@ function run(): void {
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
   for (const marker of [
-    '1.5.1', '4.0.0', '7.0.0', '8.0.0', 'fixed-51x51-v1', 'SetPowerSupply',
+    '1.5.2', '4.0.0', '8.0.0', '9.0.0', 'fixed-51x51-v1', 'SetPowerSupply',
     'BuildConstructibleFacility', 'DecommissionConstructibleFacility', 'TurnAwayCheckpointRefugees',
     'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',
     'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates',
-    'constructibleFacilityPositionCandidates', 'strategicForecast', 'queuePressureClass',
+    'constructibleFacilityPositionCandidates', 'strategicForecast', 'productionCapacity',
+    'projectedEndTurnOutput', 'installedFacilityRatedCapacity', 'residentRatedOutputAtCurrentPopulation',
+    'ratedUpperBoundAtCurrentCityPopulation', 'currentFacilityWorkerRatedCapacity', 'currentTotalRatedCapacity',
+    'currentPlanPrePowerOutput', 'ratedGapUpperBound', 'utilizationRatio', 'utilizationUnavailableReason',
+    'blockingReasonCounts', 'feasibleHeadroom', 'availableGenerationCapacity', 'unallocatedAvailableCapacity',
+    'queuePressureClass',
     'crisisSummary', 'endTurnRisk', 'proficiency', 'attackChargesRemaining', 'maxAttackCharges',
     'riotPolice', 'riotZombie', 'hunterZombie', 'possibleNonHordeTypes', 'nonHordeSlotCountPerDirection',
     'currentFuel', 'currentMilitaryGoods', 'maxMilitaryGoods', 'fixedMilitaryGoodsUpkeepPerTurn',
@@ -122,7 +127,7 @@ function run(): void {
     'hordeWaves', 'visionMode', 'terrainLosBlocking', 'site_zombies_spawned',
     'groundVisionBlockedHexes', 'infectedPopulationConvertedToZombies',
   ]) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.5.1 schema marker: ${marker}`);
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.5.2 schema marker: ${marker}`);
   }
   // Compatibility validation may legitimately retain the names of removed
   // fields so an old Config can be rejected with a useful reason. Only flag

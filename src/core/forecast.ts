@@ -1,4 +1,4 @@
-import { forecastEndTurn, forecastFacilityProduction } from './engine';
+import { forecastEndTurn, forecastFacilityProduction, forecastProductionCapacity } from './economy-query';
 import type {
   CriticalResourceDependencyForecast,
   GameState,
@@ -89,6 +89,7 @@ export function deriveStrategicForecast(state: Readonly<GameState>): StrategicFo
   const afterCivilianGoods = Math.max(0, afterFood - economy.civilianGoods.maintenanceShortage);
   const guaranteed = afterCivilianGoods === 0;
   return {
+    productionCapacity: forecastProductionCapacity(state),
     resources,
     guaranteedDefeat: {
       guaranteed,

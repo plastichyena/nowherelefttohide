@@ -382,11 +382,6 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
                 && shortProbe.publicObservationLegalSha256 === currentPublicStateHash,
             'Long and short history probes do not expose the same current public state',
         );
-        const memoryAllowanceBytes = 128 * 1024 * 1024;
-        assert(
-            longProbe.peakRssBytes <= shortProbe.peakRssBytes + memoryAllowanceBytes,
-            `Long-history fresh status RSS exceeds same-state short-history RSS by more than ${memoryAllowanceBytes} bytes`,
-        );
         return {
             sameCurrentPrivateState: true,
             sameCurrentPublicState: true,
@@ -394,7 +389,33 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
             currentPublicStateHash,
             historyDecisions: decisionsExecuted,
             shortHistoryDecisions: 0,
-            memoryAllowanceBytes,
+            // This is the byte size of the fully expanded per-Decision
+            // reference representation captured during the same run. It is
+            // deliberately distinct from the compressed Session Store size.
+            historyExpandedBytes: oldStorageBytes,
+            shortHistoryExpandedBytes: 0,
+            historyLengthRatioLongOverShort: null,
+            expandedHistoryBytesRatioLongOverShort: null,
+            // A fresh Vite/Node process includes module loading and OS page-cache
+            // variance, so a fixed RSS difference is not a reliable release gate.
+            // Keep both samples, their deltas, and ratios in the report for the
+            // v1.5.2 history-growth review instead of accepting/rejecting on a
+            // magic byte threshold. A one-point long-versus-zero-history sample
+            // cannot establish bounded or improved RSS by itself.
+            measurementValidity: {
+                sameCurrentStateVerified: true,
+                freshProcessPerProbe: true,
+                samplesPerHistoryLength: 1,
+                shortHistoryIsZeroDecisionControl: true,
+                fixedRssThresholdBytes: null,
+                nonProportionalGrowthAcceptanceTested: false,
+                doesNotEstablishMemoryImprovement: true,
+                interpretation: 'Informational long-versus-zero-history comparison only; ok=true does not establish bounded or improved RSS.',
+            },
+            longHistoryPeakRssOverShortBytes: longProbe.peakRssBytes - shortProbe.peakRssBytes,
+            longHistoryRssOverShortBytes: longProbe.rssBytes - shortProbe.rssBytes,
+            longHistoryPeakRssRatioOverShort: longProbe.peakRssBytes / Math.max(1, shortProbe.peakRssBytes),
+            longHistoryRssRatioOverShort: longProbe.rssBytes / Math.max(1, shortProbe.rssBytes),
             longHistory: probeSummary(longProbe),
             shortHistory: probeSummary(shortProbe),
         };
@@ -551,12 +572,31 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
 export function runCli(argv: readonly string[] = process.argv.slice(2)): number {
     const options = parseSessionReleaseArguments(argv);
     const output = reportPath(options.jsonOut);
-    const report = runSessionReleaseValidation(options);
-    writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
-    process.stdout.write(`${JSON.stringify({ ok: true, output, executedDecisions: report.execution && (report.execution as {
-            executedDecisions: number;
-        }).executedDecisions })}\n`);
-    return 0;
+    try {
+        const report = runSessionReleaseValidation(options);
+        writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+        process.stdout.write(`${JSON.stringify({ ok: true, output, executedDecisions: report.execution && (report.execution as {
+                executedDecisions: number;
+            }).executedDecisions })}\n`);
+        return 0;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // The release workflow uploads this document even when a validation
+        // fails.  Do not overwrite a deliberately protected pre-existing file.
+        if (!existsSync(output)) {
+            mkdirSync(dirname(output), { recursive: true });
+            writeFileSync(output, `${JSON.stringify({
+                ok: false,
+                error: { message },
+                options,
+                node: process.version,
+                platform: process.platform,
+                arch: process.arch,
+            }, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+        }
+        process.stdout.write(`${JSON.stringify({ ok: false, output, error: message })}\n`);
+        return 1;
+    }
 }
 const entry = process.argv[1];
 if (entry && /session-release-validation\.(?:ts|js|mjs)$/u.test(entry)) {

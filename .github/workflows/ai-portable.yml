@@ -1,4 +1,4 @@
-name: AI Portable Package v1.5.1
+name: AI Portable Package v1.5.2
 
 on:
   workflow_run:
@@ -160,11 +160,12 @@ jobs:
           test -f "${ROOT}/game/public/assets/board/units/unit_hunter_zombie.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_wind_power_plant.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_simple_farm.png"
-          test -f "${ROOT}/game/public/assets/board/facilities/facility_civilian_drone_base.png"
-          test -x "${ROOT}/runtime/node/bin/node"
-          test -x "${ROOT}/run-session.sh"
-          VERSION="$(node -p "require('${ROOT}/game/package.json').version")"
-          test "${VERSION}" = "1.5.1"
+           test -f "${ROOT}/game/public/assets/board/facilities/facility_civilian_drone_base.png"
+           test -x "${ROOT}/runtime/node/bin/node"
+           test -x "${ROOT}/run-session.sh"
+          "${ROOT}/run-session.sh" --help | grep -F '"play-turn"'
+           VERSION="$(node -p "require('${ROOT}/game/package.json').version")"
+          test "${VERSION}" = "1.5.2"
           grep -F "App version: ${VERSION}" "${ROOT}/BUILD_INFO.txt"
           grep -F "Build ID:" "${ROOT}/BUILD_INFO.txt"
           grep -F "Platform: linux-x64" "${ROOT}/BUILD_INFO.txt"
@@ -277,6 +278,126 @@ jobs:
         with:
           name: ${{ steps.package.outputs.package_name }}
           path: ${{ steps.package.outputs.package_name }}.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  package-windows:
+    name: Build Windows x64 AI package
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out verified source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Assemble Windows portable package
+        id: package_windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = node -p "require('./package.json').version"
+          $shortSha = git rev-parse --short=12 HEAD
+          $fullSha = git rev-parse HEAD
+          $packageName = "nowhere-left-to-hide-ai-$version-$shortSha-win-x64"
+          $packageRoot = Join-Path $env:RUNNER_TEMP $packageName
+          $gameRoot = Join-Path $packageRoot 'game'
+          New-Item -ItemType Directory -Force -Path $gameRoot, (Join-Path $packageRoot 'runtime') | Out-Null
+
+          robocopy $env:GITHUB_WORKSPACE $gameRoot /E /XD .git node_modules dist output | Out-Null
+          if ($LASTEXITCODE -gt 7) { throw "robocopy failed with exit code $LASTEXITCODE" }
+          Copy-Item -Recurse -Force node_modules (Join-Path $gameRoot 'node_modules')
+          Push-Location $gameRoot
+          try { node scripts/build-portable.mjs --out=dist/portable/session-cli.mjs }
+          finally { Pop-Location }
+
+          $nodeRoot = Split-Path -Parent (Get-Command node).Source
+          Copy-Item -Recurse -Force $nodeRoot (Join-Path $packageRoot 'runtime/node')
+          Set-Content -Encoding ascii (Join-Path $packageRoot 'runtime/identity.cmd') @(
+            "set `"NLTH_GIT_COMMIT=$fullSha`"",
+            "set `"NLTH_BUILD_ID=$fullSha`""
+          )
+          Set-Content -Encoding ascii (Join-Path $packageRoot 'run-npm.cmd') @(
+            '@echo off', 'setlocal', 'set "ROOT=%~dp0"', 'call "%ROOT%runtime\identity.cmd"',
+            'cd /d "%ROOT%game"', 'call "%ROOT%runtime\node\npm.cmd" %*', 'exit /b %ERRORLEVEL%'
+          )
+          Set-Content -Encoding ascii (Join-Path $packageRoot 'run-vite-node.cmd') @(
+            '@echo off', 'setlocal', 'set "ROOT=%~dp0"', 'call "%ROOT%runtime\identity.cmd"',
+            '"%ROOT%runtime\node\node.exe" "%ROOT%game\node_modules\vite-node\vite-node.mjs" --script %*', 'exit /b %ERRORLEVEL%'
+          )
+          Set-Content -Encoding ascii (Join-Path $packageRoot 'run-session.cmd') @(
+            '@echo off', 'setlocal', 'set "ROOT=%~dp0"', 'call "%ROOT%runtime\identity.cmd"',
+            'cd /d "%ROOT%game"', '"%ROOT%runtime\node\node.exe" "%ROOT%game\dist\portable\session-cli.mjs" %*', 'exit /b %ERRORLEVEL%'
+          )
+          Set-Content -Encoding utf8 (Join-Path $packageRoot 'BUILD_INFO.txt') @(
+            'Nowhere Left to Hide portable AI package', "App version: $version", "Commit: $fullSha", "Build ID: $fullSha",
+            "Node.js: $(node --version)", 'Platform: win-x64', 'Generated by: GitHub Actions'
+          )
+          Copy-Item -Force PLAY_WITH_AI.md (Join-Path $packageRoot 'PLAY_WITH_AI.md')
+          "package_name=$packageName" | Add-Content $env:GITHUB_OUTPUT
+          "package_root=$packageRoot" | Add-Content $env:GITHUB_OUTPUT
+
+      - name: Verify Windows portable package contents
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = '${{ steps.package_windows.outputs.package_root }}'
+          @('PLAY_WITH_AI.md', 'BUILD_INFO.txt', 'runtime/identity.cmd', 'runtime/node/node.exe', 'run-npm.cmd', 'run-vite-node.cmd', 'run-session.cmd', 'game/package.json', 'game/package-lock.json', 'game/dist/portable/session-cli.mjs') |
+            ForEach-Object { if (-not (Test-Path (Join-Path $root $_))) { throw "Missing portable package entry: $_" } }
+          $version = node -p "require('$root/game/package.json').version"
+          if ($version -ne '1.5.2') { throw "Expected app version 1.5.2, received $version" }
+          if (-not (Select-String -Quiet -Path (Join-Path $root 'BUILD_INFO.txt') -Pattern 'Platform: win-x64')) { throw 'BUILD_INFO platform is missing' }
+
+      - name: Smoke test bundled Windows Node runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = '${{ steps.package_windows.outputs.package_root }}'
+          $help = & "$root/run-session.cmd" --help | ConvertFrom-Json
+          if ($help.ok -ne $true -or $help.playTurn.command -ne 'play-turn') { throw 'Windows run-session launcher did not expose play-turn' }
+          & "$root/run-npm.cmd" run sim -- --agent=random --games=1 --seed=1 --summary-only --out="$env:RUNNER_TEMP/portable-ai-windows-smoke" --overwrite
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Complete persistent Sessions with bundled Windows Node
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = '${{ steps.package_windows.outputs.package_root }}'
+          & "$root/run-vite-node.cmd" "$root/game/src/testing/portable-session-e2e.ts" --cli="$root/game/dist/portable/session-cli.mjs" --root="$env:RUNNER_TEMP/portable-session-windows" --out="$root/PORTABLE_SESSION_E2E.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content -Raw "$root/PORTABLE_SESSION_E2E.json" | ConvertFrom-Json
+          if (-not $report.ok -or -not $report.replayMatched -or $report.seeds.Count -ne 2) { throw 'Windows portable Session E2E report is incomplete' }
+
+      - name: Create Windows distributable ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = '${{ steps.package_windows.outputs.package_root }}'
+          $zip = Join-Path $env:GITHUB_WORKSPACE '${{ steps.package_windows.outputs.package_name }}.zip'
+          Compress-Archive -Path $root -DestinationPath $zip -CompressionLevel Optimal
+
+      - name: Upload Windows portable AI package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package_windows.outputs.package_name }}
+          path: ${{ steps.package_windows.outputs.package_name }}.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

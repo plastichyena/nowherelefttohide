@@ -1,10 +1,43 @@
-import { forecastEndTurn, forecastUnitSuppression, getUnitLegalAttackProjections } from './engine';
+import { forecastEndTurn } from './economy-query';
+import { forecastUnitSuppression, getUnitLegalAttackProjections } from './combat-query';
 import { deriveStrategicForecast } from './forecast';
 import { deriveCheckpointRole, isHexSupplied } from './supply';
 import { isHumanUnit } from './state';
 import type { CrisisAlert, CrisisSeverity, EndTurnRisk, EndTurnRiskUnit, GameState, JsonObject } from './types';
 
 const severityOrder: Record<CrisisSeverity, number> = { critical: 0, warning: 1, advisory: 2 };
+
+/** Public fact comparisons, exhaustive for the current crisis contract. */
+export const CRISIS_WORSENING_FACTS = {
+  capital_infection_uncontained: { infected: 'up', healthyPopulation: 'down', suppressionUnitAvailable: 'false' },
+  critical_site_infection_uncontained: { infected: 'up', healthyPopulation: 'down', currentProductionLoss: 'up' },
+  checkpoint_defense_degraded: { standbyCount: 'down', fallbackDepth: 'down', roleChangedThisTurn: 'true', activeCheckpointId: 'lost' },
+  unit_out_of_supply_risk: { hp: 'down', fuel: 'down', militaryGoods: 'down' },
+  horde_warning_active: { turnsRemaining: 'down', directionCount: 'up', final: 'true' },
+  guaranteed_resource_defeat: { foodShortage: 'up', civilianGoodsShortage: 'up', healthyCivilians: 'down' },
+  new_state_loss: { eventId: 'changed' },
+} satisfies Record<CrisisAlert['reasonCode'], Record<string, string>>;
+
+type ComparableCrisis = Pick<CrisisAlert, 'id' | 'reasonCode' | 'entityIds' | 'severity' | 'publicFacts'>;
+export function comparePublicCrisisAlerts(before: readonly ComparableCrisis[], after: readonly ComparableCrisis[]): { newAlertIds: string[]; worsenedAlertIds: string[] } {
+  const identity = (a: ComparableCrisis) => `${a.reasonCode}:${[...a.entityIds].sort().join(',') || 'state'}`;
+  const previous = new Map(before.map(a => [identity(a), a]));
+  const newAlertIds: string[] = [], worsenedAlertIds: string[] = [];
+  for (const current of after) {
+    const old = previous.get(identity(current));
+    if (!old) { newAlertIds.push(current.id); continue; }
+    const worse = severityOrder[current.severity] < severityOrder[old.severity] || Object.entries(CRISIS_WORSENING_FACTS[current.reasonCode]).some(([key, direction]) => {
+      const a = old.publicFacts[key], b = current.publicFacts[key];
+      if (direction === 'up' || direction === 'down') return typeof a === 'number' && typeof b === 'number' && (direction === 'up' ? b > a : b < a);
+      if (direction === 'true') return a === false && b === true;
+      if (direction === 'false') return a === true && b === false;
+      if (direction === 'lost') return a != null && b == null;
+      return a !== b;
+    });
+    if (worse) worsenedAlertIds.push(current.id);
+  }
+  return { newAlertIds, worsenedAlertIds };
+}
 
 function alert(
   severity: CrisisSeverity,

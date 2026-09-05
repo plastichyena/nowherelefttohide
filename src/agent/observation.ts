@@ -1,37 +1,32 @@
 import {
   deriveVictoryProgress,
-  effectiveRange,
   forecastEndTurn,
   forecastFacilityProduction,
-  forecastUnitSuppression,
   forecastUnitRefills,
   getConstructibleFacilityPositionCandidates,
   getCheckpointPositionCandidates,
-  getUnitLegalMoveFuelProjections,
-  getUnitLegalAttackProjections,
 } from '../core/engine';
-import { deriveStrategicForecast, getQueuePressureClass } from '../core/forecast';
-import { deriveUnitRecovery } from '../core/recovery';
+import { deriveStrategicForecast } from '../core/forecast';
 import { hexKey } from '../core/hex';
-import { getTile } from '../core/map';
-import { facilityZombieTargetValue, isCityFacility, isProductionFacility } from '../core/state';
 import {
   deriveCheckpointRole,
   deriveSupplySnapshot,
-  isHexSupplied,
 } from '../core/supply';
-import { effectiveMovementCost, isUrbanHex, terrainDefenseAt } from '../core/terrain';
+import { effectiveMovementCost, isUrbanHex } from '../core/terrain';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
 import { deriveCrisisSummary as deriveCoreCrisisSummary, deriveEndTurnRisk as deriveCoreEndTurnRisk } from '../core/crisis';
+import { withReadOnlyQueryScope } from '../core/query-cache';
+import {
+  createPublicCheckpointProjection,
+  createPublicFacilityProjection,
+  createPublicUnitProjection,
+} from '../core/public-entities';
 import type {
   GameResult,
   GameState,
-  EndTurnForecast,
   HexTile,
   JsonValue,
-  ResourceType,
   TerrainDefenseSource,
-  UnitState,
   UnitType,
 } from '../core/types';
 import {
@@ -45,8 +40,6 @@ import {
   type AgentPublicEvent,
   type CrisisSummary,
   type EndTurnRisk,
-  type AgentUnitObservation,
-  type UnitProficiency,
 } from './types';
 
 function cloneJson<T>(value: T): T {
@@ -101,37 +94,12 @@ interface PublicTerrainProjection {
   multiplier: number;
 }
 
-function tileAt(state: Readonly<GameState>, position: { q: number; r: number }): HexTile | undefined {
-  return getTile(state.map, position);
-}
-
 function samePosition(left: { q: number; r: number }, right: { q: number; r: number }): boolean {
   return left.q === right.q && left.r === right.r;
 }
 
-type V15UnitState = UnitState & {
-  proficiency?: UnitProficiency | null;
-  recruitSurvivalTurns?: number;
-  regularZombieKills?: number;
-  veteranPromotionPending?: boolean;
-  attackChargesRemaining?: number;
-  maxAttackCharges?: number;
-  recruitAttack?: number;
-  baseRecruitAttack?: number;
-  spawnGroupId?: string | null;
-  hordeKind?: 'periodic' | 'final' | null;
-};
-
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-function unitString(value: unknown): string {
-  return typeof value === 'string' ? value : '';
-}
-
-function isHumanUnitType(type: string): boolean {
-  return type === 'police' || type === 'nationalGuard' || type === 'riotPolice';
 }
 
 /**
@@ -147,155 +115,6 @@ function publicTileDefense(state: Readonly<GameState>, tile: HexTile): PublicTer
     return { source: 'forest', multiplier: state.config.terrain.damageMultiplier.forestZombie };
   }
   return { source: 'none', multiplier: 1 };
-}
-
-function publicUnit(
-  unit: UnitState,
-  state: Readonly<GameState>,
-  refillByUnitId: ReadonlyMap<string, { demand: number; amount: number }>,
-  militaryByUnitId: ReadonlyMap<string, EndTurnForecast['militaryGoods']['units'][number]>,
-): AgentUnitObservation {
-  const v15Unit = unit as V15UnitState;
-  const unitType = unitString(unit.type);
-  const proficiency = isHumanUnitType(unitType)
-    ? v15Unit.proficiency ?? 'regular'
-    : null;
-  const recruitSurvivalTurns = Math.max(0, Math.floor(finiteNumber(v15Unit.recruitSurvivalTurns, 0)));
-  const regularZombieKills = Math.max(0, Math.floor(finiteNumber(v15Unit.regularZombieKills, 0)));
-  const veteranPromotionPending = Boolean(v15Unit.veteranPromotionPending);
-  const maxAttackCharges = isHumanUnitType(unitType)
-    ? Math.max(1, Math.floor(finiteNumber(v15Unit.maxAttackCharges, 1)))
-    : 0;
-  const attackChargesRemaining = isHumanUnitType(unitType)
-    ? Math.max(0, Math.min(maxAttackCharges, Math.floor(finiteNumber(v15Unit.attackChargesRemaining, unit.canAttack ? 1 : 0))))
-    : 0;
-  const unitConfig = state.config.units[unit.type];
-  const configuredRecruitAttack = isHumanUnitType(unitType) && 'recruitAttack' in unitConfig
-    ? unitConfig.recruitAttack
-    : unit.attack;
-  const baseRecruitAttack = isHumanUnitType(unitType)
-    ? finiteNumber(v15Unit.baseRecruitAttack ?? v15Unit.recruitAttack, configuredRecruitAttack)
-    : null;
-  const effectiveAttack = finiteNumber((v15Unit as unknown as Record<string, unknown>).effectiveAttack, unit.attack);
-  const turnsUntilRegular = proficiency === 'recruit'
-    ? Math.max(0, 5 - recruitSurvivalTurns)
-    : null;
-  const killsUntilVeteran = proficiency === 'regular' || veteranPromotionPending
-    ? Math.max(0, 5 - regularZombieKills)
-    : null;
-  const inSupply = isHexSupplied(state, unit.position);
-  const suppression = forecastUnitSuppression(state, unit);
-  const recovery = unit.isPlayerUnit
-    ? deriveUnitRecovery(state, unit, { projectedSuppression: suppression !== null })
-    : null;
-  const currentRange = effectiveRange(state, unit);
-  const positionTile = tileAt(state, unit.position);
-  const defense = terrainDefenseAt(state, unit);
-  const refill = refillByUnitId.get(unit.id) ?? { demand: 0, amount: 0 };
-  const military = militaryByUnitId.get(unit.id);
-  const fuelCostByLegalMove = (unit.isPlayerUnit
-    ? getUnitLegalMoveFuelProjections(state, unit.id)
-    : [])
-    .sort((left, right) => left.destination.q - right.destination.q || left.destination.r - right.destination.r);
-  const attackPreviews = unit.isPlayerUnit
-    ? getUnitLegalAttackProjections(state, unit.id)
-    : [];
-  return {
-    id: unit.id,
-    type: unit.type,
-    unitType: unit.type,
-    proficiency,
-    recruitSurvivalTurns,
-    turnsUntilRegular,
-    regularZombieKills,
-    killsUntilVeteran,
-    veteranPromotionPending,
-    baseRecruitAttack,
-    effectiveAttack,
-    isScheduledWaveMember: !unit.isPlayerUnit && v15Unit.spawnGroupId !== null && v15Unit.spawnGroupId !== undefined,
-    isFinalWaveMember: !unit.isPlayerUnit && v15Unit.hordeKind === 'final',
-    position: { ...unit.position },
-    vision: unit.vision,
-    visionMode: 'ground',
-    terrainLosBlocking: unit.isPlayerUnit,
-    positionTerrain: positionTile?.terrain ?? 'plain',
-    effectiveMovementCostAtPosition: effectiveMovementCost(state, unit.position),
-    terrainDefenseSource: defense.source,
-    terrainDamageMultiplier: defense.multiplier,
-    hp: unit.hp,
-    maxHp: unit.maxHp,
-    attack: unit.attack,
-    movement: unit.movement,
-    range: unit.range,
-    baseRange: unit.range,
-    effectiveRange: currentRange,
-    rangeModifierReason: unit.isPlayerUnit && currentRange < unit.range
-      ? 'carried_military_goods_shortage'
-      : null,
-    population: unit.population,
-    actionState: unit.actionState,
-    canAttack: unit.canAttack,
-    attackChargesRemaining,
-    maxAttackCharges,
-    canMove: unit.canMove,
-    inSupply,
-    currentFuel: unit.currentFuel,
-    maxFuel: unit.maxFuel,
-    currentMilitaryGoods: unit.currentMilitaryGoods,
-    maxMilitaryGoods: unit.maxMilitaryGoods,
-    fixedMilitaryGoodsUpkeepPerTurn: unitConfig.fixedMilitaryGoodsUpkeepPerTurn,
-    attackMilitaryGoodsCostByRange: cloneJson(unitConfig.attackMilitaryGoodsCostByRange),
-    suppressionMilitaryGoodsCost: unitConfig.suppressionMilitaryGoodsCost,
-    emergencyMovementPoints: unitConfig.emergencyMovementPoints,
-    emergencyMovementAvailable: unit.isPlayerUnit && unit.currentFuel === 0 && unit.canMove,
-    fuelCostByLegalMove,
-    attackPreviews: attackPreviews.map((preview) => ({
-      ...preview,
-      projectedAttackChargesRemaining: Math.max(0, attackChargesRemaining - 1),
-    })),
-    projectedRefillDemandIfTurnEndsNow: refill.demand,
-    projectedRefillAmountIfTurnEndsNow: refill.amount,
-    projectedMilitaryGoodsAfterFixedConsumption: military?.afterFixed ?? unit.currentMilitaryGoods,
-    projectedMilitaryGoodsAfterRefill: military?.afterRefill ?? unit.currentMilitaryGoods,
-    projectedMilitaryGoodsAfterSuppression: military?.afterSuppression ?? unit.currentMilitaryGoods,
-    recoveryClassIfTurnEndsNow: recovery?.recoveryClass ?? null,
-    recoveryRateIfTurnEndsNow: recovery?.rate ?? 0,
-    recoveryBaseAmountIfTurnEndsNow: recovery?.baseAmount ?? 0,
-    recoveryTiming: recovery?.timing ?? null,
-    recoveryConditions: {
-      requiresSurvival: recovery?.requiresSurvival ?? false,
-      requiresSupplyAtRecovery: recovery?.requiresSupplyAtRecovery ?? false,
-    },
-    infectionContainmentCapable: unit.isPlayerUnit,
-    suppressionPower: suppression?.suppressionPower ?? (unit.isPlayerUnit ? effectiveAttack : 0),
-    suppressionCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
-    suppressionAvailableIfTurnEndsNow: military?.suppressionStatus === 'suppression',
-    suppressionStatusIfTurnEndsNow: military?.suppressionStatus ?? 'none',
-    suppressionTargetId: suppression?.targetId ?? null,
-    suppressionChecksIfTurnEndsNow: attackChargesRemaining,
-    suppressionMilitaryGoodsCostsIfTurnEndsNow: Array.from(
-      { length: Math.max(0, attackChargesRemaining) },
-      () => unitConfig.suppressionMilitaryGoodsCost,
-    ),
-    projectedSuppressionIfTurnEndsNow: suppression?.projectedSuppression ?? 0,
-    projectedSuppressionCivilianDamageIfTurnEndsNow: suppression?.projectedCivilianDamage ?? 0,
-  };
-}
-
-function multiplyResources(
-  values: Partial<Record<ResourceType, number>>,
-  workers: number,
-): Partial<Record<ResourceType, number>> {
-  return Object.fromEntries(
-    Object.entries(values).map(([resource, amount]) => [resource, amount * workers]),
-  ) as Partial<Record<ResourceType, number>>;
-}
-
-function containingUnitAt(state: Readonly<GameState>, q: number, r: number): UnitState | undefined {
-  const key = `${q},${r}`;
-  return [...state.units]
-    .filter((unit) => unit.isPlayerUnit && hexKey(unit.position) === key)
-    .sort((left, right) => left.id.localeCompare(right.id))[0];
 }
 
 /**
@@ -337,6 +156,13 @@ function publicEndTurnRisk(state: Readonly<GameState>): EndTurnRisk {
 export function createAgentObservation(
   state: Readonly<GameState>,
   projectionCache: AgentObservationProjectionCache = {},
+): AgentObservation {
+  return withReadOnlyQueryScope(state, () => createAgentObservationInScope(state, projectionCache));
+}
+
+function createAgentObservationInScope(
+  state: Readonly<GameState>,
+  projectionCache: AgentObservationProjectionCache,
 ): AgentObservation {
   const supply = deriveSupplySnapshot(state);
   const visibleTileKeys = getPlayerVisibleTileKeys(state);
@@ -413,190 +239,28 @@ export function createAgentObservation(
         checkpointActionAvailable: (branchState?.checkpointActionsThisTurn ?? 0) < 1,
       };
     });
+  const entityProjectionContext = {
+    visibleTileKeys,
+    refillByUnitId,
+    militaryByUnitId,
+    productionByFacility,
+  };
   const facilities = [...state.facilities]
     .sort((left, right) => left.id.localeCompare(right.id))
-    .map((facility) => {
-      const inSupply = isHexSupplied(state, facility.position);
-      const unavailableForOperation = ['building', 'disabled', 'recovering'].includes(facility.operationalStatus);
-      const populationOperational =
-        facility.owner === 'player' &&
-        facility.status === 'owned' &&
-        facility.infected === 0 &&
-        !unavailableForOperation &&
-        facility.populationOperationalTurn <= state.turn;
-      let populationUnavailableReason: string | null = null;
-      if (facility.owner !== 'player') populationUnavailableReason = 'not_owned';
-      else if (facility.status !== 'owned') populationUnavailableReason = 'facility_ruined';
-      else if (facility.infected > 0) populationUnavailableReason = 'facility_infected';
-      else if (facility.operationalStatus === 'building') populationUnavailableReason = 'building';
-      else if (facility.operationalStatus === 'disabled') populationUnavailableReason = 'disabled';
-      else if (facility.operationalStatus === 'recovering') populationUnavailableReason = 'recovering';
-      else if (facility.populationOperationalTurn > state.turn) populationUnavailableReason = 'available_next_turn';
-      const assignable =
-        isProductionFacility(facility) &&
-        facility.owner === 'player' &&
-        facility.status === 'owned' &&
-        facility.infected === 0 &&
-        !unavailableForOperation &&
-        facility.populationOperationalTurn <= state.turn;
-      const populationIncreaseAvailable = assignable && inSupply && state.population.cityResidents > 0;
-      const populationDecreaseAvailable = assignable && facility.workers > 0;
-      const recruitmentAvailable =
-        isCityFacility(facility) &&
-        facility.owner === 'player' &&
-        facility.status === 'owned' &&
-        facility.infected === 0 &&
-        !unavailableForOperation &&
-        facility.populationOperationalTurn <= state.turn &&
-        inSupply;
-      const rule = state.config.facilities[facility.type].production;
-      const containingUnit = facility.infected > 0
-        ? containingUnitAt(state, facility.position.q, facility.position.r)
-        : undefined;
-      const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
-      const productionProjection = productionByFacility.get(facility.id);
-      const currentWorkers = productionProjection?.operatingWorkers ?? 0;
-      const estimatedInputs = productionProjection?.inputs ?? multiplyResources(rule.inputs, currentWorkers);
-      const estimatedOutputs = productionProjection?.outputs ?? multiplyResources(rule.outputs, currentWorkers);
-      const stoppedReason = productionProjection ? productionProjection.stoppedReason : 'stopped';
-      return {
-        id: facility.id,
-        type: facility.type,
-        position: { ...facility.position },
-        owner: facility.owner,
-        status: facility.status,
-        operationalStatus: facility.operationalStatus,
-        constructible: facility.constructible,
-        builtTurn: facility.builtTurn,
-        recoveryOperationalTurn: facility.recoveryOperationalTurn,
-        vision: facility.owner === 'player' && facility.status !== 'ruined' && !unavailableForOperation
-          ? facility.type === 'capital'
-            ? state.config.vision.capital
-            : facility.type === 'civilianDroneBase'
-              ? facility.workers > 0 && facility.powerSupplyEnabled && facility.lastPowerSupplied === true
-                ? facility.workers * 3
-                : 0
-              : state.config.vision.ownedFacility
-          : 0,
-        visionMode: facility.type === 'civilianDroneBase' ? 'aerial' as const : 'ground' as const,
-        terrainLosBlocking: facility.type !== 'civilianDroneBase',
-        healthyPopulation: facility.workers,
-        zombieTargetValue: facilityZombieTargetValue(state, facility),
-        infectedPopulation: facility.infected,
-        populationCapacity: facility.workerCapacity,
-        populationLimitKind: isCityFacility(facility) ? 'soft' as const : 'hard' as const,
-        populationOperational,
-        populationUnavailableReason,
-        inSupply,
-        populationIncreaseAvailable,
-        populationDecreaseAvailable,
-        recruitmentAvailable,
-        recruitmentUnavailableReason: recruitmentAvailable ? null : isCityFacility(facility) ? (
-          facility.owner !== 'player' || facility.status !== 'owned'
-            ? 'city_not_owned'
-            : facility.infected > 0
-              ? 'city_infected'
-              : facility.populationOperationalTurn > state.turn
-                ? 'available_next_turn'
-                : 'city_out_of_supply'
-        ) : 'not_recruitment_hub',
-        production: {
-          inputsPerWorker: cloneJson(rule.inputs),
-          outputsPerWorker: cloneJson(rule.outputs),
-          requiresPower: rule.requiresPower,
-          requiredPowerCapacity: rule.powerMode === 'required' ? rule.powerCapacity : 0,
-          powerGenerationPerWorker: rule.powerGeneration,
-          powerMode: rule.powerMode,
-          powerDemand: rule.powerMode === 'required' ? rule.powerCapacity : 0,
-          powerSupplyEnabled: rule.powerMode === 'required' && facility.powerSupplyEnabled,
-          projectedPowerRequested: productionProjection?.projectedPowerRequested ?? false,
-          projectedPowerSupplied: productionProjection?.projectedPowerSupplied ?? false,
-          projectedPowerReason: productionProjection?.projectedPowerReason ?? 'not_applicable',
-          lastPowerSupplied: facility.lastPowerSupplied,
-          projectedProductionMultiplier: productionProjection?.productionMultiplier ?? 1,
-          baseProduction: cloneJson(productionProjection?.baseOutputs ?? {}),
-          projectedProduction: cloneJson(estimatedOutputs),
-          estimatedInputConsumption: estimatedInputs,
-          estimatedOutput: estimatedOutputs,
-          estimatedPowerGeneration: productionProjection?.powerGeneration ?? 0,
-          stoppedReason,
-          projectedInputLossIfInfectedOrOverrun: cloneJson(estimatedInputs),
-          projectedOutputLossIfInfectedOrOverrun: cloneJson(estimatedOutputs),
-          projectedPowerLossIfInfectedOrOverrun: productionProjection?.powerGeneration ?? 0,
-        },
-        infectionContained: facility.infected > 0 && containingUnit !== undefined,
-        containingUnitId: containingUnit?.id ?? null,
-        projectedSuppression: suppression?.projectedSuppression ?? 0,
-        projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
-        decommissionRefundCivilianGoods: facility.constructible && facility.type === 'civilianDroneBase'
-          ? Math.ceil(state.config.facilities.civilianDroneBase.buildCivilianGoods / 2)
-          : null,
-      };
-    });
+    .map((facility) => createPublicFacilityProjection(facility, state, entityProjectionContext));
+
   const orderedUnits = [...state.units].sort((left, right) => left.id.localeCompare(right.id));
   const visibleEnemyUnits = orderedUnits.filter(
     (unit) => !unit.isPlayerUnit && visibleTileKeys.has(hexKey(unit.position)),
   );
   const units = orderedUnits
     .filter((unit) => unit.isPlayerUnit)
-    .map((unit) => publicUnit(unit, state, refillByUnitId, militaryByUnitId));
-  const zombies = visibleEnemyUnits.map((unit) => publicUnit(unit, state, refillByUnitId, militaryByUnitId));
+    .map((unit) => createPublicUnitProjection(unit, state, entityProjectionContext));
+  const zombies = visibleEnemyUnits.map((unit) => createPublicUnitProjection(unit, state, entityProjectionContext));
   const checkpoints: PublicCheckpoint[] = [...state.checkpoints]
     .sort((left, right) => left.id.localeCompare(right.id))
-    .map((checkpoint) => {
-      const role = checkpointRoleById.get(checkpoint.id) ?? 'abandoned';
-      const branch = branchStatesById.get(checkpoint.branchId ?? checkpoint.direction);
-      const containingUnit = checkpoint.infected > 0
-        ? containingUnitAt(state, checkpoint.position.q, checkpoint.position.r)
-        : undefined;
-      const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
-      return {
-        id: checkpoint.id,
-        branchId: checkpoint.branchId ?? checkpoint.direction,
-        position: { ...checkpoint.position },
-        direction: checkpoint.direction,
-        vision: role === 'active' ? state.config.vision.operationalCheckpoint : 0,
-        visionMode: 'ground' as const,
-        terrainLosBlocking: true as const,
-        status: checkpoint.status,
-        role,
-        waiting: checkpoint.waiting,
-        screening: checkpoint.screening,
-        approved: checkpoint.approved,
-        queuePeople: checkpoint.waiting + checkpoint.screening + checkpoint.approved,
-        screeningCapacity: state.config.refugees.screeningCapacity,
-        estimatedScreeningThroughput: state.config.refugees.screeningCapacity / Math.max(
-          1,
-          state.config.refugees.policies[branch?.currentPolicy ?? 'normal'].turns,
-        ),
-        arrivalIntervalMin: state.config.refugees.arrivalIntervalMin,
-        arrivalIntervalMax: state.config.refugees.arrivalIntervalMax,
-        arrivalPeopleMin: state.config.refugees.arrivalPeopleMin,
-        arrivalPeopleMax: state.config.refugees.arrivalPeopleMax,
-        queuePressureClass: getQueuePressureClass(
-          checkpoint.waiting + checkpoint.screening + checkpoint.approved,
-          state.config.refugees.screeningCapacity,
-        ),
-        healthyQueueConsumesMaintenance: true as const,
-        queueMaintenanceFood:
-          (checkpoint.waiting + checkpoint.screening + checkpoint.approved) *
-          state.config.economy.populationConsumption.food,
-        queueMaintenanceCivilianGoods:
-          (checkpoint.waiting + checkpoint.screening + checkpoint.approved) *
-          state.config.economy.populationConsumption.civilianGoods,
-        infected: checkpoint.infected,
-        remainingTurns: checkpoint.remainingTurns,
-        currentPolicy: branch?.currentPolicy ?? 'normal',
-        currentPolicyTurns: state.config.refugees.policies[branch?.currentPolicy ?? 'normal'].turns,
-        nextPolicy: checkpoint.screeningPolicy,
-        nextArrivalTurn: checkpoint.nextArrivalTurn,
-        providesSupply: role === 'active',
-        infectionContained: checkpoint.infected > 0 && containingUnit !== undefined,
-        containingUnitId: containingUnit?.id ?? null,
-        projectedSuppression: suppression?.projectedSuppression ?? 0,
-        projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
-      };
-    });
+    .map((checkpoint) => createPublicCheckpointProjection(checkpoint, state));
+
   const victory = deriveVictoryProgress(state);
   const publicFinalHordeStatus = victory.finalHordeDefeated
     ? 'defeated' as const

@@ -565,7 +565,7 @@ describe('AI Portable Session lifecycle', () => {
 });
 
 describe('Session JSON CLI', () => {
-  it('supports all seven formal commands with file/stdin-style JSON input', () => {
+  it('supports the formal single-command interface with file/stdin-style JSON input', () => {
     const root = tempRoot('cli');
     let stdin = '';
     const dependencies = {

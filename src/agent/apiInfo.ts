@@ -104,6 +104,12 @@ export function createAgentApiInfo(
       getRunArtifact: { arguments: 'none', returns: `AgentPublicRunArtifact ${ARTIFACT_SCHEMA_VERSION}`, description: 'Returns an in-memory public play trace without verification-only fields or exact Noise radii.' },
     },
     recommendedCallOrder: [...PUBLIC_METHODS],
+    productionCapacitySchema: {
+      path: 'strategicForecast.productionCapacity',
+      resourceFields: ['projectedEndTurnOutput', 'installedFacilityRatedCapacity', 'residentRatedOutputAtCurrentPopulation', 'ratedUpperBoundAtCurrentCityPopulation', 'currentFacilityWorkerRatedCapacity', 'currentTotalRatedCapacity', 'currentPlanPrePowerOutput', 'ratedGapUpperBound', 'utilizationRatio', 'utilizationUnavailableReason', 'blockingReasonCounts', 'feasibleHeadroom'],
+      assumptions: ['Next EndTurn gross output, before consumption.', 'Installed capacity includes completed owned temporarily unavailable facilities; excludes unowned, building and ruined facilities.', 'Current healthy city residents are fixed for the upper bound; shared population, power and input stocks prevent simultaneous guarantees.', 'feasibleHeadroom=not_computed; exactReallocationCapacityComputed=false.', 'Electricity cannot be stored; current refinery output cannot fund current power or unit refills.', 'Blocking reason counts overlap and cannot be summed into lost output.'],
+      details: 'Session compact responses retain resource bounds, gaps, utilization and reasons. query forecast returns intermediate stages, per-facility inactive reasons and residentSoftCapRatedCeiling/residentSoftCapGap at its revision.',
+    },
     publicInformation: [
       'Use getObservation() for current public facts and getLegalActions() for currently legal operations.',
       'Call step() with one listed action at a time until isGameOver() is true.',

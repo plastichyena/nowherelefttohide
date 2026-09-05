@@ -1,5 +1,5 @@
 import { HEX_DIRECTION_ORDER, hexKey, hexNeighbor, hexWithinBounds } from './hex';
-import { getTile } from './map';
+import { createMapReference } from './map-reference';
 import type { FixedMap, HexCoord } from './types';
 
 export function compareHexCoordinates(a: HexCoord, b: HexCoord): number {
@@ -7,6 +7,51 @@ export function compareHexCoordinates(a: HexCoord, b: HexCoord): number {
 }
 
 export type MovementCostResolver = (position: HexCoord) => number | null;
+
+interface Pending { position: HexCoord; cost: number; signature: string }
+
+/** Stable min-heap with precisely the old Array.sort comparison and tie order. */
+class PathFrontier {
+  private entries: Array<Pending & { order: number }> = [];
+  private nextOrder = 0;
+  get length(): number { return this.entries.length; }
+  private compare(left: Pending & { order: number }, right: Pending & { order: number }): number {
+    return left.cost - right.cost || left.signature.localeCompare(right.signature) || left.order - right.order;
+  }
+  push(value: Pending): void {
+    const entry = { ...value, order: this.nextOrder++ };
+    let index = this.entries.length;
+    this.entries.push(entry);
+    while (index > 0) {
+      const parent = (index - 1) >>> 1;
+      if (this.compare(this.entries[parent]!, entry) <= 0) break;
+      this.entries[index] = this.entries[parent]!;
+      index = parent;
+    }
+    this.entries[index] = entry;
+  }
+  pop(): Pending {
+    const first = this.entries[0]!;
+    const last = this.entries.pop()!;
+    if (this.entries.length > 0) {
+      let index = 0;
+      while (index * 2 + 1 < this.entries.length) {
+        let child = index * 2 + 1;
+        if (child + 1 < this.entries.length && this.compare(this.entries[child + 1]!, this.entries[child]!) < 0) child += 1;
+        if (this.compare(last, this.entries[child]!) <= 0) break;
+        this.entries[index] = this.entries[child]!;
+        index = child;
+      }
+      this.entries[index] = last;
+    }
+    return first;
+  }
+}
+
+function mapMovementCostResolver(map: FixedMap): MovementCostResolver {
+  const reference = createMapReference(map);
+  return (position) => reference.getTile(position)?.movementCost ?? null;
+}
 
 function coordinateSignature(position: HexCoord): string {
   return `${position.q.toString().padStart(2, '0')},${position.r.toString().padStart(2, '0')}`;
@@ -18,7 +63,7 @@ export function findShortestPath(
   start: HexCoord,
   destination: HexCoord,
   blocked: ReadonlySet<string> = new Set(),
-  resolveCost: MovementCostResolver = (position) => getTile(map, position)?.movementCost ?? null,
+  resolveCost: MovementCostResolver = mapMovementCostResolver(map),
 ): HexCoord[] | null {
   const startKey = hexKey(start);
   const destinationKey = hexKey(destination);
@@ -28,14 +73,13 @@ export function findShortestPath(
   if (blocked.has(destinationKey) && destinationKey !== startKey) {
     return null;
   }
-  type Pending = { position: HexCoord; cost: number; signature: string };
-  const pending: Pending[] = [{ position: { ...start }, cost: 0, signature: coordinateSignature(start) }];
+  const pending = new PathFrontier();
+  pending.push({ position: { ...start }, cost: 0, signature: coordinateSignature(start) });
   const best = new Map<string, { cost: number; signature: string }>([[startKey, { cost: 0, signature: coordinateSignature(start) }]]);
   const previous = new Map<string, string | null>([[startKey, null]]);
   const positions = new Map<string, HexCoord>([[startKey, { ...start }]]);
   while (pending.length > 0) {
-    pending.sort((left, right) => left.cost - right.cost || left.signature.localeCompare(right.signature));
-    const currentEntry = pending.shift()!;
+    const currentEntry = pending.pop();
     const current = currentEntry.position;
     const currentKey = hexKey(current);
     const currentBest = best.get(currentKey);
@@ -83,7 +127,7 @@ export function findReachableTiles(
   start: HexCoord,
   budget: number,
   blocked: ReadonlySet<string> = new Set(),
-  resolveCost: MovementCostResolver = (position) => getTile(map, position)?.movementCost ?? null,
+  resolveCost: MovementCostResolver = mapMovementCostResolver(map),
 ): HexCoord[] {
   return findReachablePaths(map, start, budget, blocked, resolveCost).map((entry) => entry.position);
 }
@@ -100,19 +144,17 @@ export function findReachablePaths(
   start: HexCoord,
   budget: number,
   blocked: ReadonlySet<string> = new Set(),
-  resolveCost: MovementCostResolver = (position) => getTile(map, position)?.movementCost ?? null,
+  resolveCost: MovementCostResolver = mapMovementCostResolver(map),
 ): ReachablePath[] {
   const startKey = hexKey(start);
   const startSignature = coordinateSignature(start);
   const best = new Map<string, { cost: number; signature: string }>([[startKey, { cost: 0, signature: startSignature }]]);
   const previous = new Map<string, string | null>([[startKey, null]]);
   const positions = new Map<string, HexCoord>([[startKey, { ...start }]]);
-  const pending: Array<{ position: HexCoord; cost: number; signature: string }> = [
-    { position: { ...start }, cost: 0, signature: startSignature },
-  ];
+  const pending = new PathFrontier();
+  pending.push({ position: { ...start }, cost: 0, signature: startSignature });
   while (pending.length > 0) {
-    pending.sort((left, right) => left.cost - right.cost || left.signature.localeCompare(right.signature));
-    const current = pending.shift()!;
+    const current = pending.pop();
     const currentKey = hexKey(current.position);
     const knownCurrent = best.get(currentKey);
     if (!knownCurrent || knownCurrent.cost !== current.cost || knownCurrent.signature !== current.signature) continue;

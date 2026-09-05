@@ -1,15 +1,15 @@
 # Play Nowhere Left to Hide with an AI
 
-This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.5.1.
+This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.5.2.
 
-The portable AI package produced by GitHub Actions contains this repository, installed dependencies, and a Linux x64 Node.js runtime. No separate Node.js installation or `npm install` is required after extracting the package.
+The portable AI packages produced by GitHub Actions contain this repository, installed dependencies, and either a Linux x64 or Windows x64 Node.js runtime. No separate Node.js installation or `npm install` is required after extracting a package.
 
 ## Intended use
 
 Give the extracted package (or its ZIP) to an AI environment that can inspect files and execute local commands, then ask it to play the game. A useful prompt is:
 
 ```text
-Play Nowhere Left to Hide as the governor. Use the Session CLI and only its public observations, legal actions, step results, events, and your own Public Decision Log. Create a Session, inspect status, submit exactly one listed action with a short public decisionSummary per step, and continue until Game Over. If this response must end, report the Session ID so the next response can resume it with status. At the end, report the result and retain the artifact.
+Play Nowhere Left to Hide as the governor. Use the Session CLI and only its public observations, legal actions, action results, events, and your own Public Decision Log. Create a Session, then use play-turn so one Node process stays open for the current turn. Read each JSONL result before choosing the next action, include a unique requestId and the returned expectedRevision, and explicitly submit EndTurn. If an action reports a stopReason, reassess from the returned Compact state and query details before continuing. If this response must end, close the process and report the Session ID so the next response can resume it. At the end, report the result and retain the artifact.
 ```
 
 ## Portable package commands
@@ -18,12 +18,49 @@ From the extracted package root, create a persistent Session:
 
 ```bash
 ./run-session.sh new --session-id=my-game --seed=1 --agent-id=my-agent
-./run-session.sh status --session=my-game
+./run-session.sh play-turn --session=my-game
 ```
 
-`status` is also the resume command: run it with the same Session ID in a later process or AI response. There is intentionally no separate `resume` command. `new`, `status`, `step`, and `load-checkpoint` return a Compact public snapshot by default: the Version, Session ID, Revision, turn/phase/Game Over state, public resources and population, every owned Unit's basic status, owned Facility/Checkpoint state, visible enemies, Crisis Summary, End Turn Forecast summary, Horde warning, available action kinds, and a route to the corresponding detail query. It never silently omits a Unit or candidate; it omits repeated fixed-map data, complete candidate lists, cost tables, and historical Observations from the ordinary response.
+On Windows PowerShell, use the matching bundled launcher:
 
-Choose exactly one action from `legalActions`, then submit it with a short public rationale. `step` accepts JSON from standard input or `--input`:
+```powershell
+.\run-session.cmd new --session-id=my-game --seed=1 --agent-id=my-agent
+.\run-session.cmd play-turn --session=my-game
+```
+
+`play-turn` starts by returning one JSON object containing the current Compact state and protocol capabilities. Keep its stdin/stdout handles open across tool calls. Send one JSON object per line and read one JSON response line before sending the next request:
+
+```json
+{"type":"query","target":"legal-actions","expectedRevision":0,"pageSize":100}
+{"type":"action","action":{"type":"Wait","unitId":"unit-1"},"decisionSummary":"Hold this supplied position.","expectedRevision":0,"requestId":"turn-1-wait-unit-1"}
+{"type":"action","action":{"type":"EndTurn"},"decisionSummary":"No higher-priority legal action remains.","expectedRevision":1,"requestId":"turn-1-end"}
+```
+
+Every accepted or rejected Action is saved before its response is written. If the connection ends after commit, resend the exact request with the same `requestId`; the response has `replayed: true` and the Action is not applied twice. Reusing an ID with different content is rejected. A successful EndTurn or Game Over closes the process. EOF, explicit `{"type":"close"}`, idle timeout, and the request limit close it without inventing EndTurn or Wait; the closing line reports the saved Revision.
+
+Protocol `1.0.0` accepts at most 1 MiB per JSONL line, 256 requests per process, and 64 Actions or 8 MiB per finite-plan file. The default idle timeout is five minutes; `--idle-timeout-ms` accepts 100–3,600,000 ms. Requests are processed serially with one pending write, stdout honors pipe backpressure, and process-local payload/Runtime caches are bounded and released on close. One live `play-turn` writer is allowed per Session. A legacy `step` or another external commit may still advance the Session; the next interactive request then returns `stale_revision` with the current Compact state so the caller can recover. Run `./run-session.sh --help` or `.\run-session.cmd --help` for the machine-readable schemas and limits. `query api` retains the Agent API fields at top level and adds the same Session capability object at `sessionPlayTurn`.
+
+If the AI host cannot retain a process handle, put a finite plan in `turn-plan.json` and run one process:
+
+```json
+{
+  "expectedRevision": 0,
+  "actions": [
+    {"action":{"type":"AssignWorkers","facilityId":"farm-1","workers":5},"decisionSummary":"Restore food output.","requestId":"turn-1-workers"},
+    {"action":{"type":"EndTurn"},"decisionSummary":"Complete the reviewed domestic plan.","requestId":"turn-1-end"}
+  ]
+}
+```
+
+```bash
+./run-session.sh play-turn --session=my-game --input=turn-plan.json
+```
+
+Use finite plans for actions whose intervening public results do not require tactical reassessment. The runner stops on rejection, interrupted movement, unexpected Player Unit damage or loss, a newly visible enemy, a new or worsened Crisis, Game Over, or the first successful EndTurn. It returns executed, rejected, and unexecuted indexes. To allow expected immediate Player Unit damage for one action, provide exact public bounds such as `"expectations":{"playerUnitHp":[{"unitId":"unit-1","minHp":20,"maxHp":25}]}`. This never disables enemy discovery, Unit loss, movement interruption, Crisis, or Game Over stops.
+
+`status` is the process-independent resume command: run it with the same Session ID in a later AI response. There is intentionally no separate `resume` command. `new`, `status`, `play-turn`, `step`, and `load-checkpoint` return a Compact public snapshot by default: the Version, Session ID, Revision, turn/phase/Game Over state, public resources and population, every owned Unit's basic status, owned Facility/Checkpoint state, visible enemies, Crisis Summary, End Turn Forecast and production-capacity summaries, Horde warning, available action kinds, and routes to detail queries. It omits repeated fixed-map data, complete candidate lists, cost tables, facility-level capacity details, and historical Observations from ordinary responses.
+
+The original single-action `step` command remains available for compatibility and recovery. It accepts JSON from standard input or `--input` and starts a new process for that one request:
 
 ```bash
 printf '%s\n' '{"action":{"type":"EndTurn"},"decisionSummary":"No higher-priority legal action remains.","expectedRevision":0}' | \
@@ -34,11 +71,12 @@ printf '%s\n' '{"action":{"type":"EndTurn"},"decisionSummary":"No higher-priorit
 
 The `decisionSummary` is required, must contain 1–500 Unicode code points after trimming, and should be a concise public explanation or reason code—not private chain-of-thought. `expectedRevision` is optional but recommended: use the Revision returned by the last command. A mismatch is rejected as `stale_revision` before an Action or Decision number is applied. A malformed request is rejected without consuming a Decision number. A well-formed but illegal action is recorded as a rejected Decision without changing game state or RNG; inspect the returned error and current Compact snapshot before retrying.
 
-The complete eight-command interface is:
+The complete nine-command interface is:
 
 - `new`: create a new, non-overwriting Session
 - `status`: inspect or resume the current Active Session
 - `step`: apply one action plus `decisionSummary`
+- `play-turn`: keep one process and verified Runtime for an interactive turn, or execute a bounded finite plan
 - `save-checkpoint`: create a manual Checkpoint
 - `list-checkpoints`: list public Checkpoint metadata
 - `load-checkpoint`: branch from a Checkpoint into a required new Session ID
@@ -71,7 +109,7 @@ Use the exact Checkpoint ID returned by `save-checkpoint` or `list-checkpoints`;
 
 Session data defaults to `output/sessions`; pass the same `--root=PATH` to every command to use another root. Active state is committed after each well-formed Decision, so a later `status` continues the same Decision Log and Run Artifact. `artifact --out=PATH` creates a self-contained public Artifact Package directory without placing its full JSON on standard output; the response is a small manifest with the package path, schema, hash, and count. The result is stored in the Artifact stream footer. The directory contains `manifest.json`, streaming `artifact.ndjson`, and deduplicated public payloads. If Active data is reported corrupt or incompatible, do not edit private files and do not expect an automatic rollback: list the valid Checkpoints and explicitly create a new branch with `load-checkpoint`.
 
-The Session directory includes a private Save Format 11 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 4 stores immutable generation data, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 7.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
+The Session directory includes a private Save Format 11 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 5 stores immutable generation data, persistent request IDs, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. v1.5.1 and earlier AI Session, Checkpoint, Artifact, and Replay data are not migrated; start a new v1.5.2 AI Session and retain old data for use with its old release. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 8.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
 
 For a quick built-in-agent smoke test instead of an interactive Session:
 
@@ -79,7 +117,7 @@ For a quick built-in-agent smoke test instead of an interactive Session:
 ./run-npm.sh run sim -- --agent=balanced --games=1 --seed=1 --summary-only --out=output/ai-smoke --overwrite
 ```
 
-This runs the built-in Balanced Agent and is a quick way to verify that the bundled runtime works. The package workflow separately exercises all eight Session commands, file Artifact export, and public API drivers for Seeds 1 and 7 with the bundled Node.js runtime.
+This runs the built-in Balanced Agent and is a quick way to verify that the bundled runtime works. The package workflow separately exercises all nine Session commands, file Artifact export, and public API drivers for Seeds 1 and 7 with the bundled Node.js runtime.
 
 For custom TypeScript driver scripts, use the bundled `vite-node` launcher instead of installing tools globally:
 
@@ -113,7 +151,7 @@ Recommended loop:
 
 `getRunArtifact()` remains the complete public Artifact API. For a bounded read of a large trace, use `getArtifactPage({ target, offset?, pageSize?, expectedRevision? })`. The allowed targets are `manifest`, `observations`, `actions`, `events`, and `invalid-attempts`; it returns the current Revision, target, `count`, `total`, `hasMore`, `nextOffset`, and public `items`. Pages default to 100 items and cannot exceed 500. It is read-only; an old `expectedRevision` is rejected without changing the game.
 
-## v1.5.1 tactical context
+## v1.5.2 tactical context
 
 Use the current `AgentObservation` as the source of truth for conditional forecasts. It does not reveal future random draws or private state.
 
@@ -156,7 +194,7 @@ When using the Session CLI, each `step` response also contains `stateDelta`, a p
 
 The AI player should not use `GameEngine.getState()`, `AgentGameAdapter.getDebugState()`, save internals, hidden future random values, or other non-public implementation details to make decisions. Those exist for development and diagnostics, not as player-visible information.
 
-The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.5.1` uses Game Rules `4.0.0`, Agent/Observation/Browser Bridge API `8.0.0`, Fixed Map `fixed-51x51-v1`, Save Format `11`, Artifact Schema `7.0.0`, Checkpoint/Session Schema `4.0.0`, Balanced Agent `5.0.0`, and Random Agent `3.0.0`. Artifact Schema 7.0.0 packages public Wave/Warning/Site Event state, Metrics, a lossless public Decision Log, and lineage without private Checkpoint state. v1.5.0 and earlier Save, Replay, Artifact, Session, and Checkpoint data are rejected without conversion.
+The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.5.2` uses Game Rules `4.0.0`, Agent/Observation/Browser Bridge API `9.0.0`, Fixed Map `fixed-51x51-v1`, Save Format `11`, Artifact Schema `8.0.0`, Checkpoint/Session Schema `5.0.0`, Balanced Agent `5.0.0`, and Random Agent `3.0.0`. Artifact Schema 8.0.0 packages public Wave/Warning/Site Event and production-capacity state, Metrics, a lossless public Decision Log, request identity, and lineage without private Checkpoint state. v1.5.1 and earlier AI Replay, Artifact, Session, and Checkpoint data are rejected without conversion; v1.5.1 normal saves remain the supported save migration source.
 
 ## Package layout
 
@@ -168,7 +206,7 @@ nowhere-left-to-hide-ai-<version>-<commit>-linux-x64/
 ├─ BUILD_INFO.txt
 ├─ run-npm.sh
 ├─ run-vite-node.sh
-├─ run-session.sh
+├─ run-session.sh / run-session.cmd
 ├─ runtime/
 │  └─ node/              # bundled Linux x64 Node.js runtime
 └─ game/

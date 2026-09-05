@@ -9,19 +9,26 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** v1.5.1 deliberately rejects Session/Checkpoint v3 instead of migrating it. */
-export const CHECKPOINT_SCHEMA_VERSION = '4.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '4.0.0' as const;
+/** v1.5.2 deliberately rejects Session/Checkpoint v4 instead of migrating it. */
+export const CHECKPOINT_SCHEMA_VERSION = '5.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '5.0.0' as const;
 export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
 export const SESSION_ARTIFACT_PACKAGE_VERSION = '1.0.0' as const;
+export const PLAY_TURN_PROTOCOL_VERSION = '1.0.0' as const;
 export const DEFAULT_CHECKPOINT_INTERVAL = 5;
 export const PUBLIC_SNAPSHOT_INTERVAL = 50;
 export const DEFAULT_QUERY_PAGE_SIZE = 100;
 export const MAX_QUERY_PAGE_SIZE = 500;
 export const MAX_DECISION_SUMMARY_CODE_POINTS = 500;
+export const MAX_PLAY_TURN_REQUEST_ID_CODE_POINTS = 128;
+export const MAX_PLAY_TURN_LINE_BYTES = 1024 * 1024;
+export const MAX_PLAY_TURN_PLAN_BYTES = 8 * 1024 * 1024;
+export const MAX_PLAY_TURN_PLAN_ACTIONS = 64;
+export const MAX_PLAY_TURN_REQUESTS = 256;
+export const DEFAULT_PLAY_TURN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 export const ZERO_HASH = '0'.repeat(64);
 
-export type SessionCommand = 'new' | 'status' | 'step' | 'save-checkpoint' | 'list-checkpoints' | 'load-checkpoint' | 'query' | 'artifact';
+export type SessionCommand = 'new' | 'status' | 'step' | 'play-turn' | 'save-checkpoint' | 'list-checkpoints' | 'load-checkpoint' | 'query' | 'artifact';
 
 export interface SessionVersionIdentity {
   appVersion: string;
@@ -108,6 +115,41 @@ export interface SessionPrivateEnvelope { body: JsonValue; map: SessionPayloadRe
 
 export interface SessionStepInput { action: GameAction; decisionSummary: string; expectedRevision?: number }
 
+export interface SessionPlayTurnHpExpectation { unitId: string; minHp: number; maxHp: number }
+export interface SessionPlayTurnExpectations { playerUnitHp: SessionPlayTurnHpExpectation[] }
+export interface SessionPlayTurnActionInput {
+  type: 'action';
+  action: GameAction;
+  decisionSummary: string;
+  expectedRevision: number;
+  requestId: string;
+  expectations?: SessionPlayTurnExpectations;
+}
+export interface SessionPlayTurnQueryInput {
+  type: 'query';
+  target: SessionQueryTarget;
+  expectedRevision?: number;
+  cursor?: string;
+  pageSize?: number;
+  filters?: Record<string, JsonValue>;
+}
+export interface SessionPlayTurnCloseInput { type: 'close' }
+export type SessionPlayTurnRequest = SessionPlayTurnActionInput | SessionPlayTurnQueryInput | SessionPlayTurnCloseInput;
+export interface SessionPlayTurnPlanAction extends Omit<SessionPlayTurnActionInput, 'type' | 'expectedRevision'> {}
+export interface SessionPlayTurnPlanInput { expectedRevision: number; actions: SessionPlayTurnPlanAction[] }
+
+export type SessionPlayTurnStopReason =
+  | 'rejected'
+  | 'move_interrupted'
+  | 'unexpected_unit_damage'
+  | 'player_unit_lost'
+  | 'new_enemy_spotted'
+  | 'new_crisis'
+  | 'crisis_worsened'
+  | 'stale_revision'
+  | 'game_over'
+  | 'end_turn_completed';
+
 export interface SessionStateDelta {
   newlyInfectedSites: string[];
   newlyRuinedSites: string[];
@@ -125,6 +167,11 @@ export interface PublicDecisionRecord {
   phase: AgentObservation['phase'];
   inputAction: GameAction;
   decisionSummary: string;
+  /** Present only for play-turn writes; hashed into the immutable Decision record. */
+  requestId: string | null;
+  requestHash: string | null;
+  playTurnStopReason: SessionPlayTurnStopReason | null;
+  playTurnStopDetails: JsonValue;
   accepted: boolean;
   error: AgentStepResult['error'];
   events: AgentPublicEvent[];
@@ -232,10 +279,26 @@ export interface SessionCompactSnapshot {
   crisisSummary: AgentObservation['crisisSummary'];
   endTurnRisk: AgentObservation['endTurnRisk'];
   forecastSummary: Record<string, JsonValue>;
+  productionCapacity: JsonValue;
   gameOver: boolean;
   result: AgentGameResult | null;
   availableActionTypes: Array<{ type: string; count: number; targetIds: string[]; modes: string[] }>;
   query: { command: 'query'; revision: number; defaultPageSize: number; maxPageSize: number; targets: SessionQueryTarget[] };
+  playTurn: SessionPlayTurnCapabilities;
+}
+
+export interface SessionPlayTurnCapabilities {
+  protocolVersion: typeof PLAY_TURN_PROTOCOL_VERSION;
+  interactive: true;
+  finitePlan: true;
+  command: 'play-turn';
+  portableLauncher: './run-session.sh';
+  portableLauncherWindows: '.\\run-session.cmd';
+  developmentLauncher: 'npm run session --';
+  limits: { maxLineBytes: number; maxPlanBytes: number; maxPlanActions: number; maxRequests: number; idleTimeoutMs: number };
+  inputSchema: JsonValue;
+  finitePlanStopsOn: SessionPlayTurnStopReason[];
+  exitsOn: Array<'successful_end_turn' | 'game_over' | 'explicit_close' | 'eof' | 'idle_timeout' | 'request_limit'>;
 }
 
 export interface SessionStatusResult {
@@ -254,6 +317,40 @@ export interface SessionStepResult extends SessionStatusResult {
   stateDelta: SessionStateDelta;
   decisionRecord: PublicDecisionRecord;
   checkpointsCreated: SessionCheckpointMetadata[];
+}
+
+export interface SessionPlayTurnActionResult {
+  kind: 'action-result';
+  requestId: string;
+  replayed: boolean;
+  originalDecision: number;
+  originalRevision: number;
+  currentRevision: number;
+  accepted: boolean;
+  error: AgentStepResult['error'];
+  events: AgentPublicEvent[];
+  stateDelta: SessionStateDelta;
+  stopReason: SessionPlayTurnStopReason | null;
+  stopDetails: JsonValue;
+  observation: SessionCompactSnapshot;
+  gameOver: boolean;
+  result: AgentGameResult | null;
+}
+
+export interface SessionPlayTurnPlanResult {
+  kind: 'plan-result';
+  sessionId: string;
+  startRevision: number;
+  startTurn: number;
+  currentRevision: number;
+  executedIndexes: number[];
+  rejectedIndex: number | null;
+  unexecutedIndexes: number[];
+  stopReason: SessionPlayTurnStopReason | null;
+  steps: Array<Omit<SessionPlayTurnActionResult, 'observation' | 'gameOver' | 'result'>>;
+  observation: SessionCompactSnapshot;
+  gameOver: boolean;
+  result: AgentGameResult | null;
 }
 
 export interface NewSessionOptions { sessionId?: string; seed?: number; agentId?: string; checkpointInterval?: number }

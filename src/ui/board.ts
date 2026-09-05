@@ -59,6 +59,8 @@ export interface BoardRenderState {
   visibilityOverlay?: boolean;
   /** Core-derived visibility decomposition used by Fog and Vision overlays. */
   visionCoverage?: VisionCoverage;
+  /** Shared Core facility forecast for this committed revision. */
+  facilityProduction?: readonly ReturnType<typeof forecastFacilityProduction>[number][];
   selectedVision?: BoardVisionSelection | null;
   supplyOverlay?: boolean;
   suppliedTileKeys?: readonly string[];
@@ -169,6 +171,31 @@ export const BOARD_RENDER_LAYER_ORDER = [
 
 export const BOARD_FALLBACK_LAYER_ORDER = BOARD_RENDER_LAYER_ORDER;
 export const BOARD_LOD_THRESHOLD = BOARD_LOD_ZOOM_THRESHOLD;
+
+/** Lightweight counters used by performance tests and development builds. */
+export interface BoardRenderCounters {
+  stateUpdates: number;
+  drawCalls: number;
+  staticRebuilds: number;
+  dynamicRebuilds: number;
+  imageCreates: number;
+  imageReuses: number;
+  labelCreates: number;
+  labelReuses: number;
+}
+
+function emptyBoardRenderCounters(): BoardRenderCounters {
+  return {
+    stateUpdates: 0,
+    drawCalls: 0,
+    staticRebuilds: 0,
+    dynamicRebuilds: 0,
+    imageCreates: 0,
+    imageReuses: 0,
+    labelCreates: 0,
+    labelReuses: 0,
+  };
+}
 
 export interface BoardCameraProjection {
   x: number;
@@ -499,6 +526,9 @@ export class HexBoardScene extends Phaser.Scene {
 
   private readonly labels = new Map<string, Phaser.GameObjects.Text>();
   private readonly activeLabelKeys = new Set<string>();
+  /** Image instances are retained per layer and rebound to the next pass. */
+  private readonly imagePools = new Map<Phaser.GameObjects.Container, Phaser.GameObjects.Image[]>();
+  private readonly imagePoolCursors = new Map<Phaser.GameObjects.Container, number>();
   private readonly assetStatuses = new Map<string, BoardAssetStatus>();
   private readonly assetPathByKey = new Map<string, string>();
   private readonly warnedAssetPaths = new Set<string>();
@@ -509,9 +539,23 @@ export class HexBoardScene extends Phaser.Scene {
   private readonly pinchPointers = new Map<number, { x: number; y: number }>();
   private pinchDistance = 0;
   private pinchZoom = 1;
+  private pendingZoom: { next: number; screenX: number; screenY: number } | null = null;
+  private zoomFrameScheduled = false;
   private cameraInitialized = false;
   private readonly zoomMin = BOARD_MIN_ZOOM;
   private readonly zoomMax = BOARD_MAX_ZOOM;
+  /** Each layer has its own immutable-input key. Engine commits clone the
+   * state tree, so object identity alone cannot decide whether map pixels or
+   * a facility/unit base really changed. */
+  private mapStaticKey: string | null = null;
+  private facilityBaseKey: string | null = null;
+  private facilityStateKey: string | null = null;
+  private unitKey: string | null = null;
+  private fogKey: string | null = null;
+  private fogDirty = true;
+  private staticLod: boolean | null = null;
+  private staticDirty = true;
+  private readonly renderCounters = emptyBoardRenderCounters();
 
   constructor(callbacks: BoardCallbacks) {
     super({ key: 'hex-board' });
@@ -570,8 +614,20 @@ export class HexBoardScene extends Phaser.Scene {
 
   updateState(next: BoardRenderState): void {
     this.current = next;
+    this.renderCounters.stateUpdates += 1;
+    const lod = this.boardLodActive();
+    if (this.staticLod !== lod) this.staticDirty = true;
     if (this.graphics) this.draw(next);
     this.invokeViewChange();
+  }
+
+  /** Return a snapshot so callers cannot mutate the board's measurements. */
+  public getRenderCounters(): Readonly<BoardRenderCounters> {
+    return { ...this.renderCounters };
+  }
+
+  public resetRenderCounters(): void {
+    Object.assign(this.renderCounters, emptyBoardRenderCounters());
   }
 
   /**
@@ -721,11 +777,16 @@ export class HexBoardScene extends Phaser.Scene {
       else this.markAssetFailure(path, 'texture-registration', 'Image loaded but texture registration failed');
     }
     this.assetLoadComplete = true;
+    // A scene may receive its first state while assets are still loading.
+    // Rebuild the static pools once textures become ready, while retaining
+    // all already allocated instances.
+    this.staticDirty = true;
     this.emitProgress(false, 1);
     const summary = this.assetSummary();
     this.invokeReady(this.callbacks.onReady, summary);
     this.invokeReady(this.callbacks.onAssetsReady, summary);
     this.invokeReady(this.callbacks.onAssetReady, summary);
+    if (this.current && this.layersReady) this.draw(this.current);
   }
 
   private invokeReady(callback: ((summary: BoardAssetLoadSummary) => void) | undefined, summary: BoardAssetLoadSummary): void {
@@ -835,25 +896,36 @@ export class HexBoardScene extends Phaser.Scene {
   }
 
   private clearRenderLayers(): void {
-    this.clearLayer(this.terrainLayer, this.terrainFallbackGraphics);
-    this.clearLayer(this.roadLayer, this.roadFallbackGraphics);
-    this.clearLayer(this.urbanLayer, this.urbanFallbackGraphics);
-    this.clearLayer(this.facilityBaseLayer, this.facilityBaseFallbackGraphics);
-    this.clearLayer(this.facilityStateLayer, this.facilityStateFallbackGraphics);
-    this.clearLayer(this.fogLayer, this.fogGraphics);
-    this.clearLayer(this.unitLayer, this.unitFallbackGraphics);
-    this.clearLayer(this.dynamicLayer, this.graphics);
-    this.terrainFallbackGraphics.clear();
-    this.roadFallbackGraphics.clear();
-    this.urbanFallbackGraphics.clear();
-    this.facilityBaseFallbackGraphics.clear();
-    this.facilityStateFallbackGraphics.clear();
-    this.fogGraphics.clear();
-    this.unitFallbackGraphics.clear();
+    this.clearStaticRenderLayers();
+    this.clearDynamicRenderLayers();
+  }
+
+  private clearStaticRenderLayers(): void {
+    this.clearLayerRender(this.terrainLayer, this.terrainFallbackGraphics);
+    this.clearLayerRender(this.roadLayer, this.roadFallbackGraphics);
+    this.clearLayerRender(this.urbanLayer, this.urbanFallbackGraphics);
+    this.clearLayerRender(this.facilityBaseLayer, this.facilityBaseFallbackGraphics);
+    this.clearLayerRender(this.facilityStateLayer, this.facilityStateFallbackGraphics);
+    this.clearLayerRender(this.unitLayer, this.unitFallbackGraphics);
+  }
+
+  private clearLayerRender(layer: Phaser.GameObjects.Container, fallback: Phaser.GameObjects.Graphics): void {
+    fallback.clear();
+    for (const image of this.imagePools.get(layer) ?? []) image.setVisible(false);
+    this.imagePoolCursors.delete(layer);
+  }
+
+  private clearDynamicRenderLayers(clearFog = true): void {
+    if (clearFog) {
+      this.fogGraphics.clear();
+      this.fogKey = null;
+      this.fogDirty = true;
+    }
     this.graphics.clear();
-    for (const label of this.labels.values()) label.destroy();
-    this.labels.clear();
     this.activeLabelKeys.clear();
+    // Keep Text objects alive.  Rebinding them by key avoids allocating a new
+    // label for every selection/overlay update.
+    for (const label of this.labels.values()) label.setVisible(false);
   }
 
   private handleResize(size: { width: number; height: number }): void {
@@ -895,6 +967,7 @@ export class HexBoardScene extends Phaser.Scene {
 
   private handlePointerUp(pointer: Phaser.Input.Pointer): void {
     const wasPinching = this.pinchPointers.size >= 2;
+    if (wasPinching) this.flushPendingZoom();
     this.pinchPointers.delete(pointer.id);
     if (this.pinchPointers.size < 2) this.pinchDistance = 0;
     if (wasPinching || !this.pointerDown) {
@@ -915,20 +988,42 @@ export class HexBoardScene extends Phaser.Scene {
   }
 
   private handleWheel(pointer: Phaser.Input.Pointer, _gameObjects: unknown, deltaX: number, deltaY: number): void {
-    this.setZoom(this.cameras.main.zoom * (deltaY > 0 ? 0.9 : 1.1), pointer.x, pointer.y);
+    const baseZoom = this.pendingZoom?.next ?? this.cameras.main.zoom;
+    this.setZoom(baseZoom * (deltaY > 0 ? 0.9 : 1.1), pointer.x, pointer.y);
     void deltaX;
   }
 
   private setZoom(next: number, screenX: number, screenY: number): void {
+    this.pendingZoom = { next, screenX, screenY };
+    if (this.zoomFrameScheduled) return;
+    if (typeof globalThis.requestAnimationFrame !== 'function') {
+      this.flushPendingZoom();
+      return;
+    }
+    this.zoomFrameScheduled = true;
+    globalThis.requestAnimationFrame(() => {
+      this.zoomFrameScheduled = false;
+      this.flushPendingZoom();
+    });
+  }
+
+  private flushPendingZoom(): void {
+    const pending = this.pendingZoom;
+    this.pendingZoom = null;
+    if (!pending) return;
     const camera = this.cameras.main;
-    const before = camera.getWorldPoint(screenX, screenY);
-    camera.setZoom(Phaser.Math.Clamp(next, this.zoomMin, this.zoomMax));
-    const after = camera.getWorldPoint(screenX, screenY);
+    const beforeLod = this.boardLodActive();
+    const before = camera.getWorldPoint(pending.screenX, pending.screenY);
+    camera.setZoom(Phaser.Math.Clamp(pending.next, this.zoomMin, this.zoomMax));
+    const after = camera.getWorldPoint(pending.screenX, pending.screenY);
     camera.scrollX += before.x - after.x;
     camera.scrollY += before.y - after.y;
     if (this.current) {
       this.configureCamera(this.current.state, false, this.scale.gameSize);
-      if (this.graphics) this.draw(this.current);
+      if (beforeLod !== this.boardLodActive()) {
+        this.staticDirty = true;
+        if (this.graphics) this.draw(this.current);
+      }
     }
     this.invokeViewChange();
   }
@@ -981,11 +1076,47 @@ export class HexBoardScene extends Phaser.Scene {
     });
   }
 
+  private mapRenderKey(state: Readonly<GameState>): string {
+    // FixedMap is immutable by contract and mapId changes whenever the map
+    // definition changes. Include dimensions so test/integration maps with a
+    // reused id still invalidate their static terrain layer.
+    return `${state.map.id}:${state.map.width}x${state.map.height}`;
+  }
+
+  private facilityBaseRenderKey(state: Readonly<GameState>): string {
+    const facilities = state.facilities.map((facility) =>
+      `${facility.id}:${facility.type}:${facility.position.q},${facility.position.r}`,
+    );
+    const checkpoints = state.checkpoints.map((checkpoint) =>
+      `${checkpoint.id}:${checkpoint.position.q},${checkpoint.position.r}`,
+    );
+    return `${facilities.join('|')}#${checkpoints.join('|')}`;
+  }
+
+  private facilityStateRenderKey(state: Readonly<GameState>): string {
+    const facilities = state.facilities.map((facility) =>
+      `${facility.id}:${facility.owner}:${facility.status}:${facility.operationalStatus}:${facility.infected}`,
+    );
+    const checkpoints = state.checkpoints.map((checkpoint) =>
+      `${checkpoint.id}:${checkpoint.status}:${checkpoint.infected}`,
+    );
+    return `${facilities.join('|')}#${checkpoints.join('|')}`;
+  }
+
+  private unitRenderKey(state: Readonly<GameState>, visibleTileKeys: ReadonlySet<string>): string {
+    const visible = [...visibleTileKeys].sort().join(',');
+    const units = state.units
+      .filter((unit) => isUnitVisible(unit, visibleTileKeys))
+      .map((unit) => `${unit.id}:${unit.type}:${unit.hordeKind ?? ''}:${unit.actionState}:${unit.position.q},${unit.position.r}`)
+      .join('|');
+    return `${visible}#${units}`;
+  }
+
   private draw(render: BoardRenderState): void {
     if (!this.layersReady) return;
+    this.renderCounters.drawCalls += 1;
     const { state } = render;
     const t = createTranslator(render.locale ?? 'ja');
-    this.clearRenderLayers();
     const legal = new Set((render.legalDestinations ?? []).map((position) => hexKey(position)));
     const path = new Set((render.pendingPath ?? []).map((position) => hexKey(position)));
     const attackTargets = new Set(render.attackTargetIds ?? []);
@@ -1024,7 +1155,7 @@ export class HexBoardScene extends Phaser.Scene {
     const reserveKeys = new Set(render.spawnReserveTileKeys ?? spawnReserveTileKeys(state.map));
     const capital = state.facilities.find((facility) => facility.type === 'capital');
     const hordeTarget = capital ? this.hexToWorld(state, capital.position) : null;
-    const productionByFacility = this.productionMap(state);
+    const productionByFacility = this.productionMap(state, render.facilityProduction);
     const facilitiesByTile = new Map<string, FacilityState>();
     for (const facility of state.facilities) facilitiesByTile.set(hexKey(facility.position), facility);
     const checkpointsByTile = new Map<string, CheckpointState>();
@@ -1036,43 +1167,109 @@ export class HexBoardScene extends Phaser.Scene {
       unitsByTile.set(hexKey(unit.position), units);
     }
 
-    // Explicit passes preserve terrain -> road -> urban -> facility -> Fog -> unit -> dynamic order.
-    for (const tile of state.map.tiles) this.drawTerrainPass(state, tile);
-    for (const tile of state.map.tiles) this.drawRoadPass(state, tile);
-    for (const tile of state.map.tiles) this.drawUrbanPass(state, tile);
-    for (const tile of state.map.tiles) {
-      const key = hexKey(tile);
-      const center = this.hexToWorld(state, tile);
-      const facility = facilitiesByTile.get(key);
-      const checkpoint = checkpointsByTile.get(key);
-      if (facility) this.drawFacilityBasePass(facility, center);
-      if (checkpoint) this.drawCheckpointBasePass(checkpoint, center);
-    }
-    for (const tile of state.map.tiles) {
-      const key = hexKey(tile);
-      const center = this.hexToWorld(state, tile);
-      const facility = facilitiesByTile.get(key);
-      const checkpoint = checkpointsByTile.get(key);
-      if (facility) this.drawFacilityStatePass(facility, productionByFacility.get(facility.id), center);
-      if (checkpoint) this.drawCheckpointStatePass(checkpoint, center);
-    }
-    for (const tile of state.map.tiles) {
-      if (render.visibilityOverlay !== false && !this.tileVisible(tile, visibleTileKeys)) {
-        const points = this.hexPoints(this.hexToWorld(state, tile));
-        this.fogGraphics.fillStyle(0x02070b, 0.57);
-        this.fogGraphics.fillPoints(points, true);
-        this.fogGraphics.lineStyle(1, 0x142b34, 0.75);
-        this.fogGraphics.strokePoints(points, true);
-      }
-    }
-    for (const tile of state.map.tiles) {
-      const key = hexKey(tile);
-      const facility = facilitiesByTile.get(key);
-      const checkpoint = checkpointsByTile.get(key);
-      const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
-      units.forEach((unit, index) => this.drawUnitPass(unit, this.hexToWorld(state, tile), getFacilityUnitOffset(Boolean(facility || checkpoint)), index, units.length));
+    const lod = this.boardLodActive();
+    const mapKey = this.mapRenderKey(state);
+    const facilityBaseKey = this.facilityBaseRenderKey(state);
+    const facilityStateKey = this.facilityStateRenderKey(state);
+    const unitKey = this.unitRenderKey(state, visibleTileKeys);
+    const nextFogKey = `${mapKey}:${render.visibilityOverlay !== false}:${[...visibleTileKeys].sort().join(',')}`;
+    const lodChanged = this.staticLod !== lod;
+    const rebuildMap = this.staticDirty || lodChanged || this.mapStaticKey !== mapKey;
+    const rebuildFacilityBase = rebuildMap || lodChanged || this.facilityBaseKey !== facilityBaseKey;
+    const rebuildFacilityState = rebuildMap || lodChanged || this.facilityStateKey !== facilityStateKey;
+    // A newly built/removed Facility or Checkpoint changes stacked Unit
+    // offsets even when no Unit field changed, so keep the Unit layer coupled
+    // to the base occupancy key.
+    const rebuildUnits = rebuildMap || rebuildFacilityBase || lodChanged || this.unitKey !== unitKey;
+    if (rebuildMap || rebuildFacilityBase || rebuildFacilityState || rebuildUnits) {
+      this.renderCounters.staticRebuilds += 1;
     }
 
+    // Terrain and overlays are map-static. Engine commits clone the state,
+    // but this layer remains untouched when only a Unit or Facility state
+    // changes.
+    if (rebuildMap) {
+      this.clearLayerRender(this.terrainLayer, this.terrainFallbackGraphics);
+      this.beginImagePass(this.terrainLayer);
+      for (const tile of state.map.tiles) this.drawTerrainPass(state, tile);
+      this.endImagePass(this.terrainLayer);
+
+      this.clearLayerRender(this.roadLayer, this.roadFallbackGraphics);
+      this.beginImagePass(this.roadLayer);
+      for (const tile of state.map.tiles) this.drawRoadPass(state, tile);
+      this.endImagePass(this.roadLayer);
+
+      this.clearLayerRender(this.urbanLayer, this.urbanFallbackGraphics);
+      this.beginImagePass(this.urbanLayer);
+      for (const tile of state.map.tiles) this.drawUrbanPass(state, tile);
+      this.endImagePass(this.urbanLayer);
+      this.mapStaticKey = mapKey;
+    }
+
+    if (rebuildFacilityBase) {
+      this.clearLayerRender(this.facilityBaseLayer, this.facilityBaseFallbackGraphics);
+      this.beginImagePass(this.facilityBaseLayer);
+      for (const tile of state.map.tiles) {
+        const key = hexKey(tile);
+        const center = this.hexToWorld(state, tile);
+        const facility = facilitiesByTile.get(key);
+        const checkpoint = checkpointsByTile.get(key);
+        if (facility) this.drawFacilityBasePass(facility, center);
+        if (checkpoint) this.drawCheckpointBasePass(checkpoint, center);
+      }
+      this.endImagePass(this.facilityBaseLayer);
+      this.facilityBaseKey = facilityBaseKey;
+    }
+
+    if (rebuildFacilityState) {
+      this.clearLayerRender(this.facilityStateLayer, this.facilityStateFallbackGraphics);
+      this.beginImagePass(this.facilityStateLayer);
+      for (const tile of state.map.tiles) {
+        const key = hexKey(tile);
+        const center = this.hexToWorld(state, tile);
+        const facility = facilitiesByTile.get(key);
+        const checkpoint = checkpointsByTile.get(key);
+        if (facility) this.drawFacilityStatePass(facility, productionByFacility.get(facility.id), center);
+        if (checkpoint) this.drawCheckpointStatePass(checkpoint, center);
+      }
+      this.endImagePass(this.facilityStateLayer);
+      this.facilityStateKey = facilityStateKey;
+    }
+
+    if (rebuildUnits) {
+      this.clearLayerRender(this.unitLayer, this.unitFallbackGraphics);
+      this.beginImagePass(this.unitLayer);
+      for (const tile of state.map.tiles) {
+        const key = hexKey(tile);
+        const facility = facilitiesByTile.get(key);
+        const checkpoint = checkpointsByTile.get(key);
+        const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
+        units.forEach((unit, index) => this.drawUnitPass(unit, this.hexToWorld(state, tile), getFacilityUnitOffset(Boolean(facility || checkpoint)), index, units.length));
+      }
+      this.endImagePass(this.unitLayer);
+      this.unitKey = unitKey;
+    }
+
+    this.staticLod = lod;
+    this.staticDirty = false;
+
+    const rebuildFog = this.fogDirty || this.fogKey !== nextFogKey;
+    if (rebuildFog) {
+      this.fogGraphics.clear();
+      for (const tile of state.map.tiles) {
+        if (render.visibilityOverlay !== false && !this.tileVisible(tile, visibleTileKeys)) {
+          const points = this.hexPoints(this.hexToWorld(state, tile));
+          this.fogGraphics.fillStyle(0x02070b, 0.57);
+          this.fogGraphics.fillPoints(points, true);
+          this.fogGraphics.lineStyle(1, 0x142b34, 0.75);
+          this.fogGraphics.strokePoints(points, true);
+        }
+      }
+      this.fogKey = nextFogKey;
+      this.fogDirty = false;
+    }
+    this.renderCounters.dynamicRebuilds += 1;
+    this.clearDynamicRenderLayers(false);
     for (const tile of state.map.tiles) {
       const key = hexKey(tile);
       const center = this.hexToWorld(state, tile);
@@ -1097,9 +1294,12 @@ export class HexBoardScene extends Phaser.Scene {
     for (const [key, label] of this.labels) if (!this.activeLabelKeys.has(key)) label.setVisible(false);
   }
 
-  private productionMap(state: Readonly<GameState>): Map<string, ReturnType<typeof forecastFacilityProduction>[number]> {
+  private productionMap(
+    state: Readonly<GameState>,
+    projections?: readonly ReturnType<typeof forecastFacilityProduction>[number][],
+  ): Map<string, ReturnType<typeof forecastFacilityProduction>[number]> {
     try {
-      return new Map(forecastFacilityProduction(state).map((projection) => [projection.facilityId, projection]));
+      return new Map((projections ?? forecastFacilityProduction(state)).map((projection) => [projection.facilityId, projection]));
     } catch {
       return new Map();
     }
@@ -1148,14 +1348,12 @@ export class HexBoardScene extends Phaser.Scene {
     const path = mapFacilityAssetLayers(facility).base;
     if (!this.boardLodActive() && this.drawTexture(this.facilityBaseLayer, path, center, FACILITY_TEXTURE_SIZE, FACILITY_TEXTURE_SIZE)) return;
     this.drawFacilityFallbackBase(this.facilityBaseFallbackGraphics, center, facility.type);
-    if (!this.boardLodActive()) this.addFallbackLabel(`facility:${facility.id}:fallback`, FALLBACK_FACILITY_SYMBOL[facility.type] ?? '□', center.x, center.y, '#d7e5e6', 12);
   }
 
   private drawCheckpointBasePass(checkpoint: CheckpointState, center: { x: number; y: number }): void {
     const path = mapCheckpointAssetLayers(checkpoint).base;
     if (!this.boardLodActive() && this.drawTexture(this.facilityBaseLayer, path, center, FACILITY_TEXTURE_SIZE, FACILITY_TEXTURE_SIZE)) return;
     this.drawFacilityFallbackBase(this.facilityBaseFallbackGraphics, center, 'checkpoint');
-    if (!this.boardLodActive()) this.addFallbackLabel(`checkpoint:${checkpoint.id}:fallback`, FALLBACK_FACILITY_SYMBOL.checkpoint!, center.x, center.y, '#d7e5e6', 11);
   }
 
   private drawFacilityStatePass(facility: FacilityState, _projection: ReturnType<typeof forecastFacilityProduction>[number] | undefined, center: { x: number; y: number }): void {
@@ -1183,7 +1381,6 @@ export class HexBoardScene extends Phaser.Scene {
       this.drawUnitSilhouette(this.unitFallbackGraphics, position, unit);
     } else if (!this.drawTexture(this.unitLayer, mapping.base, position, UNIT_TEXTURE_SIZE, UNIT_TEXTURE_SIZE)) {
       this.drawUnitFallback(this.unitFallbackGraphics, position, unit);
-      this.addFallbackLabel(`unit:${unit.id}:fallback`, FALLBACK_UNIT_SYMBOL[unit.type] ?? '□', position.x, position.y, '#071019', 8);
     }
     if (lod) return;
     for (const [markerIndex, path] of mapping.overlays.entries()) {
@@ -1321,6 +1518,9 @@ export class HexBoardScene extends Phaser.Scene {
     tileKey: string,
     t: ReturnType<typeof createTranslator>,
   ): void {
+    if (!this.boardLodActive() && !this.assetReady(mapFacilityAssetLayers(facility).base)) {
+      this.addFallbackLabel(`facility:${facility.id}:fallback`, FALLBACK_FACILITY_SYMBOL[facility.type] ?? '□', center.x, center.y, '#d7e5e6', 12);
+    }
     if (facility.infected > 0) {
       this.graphics.lineStyle(3, 0xff665f, 0.95);
       this.graphics.strokeCircle(center.x, center.y, 15);
@@ -1380,6 +1580,9 @@ export class HexBoardScene extends Phaser.Scene {
     tileKey: string,
     t: ReturnType<typeof createTranslator>,
   ): void {
+    if (!this.boardLodActive() && !this.assetReady(mapCheckpointAssetLayers(checkpoint).base)) {
+      this.addFallbackLabel(`checkpoint:${checkpoint.id}:fallback`, FALLBACK_FACILITY_SYMBOL.checkpoint!, center.x, center.y, '#d7e5e6', 11);
+    }
     const role = deriveCheckpointRole(state, checkpoint);
     const roleColor = role === 'active'
       ? 0x8ff0d4
@@ -1428,6 +1631,9 @@ export class HexBoardScene extends Phaser.Scene {
   ): void {
     const offset = this.stackUnitOffset(facilityOffset, index, total);
     const position = { x: center.x + offset.x, y: center.y + offset.y + 1 };
+    if (!this.boardLodActive() && !this.assetReady(mapUnitAssetLayers(unit).base)) {
+      this.addFallbackLabel(`unit:${unit.id}:fallback`, FALLBACK_UNIT_SYMBOL[unit.type] ?? '□', position.x, position.y, '#071019', 8);
+    }
     const isZombie = isBoardZombieUnitType(unit.type);
     const selected = render.selectedUnitId === unit.id || render.selectedZombieId === unit.id;
     const target = attackTargets.has(unit.id);
@@ -1457,16 +1663,41 @@ export class HexBoardScene extends Phaser.Scene {
     void t;
   }
 
+  private beginImagePass(layer: Phaser.GameObjects.Container): void {
+    this.imagePoolCursors.set(layer, 0);
+  }
+
+  private endImagePass(layer: Phaser.GameObjects.Container): void {
+    const cursor = this.imagePoolCursors.get(layer) ?? 0;
+    const pool = this.imagePools.get(layer) ?? [];
+    for (let index = cursor; index < pool.length; index += 1) pool[index]!.setVisible(false);
+  }
+
   private drawTexture(layer: Phaser.GameObjects.Container, path: string | null, center: { x: number; y: number }, width: number, height: number, rotation = 0): boolean {
     if (!path || !this.assetReady(path)) return false;
     const status = this.assetStatuses.get(path);
     if (!status) return false;
     try {
-      const image = this.add.image(center.x, center.y, status.key);
-      image.setOrigin(0.5, 0.5);
+      const pool = this.imagePools.get(layer) ?? [];
+      if (!this.imagePools.has(layer)) this.imagePools.set(layer, pool);
+      const index = this.imagePoolCursors.get(layer) ?? 0;
+      this.imagePoolCursors.set(layer, index + 1);
+      let image = pool[index];
+      if (!image) {
+        image = this.add.image(center.x, center.y, status.key);
+        image.setOrigin(0.5, 0.5);
+        layer.add(image);
+        pool.push(image);
+        this.renderCounters.imageCreates += 1;
+      } else {
+        this.renderCounters.imageReuses += 1;
+      }
+      image.setTexture(status.key);
+      image.setVisible(true);
+      image.setActive(true);
+      image.setPosition(center.x, center.y);
       image.setDisplaySize(width, height);
       image.setRotation(rotation);
-      layer.add(image);
       return true;
     } catch (error) {
       this.markAssetFailure(path, 'texture-registration', safeString(error));
@@ -1676,8 +1907,12 @@ export class HexBoardScene extends Phaser.Scene {
       if (center) label.setOrigin(0.5, 0.5);
       this.dynamicLayer.add(label);
       this.labels.set(key, label);
-    } else if (label.text !== text) {
-      label.setText(text);
+      this.renderCounters.labelCreates += 1;
+    } else {
+      this.renderCounters.labelReuses += 1;
+      if (label.text !== text) {
+        label.setText(text);
+      }
     }
     label.setPosition(x, y);
     label.setVisible(true);
@@ -1727,9 +1962,24 @@ export class HexBoardScene extends Phaser.Scene {
   }
 
   private handleShutdown(): void {
+    this.pendingZoom = null;
+    this.zoomFrameScheduled = false;
     for (const label of this.labels.values()) label.destroy();
     this.labels.clear();
     this.activeLabelKeys.clear();
+    for (const pool of this.imagePools.values()) {
+      for (const image of pool) image.destroy();
+    }
+    this.imagePools.clear();
+    this.imagePoolCursors.clear();
+    this.mapStaticKey = null;
+    this.facilityBaseKey = null;
+    this.facilityStateKey = null;
+    this.unitKey = null;
+    this.fogKey = null;
+    this.fogDirty = true;
+    this.staticLod = null;
+    this.staticDirty = true;
     if (this.load) {
       this.load.off('progress', this.handleLoaderProgress, this);
       this.load.off('fileprogress', this.handleFileProgress, this);

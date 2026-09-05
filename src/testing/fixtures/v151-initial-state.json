@@ -1,0 +1,17 @@
+{
+  "sourceCommit": "e98f1f57f2c1747588d8840d32bf623bbd625dca",
+  "fixtures": [
+    {
+      "seed": 1,
+      "sha256": "a28bed4787aa109c2c4aa13834aa599e32e20da5efa819fad8543ab780905047"
+    },
+    {
+      "seed": 17,
+      "sha256": "45c3bc2a88b2010ef42e6c369416940cedb6648db65af35f6b671f5276847e7d"
+    },
+    {
+      "seed": 20260905,
+      "sha256": "08e3dff3fe76fa63c11805369286f5a0fd5a8e9eba199685a9b3b07e490de011"
+    }
+  ]
+}

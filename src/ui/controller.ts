@@ -1,6 +1,20 @@
 import { createDefaultConfig } from '../core/config';
-import { forecastEndTurn, validateAction } from '../core/engine';
-import { createAgentObservation } from '../agent/observation';
+import {
+  forecastEndTurn,
+  forecastFacilityProduction,
+  getUnitLegalAttackProjections,
+  getUnitLegalMoveFuelProjections,
+  deriveVictoryProgress,
+  validateAction,
+} from '../core/engine';
+import { deriveStrategicForecast } from '../core/forecast';
+import { deriveCrisisSummary as deriveCoreCrisisSummary, deriveEndTurnRisk as deriveCoreEndTurnRisk } from '../core/crisis';
+import {
+  createPublicCheckpointProjection,
+  createPublicFacilityProjection,
+  createPublicUnitProjection,
+  type PublicEntityProjectionContext,
+} from '../core/public-entities';
 import type {
   AgentCheckpointObservation,
   AgentFacilityObservation,
@@ -12,13 +26,13 @@ import { APP_VERSION } from '../agent/types';
 import { hexKey } from '../core/hex';
 import {
   deriveCheckpointRole,
-  deriveSupplySnapshot,
   getBlockingZombiesForCheckpoint,
   getBranchSupplyRadius,
   getSuppliedTileKeys,
   isHexSupplied,
 } from '../core/supply';
 import { getAerialVisibleTileKeys, getGroundVisionCoverageFrom, getPlayerVisionCoverage, getPlayerVisibleTileKeys } from '../core/visibility';
+import { effectiveMovementCost, isUrbanHex } from '../core/terrain';
 import Phaser from 'phaser';
 import type {
   CardinalDirection,
@@ -78,6 +92,7 @@ import {
   exportSaveJson,
   importSaveJson,
 } from '../persistence/save';
+import type { SaveTiming } from '../persistence/save';
 import { BOARD_ASSET_REGISTRY, resolveBoardAssetUrl } from './boardAssets';
 
 export interface MovePreview {
@@ -95,6 +110,37 @@ export interface MovePreview {
 /** Narrow adapter expected from src/core/engine.ts. */
 export interface UiGameEngine extends HeadlessGame {
   previewMove?: (unitId: string, destination: HexCoord) => MovePreview | unknown;
+  /** v1.5.2 read-only context. Older test doubles may omit this method. */
+  getQuery?: () => UiQueryContext;
+}
+
+/**
+ * The UI consumes the same immutable Query Context as the Agent boundary.
+ * Keep this structural so the Phaser controller can load against v1.5.1 test
+ * doubles while the Core rolls the typed context out incrementally.
+ */
+export interface UiQueryContext {
+  readonly revision?: number;
+  getEndTurnForecast?: () => EndTurnForecast;
+  getStrategicForecast?: () => unknown;
+  getCrisisSummary?: () => unknown;
+  getEndTurnRisk?: () => unknown;
+  getSupply?: () => unknown;
+  getVisibleTileKeys?: () => ReadonlySet<string> | readonly string[];
+  getSuppliedTileKeys?: () => readonly string[];
+  getVision?: () => unknown;
+  getFacilityProduction?: () => readonly ReturnType<typeof forecastFacilityProduction>[number][];
+  getUnitMoveProjections?: (unitId: string) => readonly unknown[];
+  getUnitAttackProjections?: (unitId: string) => readonly unknown[];
+  previewMove?: (unitId: string, destination: HexCoord) => MovePreview | unknown;
+  getCheckpointPositionCandidates?: () => readonly CheckpointPositionCandidate[];
+  getConstructibleFacilityPositionCandidates?: (facilityType: ConstructibleFacilityType) => readonly ConstructibleFacilityPositionCandidate[];
+  getLegalActions?: () => readonly GameAction[];
+  getLegalActionsForUnit?: (unitId: string) => readonly GameAction[];
+  getLegalActionsForFacility?: (facilityId: string) => readonly GameAction[];
+  getPublicUnitProjection?: (unitId: string) => AgentUnitObservation | null | undefined;
+  getPublicFacilityProjection?: (facilityId: string) => AgentFacilityObservation | null | undefined;
+  getPublicCheckpointProjection?: (checkpointId: string) => AgentCheckpointObservation | null | undefined;
 }
 
 export type EngineFactory = () => UiGameEngine;
@@ -1681,11 +1727,38 @@ function terrainDefenseLabel(source: AgentMapTileObservation['terrainDefenseSour
   return t('terrainDefenseNone');
 }
 
-function mapTileForPosition(
-  observation: { map: { tiles: AgentMapTileObservation[] } },
+/** Build one public map tile without materializing the complete Observation. */
+function publicMapTileForPosition(
+  state: Readonly<GameState>,
   position: HexCoord,
+  visibleTileKeys: ReadonlySet<string>,
 ): AgentMapTileObservation | undefined {
-  return observation.map.tiles.find((tile) => tile.q === position.q && tile.r === position.r);
+  const tile = state.map.tiles.find((candidate) => candidate.q === position.q && candidate.r === position.r);
+  if (!tile) return undefined;
+  const checkpoint = state.checkpoints.find((candidate) => samePosition(candidate.position, position));
+  const urban = isUrbanHex(state, tile);
+  const movementCost = effectiveMovementCost(state, tile);
+  const defense = urban
+    ? { source: 'urban' as const, multiplier: state.config.terrain.damageMultiplier.urban }
+    : tile.terrain === 'forest'
+      ? { source: 'forest' as const, multiplier: state.config.terrain.damageMultiplier.forestZombie }
+      : { source: 'none' as const, multiplier: 1 };
+  return {
+    q: tile.q,
+    r: tile.r,
+    terrain: tile.terrain,
+    passable: movementCost !== null,
+    road: tile.road,
+    urban,
+    facilityId: tile.facilityId,
+    checkpointId: checkpoint?.id ?? null,
+    effectiveMovementCost: movementCost,
+    terrainDefenseSource: defense.source,
+    terrainDamageMultiplier: defense.multiplier,
+    visibleToPlayer: visibleTileKeys.has(tile.key) || visibleTileKeys.has(hexKey(tile)),
+    hordeEntranceDirections: [...tile.hordeEntranceDirections].sort(),
+    playerOccupancyAllowed: tile.playerOccupancyAllowed,
+  };
 }
 
 function facilityLabel(type: string, locale: Locale): string {
@@ -2216,6 +2289,11 @@ export class GameUiController {
   private state: Readonly<GameState> | null = null;
   private boardGame: Phaser.Game | null = null;
   private boardScene: HexBoardScene | null = null;
+  /** Query Context is reused for every read in one committed UI state. */
+  private queryContext: UiQueryContext | null = null;
+  private queryEngine: UiGameEngine | null = null;
+  private publicProjectionContextState: Readonly<GameState> | null = null;
+  private publicProjectionContext: PublicEntityProjectionContext | null = null;
   private selection: Selection = null;
   private unitActionMode: UnitActionMode = null;
   private pendingMove: MovePreview | null = null;
@@ -2228,6 +2306,15 @@ export class GameUiController {
   private constructiblePlacementMessage: string | null = null;
   private supplyOverlay = false;
   private lastSaveCode: string | null = null;
+  /** Code currently shown by the manual-save modal; it may be an export after
+   * a failed Storage write and therefore is not necessarily the last local
+   * autosave checkpoint. */
+  private saveModalCode: string | null = null;
+  private lastSaveTiming: SaveTiming | null = null;
+  private lastSavedTurn: number | null = null;
+  private hasUnsavedChanges = false;
+  private saveStatus: 'none' | 'saving' | 'saved' | 'failed' = 'none';
+  private manualSavePending = false;
   private toastMessage: string | null = null;
   /** Event IDs already surfaced as a Toast in this UI session. */
   private readonly notifiedEventIds = new Set<string>();
@@ -2244,7 +2331,23 @@ export class GameUiController {
   constructor(root: HTMLElement, createEngine: EngineFactory) {
     this.root = root;
     this.createEngine = createEngine;
-    this.store = new AutoSaveStore({ onError: (message: string) => this.showToast(message) });
+    // Save failures are surfaced by saveState so automatic and manual saves
+    // share one status path and never emit duplicate toasts.
+    this.store = new AutoSaveStore();
+    if (IS_DEVELOPMENT_BUILD && typeof window !== 'undefined') {
+      const diagnosticsWindow = window as Window & {
+        __NLTH_UI_DEBUG__?: {
+          getBoardRenderCounters: () => Readonly<import('./board').BoardRenderCounters> | null;
+          resetBoardRenderCounters: () => void;
+          getLastSaveTiming: () => SaveTiming | null;
+        };
+      };
+      diagnosticsWindow.__NLTH_UI_DEBUG__ = {
+        getBoardRenderCounters: () => this.boardScene?.getRenderCounters() ?? null,
+        resetBoardRenderCounters: () => this.boardScene?.resetRenderCounters(),
+        getLastSaveTiming: () => this.lastSaveTiming,
+      };
+    }
   }
 
   mount(): void {
@@ -2267,10 +2370,234 @@ export class GameUiController {
     return createTranslator(this.locale);
   }
 
+  private invalidateQueryContext(): void {
+    this.queryContext = null;
+    this.queryEngine = null;
+    this.publicProjectionContextState = null;
+    this.publicProjectionContext = null;
+  }
+
+  private query(): UiQueryContext | null {
+    if (!this.engine?.getQuery) return null;
+    if (this.queryContext && this.queryEngine === this.engine) return this.queryContext;
+    try {
+      const context = this.engine.getQuery();
+      this.queryContext = context;
+      this.queryEngine = this.engine;
+      return context;
+    } catch {
+      this.invalidateQueryContext();
+      return null;
+    }
+  }
+
+  private queryEndTurnForecast(): EndTurnForecast {
+    if (!this.state) throw new Error('Game state is unavailable');
+    try {
+      return this.query()?.getEndTurnForecast?.() ?? forecastEndTurn(this.state);
+    } catch {
+      return forecastEndTurn(this.state);
+    }
+  }
+
+  private queryStrategicForecast(): AgentObservation['strategicForecast'] {
+    if (!this.state) throw new Error('Game state is unavailable');
+    try {
+      return (this.query()?.getStrategicForecast?.() as AgentObservation['strategicForecast'] | undefined)
+        ?? deriveStrategicForecast(this.state);
+    } catch {
+      return deriveStrategicForecast(this.state);
+    }
+  }
+
+  private queryCrisisSummary(): CrisisSummaryViewModel {
+    if (!this.state) return { alerts: [], criticalCount: 0, warningCount: 0, advisoryCount: 0 };
+    try {
+      const value = this.query()?.getCrisisSummary?.();
+      if (value) return crisisSummaryViewModel({ crisisSummary: value });
+    } catch {
+      // Fall back to the same pure Core projection used by the Agent adapter.
+    }
+    const alerts = deriveCoreCrisisSummary(this.state);
+    return crisisSummaryViewModel({ crisisSummary: { alerts } });
+  }
+
+  private queryEndTurnRisk(): EndTurnRiskViewModel {
+    if (!this.state) return endTurnRiskViewModel({ endTurnRisk: {} });
+    try {
+      const value = this.query()?.getEndTurnRisk?.();
+      if (value) return endTurnRiskViewModel({ endTurnRisk: value });
+    } catch {
+      // Fall back to the same pure Core projection used by the Agent adapter.
+    }
+    return endTurnRiskViewModel({ endTurnRisk: deriveCoreEndTurnRisk(this.state) });
+  }
+
+  private queryVision(): ReturnType<typeof getPlayerVisionCoverage> {
+    if (!this.state) {
+      return {
+        visible: new Set(),
+        groundPotential: new Set(),
+        groundVisible: new Set(),
+        groundBlocked: new Set(),
+        aerialVisible: new Set(),
+      };
+    }
+    try {
+      const value = this.query()?.getVision?.();
+      if (value && typeof value === 'object') return value as ReturnType<typeof getPlayerVisionCoverage>;
+    } catch {
+      // Fall through to the pure Core helper.
+    }
+    return getPlayerVisionCoverage(this.state);
+  }
+
+  private queryVisibleTileKeys(): ReadonlySet<string> {
+    if (!this.state) return new Set();
+    try {
+      const value = this.query()?.getVisibleTileKeys?.();
+      if (value) return value instanceof Set ? value : new Set(value);
+    } catch {
+      // Fall through to the pure Core helper.
+    }
+    return getPlayerVisibleTileKeys(this.state);
+  }
+
+  private querySuppliedTileKeys(): readonly string[] {
+    if (!this.state) return [];
+    try {
+      const value = this.query()?.getSuppliedTileKeys?.();
+      if (value) return [...value];
+    } catch {
+      // Fall through to the pure Core helper.
+    }
+    return getSuppliedTileKeys(this.state);
+  }
+
+  private queryFacilityProduction(): readonly ReturnType<typeof forecastFacilityProduction>[number][] {
+    if (!this.state) return [];
+    try {
+      const value = this.query()?.getFacilityProduction?.();
+      if (value) return value;
+    } catch {
+      // Fall through to the pure Core helper.
+    }
+    return forecastFacilityProduction(this.state);
+  }
+
+  private queryCheckpointPositionCandidates(): readonly CheckpointPositionCandidate[] {
+    if (!this.state) return [];
+    try {
+      const value = this.query()?.getCheckpointPositionCandidates?.();
+      if (value) return value;
+    } catch {
+      // Fall through to the read-only Headless/Core helper.
+    }
+    return this.engine?.getCheckpointPositionCandidates() ?? [];
+  }
+
+  private queryConstructibleFacilityPositionCandidates(facilityType: ConstructibleFacilityType): readonly ConstructibleFacilityPositionCandidate[] {
+    if (!this.state) return [];
+    try {
+      const value = this.query()?.getConstructibleFacilityPositionCandidates?.(facilityType);
+      if (value) return value;
+    } catch {
+      // Fall through to the read-only Headless/Core helper.
+    }
+    return this.engine?.getConstructibleFacilityPositionCandidates(facilityType) ?? [];
+  }
+
+  private queryUnitMoveProjections(unitId: string): readonly unknown[] {
+    if (!this.state) return [];
+    try {
+      const value = this.query()?.getUnitMoveProjections?.(unitId);
+      if (value) return value;
+    } catch {
+      // Fall through to the pure Core helper.
+    }
+    return getUnitLegalMoveFuelProjections(this.state, unitId);
+  }
+
+  private queryUnitAttackProjections(unitId: string): readonly unknown[] {
+    if (!this.state) return [];
+    try {
+      const value = this.query()?.getUnitAttackProjections?.(unitId);
+      if (value) return value;
+    } catch {
+      // Fall through to the pure Core helper.
+    }
+    return getUnitLegalAttackProjections(this.state, unitId);
+  }
+
+  private queryPublicUnit(unitId: string): AgentUnitObservation | undefined {
+    if (!this.state) return undefined;
+    try {
+      const value = this.query()?.getPublicUnitProjection?.(unitId);
+      if (value) return value;
+    } catch {
+      // Fall through to local Core projection.
+    }
+    const unit = this.state.units.find((candidate) => candidate.id === unitId);
+    return unit ? createPublicUnitProjection(unit, this.state, this.publicEntityContext()) : undefined;
+  }
+
+  private queryPublicFacility(facilityId: string): AgentFacilityObservation | undefined {
+    if (!this.state) return undefined;
+    try {
+      const value = this.query()?.getPublicFacilityProjection?.(facilityId);
+      if (value) return value;
+    } catch {
+      // Fall through to local Core projection.
+    }
+    const facility = this.state.facilities.find((candidate) => candidate.id === facilityId);
+    return facility ? createPublicFacilityProjection(facility, this.state, this.publicEntityContext()) : undefined;
+  }
+
+  private queryPublicCheckpoint(checkpointId: string): AgentCheckpointObservation | undefined {
+    if (!this.state) return undefined;
+    try {
+      const value = this.query()?.getPublicCheckpointProjection?.(checkpointId);
+      if (value) return value;
+    } catch {
+      // Fall through to local Core projection.
+    }
+    const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === checkpointId);
+    return checkpoint ? createPublicCheckpointProjection(checkpoint, this.state) : undefined;
+  }
+
+  private publicEntityContext(): PublicEntityProjectionContext {
+    if (!this.state) return {};
+    if (this.publicProjectionContextState === this.state && this.publicProjectionContext) {
+      return this.publicProjectionContext;
+    }
+    const forecast = this.queryEndTurnForecast();
+    const refills = new Map(forecast.militaryGoods.units.map((unit) => [unit.unitId, {
+      demand: unit.refillDemand,
+      amount: unit.projectedRefillAmount,
+    }] as const));
+    const context = {
+      visibleTileKeys: this.queryVisibleTileKeys(),
+      refillByUnitId: refills,
+      militaryByUnitId: new Map(forecast.militaryGoods.units.map((unit) => [unit.unitId, unit] as const)),
+      productionByFacility: new Map(this.queryFacilityProduction().map((projection) => [projection.facilityId, projection] as const)),
+    };
+    this.publicProjectionContextState = this.state;
+    this.publicProjectionContext = context;
+    return context;
+  }
+
   private showTitle(): void {
     this.screen = 'title';
     this.state = null;
     this.engine = null;
+    this.invalidateQueryContext();
+    this.lastSaveCode = null;
+    this.saveModalCode = null;
+    this.lastSaveTiming = null;
+    this.manualSavePending = false;
+    this.lastSavedTurn = null;
+    this.hasUnsavedChanges = false;
+    this.saveStatus = 'none';
     this.selection = null;
     this.unitActionMode = null;
     this.pendingMove = null;
@@ -2401,6 +2728,14 @@ export class GameUiController {
       this.eventHistoryLimit = 10;
       this.notifiedEventIds.clear();
       for (const event of this.state.events ?? []) this.notifiedEventIds.add(event.id);
+      this.invalidateQueryContext();
+      this.lastSaveCode = null;
+      this.saveModalCode = null;
+      this.lastSaveTiming = null;
+      this.manualSavePending = false;
+      this.lastSavedTurn = null;
+      this.hasUnsavedChanges = true;
+      this.saveStatus = 'none';
       this.guideShown = !this.hasSeenGuide();
       this.renderGame();
       this.autosave();
@@ -2450,6 +2785,7 @@ export class GameUiController {
         ${renderResourceAccordion(this.locale)}
         <span class="resource-pill civilian-pill">♙ <b data-bind="healthy-civilians">0</b><small>${escapeHtml(t('healthyCivilians'))}</small></span>
         <span class="resource-pill infected-pill">☣ <b data-bind="infected">0</b><small>${escapeHtml(t('infected'))}</small></span>
+        <span class="save-status" data-bind="save-status" aria-live="polite"></span>
       </section>
       ${renderHordeWarningCard(this.locale)}
       <div data-crisis-mount></div>
@@ -2460,7 +2796,7 @@ export class GameUiController {
         <div class="sheet-header" data-action="sheet-toggle"><div><strong data-bind="selection-title">${escapeHtml(t('selectUnit'))}</strong><small data-bind="selection-summary">${escapeHtml(stateSummary(this.state, this.locale))}</small></div><span data-bind="sheet-state">${escapeHtml(sheetStateLabel(this.sheetState, this.locale))}</span></div>
         <div class="sheet-body" data-bind="sheet-body"></div>
       </section>
-      <nav class="bottom-nav" aria-label="${escapeHtml(t('map'))}"><button data-nav="map" class="${this.navMode === 'map' ? 'active' : ''}" aria-current="${this.navMode === 'map' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'map'}">▦<span>${escapeHtml(t('map'))}</span></button><button data-nav="domestic" class="${this.navMode === 'domestic' ? 'active' : ''}" aria-current="${this.navMode === 'domestic' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'domestic'}">⌂<span>${escapeHtml(t('domestic'))}</span></button><button data-action="end-turn" class="nav-end">▶<span>${escapeHtml(t('endTurn'))}</span></button><button data-action="save">▤<span>${escapeHtml(t('saveCode'))}</span></button></nav>`;
+      <nav class="bottom-nav" aria-label="${escapeHtml(t('map'))}"><button data-nav="map" class="${this.navMode === 'map' ? 'active' : ''}" aria-current="${this.navMode === 'map' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'map'}">▦<span>${escapeHtml(t('map'))}</span></button><button data-nav="domestic" class="${this.navMode === 'domestic' ? 'active' : ''}" aria-current="${this.navMode === 'domestic' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'domestic'}">⌂<span>${escapeHtml(t('domestic'))}</span></button><button data-action="end-turn" class="nav-end">▶<span>${escapeHtml(t('endTurn'))}</span></button><button data-action="save">▤<span>${escapeHtml(t('manualSave'))}</span></button></nav>`;
     this.bindRootEvents();
     this.createBoard();
     this.updateView();
@@ -2604,6 +2940,7 @@ export class GameUiController {
       case 'end-turn': this.endTurn(); break;
       case 'end-turn-confirm': this.dismissModal(); this.commitEndTurn(); break;
       case 'save': this.showSaveModal(); break;
+      case 'manual-save': this.manualSave(); break;
       case 'copy-code': this.copySaveCode(element); break;
       case 'download-json': this.downloadJson(); break;
       case 'file-import': this.readJsonFile(element); break;
@@ -2775,25 +3112,24 @@ export class GameUiController {
   private updateHud(): void {
     if (!this.state) return;
     const t = this.translator();
-    const observation = createAgentObservation(this.state);
     const population = populationLocationTotals(this.state);
-    const forecast = forecastEndTurn(this.state);
+    const forecast = this.queryEndTurnForecast();
     this.updateResourceAccordion(forecast);
     const forecastPower = forecast.electricity;
     const powerHud = powerHudViewModel(forecastPower, this.locale);
-    const horde = observation.horde;
+    const horde = this.state.horde;
     const warningType = horde.warningType;
     const finalHordeVisible = warningType === 'final' || horde.finalHordeStatus !== 'notStarted';
     const warningLabel = finalHordeVisible ? this.translator()('finalHordeWarning') : this.translator()('horde');
     const warnedDirections = warningType === 'none' ? [] : horde.warningDirections;
-    const nextWave = horde.nextWave ?? hordeWaveForIndex(this.state.config, horde.nextWaveIndex);
+    const nextWave = hordeWaveForIndex(this.state.config, horde.nextWaveIndex);
     const finalTurn = finalWaveTurn(this.state.config);
     const nextWaveLabel = horde.nextWaveIndex === null ? '—' : String(horde.nextWaveIndex);
     const directionCount = nextWave ? String(nextWave.directionCount) : '—';
     const directionsLabel = warnedDirections.length > 0
       ? warnedDirections.map((direction) => formatDirection(direction, this.locale)).join(' / ')
       : '—';
-    const scheduledSpawnTurn = horde.spawnTurn ?? hordeWaveSpawnTurn(nextWave);
+    const scheduledSpawnTurn = horde.nextSpawnTurn ?? hordeWaveSpawnTurn(nextWave);
     const composition = hordeCompositionLabel(nextWave, this.locale, this.state.config);
     const remainingTurns = warningType === 'none' && !finalHordeVisible && scheduledSpawnTurn !== null
       ? Math.max(0, scheduledSpawnTurn - this.state.turn)
@@ -2830,6 +3166,7 @@ export class GameUiController {
       'horde-spawn-turn': scheduledSpawnTurn === null ? '—' : String(scheduledSpawnTurn),
       'healthy-civilians': String(population.healthyCivilians),
       infected: String(population.infected),
+      'save-status': this.saveStatusLabel(),
     };
     for (const [key, value] of Object.entries(bindings)) {
       const element = this.root.querySelector<HTMLElement>(`[data-bind="${key}"]`);
@@ -2837,7 +3174,12 @@ export class GameUiController {
     }
     const hordeCard = this.root.querySelector<HTMLElement>('[data-bind="horde-card"]');
     if (hordeCard) hordeCard.dataset.hordeState = finalHordeVisible ? 'final' : warningType;
-    const strategicWarnings = strategicWarningViewModel(observation, this.locale);
+    const crisis = this.queryCrisisSummary();
+    const strategicWarnings = strategicWarningViewModel({
+      strategicForecast: this.queryStrategicForecast(),
+      checkpoints: this.state.checkpoints.map((checkpoint) => this.queryPublicCheckpoint(checkpoint.id)).filter((checkpoint): checkpoint is AgentCheckpointObservation => Boolean(checkpoint)),
+      checkpointPositionCandidates: [...this.queryCheckpointPositionCandidates()],
+    }, this.locale);
     const critical = strategicWarnings.find((warning) => warning.tier === 'critical');
     const criticalStrip = this.root.querySelector<HTMLElement>('[data-bind="strategic-critical"]');
     if (criticalStrip) {
@@ -2848,10 +3190,11 @@ export class GameUiController {
     }
     const progress = this.root.querySelector<HTMLElement>('[data-bind="victory-progress"]');
     if (progress) {
+      const victory = deriveVictoryProgress(this.state);
       const progressItems = [
-        ['finalHordeDefeated', this.translator()('finalHordeDefeated'), observation.finalHordeDefeated],
-        ['suppliedAreaZombieClear', this.translator()('suppliedAreaZombieClear'), observation.suppliedAreaZombieClear],
-        ['suppliedAreaInfectionClear', this.translator()('suppliedAreaInfectionClear'), observation.suppliedAreaInfectionClear],
+        ['finalHordeDefeated', this.translator()('finalHordeDefeated'), victory.finalHordeDefeated],
+        ['suppliedAreaZombieClear', this.translator()('suppliedAreaZombieClear'), victory.suppliedAreaZombieClear],
+        ['suppliedAreaInfectionClear', this.translator()('suppliedAreaInfectionClear'), victory.suppliedAreaInfectionClear],
       ] as const;
       progress.innerHTML = progressItems.map(([key, label, complete]) =>
         `<span class="victory-check ${complete ? 'is-complete' : 'is-pending'}" data-progress="${key}"><b aria-hidden="true">${complete ? '✓' : '○'}</b>${escapeHtml(label)}</span>`,
@@ -2870,7 +3213,7 @@ export class GameUiController {
       fuelElement.title = `${t('fuelForecast')}: ${t('currentFuel')} ${fuel.turnStartFuel} · ${t('powerFuelDemand')} ${fuel.projectedPowerFuelDemand} · ${t('unitRefillDemand')} ${fuel.projectedUnitRefillDemand} · ${t('projectedEndingFuel')} ${fuel.projectedEndingFuel}`;
       fuelElement.setAttribute('aria-label', `${t('fuel')}: ${fuel.turnStartFuel}. ${t('totalFuelDemand')}: ${fuel.projectedTotalFuelDemand}. ${t('projectedEndingFuel')}: ${fuel.projectedEndingFuel}`);
     }
-    this.updateCrisisStrip(observation);
+    this.updateCrisisStrip(crisis);
   }
 
   private updateResourceAccordion(forecast: EndTurnForecast): void {
@@ -2900,22 +3243,22 @@ export class GameUiController {
     }
   }
 
-  private updateCrisisStrip(observation: AgentObservation): void {
+  private updateCrisisStrip(summary: CrisisSummaryViewModel): void {
     const mount = this.root.querySelector<HTMLElement>('[data-crisis-mount]');
     if (!mount) return;
-    mount.innerHTML = renderCrisisStrip(crisisSummaryViewModel(observation), this.locale);
+    mount.innerHTML = renderCrisisStrip(summary, this.locale);
   }
 
   private updateBoard(): void {
     if (!this.state || !this.boardScene) return;
-    const supply = deriveSupplySnapshot(this.state);
+    const suppliedTileKeys = this.querySuppliedTileKeys();
     const supplyContext = this.supplyOverlay || Boolean(this.checkpointPlacement) || Boolean(this.constructiblePlacement) || selectionShowsSupplyOverlay(this.state, this.selection);
     const preview = this.checkpointPreview();
     const constructiblePreview = this.constructibleFacilityPreview();
     const previewTarget = this.checkpointPlacement ? this.checkpointPreviewTarget : null;
-    const suppliedTileKeys = previewTarget
+    const previewSuppliedTileKeys = previewTarget
       ? getSuppliedTileKeys(this.state, { branchId: previewTarget.branchId, checkpointPosition: previewTarget.position })
-      : supply.suppliedTileKeys;
+      : suppliedTileKeys;
     const render: BoardRenderState = {
       state: this.state,
       locale: this.locale,
@@ -2928,10 +3271,11 @@ export class GameUiController {
       hordeDirections: this.state.horde.warningType === 'none' ? [] : this.state.horde.warningDirections,
       hordeWarningType: this.state.horde.warningType,
       visibilityOverlay: true,
-      visionCoverage: getPlayerVisionCoverage(this.state),
+      visionCoverage: this.queryVision(),
       selectedVision: this.selectedVision(),
       supplyOverlay: supplyContext,
-      suppliedTileKeys,
+      suppliedTileKeys: previewSuppliedTileKeys,
+      facilityProduction: this.queryFacilityProduction(),
       checkpointLegalPreviewPositions: preview.legalPositions,
       checkpointInvalidPreviewPositions: preview.invalidPositions,
       blockedZombieIds: preview.blockedZombieIds,
@@ -2968,7 +3312,7 @@ export class GameUiController {
     const candidates = this.checkpointCandidates();
     const legalPositions = candidates.filter((candidate) => candidate.legal).map((candidate) => ({ ...candidate.position }));
     const invalidPositions = candidates.filter((candidate) => !candidate.legal).map((candidate) => ({ ...candidate.position }));
-    const visible = getPlayerVisibleTileKeys(this.state);
+    const visible = this.queryVisibleTileKeys();
     const blockedZombieIds = this.checkpointPreviewTarget
       ? getBlockingZombiesForCheckpoint(
         this.state,
@@ -2986,7 +3330,7 @@ export class GameUiController {
   ): ConstructibleFacilityPositionCandidate[] {
     if (!this.engine || !facilityType) return [];
     try {
-      return this.engine.getConstructibleFacilityPositionCandidates(facilityType)
+      return this.queryConstructibleFacilityPositionCandidates(facilityType)
         .map((candidate) => ({ ...candidate, position: { ...candidate.position } }));
     } catch {
       return [];
@@ -3005,7 +3349,6 @@ export class GameUiController {
   private selectedVision(): BoardVisionSelection | null {
     if (!this.state || !this.selection) return null;
     const selected = this.selection;
-    const coverage = getPlayerVisionCoverage(this.state);
     const selection = (
       origin: HexCoord,
       radius: number,
@@ -3041,7 +3384,7 @@ export class GameUiController {
     if (selected.kind === 'facility') {
       const facility = this.state.facilities.find((candidate) => candidate.id === selected.id);
       if (!facility || facility.owner !== 'player' || facility.status === 'ruined') return null;
-      const publicFacility = createAgentObservation(this.state).facilities.find((candidate) => candidate.id === facility.id);
+      const publicFacility = this.queryPublicFacility(facility.id);
       const visionMode = publicFacility?.visionMode ?? (facility.type === 'civilianDroneBase' ? 'aerial' : 'ground');
       const terrainLosBlocking = publicFacility?.terrainLosBlocking ?? visionMode === 'ground';
       const radius = publicFacility?.vision ?? (facility.type === 'capital'
@@ -3053,7 +3396,7 @@ export class GameUiController {
     }
     if (selected.kind === 'road' || selected.kind === 'hex' || selected.kind === 'zombie') return null;
     const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === selected.id);
-    const publicCheckpoint = createAgentObservation(this.state).checkpoints.find((candidate) => candidate.id === checkpoint?.id);
+    const publicCheckpoint = checkpoint ? this.queryPublicCheckpoint(checkpoint.id) : undefined;
     return checkpoint?.status === 'operational'
       ? selection(checkpoint.position, publicCheckpoint?.vision ?? 0, 'ground', true)
       : null;
@@ -3071,7 +3414,8 @@ export class GameUiController {
 
   private legalActions(): GameAction[] {
     try {
-      return this.engine?.getLegalActions() ?? [];
+      const listed = this.query()?.getLegalActions?.();
+      return listed ? [...listed] : this.engine?.getLegalActions() ?? [];
     } catch {
       return [];
     }
@@ -3081,7 +3425,7 @@ export class GameUiController {
     if (!this.engine || !placement) return [];
     try {
       const actionType = placement.mode === 'build' ? 'BuildCheckpoint' : 'RelocateCheckpoint';
-      return this.engine.getCheckpointPositionCandidates()
+      return this.queryCheckpointPositionCandidates()
         .filter((candidate) => candidate.actionType === actionType)
         .filter((candidate) => !placement.branchId || candidate.branchId === placement.branchId)
         .filter((candidate) => placement.mode !== 'relocate' || candidate.checkpointId === placement.checkpointId)
@@ -3095,7 +3439,7 @@ export class GameUiController {
   private checkpointCandidatesForBranch(branchId: RoadBranchId): CheckpointPositionCandidate[] {
     if (!this.engine) return [];
     try {
-      return this.engine.getCheckpointPositionCandidates()
+      return this.queryCheckpointPositionCandidates()
         .filter((candidate) => candidate.branchId === branchId)
         .map((candidate) => ({ ...candidate, position: { ...candidate.position } }));
     } catch {
@@ -3113,7 +3457,7 @@ export class GameUiController {
     const branchId = roadBranchForPosition(this.state, position);
     if (!branchId) return null;
     try {
-      const candidate = this.engine.getCheckpointPositionCandidates().find((entry) =>
+      const candidate = this.queryCheckpointPositionCandidates().find((entry) =>
         entry.actionType === 'BuildCheckpoint' && entry.branchId === branchId && samePosition(entry.position, position),
       );
       return candidate ? { ...candidate, position: { ...candidate.position } } : null;
@@ -3129,7 +3473,10 @@ export class GameUiController {
 
   private selectedUnitLegalMovesRaw(): HexCoord[] {
     if (!this.selection || this.selection.kind !== 'unit') return [];
-    return legalMoveDestinations(this.legalActions(), this.selection.id);
+    const unitActions = this.query()?.getLegalActionsForUnit?.(this.selection.id);
+    return unitActions
+      ? legalMoveDestinations([...unitActions], this.selection.id)
+      : legalMoveDestinations(this.legalActions(), this.selection.id);
   }
 
   private selectedUnitAttackTargets(): string[] {
@@ -3139,7 +3486,10 @@ export class GameUiController {
 
   private selectedUnitAttackTargetsRaw(): string[] {
     if (!this.selection || this.selection.kind !== 'unit') return [];
-    return legalAttackTargets(this.legalActions(), this.selection.id);
+    const unitActions = this.query()?.getLegalActionsForUnit?.(this.selection.id);
+    return unitActions
+      ? legalAttackTargets([...unitActions], this.selection.id)
+      : legalAttackTargets(this.legalActions(), this.selection.id);
   }
 
   private enterUnitActionMode(mode: Exclude<UnitActionMode, null>): void {
@@ -3214,7 +3564,7 @@ export class GameUiController {
     if (this.pendingMove || this.pendingAttackTargetId) {
       const confirmAction = this.pendingMove ? 'confirm-move' : 'confirm-attack';
       const confirmLabel = this.pendingMove ? t('confirmMove') : t('confirmAttack');
-      const publicUnit = createAgentObservation(this.state).units.find((candidate) => candidate.id === unit.id);
+      const publicUnit = this.queryPublicUnit(unit.id);
       const attackPreview = this.pendingAttackTargetId
         ? publicUnit?.attackPreviews.find((candidate) => candidate.targetUnitId === this.pendingAttackTargetId)
         : undefined;
@@ -3410,10 +3760,9 @@ export class GameUiController {
 
   private endTurn(): void {
     if (!this.state) return;
-    const forecast = forecastEndTurn(this.state);
-    const observation = createAgentObservation(this.state);
-    const crisis = crisisSummaryViewModel(observation);
-    const endTurnRisk = endTurnRiskViewModel(observation);
+    const forecast = this.queryEndTurnForecast();
+    const crisis = this.queryCrisisSummary();
+    const endTurnRisk = this.queryEndTurnRisk();
     const t = this.translator();
     const projected: Array<[string, number]> = [];
     if (forecast.food.shortage > 0) projected.push([t('food'), forecast.food.shortage]);
@@ -3583,7 +3932,7 @@ export class GameUiController {
     const t = this.translator();
     const peopleOutput = this.root.querySelector<HTMLOutputElement>('[data-transfer-output="true"]');
     if (peopleOutput) peopleOutput.textContent = String(people);
-    const forecast = forecastEndTurn(this.state);
+    const forecast = this.queryEndTurnForecast();
     const projection = toId ? projectCityTransfer(this.state, from.id, toId, people, forecast) : null;
     if (!toId) {
       output.innerHTML = `<p class="warning-text">${escapeHtml(t('noTransferTarget'))}</p>`;
@@ -4017,9 +4366,16 @@ export class GameUiController {
       return false;
     }
     this.state = result.state;
+    this.invalidateQueryContext();
+    this.hasUnsavedChanges = true;
+    this.saveStatus = 'none';
     this.notifyImportantEvents(result.events ?? [], previousState);
     this.checkpointPlacementMessage = null;
-    this.autosave();
+    // v1.5.2 keeps one human autosave checkpoint per meaningful boundary:
+    // new game, successful EndTurn at the next player turn, and final game
+    // over. Other accepted actions remain dirty until that boundary or an
+    // explicit Save action.
+    if (result.gameOver || (action.type === 'EndTurn' && this.state.phase === 'player')) this.autosave();
     this.updateView();
     if (result.gameOver && result.result) this.showStatistics(result.result);
     return true;
@@ -4068,10 +4424,43 @@ export class GameUiController {
     this.updateView();
   }
 
-  private autosave(): void {
-    if (!this.state) return;
+  private saveStatusLabel(): string {
+    const t = this.translator();
+    const turn = this.lastSavedTurn === null ? '' : ` · ${t('lastSavedTurn')} ${this.lastSavedTurn}`;
+    if (this.saveStatus === 'saving') return `${t('saving')}${turn}`;
+    if (this.saveStatus === 'failed') return `${t('saveFailed')}${turn}`;
+    if (this.hasUnsavedChanges) return `${t('unsavedChanges')}${turn}`;
+    if (this.lastSavedTurn !== null) return `${t('saveStatusSaved')}${turn}`;
+    return '';
+  }
+
+  private refreshSaveStatusUi(): void {
+    const status = this.root.querySelector<HTMLElement>('[data-bind="save-status"]');
+    if (status) status.textContent = this.saveStatusLabel();
+  }
+
+  private saveState(): boolean {
+    if (!this.state) return false;
+    this.saveStatus = 'saving';
+    this.refreshSaveStatusUi();
     const result = this.store.save(this.state);
-    if (result.ok) this.lastSaveCode = result.code;
+    if (!result.ok) {
+      this.saveStatus = 'failed';
+      this.showToast(this.translator()('saveFailed'));
+      this.refreshSaveStatusUi();
+      return false;
+    }
+    this.lastSaveCode = result.code;
+    this.lastSaveTiming = result.timing ?? null;
+    this.lastSavedTurn = this.state.turn;
+    this.hasUnsavedChanges = false;
+    this.saveStatus = 'saved';
+    this.refreshSaveStatusUi();
+    return true;
+  }
+
+  private autosave(): boolean {
+    return this.saveState();
   }
 
   private loadAutosave(): void {
@@ -4091,6 +4480,7 @@ export class GameUiController {
       const result = this.engine.step({ type: 'LoadSnapshot', snapshot });
       if (result.error) throw new Error(result.error.message);
       this.state = result.state;
+      this.invalidateQueryContext();
       this.screen = 'game';
       this.navMode = 'map';
       this.selection = null;
@@ -4104,6 +4494,12 @@ export class GameUiController {
       this.constructiblePreviewTarget = null;
       this.constructiblePlacementMessage = null;
       this.lastSaveCode = null;
+      this.saveModalCode = null;
+      this.lastSaveTiming = null;
+      this.manualSavePending = false;
+      this.lastSavedTurn = migrated ? null : this.state.turn;
+      this.hasUnsavedChanges = migrated;
+      this.saveStatus = migrated ? 'none' : 'saved';
       this.resourceAccordion = null;
       this.overviewSections.clear();
       this.crisisExpandedGroups.clear();
@@ -4143,13 +4539,41 @@ export class GameUiController {
   private showSaveModal(): void {
     if (!this.state) return;
     const t = this.translator();
-    const code = this.lastSaveCode ?? encodeSaveCode(this.state);
-    this.lastSaveCode = code;
-    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="save"><section class="modal-card floating-card" aria-labelledby="save-heading"><button class="icon-button modal-close" data-action="dismiss-modal">×</button><h2 id="save-heading">${escapeHtml(t('saveCode'))}</h2><textarea data-input="save-code" rows="7" spellcheck="false" readonly>${escapeHtml(code)}</textarea><div class="modal-actions"><button class="primary-button" data-action="copy-code">${escapeHtml(t('copy'))}</button><button class="secondary-button" data-action="download-json">${escapeHtml(t('download'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
+    // Opening the code export does not mutate the shared local slot. The
+    // modal exposes an explicit Manual Save button for that operation.
+    const code = encodeSaveCode(this.state);
+    this.saveModalCode = code;
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="save"><section class="modal-card floating-card" aria-labelledby="save-heading"><button class="icon-button modal-close" data-action="dismiss-modal">×</button><h2 id="save-heading">${escapeHtml(t('saveCode'))}</h2><p class="muted" data-bind="save-modal-status" aria-live="polite">${escapeHtml(this.saveStatusLabel())}</p><textarea data-input="save-code" rows="7" spellcheck="false" readonly>${escapeHtml(code)}</textarea><div class="modal-actions"><button class="primary-button" data-action="manual-save">${escapeHtml(t('manualSave'))}</button><button class="secondary-button" data-action="copy-code">${escapeHtml(t('copy'))}</button><button class="secondary-button" data-action="download-json">${escapeHtml(t('download'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
+  }
+
+  private manualSave(): void {
+    if (!this.state) return;
+    if (this.manualSavePending) return;
+    this.manualSavePending = true;
+    const requestedEngine = this.engine;
+    this.saveStatus = 'saving';
+    this.refreshSaveStatusUi();
+    const modalStatus = this.root.querySelector<HTMLElement>('[data-modal="save"] [data-bind="save-modal-status"]');
+    if (modalStatus) modalStatus.textContent = this.saveStatusLabel();
+    const commit = (): void => {
+      if (this.engine !== requestedEngine) return;
+      this.manualSavePending = false;
+      if (!this.state) return;
+      const saved = this.saveState();
+      const code = saved && this.lastSaveCode ? this.lastSaveCode : encodeSaveCode(this.state);
+      this.saveModalCode = code;
+      const textarea = this.root.querySelector<HTMLTextAreaElement>('[data-modal="save"] [data-input="save-code"]');
+      if (textarea) textarea.value = code;
+      const status = this.root.querySelector<HTMLElement>('[data-modal="save"] [data-bind="save-modal-status"]');
+      if (status) status.textContent = this.saveStatusLabel();
+      if (saved) this.showToast(this.translator()('manualSaved'));
+    };
+    if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(commit));
+    else commit();
   }
 
   private copySaveCode(_element?: HTMLElement): void {
-    const code = this.lastSaveCode;
+    const code = this.saveModalCode ?? this.lastSaveCode;
     if (!code) return;
     void navigator.clipboard?.writeText(code).then(() => this.showToast(this.translator()('copy'))).catch(() => this.showToast(code));
   }
@@ -4258,7 +4682,7 @@ export class GameUiController {
     const stats = result.statistics;
     const finalPopulation = this.state ? populationLocationTotals(this.state).total : 0;
     const finalFacilities = this.state?.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length ?? 0;
-    const victory = this.state ? createAgentObservation(this.state) : null;
+    const victory = this.state ? deriveVictoryProgress(this.state) : null;
     const progress = victory
       ? [
         ['finalHordeDefeated', t('finalHordeDefeated'), victory.finalHordeDefeated],
@@ -4276,10 +4700,8 @@ export class GameUiController {
   private renderBranchFlow(): string {
     if (!this.state) return '';
     const t = this.translator();
-    const observation = createAgentObservation(this.state);
     const refugeeArrivalsStopped = this.state.horde.finalHordeStatus !== 'notStarted';
     const branches = [...this.state.map.roadBranches].sort((left, right) => left.id.localeCompare(right.id));
-    const supply = deriveSupplySnapshot(this.state);
     const panels = branchPanelViewModel(this.state);
     const cards = branches.map((branch) => {
       const branchState = this.state!.roadBranches.find((candidate) => candidate.branchId === branch.id);
@@ -4288,7 +4710,7 @@ export class GameUiController {
         ? this.state!.checkpoints.find((candidate) => candidate.id === panel.activeCheckpointId)
         : undefined;
       const publicCheckpoint = checkpoint
-        ? observation.checkpoints.find((candidate) => candidate.id === checkpoint.id)
+        ? this.queryPublicCheckpoint(checkpoint.id)
         : undefined;
       const policyKey: CheckpointPolicy = panel?.currentPolicy ?? 'passThrough';
       const policy = this.state!.config.refugees.policies[policyKey];
@@ -4298,7 +4720,7 @@ export class GameUiController {
       const range = String(this.state!.config.refugees.arrivalPeopleMin) + '–' + String(this.state!.config.refugees.arrivalPeopleMax);
       const destination = checkpoint ? t('checkpoint') + ' · ' + checkpoint.id : t('noCheckpoint');
       const policyText = formatPercent(policy.workerRate, this.locale) + ' / ' + formatPercent(policy.infectionRate, this.locale);
-      const radius = supply.branchRadii.find((entry) => entry.branchId === branch.id)?.radius ?? this.state!.config.checkpoint.initialSupplyRadius;
+      const radius = getBranchSupplyRadius(this.state!, branch.id);
       const screeningCapacity = publicCheckpoint?.screeningCapacity ?? this.state!.config.refugees.screeningCapacity;
       const screeningThroughput = publicCheckpoint?.estimatedScreeningThroughput ?? screeningCapacity / Math.max(1, policy.turns);
       const queuePressure = publicCheckpoint ? queuePressureLabel(publicCheckpoint.queuePressureClass, this.locale) : t('none');
@@ -4482,19 +4904,18 @@ export class GameUiController {
     const summary = this.root.querySelector<HTMLElement>('[data-bind="selection-summary"]');
     if (!body || !title || !summary) return;
     const t = this.translator();
-    const observation = createAgentObservation(this.state);
     const selected = this.selection;
     if (!selected) {
       const prompt = unselectedPrompt(this.navMode, this.locale);
       const population = populationLocationTotals(this.state);
-      const crisis = crisisSummaryViewModel(observation);
+      const crisis = this.queryCrisisSummary();
       title.textContent = prompt;
       summary.textContent = stateSummary(this.state, this.locale);
       const isOpen = (section: OverviewSectionKey): boolean => this.overviewSections.has(section)
         ? Boolean(this.overviewSections.get(section))
         : section === 'crisis' && crisis.criticalCount > 0;
       const populationContent = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl><p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>`;
-      const risk = endTurnRiskViewModel(observation);
+      const risk = this.queryEndTurnRisk();
       const crisisSummary = `${crisis.criticalCount} ${t('crisisSeverity.critical')} · ${crisis.warningCount} ${t('crisisSeverity.warning')} · ${crisis.advisoryCount} ${t('crisisSeverity.advisory')}`;
       const branchContent = this.renderBranchFlow();
       const eventHistory = renderImportantEventHistory(this.state.events ?? [], this.locale, this.eventHistoryLimit);
@@ -4508,9 +4929,10 @@ export class GameUiController {
     if (selected.kind === 'unit') {
       const unit = findUnit(this.state, selected.id);
       if (!unit) return;
-      const actions = legalActionsForUnit(this.state, this.legalActions(), unit.id);
-      const publicUnit = observation.units.find((candidate) => candidate.id === unit.id);
-      const publicTile = mapTileForPosition(observation, unit.position);
+      const listedUnitActions = this.query()?.getLegalActionsForUnit?.(unit.id);
+      const actions = listedUnitActions ? [...listedUnitActions] : legalActionsForUnit(this.state, this.legalActions(), unit.id);
+      const publicUnit = this.queryPublicUnit(unit.id);
+      const publicTile = publicMapTileForPosition(this.state, unit.position, this.queryVisibleTileKeys());
       const proficiency = unitProficiencyViewModel(unit, this.state.config);
       const proficiencySummary = proficiency
         ? ` · ${proficiencyLabel(proficiency.proficiency, this.locale)} · ${t('attackCharge')} ${proficiency.attackChargesRemaining}/${proficiency.maxAttackCharges}`
@@ -4528,8 +4950,8 @@ export class GameUiController {
     if (selected.kind === 'zombie') {
       const zombie = findUnit(this.state, selected.id);
       if (!zombie || zombie.isPlayerUnit) return;
-      const publicZombie = observation.zombies.find((candidate) => candidate.id === zombie.id);
-      const publicTile = mapTileForPosition(observation, zombie.position);
+      const publicZombie = this.queryPublicUnit(zombie.id);
+      const publicTile = publicMapTileForPosition(this.state, zombie.position, this.queryVisibleTileKeys());
       title.textContent = `${unitLabel(zombie.type, this.locale)} · ${zombie.id}`;
       const waveBadge = zombie.hordeKind === 'final'
         ? t('finalWave')
@@ -4541,12 +4963,12 @@ export class GameUiController {
       return;
     }
     if (selected.kind === 'hex') {
-      const publicTile = mapTileForPosition(observation, selected.position);
+      const publicTile = publicMapTileForPosition(this.state, selected.position, this.queryVisibleTileKeys());
       this.renderHexSheet(selected.position, body, title, summary, publicTile);
       return;
     }
     if (selected.kind === 'road') {
-      const publicTile = mapTileForPosition(observation, selected.position);
+      const publicTile = publicMapTileForPosition(this.state, selected.position, this.queryVisibleTileKeys());
       body.innerHTML = this.renderSameHexTabs(selected.position, selected);
       const content = document.createElement('div');
       this.renderRoadSheet(selected.position, content, title, summary, publicTile);
@@ -4556,8 +4978,8 @@ export class GameUiController {
     if (selected.kind === 'checkpoint') {
       const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === selected.id);
       if (!checkpoint) return;
-      const publicCheckpoint = observation.checkpoints.find((candidate) => candidate.id === checkpoint.id);
-      const publicTile = mapTileForPosition(observation, checkpoint.position);
+      const publicCheckpoint = this.queryPublicCheckpoint(checkpoint.id);
+      const publicTile = publicMapTileForPosition(this.state, checkpoint.position, this.queryVisibleTileKeys());
       body.innerHTML = this.renderSameHexTabs(checkpoint.position, selected);
       const content = document.createElement('div');
       this.renderCheckpointSheet(checkpoint, content, title, summary, publicCheckpoint, publicTile);
@@ -4566,8 +4988,8 @@ export class GameUiController {
     }
     const facility = this.state.facilities.find((candidate) => candidate.id === selected.id);
     if (!facility) return;
-    const publicFacility = observation.facilities.find((candidate) => candidate.id === facility.id);
-    const publicTile = mapTileForPosition(observation, facility.position);
+    const publicFacility = this.queryPublicFacility(facility.id);
+    const publicTile = publicMapTileForPosition(this.state, facility.position, this.queryVisibleTileKeys());
     title.textContent = facilityLabel(facility.type, this.locale);
     const owned = facility.owner === 'player' && facility.status === 'owned';
     const statusText = facility.status === 'ruined' ? t('ruined') : facility.owner === 'player' ? t('owned') : t('unowned');

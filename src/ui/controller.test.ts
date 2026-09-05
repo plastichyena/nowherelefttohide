@@ -45,8 +45,8 @@ function siteEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.5.1');
-    expect(titleVersionLabel('en')).toContain('1.5.1');
+    expect(titleVersionLabel('ja')).toContain('1.5.2');
+    expect(titleVersionLabel('en')).toContain('1.5.2');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });

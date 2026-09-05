@@ -59,6 +59,26 @@ export interface SaveOperationResult {
   ok: boolean;
   code: string | null;
   error: string | null;
+  /** Optional synchronous save timings for profiling and diagnostics. */
+  timing?: SaveTiming;
+}
+
+export interface SaveTiming {
+  validationMs: number;
+  normalizationMs: number;
+  checksumMs: number;
+  gzipMs: number;
+  base64Ms: number;
+  storageWriteMs?: number;
+  totalMs: number;
+  normalizedBytes: number;
+  compressedBytes: number;
+  codeChars: number;
+}
+
+export interface SaveEncodingMeasurement {
+  code: string;
+  timing: SaveTiming;
 }
 
 export interface StorageLike {
@@ -1163,11 +1183,67 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   return { valid: true, errors: [], state: clone(state), envelope };
 }
 
+function clockMs(): number {
+  return typeof globalThis.performance?.now === 'function' ? globalThis.performance.now() : Date.now();
+}
+
+/**
+ * Encode one committed state and expose synchronous stage timings for the
+ * v1.5.2 save benchmark. Gzip keeps level 9 for Save Format 11 compatibility;
+ * a zero mtime makes repeated encodes of one committed state byte-stable so
+ * the shared autosave slot is not rewritten only because the clock advanced.
+ */
+export function measureSaveEncoding(state: GameState): SaveEncodingMeasurement {
+  const totalStart = clockMs();
+  const validationStart = clockMs();
+  const errors = validateStateForSave(state);
+  const validationMs = clockMs() - validationStart;
+  if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
+
+  const normalizationStart = clockMs();
+  const payload: Omit<SaveEnvelope, 'checksum'> = {
+    format: SAVE_FORMAT,
+    formatVersion: SAVE_FORMAT_VERSION,
+    gameVersion: state.gameVersion,
+    mapId: state.mapId,
+    seed: state.seed,
+    state: clone(state),
+  };
+  const normalizedPayload = envelopePayload(payload);
+  const normalizationMs = clockMs() - normalizationStart;
+
+  const checksumStart = clockMs();
+  const digest = checksum(normalizedPayload);
+  const checksumMs = clockMs() - checksumStart;
+
+  const envelopeText = canonicalJson({ ...payload, checksum: digest });
+  const gzipStart = clockMs();
+  const compressed = gzipSync(utf8(envelopeText), { level: 9, mtime: 0 });
+  const gzipMs = clockMs() - gzipStart;
+
+  const base64Start = clockMs();
+  const code = toBase64Url(compressed);
+  const base64Ms = clockMs() - base64Start;
+  const totalMs = clockMs() - totalStart;
+  return {
+    code,
+    timing: {
+      validationMs,
+      normalizationMs,
+      checksumMs,
+      gzipMs,
+      base64Ms,
+      totalMs,
+      normalizedBytes: utf8(envelopeText).byteLength,
+      compressedBytes: compressed.byteLength,
+      codeChars: code.length,
+    },
+  };
+}
+
 /** Create a checksummed, URL-safe v1.5.1 Save Format 11 code. */
 export function encodeSaveCode(state: GameState): string {
-  const errors = validateStateForSave(state);
-  if (errors.length > 0) throw new Error(`State cannot be saved: ${errors.join('; ')}`);
-  return toBase64Url(gzipSync(strToU8(canonicalJson(makeEnvelope(state))), { level: 9 }));
+  return measureSaveEncoding(state).code;
 }
 
 /** Decode and validate a v1.5.1 save code without changing caller-owned state. */
@@ -1226,9 +1302,21 @@ export class AutoSaveStore {
       return { ok: false, code: null, error: message };
     }
     try {
-      const code = encodeSaveCode(state);
+      const measurement = measureSaveEncoding(state);
+      const writeStart = clockMs();
+      const code = measurement.code;
       this.storage.setItem(this.key, code);
-      return { ok: true, code, error: null };
+      const storageWriteMs = clockMs() - writeStart;
+      return {
+        ok: true,
+        code,
+        error: null,
+        timing: {
+          ...measurement.timing,
+          storageWriteMs,
+          totalMs: measurement.timing.totalMs + storageWriteMs,
+        },
+      };
     } catch (error) {
       const message = `自動保存に失敗しました: ${error instanceof Error ? error.message : String(error)}`;
       this.onError?.(message, error);

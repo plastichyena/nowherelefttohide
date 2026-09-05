@@ -46,7 +46,8 @@ interface SeedReport {
   finalTurn: number;
   counts: {
     decisions: number;
-    legalActionQueries: number;
+    playTurnProcesses: number;
+    playTurnQueryRequests: number;
     fullSnapshotQueries: number;
     statusCommands: number;
   };
@@ -139,6 +140,43 @@ function invokeCli(
   const payload = record(parsed, `Session CLI ${args[0] ?? 'command'} response`);
   if (payload.ok !== true) fail(`Session CLI ${args[0] ?? 'command'} returned ok=false`);
   return payload;
+}
+
+/**
+ * `play-turn` is deliberately a JSONL protocol: the initial compact response,
+ * zero or more read-only queries, Action results, and the closing response all
+ * come from one bundled Node process.  Keep this helper separate from the
+ * legacy single-command helper so the package test catches a regression back
+ * to one process per Action.
+ */
+function invokePlayTurn(
+  options: PortableSessionE2EOptions,
+  sessionId: string,
+  requests: readonly JsonRecord[],
+): JsonRecord[] {
+  const child = spawnSync(process.execPath, [options.cli, 'play-turn', ...commonArgs(options.root, sessionId)], {
+    cwd: process.cwd(),
+    env: { ...process.env },
+    encoding: 'utf8',
+    input: `${requests.map((request) => JSON.stringify(request)).join('\n')}\n`,
+    maxBuffer: CLI_MAX_BUFFER,
+  });
+  if (child.error) fail(`play-turn could not start: ${child.error.message}`);
+  const stdout = String(child.stdout ?? '');
+  const stderr = String(child.stderr ?? '');
+  if (child.status !== 0) {
+    const detail = (stderr.trim() || stdout.trim()).slice(0, 2_000);
+    fail(`play-turn failed with exit ${String(child.status)}${detail ? `: ${detail}` : ''}`);
+  }
+  const lines = stdout.split(/\r?\n/u).filter((line) => line.trim().length > 0);
+  if (lines.length < 3) fail(`play-turn returned ${lines.length} JSONL response(s), expected start, Action, and close`);
+  return lines.map((line, index) => {
+    try {
+      return record(JSON.parse(line) as unknown, `play-turn response ${index}`);
+    } catch (error) {
+      fail(`play-turn response ${index} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
 }
 
 function commonArgs(root: string, sessionId: string): string[] {
@@ -240,25 +278,51 @@ function runSeed(options: PortableSessionE2EOptions, seed: number): SeedReport {
   let lastFull = readFullSnapshot(options, sessionId, current.revision);
   assertStatusMatchesFull(current, lastFull, `seed ${seed} initial`);
   let decisions = 0;
-  let legalActionQueries = 0;
+  let playTurnProcesses = 0;
+  let playTurnQueryRequests = 0;
   let fullSnapshotQueries = 1;
 
   while (!current.gameOver) {
     if (decisions >= MAX_DECISIONS) fail(`Seed ${seed} did not reach Game Over within ${MAX_DECISIONS} decisions`);
-    const legal = readEndTurnAction(options, sessionId, current.revision);
-    legalActionQueries += legal.queries;
-    if (!lastFull.legalActions.some((action) => record(action, `seed ${seed} full legal action`).type === 'EndTurn')) {
+    const endTurn = lastFull.legalActions.find((action) => record(action, `seed ${seed} full legal action`).type === 'EndTurn');
+    if (!endTurn) {
       fail(`Seed ${seed} full-snapshot omitted EndTurn at revision ${current.revision}`);
     }
-    const stepPayload = invokeCli(options, [
-      'step', ...commonArgs(options.root, sessionId),
-    ], {
-      action: legal.action,
-      decisionSummary: `portable public EndTurn seed ${seed} decision ${decisions + 1}`,
+    const requests: JsonRecord[] = [];
+    // The first process also proves that a read-only query and its following
+    // Action use the same live Turn context.  Later Turns retain the compact
+    // response path and avoid querying the whole legal-action list again.
+    if (decisions === 0) {
+      requests.push({ type: 'query', target: 'legal-actions', expectedRevision: current.revision, pageSize: 500 });
+      playTurnQueryRequests += 1;
+    }
+    requests.push({
+      type: 'action',
+      action: endTurn,
+      decisionSummary: `portable play-turn EndTurn seed ${seed} decision ${decisions + 1}`,
       expectedRevision: current.revision,
+      requestId: `portable-${seed}-${decisions + 1}`,
     });
-    if (stepPayload.accepted !== true || stepPayload.error !== null) fail(`Seed ${seed} EndTurn was not accepted at decision ${decisions + 1}`);
-    const next = statusView(stepPayload, `seed ${seed} step ${decisions + 1}`);
+    const responses = invokePlayTurn(options, sessionId, requests);
+    playTurnProcesses += 1;
+    const started = responses[0]!;
+    if (started.ok !== true || started.command !== 'play-turn' || started.kind !== 'start') fail(`Seed ${seed} play-turn did not return a protocol start response`);
+    const actionResult = responses.find((response) => response.kind === 'action-result');
+    if (!actionResult || actionResult.ok !== true || actionResult.accepted !== true || actionResult.error !== null) {
+      fail(`Seed ${seed} play-turn EndTurn was not accepted at decision ${decisions + 1}`);
+    }
+    if (safeInteger(actionResult.currentRevision, `seed ${seed} play-turn currentRevision`) !== current.revision + 1) {
+      fail(`Seed ${seed} play-turn revision did not advance by one`);
+    }
+    if (decisions === 0 && !responses.some((response) => response.kind === 'query-result' && response.target === 'legal-actions')) {
+      fail(`Seed ${seed} play-turn did not return its in-process legal-action query`);
+    }
+    const closed = responses.at(-1)!;
+    const expectedCloseReason = actionResult.gameOver === true ? 'game_over' : 'successful_end_turn';
+    if (closed.ok !== true || closed.kind !== 'closed' || closed.reason !== expectedCloseReason) {
+      fail(`Seed ${seed} play-turn closed with ${String(closed.reason)}, expected ${expectedCloseReason}`);
+    }
+    const next = statusView(invokeCli(options, ['status', ...commonArgs(options.root, sessionId)]), `seed ${seed} play-turn ${decisions + 1}`);
     if (next.revision !== current.revision + 1) fail(`Seed ${seed} revision did not advance by one`);
     decisions += 1;
     current = next;
@@ -297,7 +361,7 @@ function runSeed(options: PortableSessionE2EOptions, seed: number): SeedReport {
     result: summary,
     finalRevision: finalFromStatus.revision,
     finalTurn: safeInteger(finalFromStatus.observation.turn, `seed ${seed} final turn`),
-    counts: { decisions, legalActionQueries, fullSnapshotQueries, statusCommands: 2 },
+    counts: { decisions, playTurnProcesses, playTurnQueryRequests, fullSnapshotQueries, statusCommands: decisions + 2 },
     artifact: {
       path: artifactPath,
       decisionCount: readManifest.decisionCount,

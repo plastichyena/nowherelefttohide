@@ -40,7 +40,7 @@ describe('Batch Simulation CLI', () => {
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.technicalFailureCount).toBeGreaterThanOrEqual(0);
     expect(report.schemaVersion).toBe('7.0.0');
-    expect(report.appVersion).toBe('1.5.1');
+    expect(report.appVersion).toBe('1.5.2');
   // The v1.4.4 fixed 51×51 board deliberately raises deterministic run cost;
   // one shared seed still exercises both strategies and their comparison without
   // blocking Vitest's worker RPC heartbeat.

@@ -22,14 +22,27 @@ interface SupplyGeometry {
   byKey: Map<string, { key: string; distance: number; branchIds: RoadBranchId[] }>;
 }
 
-const supplyGeometryByMapId = new Map<string, SupplyGeometry>();
+// Static geometry belongs to this map object, never to the reusable map ID.
+const supplyGeometryByMap = new WeakMap<Readonly<FixedMap>, SupplyGeometry>();
+// JSON clones have new identities but usually identical static geometry. Keep
+// only four complete geometry keys strongly, so repeated candidate clones do
+// not redo every branch-distance calculation or grow an unbounded map cache.
+const recentSupplyGeometries = new Map<string, SupplyGeometry>();
+
+function supplyGeometryKey(map: Readonly<FixedMap>, capital: HexCoord): string {
+  return JSON.stringify([
+    [capital.q, capital.r],
+    map.tiles.map((tile) => [tile.key, tile.q, tile.r]),
+    stableBranches(map).map((branch) => [branch.id, branch.roadTiles.map((tile) => [tile.q, tile.r])]),
+  ]);
+}
 
 function stableBranches(map: Readonly<FixedMap>): RoadBranchDefinition[] {
   return [...map.roadBranches].sort((left, right) => left.id.localeCompare(right.id));
 }
 
 export function getCapitalPosition(map: Readonly<FixedMap>): HexCoord {
-  const cached = supplyGeometryByMapId.get(map.id);
+  const cached = supplyGeometryByMap.get(map);
   if (cached) return { ...cached.capital };
   const capital = map.facilities.find((facility) => facility.type === 'capital');
   if (!capital) throw new Error('Map does not contain a capital facility');
@@ -87,18 +100,28 @@ function computeSectorBranchIds(
 }
 
 function supplyGeometry(map: Readonly<FixedMap>): SupplyGeometry {
-  const cached = supplyGeometryByMapId.get(map.id);
+  const cached = supplyGeometryByMap.get(map);
   if (cached) return cached;
   const capitalDefinition = map.facilities.find((facility) => facility.type === 'capital');
   if (!capitalDefinition) throw new Error('Map does not contain a capital facility');
   const capital = { ...capitalDefinition.position };
+  const geometryKey = supplyGeometryKey(map, capital);
+  const shared = recentSupplyGeometries.get(geometryKey);
+  if (shared) {
+    recentSupplyGeometries.delete(geometryKey);
+    recentSupplyGeometries.set(geometryKey, shared);
+    supplyGeometryByMap.set(map, shared);
+    return shared;
+  }
   const tiles = map.tiles.map((tile) => ({
     key: tile.key,
     distance: hexDistance(capital, tile),
     branchIds: computeSectorBranchIds(map, tile),
   }));
   const geometry = { capital, tiles, byKey: new Map(tiles.map((tile) => [tile.key, tile])) };
-  supplyGeometryByMapId.set(map.id, geometry);
+  supplyGeometryByMap.set(map, geometry);
+  recentSupplyGeometries.set(geometryKey, geometry);
+  if (recentSupplyGeometries.size > 4) recentSupplyGeometries.delete(recentSupplyGeometries.keys().next().value!);
   return geometry;
 }
 

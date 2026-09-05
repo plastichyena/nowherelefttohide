@@ -78,6 +78,15 @@ const MAX_TRACE_LINE_BYTES = 8 * 1024 * 1024;
 const PRIVATE_EVENT_BLOCK_SIZE = 256;
 
 interface LockOwner { pid: number; host: string; token: string; acquiredAt: string }
+interface RequestIndexEntry {
+  sessionSchemaVersion: typeof SESSION_SCHEMA_VERSION;
+  sessionId: string;
+  requestId: string;
+  requestHash: string;
+  decision: number;
+  decisionHash: string;
+  integrityHash: string;
+}
 
 export interface LoadedSession {
   directory: string;
@@ -106,6 +115,8 @@ export interface CommitInput {
 export interface SessionStoreOptions {
   /** Test-only large-fixture support; production defaults to maximum compression. */
   gzipLevel?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  /** Bounds process-local CAS references during a long play-turn process. */
+  payloadCacheEntries?: number;
 }
 
 function parseJson<T>(text: string, subject: string): T {
@@ -163,10 +174,13 @@ export class SessionStore {
   /** Content-addressed payloads written and fsync-committed by this Store instance. */
   private readonly writtenPayloads = new Map<string, SessionPayloadReference>();
   private readonly gzipLevel: NonNullable<SessionStoreOptions['gzipLevel']>;
+  private readonly payloadCacheEntries: number;
 
   public constructor(sessionsRoot: string, private readonly faultInjector?: SessionFaultInjector, options: SessionStoreOptions = {}) {
     if (options.gzipLevel !== undefined && (!Number.isInteger(options.gzipLevel) || options.gzipLevel < 0 || options.gzipLevel > 9)) throw new SessionError('invalid_store_option', 'gzipLevel must be an integer from 0 to 9');
+    if (options.payloadCacheEntries !== undefined && (!Number.isSafeInteger(options.payloadCacheEntries) || options.payloadCacheEntries < 1 || options.payloadCacheEntries > 4096)) throw new SessionError('invalid_store_option', 'payloadCacheEntries must be an integer from 1 to 4096');
     this.gzipLevel = options.gzipLevel ?? 9;
+    this.payloadCacheEntries = options.payloadCacheEntries ?? 512;
     this.sessionsRoot = resolve(sessionsRoot);
     this.safeRoot = ensureStoreRoot(this.sessionsRoot);
     this.manifest = this.ensureStoreManifest();
@@ -204,6 +218,35 @@ export class SessionStore {
     const directory = this.sessionDirectory(sessionId);
     if (!existsSync(join(directory, 'session.json'))) throw new SessionError('session_not_found', `No Session exists at ${directory}`);
     return this.acquireLock(sessionId);
+  }
+
+  /** Held for the lifetime of one play-turn process so two writers cannot share a turn. */
+  public acquirePlayTurnLock(sessionId: string): SessionLock {
+    const directory = this.sessionDirectory(sessionId);
+    if (!existsSync(join(directory, 'session.json'))) throw new SessionError('session_not_found', `No Session exists at ${directory}`);
+    return this.acquireNamedLock(sessionId, '.play-turn-lock', '.play-turn-lock-history');
+  }
+
+  private acquireNamedLock(sessionId: string, lockName: string, archiveName: string): SessionLock {
+    const directory = this.sessionDirectory(sessionId);
+    ensureSafeOutputDirectory(this.safeRoot, directory);
+    const lockDirectory = join(directory, lockName);
+    const archiveDirectory = join(directory, archiveName);
+    const owner: LockOwner = { pid: process.pid, host: hostname(), token: randomUUID(), acquiredAt: new Date().toISOString() };
+    try { mkdirSync(assertSafeOutputPath(this.safeRoot, lockDirectory)); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      let existing: LockOwner;
+      try { existing = parseJson<LockOwner>(readFileSync(assertSafeInputFile(this.safeRoot, join(lockDirectory, 'owner.json')), 'utf8'), 'play-turn lock owner'); }
+      catch { throw new SessionError('session_locked', `Session ${sessionId} has an unreadable play-turn lock; it cannot be recovered safely`); }
+      if (!this.lockOwnerIsDefinitelyDead(existing)) throw new SessionError('session_locked', `Session ${sessionId} already has an active play-turn writer`, asJsonValue(existing));
+      ensureSafeOutputDirectory(this.safeRoot, archiveDirectory);
+      renameSync(assertSafeInputDirectory(this.safeRoot, lockDirectory), assertSafeOutputPath(this.safeRoot, join(archiveDirectory, `stale-${Date.now()}-${existing.token}`)));
+      try { mkdirSync(assertSafeOutputPath(this.safeRoot, lockDirectory)); }
+      catch { throw new SessionError('session_locked', `Session ${sessionId} play-turn lock was acquired during stale-lock recovery`); }
+    }
+    writeFileSync(assertSafeOutputPath(this.safeRoot, join(lockDirectory, 'owner.json')), `${canonicalJson(owner)}\n`, { encoding: 'utf8', flag: 'wx' });
+    return new SessionLock(this.safeRoot, lockDirectory, archiveDirectory, owner);
   }
 
   private lockOwnerIsDefinitelyDead(owner: LockOwner): boolean {
@@ -244,10 +287,10 @@ export class SessionStore {
     const cached = this.writtenPayloads.get(`${domain}:${contentHash}`);
     if (cached) return clone(cached);
     const existing = this.tryReadPayloadReference(domain, contentHash);
-    if (existing) { this.validatePayload(existing); this.writtenPayloads.set(`${domain}:${contentHash}`, clone(existing)); return existing; }
+    if (existing) { this.validatePayload(existing); this.cachePayload(`${domain}:${contentHash}`, existing); return existing; }
     const reference: SessionPayloadReference = { domain, contentHash, logicalBytes, compressedBytes, encoding: 'utf8+gzip-chunks', chunks };
     this.writeUniqueJson(this.referencePath(domain, contentHash), reference);
-    this.writtenPayloads.set(`${domain}:${contentHash}`, clone(reference));
+    this.cachePayload(`${domain}:${contentHash}`, reference);
     return reference;
   }
 
@@ -257,7 +300,7 @@ export class SessionStore {
     const cached = this.writtenPayloads.get(`${domain}:${contentHash}`);
     if (cached) return clone(cached);
     const existing = this.tryReadPayloadReference(domain, contentHash);
-    if (existing) { this.validatePayload(existing); this.writtenPayloads.set(`${domain}:${contentHash}`, clone(existing)); return existing; }
+    if (existing) { this.validatePayload(existing); this.cachePayload(`${domain}:${contentHash}`, existing); return existing; }
     const chunks: Buffer[] = [];
     for (let offset = 0; offset < bytes.length || (offset === 0 && bytes.length === 0); offset += CHUNK_BYTES) {
       chunks.push(Buffer.from(bytes.subarray(offset, Math.min(bytes.length, offset + CHUNK_BYTES))));
@@ -282,8 +325,18 @@ export class SessionStore {
       domain, contentHash, logicalBytes, compressedBytes, encoding, chunks,
     };
     this.writeUniqueJson(this.referencePath(domain, contentHash), reference);
-    this.writtenPayloads.set(`${domain}:${contentHash}`, clone(reference));
+    this.cachePayload(`${domain}:${contentHash}`, reference);
     return clone(reference);
+  }
+
+  private cachePayload(key: string, reference: SessionPayloadReference): void {
+    this.writtenPayloads.delete(key);
+    this.writtenPayloads.set(key, clone(reference));
+    while (this.writtenPayloads.size > this.payloadCacheEntries) {
+      const oldest = this.writtenPayloads.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this.writtenPayloads.delete(oldest);
+    }
   }
 
   public payloadReferenceByHash(domain: 'public' | 'private', contentHash: string): SessionPayloadReference {
@@ -482,6 +535,8 @@ export class SessionStore {
         try { appendFileSync(fd, text, 'utf8'); fsyncSync(fd); } finally { closeSync(fd); }
       }
       this.faultInjector?.('after-trace-append');
+      if ((input.decisionRecord.requestId === null) !== (input.decisionRecord.requestHash === null)) throw new SessionError('request_index_invalid', 'Decision request identity fields must both be present or both be null');
+      if (input.decisionRecord.requestId !== null && input.decisionRecord.requestHash !== null) this.reserveRequest(input.descriptor.sessionId, input.decisionRecord);
     }
 
     const withoutHash = {
@@ -508,6 +563,44 @@ export class SessionStore {
     this.faultInjector?.('before-active-commit');
     this.writeUniqueJson(join(directory, 'commits', `g${this.pad(generation)}-d${this.pad(decision)}-${randomUUID()}.json`), commit);
     return clone(commit);
+  }
+
+  /** O(1) durable idempotency lookup. A reserved entry may precede Active after an interrupted commit. */
+  public lookupRequest(sessionId: string, requestId: string): { status: 'missing' } | { status: 'reserved'; requestHash: string } | { status: 'committed'; requestHash: string; record: PublicDecisionRecord } {
+    const directory = this.sessionDirectory(sessionId);
+    const path = this.requestIndexPath(directory, requestId);
+    if (!existsSync(path)) return { status: 'missing' };
+    const entry = parseJson<RequestIndexEntry>(readFileSync(assertSafeInputFile(this.safeRoot, path), 'utf8'), 'play-turn request index');
+    const expected = integrityHash(entry as unknown as Record<string, unknown>, 'integrityHash');
+    if (entry.sessionSchemaVersion !== SESSION_SCHEMA_VERSION || entry.sessionId !== sessionId || entry.requestId !== requestId || !isSha256(entry.requestHash) || !isSha256(entry.decisionHash) || !hashesEqual(expected, entry.integrityHash)) throw new SessionError('request_index_invalid', 'play-turn request index is corrupt');
+    const head = this.readCurrentHead(sessionId).active;
+    const descriptor = this.getDescriptor(sessionId);
+    const localBase = descriptor.branchBase?.baseDecision ?? 0;
+    if (entry.decision <= localBase || entry.decision > head.decision) return { status: 'reserved', requestHash: entry.requestHash };
+    const decisionPath = join(directory, 'public/decisions', `d${this.pad(entry.decision)}-${entry.decisionHash}.json`);
+    if (!existsSync(decisionPath)) throw new SessionError('request_index_invalid', 'Committed play-turn request does not reference a Decision record');
+    const record = parseJson<PublicDecisionRecord>(readFileSync(assertSafeInputFile(this.safeRoot, decisionPath), 'utf8'), 'play-turn request Decision');
+    const { decisionHash: _hash, ...withoutHash } = record;
+    if (record.decisionHash !== entry.decisionHash || record.requestId !== requestId || record.requestHash !== entry.requestHash || !hashesEqual(decisionHash(withoutHash), record.decisionHash)) throw new SessionError('request_index_invalid', 'play-turn request index differs from its Decision record');
+    return { status: 'committed', requestHash: entry.requestHash, record: clone(record) };
+  }
+
+  private reserveRequest(sessionId: string, record: PublicDecisionRecord): void {
+    const requestId = record.requestId!;
+    const withoutIntegrity = { sessionSchemaVersion: SESSION_SCHEMA_VERSION, sessionId, requestId, requestHash: record.requestHash!, decision: record.decision, decisionHash: record.decisionHash };
+    const entry: RequestIndexEntry = { ...withoutIntegrity, integrityHash: sha256Json(withoutIntegrity) };
+    const path = this.requestIndexPath(this.sessionDirectory(sessionId), requestId);
+    const text = `${canonicalJson(entry)}\n`;
+    if (existsSync(path)) {
+      if (readFileSync(assertSafeInputFile(this.safeRoot, path), 'utf8') !== text) throw new SessionError('request_id_conflict', `requestId ${requestId} is already reserved for different content`);
+      return;
+    }
+    this.writeUniqueText(path, text);
+  }
+
+  private requestIndexPath(directory: string, requestId: string): string {
+    const hash = createHash('sha256').update(requestId, 'utf8').digest('hex');
+    return join(directory, 'public/requests', hash.slice(0, 2), `${hash}.json`);
   }
 
   private writePublicHead(state: SessionPublicState, previousHeadReference: SessionPayloadReference | null, record: PublicDecisionRecord | undefined, forceSnapshot: boolean): SessionPayloadReference {

@@ -1,3 +1,4 @@
+import { detachedQueryValue } from './query-cache';
 import { hexDistance, hexKey, hexLine } from './hex';
 import { deriveCheckpointRole } from './supply';
 import type { GameState, HexCoord, UnitState } from './types';
@@ -75,12 +76,16 @@ export function getGroundVisionCoverageFrom(
   origin: HexCoord,
   radius: number,
 ): GroundVisionCoverage {
-  const potential = new Set(
-    state.map.tiles
-      .filter((tile) => hexDistance(origin, tile) <= radius)
-      .map((tile) => tile.key),
-  );
-  const visible = getGroundVisibleTileKeys(state, origin, radius);
+  const potential = new Set<string>();
+  const visible = new Set<string>();
+  // Keep map order while sharing the range pass. Most tiles lie outside a
+  // source's radius and need no second distance check or LOS function call.
+  for (const tile of state.map.tiles) {
+    const distance = hexDistance(origin, tile);
+    if (distance <= radius) potential.add(tile.key);
+    if (distance > radius) continue;
+    if (isGroundVisibleFrom(state, origin, tile, radius)) visible.add(tile.key);
+  }
   const blocked = new Set([...potential].filter((key) => !visible.has(key)));
   return { potential, visible, blocked };
 }
@@ -99,6 +104,10 @@ function addGroundSource(
 
 /** Complete public visibility decomposition shared by UI, Observation, Metrics and legal actions. */
 export function getPlayerVisionCoverage(state: Readonly<GameState>): VisionCoverage {
+  return detachedQueryValue(state, 'vision', () => computePlayerVisionCoverage(state));
+}
+
+function computePlayerVisionCoverage(state: Readonly<GameState>): VisionCoverage {
   const groundPotential = new Set<string>();
   const groundVisible = new Set<string>();
   const aerialVisible = new Set<string>();

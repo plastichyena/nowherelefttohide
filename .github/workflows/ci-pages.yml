@@ -44,8 +44,8 @@ jobs:
         # task-update timeouts during CPU-heavy deterministic simulations.
         run: npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts
 
-      - name: Test v1.5.0 baseline report normalization
-        run: node --test scripts/normalize-baseline-report.test.mjs
+      - name: Test release validation report tools
+        run: node --test scripts/normalize-baseline-report.test.mjs scripts/verify-release-baseline.test.mjs
 
       - name: Build production bundle
         run: npm run build
@@ -121,7 +121,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run v1.5.1 Balanced seed regression
+      - name: Run v1.5.2 Balanced seed regression
         env:
           AGENT_STRATEGY: balanced
           BALANCED_SEED_START: ${{ matrix.start }}
@@ -130,7 +130,7 @@ jobs:
         run: npx --no-install vitest run src/agent/balancedAgent.batch.test.ts --pool=threads --maxWorkers=1
 
   session-release-validation:
-    name: Session v1.5.1 normal 1,000-action validation
+    name: Session v1.5.2 normal 1,000-action validation
     # This long-running job is independent of verify: Pages deployment must
     # not wait for release persistence validation.
     runs-on: ubuntu-latest
@@ -155,7 +155,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: session-v151-normal-1000
+          name: session-v152-normal-1000
           path: output/session-release/normal-1000.json
           if-no-files-found: error
           retention-days: 30
@@ -164,7 +164,7 @@ jobs:
     name: Deploy to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Long fixed-seed release batches live in the separately dispatched
-    # v1.5.1 Release Validation workflow and never delay Pages or AI Portable.
+    # v1.5.2 Release Validation workflow and never delay Pages or AI Portable.
     needs: verify
     runs-on: ubuntu-latest
     permissions:

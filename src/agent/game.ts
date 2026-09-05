@@ -386,6 +386,7 @@ export class AgentGameAdapter implements AgentGame {
   private readonly buildId: string;
   private readonly bridgeApiVersion: string;
   private readonly recordHistory: boolean;
+  private decisionCount = 0;
 
   public constructor(options: AgentGameAdapterOptions = {}) {
     this.engine = new GameEngine(this.seed, this.config);
@@ -393,9 +394,9 @@ export class AgentGameAdapter implements AgentGame {
     this.bridgeApiVersion = options.bridgeApiVersion ?? BRIDGE_API_VERSION;
     this.recordHistory = options.recordHistory ?? true;
     const observation = this.getObservation();
-    this.initialObservation = cloneJson(observation);
+    this.initialObservation = this.recordHistory ? cloneJson(observation) : null;
     this.observations = new ObservationHistory();
-    this.observations.push(observation);
+    if (this.recordHistory) this.observations.push(observation);
   }
 
   public getApiInfo() {
@@ -411,6 +412,7 @@ export class AgentGameAdapter implements AgentGame {
     this.seed = normalized.seed;
     this.config = cloneConfig(config);
     this.agentId = normalized.agent?.id ?? 'external-agent';
+    this.decisionCount = 0;
     this.acceptedActions = [];
     this.invalidAttempts = [];
     this.events = [];
@@ -418,9 +420,9 @@ export class AgentGameAdapter implements AgentGame {
     this.cachedObservation = null;
     this.cachedCheckpointPositionCandidates = null;
     const observation = this.getObservation();
-    this.initialObservation = cloneJson(observation);
+    this.initialObservation = this.recordHistory ? cloneJson(observation) : null;
     this.observations = new ObservationHistory();
-    this.observations.push(observation);
+    if (this.recordHistory) this.observations.push(observation);
     return observation;
   }
 
@@ -487,7 +489,8 @@ export class AgentGameAdapter implements AgentGame {
           // the Browser Bridge performs stricter shape validation first.
         }
       }
-      this.invalidAttempts.push({ decision: this.acceptedActions.length + this.invalidAttempts.length + 1, action: safeUnknownClone(action), error });
+      if (this.recordHistory) this.invalidAttempts.push({ decision: this.decisionCount + 1, action: safeUnknownClone(action), error });
+      this.decisionCount += 1;
       return {
         observation: this.getObservation(),
         events: [],
@@ -500,16 +503,18 @@ export class AgentGameAdapter implements AgentGame {
     const result = this.engine.step(matched);
     if (result.error) {
       const error = publicError(result.error.code, result.error.message);
-      this.invalidAttempts.push({ decision: this.acceptedActions.length + this.invalidAttempts.length + 1, action: cloneAction(matched), error });
+      if (this.recordHistory) this.invalidAttempts.push({ decision: this.decisionCount + 1, action: cloneAction(matched), error });
+      this.decisionCount += 1;
       const observation = this.getObservation();
       return { observation, events: [], error, gameOver: result.gameOver, result: this.getResult() };
     }
-    this.acceptedActions.push(cloneAction(matched));
+    this.decisionCount += 1;
+    if (this.recordHistory) this.acceptedActions.push(cloneAction(matched));
     this.cachedLegalActions = null;
     this.cachedObservation = null;
     const observation = this.currentObservation();
     const events = publicEvents(before, result.state, result.events);
-    this.events.push(...events);
+    if (this.recordHistory) this.events.push(...events);
     if (this.recordHistory) this.observations.push(observation);
     return {
       observation: cloneJson(observation),
@@ -637,6 +642,7 @@ export class AgentGameAdapter implements AgentGame {
     this.seed = snapshotCopy.seed;
     this.config = config;
     if (options.agentId !== undefined) this.agentId = options.agentId;
+    this.decisionCount = 0;
     this.acceptedActions = [];
     this.invalidAttempts = [];
     this.events = [];
@@ -644,9 +650,9 @@ export class AgentGameAdapter implements AgentGame {
     this.cachedObservation = null;
     this.cachedCheckpointPositionCandidates = null;
     const observation = this.getObservation();
-    this.initialObservation = cloneJson(observation);
+    this.initialObservation = this.recordHistory ? cloneJson(observation) : null;
     this.observations = new ObservationHistory();
-    this.observations.push(observation);
+    if (this.recordHistory) this.observations.push(observation);
     return cloneJson(observation);
   }
 

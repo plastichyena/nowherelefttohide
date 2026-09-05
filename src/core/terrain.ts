@@ -1,5 +1,6 @@
 import { hexKey } from './hex';
-import { getTile } from './map';
+import { createMapReference, getTile } from './map-reference';
+import type { MovementCostResolver } from './path';
 import type {
   GameState,
   HexCoord,
@@ -31,6 +32,24 @@ export function effectiveMovementCost(
   if (!tile) return null;
   if (tile.road || isUrbanHex(state, position)) return 1;
   return state.config.terrain.movementCost[tile.terrain];
+}
+
+/** Snapshot lookup costs for one search; rebuild after facilities/checkpoints change. */
+export function createMovementCostResolver(
+  state: Readonly<TerrainState>,
+  playerMovement = false,
+): MovementCostResolver {
+  const reference = createMapReference(state.map);
+  const urban = new Set([
+    ...state.facilities.map((facility) => hexKey(facility.position)),
+    ...state.checkpoints.map((checkpoint) => hexKey(checkpoint.position)),
+  ]);
+  return (position) => {
+    const tile = reference.getTile(position);
+    if (!tile || (playerMovement && !reference.canPlayerOccupyHex(position))) return null;
+    if (tile.road || tile.facilityId || urban.has(hexKey(position))) return 1;
+    return state.config.terrain.movementCost[tile.terrain];
+  };
 }
 
 export function terrainDefenseAt(

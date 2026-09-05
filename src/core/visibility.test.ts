@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
 import { createInitialState } from './state';
+import { hexDistance } from './hex';
 import { getSuppliedTileKeys } from './supply';
 import {
   getGroundVisibleTileKeys,
@@ -19,6 +20,23 @@ function tile(state: GameState, position: HexCoord) {
 }
 
 describe('v1.4.4 player visibility', () => {
+  it('preserves the former separate range/LOS passes and insertion order on reordered maps', () => {
+    const state = createInitialState(1, createDefaultConfig());
+    for (const reverse of [false, true]) {
+      if (reverse) state.map.tiles.reverse();
+      for (const origin of [{ q: 0, r: 0 }, { q: 4, r: 4 }, { q: 25, r: 25 }]) {
+        for (const radius of [0, 1, 5, 12]) {
+          const potential = new Set(state.map.tiles.filter(tile => hexDistance(origin, tile) <= radius).map(tile => tile.key));
+          const visible = getGroundVisibleTileKeys(state, origin, radius);
+          const result = getGroundVisionCoverageFrom(state, origin, radius);
+          expect([...result.potential]).toEqual([...potential]);
+          expect([...result.visible]).toEqual([...visible]);
+          expect([...result.blocked]).toEqual([...potential].filter(key => !visible.has(key)));
+        }
+      }
+    }
+  });
+
   it('combines human units, capital, owned facilities and operational checkpoints', () => {
     const state = createInitialState(1, createDefaultConfig());
     const visible = getPlayerVisibleTileKeys(state);

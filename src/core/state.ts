@@ -1,8 +1,9 @@
+import { initialUnitDeployment } from './initial-deployment';
+import { isHumanUnitType, isZombieUnitType } from './unit-catalog';
 import { assertValidGameConfig, cloneConfig } from './config';
 import { hexKey } from './hex';
 import {
   createFixedMap,
-  FIXED_INITIAL_UNIT_POSITIONS,
   FIXED_MAP_ID,
   generateInitialZombiePositions,
   generateInitialHunterPositions,
@@ -86,16 +87,11 @@ export function getUnitAt(state: GameState, position: HexCoord): UnitState | und
 }
 
 export function isHumanUnit(unit: UnitState): unit is UnitState & { type: HumanUnitType } {
-  return unit.type === 'police' || unit.type === 'nationalGuard' || unit.type === 'riotPolice';
+  return isHumanUnitType(unit.type);
 }
 
 export function isZombieUnit(unit: Pick<UnitState, 'type'>): boolean {
-  return unit.type === 'zombie'
-    || unit.type === 'hordeZombie'
-    || unit.type === 'policeZombie'
-    || unit.type === 'soldierZombie'
-    || unit.type === 'riotZombie'
-    || unit.type === 'hunterZombie';
+  return isZombieUnitType(unit.type);
 }
 
 export function effectiveAttackForProficiency(
@@ -126,7 +122,7 @@ export function createUnit(
   proficiency?: UnitProficiency,
 ): UnitState {
   const stats = state.config.units[type];
-  const human = type === 'police' || type === 'nationalGuard' || type === 'riotPolice';
+  const human = isHumanUnitType(type);
   const resolvedProficiency = human ? (proficiency ?? 'regular') : null;
   const attack = human
     ? effectiveAttackForProficiency(state, type as HumanUnitType, resolvedProficiency!)
@@ -496,16 +492,9 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       electricityCapacity: 0,
       electricityRequired: 0,
     },
-    units: [
-      createUnit({ config: stateConfig }, 'police-1', 'police', { ...FIXED_INITIAL_UNIT_POSITIONS.police }),
-      createUnit({ config: stateConfig }, 'national-guard-1', 'nationalGuard', { ...FIXED_INITIAL_UNIT_POSITIONS.nationalGuard }),
-      ...map.initialZombiePositions.slice(0, stateConfig.economy.initialZombieCount).map((position, index) =>
-        createUnit({ config: stateConfig }, `zombie-${index + 1}`, 'zombie', position),
-      ),
-      ...initialHunterPositions.map((position, index) =>
-        createUnit({ config: stateConfig }, `hunter-zombie-initial-${index + 1}`, 'hunterZombie', position),
-      ),
-    ],
+    units: initialUnitDeployment(map, initialHunterPositions, stateConfig.economy.initialZombieCount).map(
+      (unit) => createUnit({ config: stateConfig }, unit.id, unit.type, unit.position, 'ready', unit.proficiency),
+    ),
     checkpoints: [],
     roadBranches,
     rejectedRefugeesByDirection: emptyRejectedRefugeeCounterByDirection(),

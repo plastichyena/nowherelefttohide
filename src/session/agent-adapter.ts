@@ -43,12 +43,12 @@ function adapt(game: SessionCapableAgentGame): SessionGameRuntime {
 export function createAgentSessionGameFactory(buildId: string): SessionGameFactory {
   return {
     createNew: ({ seed, agentId }) => {
-      const game = createAgentGame({ buildId }) as SessionCapableAgentGame;
+      const game = createAgentGame({ buildId, recordHistory: false }) as SessionCapableAgentGame;
       game.reset({ seed, agent: { id: agentId } });
       return adapt(game);
     },
     restore: ({ privateState, agentId }) => {
-      const game = createAgentGame({ buildId }) as SessionCapableAgentGame;
+      const game = createAgentGame({ buildId, recordHistory: false }) as SessionCapableAgentGame;
       if (typeof game.restorePrivateSessionState !== 'function' || typeof game.exportPrivateSessionState !== 'function') {
         throw new SessionError('session_integration_unavailable', 'AgentGameAdapter does not provide Private Session persistence hooks');
       }
