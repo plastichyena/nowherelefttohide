@@ -485,6 +485,7 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .crisis-strip.severity-advisory { border-color: #3e7180; background: #102d35; color: #9bdde0; }
 .crisis-strip.severity-advisory strong { color: #9bdde0; }
 .crisis-strip-mount:empty { display: none; }
+[data-crisis-mount] { min-width: 0; }
 .crisis-list { display: grid; gap: 8px; }
 .crisis-group { display: grid; gap: 5px; }
 .crisis-group h4 { display: flex; align-items: baseline; justify-content: space-between; margin: 0; color: #ffb394; font-size: 0.74rem; }
