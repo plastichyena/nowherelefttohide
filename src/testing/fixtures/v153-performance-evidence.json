@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "measuredAt": "2026-09-06T04:02:52.865Z",
+  "measuredAt": "2026-09-06T04:04:47.578Z",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -23,15 +23,15 @@
       "operation": "Attack",
       "observedGasExplosions": 6,
       "samplesMs": [
-        27.5948,
-        29.3093,
-        25.6189,
-        26.1143,
-        24.113
+        28.4063,
+        27.1624,
+        26.352,
+        24.5178,
+        26.2618
       ],
-      "medianMs": 26.1143,
-      "p95Ms": 29.3093,
-      "maxMs": 29.3093,
+      "medianMs": 26.352,
+      "p95Ms": 28.4063,
+      "maxMs": 28.4063,
       "deterministicDigest": "0608ee6be0a39a8d38866a321a3e2024e5491a778911f1a50360ec2deb62d240"
     },
     {
@@ -40,34 +40,35 @@
       "operation": "EndTurn",
       "observedBaseInterceptions": 8,
       "samplesMs": [
-        38.509,
-        38.5768,
-        38.5392,
-        38.5062,
-        39.0943
+        40.2562,
+        39.722,
+        39.3927,
+        39.4513,
+        39.3244
       ],
-      "medianMs": 38.5392,
-      "p95Ms": 39.0943,
-      "maxMs": 39.0943,
+      "medianMs": 39.4513,
+      "p95Ms": 40.2562,
+      "maxMs": 40.2562,
       "deterministicDigest": "46d113ab650b39712f49066c85efbf54d9d1b4aa004d3c9d135566bedbfa5fcd"
     },
     {
-      "name": "zombie-phase-25-normal-ai",
+      "name": "zombie-phase-25-normal-ai-idle",
       "seed": 15303,
       "operation": "EndTurn",
       "initialZombieCount": 25,
+      "observedZombieIdleEvents": 25,
       "observedUnitMoves": 0,
       "samplesMs": [
-        48.8511,
-        50.7878,
-        48.7755,
-        60.1145,
-        57.2439
+        48.4308,
+        47.3489,
+        47.3847,
+        59.0846,
+        55.5124
       ],
-      "medianMs": 50.7878,
-      "p95Ms": 60.1145,
-      "maxMs": 60.1145,
-      "deterministicDigest": "366bca6e352ae4cddb4cd5fd7f8e16d8160017958acc0a29cfcbf1338b2cf284"
+      "medianMs": 48.4308,
+      "p95Ms": 59.0846,
+      "maxMs": 59.0846,
+      "deterministicDigest": "9730a24c9d45ec21e56bc6cacff9adb12833c90a0144f1c59c04f65d42a2aa6e"
     }
   ],
   "armyBaseRecruitmentForecast": {
@@ -75,28 +76,28 @@
     "operationsPerSample": 25,
     "sameRevisionCached": {
       "samplesMs": [
-        0.5104,
-        0.5945,
-        0.4778,
-        0.4806,
-        0.4849
+        0.5606,
+        0.5989,
+        0.4805,
+        0.4777,
+        0.4876
       ],
-      "medianMs": 0.4849,
-      "p95Ms": 0.5945,
-      "maxMs": 0.5945,
+      "medianMs": 0.4876,
+      "p95Ms": 0.5989,
+      "maxMs": 0.5989,
       "publicResultsDetached": true
     },
     "freshDetachedState": {
       "samplesMs": [
-        12.9293,
-        9.3316,
-        7.9318,
-        8.546,
-        7.6516
+        13.8715,
+        10.4372,
+        7.7636,
+        7.6683,
+        7.5623
       ],
-      "medianMs": 8.546,
-      "p95Ms": 12.9293,
-      "maxMs": 12.9293
+      "medianMs": 7.7636,
+      "p95Ms": 13.8715,
+      "maxMs": 13.8715
     }
   },
   "staticEvidence": {

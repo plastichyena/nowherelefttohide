@@ -1256,6 +1256,7 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 ## 18.1 v1.5.3 検証状況と性能証跡
 
 - ローカルのCore／UI／Save／Agent検証、型検査、本番Buildを実施する。PortableのSeed 1／7はローカルで成功を確認済みである。
-- GitHub Pagesとremote AI Portableの公開検証は進行中であり、結果未確認の時点で成功済みとは扱わない。
+- 2026-09-06、Commit `d5820b98b34deb3611825d9475897a34ea21d407` の[Pages検証・デプロイ](https://github.com/plastichyena/nowherelefttohide/actions/runs/34010590115)と[Linux／Windows AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34010593801)が成功した。公開版でSeed 1／7のGame Over、公開Artifact取得、不正Action拒否後の継続、同Action列Replay一致を確認した。PC 1280×720・スマートフォン相当390×844で表示とターン進行を確認し、ブラウザーconsole errorは0件だった。
+- 長時間のBalanced Seed 1～30、Session 1,000 Action、[Random／Balanced各100 Seed・512 MiB検証](https://github.com/plastichyena/nowherelefttohide/actions/runs/34010594878)はJob開始まで確認した。ユーザー指定により完了待ちは行わず、成功済みとは扱わない。
 - 既存v1.5.2性能証跡と比較スクリプトは履歴の測定記録として保持するが、v1.5.3のRules／Map／Save変更に対する結果一致ゲートにはしない。
-- `src/testing/v153-performance.ts`は`src/testing/fixtures/v153-performance-evidence.json`へPC 5サンプルを記録する。Gas 6体連鎖のmedianは26.1143 ms、Army Base迎撃を含むEndTurnは38.5392 ms、通常Zombie 25体のZombie Phaseは50.7878 msである。SOG05は実測がないため、PC・モバイルviewportの結果から実機性能を断定しない。
+- `src/testing/v153-performance.ts`は`src/testing/fixtures/v153-performance-evidence.json`へPC 5サンプルを記録する。Gas 6体連鎖、Army Baseの距離0迎撃8発を含むEndTurn、通常Zombie 25体のidle判断を含むZombie Phase、基地編成予測を測定し、各中央値・p95と計測条件をJSONに保持する。旧版との比較や移動が密集する局面の測定を示すものではない。SOG05は実測がないため、PC・モバイルviewportの結果から実機性能を断定しない。

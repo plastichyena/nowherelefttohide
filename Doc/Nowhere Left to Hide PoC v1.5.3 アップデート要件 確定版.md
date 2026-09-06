@@ -1,9 +1,9 @@
 # Nowhere Left to Hide PoC v1.5.3 アップデート要件 確定版
 
 - 要件確定日: 2026-09-06
-- 状態: **ローカル実装・テスト検証済み。GitHub Pagesとremote AI Portableの公開検証中。**
+- 状態: **実装・テスト・現行仕様反映完了。GitHub PagesとLinux／Windows AI Portableの公開検証成功。長時間Workflowは指定どおりJob開始まで確認。**
 - 対象Release: `1.5.3`
-- 基準: [Nowhere Left to Hide PoC 現行仕様](./Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)（v1.5.2）
+- 基準: [Nowhere Left to Hide PoC 現行仕様](./Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)（策定時v1.5.2。実装完了後の現行正本はv1.5.3）
 - 決定根拠: v1.5.3ドラフトとユーザーとの一問一答 第1～70問、および回答時の追加指定。
 - 回答記録: `archive/Nowhere Left to Hide PoC v1.5.3 アップデート要件 ドラフト.md`
 

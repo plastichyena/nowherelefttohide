@@ -145,7 +145,8 @@ function armyBaseInterceptionFixture(): { snapshot: GameState; action: GameActio
 }
 
 function zombiePhaseFixture(): { snapshot: GameState; action: GameAction } {
-  const config = benchmarkConfig({ economy: { initialZombieCount: 25 } });
+  const config = benchmarkConfig();
+  config.economy.initialZombieCount = 25;
   const state = new GameEngine(15303, config).getState() as GameState;
   return { snapshot: finalizeFixture(state), action: { type: 'EndTurn' } };
 }
@@ -252,7 +253,15 @@ async function main(): Promise<void> {
     scenarios: [
       { name: 'gas-death-chain-six', seed: 15301, operation: 'Attack', observedGasExplosions: gasExplosions, ...measureAction(gas.snapshot, gas.action) },
       { name: 'army-base-distance-zero-interception', seed: 15302, operation: 'EndTurn', observedBaseInterceptions: baseInterceptions, ...measureAction(interception.snapshot, interception.action) },
-      { name: 'zombie-phase-25-normal-ai', seed: 15303, operation: 'EndTurn', initialZombieCount: 25, observedUnitMoves: zombieObserved.events.filter((event) => event.type === 'unit_moved').length, ...measureAction(zombiePhase.snapshot, zombiePhase.action) },
+      {
+        name: 'zombie-phase-25-normal-ai-idle',
+        seed: 15303,
+        operation: 'EndTurn',
+        initialZombieCount: 25,
+        observedZombieIdleEvents: zombieObserved.events.filter((event) => event.type === 'zombie_idle').length,
+        observedUnitMoves: zombieObserved.events.filter((event) => event.type === 'unit_moved').length,
+        ...measureAction(zombiePhase.snapshot, zombiePhase.action),
+      },
     ],
     armyBaseRecruitmentForecast: {
       seed: 15304,
