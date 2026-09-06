@@ -124,6 +124,7 @@ export function createAgentPublicConfig(config: GameConfig): AgentPublicConfig {
       for (const key of ['noiseRadius', 'combatNoiseRadius', 'noiseRadiusByType', 'exactNoiseRadius']) delete unit[key];
     }
   }
+  if (isPlainObject(value.armyBase)) { value.armyBase.interceptionNoiseRadius=value.armyBase.noiseRadius; delete value.armyBase.noiseRadius; }
   return value as unknown as AgentPublicConfig;
 }
 
@@ -162,11 +163,12 @@ function publicEvents(
   events: readonly GameEvent[],
 ): AgentPublicEvent[] {
   const visibleTiles = new Set([...getPlayerVisibleTileKeys(before), ...getPlayerVisibleTileKeys(after)]);
-  const enemyById = new Map(
+  const enemyById = new Map<string, { id:string; position:{q:number;r:number} }>(
     [...before.units, ...after.units]
       .filter((unit) => !unit.isPlayerUnit)
       .map((unit) => [unit.id, unit] as const),
   );
+  for(const event of events) { const p=event.payload; if(event.type==='unit_destroyed' && p.isPlayerUnit===false && typeof p.unitId==='string' && typeof p.q==='number' && typeof p.r==='number') enemyById.set(p.unitId,{id:p.unitId,position:{q:p.q,r:p.r}}); }
   const visibleEnemyIds = new Set(
     [...enemyById.values()]
       .filter((unit) => visibleTiles.has(hexKey(unit.position)))
@@ -221,7 +223,7 @@ function publicEvents(
             : 0;
           const possibleNonHordeTypes = Array.isArray(waveRecord.possibleNonHordeTypes)
             ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
-            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'];
+            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', ...(waveIndex !== null && waveIndex >= Math.max(1,after.config.horde.waves.length-1) ? ['gasZombie'] : [])];
           payload = {
             hordeKind: wave.final ? 'final' : 'periodic',
             waveIndex,
@@ -258,7 +260,7 @@ function publicEvents(
           : [];
         const possibleNonHordeTypes = Array.isArray(waveRecord?.possibleNonHordeTypes)
           ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
-          : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'];
+          : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', ...(waveIndex !== null && waveIndex >= Math.max(1,after.config.horde.waves.length-1) ? ['gasZombie'] : [])];
         if (wave && directions.length > 0) {
           const slotValue = waveRecord?.nonHordeSlotCountPerDirection ?? waveRecord?.nonHordeSlotsPerDirection ?? composition.zombie;
           const nonHordeSlotCountPerDirection = typeof slotValue === 'number' && Number.isSafeInteger(slotValue)
@@ -280,7 +282,7 @@ function publicEvents(
         // count may reveal a future direction-specific Horde increase.
         payload = { qualitativeRisk: 'future_horde_may_be_strengthened' };
       }
-      for (const field of ['zombieId', 'unitId', 'sourceId', 'targetId', 'attackerId', 'defenderId'] as const) {
+      for (const field of ['zombieId', 'unitId', 'sourceUnitId', 'sourceId', 'targetId', 'attackerId', 'defenderId'] as const) {
         const id = payload[field];
         if (typeof id === 'string' && enemyById.has(id) && !visibleEnemyIds.has(id)) delete payload[field];
       }

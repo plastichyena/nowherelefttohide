@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "1.0.0",
+  "measuredAt": "2026-09-06T04:02:52.865Z",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "nodeVersion": "v22.14.0",
+    "cpu": "AMD Ryzen 7 3700X 8-Core Processor             ",
+    "logicalCpuCount": 16,
+    "totalMemoryBytes": 34294226944
+  },
+  "methodology": {
+    "runsPerScenario": 5,
+    "fixtureConstructionAndLoadSnapshotTimed": false,
+    "clock": "performance.now()",
+    "percentile": "nearest-rank p95; with five runs this is the maximum sample",
+    "thresholds": null
+  },
+  "scenarios": [
+    {
+      "name": "gas-death-chain-six",
+      "seed": 15301,
+      "operation": "Attack",
+      "observedGasExplosions": 6,
+      "samplesMs": [
+        27.5948,
+        29.3093,
+        25.6189,
+        26.1143,
+        24.113
+      ],
+      "medianMs": 26.1143,
+      "p95Ms": 29.3093,
+      "maxMs": 29.3093,
+      "deterministicDigest": "0608ee6be0a39a8d38866a321a3e2024e5491a778911f1a50360ec2deb62d240"
+    },
+    {
+      "name": "army-base-distance-zero-interception",
+      "seed": 15302,
+      "operation": "EndTurn",
+      "observedBaseInterceptions": 8,
+      "samplesMs": [
+        38.509,
+        38.5768,
+        38.5392,
+        38.5062,
+        39.0943
+      ],
+      "medianMs": 38.5392,
+      "p95Ms": 39.0943,
+      "maxMs": 39.0943,
+      "deterministicDigest": "46d113ab650b39712f49066c85efbf54d9d1b4aa004d3c9d135566bedbfa5fcd"
+    },
+    {
+      "name": "zombie-phase-25-normal-ai",
+      "seed": 15303,
+      "operation": "EndTurn",
+      "initialZombieCount": 25,
+      "observedUnitMoves": 0,
+      "samplesMs": [
+        48.8511,
+        50.7878,
+        48.7755,
+        60.1145,
+        57.2439
+      ],
+      "medianMs": 50.7878,
+      "p95Ms": 60.1145,
+      "maxMs": 60.1145,
+      "deterministicDigest": "366bca6e352ae4cddb4cd5fd7f8e16d8160017958acc0a29cfcbf1338b2cf284"
+    }
+  ],
+  "armyBaseRecruitmentForecast": {
+    "seed": 15304,
+    "operationsPerSample": 25,
+    "sameRevisionCached": {
+      "samplesMs": [
+        0.5104,
+        0.5945,
+        0.4778,
+        0.4806,
+        0.4849
+      ],
+      "medianMs": 0.4849,
+      "p95Ms": 0.5945,
+      "maxMs": 0.5945,
+      "publicResultsDetached": true
+    },
+    "freshDetachedState": {
+      "samplesMs": [
+        12.9293,
+        9.3316,
+        7.9318,
+        8.546,
+        7.6516
+      ],
+      "medianMs": 8.546,
+      "p95Ms": 12.9293,
+      "maxMs": 12.9293
+    }
+  },
+  "staticEvidence": {
+    "source": "src/ui/controller.ts",
+    "acceptedActionCallsUpdateView": true,
+    "acceptedActionDoesNotCallRenderGame": true,
+    "acceptedActionDoesNotCreateBoard": true,
+    "autosaveLimitedToEndTurnOrGameOver": true,
+    "autosaveCallsInAcceptedActionPath": 1,
+    "boardUpdatesExistingScene": true
+  },
+  "limitations": [
+    "One desktop Node.js process with other operating-system activity uncontrolled.",
+    "Engine step timings include normal result cloning and validation, but exclude fixture construction and LoadSnapshot.",
+    "These measurements establish a v1.5.3 reference only; they are not absolute pass/fail thresholds and do not claim SOG05 or device improvement.",
+    "No browser layout, paint, GPU, mobile thermal, or autosave serialization timing is included."
+  ]
+}

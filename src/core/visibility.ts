@@ -116,6 +116,7 @@ function computePlayerVisionCoverage(state: Readonly<GameState>): VisionCoverage
   }
   for (const facility of state.facilities) {
     if (facility.owner !== 'player' || facility.status === 'ruined') continue;
+    if (facility.type === 'armyBase') { addGroundSource(state, groundPotential, groundVisible, facility.position, facility.workers > 0 ? state.config.armyBase.staffedVision : state.config.facilities.armyBase.visionRadius); continue; }
     if (['building', 'disabled', 'recovering'].includes(facility.operationalStatus)) continue;
     if (facility.type === 'civilianDroneBase') {
       if (facility.workers > 0 && facility.powerSupplyEnabled && facility.lastPowerSupplied === true) {

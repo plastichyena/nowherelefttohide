@@ -110,7 +110,7 @@ describe('v1.5.2 production capacity and economy plan', () => {
     expect(forecastProductionCapacity(state).resources.militaryGoods.projectedEndTurnOutput).toBe(20);
   });
 
-  it('keeps Fuel generation/refill limited to starting stock even when Refinery production is positive', () => {
+  it('keeps Fuel generation/refill limited to starting stock and does not pre-spend Refinery output', () => {
     const engine = new GameEngine(152, config());
     const state = engine.getState() as GameState;
     state.resources.fuel = 1;
@@ -118,13 +118,14 @@ describe('v1.5.2 production capacity and economy plan', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const capacity = forecastProductionCapacity(state);
     const forecast = forecastEndTurn(state);
-    expect(capacity.electricity).toMatchObject({ fuelBasis: 'turn_start_stock', availableGenerationCapacity: 20, storable: false });
-    expect(capacity.resources.fuel.projectedEndTurnOutput).toBe(50);
-    expect(forecast.fuel).toMatchObject({ projectedFuelUsed: 1, projectedUnitFuelRefilled: 0, endingStock: 50 });
+    // Fuel 1 cannot power a five-electricity increment, so only the fixed Wind 15 remains.
+    expect(capacity.electricity).toMatchObject({ fuelBasis: 'turn_start_stock', availableGenerationCapacity: 15, storable: false });
+    expect(capacity.resources.fuel.projectedEndTurnOutput).toBe(0);
+    expect(forecast.fuel).toMatchObject({ projectedFuelUsed: 0, projectedUnitFuelRefilled: 1, endingStock: 0 });
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().resources.fuel).toBe(50);
-    expect(engine.getState().units.every(unit => unit.currentFuel === 0)).toBe(true);
-    expect(engine.getQuery().getEndTurnForecast().electricity.availableGenerationCapacity).toBeGreaterThan(20);
+    expect(engine.getState().resources.fuel).toBe(0);
+    expect(engine.getState().units.filter(unit => unit.isPlayerUnit).reduce((sum, unit) => sum + unit.currentFuel, 0)).toBe(1);
+    expect(engine.getQuery().getEndTurnForecast().electricity.availableGenerationCapacity).toBe(15);
   });
 
   it('does not impose supply on production and reflects reassignment without claiming simultaneous maxima', () => {

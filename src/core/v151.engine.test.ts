@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultConfig, validateGameConfig } from './config';
 import { GameEngine } from './engine';
 import { hexDistance, hexKey } from './hex';
-import { generateInitialHunterPositions, generateInitialZombiePositions, initialHunterPositionsMatchSeed, isHordeSpawnReserve } from './map';
+import { ARMY_BASE_CANDIDATES, generateInitialHunterPositions, generateInitialZombiePositions, initialHunterPositionsMatchSeed, isHordeSpawnReserve } from './map';
 import { SeededRng } from './rng';
 import { createInitialState, createUnit } from './state';
 import type { GameState } from './types';
@@ -11,7 +11,7 @@ import { createAgentObservation } from '../agent/observation';
 
 function quiet() {
   return createDefaultConfig({
-    economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 10000, civilianGoods: 10000, fuel: 10000, militaryGoods: 10000 } },
+    economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialResources: { food: 10000, civilianGoods: 10000, fuel: 10000, militaryGoods: 10000 } },
     refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 },
     horde: { waves: [{ turn: 100, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
   });
@@ -32,9 +32,9 @@ function load(engine: GameEngine, state: GameState) {
 }
 
 describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
-  it('keeps all six zombie configurations separate and derives human ranks', () => {
+  it('keeps all seven zombie configurations separate and derives human ranks', () => {
     const state = createInitialState(1, createDefaultConfig());
-    const expected = { zombie: [15, 5, 3, 1], hordeZombie: [40, 5, 3, 2], policeZombie: [10, 5, 3, 1], soldierZombie: [20, 5, 5, 1], riotZombie: [60, 5, 3, 1], hunterZombie: [20, 15, 15, 1] };
+    const expected = { zombie: [15, 5, 3, 1], hordeZombie: [40, 5, 3, 2], policeZombie: [10, 5, 3, 1], soldierZombie: [20, 5, 5, 1], riotZombie: [60, 5, 3, 1], hunterZombie: [20, 15, 15, 1], gasZombie: [35, 5, 3, 1] };
     for (const type of Object.keys(expected) as Array<keyof typeof expected>) {
       const unit = createUnit(state, type, type, { q: 20, r: 20 });
       expect([unit.hp, unit.attack, unit.movement, unit.maxAttackCharges]).toEqual(expected[type]);
@@ -50,6 +50,8 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
     for (const seed of [1, 7, 151]) {
       const state = createInitialState(seed, createDefaultConfig());
       const rng = new SeededRng(seed);
+      // New-game setup consumes the seeded Army Base candidate draw first.
+      rng.nextInt(0, ARMY_BASE_CANDIDATES.length - 1);
       expect(generateInitialZombiePositions(state.map, rng)).toEqual(state.map.initialZombiePositions);
       expect(generateInitialHunterPositions(state.map, rng, state.config.economy)).toEqual(state.initialHunterPositions);
       expect(state.units.filter((unit) => unit.type === 'zombie')).toHaveLength(25);
@@ -147,7 +149,7 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
     expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.hordeZombie, 0)).toBe(41);
     expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.zombie, 0)).toBe(73);
     config.horde.waves = [{ ...config.horde.waves[4]!, turn: 1 }];
-    config.horde.specialZombieWeights = { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100000, hunterZombie: 100000 };
+    config.horde.specialZombieWeights = { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100000, hunterZombie: 100000, gasZombie: 0 };
     const result = new GameEngine(151, config).step({ type: 'EndTurn' });
     expect(result.error?.message ?? null).toBeNull();
     const wave = result.state.units.filter((unit) => unit.hordeKind === 'final');

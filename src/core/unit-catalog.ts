@@ -11,6 +11,7 @@ export const UNIT_CATALOG = {
   soldierZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
   riotZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
   hunterZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
+  gasZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
 } as const satisfies Record<UnitType, {
   faction: 'human' | 'zombie'; ai: 'normal' | 'horde' | null;
   waveSlot: 'horde' | 'nonHorde' | null; reanimation: ZombieUnitType | null;

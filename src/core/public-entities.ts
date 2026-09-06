@@ -11,14 +11,15 @@ import {
   forecastUnitSuppression,
   getUnitLegalAttackProjections,
 } from './combat-query';
-import { forecastEndTurn, forecastFacilityProduction, forecastUnitRefills } from './economy-query';
+import { forecastArmyBaseRecruitmentPower, forecastEndTurn, forecastFacilityProduction, forecastUnitRefills } from './economy-query';
 import { getUnitLegalMoveFuelProjections } from './movement-query';
 import { deriveUnitRecovery } from './recovery';
 import { facilityZombieTargetValue, isCityFacility, isProductionFacility } from './state';
 import { deriveCheckpointRole, isHexSupplied } from './supply';
-import { effectiveMovementCost, terrainDefenseAt } from './terrain';
+import { effectiveMovementCost, terrainDefenseAt, terrainAdjustedDamage } from './terrain';
 import { getTile } from './map';
-import { hexKey } from './hex';
+import { getPlayerVisibleTileKeys } from './visibility';
+import { hexDistance, hexKey } from './hex';
 import type {
   CheckpointState,
   EndTurnForecast,
@@ -173,6 +174,11 @@ export function createPublicUnitProjection(
   return {
     id: unit.id,
     type: unit.type,
+    ...(unit.type === 'gasZombie' ? { deathExplosion: {
+      radius:1, excludesCenter:true as const, baseUnitDamage:state.config.units.gasZombie.explosionDamage, maxSiteInfection:state.config.units.gasZombie.explosionInfection,
+      units:state.units.filter(target=>hexDistance(target.position,unit.position)===1 && (target.isPlayerUnit || (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(target.position)))).map(target=>({unitId:target.id,damage:Math.min(target.hp,terrainAdjustedDamage(state,target,state.config.units.gasZombie.explosionDamage).finalDamage)})),
+      sites:[...state.facilities.filter(f=>hexDistance(f.position,unit.position)===1 && (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(f.position))).map(f=>({siteId:f.id,infection:Math.min(f.workers,state.config.units.gasZombie.explosionInfection)})),...state.checkpoints.filter(c=>hexDistance(c.position,unit.position)===1 && (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(c.position))).map(c=>({siteId:c.id,infection:Math.min(c.waiting+c.screening+c.approved,state.config.units.gasZombie.explosionInfection)}))],
+    } } : {}),
     unitType: unit.type,
     proficiency,
     recruitSurvivalTurns,
@@ -271,7 +277,7 @@ export function createPublicFacilityProjection(
   const assignable = isProductionFacility(facility) && facility.owner === 'player' && facility.status === 'owned' && facility.infected === 0 && !unavailableForOperation && facility.populationOperationalTurn <= state.turn;
   const populationIncreaseAvailable = assignable && inSupply && state.population.cityResidents > 0;
   const populationDecreaseAvailable = assignable && facility.workers > 0;
-  const recruitmentAvailable = isCityFacility(facility) && facility.owner === 'player' && facility.status === 'owned' && facility.infected === 0 && !unavailableForOperation && facility.populationOperationalTurn <= state.turn && inSupply;
+  const recruitmentAvailable = (isCityFacility(facility) || facility.type === 'armyBase') && facility.owner === 'player' && facility.status === 'owned' && facility.infected === 0 && !unavailableForOperation && facility.populationOperationalTurn <= state.turn && inSupply && !state.pendingUnitProductions.some(order => order.cityFacilityId === facility.id);
   const rule = state.config.facilities[facility.type].production;
   const containingUnit = facility.infected > 0 ? containingUnitAt(state, facility.position.q, facility.position.r) : undefined;
   const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
@@ -281,6 +287,7 @@ export function createPublicFacilityProjection(
   const estimatedOutputs = productionProjection?.outputs ?? multiplyResources(rule.outputs, currentWorkers);
   const stoppedReason = productionProjection ? productionProjection.stoppedReason : 'stopped';
   return {
+    armyBase: armyBaseProjection(state, facility, productionProjection),
     id: facility.id,
     type: facility.type,
     position: { ...facility.position },
@@ -290,7 +297,7 @@ export function createPublicFacilityProjection(
     constructible: facility.constructible,
     builtTurn: facility.builtTurn,
     recoveryOperationalTurn: facility.recoveryOperationalTurn,
-    vision: facility.owner === 'player' && facility.status !== 'ruined' && !unavailableForOperation
+    vision: facility.type === 'armyBase' ? (facility.owner === 'player' && facility.status !== 'ruined' ? (facility.workers > 0 ? state.config.armyBase.staffedVision : state.config.facilities.armyBase.visionRadius) : 0) : facility.owner === 'player' && facility.status !== 'ruined' && !unavailableForOperation
       ? facility.type === 'capital'
         ? state.config.vision.capital
         : facility.type === 'civilianDroneBase'
@@ -310,17 +317,17 @@ export function createPublicFacilityProjection(
     populationIncreaseAvailable,
     populationDecreaseAvailable,
     recruitmentAvailable,
-    recruitmentUnavailableReason: recruitmentAvailable ? null : isCityFacility(facility) ? (
+    recruitmentUnavailableReason: recruitmentAvailable ? null : facility.type === 'armyBase' ? (populationUnavailableReason ?? (!inSupply ? 'recruitment_out_of_supply' : 'city_busy')) : isCityFacility(facility) ? (
       facility.owner !== 'player' || facility.status !== 'owned' ? 'city_not_owned' : facility.infected > 0 ? 'city_infected' : facility.populationOperationalTurn > state.turn ? 'available_next_turn' : 'city_out_of_supply'
     ) : 'not_recruitment_hub',
     production: {
       inputsPerWorker: cloneJson(rule.inputs),
       outputsPerWorker: cloneJson(rule.outputs),
-      requiresPower: rule.requiresPower,
-      requiredPowerCapacity: rule.powerMode === 'required' ? rule.powerCapacity : 0,
+      requiresPower: (productionProjection?.powerMode ?? rule.powerMode) === 'required',
+      requiredPowerCapacity: productionProjection?.requiredPowerCapacity ?? (rule.powerMode === 'required' ? rule.powerCapacity : 0),
       powerGenerationPerWorker: rule.powerGeneration,
-      powerMode: rule.powerMode,
-      powerDemand: rule.powerMode === 'required' ? rule.powerCapacity : 0,
+      powerMode: productionProjection?.powerMode ?? rule.powerMode,
+      powerDemand: productionProjection?.requiredPowerCapacity ?? (rule.powerMode === 'required' ? rule.powerCapacity : 0),
       powerSupplyEnabled: rule.powerMode === 'required' && facility.powerSupplyEnabled,
       projectedPowerRequested: productionProjection?.projectedPowerRequested ?? false,
       projectedPowerSupplied: productionProjection?.projectedPowerSupplied ?? false,
@@ -415,4 +422,17 @@ export function createPublicEntityProjectionContext(state: Readonly<GameState>):
     militaryByUnitId: new Map(military.map((unit) => [unit.unitId, unit] as const)),
     productionByFacility: new Map(production.map((projection) => [projection.facilityId, projection] as const)),
   };
+}
+
+function armyBaseProjection(state: Readonly<GameState>, facility: FacilityState, projection: ReturnType<typeof forecastFacilityProduction>[number] | undefined): AgentFacilityObservation['armyBase'] {
+  if (!facility.armyBase) return null;
+  const settings=state.config.armyBase;
+  const normal=facility.owner==='player' && facility.status==='owned' && facility.infected===0 && facility.operationalStatus==='operational';
+  const operationReason=facility.owner!=='player'?'not_owned':facility.status!=='owned'?'facility_ruined':facility.infected>0?'facility_infected':facility.operationalStatus!=='operational'?facility.operationalStatus:null;
+  const order=state.pendingUnitProductions.find(o=>o.cityFacilityId===facility.id);
+  const powerPreview=forecastArmyBaseRecruitmentPower(state,facility.id);
+  const refill=projection?.armyBaseMilitaryGoods;
+  const reward=facility.armyBase.reward==='unclaimed' && state.turn>settings.rewardLastTurn?'expired':facility.armyBase.reward;
+  const interceptionReason=operationReason ?? (facility.workers<=0?'no_workers':facility.armyBase.interceptionsRemaining<=0?'no_interceptions':facility.armyBase.militaryGoods<settings.interceptionCost?'insufficient_military_goods':null);
+  return {militaryGoods:facility.armyBase.militaryGoods,maxMilitaryGoods:settings.maxMilitaryGoods,interceptionsRemaining:Math.min(facility.armyBase.interceptionsRemaining,facility.workers),interceptionsRefresh:'zombie_phase_start',interceptionAttack:settings.attack,interceptionRange:settings.range,interceptionCost:settings.interceptionCost,interceptionNoiseRadius:settings.noiseRadius,interceptionAvailable:interceptionReason===null,interceptionUnavailableReason:interceptionReason,projectedMilitaryGoodsRefill:refill?.projectedRefillAmount??0,refillAvailable:refill?.refillEligible??false,refillUnavailableReason:refill?.refillEligible?null:refill?.refillReason??operationReason,rewardStatus:reward,rewardLastTurn:settings.rewardLastTurn,rewardAvailable:reward==='unclaimed'||reward==='pending',rewardUnavailableReason:reward==='claimed'?'claimed':reward==='expired'?'expired':null,pendingRecruitment:order?{unitType:order.unitType,readyTurn:order.readyTurn,powerDemand:projection?.requiredPowerCapacity??0,powerAllocated:order.powerReady===true,status:!normal?'paused':order.powerReady?'ready':'waiting_power',reason:operationReason??(order.powerReady?null:projection?.projectedPowerReason??'not_applicable')}:null,recruitmentPowerDemand:state.config.facilities.armyBase.production.powerCapacity,recruitmentPowerAllocated:powerPreview?.supplied??false,recruitmentPowerReason:powerPreview?.reason??'not_applicable'};
 }

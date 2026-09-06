@@ -8,8 +8,8 @@ import {
 describe('v1.5.1 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('4.0.0');
-    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v1');
+    expect(DEFAULT_CONFIG.version).toBe('5.0.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v2');
     expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(25);
     expect(DEFAULT_CONFIG.economy.initialResources).toMatchObject({
       food: 230,
@@ -36,8 +36,8 @@ describe('v1.5.1 GameConfig', () => {
     expect(DEFAULT_CONFIG.refugees).toMatchObject({
       arrivalIntervalMin: 2,
       arrivalIntervalMax: 4,
-      arrivalPeopleMin: 5,
-      arrivalPeopleMax: 10,
+      arrivalPeopleMin: 10,
+      arrivalPeopleMax: 20,
       screeningCapacity: 20,
     });
     expect(DEFAULT_CONFIG.checkpoint).toMatchObject({

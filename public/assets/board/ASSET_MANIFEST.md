@@ -1,15 +1,15 @@
-# Nowhere Left to Hide v1.5.0 Board Asset Manifest
+# Nowhere Left to Hide v1.5.3 Board Asset Manifest
 
-- Generated: 2026-09-04
+- Generated: 2026-09-06
 - Runtime format: 256×256 PNG
 - Generated source resolutions: 1254×1254 for most sources, 1362×1155 for the
   twelve-Zombie Horde swarm, and 1536×1024 for Capital and Refinery; every
   checked-in runtime image is normalized to 256×256.
-- Runtime total: 34 PNG files, 1,564,167 bytes (approximately 1.49 MiB)
+- Runtime total: 37 PNG files, 1,739,215 bytes (approximately 1.66 MiB)
 - Source: original assets created for this project; no third-party images, real
   logos, seals, flags, or trademarks are included.
 - Provenance / licensing: generated specifically for this repository during
-  the v1.3.1, v1.4.4, and v1.5.0 implementations. No third-party asset or external
+  the v1.3.1, v1.4.4, v1.5.0, and v1.5.3 implementations. No third-party asset or external
   asset-license obligation is incorporated into these PNGs.
 - Generation: OpenAI built-in image generation. The built-in tool did not
   expose a more specific model identifier for recording.
@@ -62,10 +62,18 @@ large shield motif so the two Riot types remain distinguishable from Police and
 Police Zombie at board scale. Their transparent source files are retained under
 `Art/reference/v1.5.0-unit-concepts/`; only the 256px derivatives are preloaded.
 
-The v1.5.1 Hunter Zombie uses a single hooded, forward-leaning athletic
+The v1.5.1 Hunter Zombie update keeps a single forward-leaning athletic
 silhouette with unusually long claws so the Normal AI type remains identifiable
-at low Zoom. Its transparent source and generation record are retained under
+at low Zoom. The v1.5.3 clothing revision uses a thin long-sleeve shirt, short
+running shorts, crew socks, running shoes, and a sports watch; its transparent
+source and generation record are retained under
 `Art/reference/v1.5.1-hunter-concept/`; only the 256px derivative is preloaded.
+
+The v1.5.3 Gas Zombie is a single hunched figure with a swollen rupture-ready
+back gas sac and pale green vapor. The Army Base is a compact fenced compound
+with a barracks, hangar, and watchtower. Prompt and post-processing records are
+kept in `Art/reference/v1.5.3-asset-concepts/`; only the 256px derivatives are
+preloaded.
 
 ## Runtime files
 
@@ -81,6 +89,7 @@ at low Zoom. Its transparent source and generation record are retained under
 | `facilities/facility_farm.png` | `farm` | Barn, silo, and fields |
 | `facilities/facility_civilian_factory.png` | `civilianFactory` | General factory and gear motif |
 | `facilities/facility_military_factory.png` | `militaryFactory` | Factory and generic supply motif |
+| `facilities/facility_army_base.png` | `armyBase` | Fenced barracks, hangar, and watchtower compound |
 | `facilities/facility_refinery.png` | `refinery` | Storage tanks and pipes |
 | `facilities/facility_power_plant.png` | `powerPlant` | Turbine hall and transmission tower |
 | `facilities/facility_wind_power_plant.png` | `windPowerPlant` | Wind turbine array and compact control hut; fixed 15 Electricity source |
@@ -95,7 +104,8 @@ at low Zoom. Its transparent source and generation record are retained under
 | `units/unit_soldier_zombie.png` | `soldierZombie` | Approved reanimated soldier silhouette; normal Zombie AI |
 | `units/unit_riot_police.png` | `riotPolice` | Approved five-person Riot Police group; shield-focused suppression unit |
 | `units/unit_riot_zombie.png` | `riotZombie` | Approved three-person reanimated Riot group; normal Zombie AI |
-| `units/unit_hunter_zombie.png` | `hunterZombie` | v1.5.1 single Hunter Zombie; hooded athletic silhouette with long claws; normal Zombie AI |
+| `units/unit_hunter_zombie.png` | `hunterZombie` | v1.5.3 single Hunter Zombie; athletic runner clothing and long claws; normal Zombie AI |
+| `units/unit_gas_zombie.png` | `gasZombie` | Single Gas Zombie with swollen back gas sac and visible vapor |
 | `overlays/state_unsecured.png` | Unowned facility | Gray dashed perimeter |
 | `overlays/state_secured.png` | Player-owned facility | Teal perimeter |
 | `overlays/state_stopped.png` | Current `operationalStatus === stopped` | Pause bars; not used for forecast warnings |
@@ -127,6 +137,8 @@ warnings, and Horde entrance directions remain dynamic UI overlays.
    v1.4.4 runtime candidate files above are the approved sources for the two
    replacement human sprites and two reanimated Zombie sprites; v1.5.0 Riot
    candidates are documented under `Art/reference/v1.5.0-unit-concepts/`.
+   v1.5.3 Gas and Army Base source output identifiers and prompts are recorded
+   under `Art/reference/v1.5.3-asset-concepts/`.
 
 The original single-Zombie concept, approved three-Zombie normal-unit source,
 approved twelve-Zombie Horde source, and v1.4 facility references live in

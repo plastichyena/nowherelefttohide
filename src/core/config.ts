@@ -15,10 +15,11 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '4.0.0';
-export const DEFAULT_MAP_ID = 'fixed-51x51-v1';
+export const CONFIG_VERSION = '5.0.0';
+export const DEFAULT_MAP_ID = 'fixed-51x51-v2';
 
 const facilityIds: FacilityId[] = [
+  'army-base-1',
   'capital',
   'city-1',
   'city-2',
@@ -65,6 +66,7 @@ function production(
 }
 
 const defaultUnitConfig: UnitConfigMap = {
+  gasZombie: { maxAttackCharges: 1, hp: 35, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, explosionDamage: 30, explosionInfection: 30 },
   police: {
     hp: 25, recruitAttack: 6, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 12,
     maxMilitaryGoods: 5, fixedMilitaryGoodsUpkeepPerTurn: 0,
@@ -79,7 +81,7 @@ const defaultUnitConfig: UnitConfigMap = {
     maxMilitaryGoods: 20, fixedMilitaryGoodsUpkeepPerTurn: 1,
     attackMilitaryGoodsCostByRange: { 1: 1, 2: 2 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
-    recruitmentFacilityTypes: ['capital'],
+    recruitmentFacilityTypes: ['capital', 'armyBase'],
     productionCivilianGoods: 20, productionMilitaryGoods: 25, fuelCostRule: 'nationalGuardLike',
     suppressionCivilianDamageRate: 0.5, reanimationUnitType: UNIT_CATALOG.nationalGuard.reanimation, noiseClass: 'large', noiseRadius: 8,
   },
@@ -137,6 +139,7 @@ const defaultUnitConfig: UnitConfigMap = {
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
+  armyBase: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
   capital: {
     workerCapacity: 100,
     production: production(emptyInputs(), { civilianGoods: 1 }, 'required', 5),
@@ -207,6 +210,7 @@ const initialResources: ResourceStock = {
 };
 
 const initialWorkersByFacility: Record<FacilityId, number> = {
+  'army-base-1': 0,
   capital: 41,
   'city-1': 0,
   'city-2': 0,
@@ -245,6 +249,8 @@ const defaultEconomy: EconomyConfig = {
   initialZombieCount: 25,
   initialHunterCount: { min: 1, max: 4 },
   initialHunterMinDistance: 20,
+  initialGasCount: { min: 1, max: 2 },
+  initialGasMinDistance: 9,
 };
 
 const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopulationConfig> =
@@ -269,6 +275,7 @@ const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopula
  * independent copy that can be stored in GameState.
  */
 export const DEFAULT_CONFIG: GameConfig = {
+  armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 20 },
   version: CONFIG_VERSION,
   mapId: DEFAULT_MAP_ID,
   maxActionsPerTurn: 100,
@@ -302,16 +309,17 @@ export const DEFAULT_CONFIG: GameConfig = {
       { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 3, zombie: 7 }, final: false },
       { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 5, zombie: 8 }, final: true },
     ],
-    specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5 },
+    specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5 },
     riotZombieCapPerDirection: 1,
     hunterZombieCapPerDirection: 1,
+    gasZombieCapPerDirection: 1,
     movementNoiseRadius: 8,
   },
   refugees: {
     arrivalIntervalMin: 2,
     arrivalIntervalMax: 4,
-    arrivalPeopleMin: 5,
-    arrivalPeopleMax: 10,
+    arrivalPeopleMin: 10,
+    arrivalPeopleMax: 20,
     screeningCapacity: 20,
     policies: {
       passThrough: {
@@ -535,6 +543,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   }
 
   const facilityTypes: FacilityType[] = [
+    'armyBase',
     'capital',
     'city',
     'farm',
@@ -567,7 +576,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     if (!['required', 'none'].includes(facility.production.powerMode)) {
       errors.push(`facilities.${type}.production.powerMode must be required or none`);
     }
-    const expectedPowerMode = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(type)
+    const expectedPowerMode = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'armyBase'].includes(type)
       ? 'required'
       : 'none';
     if (facility.production.powerMode !== expectedPowerMode) {
@@ -601,6 +610,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('initialFacilityPopulation is required');
   } else {
     const facilityTypeById: Record<FacilityId, FacilityType> = {
+      'army-base-1': 'armyBase',
       capital: 'capital',
       'city-1': 'city',
       'city-2': 'city',
@@ -849,6 +859,14 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     }
   }
 
+  for (const key of ['maxMilitaryGoods','interceptionCost','attack','range','noiseRadius','staffedVision','rewardLastTurn'] as const) requireInteger(errors,config.armyBase?.[key],`armyBase.${key}`,key==='interceptionCost'?1:0);
+  requireInteger(errors,config.units?.gasZombie?.explosionDamage,'units.gasZombie.explosionDamage',0);
+  requireInteger(errors,config.units?.gasZombie?.explosionInfection,'units.gasZombie.explosionInfection',0);
+  requireInteger(errors,config.horde?.gasZombieCapPerDirection,'horde.gasZombieCapPerDirection',0);
+  requireInteger(errors,config.economy?.initialGasCount?.min,'economy.initialGasCount.min',0);
+  requireInteger(errors,config.economy?.initialGasCount?.max,'economy.initialGasCount.max',0);
+  requireInteger(errors,config.economy?.initialGasMinDistance,'economy.initialGasMinDistance',9);
+  if(config.economy?.initialGasCount?.min>config.economy?.initialGasCount?.max) errors.push('initialGasCount min exceeds max');
   return { valid: errors.length === 0, errors };
 }
 

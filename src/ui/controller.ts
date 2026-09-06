@@ -33,6 +33,7 @@ import {
 } from '../core/supply';
 import { getAerialVisibleTileKeys, getGroundVisionCoverageFrom, getPlayerVisionCoverage, getPlayerVisibleTileKeys } from '../core/visibility';
 import { effectiveMovementCost, isUrbanHex } from '../core/terrain';
+import { effectiveAttackForProficiency } from '../core/state';
 import Phaser from 'phaser';
 import type {
   CardinalDirection,
@@ -1334,8 +1335,8 @@ export interface BoardLegendViewModel {
 
 const LEGEND_TERRAINS = ['plain', 'forest', 'mountain'] as const;
 const LEGEND_OVERLAYS = ['road', 'urban'] as const;
-const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
-const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'checkpoint'] as const;
+const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const;
+const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'armyBase', 'checkpoint'] as const;
 
 function legendAssetFromRegistry(
   registry: BoardLegendRegistry | undefined,
@@ -1486,14 +1487,15 @@ function configLegendEntries(
       `${waveKind} · ${t('spawnTurn')} ${wave.turn} · ${t('directionCount')} ${wave.directionCount} · ${t('composition')} ${composition}`,
     );
   });
-  const mixedSlotTypes = ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
-  const specialWeights = mixedSlotTypes
-    .map((key) => `${unitLabel(key, locale)} ${config.horde.specialZombieWeights[key]}`)
-    .join(' / ');
-  add('specialSlotWeights', t('legendSpecialSlotWeights'), specialWeights);
-  add('specialSlotCaps', t('legendSpecialSlotCaps'), `${unitLabel('riotZombie', locale)} ${config.horde.riotZombieCapPerDirection} · ${unitLabel('hunterZombie', locale)} ${config.horde.hunterZombieCapPerDirection}`);
+  const earlyWeights = hordeMixedSlotWeightsLabel(config, locale, false);
+  const lateWeights = hordeMixedSlotWeightsLabel(config, locale, true);
+  add('specialSlotWeights', t('legendSpecialSlotWeights'), `${t('wavesBeforeLastTwo')}: ${earlyWeights} · ${t('lastTwoWaves')}: ${lateWeights}`);
+  add('specialSlotCaps', t('legendSpecialSlotCaps'), `${unitLabel('riotZombie', locale)} ${config.horde.riotZombieCapPerDirection} · ${unitLabel('hunterZombie', locale)} ${config.horde.hunterZombieCapPerDirection} · ${unitLabel('gasZombie', locale)} ${config.horde.gasZombieCapPerDirection}`);
   add('initialHunterCount', t('legendInitialHunterCount'), `${config.economy.initialHunterCount.min}–${config.economy.initialHunterCount.max}`);
   add('initialHunterDistance', t('legendInitialHunterDistance'), String(config.economy.initialHunterMinDistance));
+  add('initialGasCount', t('legendInitialGasCount'), `${config.economy.initialGasCount.min}–${config.economy.initialGasCount.max}`);
+  add('initialGasDistance', t('legendInitialGasDistance'), String(config.economy.initialGasMinDistance));
+  add('gasExplosion', t('legendGasExplosion'), `${t('damage')} ${config.units.gasZombie.explosionDamage} · ${t('infected')} ${config.units.gasZombie.explosionInfection} · ${t('range')} 1`);
   add('spawnReserve', t('spawnReserve'), `${t('spawnReserveTileCount')} 200 · ${t('spawnReserveReason')}`);
   add('initialSupplyRadius', t('initialSupplyRadius'), String(config.checkpoint.initialSupplyRadius));
   add('checkpointMaxPerDirection', t('checkpointMaxPerDirection'), String(config.checkpoint.maxPreparedPostsPerDirection));
@@ -1532,6 +1534,7 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
     policeZombie: ['Police由来の再活性化通常Zombie。Policeの外見を識別できますが、AIとScheduleは通常Zombieです。', 'A reanimated Police-derived normal Zombie. Its Police silhouette is identifiable, but its AI and schedule are normal Zombie behavior.'],
     soldierZombie: ['National Guard由来の再活性化通常Zombie。兵士の外見を識別できますが、Horde中核ではありません。', 'A reanimated National Guard-derived normal Zombie. Its soldier silhouette is identifiable, but it is not a Horde core.'],
     hunterZombie: ['筋骨隆々で長い爪を持つ高速のNormal AI系Zombie。性能値は表示中のConfigを使用し、専用TargetやCapital常時知識は持ちません。', 'A fast Normal AI Zombie with a powerful build and long claws. Its performance comes from the current Config; it has no special target or permanent Capital knowledge.'],
+    gasZombie: ['死亡時に隣接6 HexへTerrain適用damageと拠点感染を与え、Gas同士でFIFO連鎖するNormal AI系Zombieです。', 'A Normal AI Zombie whose death damages units with Terrain defense and infects sites in the six adjacent Hexes; Gas deaths chain in FIFO order.'],
     periodic: ['Horde ZombieとNormal Zombieが混在できる周期集団。MarkerはUnit Typeではなく所属を示します。', 'A periodic group that may mix Horde and Normal Zombies. Its marker shows membership, not Unit Type.'],
     final: ['Final Spawn Group所属を示すMarker。Normal Zombieも含め、Group全滅がVictory条件の一つです。', 'Marks Final Spawn Group membership. Every member, including Normal Zombies, must be defeated for Victory.'],
     capital: ['州都。人口の基点、編成、初期Supply、Capital Ground Visionを担います。', 'The capital anchors population, recruitment, initial Supply, and Capital Ground Vision.'],
@@ -1541,6 +1544,7 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
     militaryFactory: ['軍需品を生産する施設。入力とRequired電力が必要です。', 'Produces Military Goods. Inputs and Required power are needed.'],
     refinery: ['Fuelを生産するRequired電力施設。', 'Produces Fuel and requires Required power.'],
     powerPlant: ['電力Capacityを発電する施設。Turn-start Fuelの制限を受けます。', 'Generates power Capacity and is limited by Turn-start Fuel.'],
+    armyBase: ['恒久施設。健常Workerによる迎撃、専用軍需品、早期確保報酬、都市人口を使う州兵編成を扱います。', 'A permanent facility with staffed interceptions, dedicated Military Goods, an early-capture reward, and National Guard recruitment from city residents.'],
     checkpoint: ['道路上の避難民を待機・審査・合格の3プールで管理します。1回の審査枠は20人です。', 'Manages road refugees through waiting, screening, and approved pools. Each batch screens up to 20 people.'],
     spawnReserve: ['盤面外周200 HexのSpawn Reserve。Player Unit・Facility・Checkpointは配置できませんが、Playerの攻撃とHordeのSpawn・Damageは可能です。', 'The outer 200-Hex Spawn Reserve. Player Units, Facilities, and Checkpoints cannot occupy it; Player attacks and Horde Spawn/damage remain allowed.'],
     unowned: ['未確保。人口操作や生産はできません。', 'Unsecured. Population actions and production are unavailable.'],
@@ -1563,7 +1567,7 @@ function legendSections(
   const t = createTranslator(locale);
   const terrain = LEGEND_TERRAINS.map((key) => legendAssetEntry(registry, 'terrain', key, terrainLabel(key, locale), legendDescription(key, locale, t), key === 'plain' ? '◇' : key === 'forest' ? '♣' : '△'));
   const overlays = LEGEND_OVERLAYS.map((key) => legendAssetEntry(registry, 'overlay', key, key === 'road' ? t('roadOverlay') : t('urbanOverlay'), legendDescription(key, locale, t), key === 'road' ? '═' : '▦'));
-  const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'riotPolice' ? 'RP' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : key === 'soldierZombie' ? 'SZ' : key === 'riotZombie' ? 'RZ' : 'HZ'));
+  const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'riotPolice' ? 'RP' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : key === 'soldierZombie' ? 'SZ' : key === 'riotZombie' ? 'RZ' : key === 'gasZombie' ? 'GZ' : 'HZ'));
   const horde = (['periodic', 'final'] as const).map((key) => legendAssetEntry(registry, 'horde', key, key === 'periodic' ? t('periodicHorde') : t('finalHorde'), legendDescription(key, locale, t), key === 'periodic' ? '↝' : '✹'));
   const facilities = LEGEND_FACILITIES.map((key) => legendAssetEntry(registry, 'facility', key, key === 'checkpoint' ? t('checkpoint') : facilityLabel(key, locale), legendDescription(key, locale, t), key === 'capital' ? '★' : key === 'city' ? '⌂' : key === 'checkpoint' ? '⊞' : '▣'));
   const facilityStates = ['unowned', 'owned', 'stopped', 'infected', 'ruined'].map((key) => legendAssetEntry(registry, 'facilityState', key, t(key), legendDescription(key, locale, t), key === 'owned' ? '✓' : key === 'infected' ? '☣' : key === 'ruined' ? '×' : '•'));
@@ -1696,7 +1700,31 @@ function hordeWaveForIndex(config: Readonly<GameConfig>, nextWaveIndex: number |
 
 type AgentNextWave = NonNullable<AgentObservation['horde']['nextWave']>;
 
-function hordeCompositionLabel(
+function hordeMixedSlotWeightsLabel(config: Readonly<GameConfig>, locale: Locale, gasEligible: boolean): string {
+  const mixedSlotTypes = ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const;
+  return mixedSlotTypes
+    .map((key) => {
+      const configured = config.horde.specialZombieWeights[key];
+      const weight = key === 'gasZombie'
+        ? (gasEligible ? configured : 0)
+        : key === 'zombie' && gasEligible
+          ? Math.max(0, configured - config.horde.specialZombieWeights.gasZombie)
+          : configured;
+      return `${unitLabel(key, locale)} ${weight}`;
+    })
+    .join(' / ');
+}
+
+function gasEligibleHordeWave(
+  wave: GameConfig['horde']['waves'][number] | AgentNextWave,
+  config: Readonly<GameConfig>,
+): boolean {
+  const spawnTurn = hordeWaveSpawnTurn(wave);
+  const waveIndex = config.horde.waves.findIndex((candidate) => candidate === wave || candidate.turn === spawnTurn);
+  return waveIndex >= Math.max(0, config.horde.waves.length - 2);
+}
+
+export function hordeCompositionLabel(
   wave: GameConfig['horde']['waves'][number] | AgentNextWave | undefined,
   locale: Locale,
   config?: Readonly<GameConfig>,
@@ -1705,11 +1733,17 @@ function hordeCompositionLabel(
   const t = createTranslator(locale);
   const base = `${t('hordeZombie')} ${wave.compositionPerDirection.hordeZombie} / ${unitLabel('zombie', locale)} ${wave.compositionPerDirection.zombie}`;
   if (!config) return base;
-  const mixedSlotTypes = ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
-  const possible = mixedSlotTypes
-    .map((key) => `${unitLabel(key, locale)} ${config.horde.specialZombieWeights[key]}`)
-    .join(' / ');
+  const possible = hordeMixedSlotWeightsLabel(config, locale, gasEligibleHordeWave(wave, config));
   return `${base} · ${t('mixedSlotTypes')} ${possible}`;
+}
+
+export function newGameRefugeeDefaults(config: Readonly<GameConfig> = createDefaultConfig()) {
+  return {
+    intervalMin: config.refugees.arrivalIntervalMin,
+    intervalMax: config.refugees.arrivalIntervalMax,
+    peopleMin: config.refugees.arrivalPeopleMin,
+    peopleMax: config.refugees.arrivalPeopleMax,
+  };
 }
 
 function hordeWaveSpawnTurn(wave: GameConfig['horde']['waves'][number] | AgentNextWave | undefined): number | null {
@@ -1781,6 +1815,7 @@ function facilityLabel(type: string, locale: Locale): string {
     windPowerPlant: ['風力発電所', 'Wind Power Plant'],
     simpleFarm: ['簡易農場', 'Simple Farm'],
     civilianDroneBase: ['民間ドローン基地', 'Civilian Drone Base'],
+    armyBase: ['陸軍基地', 'Army Base'],
   };
   return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
 }
@@ -1796,6 +1831,7 @@ function unitLabel(type: string, locale: Locale): string {
     soldierZombie: ['兵士ゾンビ', 'Soldier Zombie'],
     riotZombie: ['暴動鎮圧ゾンビ', 'Riot Zombie'],
     hunterZombie: ['ハンターゾンビ', 'Hunter Zombie'],
+    gasZombie: ['ガスゾンビ', 'Gas Zombie'],
   };
   return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
 }
@@ -2188,10 +2224,10 @@ export function localizeActionError(code: string | undefined, locale: Locale): s
     insufficient_civilian_goods: locale === 'ja' ? '民需品が不足しています。' : 'Civilian goods are insufficient.',
     insufficient_military_goods: locale === 'ja' ? '軍需品が不足しています。' : 'Military goods are insufficient.',
     invalid_unit_type: locale === 'ja' ? 'このユニットは編成できません。' : 'This unit type cannot be produced.',
-    invalid_recruitment_hub: locale === 'ja' ? '警察は都市、州兵は操作可能な州都でのみ編成できます。' : 'Police require an eligible city; National Guard requires the eligible capital.',
+    invalid_recruitment_hub: locale === 'ja' ? 'このUnitは選択中の編成拠点では編成できません。州兵は州都または陸軍基地、警察と機動隊は州都または地方都市が対象です。' : 'This unit cannot be recruited at the selected hub. National Guard uses the capital or Army Base; Police and Riot Police use the capital or a city.',
     insufficient_production_cost: locale === 'ja' ? '都市住民または資源が不足しています。最後の健全民間人口を使う編成もできません。' : 'Eligible city residents or supplies are insufficient; recruitment cannot use the last healthy civilian.',
-    city_busy: locale === 'ja' ? 'この都市には既に編成予約があります。' : 'This city already has a recruitment reservation.',
-    no_production_city: locale === 'ja' ? '編成できる都市がありません。' : 'No eligible city can produce this unit.',
+    city_busy: locale === 'ja' ? 'この拠点には既に編成予約があります。' : 'This hub already has a recruitment reservation.',
+    no_production_city: locale === 'ja' ? '編成できる拠点がありません。' : 'No eligible recruitment hub can produce this unit.',
     no_change_policy: locale === 'ja' ? '審査方針は変更されていません。' : 'The screening policy is unchanged.',
     facility_out_of_supply: locale === 'ja' ? '供給外の施設には労働者を追加できません。' : 'Workers cannot be added to a facility outside the supply network.',
     recruitment_out_of_supply: locale === 'ja' ? '供給外では新しいユニットを編成できません。' : 'New units cannot be recruited outside the supply network.',
@@ -2248,6 +2284,131 @@ function actionReasonFor(state: Readonly<GameState>, action: GameAction, locale:
   } catch {
     return null;
   }
+}
+
+export interface RecruitmentOptionViewModel {
+  unitType: HumanUnitType;
+  label: string;
+  completionProficiency: UnitProficiency;
+  populationCost: number;
+  civilianGoodsCost: number;
+  militaryGoodsCost: number;
+  hp: number;
+  attack: number;
+  movement: number;
+  range: number;
+  vision: number;
+  legal: boolean;
+  unavailableReason: string | null;
+}
+
+/** Shared Config/Query-backed recruitment rows for Capital, City, and Army Base. */
+export function recruitmentOptionsForFacility(
+  state: Readonly<GameState>,
+  facility: Readonly<FacilityState>,
+  legalActions: readonly GameAction[],
+  locale: Locale,
+): RecruitmentOptionViewModel[] {
+  return (['police', 'nationalGuard', 'riotPolice'] as const)
+    .filter((unitType) => state.config.units[unitType].recruitmentFacilityTypes.includes(
+      facility.type as 'capital' | 'city' | 'armyBase',
+    ))
+    .map((unitType) => {
+      const unit = state.config.units[unitType];
+      const completionProficiency = state.config.unitExperience.productionProficiencyByType[unitType];
+      const action: Extract<GameAction, { type: 'ProduceUnit' }> = {
+        type: 'ProduceUnit',
+        unitType,
+        destination: { ...facility.position },
+      };
+      const legal = Boolean(actionForUnitProduction(legalActions, unitType, facility.position));
+      return {
+        unitType,
+        label: unitLabel(unitType, locale),
+        completionProficiency,
+        populationCost: unit.population,
+        civilianGoodsCost: unit.productionCivilianGoods,
+        militaryGoodsCost: unit.productionMilitaryGoods,
+        hp: unit.hp,
+        attack: effectiveAttackForProficiency(state, unitType, completionProficiency),
+        movement: unit.movement,
+        range: unit.range,
+        vision: unit.vision,
+        legal,
+        unavailableReason: legal ? null : actionReasonFor(state, action, locale) ?? createTranslator(locale)('invalidAction'),
+      };
+    });
+}
+
+export function renderRecruitmentAccordion(
+  state: Readonly<GameState>,
+  facility: Readonly<FacilityState>,
+  legalActions: readonly GameAction[],
+  locale: Locale,
+): string {
+  const t = createTranslator(locale);
+  const options = recruitmentOptionsForFacility(state, facility, legalActions, locale);
+  if (options.length === 0) return '';
+  const rows = options.map((option) => {
+    const actionName = option.unitType === 'nationalGuard' ? 'guard' : option.unitType === 'riotPolice' ? 'riot-police' : 'police';
+    const cost = `${t('population')} ${option.populationCost} · ${t('civilianGoods')} ${option.civilianGoodsCost} · ${t('militaryGoods')} ${option.militaryGoodsCost}`;
+    const performance = [
+      [t('completionProficiency'), proficiencyLabel(option.completionProficiency, locale)],
+      [t('hp'), String(option.hp)],
+      [t('attack'), String(option.attack)],
+      [t('movement'), String(option.movement)],
+      [t('range'), String(option.range)],
+      [t('vision'), String(option.vision)],
+    ].map(([label, value]) => `<div><dt>${escapeHtml(label!)}</dt><dd>${escapeHtml(value!)}</dd></div>`).join('');
+    return `<article class="recruitment-option" data-recruitment-unit="${option.unitType}"><div class="section-heading"><h4>${escapeHtml(option.label)}</h4><span class="status-chip">${escapeHtml(cost)}</span></div><dl class="recruitment-performance">${performance}</dl><button class="secondary-button" data-action="produce-${actionName}" ${option.legal ? '' : 'disabled'}>${escapeHtml(t(option.unitType === 'police' ? 'producePolice' : option.unitType === 'nationalGuard' ? 'produceGuard' : 'produceRiotPolice'))}</button>${option.unavailableReason ? `<p class="warning-text" data-recruitment-reason="${option.unitType}">${escapeHtml(option.unavailableReason)}</p>` : `<p class="warning-text" data-recruitment-reason="${option.unitType}" hidden></p>`}</article>`;
+  }).join('');
+  const id = `recruitment-${facility.id}`;
+  return `<details class="recruitment-accordion" data-recruitment-accordion="true"><summary id="${escapeHtml(id)}-heading" data-action="toggle-recruitment" aria-expanded="false" aria-controls="${escapeHtml(id)}-panel"><span>${escapeHtml(t('unitRecruitment'))}</span><small>${options.length} ${escapeHtml(t('unitTypes'))}</small></summary><div id="${escapeHtml(id)}-panel" class="recruitment-accordion-panel" role="region" aria-labelledby="${escapeHtml(id)}-heading">${rows}</div></details>`;
+}
+
+export function renderArmyBaseDetails(
+  facility: Readonly<AgentFacilityObservation>,
+  locale: Locale,
+): string {
+  const base = facility.armyBase;
+  if (!base) return '';
+  const t = createTranslator(locale);
+  const reasonLabel = (reason: string | null): string | null => {
+    if (!reason) return null;
+    const keyByReason: Record<string, string> = {
+      not_owned: 'armyBaseReasonNotOwned',
+      facility_ruined: 'armyBaseReasonRuined',
+      facility_infected: 'armyBaseReasonInfected',
+      infection: 'armyBaseReasonInfected',
+      recovering: 'armyBaseReasonRecovering',
+      disabled: 'armyBaseReasonDisabled',
+      stopped: 'armyBaseReasonStopped',
+      not_operational: 'armyBaseReasonStopped',
+      no_workers: 'armyBaseReasonNoWorkers',
+      no_interceptions: 'armyBaseReasonNoInterceptions',
+      insufficient_military_goods: 'armyBaseReasonMilitaryGoods',
+      out_of_supply: 'armyBaseReasonOutOfSupply',
+      full: 'armyBaseReasonFull',
+      not_applicable: 'powerReasonNone',
+      supplied: 'powerReasonSupplied',
+      physical_capacity_shortage: 'powerReasonPhysical',
+      fuel_shortage: 'powerReasonFuel',
+      allocation_priority: 'powerReasonPriority',
+      claimed: 'armyBaseReward.claimed',
+      expired: 'armyBaseReward.expired',
+    };
+    return keyByReason[reason] ? t(keyByReason[reason]!) : reason;
+  };
+  const availability = (available: boolean, reason: string | null): string =>
+    available ? t('available') : reason ? `${t('unavailable')}: ${reasonLabel(reason)}` : t('unavailable');
+  const reward = t(`armyBaseReward.${base.rewardStatus}`);
+  const pending = base.pendingRecruitment;
+  const pendingMarkup = pending
+    ? `<section class="army-base-reservation" data-army-base-reservation="true"><h4>${escapeHtml(t('armyBasePendingRecruitment'))}</h4><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('unit'))}</dt><dd>${escapeHtml(unitLabel(pending.unitType, locale))}</dd></div><div><dt>${escapeHtml(t('completionTurn'))}</dt><dd>${pending.readyTurn}</dd></div><div><dt>${escapeHtml(t('powerRequirement'))}</dt><dd>${pending.powerDemand}</dd></div><div><dt>${escapeHtml(t('status'))}</dt><dd>${escapeHtml(t(`armyBaseRecruitment.${pending.status}`))}</dd></div></dl>${pending.reason ? `<p class="warning-text">${escapeHtml(reasonLabel(pending.reason) ?? pending.reason)}</p>` : ''}</section>`
+    : `<p class="muted">${escapeHtml(t('armyBaseNoPendingRecruitment'))}</p>`;
+  const powerReason = reasonLabel(base.recruitmentPowerReason);
+  const rewardReason = base.rewardUnavailableReason ? ` · ${reasonLabel(base.rewardUnavailableReason) ?? reward}` : '';
+  return `<section class="army-base-details" data-army-base-details="true"><h3>${escapeHtml(t('armyBaseFunctions'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('dedicatedMilitaryGoods'))}</dt><dd>${base.militaryGoods}/${base.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('interceptionsRemaining'))}</dt><dd>${base.interceptionsRemaining} · ${escapeHtml(t('armyBaseInterceptionRefresh'))}</dd></div><div><dt>${escapeHtml(t('attack'))} / ${escapeHtml(t('range'))}</dt><dd>${base.interceptionAttack} / ${base.interceptionRange}</dd></div><div><dt>${escapeHtml(t('interceptionCost'))}</dt><dd>${base.interceptionCost} ${escapeHtml(t('militaryGoods'))}</dd></div><div><dt>${escapeHtml(t('noiseRadius'))}</dt><dd>${base.interceptionNoiseRadius}</dd></div><div><dt>${escapeHtml(t('interception'))}</dt><dd>${escapeHtml(availability(base.interceptionAvailable, base.interceptionUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('projectedRefill'))}</dt><dd>+${base.projectedMilitaryGoodsRefill} · ${escapeHtml(availability(base.refillAvailable, base.refillUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('earlyCaptureReward'))}</dt><dd>${escapeHtml(reward)} · ${escapeHtml(t('throughTurn'))} ${base.rewardLastTurn}${escapeHtml(rewardReason)}</dd></div><div><dt>${escapeHtml(t('recruitmentPower'))}</dt><dd>${base.recruitmentPowerDemand} · ${escapeHtml(base.recruitmentPowerAllocated ? t('powerSupplied') : t('powerNotSupplied'))}${powerReason ? ` · ${escapeHtml(powerReason)}` : ''}</dd></div></dl>${pendingMarkup}<p class="muted">${escapeHtml(t('armyBaseRewardRule'))}</p><p class="muted">${escapeHtml(t('armyBaseRecruitmentRule'))}</p><p class="muted">${escapeHtml(t('armyBaseForfeitRule'))}</p></section>`;
 }
 
 function gameOverReasonLabel(reason: GameResult['reason'], locale: Locale): string {
@@ -2649,6 +2810,7 @@ export class GameUiController {
   private beginNewGame(): void {
     const t = this.translator();
     const defaults = createDefaultConfig();
+    const refugeeDefaults = newGameRefugeeDefaults(defaults);
     const schedule = defaults.horde.waves.map((wave, index) => {
       const composition = hordeCompositionLabel(wave, this.locale, defaults);
       return `<li><strong>${escapeHtml(t('wave'))} ${index + 1}</strong> · ${escapeHtml(t('spawnTurn'))} ${wave.turn} · ${escapeHtml(t('directionCount'))} ${wave.directionCount} · ${escapeHtml(composition)}${wave.final ? ` · ${escapeHtml(t('finalWave'))}` : ''}</li>`;
@@ -2662,10 +2824,10 @@ export class GameUiController {
         <form data-form="new-game" class="settings-form">
           <label>${escapeHtml(t('newSeed'))}<input name="seed" type="number" inputmode="numeric" value="${Date.now() % 2147483647}" /></label>
           <section class="fixed-horde-schedule" aria-labelledby="horde-schedule-heading"><h3 id="horde-schedule-heading">${escapeHtml(t('hordeSchedule'))}</h3><p class="muted">${escapeHtml(t('fixedHordeScheduleHint'))}</p><ul>${schedule}</ul></section>
-          <label>${escapeHtml(t('refugeeIntervalMin'))}<input name="refugeeIntervalMin" type="number" min="1" value="2" /></label>
-          <label>${escapeHtml(t('refugeeIntervalMax'))}<input name="refugeeIntervalMax" type="number" min="1" value="4" /></label>
-          <label>${escapeHtml(t('refugeePeopleMin'))}<input name="refugeePeopleMin" type="number" min="1" value="5" /></label>
-          <label>${escapeHtml(t('refugeePeopleMax'))}<input name="refugeePeopleMax" type="number" min="1" value="10" /></label>
+          <label>${escapeHtml(t('refugeeIntervalMin'))}<input name="refugeeIntervalMin" type="number" min="1" value="${refugeeDefaults.intervalMin}" /></label>
+          <label>${escapeHtml(t('refugeeIntervalMax'))}<input name="refugeeIntervalMax" type="number" min="1" value="${refugeeDefaults.intervalMax}" /></label>
+          <label>${escapeHtml(t('refugeePeopleMin'))}<input name="refugeePeopleMin" type="number" min="1" value="${refugeeDefaults.peopleMin}" /></label>
+          <label>${escapeHtml(t('refugeePeopleMax'))}<input name="refugeePeopleMax" type="number" min="1" value="${refugeeDefaults.peopleMax}" /></label>
           <label>${escapeHtml(t('screeningCapacity'))}<input name="screeningCapacity" type="number" min="1" value="${defaults.refugees.screeningCapacity}" /></label>
           <label>${escapeHtml(t('resourceMultiplier'))}<input name="resourceMultiplier" type="number" min="0.25" max="4" step="0.25" value="1" /></label>
           <label>${escapeHtml(t('infectionMultiplier'))}<input name="infectionMultiplier" type="number" min="0.25" max="4" step="0.25" value="1" /></label>
@@ -2677,10 +2839,10 @@ export class GameUiController {
     form?.addEventListener('submit', (event) => {
       event.preventDefault();
       const values = new FormData(form);
-      const refugeeIntervalMin = Math.max(1, Math.floor(numberValue(values.get('refugeeIntervalMin')?.toString(), 2)));
-      const refugeeIntervalMax = Math.max(refugeeIntervalMin, Math.floor(numberValue(values.get('refugeeIntervalMax')?.toString(), 4)));
-      const refugeePeopleMin = Math.max(1, Math.floor(numberValue(values.get('refugeePeopleMin')?.toString(), 5)));
-      const refugeePeopleMax = Math.max(refugeePeopleMin, Math.floor(numberValue(values.get('refugeePeopleMax')?.toString(), 10)));
+      const refugeeIntervalMin = Math.max(1, Math.floor(numberValue(values.get('refugeeIntervalMin')?.toString(), refugeeDefaults.intervalMin)));
+      const refugeeIntervalMax = Math.max(refugeeIntervalMin, Math.floor(numberValue(values.get('refugeeIntervalMax')?.toString(), refugeeDefaults.intervalMax)));
+      const refugeePeopleMin = Math.max(1, Math.floor(numberValue(values.get('refugeePeopleMin')?.toString(), refugeeDefaults.peopleMin)));
+      const refugeePeopleMax = Math.max(refugeePeopleMin, Math.floor(numberValue(values.get('refugeePeopleMax')?.toString(), refugeeDefaults.peopleMax)));
       const config = createDefaultConfig({
         refugees: {
           arrivalIntervalMin: refugeeIntervalMin,
@@ -2960,6 +3122,10 @@ export class GameUiController {
       case 'produce-police': this.produce('police'); break;
       case 'produce-guard': this.produce('nationalGuard'); break;
       case 'produce-riot-police': this.produce('riotPolice'); break;
+      case 'toggle-recruitment': queueMicrotask(() => {
+        const details = element.closest<HTMLDetailsElement>('[data-recruitment-accordion="true"]');
+        element.setAttribute('aria-expanded', String(details?.open ?? false));
+      }); break;
       case 'build-constructible-local': this.buildConstructibleAtSelectedHex(element.dataset.facilityType); break;
       case 'build-simple-farm': this.startConstructibleBuild('simpleFarm'); break;
       case 'build-civilian-drone-base': this.startConstructibleBuild('civilianDroneBase'); break;
@@ -3917,6 +4083,17 @@ export class GameUiController {
     return facility && isCity(facility) ? facility : undefined;
   }
 
+  private selectedRecruitmentFacility(): FacilityState | undefined {
+    const selected = this.selection;
+    if (!this.state || selected?.kind !== 'facility') return undefined;
+    const facility = this.state.facilities.find((candidate) => candidate.id === selected.id);
+    if (!facility) return undefined;
+    return (['police', 'nationalGuard', 'riotPolice'] as const).some((unitType) =>
+      this.state!.config.units[unitType].recruitmentFacilityTypes.includes(
+        facility.type as 'capital' | 'city' | 'armyBase',
+      )) ? facility : undefined;
+  }
+
   private eligibleCities(): FacilityState[] {
     if (!this.state) return [];
     const snapshot = this.state.cityPopulationSnapshot;
@@ -3998,7 +4175,7 @@ export class GameUiController {
   }
 
   private produce(unitType: 'police' | 'nationalGuard' | 'riotPolice'): void {
-    const facility = this.selectedCity();
+    const facility = this.selectedRecruitmentFacility();
     const destination = facility?.position;
     const action = facility ? actionForUnitProduction(this.legalActions(), unitType as HumanUnitType, destination) : undefined;
     if (action) {
@@ -4335,17 +4512,17 @@ export class GameUiController {
 
   private updateRecruitmentReasons(): void {
     if (!this.state) return;
-    const city = this.selectedCity();
-    const destination = city?.position;
+    const facility = this.selectedRecruitmentFacility();
+    const destination = facility?.position;
     for (const unitType of ['police', 'nationalGuard', 'riotPolice'] as const) {
       const actionName = unitType === 'police' ? 'police' : unitType === 'nationalGuard' ? 'guard' : 'riot-police';
       const button = this.root.querySelector<HTMLButtonElement>(`[data-action="produce-${actionName}"]`);
       if (!button) continue;
       const requested = { type: 'ProduceUnit', unitType, ...(destination ? { destination } : {}) } as GameAction;
-      const reason = !city
+      const reason = !facility
         ? (unitType === 'police' ? this.translator()('policeRecruitmentRule') : unitType === 'nationalGuard' ? this.translator()('guardRecruitmentRule') : this.translator()('riotPoliceRecruitmentRule'))
         : actionReasonFor(this.state, requested, this.locale) ?? (unitType === 'police' ? this.translator()('policeRecruitmentRule') : unitType === 'nationalGuard' ? this.translator()('guardRecruitmentRule') : this.translator()('riotPoliceRecruitmentRule'));
-      const legal = Boolean(city && actionForUnitProduction(this.legalActions(), unitType as HumanUnitType, destination));
+      const legal = Boolean(facility && actionForUnitProduction(this.legalActions(), unitType as HumanUnitType, destination));
       button.disabled = !legal;
       button.title = legal ? '' : reason;
       const reasonElement = this.root.querySelector<HTMLElement>(`[data-recruitment-reason="${unitType}"]`);
@@ -4632,7 +4809,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipRiotPolice', 'tipHunterZombie', 'tipProficiency', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipDecommission', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipCrisis', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipRiotPolice', 'tipZombieEngagement', 'tipGasZombie', 'tipHunterZombie', 'tipArmyBase', 'tipArmyBaseRecruitment', 'tipArmyBaseInterception', 'tipArmyBaseRecovery', 'tipProficiency', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipDecommission', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipCrisis', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
@@ -5013,7 +5190,7 @@ export class GameUiController {
             ? t('stateDisabled')
             : facility.operationalStatus === 'recovering'
               ? t('stateRecovering')
-        : facility.workers <= 0
+        : facility.workers <= 0 && facility.type !== 'armyBase'
           ? t('stopped')
           : projectedPowerUnavailable
             ? t('unpoweredForecast')
@@ -5060,9 +5237,8 @@ export class GameUiController {
     const workerEditor = owned && !city
       ? `<section class="population-editor facility-editor" aria-labelledby="workers-heading"><h3 id="workers-heading">${escapeHtml(t('workers'))}</h3><p class="muted">${escapeHtml(t('assignWorkersHint'))}</p><label>${escapeHtml(t('workers'))}<output data-worker-output="true">${bounds.current}/${bounds.maximum}</output><input type="range" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" data-worker-control="true" data-worker-input="true" data-worker-slider="true" aria-label="${escapeHtml(t('workers'))}" /></label><input class="numeric-input" type="number" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" inputmode="numeric" aria-label="${escapeHtml(t('workers'))}" data-worker-control="true" data-worker-input="true" data-worker-number="true" /><p class="warning-text" data-worker-reason="true" ${workerReason ? '' : 'hidden'}>${workerReason ? escapeHtml(workerReason) : ''}</p><button class="secondary-button" data-action="assign-workers" ${workerAction && canOperatePopulation ? '' : 'disabled'}>${escapeHtml(t('assignWorkers'))}</button></section>`
       : '';
-    const riotConfig = this.state.config.units.riotPolice;
-    const riotRecruitmentCost = `P${riotConfig.population}/C${riotConfig.productionCivilianGoods}/M${riotConfig.productionMilitaryGoods}`;
-    const recruitment = `<section class="recruitment-editor"><h3>${escapeHtml(t('population'))}</h3><p class="muted">${escapeHtml(city ? t('tipRecruitment') : t('recruitmentDisabled'))}</p><div class="action-row"><button class="secondary-button" data-action="produce-police">${escapeHtml(t('producePolice'))}</button><button class="secondary-button" data-action="produce-guard">${escapeHtml(t('produceGuard'))}</button><button class="secondary-button" data-action="produce-riot-police">${escapeHtml(t('produceRiotPolice'))} · ${escapeHtml(riotRecruitmentCost)}</button></div><p class="warning-text" data-recruitment-reason="police" hidden></p><p class="warning-text" data-recruitment-reason="nationalGuard" hidden></p><p class="warning-text" data-recruitment-reason="riotPolice" hidden></p></section>`;
+    const recruitment = renderRecruitmentAccordion(this.state, facility, this.legalActions(), this.locale);
+    const armyBaseDetails = publicFacility ? renderArmyBaseDetails(publicFacility, this.locale) : '';
     const isDecommissionableType = facility.constructible && facility.type === 'civilianDroneBase';
     const decommissionRefund = Math.ceil(this.state.config.facilities.civilianDroneBase.buildCivilianGoods / 2);
     const decommissionAction: Extract<GameAction, { type: 'DecommissionConstructibleFacility' }> = {
@@ -5075,7 +5251,7 @@ export class GameUiController {
     const decommissionControl = isDecommissionableType
       ? `<section class="decommission-editor" data-decommission-editor="true"><h3>${escapeHtml(t('decommissionFacility'))}</h3><p class="muted">${escapeHtml(t('decommissionConditions'))}</p><p>${escapeHtml(t('decommissionRefund'))}: <strong>${decommissionRefund} ${escapeHtml(t('civilianGoods'))}</strong></p><button class="secondary-button" data-action="decommission-facility" data-facility-id="${escapeHtml(facility.id)}" ${decommissionReason ? 'disabled' : ''}>${escapeHtml(t('decommissionFacility'))}</button>${decommissionReason ? `<p class="warning-text" data-decommission-reason="true">${escapeHtml(decommissionReason)}</p>` : '<p class="muted" data-decommission-reason="true"></p>'}</section>`
       : '';
-    body.innerHTML = this.renderSameHexTabs(facility.position, selected) + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
+    body.innerHTML = this.renderSameHexTabs(facility.position, selected) + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${armyBaseDetails}${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
     body.insertAdjacentHTML('beforeend', this.renderFacilityForecast(publicFacility));
     this.updateTransferPreview();
     this.updateRecruitmentReasons();

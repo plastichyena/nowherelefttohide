@@ -150,7 +150,9 @@ export function createAgentApiInfo(
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
     rules: {
-      zombies: Object.fromEntries((['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const).map((type) => {
+      gasZombie: { explosionDamage:config.units.gasZombie.explosionDamage, explosionInfection:config.units.gasZombie.explosionInfection,radius:1,excludesCenter:true,initialCount:cloneJson(config.economy.initialGasCount),initialMinDistance:config.economy.initialGasMinDistance,finalWaves:2,capPerDirection:config.horde.gasZombieCapPerDirection },
+      armyBase: {maxMilitaryGoods:config.armyBase.maxMilitaryGoods,interceptionCost:config.armyBase.interceptionCost,attack:config.armyBase.attack,range:config.armyBase.range,staffedVision:config.armyBase.staffedVision,rewardLastTurn:config.armyBase.rewardLastTurn,interceptionNoiseRadius:config.armyBase.noiseRadius,recruitmentPower:config.facilities.armyBase.production.powerCapacity,cityPopulationOnly:true},
+      zombies: Object.fromEntries((['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const).map((type) => {
         const { hp, attack, movement, range, vision, maxAttackCharges } = config.units[type];
         return [type, { hp, attack, movement, range, vision, maxAttackCharges, ai: type === 'hordeZombie' ? 'horde' : 'normal' }];
       })) as AgentApiInfo['rules']['zombies'],
@@ -162,7 +164,7 @@ export function createAgentApiInfo(
         regularAttackRounding: unitExperience.regularAttackRounding === 'floor' ? 'floor' : 'ceil',
         veteranZombieKillsRequired: getNumber(unitExperience, 'veteranZombieKillsRequired', 5),
         veteranAttackCharges: getNumber(unitExperience, 'veteranAttackCharges', 2),
-        killCreditTypes: ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as never,
+        killCreditTypes: ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as never,
       },
       crisis: {
         severityOrder: ['critical', 'warning', 'advisory'],
@@ -285,7 +287,7 @@ export function createAgentApiInfo(
           );
           const possibleNonHordeTypes = Array.isArray(waveRecord.possibleNonHordeTypes)
             ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
-            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'].filter((type) => Object.prototype.hasOwnProperty.call(units, type));
+            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', ...(index >= Math.max(0,config.horde.waves.length-2) ? ['gasZombie'] : [])].filter((type) => Object.prototype.hasOwnProperty.call(units, type));
           return {
             index: index + 1,
             turn: wave.turn,
@@ -493,7 +495,7 @@ export function createAgentApiInfo(
         ) as AgentApiInfo['rules']['production']['workerCapacityByFacilityType'],
         powerPlantsGenerateCapacityPerWorker: config.facilities.powerPlant.production.powerGeneration,
         poweredFacilitiesConsumeFixedCapacityWhenOperating: true,
-        fuelPerFiveElectricity: 1,
+        fuelPerFiveElectricity: 2,
         facilityPowerUnit: 5,
         powerModes: ['required', 'none'],
         standardOutputRule: {
@@ -506,7 +508,7 @@ export function createAgentApiInfo(
         sameTurnProductionCanCoverProductionInputs: false,
         sameTurnCivilianGoodsCannotDirectlyFeedMilitaryFactories: true,
         civilianProductionCanReleaseTurnStartStockFromMaintenanceReservation: true,
-        powerAllocationOrder: ['capital_and_cities', 'farm_and_civilian_factory', 'input_ready_military_factory', 'refinery', 'civilian_drone_base'],
+        powerAllocationOrder: ['capital_and_cities', 'farm_and_civilian_factory', 'input_ready_military_factory', 'refinery', 'civilian_drone_base', 'army_base_reservation'],
       },
     },
     minimalExample: [

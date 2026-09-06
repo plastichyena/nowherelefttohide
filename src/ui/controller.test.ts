@@ -10,9 +10,11 @@ vi.mock('phaser', () => ({
 }));
 
 import type { CheckpointPositionCandidate, CheckpointState, FacilityState, GameAction, GameEvent, GameState, UnitState } from '../core/types';
+import type { AgentFacilityObservation } from '../agent/types';
+import { createDefaultConfig } from '../core/config';
 import { forecastEndTurn, GameEngine } from '../core/engine';
 import { createAgentObservation } from '../agent/observation';
-import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderHordeWarningCard, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderUnitMilitaryGoodsDetails, resolveTileSelection, roadBranchForPosition, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep } from './controller';
+import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, hordeCompositionLabel, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, newGameRefugeeDefaults, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, recruitmentOptionsForFacility, renderArmyBaseDetails, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderHordeWarningCard, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderRecruitmentAccordion, renderUnitMilitaryGoodsDetails, resolveTileSelection, roadBranchForPosition, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
@@ -45,10 +47,90 @@ function siteEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.5.2');
-    expect(titleVersionLabel('en')).toContain('1.5.2');
+    expect(titleVersionLabel('ja')).toContain('1.5.3');
+    expect(titleVersionLabel('en')).toContain('1.5.3');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
+  });
+
+  it('uses Core refugee defaults and distinguishes Gas weights in the last two Waves', () => {
+    const config = createDefaultConfig();
+    expect(newGameRefugeeDefaults(config)).toEqual({
+      intervalMin: config.refugees.arrivalIntervalMin,
+      intervalMax: config.refugees.arrivalIntervalMax,
+      peopleMin: 10,
+      peopleMax: 20,
+    });
+    expect(hordeCompositionLabel(config.horde.waves[0], 'en', config)).toContain(
+      'Zombie 70 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Gas Zombie 0',
+    );
+    expect(hordeCompositionLabel(config.horde.waves.at(-2), 'en', config)).toContain(
+      'Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Gas Zombie 5',
+    );
+  });
+
+  it('renders one collapsed Config-backed recruitment accordion for each supported hub', () => {
+    const config = createDefaultConfig();
+    const capital = { id: 'capital', type: 'capital', position: { q: 25, r: 25 } } as FacilityState;
+    const armyBase = { id: 'army-base-1', type: 'armyBase', position: { q: 25, r: 19 } } as FacilityState;
+    const state = { config } as GameState;
+    const capitalActions = (['police', 'nationalGuard', 'riotPolice'] as const).map((unitType) => ({
+      type: 'ProduceUnit' as const, unitType, destination: { ...capital.position },
+    }));
+    const baseActions: GameAction[] = [{ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { ...armyBase.position } }];
+
+    const capitalOptions = recruitmentOptionsForFacility(state, capital, capitalActions, 'en');
+    expect(capitalOptions.map((option) => option.unitType)).toEqual(['police', 'nationalGuard', 'riotPolice']);
+    expect(capitalOptions.find((option) => option.unitType === 'riotPolice')).toMatchObject({
+      completionProficiency: config.unitExperience.productionProficiencyByType.riotPolice,
+      populationCost: 10,
+      civilianGoodsCost: 25,
+      militaryGoodsCost: 25,
+      hp: 75,
+      movement: 10,
+      range: 1,
+      vision: 5,
+      legal: true,
+    });
+    expect(recruitmentOptionsForFacility(state, armyBase, baseActions, 'en').map((option) => option.unitType))
+      .toEqual(['nationalGuard']);
+    const markup = renderRecruitmentAccordion(state, armyBase, baseActions, 'en');
+    expect(markup).toContain('<details class="recruitment-accordion"');
+    expect(markup).not.toMatch(/<details[^>]*\sopen(?:\s|>)/);
+    expect(markup).toContain('aria-expanded="false"');
+    expect(markup).toContain('National Guard');
+    expect(markup).toContain('Population 10');
+    expect(markup).toContain('Civilian 20');
+    expect(markup).toContain('Military 25');
+    expect(markup).not.toContain('data-recruitment-unit="police"');
+  });
+
+  it('renders Army Base function states and Core-provided reasons independently', () => {
+    const facility = {
+      armyBase: {
+        militaryGoods: 18, maxMilitaryGoods: 40, interceptionsRemaining: 3,
+        interceptionsRefresh: 'zombie_phase_start', interceptionAttack: 10, interceptionRange: 2,
+        interceptionCost: 2, interceptionNoiseRadius: 8, interceptionAvailable: false,
+        interceptionUnavailableReason: '感染中', projectedMilitaryGoodsRefill: 7,
+        refillAvailable: false, refillUnavailableReason: 'Supply外', rewardStatus: 'claimed',
+        rewardLastTurn: 20, rewardAvailable: false, rewardUnavailableReason: '取得済み',
+        pendingRecruitment: {
+          unitType: 'nationalGuard', readyTurn: 4, powerDemand: 5, powerAllocated: false,
+          status: 'waiting_power', reason: '給電不足',
+        },
+        recruitmentPowerDemand: 5, recruitmentPowerAllocated: false, recruitmentPowerReason: '給電順位',
+      },
+    } as AgentFacilityObservation;
+    const markup = renderArmyBaseDetails(facility, 'ja');
+
+    expect(markup).toContain('18/40');
+    expect(markup).toContain('3 · Zombie Phase開始時');
+    expect(markup).toContain('10 / 2');
+    expect(markup).toContain('給電待ち');
+    expect(markup).toContain('給電不足');
+    expect(markup).toContain('感染中');
+    expect(markup).toContain('Supply外');
+    expect(markup).toContain('取得済み');
   });
 
   it('renders Horde warning details as a collapsed disclosure with a persistent heading', () => {
@@ -167,26 +249,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.5.0-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.5.2-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.0以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.0');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.2以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.3');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.0 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.0');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.2 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.3');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 4.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 11');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 4.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 11');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 5.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 12');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 5.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 12');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.0以前' : 'v1.5.0 or earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2-or-earlier');
     }
   });
 
@@ -509,7 +591,15 @@ describe('controller view models', () => {
       'tipMilitaryGoods', 'tipEmergencyMovement', 'carriedMilitaryGoods', 'emergencyMovement',
       'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'recoveryTiming', 'effectiveRange', 'projectedSuppression', 'powerRequirement', 'projectedPower', 'lastPowerSupplied', 'productionMultiplier', 'policyTradeoff', 'migratedSaveNotice', 'migrationSaveError',
       'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipDecommission',
-      'tipRiotPolice', 'tipHunterZombie', 'tipProficiency', 'tipCrisis',
+      'tipRiotPolice', 'tipZombieEngagement', 'tipGasZombie', 'tipHunterZombie',
+      'tipArmyBase', 'tipArmyBaseRecruitment', 'tipArmyBaseInterception', 'tipArmyBaseRecovery',
+      'tipProficiency', 'tipCrisis', 'unitRecruitment', 'completionProficiency',
+      'dedicatedMilitaryGoods', 'interceptionsRemaining', 'interceptionCost', 'noiseRadius',
+      'projectedRefill', 'earlyCaptureReward', 'recruitmentPower', 'armyBaseFunctions',
+      'armyBaseInterceptionRefresh', 'armyBasePendingRecruitment', 'armyBaseNoPendingRecruitment',
+      'armyBaseRecruitmentRule', 'armyBaseForfeitRule', 'armyBaseReward.claimed',
+      'armyBaseRecruitment.waiting_power', 'legendInitialGasCount', 'legendInitialGasDistance',
+      'legendGasExplosion', 'legendDescription.gasZombie', 'legendDescription.armyBase',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);
@@ -650,7 +740,8 @@ describe('controller view models', () => {
     expect(english).toContain('Police Zombie');
     expect(english).toContain('Soldier Zombie');
     expect(english).toContain('Special Slot weights');
-    expect(english).toContain('Zombie 70 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5');
+    expect(english).toContain('Before the last two Waves: Zombie 70 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Gas Zombie 0');
+    expect(english).toContain('Last two Waves: Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Gas Zombie 5');
     expect(english).toContain('Special Slot caps');
     expect(english).toContain('Riot Zombie 1 · Hunter Zombie 1');
     expect(english).toContain('Initial Hunter count');

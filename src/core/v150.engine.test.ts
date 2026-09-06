@@ -23,7 +23,7 @@ function quietConfig() {
         compositionPerDirection: { hordeZombie: 1, zombie: 0 },
         final: true,
       }],
-      specialZombieWeights: { hunterZombie: 0 },
+      specialZombieWeights: { hunterZombie: 0, gasZombie: 0 },
     },
     units: {
       zombie: { attack: 1, movement: 0, vision: 0 },
@@ -52,8 +52,8 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     const police = state.units.find((unit) => unit.type === 'police')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
 
-    expect(state.gameVersion).toBe('4.0.0');
-    expect(config.version).toBe('4.0.0');
+    expect(state.gameVersion).toBe('5.0.0');
+    expect(config.version).toBe('5.0.0');
     expect(police).toMatchObject({
       proficiency: 'regular', recruitSurvivalTurns: 0, regularZombieKills: 0,
       veteranPromotionPending: false, attack: 8, maxAttackCharges: 1, attackChargesRemaining: 1,
@@ -284,7 +284,7 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
           compositionPerDirection: { hordeZombie: 1, zombie: 3 },
           final: true,
         }],
-        specialZombieWeights: { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100, hunterZombie: 0 },
+        specialZombieWeights: { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100, hunterZombie: 0, gasZombie: 0 },
         riotZombieCapPerDirection: 1,
       },
     });

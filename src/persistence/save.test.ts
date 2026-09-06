@@ -72,8 +72,30 @@ function exportedEnvelope(state = initialState()): Record<string, unknown> {
   return JSON.parse(exportSaveJson(state)) as Record<string, unknown>;
 }
 
-describe('v1.5.1 Save Format 11', () => {
-  it('exposes stable per-stage timings without changing Save Format 11 bytes', () => {
+function stateWithArmyBaseReservation(seed = 42): GameState {
+  const state = initialState(seed);
+  const armyBase = state.facilities.find((facility) => facility.type === 'armyBase')!;
+  const capital = state.facilities.find((facility) => facility.id === 'capital')!;
+  armyBase.owner = 'player';
+  armyBase.status = 'owned';
+  armyBase.operationalStatus = 'operational';
+  armyBase.armyBase = { militaryGoods: 24, interceptionsRemaining: 0, reward: 'pending' };
+  capital.workers -= 10;
+  state.pendingUnitProductions.push({
+    id: 'production-army-base-boundary',
+    cityFacilityId: armyBase.id,
+    unitType: 'nationalGuard',
+    population: 10,
+    readyTurn: state.turn + 1,
+    powerReady: false,
+  });
+  synchronizePopulation(state);
+  createCityPopulationSnapshot(state);
+  return state;
+}
+
+describe('v1.5.3 Save Format 12', () => {
+  it('exposes stable per-stage timings without changing Save Format 12 bytes', () => {
     const state = initialState(15152);
     const measured = measureSaveEncoding(state);
     expect(measured.code).toBe(encodeSaveCode(state));
@@ -85,7 +107,7 @@ describe('v1.5.1 Save Format 11', () => {
     }
   });
 
-  it('round-trips a detached complete Save Format 11 GameState through code and JSON', () => {
+  it('round-trips a detached complete Save Format 12 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -93,9 +115,9 @@ describe('v1.5.1 Save Format 11', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 11,
+      formatVersion: 12,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-51x51-v1',
+      mapId: 'fixed-51x51-v2',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -106,7 +128,7 @@ describe('v1.5.1 Save Format 11', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('preserves v1.5 progression, Riot, and pending common-Noise state without conversion', () => {
+  it('preserves v1.5.3 Army Base, Gas, and pending Noise state without conversion', () => {
     const state = initialState(78);
     const riot = state.units.find((unit) => unit.type === 'police')!;
     const capital = state.facilities.find((facility) => facility.id === 'capital')!;
@@ -139,6 +161,37 @@ describe('v1.5.1 Save Format 11', () => {
       sourceUnitType: 'riotPolice',
       emittedTurn: state.turn,
     });
+    const armyBase = state.facilities.find((facility) => facility.type === 'armyBase')!;
+    armyBase.owner = 'player';
+    armyBase.status = 'owned';
+    armyBase.operationalStatus = 'operational';
+    armyBase.armyBase = { militaryGoods: 24, interceptionsRemaining: 0, reward: 'pending' };
+    capital.workers -= 10;
+    state.pendingUnitProductions.push({
+      id: 'production-army-base-save',
+      cityFacilityId: armyBase.id,
+      unitType: 'nationalGuard',
+      population: 10,
+      readyTurn: state.turn + 1,
+      powerReady: false,
+    });
+    state.pendingNoisePulses.push({
+      id: 'noise-army-base-save',
+      center: { ...armyBase.position },
+      radius: state.config.armyBase.noiseRadius,
+      sourceKind: 'armyBase',
+      sourceUnitType: 'armyBase',
+      emittedTurn: state.turn,
+    });
+    state.events.push({
+      id: 'event-army-base-save',
+      turn: state.turn,
+      phase: 'zombie',
+      type: 'army_base_reward',
+      payload: { facilityId: armyBase.id, reward: 'pending' },
+    });
+    state.statistics.noisePulsesBySourceType.armyBase = 1;
+    state.statistics.gasZombiesSpawned = state.initialGasPositions.length;
     synchronizePopulation(state);
     createCityPopulationSnapshot(state);
 
@@ -150,18 +203,25 @@ describe('v1.5.1 Save Format 11', () => {
       maxAttackCharges: 2, attackChargesRemaining: 1,
     });
     expect(loaded.state?.pendingNoisePulses).toEqual(state.pendingNoisePulses);
+    expect(loaded.state?.facilities.find((facility) => facility.id === armyBase.id)?.armyBase).toEqual(armyBase.armyBase);
+    expect(loaded.state?.pendingUnitProductions).toContainEqual(expect.objectContaining({
+      cityFacilityId: armyBase.id,
+      unitType: 'nationalGuard',
+      powerReady: false,
+    }));
+    expect(loaded.state?.initialGasPositions).toEqual(state.initialGasPositions);
   });
 
-  it('writes the v1.5.1 version boundaries and complete v1.5.1 Config / Statistics / Event state', () => {
+  it('writes the v1.5.3 version boundaries and complete v1.5.3 Config / Statistics / Event state', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(11);
-    expect(envelope.gameVersion).toBe('4.0.0');
-    expect(config.version).toBe('4.0.0');
-    expect(config.mapId).toBe('fixed-51x51-v1');
+    expect(envelope.formatVersion).toBe(12);
+    expect(envelope.gameVersion).toBe('5.0.0');
+    expect(config.version).toBe('5.0.0');
+    expect(config.mapId).toBe('fixed-51x51-v2');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
@@ -174,6 +234,8 @@ describe('v1.5.1 Save Format 11', () => {
         initialZombieCount: 25,
         initialHunterCount: { min: 1, max: 4 },
         initialHunterMinDistance: 20,
+        initialGasCount: { min: 1, max: 2 },
+        initialGasMinDistance: 9,
       },
       infection: {
         zombieSpawnPopulationPerUnit: 5,
@@ -190,16 +252,19 @@ describe('v1.5.1 Save Format 11', () => {
         veteranAttackCharges: 2,
       },
       horde: {
-        specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5 },
+        specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5 },
         riotZombieCapPerDirection: 1,
         hunterZombieCapPerDirection: 1,
+        gasZombieCapPerDirection: 1,
         movementNoiseRadius: 8,
       },
+      armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 20 },
       units: {
         police: { recruitAttack: 6, noiseClass: 'medium', noiseRadius: 4 },
         riotPolice: { hp: 75, recruitAttack: 9, reanimationUnitType: 'riotZombie', noiseRadius: 5 },
         riotZombie: { hp: 60, attack: 5 },
         hunterZombie: { hp: 20, attack: 15, movement: 15, range: 1, vision: 5 },
+        gasZombie: { hp: 35, attack: 5, explosionDamage: 30, explosionInfection: 30 },
       },
     });
     expect(state).toHaveProperty('pendingNoisePulses', []);
@@ -207,6 +272,12 @@ describe('v1.5.1 Save Format 11', () => {
     expect(state).toHaveProperty('initialHunterPositions');
     expect((state.initialHunterPositions as unknown[]).length).toBeGreaterThanOrEqual(1);
     expect((state.initialHunterPositions as unknown[]).length).toBeLessThanOrEqual(4);
+    expect(state).toHaveProperty('initialGasPositions');
+    expect((state.initialGasPositions as unknown[]).length).toBeGreaterThanOrEqual(1);
+    expect((state.initialGasPositions as unknown[]).length).toBeLessThanOrEqual(2);
+    expect((state.map as Record<string, unknown>).facilities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'army-base-1', type: 'armyBase' }),
+    ]));
     expect(state.statistics).toMatchObject({
       initialNormalZombies: 25,
       noiseRespawnAttempts: 0,
@@ -217,6 +288,11 @@ describe('v1.5.1 Save Format 11', () => {
       riotZombiesSpawned: 0,
       hunterZombiesSpawned: (state.initialHunterPositions as unknown[]).length,
       hunterZombiesKilled: 0,
+      gasZombiesSpawned: (state.initialGasPositions as unknown[]).length,
+      gasZombiesKilled: 0,
+      gasExplosions: 0,
+      gasExplosionUnitDamage: 0,
+      noisePulsesBySourceType: expect.objectContaining({ armyBase: 0 }),
       hordeMovementNoisePulses: 0,
     });
   });
@@ -244,6 +320,57 @@ describe('v1.5.1 Save Format 11', () => {
     const result = importSaveJson(JSON.stringify(resign(envelope)));
     expect(result.valid).toBe(false);
     expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|hordeSpawnReserve|playerOccupancyAllowed|initialHunterPositions|noiseRespawnAttempts|unitExperience|specialZombieWeights|pendingNoisePulses|proficiency|riotPoliceProduced/i);
+  });
+
+  it('rejects missing or invalid v1.5.3 Army Base, Gas, Noise, Event, and statistics data', () => {
+    const valid = exportedEnvelope(stateWithArmyBaseReservation(117));
+
+    const missingBaseState = clone(valid);
+    const missingBase = missingBaseState.state as Record<string, unknown>;
+    const baseFacility = (missingBase.facilities as Array<Record<string, unknown>>).find((facility) => facility.type === 'armyBase')!;
+    delete baseFacility.armyBase;
+    const missingBaseResult = importSaveJson(JSON.stringify(resign(missingBaseState)));
+    expect(missingBaseResult.valid).toBe(false);
+    expect(missingBaseResult.errors.join(' ')).toMatch(/armyBase/i);
+
+    const missingPowerState = clone(valid);
+    const pending = ((missingPowerState.state as Record<string, unknown>).pendingUnitProductions as Array<Record<string, unknown>>)[0]!;
+    delete pending.powerReady;
+    const missingPowerResult = importSaveJson(JSON.stringify(resign(missingPowerState)));
+    expect(missingPowerResult.valid).toBe(false);
+    expect(missingPowerResult.errors.join(' ')).toMatch(/powerReady/i);
+
+    const invalidGasState = clone(valid);
+    const invalidGas = invalidGasState.state as Record<string, unknown>;
+    (invalidGas.initialGasPositions as Array<Record<string, unknown>>)[0]!.q = 0;
+    const invalidGasResult = importSaveJson(JSON.stringify(resign(invalidGasState)));
+    expect(invalidGasResult.valid).toBe(false);
+    expect(invalidGasResult.errors.join(' ')).toMatch(/initial Zombie positions.*seed|Gas|seed/i);
+
+    const invalidNoiseState = clone(valid);
+    const invalidNoise = invalidNoiseState.state as Record<string, unknown>;
+    invalidNoise.pendingNoisePulses = [{
+      id: 'noise-invalid-army-base', center: { q: 24, r: 24 }, radius: 8,
+      sourceKind: 'humanCombat', sourceUnitType: 'armyBase', emittedTurn: 1,
+    }];
+    const invalidNoiseResult = importSaveJson(JSON.stringify(resign(invalidNoiseState)));
+    expect(invalidNoiseResult.valid).toBe(false);
+    expect(invalidNoiseResult.errors.join(' ')).toMatch(/sourceKind.*sourceUnitType|source kind and type/i);
+
+    const invalidEventState = clone(valid);
+    const invalidEvents = (invalidEventState.state as Record<string, unknown>).events as Array<Record<string, unknown>>;
+    invalidEvents.push({ id: 'event-invalid', turn: 1, phase: 'zombie', type: 'army_base_interception', payload: {} });
+    const invalidEventResult = importSaveJson(JSON.stringify(resign(invalidEventState)));
+    expect(invalidEventResult.valid).toBe(false);
+    expect(invalidEventResult.errors.join(' ')).toMatch(/event.*invalid/i);
+
+    const missingStatisticState = clone(valid);
+    const statistics = (missingStatisticState.state as Record<string, unknown>).statistics as Record<string, unknown>;
+    delete statistics.gasExplosions;
+    delete (statistics.noisePulsesBySourceType as Record<string, unknown>).armyBase;
+    const missingStatisticResult = importSaveJson(JSON.stringify(resign(missingStatisticState)));
+    expect(missingStatisticResult.valid).toBe(false);
+    expect(missingStatisticResult.errors.join(' ')).toMatch(/gasExplosions|noisePulsesBySourceType\.armyBase/i);
   });
 
   it('requires current Checkpoint history, Rejected Refugee counters, and reanimation statistics', () => {
@@ -411,11 +538,11 @@ describe('v1.5.1 Save Format 11', () => {
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
     expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.3\.0/i);
-    expect(result.errors.join(' ')).toContain('v1.4.4 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toContain('v1.5.2 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Save Format 11', () => {
+  it('rejects a stale state/config version even when the envelope has Save Format 12', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     state.gameVersion = '2.4.0';
@@ -453,7 +580,7 @@ describe('v1.5.1 Save Format 11', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v11 autosave key and never rewrites or removes a v10 legacy key', () => {
+  it('uses the v12 autosave key and never rewrites or removes a v11 legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
     legacy.formatVersion = 10;

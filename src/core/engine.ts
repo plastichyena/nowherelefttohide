@@ -8,7 +8,7 @@ import { unitMoveFuelCost, getMovePath, reachableDestinations, getUnitLegalMoveF
 export { getUnitLegalMoveFuelProjections, previewMove } from './movement-query';
 export type { MovePreview } from './movement-query';
 export { unitMoveFuelCost } from './movement-query';
-import { createUnitLifecycle, type SpawnOccupancyEntry } from './unit-lifecycle';
+import { createUnitLifecycle, type SpawnOccupancyEntry, type GasExplosionSiteTarget } from './unit-lifecycle';
 import { emit } from './events-internal';
 import type { FacilityProductionProjection } from './economy-types';
 export type { FacilityProductionProjection } from './economy-types';
@@ -113,8 +113,8 @@ import type {
   ZombieUnitType,
 } from './types';
 
-const { dealDamage } = createUnitLifecycle({ applyGeneratedZombieOccupancy, processSpawnOccupancyQueue });
-const { applyMovement } = createMovement({ interceptorsAt, resolveCombat, tryCapture });
+const { dealDamage } = createUnitLifecycle({ applyGeneratedZombieOccupancy, processSpawnOccupancyQueue, applyGasExplosionSiteInfection, resolveGasExplosionSiteFalls });
+const { applyMovement } = createMovement({ interceptorsAt, resolveCombat, tryCapture, interceptArmyBase });
 
 const RESOURCE_TYPES: readonly ResourceType[] = ['food', 'civilianGoods', 'militaryGoods', 'fuel'];
 const CANONICAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
@@ -204,7 +204,7 @@ function resolveCombat(
     state.statistics.hordeInterceptions += attacker.isPlayerUnit ? 1 : 0;
   }
   dealDamage(state, defender, attackProjection.effectiveAttack, attacker.id, kind, rng);
-  if (!state.units.some((unit) => unit.id === defender.id)) {
+  if (!state.units.some((unit) => unit.id === defender.id) || !state.units.some((unit) => unit.id === attacker.id)) {
     if (noise) resolveFallenSiteNoiseRespawns(state, noise.sourceUnitType, noise.center, noise.radius, rng);
     return;
   }
@@ -227,7 +227,39 @@ function resolveCombat(
   if (noise) resolveFallenSiteNoiseRespawns(state, noise.sourceUnitType, noise.center, noise.radius, rng);
 }
 
-function tryCapture(state: GameState, unit: UnitState): void {
+function settleArmyReward(state: GameState, facility: FacilityState, rng: SeededRng): void {
+  if (!facility.armyBase || facility.armyBase.reward !== 'pending') return;
+  const position = nearestHumanSpawnPosition(state, facility.position, rng);
+  if (!position) return;
+  const unit = createUnit(state, nextHumanUnitId(state, 'nationalGuard'), 'nationalGuard', position, 'ready', 'regular');
+  state.units.push(unit);
+  state.population.cumulativeReinforcements += unit.population;
+  facility.armyBase.reward = 'claimed';
+  emit(state,'army_base_reward',{facilityId:facility.id,unitId:unit.id,people:unit.population});
+}
+function interceptArmyBase(state: GameState, mover: UnitState, rng: SeededRng): boolean {
+  let fired=false;
+  for (const base of state.facilities.filter(f=>f.type==='armyBase').sort((a,b)=>a.id.localeCompare(b.id))) {
+    const distance=hexDistance(base.position,mover.position);
+    if(distance>state.config.armyBase.range) continue;
+    while(state.units.some(u=>u.id===mover.id) && base.armyBase && base.owner==='player' && base.status==='owned' && base.operationalStatus==='operational' && base.infected===0 && base.workers>0) {
+      base.armyBase.interceptionsRemaining=Math.min(base.armyBase.interceptionsRemaining,base.workers);
+      if(base.armyBase.interceptionsRemaining<=0 || base.armyBase.militaryGoods<state.config.armyBase.interceptionCost) break;
+      base.armyBase.interceptionsRemaining--; base.armyBase.militaryGoods-=state.config.armyBase.interceptionCost;
+      fired=true;
+      state.pendingNoisePulses.push({id:`noise-${state.nextEventNumber}`,center:{...base.position},radius:state.config.armyBase.noiseRadius,sourceKind:'armyBase',sourceUnitType:'armyBase',emittedTurn:state.turn});
+      state.statistics.noisePulsesEmitted++;
+      state.statistics.noisePulsesBySourceType.armyBase++;
+      emit(state,'noise_emitted',{sourceUnitType:'armyBase',sourceKind:'armyBase',noiseClass:'large'});
+      emit(state,'interception',{facilityId:base.id,defenderId:mover.id,effectiveAttack:state.config.armyBase.attack,militaryGoodsCost:state.config.armyBase.interceptionCost});
+      dealDamage(state,mover,state.config.armyBase.attack,base.id,'army_base_interception',rng);
+      resolveFallenSiteNoiseRespawns(state,'armyBase',base.position,state.config.armyBase.noiseRadius,rng);
+      if(distance>0) break;
+    }
+  }
+  return fired;
+}
+function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRng.fromState(state.rngState)): void {
   if (!unit.isPlayerUnit) {
     return;
   }
@@ -237,18 +269,30 @@ function tryCapture(state: GameState, unit: UnitState): void {
     facility.operationalStatus === 'disabled' &&
     !state.units.some((candidate) => !candidate.isPlayerUnit && hexKey(candidate.position) === hexKey(facility.position))
   ) {
+    if (facility.type === 'armyBase' && facility.owner !== 'player') {
+      facility.owner = 'player';
+      facility.status = 'owned';
+      facility.securedOrder = state.facilities.reduce((max, item) => Math.max(max, item.securedOrder ?? -1), -1) + 1;
+      facility.lastAssignedOrder = state.nextAssignmentOrder++;
+      emit(state, 'facility_captured', { facilityId: facility.id, unitId: unit.id });
+      if (facility.armyBase?.reward === 'unclaimed') {
+        facility.armyBase.reward = state.turn <= state.config.armyBase.rewardLastTurn ? 'pending' : 'expired';
+        settleArmyReward(state, facility, rng);
+      }
+    }
     facility.operationalStatus = 'recovering';
     facility.recoveryOperationalTurn = state.turn + 1;
     facility.populationOperationalTurn = state.turn + 1;
     emit(state, 'facility_recovered', { facilityId: facility.id, unitId: unit.id, recovering: true });
     return;
   }
+  if (facility?.type === 'armyBase' && facility.status === 'ruined' && facility.infected === 0) { facility.owner='player'; facility.status='owned'; facility.operationalStatus='recovering'; facility.recoveryOperationalTurn=state.turn+1; facility.populationOperationalTurn=state.turn+1; return; }
   if (!facility || facility.status !== 'unowned') {
     return;
   }
   facility.owner = 'player';
   facility.status = 'owned';
-  facility.operationalStatus = facility.infected > 0 ? 'infected' : facility.workers > 0 ? 'operational' : 'stopped';
+  facility.operationalStatus = facility.infected > 0 ? 'infected' : facility.type === 'armyBase' || facility.workers > 0 ? 'operational' : 'stopped';
   const previousOrder = state.facilities.reduce(
     (maximum, candidate) => Math.max(maximum, candidate.securedOrder ?? -1),
     -1,
@@ -257,6 +301,7 @@ function tryCapture(state: GameState, unit: UnitState): void {
   facility.lastAssignedOrder = state.nextAssignmentOrder++;
   facility.populationOperationalTurn = state.turn + 1;
   emit(state, 'facility_captured', { facilityId: facility.id, unitId: unit.id });
+  if (facility.armyBase?.reward === 'unclaimed') { facility.armyBase.reward=state.turn<=state.config.armyBase.rewardLastTurn ? 'pending' : 'expired'; settleArmyReward(state,facility,rng); }
 }
 
 function totalCheckpointPeople(checkpoint: CheckpointState): number {
@@ -623,6 +668,7 @@ function removeWorkersForShortage(state: GameState, amount: number, resource: 'f
   for (const facility of cities) {
     const loss = Math.min(remaining, facility.workers);
     facility.workers -= loss;
+    if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
     remaining -= loss;
     removed += loss;
     if (loss > 0) emit(state, 'resource_shortage', { resource, facilityId: facility.id, populationLost: loss });
@@ -640,6 +686,7 @@ function removeWorkersForShortage(state: GameState, amount: number, resource: 'f
   for (const facility of facilities) {
     const loss = Math.min(remaining, facility.workers);
     facility.workers -= loss;
+    if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
     remaining -= loss;
     removed += loss;
     if (loss > 0) emit(state, 'resource_shortage', { resource, facilityId: facility.id, populationLost: loss });
@@ -704,7 +751,7 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
         ? 'ruined'
         : facility.infected > 0
           ? 'infected'
-          : facility.type === 'windPowerPlant' || facility.workers > 0
+          : facility.type === 'windPowerPlant' || facility.type === 'armyBase' || facility.workers > 0
             ? 'operational'
             : 'stopped';
     }
@@ -754,6 +801,11 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
       });
     }
   }
+  for (const refill of plan.armyBaseMilitaryGoodsRefills) {
+    const base = getFacilityState(state,refill.facilityId);
+    if(base?.armyBase) { base.armyBase.militaryGoods += refill.amount; if(refill.amount>0) emit(state,'resource_consumed',{resource:'militaryGoods',amount:refill.amount,reason:'army_base_refill',facilityId:base.id}); }
+  }
+  for (const power of plan.armyBasePowerOrders) { const order=state.pendingUnitProductions.find(o=>o.id===power.orderId); if(order) order.powerReady=power.powerSupplied; }
   emit(state, 'resource_consumed', {
     resource: 'food',
     amount: forecast.food.maintenanceRequired - forecast.food.shortage,
@@ -797,6 +849,14 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
  * ending the current turn. The private copy includes maintenance losses,
  * secured-order power allocation, and partial input-resource operation.
  */
+function nearestHumanSpawnPosition(state: GameState, origin: HexCoord, rng: SeededRng): HexCoord | null {
+  const occupied=occupiedKeys(state);
+  const available=state.map.tiles.filter(t=>!occupied.has(t.key)&&t.movementCost!==null&&canPlayerOccupyHex(state.map,t));
+  if(available.length===0)return null;
+  const distance=Math.min(...available.map(t=>hexDistance(origin,t)));
+  const nearest=available.filter(t=>hexDistance(origin,t)===distance).sort((a,b)=>a.q-b.q||a.r-b.r).map(({q,r})=>({q,r}));
+  return nearest.length>1?rng.pick(nearest):nearest[0]!;
+}
 function nearestSpawnPosition(state: GameState, origin: HexCoord, rng: SeededRng): HexCoord | null {
   const occupied = occupiedKeys(state);
   let frontier = [{ ...origin }];
@@ -884,11 +944,14 @@ function chooseHordeSlotType(
   rng: SeededRng,
   riotCount: number,
   hunterCount: number,
+  gasCount: number,
 ): Exclude<ZombieUnitType, 'hordeZombie'> {
+  const gasEligible = state.config.horde.waves.findIndex(w => w.turn === state.turn) >= Math.max(0, state.config.horde.waves.length - 2);
   const entries = WAVE_NON_HORDE_TYPES
+    .filter(type => type !== 'gasZombie' || (gasEligible && gasCount < state.config.horde.gasZombieCapPerDirection))
     .filter((type) => type !== 'riotZombie' || riotCount < state.config.horde.riotZombieCapPerDirection)
     .filter((type) => type !== 'hunterZombie' || hunterCount < state.config.horde.hunterZombieCapPerDirection)
-    .map((type) => ({ type, weight: state.config.horde.specialZombieWeights[type] }))
+    .map((type) => ({ type, weight: type === 'zombie' && gasEligible ? Math.max(state.config.horde.specialZombieWeights.zombie > 0 ? 1 : 0, state.config.horde.specialZombieWeights.zombie - state.config.horde.specialZombieWeights.gasZombie) : state.config.horde.specialZombieWeights[type] }))
     .filter((entry) => entry.weight > 0);
   const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
   let roll = rng.nextInt(1, total);
@@ -915,10 +978,12 @@ function spawnHordeComposition(
   const slotUnits: UnitState[] = [];
   let riotCount = 0;
   let hunterCount = 0;
+  let gasCount = 0;
   for (let slot = 0; slot < composition.zombie; slot += 1) {
-    const unitType = chooseHordeSlotType(state, rng, riotCount, hunterCount);
+    const unitType = chooseHordeSlotType(state, rng, riotCount, hunterCount, gasCount);
     if (unitType === 'riotZombie') riotCount += 1;
     if (unitType === 'hunterZombie') hunterCount += 1;
+    if (unitType === 'gasZombie') { gasCount += 1; state.statistics.gasZombiesSpawned += 1; }
     const spawned = spawnZombies(
       state,
       origin,
@@ -991,7 +1056,7 @@ function resolveSiteZombieSpawn(
   queue: SpawnOccupancyEntry[],
   chainRootEventId: string | null,
   chainDepth: number,
-  originUnitType: HumanUnitType | 'hordeZombie' | null = null,
+  originUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | null = null,
 ): { remainingInfected: number; actualSpawnCount: number; eventId: string } {
   const perUnit = state.config.infection.zombieSpawnPopulationPerUnit;
   const requestedSpawnCount = Math.min(
@@ -1107,6 +1172,11 @@ function fallFacility(
     });
     return;
   }
+  if (facility.type === 'armyBase') {
+    const lost = state.pendingUnitProductions.filter(o=>o.cityFacilityId===facility.id);
+    state.pendingUnitProductions=state.pendingUnitProductions.filter(o=>o.cityFacilityId!==facility.id);
+    for (const order of lost) { state.population.cumulativeDeaths += order.population; state.statistics.civilianLosses += order.population; emit(state,'production_forfeited',{facilityId:facility.id, people:order.population, cause}); }
+  }
   facility.status = 'ruined';
   // Ruined facilities are no longer owned. Recovery by a stationed player
   // unit claims the site again after its internal infection reaches zero.
@@ -1135,6 +1205,23 @@ function fallFacility(
   });
 }
 
+function applyGasExplosionSiteInfection(state: GameState, target: GasExplosionSiteTarget, maxInfection: number, sourceGasId: string): number {
+  const site = target.siteKind==='facility' ? getFacilityState(state,target.siteId) : state.checkpoints.find(c=>c.id===target.siteId);
+  if (!site) return 0;
+  const converted = target.siteKind==='facility' ? Math.min(maxInfection,(site as FacilityState).workers) : removeCheckpointPeople(site as CheckpointState,maxInfection);
+  if (target.siteKind==='facility') { const f=site as FacilityState; f.workers-=converted; if(converted>0 && f.status!=='ruined') f.operationalStatus='infected'; if(f.armyBase) f.armyBase.interceptionsRemaining=Math.min(f.armyBase.interceptionsRemaining,f.workers); }
+  site.infected+=converted;
+  if(converted>0) { state.statistics.civilianLosses+=converted; state.statistics.infectionLosses+=converted; emit(state,'infection_spread',{[target.siteKind==='facility'?'facilityId':'checkpointId']:site.id,amount:converted,source:sourceGasId,cause:'gas_explosion'}); }
+  return converted;
+}
+function resolveGasExplosionSiteFalls(state: GameState, targets: readonly GasExplosionSiteTarget[], rng: SeededRng, sourceGasId: string): void {
+  const queue: SpawnOccupancyEntry[]=[];
+  for(const target of [...targets].sort((a,b)=>a.siteId.localeCompare(b.siteId)||a.siteKind.localeCompare(b.siteKind))) {
+    if(target.siteKind==='facility') { const f=getFacilityState(state,target.siteId); if(f && f.workers===0 && f.infected>0) fallFacility(state,f,rng,queue,'gas_explosion',null,0); }
+    else { const c=state.checkpoints.find(c=>c.id===target.siteId); if(c && totalCheckpointPeople(c)===0 && c.infected>0) fallCheckpoint(state,c,rng,queue,'gas_explosion',null,0); }
+  }
+  processSpawnOccupancyQueue(state,rng,queue);
+}
 function overrunFacility(state: GameState, facility: FacilityState, rng: SeededRng, cause = 'infection_fall'): void {
   const queue: SpawnOccupancyEntry[] = [];
   fallFacility(state, facility, rng, queue, cause, null, 0);
@@ -1305,7 +1392,7 @@ function applyGeneratedZombieOccupancy(
 ): void {
   const facility = getFacilityAt(state, zombie.position);
   if (facility && facility.status !== 'ruined') {
-    if (facility.type === 'windPowerPlant' || (facility.constructible && facility.workers === 0)) {
+    if (facility.type === 'windPowerPlant' || ((facility.constructible || facility.type === 'armyBase') && facility.workers === 0 && facility.infected === 0)) {
       facility.operationalStatus = 'disabled';
       facility.infected = 0;
       emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type, source: zombie.id, immediateSpawnOccupation: true });
@@ -1313,6 +1400,7 @@ function applyGeneratedZombieOccupancy(
       const wasInfected = facility.infected > 0;
       const converted = Math.min(zombie.attack, facility.workers);
       facility.workers -= converted;
+    if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
       facility.infected += converted;
       if (converted > 0) {
         facility.operationalStatus = 'infected';
@@ -1381,6 +1469,7 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
       Math.ceil(amount * civilianDamageRate),
     );
     facility.workers -= civilianLosses;
+    if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
     state.statistics.civilianLosses += civilianLosses;
     state.population.cumulativeDeaths += civilianLosses;
   }
@@ -1401,11 +1490,12 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
   if (facility.infected > 0) {
     facility.operationalStatus = facility.status === 'ruined' ? 'ruined' : 'infected';
   }
-  else if (facility.status === 'owned') facility.operationalStatus = facility.workers > 0 ? 'operational' : 'stopped';
+  else if (facility.status === 'owned') facility.operationalStatus = facility.type === 'armyBase' || facility.workers > 0 ? 'operational' : 'stopped';
   if (facility.infected === 0 && facility.status === 'ruined') {
     facility.owner = 'player';
     facility.status = 'owned';
-    facility.operationalStatus = 'stopped';
+    facility.operationalStatus = facility.type === 'armyBase' ? 'recovering' : 'stopped';
+    if (facility.type === 'armyBase') facility.recoveryOperationalTurn = state.turn + 1;
     facility.workers = 0;
     facility.populationOperationalTurn = state.turn + 1;
     emit(state, 'facility_recovered', { facilityId: facility.id, unitId: unit.id });
@@ -1500,6 +1590,7 @@ function processInternalInfection(state: GameState, rng: SeededRng): void {
     if (!guarded && facility.infected > 0) {
       const spread = Math.min(facility.workers, facility.infected * state.config.infection.facilitySpreadPerTurn);
       facility.workers -= spread;
+    if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
       facility.infected += spread;
       facility.operationalStatus = facility.status === 'ruined' ? 'ruined' : 'infected';
       if (spread > 0) {
@@ -1633,7 +1724,7 @@ function hasVisiblePopulationTarget(state: GameState, zombie: UnitState): boolea
 }
 
 interface CombatNoiseResolution {
-  sourceUnitType: HumanUnitType | 'hordeZombie';
+  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase';
   center: HexCoord;
   radius: number;
 }
@@ -1693,7 +1784,7 @@ function emitHordeMovementNoise(
 
 function resolveFallenSiteNoiseRespawns(
   state: GameState,
-  sourceUnitType: HumanUnitType | 'hordeZombie',
+  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase',
   center: HexCoord,
   radius: number,
   rng: SeededRng,
@@ -1752,18 +1843,10 @@ function resolveFallenSiteNoiseRespawns(
   }
 }
 
-function nearestAttackableHuman(state: GameState, zombie: UnitState): UnitState | null {
-  const candidates = state.units
-    .filter(
-      (unit) => unit.isPlayerUnit && hexDistance(unit.position, zombie.position) <= effectiveRange(state, zombie),
-    )
-    .sort(
-      (left, right) =>
-        hexDistance(zombie.position, left.position) - hexDistance(zombie.position, right.position) ||
-        right.population - left.population ||
-        left.id.localeCompare(right.id),
-    );
-  return candidates[0] ?? null;
+function nearestAttackableHuman(state: GameState, zombie: UnitState, rng?: SeededRng): UnitState | null {
+  const candidates = state.units.filter(u => u.isPlayerUnit && u.hp > 0 && hexDistance(u.position,zombie.position) === 1).sort((a,b) => b.population-a.population || a.id.localeCompare(b.id));
+  const tied=candidates.filter(u=>u.population===candidates[0]?.population);
+  return tied.length > 1 && rng ? rng.pick(tied) : candidates[0] ?? null;
 }
 
 function chooseNoisePulseTarget(
@@ -1879,7 +1962,7 @@ function resolveZombieAttacks(state: GameState, zombieId: string, rng: SeededRng
   while (!state.gameOver) {
     const zombie = getUnit(state, zombieId);
     if (!zombie || !zombie.canAttack || zombie.attackChargesRemaining <= 0) return;
-    const target = nearestAttackableHuman(state, zombie);
+    const target = nearestAttackableHuman(state, zombie, rng);
     if (!target) return;
     resolveCombat(state, zombie, target, 'attack', rng);
     if (checkImmediateDefeat(state)) return;
@@ -1887,6 +1970,7 @@ function resolveZombieAttacks(state: GameState, zombieId: string, rng: SeededRng
 }
 
 function processZombieTurn(state: GameState, rng: SeededRng): void {
+  for (const f of state.facilities) if (f.armyBase) f.armyBase.interceptionsRemaining = f.workers;
   const pendingPulses = state.pendingNoisePulses.map((pulse) => ({ ...pulse, center: { ...pulse.center } }));
   state.pendingNoisePulses = [];
   const decisions = targetDecisionSnapshot(state, rng, pendingPulses);
@@ -1992,7 +2076,7 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
     if (facility) {
       if (
         facility.status !== 'ruined' &&
-        (facility.type === 'windPowerPlant' || (facility.constructible && facility.workers === 0))
+        (facility.type === 'windPowerPlant' || ((facility.constructible || facility.type === 'armyBase') && facility.workers === 0 && facility.infected === 0))
       ) {
         facility.operationalStatus = 'disabled';
         facility.infected = 0;
@@ -2001,6 +2085,7 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
         const wasInfected = facility.infected > 0;
         const converted = Math.min(zombie.attack, facility.workers);
         facility.workers -= converted;
+    if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
         facility.infected += converted;
         if (converted > 0) facility.operationalStatus = 'infected';
         if (converted > 0) {
@@ -2117,6 +2202,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
   const policeZombieCount = allSpawned.filter((unit) => unit.type === 'policeZombie').length;
   const soldierZombieCount = allSpawned.filter((unit) => unit.type === 'soldierZombie').length;
   const riotZombieCount = allSpawned.filter((unit) => unit.type === 'riotZombie').length;
+  const gasZombieCount = allSpawned.filter(unit=>unit.type==='gasZombie').length;
   const hunterZombieCount = allSpawned.filter((unit) => unit.type === 'hunterZombie').length;
   state.statistics.policeZombiesSpawned += policeZombieCount;
   state.statistics.soldierZombiesSpawned += soldierZombieCount;
@@ -2126,6 +2212,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
   state.statistics.hordeSpecialSpawnedByType.soldierZombie += soldierZombieCount;
   state.statistics.hordeSpecialSpawnedByType.riotZombie += riotZombieCount;
   state.statistics.hordeSpecialSpawnedByType.hunterZombie += hunterZombieCount;
+  state.statistics.hordeSpecialSpawnedByType.gasZombie += gasZombieCount;
   const count = allSpawned.length;
   state.horde.spawnedWaveIndices.push(waveIndex);
   state.horde.spawnGroupIdsByWave[String(waveIndex)] = groupIds;
@@ -2159,6 +2246,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
     state.statistics.finalSpecialZombiesSpawnedByType.soldierZombie += soldierZombieCount;
     state.statistics.finalSpecialZombiesSpawnedByType.riotZombie += riotZombieCount;
     state.statistics.finalSpecialZombiesSpawnedByType.hunterZombie += hunterZombieCount;
+    state.statistics.finalSpecialZombiesSpawnedByType.gasZombie += gasZombieCount;
     for (const branch of state.roadBranches) branch.nextArrivalTurn = null;
     emit(state, 'refugee_arrivals_ended', { finalWaveIndex: waveIndex, spawnTurn: state.turn });
   } else {
@@ -2300,6 +2388,7 @@ function checkImmediateGameEnd(state: GameState): boolean {
 
 function startPlayerTurn(state: GameState, rng: SeededRng): void {
   beginHordeWarningIfDue(state, rng);
+  for(const f of state.facilities) settleArmyReward(state,f,rng);
   for (const unit of state.units.filter(isHumanUnit).sort((left, right) => left.id.localeCompare(right.id))) {
     if (unit.proficiency === 'regular' && unit.veteranPromotionPending) {
       unit.proficiency = 'veteran';
@@ -2336,7 +2425,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
       facility.recoveryOperationalTurn !== null &&
       facility.recoveryOperationalTurn <= state.turn
     ) {
-      facility.operationalStatus = facility.type === 'windPowerPlant' || facility.workers > 0 ? 'operational' : 'stopped';
+      facility.operationalStatus = facility.type === 'windPowerPlant' || facility.type === 'armyBase' || facility.workers > 0 ? 'operational' : 'stopped';
       facility.populationOperationalTurn = state.turn;
       facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
       facility.recoveryOperationalTurn = null;
@@ -2388,9 +2477,8 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
       state.pendingUnitProductions.push(order);
       continue;
     }
-    const nearestPositions = findNearestOpenTiles(state.map, city.position, occupiedKeys(state))
-      .filter((position) => canPlayerOccupyHex(state.map, position));
-    const position = nearestPositions.length > 1 ? rng.pick(nearestPositions) : nearestPositions[0];
+    if (city.type === 'armyBase' && (!order.powerReady || city.infected > 0 || city.operationalStatus !== 'operational')) { state.pendingUnitProductions.push(order); continue; }
+    const position = nearestHumanSpawnPosition(state, city.position, rng);
     if (!position) {
       state.pendingUnitProductions.push(order);
       continue;
@@ -2537,7 +2625,8 @@ function assignWorkers(state: GameState, action: Extract<GameAction, { type: 'As
   const movements = difference > 0 ? withdrawFromSupplyCities(state, difference) : distributeToReceptionCities(state, -difference);
   if (!movements) return error(action, 'population_move_failed', 'Population movement could not be completed');
   facility.workers = action.workers;
-  facility.operationalStatus = action.workers > 0 ? 'operational' : 'stopped';
+  facility.operationalStatus = facility.type === 'armyBase' || action.workers > 0 ? 'operational' : 'stopped';
+  if(facility.armyBase) facility.armyBase.interceptionsRemaining=Math.min(facility.armyBase.interceptionsRemaining,facility.workers);
   facility.lastAssignedOrder = state.nextAssignmentOrder++;
   state.actionsTakenThisTurn += 1;
   emit(state, 'workers_assigned', {
@@ -3141,8 +3230,8 @@ function validateProduceUnit(state: Readonly<GameState>, action: Extract<GameAct
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   if (!HUMAN_UNIT_TYPES.includes(action.unitType)) return error(action, 'invalid_unit_type', 'Only configured human units can be produced');
-  const eligibleCities = eligibleSnapshotCities(state, 'supply').filter(
-    (facility) => state.config.units[action.unitType].recruitmentFacilityTypes.includes(facility.type as 'capital' | 'city'),
+  const eligibleCities = [...eligibleSnapshotCities(state, 'supply'), ...state.facilities.filter(f => f.type === 'armyBase' && f.owner === 'player' && f.status === 'owned' && f.infected === 0 && f.operationalStatus === 'operational' && f.populationOperationalTurn <= state.turn)].filter(
+    (facility) => state.config.units[action.unitType].recruitmentFacilityTypes.includes(facility.type as 'capital' | 'city' | 'armyBase'),
   );
   if (
     action.destination &&
@@ -3189,6 +3278,7 @@ function produceUnit(state: GameState, action: Extract<GameAction, { type: 'Prod
     unitType: action.unitType,
     population: costs.population,
     readyTurn: state.turn + 1,
+    ...(city.type === 'armyBase' ? { powerReady: false } : {}),
   };
   state.pendingUnitProductions.push(order);
   state.actionsTakenThisTurn += 1;
@@ -3906,6 +3996,7 @@ export class GameEngine implements HeadlessGame {
       };
       if (validationError(validateDecommissionConstructibleFacility(this.state, action)) === null) actions.push(action);
     }
+    for (const base of this.state.facilities.filter(f=>f.type==='armyBase')) { const action: GameAction={type:'ProduceUnit',unitType:'nationalGuard',destination:{...base.position}}; if (!('code' in validateProduceUnit(this.state,action))) actions.push(action); }
     const currentCivilianWorkers = civilianWorkerCount(this.state);
     for (const city of cities.filter((candidate) => suppliedKeys.has(hexKey(candidate.position)))) {
       if (!this.state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) {
@@ -4000,7 +4091,7 @@ export class GameEngine implements HeadlessGame {
     if (!candidate.gameOver) checkImmediateGameEnd(candidate);
     if (
       action.type !== 'EndTurn'
-      && populationLedgerTotal(candidate) + candidate.population.cumulativeDepartures !== populationBeforeAction
+      && populationLedgerTotal(candidate) + candidate.population.cumulativeDepartures - (candidate.population.cumulativeReinforcements - original.population.cumulativeReinforcements) !== populationBeforeAction
     ) {
       return {
         state: this.getState(),

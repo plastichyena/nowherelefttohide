@@ -3,7 +3,7 @@ import { isHumanUnitType, isZombieUnitType } from './unit-catalog';
 import { assertValidGameConfig, cloneConfig } from './config';
 import { hexKey } from './hex';
 import {
-  createFixedMap,
+  createFixedMap, placeArmyBase, generateInitialGasPositions,
   FIXED_MAP_ID,
   generateInitialZombiePositions,
   generateInitialHunterPositions,
@@ -26,7 +26,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '4.0.0';
+export const GAME_VERSION = '5.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -51,7 +51,7 @@ export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
 }
 
 export function isProductionFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'simpleFarm', 'civilianDroneBase']
+  return ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'simpleFarm', 'civilianDroneBase', 'armyBase']
     .includes(facility.type);
 }
 
@@ -327,6 +327,7 @@ function facilityStateFromDefinition(
   }
   return {
     ...definition,
+    ...(definition.type === 'armyBase' ? { armyBase: { militaryGoods: config.armyBase.maxMilitaryGoods, interceptionsRemaining: 0, reward: 'unclaimed' as const } } : {}),
     workerCapacity,
     owner: owned ? 'player' : 'none',
     status: owned ? 'owned' : 'unowned',
@@ -425,8 +426,10 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   // serializable stream as every other seeded rule. Generate the full
   // canonical set even when a test Config requests fewer initial Zombies so
   // the map snapshot and replay contract remain stable.
+  placeArmyBase(map, rng, stateConfig.facilities.armyBase.workerCapacity);
   map.initialZombiePositions = generateInitialZombiePositions(map, rng);
   const initialHunterPositions = generateInitialHunterPositions(map, rng, stateConfig.economy);
+  const initialGasPositions = generateInitialGasPositions(map, rng, initialHunterPositions, stateConfig.economy);
   let securedOrder = 0;
   const facilities = map.facilities.map((definition) =>
     facilityStateFromDefinition(
@@ -452,6 +455,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     }));
   const state: GameState = {
     initialHunterPositions,
+    initialGasPositions,
     gameVersion: GAME_VERSION,
     config: stateConfig,
     seed,
@@ -466,6 +470,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     cityPopulationSnapshot: { turn: 1, supply: [], reception: [] },
     population: {
       initialPopulation: 0,
+      cumulativeReinforcements: 0,
       cityResidents: 0,
       productionWorkers: 0,
       healthyCivilians: 0,
@@ -645,10 +650,11 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       hunterZombiesSpawned: initialHunterPositions.length,
       riotZombiesKilled: 0,
       hunterZombiesKilled: 0,
+      gasZombiesKilled: 0, gasZombiesSpawned: initialGasPositions.length, gasExplosions: 0, gasExplosionUnitDamage: 0,
       riotPoliceReanimations: 0,
-      hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0 },
-      finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0 },
-      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, hordeZombie: 0 },
+      hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0 },
+      finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0 },
+      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, hordeZombie: 0, armyBase: 0 },
       hordeMovementNoisePulses: 0,
       hordeNoiseRespawnedByType: { zombie: 0, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
     },
@@ -667,6 +673,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   state.statistics.aerialDiscoveriesInGroundBlockedArea = state.units.filter((unit) =>
     !unit.isPlayerUnit && coverage.groundBlocked.has(hexKey(unit.position)) && coverage.aerialVisible.has(hexKey(unit.position)),
   ).length;
+  state.units.push(...initialGasPositions.map((position, index) => createUnit(state, `gas-zombie-initial-${index+1}`, 'gasZombie', position)));
   createCityPopulationSnapshot(state);
   return state;
 }

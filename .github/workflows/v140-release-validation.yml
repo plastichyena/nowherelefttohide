@@ -1,4 +1,4 @@
-name: v1.5.2 Release Validation
+name: v1.5.3 Release Validation
 
 on:
   workflow_dispatch:
@@ -7,35 +7,23 @@ permissions:
   contents: read
 
 concurrency:
-  group: v152-release-validation-${{ github.ref }}
+  group: v153-release-validation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  baseline-comparison:
-    name: v1.5.1 baseline vs v1.5.2 ${{ matrix.agent }} seeds ${{ matrix.seed }}-${{ matrix.endSeed }}
+  agent-validation:
+    name: v1.5.3 ${{ matrix.agent }} fixed seeds 1-100
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
         include:
           - agent: random
-            seed: 1
-            endSeed: 100
           - agent: balanced
-            seed: 1
-            endSeed: 100
     steps:
-      - name: Check out v1.5.2 candidate
+      - name: Check out v1.5.3 candidate
         uses: actions/checkout@v4
-
-      # Full SHA prevents actions/checkout from treating the v1.5.1 baseline
-      # as a branch ref, which caused run 33945010119 to fail before testing.
-      - name: Check out immutable v1.5.1 baseline
-        uses: actions/checkout@v4
-        with:
-          ref: e98f1f57f2c1747588d8840d32bf623bbd625dca
-          path: baseline-v151
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -43,60 +31,75 @@ jobs:
           node-version: 22.x
           cache: npm
 
-      - name: Install locked candidate dependencies
+      - name: Install locked dependencies
         run: npm ci
 
-      - name: Install locked baseline dependencies
-        run: npm ci
-        working-directory: baseline-v151
-
-      - name: Compare deterministic release batches with a 100-turn runner limit
+      - name: Run fixed seeds 1-100 with technical and replay validation
         shell: bash
         run: |
           set -euo pipefail
-          OUTPUT="$GITHUB_WORKSPACE/output/simulations/v152-${{ matrix.agent }}-comparison-${{ matrix.seed }}-${{ matrix.endSeed }}"
-          BASELINE_OUTPUT="$OUTPUT/baseline-v151"
-          CANDIDATE_OUTPUT="$OUTPUT/candidate-v152"
-
-          (
-            cd "$GITHUB_WORKSPACE/baseline-v151"
-            npx --no-install vite-node --script src/agent/sim-cli.ts \
-              --agent=${{ matrix.agent }} \
-              --games=100 \
-              --seed=${{ matrix.seed }} \
-              --max-turns=100 \
-              --summary-only \
-              --out="$BASELINE_OUTPUT" \
-              --overwrite
-          )
+          OUTPUT="$GITHUB_WORKSPACE/output/simulations/v153-${{ matrix.agent }}-seeds-1-100"
           npx --no-install vite-node --script src/agent/sim-cli.ts \
             --agent=${{ matrix.agent }} \
             --games=100 \
-            --seed=${{ matrix.seed }} \
+            --seed=1 \
             --max-turns=100 \
-            --summary-only \
-            --out="$CANDIDATE_OUTPUT" \
+            --out="$OUTPUT" \
             --overwrite
-          node scripts/verify-release-baseline.mjs \
-            --baseline="$BASELINE_OUTPUT/run.json" \
-            --candidate="$CANDIDATE_OUTPUT/run.json" \
-            --out="$OUTPUT/comparison.json"
+
+          cat > "$RUNNER_TEMP/verify-v153-replay.ts" <<'EOF'
+          import { readFileSync, readdirSync } from 'node:fs';
+          import { dirname, join, resolve } from 'node:path';
+          import { replayArtifact } from '${{ github.workspace }}/src/agent/runner';
+
+          const reportPath = resolve(process.argv[2]!);
+          const report = JSON.parse(readFileSync(reportPath, 'utf8')) as {
+            appVersion?: string;
+            execution?: { agents?: string[]; seeds?: number[]; limits?: { maxTurns?: number } };
+            games?: Array<{ agentId?: string; seed?: number; outcome?: string }>;
+            failures?: unknown[];
+            technicalFailureCount?: number;
+            limitReachedCount?: number;
+          };
+          const expectedSeeds = Array.from({ length: 100 }, (_, index) => index + 1);
+          if (report.appVersion !== '1.5.3') throw new Error(`Unexpected app version: ${String(report.appVersion)}`);
+          if (JSON.stringify(report.execution?.agents) !== JSON.stringify(['${{ matrix.agent }}'])) throw new Error('Agent strategy metadata is not fixed');
+          if (JSON.stringify(report.execution?.seeds) !== JSON.stringify(expectedSeeds)) throw new Error('Release seeds are not exactly 1..100');
+          if (report.execution?.limits?.maxTurns !== 100) throw new Error('Runner maxTurns must remain 100');
+          if (report.games?.length !== 100 || report.failures?.length !== 0 || report.technicalFailureCount !== 0) throw new Error('Technical failure in fixed seed batch');
+          if (report.limitReachedCount !== 0) throw new Error('A fixed seed batch reached the runner limit before Game Over');
+
+          const output = dirname(reportPath);
+          const artifactPaths = readdirSync(join(output, 'games'))
+            .filter((name) => name.endsWith('.json'))
+            .sort()
+            .map((name) => join(output, 'games', name));
+          if (artifactPaths.length !== 100) throw new Error(`Expected 100 replay artifacts, received ${artifactPaths.length}`);
+          for (const [index, artifactPath] of artifactPaths.entries()) {
+            const artifact = JSON.parse(readFileSync(artifactPath, 'utf8')) as { artifactType?: string; agent?: { strategy?: string }; seed?: number };
+            if (artifact.artifactType !== 'replay' || artifact.agent?.strategy !== '${{ matrix.agent }}' || artifact.seed !== expectedSeeds[index]) throw new Error(`Artifact metadata mismatch at ${artifactPath}`);
+            const replay = replayArtifact(artifact as never);
+            if (!replay.reproduced || replay.error !== null) throw new Error(`Replay mismatch at ${artifactPath}: ${replay.mismatch ?? 'unknown'}`);
+          }
+          process.stdout.write(JSON.stringify({ appVersion: report.appVersion, agent: '${{ matrix.agent }}', seeds: 100, replayed: artifactPaths.length }) + '\n');
+          EOF
+          npx --no-install vite-node --script "$RUNNER_TEMP/verify-v153-replay.ts" "$OUTPUT/run.json"
 
       - name: Require a Balanced Final Horde run after turn 50
         if: matrix.agent == 'balanced'
-        run: node scripts/verify-release-final-horde.mjs output/simulations/v152-${{ matrix.agent }}-comparison-${{ matrix.seed }}-${{ matrix.endSeed }}/candidate-v152/run.json
+        run: node scripts/verify-release-final-horde.mjs output/simulations/v153-balanced-seeds-1-100/run.json
 
-      - name: Upload baseline comparison report
+      - name: Upload v1.5.3 agent validation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v152-${{ matrix.agent }}-comparison-${{ matrix.seed }}-${{ matrix.endSeed }}
-          path: output/simulations/v152-${{ matrix.agent }}-comparison-${{ matrix.seed }}-${{ matrix.endSeed }}
+          name: v153-${{ matrix.agent }}-validation-seeds-1-100
+          path: output/simulations/v153-${{ matrix.agent }}-seeds-1-100
           if-no-files-found: warn
           retention-days: 30
 
   session-large-package-validation:
-    name: Session v1.5.2 physical 512 MiB Package validation
+    name: Session v1.5.3 physical 512 MiB Package validation
     # This is a separate manual-release job. It verifies actual Core EndTurn
     # transitions and a physical Artifact Package without gating Pages.
     runs-on: ubuntu-latest
@@ -121,7 +124,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: session-v152-large-512mib
+          name: session-v153-large-512mib
           path: output/session-release/large-512.json
           if-no-files-found: warn
           retention-days: 30

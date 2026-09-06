@@ -1,5 +1,5 @@
 import type { GameState, FacilityState, EndTurnForecast, MilitaryGoodsForecast, HumanUnitType, PowerSupplyReason, ResourceType } from './types';
-import type { FacilityProductionProjection } from './economy-types';
+import type { ArmyBaseMilitaryGoodsProjection, FacilityProductionProjection } from './economy-types';
 import { isCityFacility, getFacilityState } from './state';
 import { isHexSupplied } from './supply';
 import { forecastUnitSuppression, infectedSuppressionTarget } from './combat-query';
@@ -57,6 +57,7 @@ function emptyFacilityProjection(
     productionMultiplier: 1,
     baseOutputs: {},
     stoppedReason,
+    armyBaseMilitaryGoods: null,
   };
 }
 
@@ -73,12 +74,46 @@ interface EconomyPlan {
   forecast: EndTurnForecast;
   facilities: FacilityProductionProjection[];
   unitRefills: Array<{ unitId: string; amount: number }>;
+  armyBaseMilitaryGoodsRefills: Array<{ facilityId: string; amount: number }>;
+  armyBasePowerOrders: Array<{ orderId: string; facilityId: string; powerSupplied: boolean }>;
+}
+
+interface MilitaryGoodsPlan {
+  forecast: MilitaryGoodsForecast;
+  armyBaseMilitaryGoodsRefills: Array<{ facilityId: string; amount: number }>;
+}
+
+function isNormallyOperatingArmyBase(facility: Readonly<FacilityState>): boolean {
+  return facility.type === 'armyBase' &&
+    facility.owner === 'player' &&
+    facility.status === 'owned' &&
+    facility.infected === 0 &&
+    facility.operationalStatus === 'operational';
+}
+
+function armyBaseMilitaryGoodsRefillEligibility(
+  state: Readonly<GameState>,
+  facility: Readonly<FacilityState>,
+): Pick<ArmyBaseMilitaryGoodsProjection, 'inSupply' | 'refillEligible' | 'refillReason'> {
+  const inSupply = isHexSupplied(state, facility.position);
+  if (facility.owner !== 'player' || facility.status !== 'owned') {
+    return { inSupply, refillEligible: false, refillReason: 'not_owned' };
+  }
+  if (facility.infected > 0) return { inSupply, refillEligible: false, refillReason: 'infection' };
+  if (facility.operationalStatus !== 'operational') {
+    return { inSupply, refillEligible: false, refillReason: 'not_operational' };
+  }
+  if (!inSupply) return { inSupply, refillEligible: false, refillReason: 'out_of_supply' };
+  if ((facility.armyBase?.militaryGoods ?? 0) >= state.config.armyBase.maxMilitaryGoods) {
+    return { inSupply, refillEligible: true, refillReason: 'full' };
+  }
+  return { inSupply, refillEligible: true, refillReason: 'supplied' };
 }
 
 function calculateMilitaryGoodsPlan(
   state: Readonly<GameState>,
   projectedProduction: number,
-): MilitaryGoodsForecast {
+): MilitaryGoodsPlan {
   const units = state.units
     .filter((unit) => unit.isPlayerUnit)
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -131,14 +166,30 @@ function calculateMilitaryGoodsPlan(
   });
   const totalRefillDemand = forecastUnits.reduce((sum, unit) => sum + unit.refillDemand, 0);
   const projectedTotalRefilled = forecastUnits.reduce((sum, unit) => sum + unit.projectedRefillAmount, 0);
+  const armyBaseMilitaryGoodsRefills: Array<{ facilityId: string; amount: number }> = [];
+  for (const facility of stableFacilities(state as GameState)) {
+    if (facility.type !== 'armyBase' || !facility.armyBase) continue;
+    const eligibility = armyBaseMilitaryGoodsRefillEligibility(state, facility);
+    if (!eligibility.refillEligible || eligibility.refillReason === 'full' || nationalAvailable <= 0) continue;
+    const amount = Math.min(
+      nationalAvailable,
+      Math.max(0, state.config.armyBase.maxMilitaryGoods - facility.armyBase.militaryGoods),
+    );
+    if (amount <= 0) continue;
+    armyBaseMilitaryGoodsRefills.push({ facilityId: facility.id, amount });
+    nationalAvailable -= amount;
+  }
   return {
-    startingStock: state.resources.militaryGoods,
-    projectedProduction,
-    totalRefillDemand,
-    projectedTotalRefilled,
-    totalUnfilledRefillDemand: totalRefillDemand - projectedTotalRefilled,
-    projectedEndingStock: nationalAvailable,
-    units: forecastUnits,
+    forecast: {
+      startingStock: state.resources.militaryGoods,
+      projectedProduction,
+      totalRefillDemand,
+      projectedTotalRefilled,
+      totalUnfilledRefillDemand: totalRefillDemand - projectedTotalRefilled,
+      projectedEndingStock: nationalAvailable,
+      units: forecastUnits,
+    },
+    armyBaseMilitaryGoodsRefills,
   };
 }
 
@@ -151,6 +202,13 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const isOwned = (facility: Readonly<FacilityState>) => facility.owner === 'player' && facility.status === 'owned';
   const canProduce = (facility: Readonly<FacilityState>) =>
     isOwned(facility) && facility.infected === 0 && facility.workers > 0 && facility.operationalStatus === 'operational';
+  const facilityById = new Map(facilities.map((facility) => [facility.id, facility]));
+  const armyBaseReservations = new Map(
+    [...state.pendingUnitProductions]
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .filter((order) => facilityById.get(order.cityFacilityId)?.type === 'armyBase')
+      .map((order) => [order.cityFacilityId, order] as const),
+  );
   const checkpointHealthyConsumers = state.checkpoints.reduce(
     (total, checkpoint) => total + checkpoint.waiting + checkpoint.screening + checkpoint.approved,
     0,
@@ -178,7 +236,10 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       facility.operationalStatus === 'operational')
     .reduce((total, facility) => total + state.config.facilities.windPowerPlant.production.fixedPowerGeneration, 0);
   const physicalGenerationCapacity = windPowerAvailable + powerPlantPhysicalCapacity;
-  const fuelLimitedGenerationCapacity = windPowerAvailable + state.resources.fuel * 5;
+  const fuelLimitedGenerationCapacity = windPowerAvailable + Math.min(
+    powerPlantPhysicalCapacity,
+    Math.floor(state.resources.fuel / 2) * 5,
+  );
   const availableGenerationCapacity = Math.floor(
     Math.min(physicalGenerationCapacity, fuelLimitedGenerationCapacity) / 5,
   ) * 5;
@@ -286,14 +347,35 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   );
   requiredPowerAllocated += allocate(droneTargets);
 
+  // Army Base recruitment is a sixth, final allocation tier. Its reservation
+  // requires no workers and remains eligible outside Supply, but only while
+  // the Base itself is normally operating.
+  const armyBaseTargets = facilities.filter(
+    (facility) => isNormallyOperatingArmyBase(facility) && armyBaseReservations.has(facility.id),
+  );
+  requiredPowerDemand += armyBaseTargets.reduce(
+    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
+    0,
+  );
+  requiredPowerAllocated += allocate(armyBaseTargets);
+
   const projections = facilities.map((facility): FacilityProductionProjection => {
     const rule = state.config.facilities[facility.type].production;
+    const normalArmyBase = isNormallyOperatingArmyBase(facility);
+    const armyBaseHasReservation = facility.type === 'armyBase' && armyBaseReservations.has(facility.id);
     const eligible = isOwned(facility) && facility.workers > 0;
+    const eligibleForPower = facility.type === 'armyBase' ? normalArmyBase : eligible;
     let projectedPowerReason: PowerSupplyReason = reasons.get(facility.id) ?? 'not_applicable';
     let projectedPowerRequested = requested.has(facility.id);
+    const powerMode = facility.type === 'armyBase' && !armyBaseHasReservation
+      ? 'none' as const
+      : rule.powerMode;
     const toggleable = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
-    if (rule.powerMode === 'required' && toggleable && !facility.powerSupplyEnabled) projectedPowerReason = 'power_supply_off';
-    else if (!eligible && rule.powerMode !== 'none') projectedPowerReason = facility.workers <= 0 ? 'no_population' : 'not_eligible';
+    if (facility.type === 'armyBase' && armyBaseHasReservation && !normalArmyBase) {
+      projectedPowerRequested = false;
+      projectedPowerReason = 'not_eligible';
+    } else if (powerMode === 'required' && toggleable && !facility.powerSupplyEnabled) projectedPowerReason = 'power_supply_off';
+    else if (!eligibleForPower && powerMode !== 'none') projectedPowerReason = facility.workers <= 0 ? 'no_population' : 'not_eligible';
     else if (facility.type === 'militaryFactory' && canProduce(facility) && (militaryInputWorkers.get(facility.id) ?? 0) === 0) {
       projectedPowerReason = 'production_input_unavailable';
       projectedPowerRequested = false;
@@ -305,13 +387,13 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       : facility.type === 'militaryFactory'
         ? militaryInputWorkers.get(facility.id) ?? 0
         : staffed(facility);
-    const operatingWorkers = rule.powerMode === 'required' && !projectedPowerSupplied
+    const operatingWorkers = powerMode === 'required' && !projectedPowerSupplied
       ? 0
       : potentialOperatingWorkers;
     const baseOutputs = Object.fromEntries(
       Object.entries(rule.outputs).map(([resource, amount]) => [resource, amount * potentialOperatingWorkers]),
     ) as Partial<Record<ResourceType, number>>;
-    const outputs = rule.powerMode === 'required' && !projectedPowerSupplied
+    const outputs = powerMode === 'required' && !projectedPowerSupplied
       ? {}
       : Object.fromEntries(
         Object.entries(baseOutputs).map(([resource, amount]) => [resource, (amount ?? 0) * productionMultiplier]),
@@ -319,9 +401,9 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     const inputs = facility.type === 'militaryFactory' && projectedPowerSupplied
       ? { civilianGoods: (rule.inputs.civilianGoods ?? 0) * operatingWorkers }
       : {};
-    const stoppedReason = !canProduce(facility)
+    const stoppedReason = !canProduce(facility) && !normalArmyBase
       ? facilityStoppedReason(facility)
-      : rule.powerMode === 'required' && !projectedPowerSupplied
+      : powerMode === 'required' && !projectedPowerSupplied
         ? 'power_unavailable'
         : facility.type === 'militaryFactory' && operatingWorkers < facility.workers
           ? 'input_shortage'
@@ -336,8 +418,8 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
         : facility.type === 'windPowerPlant' && isOwned(facility) && facility.operationalStatus === 'operational'
           ? rule.fixedPowerGeneration
           : 0,
-      powerMode: rule.powerMode,
-      requiredPowerCapacity: rule.powerMode === 'required' ? rule.powerCapacity : 0,
+      powerMode,
+      requiredPowerCapacity: powerMode === 'required' ? rule.powerCapacity : 0,
       powerSupplyEnabled: facility.powerSupplyEnabled,
       projectedPowerRequested,
       projectedPowerSupplied,
@@ -346,6 +428,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       productionMultiplier,
       baseOutputs,
       stoppedReason,
+      armyBaseMilitaryGoods: null,
     };
   });
   const production = (resource: ResourceType) => projections.reduce(
@@ -362,8 +445,8 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   );
   const totalPowerDemand = requiredPowerDemand;
   const totalPowerAllocated = requiredPowerAllocated;
-  const generationFuelDemand = Math.max(0, totalPowerDemand - windPowerAvailable) / 5;
-  const projectedFuelUsed = Math.max(0, totalPowerAllocated - windPowerAvailable) / 5;
+  const generationFuelDemand = Math.max(0, totalPowerDemand - windPowerAvailable) / 5 * 2;
+  const projectedFuelUsed = Math.max(0, totalPowerAllocated - windPowerAvailable) / 5 * 2;
   const fuelAfterPower = Math.max(0, state.resources.fuel - projectedFuelUsed);
   const refillUnits = state.units
     .filter((unit) => unit.isPlayerUnit && isHexSupplied(state, unit.position) && unit.currentFuel < unit.maxFuel)
@@ -383,7 +466,8 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   }
   const projectedUnitRefillDemand = refillUnits.reduce((total, unit) => total + unit.maxFuel - unit.currentFuel, 0);
   const projectedUnitFuelRefilled = [...unitRefillAmounts.values()].reduce((total, amount) => total + amount, 0);
-  const militaryGoods = calculateMilitaryGoodsPlan(state, production('militaryGoods'));
+  const militaryGoodsPlan = calculateMilitaryGoodsPlan(state, production('militaryGoods'));
+  const militaryGoods = militaryGoodsPlan.forecast;
   const resourceForecast = (
     resource: 'food',
     maintenanceRequired: number,
@@ -410,12 +494,50 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   );
   const fuelProduction = production('fuel');
   const fuelEnding = Math.max(0, fuelAfterPower - projectedUnitFuelRefilled + fuelProduction);
-  const unpoweredFacilities = projections
+  const armyBaseRefillsByFacilityId = new Map(
+    militaryGoodsPlan.armyBaseMilitaryGoodsRefills.map((refill) => [refill.facilityId, refill.amount]),
+  );
+  const projectedFacilities = projections.map((projection) => {
+    const facility = facilityById.get(projection.facilityId)!;
+    if (facility.type !== 'armyBase' || !facility.armyBase) return projection;
+    const refillEligibility = armyBaseMilitaryGoodsRefillEligibility(state, facility);
+    const projectedRefillAmount = armyBaseRefillsByFacilityId.get(facility.id) ?? 0;
+    const remainingCapacity = Math.max(0, state.config.armyBase.maxMilitaryGoods - facility.armyBase.militaryGoods);
+    const refillReason = refillEligibility.refillReason === 'supplied' && projectedRefillAmount < remainingCapacity
+      ? 'national_stock_shortage' as const
+      : refillEligibility.refillReason;
+    const hasReservation = armyBaseReservations.has(facility.id);
+    return {
+      ...projection,
+      armyBaseMilitaryGoods: {
+        capacity: state.config.armyBase.maxMilitaryGoods,
+        current: facility.armyBase.militaryGoods,
+        inSupply: refillEligibility.inSupply,
+        refillEligible: refillEligibility.refillEligible,
+        projectedRefillAmount,
+        projectedAfterRefill: facility.armyBase.militaryGoods + projectedRefillAmount,
+        refillReason,
+        recruitmentPower: {
+          hasReservation,
+          requested: projection.projectedPowerRequested,
+          supplied: projection.projectedPowerSupplied,
+          reason: projection.projectedPowerReason,
+        },
+      },
+    };
+  });
+  const unpoweredFacilities = projectedFacilities
     .filter((projection) => projection.powerMode !== 'none' && !projection.projectedPowerSupplied)
     .map((projection) => ({ facilityId: projection.facilityId, reason: projection.projectedPowerReason }));
   return {
-    facilities: projections,
+    facilities: projectedFacilities,
     unitRefills: [...unitRefillAmounts.entries()].map(([unitId, amount]) => ({ unitId, amount })),
+    armyBaseMilitaryGoodsRefills: militaryGoodsPlan.armyBaseMilitaryGoodsRefills,
+    armyBasePowerOrders: [...armyBaseReservations.values()].map((order) => ({
+      orderId: order.id,
+      facilityId: order.cityFacilityId,
+      powerSupplied: supplied.has(order.cityFacilityId),
+    })),
     forecast: {
       populationConsumers: consumers,
       overcrowding: {
@@ -530,6 +652,39 @@ function overcrowdingAdditionalConsumption(normal: number, terms: ReturnType<typ
  */
 export function forecastEndTurn(state: Readonly<GameState>): EndTurnForecast {
   return calculateEconomyPlan(state).forecast;
+}
+
+/**
+ * Forecast the power result of accepting an Army Base National Guard
+ * reservation without registering a speculative State in the query cache.
+ * A caller can use this before dispatching ProduceUnit to warn that the
+ * reservation is legal but will wait for power.
+ */
+export function forecastArmyBaseRecruitmentPower(
+  state: Readonly<GameState>,
+  facilityId: string,
+): ArmyBaseMilitaryGoodsProjection['recruitmentPower'] | null {
+  const facility = state.facilities.find((candidate) => candidate.id === facilityId);
+  if (!facility || facility.type !== 'armyBase') return null;
+  const hasReservation = state.pendingUnitProductions.some((order) => order.cityFacilityId === facilityId);
+  const candidateState: GameState = hasReservation
+    ? state as GameState
+    : {
+      ...state,
+      pendingUnitProductions: [
+        ...state.pendingUnitProductions,
+        {
+          id: `power-preview-${facilityId}`,
+          cityFacilityId: facilityId,
+          unitType: 'nationalGuard',
+          population: state.config.units.nationalGuard.population,
+          readyTurn: state.turn + 1,
+        },
+      ],
+    };
+  const projection = computeEconomyPlan(candidateState).facilities
+    .find((candidate) => candidate.facilityId === facilityId);
+  return projection?.armyBaseMilitaryGoods?.recruitmentPower ?? null;
 }
 
 export function forecastProductionCapacity(state: Readonly<GameState>) {

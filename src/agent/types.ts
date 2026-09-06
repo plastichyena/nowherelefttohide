@@ -35,16 +35,16 @@ import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
 /** v1.5.1 rejects v1.5.0-or-earlier data without migration. */
-export const APP_VERSION = '1.5.2';
-export const GAME_RULES_VERSION = '4.0.0';
-export const SAVE_FORMAT_VERSION = '11';
-export const AGENT_API_VERSION = '9.0.0';
-export const OBSERVATION_API_VERSION = '9.0.0';
-export const BRIDGE_API_VERSION = '9.0.0';
+export const APP_VERSION = '1.5.3';
+export const GAME_RULES_VERSION = '5.0.0';
+export const SAVE_FORMAT_VERSION = '12';
+export const AGENT_API_VERSION = '10.0.0';
+export const OBSERVATION_API_VERSION = '10.0.0';
+export const BRIDGE_API_VERSION = '10.0.0';
 export const BALANCED_AGENT_VERSION = '5.0.0';
 export const RANDOM_AGENT_VERSION = '3.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '8.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '5.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '9.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '6.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -165,6 +165,15 @@ export interface AgentSupplyObservation {
 }
 
 export interface AgentFacilityObservation {
+  armyBase?: null | {
+    militaryGoods:number; maxMilitaryGoods:number; interceptionsRemaining:number; interceptionsRefresh:'zombie_phase_start';
+    interceptionAttack:number; interceptionRange:number; interceptionCost:number; interceptionNoiseRadius:number;
+    interceptionAvailable:boolean; interceptionUnavailableReason:string|null;
+    projectedMilitaryGoodsRefill:number; refillAvailable:boolean; refillUnavailableReason:string|null;
+    rewardStatus:'unclaimed'|'pending'|'claimed'|'expired'; rewardLastTurn:number; rewardAvailable:boolean; rewardUnavailableReason:string|null;
+    pendingRecruitment:{unitType:HumanUnitType;readyTurn:number;powerDemand:number;powerAllocated:boolean;status:'ready'|'waiting_power'|'paused'|'forfeited';reason:string|null}|null;
+    recruitmentPowerDemand:number; recruitmentPowerAllocated:boolean; recruitmentPowerReason:string|null;
+  };
   id: string;
   type: FacilityType;
   position: HexCoord;
@@ -227,6 +236,7 @@ export interface AgentFacilityObservation {
 }
 
 export interface AgentUnitObservation {
+  deathExplosion?: { radius:number; excludesCenter:true; baseUnitDamage:number; maxSiteInfection:number; units:Array<{unitId:string;damage:number}>; sites:Array<{siteId:string;infection:number}> };
   id: string;
   type: UnitType;
   /** Explicit v1.4 name; `type` remains as the established alias. */
@@ -380,6 +390,8 @@ export interface AgentApiInfo {
   };
   prohibited: string[];
   rules: {
+    gasZombie?: { explosionDamage:number; explosionInfection:number; radius:number; excludesCenter:boolean; initialCount:{min:number;max:number}; initialMinDistance:number; finalWaves:number; capPerDirection:number };
+    armyBase?: Omit<GameConfig['armyBase'], 'noiseRadius'> & { interceptionNoiseRadius:number; recruitmentPower:number; cityPopulationOnly:boolean };
     zombies: Record<import('../core/types').ZombieUnitType, { hp: number; attack: number; movement: number; range: number; vision: number; maxAttackCharges: number; ai: 'normal' | 'horde' }>;
     proficiency: {
       values: UnitProficiency[];

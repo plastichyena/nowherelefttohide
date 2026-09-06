@@ -32,12 +32,13 @@ describe('v1.4.2 economy and required power grid', () => {
       requiredPowerDemand: 20,
       requiredPowerAllocated: 20,
     });
-    expect(forecast.fuel).toMatchObject({ generationFuelDemand: 4, projectedFuelUsed: 4 });
+    // Five electricity now requires two Fuel: four complete allocations consume eight.
+    expect(forecast.fuel).toMatchObject({ generationFuelDemand: 8, projectedFuelUsed: 8 });
     expect(forecast.food).toMatchObject({ projectedProduction: 230, maintenanceRequired: 115, shortage: 0 });
     expect(forecast.civilianGoods.projectedProduction).toBe(271);
   });
 
-  it('never chains same-turn Refinery Fuel into generation or Unit refill', () => {
+  it('never chains same-turn Refinery Fuel into generation and uses only the one starting Fuel for refill', () => {
     const engine = new GameEngine(128, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = editableState(engine);
     state.resources.fuel = 1;
@@ -45,10 +46,11 @@ describe('v1.4.2 economy and required power grid', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
 
     const forecast = forecastEndTurn(engine.getState());
-    expect(forecast.electricity.availableGenerationCapacity).toBe(20);
-    expect(forecast.fuel).toMatchObject({ projectedFuelUsed: 1, projectedProduction: 50, projectedUnitFuelRefilled: 0, endingStock: 50 });
+    // One Fuel cannot fund a partial five-electricity allocation; it remains for one Unit refill.
+    expect(forecast.electricity.availableGenerationCapacity).toBe(15);
+    expect(forecast.fuel).toMatchObject({ projectedFuelUsed: 0, projectedProduction: 0, projectedUnitFuelRefilled: 1, endingStock: 0 });
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().resources.fuel).toBe(50);
+    expect(engine.getState().resources.fuel).toBe(0);
   });
 
   it('reserves starting Civilian Goods for maintenance and only then feeds Military Factories', () => {

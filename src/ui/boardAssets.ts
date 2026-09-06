@@ -93,6 +93,7 @@ export const BOARD_FACILITY_TYPES = [
   'windPowerPlant',
   'simpleFarm',
   'civilianDroneBase',
+  'armyBase',
 ] as const satisfies readonly FacilityType[];
 
 export const BOARD_FACILITY_ASSET_TYPES = [...BOARD_FACILITY_TYPES, 'checkpoint'] as const;
@@ -108,11 +109,12 @@ export const BOARD_UNIT_TYPES = [
   'soldierZombie',
   'riotZombie',
   'hunterZombie',
+  'gasZombie',
 ] as const satisfies readonly UnitType[];
 export type BoardUnitAssetType = (typeof BOARD_UNIT_TYPES)[number];
 
 /** Zombie-side unit types rendered by the Board (including reanimated units). */
-export const BOARD_ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
+export const BOARD_ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const;
 export type BoardZombieUnitAssetType = (typeof BOARD_ZOMBIE_UNIT_TYPES)[number];
 
 export const BOARD_COMMON_STATE_LAYERS = ['infected', 'ruined'] as const;
@@ -162,6 +164,7 @@ export const BOARD_ASSET_REGISTRY = {
     windPowerPlant: 'facilities/facility_wind_power_plant.png',
     simpleFarm: 'facilities/facility_simple_farm.png',
     civilianDroneBase: 'facilities/facility_civilian_drone_base.png',
+    armyBase: 'facilities/facility_army_base.png',
     checkpoint: 'facilities/facility_checkpoint.png',
   },
   units: {
@@ -174,6 +177,7 @@ export const BOARD_ASSET_REGISTRY = {
     riotPolice: 'units/unit_riot_police.png',
     riotZombie: 'units/unit_riot_zombie.png',
     hunterZombie: 'units/unit_hunter_zombie.png',
+    gasZombie: 'units/unit_gas_zombie.png',
   },
 } as const;
 

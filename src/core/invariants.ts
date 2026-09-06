@@ -1,6 +1,6 @@
 import { validateGameConfig } from './config';
 import { hexKey, hexWithinBounds } from './hex';
-import { isHordeSpawnReserve, isRoad, validateFixedMap } from './map';
+import { initialArmyBaseMatchesSeed, isHordeSpawnReserve, isRoad, validateFixedMap } from './map';
 import { civilianWorkerCount, effectiveAttackForProficiency, isCityFacility, populationLedgerTotal, resourceConsumerPopulation } from './state';
 import type { GameState } from './types';
 
@@ -56,6 +56,9 @@ export function validateInvariants(state: GameState): InvariantResult {
   try {
     const map = validateFixedMap(state.map);
     if (!map.valid) errors.push(...map.errors.map((error) => `map: ${error}`));
+    if (!initialArmyBaseMatchesSeed(state)) {
+      errors.push('map: exactly one Army Base must match the deterministic state seed');
+    }
   } catch (reason) {
     errors.push(`map: could not validate fixed map (${reason instanceof Error ? reason.message : String(reason)})`);
   }
@@ -125,6 +128,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     'cumulativeArrivals',
     'cumulativeDepartures',
     'cumulativeDiscoveredInfected',
+    'cumulativeReinforcements',
   ] as const) {
     if (!isNonNegativeInteger(state.population[field])) {
       errors.push(`Population ${field} must be a non-negative integer`);
@@ -246,6 +250,10 @@ export function validateInvariants(state: GameState): InvariantResult {
     'hunterZombiesSpawned',
     'riotZombiesKilled',
     'hunterZombiesKilled',
+    'gasZombiesKilled',
+    'gasZombiesSpawned',
+    'gasExplosions',
+    'gasExplosionUnitDamage',
     'riotPoliceReanimations',
     'hordeMovementNoisePulses',
   ] as const) {
@@ -287,7 +295,8 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.[unitType])) errors.push(`Statistic noisePulsesBySourceType.${unitType} must be a non-negative integer`);
   }
   if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.hordeZombie)) errors.push('Statistic noisePulsesBySourceType.hordeZombie must be a non-negative integer');
-  for (const unitType of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const) {
+  if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.armyBase)) errors.push('Statistic noisePulsesBySourceType.armyBase must be a non-negative integer');
+  for (const unitType of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const) {
     if (!isNonNegativeInteger(state.statistics.hordeSpecialSpawnedByType?.[unitType])) errors.push(`Statistic hordeSpecialSpawnedByType.${unitType} must be a non-negative integer`);
     if (!isNonNegativeInteger(state.statistics.finalSpecialZombiesSpawnedByType?.[unitType])) errors.push(`Statistic finalSpecialZombiesSpawnedByType.${unitType} must be a non-negative integer`);
   }
@@ -321,6 +330,8 @@ export function validateInvariants(state: GameState): InvariantResult {
   }
 
   const mapFacilityById = new Map(state.map.facilities.map((facility) => [facility.id, facility]));
+  const armyBases = state.facilities.filter((facility) => facility.type === 'armyBase');
+  if (armyBases.length !== 1) errors.push('State must contain exactly one Army Base');
   if (state.facilities.filter((facility) => !facility.constructible).length !== state.map.facilities.length) {
     errors.push('Permanent facility state count must match map');
   }
@@ -350,6 +361,26 @@ export function validateInvariants(state: GameState): InvariantResult {
     }
     if (facility.constructible && !['simpleFarm', 'civilianDroneBase'].includes(facility.type)) {
       errors.push(`Facility ${facility.id} has an invalid constructible type`);
+    }
+    if (facility.type === 'armyBase') {
+      if (facility.constructible) errors.push(`Army Base ${facility.id} cannot be constructible`);
+      if (!facility.armyBase) {
+        errors.push(`Army Base ${facility.id} must retain Army Base state`);
+      } else {
+        if (!isNonNegativeInteger(facility.armyBase.militaryGoods)
+          || facility.armyBase.militaryGoods > state.config.armyBase.maxMilitaryGoods) {
+          errors.push(`Army Base ${facility.id} has invalid Military Goods`);
+        }
+        if (!isNonNegativeInteger(facility.armyBase.interceptionsRemaining)
+          || facility.armyBase.interceptionsRemaining > facility.workers) {
+          errors.push(`Army Base ${facility.id} has invalid interception count`);
+        }
+        if (!['unclaimed', 'pending', 'claimed', 'expired'].includes(facility.armyBase.reward)) {
+          errors.push(`Army Base ${facility.id} has an invalid reward state`);
+        }
+      }
+    } else if (facility.armyBase !== undefined) {
+      errors.push(`Non-Army Base facility ${facility.id} cannot retain Army Base state`);
     }
     if (!isNonNegativeInteger(facility.workers) || !isNonNegativeInteger(facility.infected)) {
       errors.push(`Facility ${facility.id} population must be non-negative integers`);
@@ -426,7 +457,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       && (unit.currentMilitaryGoods !== 0 || unit.maxMilitaryGoods !== 0)) {
       errors.push(`Zombie unit ${unit.id} cannot store Military Goods`);
     }
-    if (!['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'].includes(unit.type)) {
+    if (!['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'].includes(unit.type)) {
       errors.push(`Unit ${unit.id} has an invalid type`);
     }
     const shouldBePlayerUnit = unit.type === 'police' || unit.type === 'nationalGuard' || unit.type === 'riotPolice';
@@ -464,7 +495,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       errors.push(`Zombie unit ${unit.id} cannot store proficiency`);
     }
     if (!shouldBePlayerUnit && unit.maxAttackCharges !== state.config.units[unit.type as import('./types').ZombieUnitType]?.maxAttackCharges) errors.push(`Zombie unit ${unit.id} max attack charges do not match Config`);
-    if (unit.type === 'zombie' || unit.type === 'policeZombie' || unit.type === 'soldierZombie' || unit.type === 'riotZombie' || unit.type === 'hunterZombie') {
+    if (unit.type === 'zombie' || unit.type === 'policeZombie' || unit.type === 'soldierZombie' || unit.type === 'riotZombie' || unit.type === 'hunterZombie' || unit.type === 'gasZombie') {
       const hasKind = ['periodic', 'final'].includes(unit.hordeKind ?? '');
       const hasGroup = typeof unit.spawnGroupId === 'string' && unit.spawnGroupId.length > 0;
       if (hasKind !== hasGroup) errors.push(`Normal-AI Zombie ${unit.id} must have both Horde kind and spawn group, or neither`);
@@ -486,10 +517,14 @@ export function validateInvariants(state: GameState): InvariantResult {
 
   for (const pulse of state.pendingNoisePulses) {
     if (!pulse || typeof pulse.id !== 'string' || !hexWithinBounds(pulse.center, state.map.width, state.map.height)
-      || !isNonNegativeInteger(pulse.radius) || !['humanCombat', 'hordeMovement'].includes(pulse.sourceKind)
+      || !isNonNegativeInteger(pulse.radius) || !['humanCombat', 'hordeMovement', 'armyBase'].includes(pulse.sourceKind)
       || !isNonNegativeInteger(pulse.emittedTurn)) {
       errors.push('Pending Noise Pulse is invalid');
     }
+    const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice'].includes(pulse.sourceUnitType))
+      || (pulse.sourceKind === 'hordeMovement' && pulse.sourceUnitType === 'hordeZombie')
+      || (pulse.sourceKind === 'armyBase' && pulse.sourceUnitType === 'armyBase');
+    if (!matchingSource) errors.push('Pending Noise Pulse source kind and type must match');
   }
 
   const remainingFinalHorde = state.units.filter(
@@ -599,10 +634,24 @@ export function validateInvariants(state: GameState): InvariantResult {
     }
   }
 
+  const pendingProductionIds = new Set<string>();
+  const pendingProductionFacilities = new Set<string>();
   for (const order of state.pendingUnitProductions ?? []) {
     if (!['police', 'nationalGuard', 'riotPolice'].includes(order.unitType)
       || !mapFacilityById.has(order.cityFacilityId) || !isNonNegativeInteger(order.population) || !isNonNegativeInteger(order.readyTurn)) {
       errors.push(`Pending unit production ${order.id} is invalid`);
+    }
+    if (pendingProductionIds.has(order.id)) errors.push(`Duplicate pending unit production ${order.id}`);
+    pendingProductionIds.add(order.id);
+    if (pendingProductionFacilities.has(order.cityFacilityId)) errors.push(`Facility ${order.cityFacilityId} has more than one pending unit production`);
+    pendingProductionFacilities.add(order.cityFacilityId);
+    const facility = state.facilities.find((candidate) => candidate.id === order.cityFacilityId);
+    if (facility?.type === 'armyBase') {
+      if (order.unitType !== 'nationalGuard' || typeof order.powerReady !== 'boolean') {
+        errors.push(`Army Base reservation ${order.id} requires National Guard power state`);
+      }
+    } else if (order.powerReady !== undefined) {
+      errors.push(`Non-Army Base reservation ${order.id} cannot contain power state`);
     }
   }
 
@@ -671,7 +720,8 @@ export function validateInvariants(state: GameState): InvariantResult {
     state.population.initialPopulation +
     state.population.cumulativeArrivals +
     state.population.cumulativeDiscoveredInfected -
-    state.population.cumulativeDepartures;
+    state.population.cumulativeDepartures +
+    state.population.cumulativeReinforcements;
   if (populationLedgerTotal(state) !== expectedPopulationLedger) {
     errors.push('Population conservation ledger is out of balance');
   }

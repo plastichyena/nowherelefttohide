@@ -187,6 +187,26 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .population-editor input[type="range"] { width: 100%; accent-color: var(--primary); }
 .numeric-input { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #0a1821; color: #edf9fa; font-variant-numeric: tabular-nums; }
 .tips-list { display: grid; gap: 8px; margin: 8px 0 18px; padding-left: 1.2rem; color: var(--muted); line-height: 1.55; font-size: 0.82rem; }
+.recruitment-accordion { margin-bottom: 10px; border: 1px solid #35606e; border-radius: 10px; background: #0c1b24; }
+.recruitment-accordion > summary { display: grid; min-height: 44px; grid-template-columns: minmax(0, 1fr) auto 14px; align-items: center; gap: 8px; padding: 9px 10px; color: #d8f8e8; font-weight: 800; cursor: pointer; list-style: none; }
+.recruitment-accordion > summary::-webkit-details-marker { display: none; }
+.recruitment-accordion > summary::after { width: 7px; height: 7px; border: solid #a8dfe5; border-width: 0 2px 2px 0; content: ''; transform: rotate(45deg); transition: transform 120ms ease; }
+.recruitment-accordion[open] > summary::after { transform: rotate(-135deg); }
+.recruitment-accordion > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.recruitment-accordion > summary small { color: var(--muted); font-size: 0.68rem; font-weight: 600; }
+.recruitment-accordion-panel { display: grid; gap: 8px; padding: 8px; border-top: 1px solid #35606e; }
+.recruitment-option { padding: 9px; border: 1px solid #294e59; border-radius: 8px; background: #102a31; }
+.recruitment-option h4 { margin: 0; }
+.recruitment-option .status-chip { white-space: normal; text-align: right; }
+.recruitment-option > button { width: 100%; min-height: 44px; }
+.recruitment-performance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin: 7px 0; }
+.recruitment-performance > div { padding: 5px 6px; border: 1px solid #23414c; border-radius: 6px; background: #112832; }
+.recruitment-performance dt { color: var(--muted); font-size: 0.62rem; }
+.recruitment-performance dd { margin: 2px 0 0; color: #edf9fa; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.army-base-details { margin-bottom: 10px; padding: 10px; border: 1px solid #6d643b; border-radius: 10px; background: #282619; }
+.army-base-details > h3, .army-base-reservation > h4 { margin: 0 0 6px; color: #f0d17d; }
+.army-base-details > p:last-child { margin-bottom: 0; }
+.army-base-reservation { margin-top: 8px; padding-top: 8px; border-top: 1px solid #6d643b; }
 .legacy-save-notice { padding: 9px 10px; border-left: 3px solid var(--warning); background: #2c2718; color: #f3d682; }
 
 .bottom-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; min-height: calc(58px + var(--safe-bottom)); padding: 5px 8px var(--safe-bottom); background: #0a1821; border-top: 1px solid var(--line); z-index: 6; }.bottom-nav button { display: flex; min-width: 44px; min-inline-size: 0; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden; background: transparent; color: var(--muted); border-color: transparent; font-size: 1rem; }.bottom-nav button span { overflow: hidden; max-width: 100%; font-size: 0.63rem; text-overflow: ellipsis; white-space: nowrap; }.bottom-nav button.active { background: #173642; color: var(--primary); border-color: #2b6574; }.bottom-nav .nav-end { background: #27584e; color: #bcefd0; }

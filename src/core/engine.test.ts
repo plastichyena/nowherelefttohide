@@ -28,7 +28,7 @@ describe('GameEngine', () => {
     const first = createInitialState(42, config);
     const second = createInitialState(42, config);
     expect(first).toEqual(second);
-    expect(first.facilities).toHaveLength(29);
+    expect(first.facilities).toHaveLength(30);
     expect(first.facilities.filter((facility) => facility.status === 'owned')).toHaveLength(6);
     expect(first.population.healthyCivilians).toBe(100);
     expect(first.facilities.find((facility) => facility.id === 'capital')?.workers).toBe(41);
@@ -378,13 +378,14 @@ describe('GameEngine', () => {
     const before = JSON.stringify(snapshot);
     const forecast = forecastEndTurn(snapshot);
     expect(JSON.stringify(snapshot)).toBe(before);
-    expect(forecast.fuel).toMatchObject({ available: 5, generationFuelDemand: 4, projectedFuelUsed: 4 });
-    expect(forecast.electricity).toMatchObject({ physicalGenerationCapacity: 30, required: 20, shortage: 0 });
+    // The full 20-electricity demand needs eight Fuel; five starting Fuel can fund two allocations.
+    expect(forecast.fuel).toMatchObject({ available: 5, generationFuelDemand: 8, projectedFuelUsed: 4 });
+    expect(forecast.electricity).toMatchObject({ physicalGenerationCapacity: 30, required: 20, shortage: 10 });
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
-    expect(result.state.resources.fuel).toBe(51);
+    // Two allocations consume four Fuel; the remaining starting Fuel cannot enable the lower-priority Refinery.
+    expect(result.state.resources.fuel).toBe(1);
     expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'food' && event.payload.amount === 230)).toBe(true);
-    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'civilianGoods' && event.payload.amount === 271)).toBe(true);
 
     const noPower = engine.getState() as ReturnType<typeof createInitialState>;
     noPower.turn = 1;

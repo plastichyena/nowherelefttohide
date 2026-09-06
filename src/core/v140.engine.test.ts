@@ -146,15 +146,15 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const forecast = forecastEndTurn(before);
     expect(forecast.fuel).toMatchObject({
       turnStartFuel: 5,
-      projectedPowerFuelDemand: 3,
-      projectedPowerFuelUsed: 3,
-      fuelAfterPower: 2,
+      projectedPowerFuelDemand: 6,
+      projectedPowerFuelUsed: 4,
+      fuelAfterPower: 1,
       projectedUnitRefillDemand: 2,
-      projectedUnitFuelRefilled: 2,
+      projectedUnitFuelRefilled: 1,
       projectedEndingFuel: 0,
     });
     expect(forecastUnitRefills(before)).toEqual(expect.arrayContaining([
-      { unitId: 'police-1', demand: 2, amount: 2 },
+      { unitId: 'police-1', demand: 2, amount: 1 },
       { unitId: 'national-guard-1', demand: 2, amount: 0 },
     ]));
     const beforeJson = JSON.stringify(before);
@@ -163,11 +163,11 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
     expect(result.state.resources.fuel).toBe(0);
-    expect(result.state.units.find((unit) => unit.id === 'police-1')?.currentFuel).toBe(12);
+    expect(result.state.units.find((unit) => unit.id === 'police-1')?.currentFuel).toBe(11);
     expect(result.state.units.find((unit) => unit.id === 'national-guard-1')?.currentFuel).toBe(20);
     expect(result.events).toContainEqual(expect.objectContaining({
       type: 'resource_consumed',
-      payload: expect.objectContaining({ resource: 'fuel', amount: 3, reason: 'power_generation' }),
+      payload: expect.objectContaining({ resource: 'fuel', amount: 4, reason: 'power_generation' }),
     }));
   });
 });
@@ -210,8 +210,8 @@ describe('v1.4 Wind Power Plant', () => {
     const forecast = forecastEndTurn(engine.getState());
     expect(forecast.electricity.requiredPowerDemand).toBe(25);
     expect(forecast.fuel.windPowerAvailable).toBe(15);
-    expect(forecast.fuel.projectedPowerFuelDemand).toBe(2);
-    expect(forecast.fuel.projectedPowerFuelUsed).toBe(1);
+    expect(forecast.fuel.projectedPowerFuelDemand).toBe(4);
+    expect(forecast.fuel.projectedPowerFuelUsed).toBe(0);
   });
 
   it('disables on Zombie occupation and recovers on Human entry at the next Player Turn', () => {

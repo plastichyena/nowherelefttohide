@@ -1,4 +1,4 @@
-name: AI Portable Package v1.5.2
+name: AI Portable Package v1.5.3
 
 on:
   workflow_run:
@@ -158,14 +158,16 @@ jobs:
           test -f "${ROOT}/game/public/assets/board/units/unit_soldier_zombie.png"
           test -f "${ROOT}/game/public/assets/board/units/unit_riot_zombie.png"
           test -f "${ROOT}/game/public/assets/board/units/unit_hunter_zombie.png"
+          test -f "${ROOT}/game/public/assets/board/units/unit_gas_zombie.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_wind_power_plant.png"
           test -f "${ROOT}/game/public/assets/board/facilities/facility_simple_farm.png"
-           test -f "${ROOT}/game/public/assets/board/facilities/facility_civilian_drone_base.png"
-           test -x "${ROOT}/runtime/node/bin/node"
-           test -x "${ROOT}/run-session.sh"
+          test -f "${ROOT}/game/public/assets/board/facilities/facility_civilian_drone_base.png"
+          test -f "${ROOT}/game/public/assets/board/facilities/facility_army_base.png"
+          test -x "${ROOT}/runtime/node/bin/node"
+          test -x "${ROOT}/run-session.sh"
           "${ROOT}/run-session.sh" --help | grep -F '"play-turn"'
-           VERSION="$(node -p "require('${ROOT}/game/package.json').version")"
-          test "${VERSION}" = "1.5.2"
+          VERSION="$(node -p "require('${ROOT}/game/package.json').version")"
+          test "${VERSION}" = "1.5.3"
           grep -F "App version: ${VERSION}" "${ROOT}/BUILD_INFO.txt"
           grep -F "Build ID:" "${ROOT}/BUILD_INFO.txt"
           grep -F "Platform: linux-x64" "${ROOT}/BUILD_INFO.txt"
@@ -364,10 +366,10 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $root = '${{ steps.package_windows.outputs.package_root }}'
-          @('PLAY_WITH_AI.md', 'BUILD_INFO.txt', 'runtime/identity.cmd', 'runtime/node/node.exe', 'run-npm.cmd', 'run-vite-node.cmd', 'run-session.cmd', 'game/package.json', 'game/package-lock.json', 'game/dist/portable/session-cli.mjs') |
+          @('PLAY_WITH_AI.md', 'BUILD_INFO.txt', 'runtime/identity.cmd', 'runtime/node/node.exe', 'run-npm.cmd', 'run-vite-node.cmd', 'run-session.cmd', 'game/package.json', 'game/package-lock.json', 'game/dist/portable/session-cli.mjs', 'game/public/assets/board/units/unit_hunter_zombie.png', 'game/public/assets/board/units/unit_gas_zombie.png', 'game/public/assets/board/facilities/facility_army_base.png') |
             ForEach-Object { if (-not (Test-Path (Join-Path $root $_))) { throw "Missing portable package entry: $_" } }
           $version = (Get-Content -Raw -LiteralPath (Join-Path $root 'game/package.json') | ConvertFrom-Json).version
-          if ($version -ne '1.5.2') { throw "Expected app version 1.5.2, received $version" }
+          if ($version -ne '1.5.3') { throw "Expected app version 1.5.3, received $version" }
           if (-not (Select-String -Quiet -Path (Join-Path $root 'BUILD_INFO.txt') -Pattern 'Platform: win-x64')) { throw 'BUILD_INFO platform is missing' }
 
       - name: Smoke test bundled Windows Node runtime

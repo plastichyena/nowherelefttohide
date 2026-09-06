@@ -13,6 +13,7 @@ function quietConfig() {
     economy: {
       initialZombieCount: 0,
       initialHunterCount: { min: 0, max: 0 },
+      initialGasCount: { min: 0, max: 0 },
       initialResources: {
         food: 10000,
         civilianGoods: 10000,

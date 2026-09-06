@@ -115,7 +115,7 @@ describe('v1.4 Horde composition and combat', () => {
     // integration tests; this unit test isolates spawn composition.
     const acceleratedSchedule = defaultSchedule.map((wave, index) => ({ ...wave, turn: index + 3 }));
     const engine = new GameEngine(302, safeScenarioConfig({
-      horde: { waves: acceleratedSchedule, specialZombieWeights: { hunterZombie: 0 } },
+      horde: { waves: acceleratedSchedule, specialZombieWeights: { hunterZombie: 0, gasZombie: 0 } },
       units: {
         zombie: { movement: 0 }, hordeZombie: { movement: 0 }, policeZombie: { movement: 0 },
         soldierZombie: { movement: 0 }, riotZombie: { movement: 0 },

@@ -40,6 +40,7 @@ describe('board asset registry', () => {
       'windPowerPlant',
       'simpleFarm',
       'civilianDroneBase',
+      'armyBase',
       'checkpoint',
     ]);
     expect(Object.keys(BOARD_ASSET_REGISTRY.units)).toEqual([
@@ -52,23 +53,27 @@ describe('board asset registry', () => {
       'riotPolice',
       'riotZombie',
       'hunterZombie',
+      'gasZombie',
     ]);
     expect('water' in BOARD_ASSET_REGISTRY.terrain).toBe(false);
     expect(getTerrainAssetPath('water')).toBeNull();
     expect(mapTerrainAsset('water')).toEqual({ key: 'water', path: null, fallback: true });
     expect(getFacilityAssetPath('not-a-facility')).toBeNull();
     expect(getUnitAssetPath('not-a-unit')).toBeNull();
+    expect(getFacilityAssetPath('armyBase')).toBe(BOARD_ASSET_REGISTRY.facilities.armyBase);
     expect(getUnitAssetPath('policeZombie')).toBe(BOARD_ASSET_REGISTRY.units.policeZombie);
     expect(getUnitAssetPath('soldierZombie')).toBe(BOARD_ASSET_REGISTRY.units.soldierZombie);
     expect(getUnitAssetPath('riotPolice')).toBe(BOARD_ASSET_REGISTRY.units.riotPolice);
     expect(getUnitAssetPath('riotZombie')).toBe(BOARD_ASSET_REGISTRY.units.riotZombie);
     expect(getUnitAssetPath('hunterZombie')).toBe(BOARD_ASSET_REGISTRY.units.hunterZombie);
+    expect(getUnitAssetPath('gasZombie')).toBe(BOARD_ASSET_REGISTRY.units.gasZombie);
     expect(isBoardZombieUnitType('zombie')).toBe(true);
     expect(isBoardZombieUnitType('hordeZombie')).toBe(true);
     expect(isBoardZombieUnitType('policeZombie')).toBe(true);
     expect(isBoardZombieUnitType('soldierZombie')).toBe(true);
     expect(isBoardZombieUnitType('riotZombie')).toBe(true);
     expect(isBoardZombieUnitType('hunterZombie')).toBe(true);
+    expect(isBoardZombieUnitType('gasZombie')).toBe(true);
     expect(isBoardZombieUnitType('police')).toBe(false);
     expect(BOARD_ASSET_PATHS.some((path) => /water/iu.test(path))).toBe(false);
   });
@@ -247,6 +252,12 @@ describe('board state asset mappings', () => {
     });
     expect(mapUnitAssetLayers({ type: 'hunterZombie', hordeKind: null })).toMatchObject({
       base: BOARD_ASSET_REGISTRY.units.hunterZombie,
+      layers: [],
+      isHorde: false,
+      isFinalHorde: false,
+    });
+    expect(mapUnitAssetLayers({ type: 'gasZombie', hordeKind: null })).toMatchObject({
+      base: BOARD_ASSET_REGISTRY.units.gasZombie,
       layers: [],
       isHorde: false,
       isFinalHorde: false,

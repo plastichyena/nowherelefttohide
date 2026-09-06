@@ -5,9 +5,9 @@ import { createUnit } from './state';
 
 describe('closed existing unit catalog', () => {
   it('preserves validation, production and weighted draw orders', () => {
-    expect(UNIT_TYPES).toEqual(['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie']);
+    expect(UNIT_TYPES).toEqual(['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie']);
     expect(HUMAN_UNIT_TYPES).toEqual(['police', 'nationalGuard', 'riotPolice']);
-    expect(WAVE_NON_HORDE_TYPES).toEqual(['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie']);
+    expect(WAVE_NON_HORDE_TYPES).toEqual(['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie']);
     const config = createDefaultConfig();
     for (const type of UNIT_TYPES) {
       const unit = createUnit({ config }, 'test', type, { q: 25, r: 25 });

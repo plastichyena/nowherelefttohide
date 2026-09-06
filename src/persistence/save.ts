@@ -7,20 +7,22 @@ import {
   FIXED_MAP_WIDTH,
   initialZombiePositionsMatchSeed,
   initialHunterPositionsMatchSeed,
+  initialGasPositionsMatchSeed,
+  initialArmyBaseMatchesSeed,
   validateFixedMap,
 } from '../core/map';
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.5.1 saves. */
+/** The sole game-rules version accepted by v1.5.3 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 11;
-/** v1.5.1 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v11';
+export const SAVE_FORMAT_VERSION = 12;
+/** v1.5.3 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v12';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v10';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v11';
 const OLDER_AUTOSAVE_KEYS = [
   'nowhere-left-to-hide:auto-save:v9',
   'nowhere-left-to-hide:auto-save:v8',
@@ -31,7 +33,7 @@ const OLDER_AUTOSAVE_KEYS = [
   'nowhere-left-to-hide:auto-save:v3',
   'nowhere-left-to-hide:auto-save:v2',
 ] as const;
-/** Deprecated metadata exports. They are never migration targets in v1.5.1. */
+/** Deprecated metadata exports. They are never migration targets in v1.5.3. */
 export const V125_GAME_VERSION = '1.2.0';
 export const V126_GAME_VERSION = '1.2.1';
 export const LEGACY_GAME_VERSION = V125_GAME_VERSION;
@@ -90,9 +92,9 @@ export interface StorageLike {
 export type SaveErrorListener = (message: string, error?: unknown) => void;
 
 const BASE_TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const;
-const UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
+const UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const;
 const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice'] as const;
-const ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
+const ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const;
 const FACILITY_TYPES = [
   'capital',
   'city',
@@ -104,6 +106,7 @@ const FACILITY_TYPES = [
   'windPowerPlant',
   'simpleFarm',
   'civilianDroneBase',
+  'armyBase',
 ] as const;
 const CONSTRUCTIBLE_FACILITY_TYPES = ['simpleFarm', 'civilianDroneBase'] as const;
 const FACILITY_STATUSES = ['unowned', 'owned', 'ruined'] as const;
@@ -122,6 +125,9 @@ const CARDINAL_DIRECTIONS = ['north', 'east', 'south', 'west'] as const;
 const GAME_PHASES = ['player', 'economy', 'refugees', 'infection', 'zombie', 'horde', 'gameOver'] as const;
 const GAME_OVER_REASONS = ['capitalLost', 'healthyCiviliansLost', 'stateSecured', 'abandoned', 'error'] as const;
 const GAME_EVENT_TYPES = [
+  'gas_explosion',
+  'army_base_reward',
+  'production_forfeited',
   'unit_moved',
   'unit_recovered',
   'interception',
@@ -298,6 +304,7 @@ const STATISTIC_INTEGER_FIELDS = [
   'hunterZombiesSpawned',
   'riotZombiesKilled',
   'hunterZombiesKilled',
+  'gasZombiesKilled', 'gasZombiesSpawned', 'gasExplosions', 'gasExplosionUnitDamage',
   'riotPoliceReanimations',
   'hordeMovementNoisePulses',
 ] as const;
@@ -344,6 +351,7 @@ const REQUIRED_STATE_FIELDS = [
   'facilities',
   'population',
   'initialHunterPositions',
+  'initialGasPositions',
   'cityPopulationSnapshot',
   'resources',
   'units',
@@ -485,7 +493,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.4.5 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.5.2 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -519,7 +527,7 @@ function validateHordeConfigShape(value: unknown, finalHordeTurn: unknown, error
     errors.push('state.config.horde must be an object');
     return;
   }
-  requireFields(errors, value, 'state.config.horde', ['warningLeadTurns', 'waves', 'specialZombieWeights', 'riotZombieCapPerDirection', 'hunterZombieCapPerDirection', 'movementNoiseRadius']);
+  requireFields(errors, value, 'state.config.horde', ['warningLeadTurns', 'waves', 'specialZombieWeights', 'riotZombieCapPerDirection', 'hunterZombieCapPerDirection', 'gasZombieCapPerDirection', 'movementNoiseRadius']);
   for (const retiredField of ['cycle', 'periodicInitial', 'periodicIncrement', 'warningStartTurn', 'spawnOnlyBeforeFinalTurn', 'finalComposition']) {
     if (hasOwn(value, retiredField)) errors.push(`state.config.horde.${retiredField} is obsolete; use horde.waves`);
   }
@@ -577,7 +585,7 @@ function hasCanonicalDirectionOrder(directions: unknown[]): boolean {
 }
 
 /**
- * Reject obsolete or partial pre-v1.5.1 container shapes before casting. The core
+ * Reject obsolete or partial pre-v1.5.3 container shapes before casting. The core
  * invariant checker performs relational validation; this guard makes the Wave
  * schedule, reserved map perimeter, and warning state an explicit save
  * boundary instead of silently accepting a partial snapshot.
@@ -626,6 +634,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       'constructibleFacility',
       'terrain',
       'vision',
+      'armyBase',
     ]);
     if (hasOwn(config, 'maxTurns')) errors.push('state.config.maxTurns is obsolete; use horde.waves');
     if (hasOwn(config, 'finalHordeTurn')) errors.push('state.config.finalHordeTurn is obsolete; derive it from the Final Wave');
@@ -636,7 +645,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     if (!isRecord(infection)) {
       errors.push('state.config.infection must be an object');
     } else {
-      // Save Format 11 deliberately has no conversion path for the old
+      // Save Format 12 deliberately has no conversion path for the old
       // fallback-capacity tuning. Reject a hand-edited v1.4.3-shaped
       // container even when its outer version strings were forged as current.
       for (const retiredField of ['fallBackCapacityRate', 'fallBackCapacityRounding']) {
@@ -695,7 +704,25 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       }
     }
     if (!Array.isArray(map.roadBranches)) errors.push('state.map.roadBranches must be an array');
-    if (!Array.isArray(map.initialZombiePositions)) errors.push('state.map.initialZombiePositions must be an array');
+    for (const field of ['initialZombiePositions'] as const) {
+      if (!Array.isArray(map[field])) {
+        errors.push(`state.map.${field} must be an array`);
+      } else {
+        for (const [index, position] of map[field].entries()) {
+          validateCoordinate(errors, position, `state.map.${field}[${index}]`, FIXED_MAP_WIDTH, FIXED_MAP_HEIGHT);
+        }
+      }
+    }
+    for (const field of ['initialHunterPositions', 'initialGasPositions'] as const) {
+      const positions = state[field];
+      if (!Array.isArray(positions)) {
+        errors.push(`state.${field} must be an array`);
+      } else {
+        for (const [index, position] of positions.entries()) {
+          validateCoordinate(errors, position, `state.${field}[${index}]`, FIXED_MAP_WIDTH, FIXED_MAP_HEIGHT);
+        }
+      }
+    }
   }
 
   const population = state.population;
@@ -721,6 +748,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       'cumulativeArrivals',
       'cumulativeDepartures',
       'cumulativeDiscoveredInfected',
+      'cumulativeReinforcements',
     ] as const;
     requireFields(errors, population, 'state.population', fields);
     for (const field of fields) {
@@ -812,6 +840,21 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (CONSTRUCTIBLE_FACILITY_TYPES.includes(facility.type as typeof CONSTRUCTIBLE_FACILITY_TYPES[number]) !== (facility.constructible === true)) errors.push(`${path}.constructible does not match its facility type`);
       if (facility.constructible && facility.builtTurn === null) errors.push(`${path}.constructible facilities require builtTurn`);
       if (!facility.constructible && facility.builtTurn !== null) errors.push(`${path}.fixed facilities cannot have builtTurn`);
+      if (facility.type === 'armyBase') {
+        if (!isRecord(facility.armyBase)) {
+          errors.push(`${path}.armyBase must be an object`);
+        } else {
+          requireFields(errors, facility.armyBase, `${path}.armyBase`, ['militaryGoods', 'interceptionsRemaining', 'reward']);
+          if (!isInteger(facility.armyBase.militaryGoods) || !isInteger(facility.armyBase.interceptionsRemaining)) {
+            errors.push(`${path}.armyBase military goods and interceptions must be non-negative integers`);
+          }
+          if (!['unclaimed', 'pending', 'claimed', 'expired'].includes(facility.armyBase.reward as string)) {
+            errors.push(`${path}.armyBase.reward is invalid`);
+          }
+        }
+      } else if (hasOwn(facility, 'armyBase')) {
+        errors.push(`${path}.armyBase is only valid for an Army Base`);
+      }
     }
   }
 
@@ -971,6 +1014,15 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (typeof order.id !== 'string' || order.id.length === 0 || typeof order.cityFacilityId !== 'string' || order.cityFacilityId.length === 0) errors.push(`${path} identifiers are invalid`);
       if (!HUMAN_UNIT_TYPES.includes(order.unitType as typeof HUMAN_UNIT_TYPES[number])) errors.push(`${path}.unitType is invalid`);
       if (!isInteger(order.population) || !isInteger(order.readyTurn, 1)) errors.push(`${path}.population or readyTurn is invalid`);
+      const facility = Array.isArray(facilities)
+        ? facilities.find((candidate) => isRecord(candidate) && candidate.id === order.cityFacilityId)
+        : undefined;
+      if (isRecord(facility) && facility.type === 'armyBase') {
+        if (order.unitType !== 'nationalGuard') errors.push(`${path}.unitType must be nationalGuard for an Army Base`);
+        if (typeof order.powerReady !== 'boolean') errors.push(`${path}.powerReady must be boolean for an Army Base reservation`);
+      } else if (hasOwn(order, 'powerReady')) {
+        errors.push(`${path}.powerReady is only valid for an Army Base reservation`);
+      }
     }
   }
 
@@ -988,8 +1040,12 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (typeof pulse.id !== 'string' || pulse.id.length === 0) errors.push(`${path}.id is invalid`);
       validateCoordinate(errors, pulse.center, `${path}.center`);
       if (!isInteger(pulse.radius) || !isInteger(pulse.emittedTurn, 1)) errors.push(`${path}.radius or emittedTurn is invalid`);
-      if (!['humanCombat', 'hordeMovement'].includes(pulse.sourceKind as string)) errors.push(`${path}.sourceKind is invalid`);
-      if (!['police', 'nationalGuard', 'riotPolice', 'hordeZombie'].includes(pulse.sourceUnitType as string)) errors.push(`${path}.sourceUnitType is invalid`);
+      if (!['humanCombat', 'hordeMovement', 'armyBase'].includes(pulse.sourceKind as string)) errors.push(`${path}.sourceKind is invalid`);
+      if (!['police', 'nationalGuard', 'riotPolice', 'hordeZombie', 'armyBase'].includes(pulse.sourceUnitType as string)) errors.push(`${path}.sourceUnitType is invalid`);
+      const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice'].includes(pulse.sourceUnitType as string))
+        || (pulse.sourceKind === 'hordeMovement' && pulse.sourceUnitType === 'hordeZombie')
+        || (pulse.sourceKind === 'armyBase' && pulse.sourceUnitType === 'armyBase');
+      if (!matchingSource) errors.push(`${path}.sourceKind and sourceUnitType do not match`);
     }
   }
 
@@ -1087,6 +1143,42 @@ function validateStatisticsShape(value: unknown, errors: string[], path: string)
   } else {
     for (const policy of CHECKPOINT_POLICIES) if (!isInteger(policyEntries[policy])) errors.push(`${path}.refugeesScreenedByPolicy.${policy} is invalid`);
   }
+  for (const field of ['recruitsCommissionedByType', 'regularPromotionsByType', 'veteranPromotionsByType', 'veteranZombieKillsByType'] as const) {
+    const counters = value[field];
+    if (!isRecord(counters)) {
+      errors.push(`${path}.${field} is invalid`);
+    } else {
+      for (const unitType of HUMAN_UNIT_TYPES) {
+        if (!isInteger(counters[unitType])) errors.push(`${path}.${field}.${unitType} is invalid`);
+      }
+    }
+  }
+  for (const field of ['hordeSpecialSpawnedByType', 'finalSpecialZombiesSpawnedByType'] as const) {
+    const counters = value[field];
+    if (!isRecord(counters)) {
+      errors.push(`${path}.${field} is invalid`);
+    } else {
+      for (const unitType of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const) {
+        if (!isInteger(counters[unitType])) errors.push(`${path}.${field}.${unitType} is invalid`);
+      }
+    }
+  }
+  const noiseBySource = value.noisePulsesBySourceType;
+  if (!isRecord(noiseBySource)) {
+    errors.push(`${path}.noisePulsesBySourceType is invalid`);
+  } else {
+    for (const sourceType of ['police', 'nationalGuard', 'riotPolice', 'hordeZombie', 'armyBase'] as const) {
+      if (!isInteger(noiseBySource[sourceType])) errors.push(`${path}.noisePulsesBySourceType.${sourceType} is invalid`);
+    }
+  }
+  const noiseRespawned = value.hordeNoiseRespawnedByType;
+  if (!isRecord(noiseRespawned)) {
+    errors.push(`${path}.hordeNoiseRespawnedByType is invalid`);
+  } else {
+    for (const unitType of ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'] as const) {
+      if (!isInteger(noiseRespawned[unitType])) errors.push(`${path}.hordeNoiseRespawnedByType.${unitType} is invalid`);
+    }
+  }
   for (const field of ['refugeeArrivalsByBranch', 'checkpointFallbacksByBranch', 'refugeesTurnedAwayByDirection', 'rejectedBonusZombiesByDirection', 'rejectedCounterResetsByDirection'] as const) {
     if (!isRecord(value[field]) || Object.values(value[field]).some((entry) => !isInteger(entry))) errors.push(`${path}.${field} is invalid`);
   }
@@ -1123,8 +1215,11 @@ function validateStateForSave(state: GameState): string[] {
     const mapResult = validateFixedMap(map as unknown as GameState['map']);
     if (!mapResult.valid) errors.push(...mapResult.errors.map((error) => `map: ${error}`));
     if (Number.isSafeInteger(raw.seed)
-      && (!initialZombiePositionsMatchSeed(map as unknown as GameState['map'], raw.seed as number) || !initialHunterPositionsMatchSeed(raw as unknown as GameState))) {
+      && (!initialZombiePositionsMatchSeed(map as unknown as GameState['map'], raw.seed as number) || !initialHunterPositionsMatchSeed(raw as unknown as GameState) || !initialGasPositionsMatchSeed(raw as unknown as GameState))) {
       errors.push('map: initial Zombie positions and order must match the deterministic state seed');
+    }
+    if (!initialArmyBaseMatchesSeed(raw as unknown as GameState)) {
+      errors.push('map: exactly one Army Base must match the deterministic state seed');
     }
   } catch (error) {
     errors.push(`map validation failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -1144,7 +1239,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.4.4以前 / v1.4.4 and earlier saves cannot be loaded or converted; earlier formats are rejected without conversion, deletion, or overwrite`);
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.5.2以前 / v1.5.2 and earlier saves cannot be loaded or converted; earlier formats are rejected without conversion, deletion, or overwrite`);
   }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (value.mapId !== FIXED_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID}`);
@@ -1189,7 +1284,7 @@ function clockMs(): number {
 
 /**
  * Encode one committed state and expose synchronous stage timings for the
- * v1.5.2 save benchmark. Gzip keeps level 9 for Save Format 11 compatibility;
+ * v1.5.3 save benchmark. Gzip keeps level 9 for Save Format 12 compatibility;
  * a zero mtime makes repeated encodes of one committed state byte-stable so
  * the shared autosave slot is not rewritten only because the clock advanced.
  */
@@ -1241,12 +1336,12 @@ export function measureSaveEncoding(state: GameState): SaveEncodingMeasurement {
   };
 }
 
-/** Create a checksummed, URL-safe v1.5.1 Save Format 11 code. */
+/** Create a checksummed, URL-safe v1.5.3 Save Format 12 code. */
 export function encodeSaveCode(state: GameState): string {
   return measureSaveEncoding(state).code;
 }
 
-/** Decode and validate a v1.5.1 save code without changing caller-owned state. */
+/** Decode and validate a v1.5.3 save code without changing caller-owned state. */
 export function decodeSaveCode(code: string): SaveValidationResult {
   if (typeof code !== 'string' || code.trim().length === 0) return reject(['Save code is empty']);
   try {
@@ -1348,7 +1443,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the current v1.5.1/v11 key; legacy data is deliberately preserved. */
+  /** Clears only the current v1.5.3/v12 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

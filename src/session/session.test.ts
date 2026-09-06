@@ -224,11 +224,11 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '4.0.0',
-      mapId: 'fixed-51x51-v1',
+      gameVersion: '5.0.0',
+      mapId: 'fixed-51x51-v2',
       config: {
-        version: '4.0.0',
-        mapId: 'fixed-51x51-v1',
+        version: '5.0.0',
+        mapId: 'fixed-51x51-v2',
         infection: {
           zombieSpawnPopulationPerUnit: 5,
           maxZombieSpawnPerResolution: 6,

@@ -49,7 +49,8 @@ export type FacilityType =
   | 'powerPlant'
   | 'windPowerPlant'
   | 'simpleFarm'
-  | 'civilianDroneBase';
+  | 'civilianDroneBase'
+  | 'armyBase';
 
 export type ConstructibleFacilityType = 'simpleFarm' | 'civilianDroneBase';
 
@@ -75,7 +76,8 @@ export type UnitType =
   | 'policeZombie'
   | 'soldierZombie'
   | 'riotZombie'
-  | 'hunterZombie';
+  | 'hunterZombie'
+  | 'gasZombie';
 
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
@@ -198,6 +200,7 @@ export interface FixedMap {
 }
 
 export interface FacilityState extends FacilityDefinition {
+  armyBase?: { militaryGoods: number; interceptionsRemaining: number; reward: 'unclaimed' | 'pending' | 'claimed' | 'expired' };
   owner: 'player' | 'none';
   status: FacilityStatus;
   operationalStatus: FacilityOperationalStatus;
@@ -224,6 +227,7 @@ export interface FacilityState extends FacilityDefinition {
 export interface PopulationState {
   /** Population present at new-game creation, including initial human units. */
   initialPopulation: number;
+  cumulativeReinforcements: number;
   /** Derived healthy civilians living in owned cities. */
   cityResidents: number;
   /** Derived healthy civilians assigned to owned production facilities. */
@@ -375,6 +379,7 @@ export interface UnitProductionOrder {
   unitType: HumanUnitType;
   population: number;
   readyTurn: number;
+  powerReady?: boolean;
 }
 
 export interface HordeState {
@@ -394,7 +399,7 @@ export interface HordeState {
   finalSpawnedCount: number;
 }
 
-export type NoisePulseSourceKind = 'humanCombat' | 'hordeMovement';
+export type NoisePulseSourceKind = 'humanCombat' | 'hordeMovement' | 'armyBase';
 
 /** Internal deterministic work item. Public projections never expose center or source id. */
 export interface NoisePulse {
@@ -402,11 +407,14 @@ export interface NoisePulse {
   center: HexCoord;
   radius: number;
   sourceKind: NoisePulseSourceKind;
-  sourceUnitType: HumanUnitType | 'hordeZombie';
+  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase';
   emittedTurn: number;
 }
 
 export type GameEventType =
+  | 'gas_explosion'
+  | 'army_base_reward'
+  | 'production_forfeited'
   | 'unit_moved'
   | 'unit_recovered'
   | 'interception'
@@ -605,10 +613,14 @@ export interface GameStatistics {
   hunterZombiesSpawned: number;
   riotZombiesKilled: number;
   hunterZombiesKilled: number;
+  gasZombiesKilled: number;
+  gasZombiesSpawned: number;
+  gasExplosions: number;
+  gasExplosionUnitDamage: number;
   riotPoliceReanimations: number;
-  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
-  finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
-  noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie', number>;
+  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number>;
+  finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number>;
+  noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie' | 'armyBase', number>;
   hordeMovementNoisePulses: number;
   hordeNoiseRespawnedByType: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
 }
@@ -844,6 +856,7 @@ export interface EndTurnRisk {
 export interface GameState {
   /** Private seed-bound initial Hunter placement; never part of Agent map. */
   initialHunterPositions: HexCoord[];
+  initialGasPositions: HexCoord[];
   gameVersion: string;
   config: GameConfig;
   seed: number;
@@ -1047,7 +1060,7 @@ export interface BaseUnitConfig {
 
 export interface HumanUnitConfig extends BaseUnitConfig {
   recruitAttack: number;
-  recruitmentFacilityTypes: Array<'capital' | 'city'>;
+  recruitmentFacilityTypes: Array<'capital' | 'city' | 'armyBase'>;
   productionCivilianGoods: number;
   productionMilitaryGoods: number;
   fuelCostRule: 'policeLike' | 'nationalGuardLike';
@@ -1074,6 +1087,7 @@ export interface UnitConfigMap {
   soldierZombie: ZombieUnitConfig;
   riotZombie: ZombieUnitConfig;
   hunterZombie: ZombieUnitConfig;
+  gasZombie: ZombieUnitConfig & { explosionDamage: number; explosionInfection: number };
 }
 
 export interface ProductionRule {
@@ -1118,9 +1132,10 @@ export interface HordeWaveConfig {
 export interface HordeConfig {
   warningLeadTurns: number;
   waves: HordeWaveConfig[];
-  specialZombieWeights: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
+  specialZombieWeights: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number>;
   riotZombieCapPerDirection: number;
   hunterZombieCapPerDirection: number;
+  gasZombieCapPerDirection: number;
   movementNoiseRadius: number;
 }
 
@@ -1186,6 +1201,8 @@ export interface CheckpointConfig {
 export interface EconomyConfig {
   initialHunterCount: { min: number; max: number };
   initialHunterMinDistance: number;
+  initialGasCount: { min: number; max: number };
+  initialGasMinDistance: number;
   populationConsumption: {
     food: number;
     civilianGoods: number;
@@ -1223,6 +1240,7 @@ export interface NaturalRecoveryConfig {
 }
 
 export interface GameConfig {
+  armyBase: { maxMilitaryGoods: number; interceptionCost: number; attack: number; range: number; noiseRadius: number; staffedVision: number; rewardLastTurn: number };
   version: string;
   mapId: string;
   maxActionsPerTurn: number;

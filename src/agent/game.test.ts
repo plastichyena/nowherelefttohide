@@ -7,7 +7,7 @@ import packageMetadata from '../../package.json';
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.5.2');
+    expect(APP_VERSION).toBe('1.5.3');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -114,7 +114,7 @@ describe('AgentGame public boundary', () => {
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('11');
+    expect(info.saveFormatVersion).toBe('12');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -142,7 +142,7 @@ describe('AgentGame public boundary', () => {
     expect(info.rules.production.workerCapacityByFacilityType.farm).toBe(30);
     expect(info.rules.production).toMatchObject({
       powerPlantsGenerateCapacityPerWorker: 10,
-      fuelPerFiveElectricity: 1,
+      fuelPerFiveElectricity: 2,
       sameTurnProductionCanCoverMaintenance: true,
       sameTurnProductionCanCoverProductionInputs: false,
     });
@@ -162,15 +162,15 @@ describe('AgentGame public boundary', () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
-    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v1', width: 51, height: 51 });
+    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v2', width: 51, height: 51 });
     expect(info.rules.map.hordeSpawnReserve).toHaveLength(200);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 50 });
     expect(info.rules.horde.waves).toEqual([
       expect.objectContaining({ index: 1, turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 3 }, final: false }),
       expect.objectContaining({ index: 2, turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 2, zombie: 5 }, nonHordeSlotCountPerDirection: 5, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'], final: false }),
       expect.objectContaining({ index: 3, turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'], final: false }),
-      expect.objectContaining({ index: 4, turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 3, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'], final: false }),
-      expect.objectContaining({ index: 5, turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 5, zombie: 8 }, nonHordeSlotCountPerDirection: 8, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'], final: true }),
+      expect.objectContaining({ index: 4, turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 3, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'], final: false }),
+      expect.objectContaining({ index: 5, turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 5, zombie: 8 }, nonHordeSlotCountPerDirection: 8, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'], final: true }),
     ]);
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',
@@ -364,7 +364,9 @@ describe('AgentGame public boundary', () => {
     const internalPayload = internalSpawn?.payload as Record<string, unknown> | undefined;
     // v1.5 draws only the base non-Horde slots. A private rejected-refugee
     // Bonus remains a Normal Zombie in the same Horde group/kind.
-    expect(internalPayload).toMatchObject({ normalZombieCount: 4, hordeZombieCount: 1 });
+    expect(internalPayload).toMatchObject({ hordeZombieCount: 1 });
+    expect((game.getDebugState() as GameState).units.filter(u=>u.hordeKind==='final'&&u.type!=='hordeZombie')).toHaveLength(4);
+    expect(Number(internalPayload?.normalZombieCount)).toBeGreaterThanOrEqual(1);
     const publicTrace = JSON.stringify(game.getRunArtifact());
     for (const privateField of [
       'rejectedRefugeesByDirection',

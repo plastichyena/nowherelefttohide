@@ -4,6 +4,7 @@ import { createUnit, isHumanUnit, getUnit } from './state';
 import { isHexSupplied } from './supply';
 import { terrainAdjustedDamage } from './terrain';
 import { emit } from './events-internal';
+import { hexKey, hexNeighbors, hexWithinBounds } from './hex';
 
 export interface SpawnOccupancyEntry {
   unitId: string;
@@ -11,14 +12,48 @@ export interface SpawnOccupancyEntry {
   chainDepth: number;
 }
 
+export interface GasExplosionSiteTarget {
+  siteKind: 'facility' | 'checkpoint';
+  siteId: string;
+}
+
+interface GasExplosionEntry {
+  sourceUnitId: string;
+  position: UnitState['position'];
+}
 
 export interface UnitLifecycleHooks {
   applyGeneratedZombieOccupancy(state: GameState, zombie: UnitState, rng: SeededRng, queue: SpawnOccupancyEntry[], root: string, depth: number): void;
   processSpawnOccupancyQueue(state: GameState, rng: SeededRng, queue: SpawnOccupancyEntry[]): void;
+  /** Apply only the direct population conversion. Site falls must wait for the second hook. */
+  applyGasExplosionSiteInfection(
+    state: GameState,
+    target: GasExplosionSiteTarget,
+    maxInfection: number,
+    sourceGasId: string,
+  ): number;
+  /** Resolve falls and their shared spawn-occupancy FIFO after every direct effect is complete. */
+  resolveGasExplosionSiteFalls(
+    state: GameState,
+    targets: readonly GasExplosionSiteTarget[],
+    rng: SeededRng,
+    sourceGasId: string,
+  ): void;
 }
 /** Engine-owned effects retain death, credit, reanimation and FIFO occupancy order. */
-export function createUnitLifecycle({ applyGeneratedZombieOccupancy, processSpawnOccupancyQueue }: UnitLifecycleHooks) {
-function destroyUnit(state: GameState, unit: UnitState, cause: string, rng: SeededRng): void {
+export function createUnitLifecycle({
+  applyGeneratedZombieOccupancy,
+  processSpawnOccupancyQueue,
+  applyGasExplosionSiteInfection,
+  resolveGasExplosionSiteFalls,
+}: UnitLifecycleHooks) {
+function destroyUnit(
+  state: GameState,
+  unit: UnitState,
+  cause: string,
+  rng: SeededRng,
+  explosionQueue: GasExplosionEntry[],
+): void {
   const index = state.units.findIndex((candidate) => candidate.id === unit.id);
   if (index < 0) {
     return;
@@ -39,6 +74,7 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string, rng: Seed
   if (unit.type === 'soldierZombie') state.statistics.soldierZombiesKilled += 1;
   if (unit.type === 'riotZombie') state.statistics.riotZombiesKilled += 1;
   if (unit.type === 'hunterZombie') state.statistics.hunterZombiesKilled += 1;
+  if (unit.type === 'gasZombie') state.statistics.gasZombiesKilled += 1;
   if (!unit.isPlayerUnit && unit.hordeKind === 'final') state.statistics.finalHordeKilled += 1;
   emit(state, 'unit_destroyed', {
     unitId: unit.id,
@@ -51,6 +87,9 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string, rng: Seed
     lostFuel: unit.isPlayerUnit ? unit.currentFuel : 0,
     lostMilitaryGoods: unit.isPlayerUnit ? unit.currentMilitaryGoods : 0,
   });
+  if (unit.type === 'gasZombie') {
+    explosionQueue.push({ sourceUnitId: unit.id, position: { ...unit.position } });
+  }
   if (isHumanUnit(unit)) {
     const reanimatedType = state.config.units[unit.type].reanimationUnitType;
     const prefix = reanimatedType === 'policeZombie'
@@ -109,6 +148,110 @@ function destroyUnit(state: GameState, unit: UnitState, cause: string, rng: Seed
   }
 }
 
+function applyDamageWithoutDeath(
+  state: GameState,
+  target: UnitState,
+  amount: number,
+  sourceId: string,
+  cause: string,
+): number {
+  const adjusted = terrainAdjustedDamage(state, target, amount);
+  const damage = Math.max(0, Math.min(target.hp, adjusted.finalDamage));
+  target.hp -= damage;
+  if (adjusted.defense.source !== 'none') {
+    const prevented = Math.max(0, adjusted.baseDamage - adjusted.finalDamage);
+    if (adjusted.defense.source === 'urban') {
+      state.statistics.urbanDefenseApplications += 1;
+      state.statistics.urbanDefenseDamagePrevented += prevented;
+    } else {
+      state.statistics.forestDefenseApplications += 1;
+      state.statistics.forestDefenseDamagePrevented += prevented;
+    }
+    emit(state, 'terrain_defense_applied', {
+      targetId: target.id,
+      source: adjusted.defense.source,
+      multiplier: adjusted.defense.multiplier,
+      baseDamage: adjusted.baseDamage,
+      finalDamage: adjusted.finalDamage,
+    });
+  }
+  emit(state, 'damage', {
+    sourceId,
+    targetId: target.id,
+    amount: damage,
+    cause,
+    baseDamage: adjusted.baseDamage,
+    terrainDefenseSource: adjusted.defense.source,
+    terrainDamageMultiplier: adjusted.defense.multiplier,
+  });
+  return damage;
+}
+
+function snapshotExplosionSites(state: Readonly<GameState>, adjacentKeys: ReadonlySet<string>): GasExplosionSiteTarget[] {
+  const facilities: GasExplosionSiteTarget[] = state.facilities
+    .filter((facility) => adjacentKeys.has(hexKey(facility.position)))
+    .map((facility) => ({ siteKind: 'facility', siteId: facility.id }));
+  const checkpoints: GasExplosionSiteTarget[] = state.checkpoints
+    .filter((checkpoint) => adjacentKeys.has(hexKey(checkpoint.position)))
+    .map((checkpoint) => ({ siteKind: 'checkpoint', siteId: checkpoint.id }));
+  return [...facilities, ...checkpoints].sort(
+    (left, right) => left.siteKind.localeCompare(right.siteKind) || left.siteId.localeCompare(right.siteId),
+  );
+}
+
+function resolveGasExplosions(
+  state: GameState,
+  rng: SeededRng,
+  explosionQueue: GasExplosionEntry[],
+): void {
+  while (explosionQueue.length > 0) {
+    const explosion = explosionQueue.shift()!;
+    const adjacentKeys = new Set(
+      hexNeighbors(explosion.position)
+        .filter((position) => hexWithinBounds(position, state.map.width, state.map.height))
+        .map(hexKey),
+    );
+    const unitSnapshot = state.units
+      .filter((unit) => unit.hp > 0 && adjacentKeys.has(hexKey(unit.position)))
+      .sort((left, right) => left.id.localeCompare(right.id));
+    const siteSnapshot = snapshotExplosionSites(state, adjacentKeys);
+    const config = state.config.units.gasZombie;
+
+    state.statistics.gasExplosions += 1;
+    emit(state, 'gas_explosion', {
+      sourceUnitId: explosion.sourceUnitId,
+      q: explosion.position.q,
+      r: explosion.position.r,
+      radius: 1,
+      baseUnitDamage: config.explosionDamage,
+      maxSiteInfection: config.explosionInfection,
+    });
+
+    for (const target of unitSnapshot) {
+      state.statistics.gasExplosionUnitDamage += applyDamageWithoutDeath(
+        state,
+        target,
+        config.explosionDamage,
+        explosion.sourceUnitId,
+        'gas_explosion',
+      );
+    }
+    for (const target of siteSnapshot) {
+      applyGasExplosionSiteInfection(
+        state,
+        target,
+        config.explosionInfection,
+        explosion.sourceUnitId,
+      );
+    }
+
+    for (const target of unitSnapshot.filter((unit) => unit.hp <= 0)) {
+      destroyUnit(state, target, 'gas_explosion', rng, explosionQueue);
+    }
+    resolveGasExplosionSiteFalls(state, siteSnapshot, rng, explosion.sourceUnitId);
+  }
+}
+
 function creditZombieKill(state: GameState, sourceId: string, target: UnitState, cause: string): void {
   if (!!target.isPlayerUnit || !['attack', 'interception', 'counterattack'].includes(cause)) return;
   const source = getUnit(state, sourceId);
@@ -149,38 +292,12 @@ function dealDamage(
   cause: string,
   rng: SeededRng,
 ): void {
-  const adjusted = terrainAdjustedDamage(state, target, amount);
-  const damage = Math.max(0, Math.min(target.hp, adjusted.finalDamage));
-  target.hp -= damage;
-  if (adjusted.defense.source !== 'none') {
-    const prevented = Math.max(0, adjusted.baseDamage - adjusted.finalDamage);
-    if (adjusted.defense.source === 'urban') {
-      state.statistics.urbanDefenseApplications += 1;
-      state.statistics.urbanDefenseDamagePrevented += prevented;
-    } else {
-      state.statistics.forestDefenseApplications += 1;
-      state.statistics.forestDefenseDamagePrevented += prevented;
-    }
-    emit(state, 'terrain_defense_applied', {
-      targetId: target.id,
-      source: adjusted.defense.source,
-      multiplier: adjusted.defense.multiplier,
-      baseDamage: adjusted.baseDamage,
-      finalDamage: adjusted.finalDamage,
-    });
-  }
-  emit(state, 'damage', {
-    sourceId,
-    targetId: target.id,
-    amount: damage,
-    cause,
-    baseDamage: adjusted.baseDamage,
-    terrainDefenseSource: adjusted.defense.source,
-    terrainDamageMultiplier: adjusted.defense.multiplier,
-  });
+  applyDamageWithoutDeath(state, target, amount, sourceId, cause);
   if (target.hp <= 0) {
+    const explosionQueue: GasExplosionEntry[] = [];
     creditZombieKill(state, sourceId, target, cause);
-    destroyUnit(state, target, cause, rng);
+    destroyUnit(state, target, cause, rng, explosionQueue);
+    resolveGasExplosions(state, rng, explosionQueue);
   }
 }
 
