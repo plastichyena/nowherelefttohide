@@ -9,6 +9,7 @@ import {
   previewMove,
 } from './engine';
 import { hexNeighbors, hexWithinBounds } from './hex';
+import { canPlayerOccupyHex } from './map';
 import { createUnit, populationLedgerTotal, synchronizePopulation } from './state';
 import { singleFinalWave } from './testConfig';
 
@@ -153,12 +154,12 @@ describe('v1.4.1 carried Military Goods combat', () => {
     const state = mutableState(engine);
     state.units = state.units.filter((unit) => unit.isPlayerUnit);
     const guard = state.units.find((unit) => unit.id === 'national-guard-1')!;
-    guard.position = { q: 1, r: 1 };
-    state.units.find((unit) => unit.id === 'police-1')!.position = { q: 49, r: 49 };
+    guard.position = { q: 2, r: 2 };
+    state.units.find((unit) => unit.id === 'police-1')!.position = { q: 48, r: 48 };
     guard.hp = 5;
     guard.currentMilitaryGoods = 5;
     state.resources.militaryGoods = 0;
-    const zombie = createUnit(state, 'zombie-kill', 'zombie', { q: 1, r: 0 });
+    const zombie = createUnit(state, 'zombie-kill', 'zombie', { q: 2, r: 1 });
     zombie.movement = 0;
     state.units.push(zombie);
     rebalance(state);
@@ -182,7 +183,7 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
     const guard = state.units.find((unit) => unit.id === 'national-guard-1')!;
     const police = state.units.find((unit) => unit.id === 'police-1')!;
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
-    guard.position = { q: 1, r: 1 };
+    guard.position = { q: 2, r: 2 };
     guard.currentMilitaryGoods = guard.maxMilitaryGoods;
     police.position = { ...farm.position };
     police.currentMilitaryGoods = 0;
@@ -336,8 +337,8 @@ describe('v1.4.1 Fuel-zero Emergency Movement', () => {
     const police = state.units.find((unit) => unit.id === 'police-1')!;
     police.currentFuel = 0;
     const findEntryPosition = (terrain: 'forest' | 'mountain') => {
-      const destination = state.map.tiles.find((tile) => tile.terrain === terrain && !tile.road && tile.facilityId === null)!;
-      const start = hexNeighbors(destination).find((position) => hexWithinBounds(position, state.map.width, state.map.height))!;
+      const destination = state.map.tiles.find((tile) => tile.terrain === terrain && !tile.road && tile.facilityId === null && canPlayerOccupyHex(state.map, tile))!;
+      const start = hexNeighbors(destination).find((position) => hexWithinBounds(position, state.map.width, state.map.height) && canPlayerOccupyHex(state.map, position))!;
       return { destination: { q: destination.q, r: destination.r }, start };
     };
 

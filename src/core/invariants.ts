@@ -36,7 +36,9 @@ export function validateInvariants(state: GameState): InvariantResult {
     !Array.isArray(state.units) ||
     !Array.isArray(state.checkpoints) ||
     !Array.isArray(state.roadBranches) ||
-    !Array.isArray(state.pendingNoisePulses)
+    !Array.isArray(state.pendingNoisePulses) ||
+    !Array.isArray(state.horde.pendingWaves) ||
+    !Array.isArray(state.horde.waves)
   ) {
     return { valid: false, errors: ['State is missing required collections'] };
   }
@@ -92,8 +94,8 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (state.horde.finalSpawnGroupIds.length !== 0 || state.horde.finalSpawnedCount !== 0) {
       errors.push('An unstarted Final Horde cannot have spawn groups');
     }
-  } else if (!Array.isArray(state.horde.finalSpawnGroupIds) || state.horde.finalSpawnGroupIds.length === 0 || state.horde.finalSpawnedCount < 1) {
-    errors.push('An active or defeated Final Horde requires spawn groups and a count');
+  } else if (!Array.isArray(state.horde.finalSpawnGroupIds) || state.horde.finalSpawnGroupIds.length === 0) {
+    errors.push('An active or defeated Final Horde requires spawn groups');
   }
   if (state.horde.warningType === 'final' && state.horde.nextSpawnTurn !== state.finalHordeTurn) {
     errors.push('Final Horde warning must point to finalHordeTurn');
@@ -108,6 +110,88 @@ export function validateInvariants(state: GameState): InvariantResult {
     const wave = state.horde.nextWaveIndex === null ? undefined : state.config.horde.waves[state.horde.nextWaveIndex - 1];
     if (!wave || state.horde.warningDirections.length !== wave.directionCount) {
       errors.push('A warned Horde Wave must expose every selected direction');
+    }
+  }
+  const publicWavesByGroupId = new Map<string, GameState['horde']['waves'][number]>();
+  const publicWavesByIndex = new Map<number, GameState['horde']['waves'][number][]>();
+  for (const wave of state.horde.waves) {
+    const scheduledWave = state.config.horde.waves[wave.waveIndex - 1];
+    const expectedBaseWaveUnitCount = scheduledWave
+      ? Object.values(scheduledWave.compositionPerDirection).reduce((total, count) => total + count, 0)
+      : null;
+    if (!scheduledWave
+      || !cardinalDirections.includes(wave.direction)
+      || wave.groupId !== `wave-${wave.waveIndex}-${wave.direction}`
+      || wave.kind !== (scheduledWave.final ? 'final' : 'periodic')) {
+      errors.push(`Public Horde Wave ${wave.groupId} does not match the configured schedule`);
+    }
+    if (!Number.isSafeInteger(wave.baseWaveUnitCount) || wave.baseWaveUnitCount < 1
+      || wave.baseWaveUnitCount !== expectedBaseWaveUnitCount
+      || !Number.isSafeInteger(wave.committedWaveUnitCount)
+      || wave.committedWaveUnitCount < wave.baseWaveUnitCount
+      || !Number.isSafeInteger(wave.spawnedSoFar)
+      || wave.spawnedSoFar < 0
+      || wave.spawnedSoFar > wave.committedWaveUnitCount
+      || !Number.isSafeInteger(wave.pendingCount)
+      || wave.pendingCount !== wave.committedWaveUnitCount - wave.spawnedSoFar) {
+      errors.push(`Public Horde Wave ${wave.groupId} has invalid frozen counts`);
+    }
+    if (publicWavesByGroupId.has(wave.groupId)) {
+      errors.push(`Public Horde Wave ${wave.groupId} is duplicated`);
+    } else {
+      publicWavesByGroupId.set(wave.groupId, wave);
+    }
+    const wavesAtIndex = publicWavesByIndex.get(wave.waveIndex) ?? [];
+    wavesAtIndex.push(wave);
+    publicWavesByIndex.set(wave.waveIndex, wavesAtIndex);
+    const expectedGroups = state.horde.spawnGroupIdsByWave[String(wave.waveIndex)];
+    if (!state.horde.spawnedWaveIndices.includes(wave.waveIndex)
+      || !expectedGroups?.includes(wave.groupId)) {
+      errors.push(`Public Horde Wave ${wave.groupId} is missing Spawn-group history`);
+    }
+  }
+  for (const waveIndex of state.horde.spawnedWaveIndices) {
+    const scheduledWave = state.config.horde.waves[waveIndex - 1];
+    const historyGroupIds = state.horde.spawnGroupIdsByWave[String(waveIndex)];
+    const publicWaves = publicWavesByIndex.get(waveIndex) ?? [];
+    const publicGroupIds = new Set(publicWaves.map((wave) => wave.groupId));
+    const publicDirections = new Set(publicWaves.map((wave) => wave.direction));
+    if (!scheduledWave
+      || !historyGroupIds
+      || historyGroupIds.length !== scheduledWave.directionCount
+      || publicWaves.length !== scheduledWave.directionCount
+      || publicGroupIds.size !== scheduledWave.directionCount
+      || publicDirections.size !== scheduledWave.directionCount
+      || historyGroupIds.some((groupId) => !publicGroupIds.has(groupId))) {
+      errors.push(`Spawn-group history for Wave ${waveIndex} does not match its public directions`);
+    }
+  }
+  for (const waveIndex of Object.keys(state.horde.spawnGroupIdsByWave)) {
+    if (!state.horde.spawnedWaveIndices.includes(Number(waveIndex))) {
+      errors.push(`Spawn-group history for Wave ${waveIndex} has no frozen Wave`);
+    }
+  }
+  const pendingWaveGroupIds = new Set<string>();
+  for (const pendingWave of state.horde.pendingWaves) {
+    const publicWave = publicWavesByGroupId.get(pendingWave.groupId);
+    const duplicateGroupId = pendingWaveGroupIds.has(pendingWave.groupId);
+    pendingWaveGroupIds.add(pendingWave.groupId);
+    if (pendingWave.roster.some((type) => !['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'].includes(type))
+      || duplicateGroupId
+      || !publicWave
+      || pendingWave.waveIndex !== publicWave?.waveIndex
+      || pendingWave.direction !== publicWave?.direction
+      || pendingWave.kind !== publicWave?.kind
+      || pendingWave.baseWaveUnitCount !== publicWave?.baseWaveUnitCount
+      || pendingWave.committedWaveUnitCount !== publicWave?.committedWaveUnitCount
+      || pendingWave.spawnedSoFar !== publicWave?.spawnedSoFar
+      || pendingWave.roster.length !== publicWave?.pendingCount) {
+      errors.push(`Pending Horde Wave ${pendingWave.groupId} does not match its public frozen state`);
+    }
+  }
+  for (const [groupId, publicWave] of publicWavesByGroupId) {
+    if (publicWave.pendingCount > 0 && !pendingWaveGroupIds.has(groupId)) {
+      errors.push(`Public Horde Wave ${groupId} has untracked pending roster entries`);
     }
   }
   for (const field of [
@@ -296,6 +380,7 @@ export function validateInvariants(state: GameState): InvariantResult {
   }
   if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.hordeZombie)) errors.push('Statistic noisePulsesBySourceType.hordeZombie must be a non-negative integer');
   if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.armyBase)) errors.push('Statistic noisePulsesBySourceType.armyBase must be a non-negative integer');
+  if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.windPowerPlant)) errors.push('Statistic noisePulsesBySourceType.windPowerPlant must be a non-negative integer');
   for (const unitType of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const) {
     if (!isNonNegativeInteger(state.statistics.hordeSpecialSpawnedByType?.[unitType])) errors.push(`Statistic hordeSpecialSpawnedByType.${unitType} must be a non-negative integer`);
     if (!isNonNegativeInteger(state.statistics.finalSpecialZombiesSpawnedByType?.[unitType])) errors.push(`Statistic finalSpecialZombiesSpawnedByType.${unitType} must be a non-negative integer`);
@@ -359,7 +444,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if ((facility.constructible || facility.owner === 'player') && isHordeSpawnReserve(state.map, facility.position)) {
       errors.push(`Player facility ${facility.id} cannot occupy the Horde Spawn Reserve`);
     }
-    if (facility.constructible && !['simpleFarm', 'civilianDroneBase'].includes(facility.type)) {
+    if (facility.constructible && !['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'].includes(facility.type)) {
       errors.push(`Facility ${facility.id} has an invalid constructible type`);
     }
     if (facility.type === 'armyBase') {
@@ -415,6 +500,12 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (facility.status === 'ruined' && facility.operationalStatus !== 'ruined') {
       errors.push(`Ruined facility ${facility.id} must use ruined operational status`);
     }
+  }
+  const playerBuiltWindCount = state.facilities.filter(
+    (facility) => facility.constructible && facility.type === 'windPowerPlant',
+  ).length;
+  if (playerBuiltWindCount > state.map.roadBranches.length) {
+    errors.push('Player-built Wind Power exceeds the road-branch build limit');
   }
 
   const occupied = new Set<string>();
@@ -472,6 +563,18 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (unit.noiseTarget && !hexWithinBounds(unit.noiseTarget, state.map.width, state.map.height)) {
       errors.push(`Unit ${unit.id} has an invalid noise target`);
     }
+    if (unit.previousFallbackPosition && !hexWithinBounds(unit.previousFallbackPosition, state.map.width, state.map.height)) {
+      errors.push(`Unit ${unit.id} has an invalid previous fallback position`);
+    }
+    if (unit.fallbackTarget && !hexWithinBounds(unit.fallbackTarget, state.map.width, state.map.height)) {
+      errors.push(`Unit ${unit.id} has an invalid fallback target`);
+    }
+    if ((unit.previousFallbackPosition === null) !== (unit.fallbackTarget === null)) {
+      errors.push(`Unit ${unit.id} fallback state must retain both position and target, or neither`);
+    }
+    if (unit.waveCapitalAnchor && !hexWithinBounds(unit.waveCapitalAnchor, state.map.width, state.map.height)) {
+      errors.push(`Unit ${unit.id} has an invalid Wave Capital Anchor`);
+    }
     if (unit.actionState === 'destroyed') {
       errors.push(`Destroyed unit ${unit.id} must be removed from state`);
     }
@@ -499,6 +602,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       const hasKind = ['periodic', 'final'].includes(unit.hordeKind ?? '');
       const hasGroup = typeof unit.spawnGroupId === 'string' && unit.spawnGroupId.length > 0;
       if (hasKind !== hasGroup) errors.push(`Normal-AI Zombie ${unit.id} must have both Horde kind and spawn group, or neither`);
+      if (unit.waveCapitalAnchor !== null && !hasKind) errors.push(`Non-Wave Zombie ${unit.id} cannot retain a Wave Capital Anchor`);
       if (unit.hordeKind === 'final' && !state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId ?? '')) {
         errors.push(`Final Wave Zombie ${unit.id} must use the active Final Horde group`);
       }
@@ -507,34 +611,42 @@ export function validateInvariants(state: GameState): InvariantResult {
         errors.push(`Horde Zombie ${unit.id} requires Horde kind and spawn group`);
       }
       if (unit.inheritedTarget !== null || unit.noiseTarget !== null) errors.push(`Horde Zombie ${unit.id} cannot retain an internal target`);
+      if (unit.waveCapitalAnchor !== null) errors.push(`Horde Zombie ${unit.id} cannot retain a Wave Capital Anchor`);
       if (unit.hordeKind === 'final' && !state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId ?? '')) {
         errors.push(`Final Horde Zombie ${unit.id} must use the active Final Horde group`);
       }
     } else if (unit.inheritedTarget !== null || unit.noiseTarget !== null || unit.hordeKind !== null || unit.spawnGroupId !== null) {
       errors.push(`Human unit ${unit.id} cannot contain Zombie target or Horde group state`);
     }
+    if (unit.isPlayerUnit && (unit.previousFallbackPosition !== null || unit.fallbackTarget !== null || unit.waveCapitalAnchor !== null)) {
+      errors.push(`Human unit ${unit.id} cannot retain Zombie fallback or Wave Anchor state`);
+    }
   }
 
   for (const pulse of state.pendingNoisePulses) {
     if (!pulse || typeof pulse.id !== 'string' || !hexWithinBounds(pulse.center, state.map.width, state.map.height)
-      || !isNonNegativeInteger(pulse.radius) || !['humanCombat', 'hordeMovement', 'armyBase'].includes(pulse.sourceKind)
+      || !isNonNegativeInteger(pulse.radius) || !['humanCombat', 'hordeMovement', 'armyBase', 'windPower'].includes(pulse.sourceKind)
       || !isNonNegativeInteger(pulse.emittedTurn)) {
       errors.push('Pending Noise Pulse is invalid');
     }
     const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice'].includes(pulse.sourceUnitType))
       || (pulse.sourceKind === 'hordeMovement' && pulse.sourceUnitType === 'hordeZombie')
-      || (pulse.sourceKind === 'armyBase' && pulse.sourceUnitType === 'armyBase');
+      || (pulse.sourceKind === 'armyBase' && pulse.sourceUnitType === 'armyBase')
+      || (pulse.sourceKind === 'windPower' && pulse.sourceUnitType === 'windPowerPlant');
     if (!matchingSource) errors.push('Pending Noise Pulse source kind and type must match');
   }
 
   const remainingFinalHorde = state.units.filter(
     (unit) => unit.spawnGroupId !== null && state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId),
   ).length;
-  if (state.horde.finalHordeStatus === 'active' && remainingFinalHorde === 0) {
-    errors.push('An active Final Horde must have at least one surviving member');
+  const finalPendingCount = state.horde.pendingWaves
+    .filter((wave) => wave.kind === 'final')
+    .reduce((total, wave) => total + wave.roster.length, 0);
+  if (state.horde.finalHordeStatus === 'active' && remainingFinalHorde + finalPendingCount === 0) {
+    errors.push('An active Final Horde must have a surviving or Pending member');
   }
-  if (state.horde.finalHordeStatus === 'defeated' && remainingFinalHorde > 0) {
-    errors.push('A defeated Final Horde cannot have surviving members');
+  if (state.horde.finalHordeStatus === 'defeated' && remainingFinalHorde + finalPendingCount > 0) {
+    errors.push('A defeated Final Horde cannot have surviving or Pending members');
   }
 
   const facilityTiles = new Set(state.facilities.map((facility) => hexKey(facility.position)));

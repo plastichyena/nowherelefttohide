@@ -319,7 +319,12 @@ describe('Agent Observation 8.0.0 rule projections', () => {
     expect(police.fuelCostByLegalMove.length).toBeGreaterThan(0);
     expect(police.fuelCostByLegalMove.every((move) => move.fuelCost >= 1 && move.projectedFuelAfterMove >= 0)).toBe(true);
     const wind = observation.facilities.find((facility) => facility.type === 'windPowerPlant')!;
-    expect(wind).toMatchObject({ healthyPopulation: 0, zombieTargetValue: 5, constructible: false });
+    expect(wind).toMatchObject({
+      healthyPopulation: 0,
+      zombieTargetValue: 0,
+      constructible: false,
+      windPower: { operational: true, generation: 15, emitsNoise: true, playerBuildLimit: 4, playerBuiltCount: 0 },
+    });
     const nearbyMilitaryFactory = observation.facilities.find(
       (facility) => facility.id === 'military-factory-2',
     );
@@ -330,7 +335,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
       inSupply: false,
     });
     expect(observation.strategicForecast.resources.fuel).toHaveProperty('singlePointOfFailure');
-    expect(observation.constructibleFacilityPositionCandidates).toHaveLength(51 * 51 * 2);
+    expect(observation.constructibleFacilityPositionCandidates).toHaveLength(51 * 51 * 4);
     expect(observation.roadBranches.every((branch) => branch.currentPolicyTurns === 2)).toBe(true);
     expect(observation.checkpoints.every((checkpoint) => checkpoint.queuePressureClass === 'none' || checkpoint.queuePeople > 0)).toBe(true);
   });

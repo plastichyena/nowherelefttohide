@@ -1,11 +1,11 @@
-# Nowhere Left to Hide v1.5.3 Board Asset Manifest
+# Nowhere Left to Hide v1.5.4 Board Asset Manifest
 
-- Generated: 2026-09-06
+- Generated: 2026-09-07
 - Runtime format: 256×256 PNG
 - Generated source resolutions: 1254×1254 for most sources, 1362×1155 for the
   twelve-Zombie Horde swarm, and 1536×1024 for Capital and Refinery; every
   checked-in runtime image is normalized to 256×256.
-- Runtime total: 37 PNG files, 1,739,215 bytes (approximately 1.66 MiB)
+- Runtime total: 38 PNG files, 1,813,763 bytes (approximately 1.73 MiB)
 - Source: original assets created for this project; no third-party images, real
   logos, seals, flags, or trademarks are included.
 - Provenance / licensing: generated specifically for this repository during
@@ -31,7 +31,9 @@ as separate overlays. Images contain no text, numbers, real marks, flags, or
 photorealistic gore. The approved Zombie sources use limited comic-painted
 wounds and blood marks; revisions must not make those details more graphic.
 
-The generation prompts followed this common structure:
+The generation prompts followed this common structure. The v1.5.4 Temporary
+Housing facility was generated with the same transparent, compact, top-down
+facility direction and normalized to the existing 256px runtime contract.
 
 > A single top-down board-game terrain tile or transparent unit/facility icon;
 > simple flat 2D war-game style; crisp thick outline; readable at 24–34 px;
@@ -95,6 +97,7 @@ preloaded.
 | `facilities/facility_wind_power_plant.png` | `windPowerPlant` | Wind turbine array and compact control hut; fixed 15 Electricity source |
 | `facilities/facility_simple_farm.png` | `simpleFarm` | Small forward farm, field rows, and utility shed |
 | `facilities/facility_civilian_drone_base.png` | `civilianDroneBase` | Forward civilian drone pad and communications mast |
+| `facilities/facility_temporary_housing.png` | `temporaryHousing` | Compact emergency container and prefab housing settlement |
 | `facilities/facility_checkpoint.png` | Checkpoint base | Barrier and guard booth |
 | `units/unit_police.png` | `police` | Approved v1.4.4 five-person Police Group in US-style uniforms |
 | `units/unit_national_guard.png` | `nationalGuard` | Approved v1.4.4 five-person armed National Guard Group |

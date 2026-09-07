@@ -58,8 +58,8 @@ describe('v1.5.2 production capacity and economy plan', () => {
     const capacity = forecastProductionCapacity(state);
     expect(capacity.resources.food).toMatchObject({ installedFacilityRatedCapacity: 300,
       currentFacilityWorkerRatedCapacity: 300, projectedEndTurnOutput: 300, ratedGapUpperBound: 0, utilizationRatio: 1 });
-    expect(capacity.electricity).toMatchObject({ installedFacilityRatedCapacity: 315,
-      currentFacilityWorkerRatedCapacity: 45, currentPlanPhysicalCapacity: 45 });
+    expect(capacity.electricity).toMatchObject({ installedFacilityRatedCapacity: 465,
+      currentFacilityWorkerRatedCapacity: 60, currentPlanPhysicalCapacity: 60 });
     expect(capacity.facilities.find(f => f.facilityId === 'farm-1')!.inactiveReasons).not.toContain('unassigned_workers');
   });
 
@@ -90,13 +90,20 @@ describe('v1.5.2 production capacity and economy plan', () => {
 
   it('allocates one shared input stock across factories in secured order and reallocates it when the first is OFF', () => {
     const state = setup();
-    state.resources.civilianGoods = 7;
+    state.resources.civilianGoods = 0;
     for (const [index, id] of ['military-factory-1', 'military-factory-2'].entries()) {
       Object.assign(facility(state, id), { owner: 'player', status: 'owned', operationalStatus: 'operational',
         workers: 5, infected: 0, powerSupplyEnabled: true, securedOrder: 20 + index, populationOperationalTurn: 1 });
     }
     facility(state, 'capital').workers -= 10;
+    Object.assign(facility(state, 'power-plant-1'), { workers: 10, operationalStatus: 'operational' });
+    state.resources.fuel = 1_000;
     synchronizePopulation(state);
+    const noInputStock = forecastEndTurn(state).civilianGoods;
+    state.resources.civilianGoods = Math.max(
+      0,
+      noInputStock.maintenanceRequired - noInputStock.projectedProduction,
+    ) + 7;
     const plan = calculateEconomyPlan(state);
     expect(plan.facilities.find(f => f.facilityId === 'military-factory-1')!.inputs).toEqual({ civilianGoods: 5 });
     expect(plan.facilities.find(f => f.facilityId === 'military-factory-2')!.inputs).toEqual({ civilianGoods: 2 });

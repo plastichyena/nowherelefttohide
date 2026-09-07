@@ -180,7 +180,7 @@ describe('v1.4.4 maintenance, decommission, and reanimation rules', () => {
     });
   });
 
-  it('decommissions only a completed empty Drone Base and refunds 13 Civilian Goods', () => {
+  it('decommissions only a completed empty Drone Base and refunds half its v1.5.4 cost', () => {
     const engine = new GameEngine(14405, noInitialZombies());
     const candidate = engine.getConstructibleFacilityPositionCandidates('civilianDroneBase').find((item) => item.legal)!;
     expect(engine.step({
@@ -196,7 +196,7 @@ describe('v1.4.4 maintenance, decommission, and reanimation rules', () => {
     const stock = engine.getState().resources.civilianGoods;
     expect(engine.step({ type: 'DecommissionConstructibleFacility', facilityId: droneId }).error).toBeNull();
     expect(engine.getState().facilities.some((facility) => facility.id === droneId)).toBe(false);
-    expect(engine.getState().resources.civilianGoods).toBe(stock + 13);
+    expect(engine.getState().resources.civilianGoods).toBe(stock + 25);
     expect(engine.getState().statistics.civilianDroneBasesDecommissioned).toBe(1);
   });
 

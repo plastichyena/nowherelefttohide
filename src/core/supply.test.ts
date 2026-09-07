@@ -21,7 +21,7 @@ function engineWithoutZombies(): GameEngine {
   // a complete road reconnaissance budget explicitly.
   const engine = new GameEngine(17, createDefaultConfig({ vision: { capital: 50 } }));
   const snapshot = engine.getState() as GameState;
-  snapshot.units = snapshot.units.filter((unit) => unit.type !== 'zombie');
+  snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
   expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
   return engine;
 }
@@ -186,7 +186,7 @@ describe('road branches and supply network', () => {
     snapshot.population.facilityWorkers.push({ facilityId: power.id, workers: 0 });
     snapshot.population.facilityWorkers.sort((a, b) => a.facilityId.localeCompare(b.facilityId));
     const police = snapshot.units.find((unit) => unit.type === 'police')!;
-    police.position = { q: 1, r: 1 };
+    police.position = { q: 2, r: 2 };
     police.hp = 10;
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'AssignWorkers', facilityId: power.id, workers: 1 }).error?.code)

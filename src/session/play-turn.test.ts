@@ -15,7 +15,7 @@ function root(name: string): string { return mkdtempSync(join(tmpdir(), `nlth-pl
 
 const identity: SessionVersionIdentity = {
   appVersion: '1.5.2', gameRulesVersion: '4.0.0', saveFormatVersion: 11, artifactSchemaVersion: '8.0.0',
-  agentApiVersion: '9.0.0', observationApiVersion: '9.0.0', bridgeApiVersion: '9.0.0', buildId: 'play-turn-test',
+  agentApiVersion: '11.0.0', observationApiVersion: '11.0.0', bridgeApiVersion: '11.0.0', buildId: 'play-turn-test',
   gitCommit: 'a'.repeat(40), mapId: 'test-map',
 };
 
@@ -31,7 +31,7 @@ function observation(state: RuntimeState): AgentObservation {
     emergencyMovementPoints: 0, emergencyMovementAvailable: false,
   };
   return {
-    apiVersion: '9.0.0', gameRulesVersion: '4.0.0', turn: state.turn, finalHordeTurn: 50, phase: 'player',
+    apiVersion: '11.0.0', gameRulesVersion: '6.0.0', turn: state.turn, finalHordeTurn: 50, phase: 'player',
     map: { id: 'test-map', width: 2, height: 1, coordinateSystem: 'axial-q-r', hordeSpawnReserve: [], tiles: [] } as never,
     resources: { food: 10, civilianGoods: 10, militaryGoods: 10, fuel: 10, electricityCapacity: 0, electricityRequired: 0 },
     population: { healthyCivilians: 1, cityResidents: 1, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
@@ -39,7 +39,7 @@ function observation(state: RuntimeState): AgentObservation {
     zombies: state.enemy ? [{ id: 'enemy-1', type: 'zombie', unitType: 'zombie', position: { q: 1, r: 0 }, hp: 10, maxHp: 10 }] as never : [],
     checkpoints: [], importantSiteEvents: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [], roadBranches: [],
     supply: { initialRadius: 0, suppliedTileKeys: ['0,0'], branchRadii: [] },
-    horde: { warningType: 'none', warningDirections: [], nextWaveIndex: null, nextWave: null, spawnTurn: null, finalHordeStatus: 'notStarted', turnsRemaining: 0, nextSpawnTurn: null },
+    horde: { warningType: 'none', warningDirections: [], nextWaveIndex: null, nextWave: null, spawnTurn: null, finalHordeStatus: 'notStarted', turnsRemaining: 0, nextSpawnTurn: null, waves: [], waveTotals: [], finalPendingCount: 0 },
     victory: { finalHordeDefeated: false, suppliedAreaZombieClear: !state.enemy, suppliedAreaInfectionClear: true },
     finalHordeDefeated: false, suppliedAreaZombieClear: !state.enemy, suppliedAreaInfectionClear: true,
     crisisSummary: { alerts: state.crisis > 0 ? [{ id: 'unit_out_of_supply_risk:unit-1', severity: 'warning', category: 'unit', reasonCode: 'unit_out_of_supply_risk', entityIds: ['unit-1'], publicFacts: { hp: state.crisis, fuel: 1, militaryGoods: 1 } }] : [], criticalCount: 0, warningCount: state.crisis > 0 ? 1 : 0, advisoryCount: 0 },

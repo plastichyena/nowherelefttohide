@@ -84,9 +84,10 @@ describe('board runtime PNG files', () => {
       'units/unit_hunter_zombie.png',
       'units/unit_gas_zombie.png',
     ]));
-    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(12);
+    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(13);
     expect(paths).toEqual(expect.arrayContaining([
       'facilities/facility_army_base.png',
+      'facilities/facility_temporary_housing.png',
     ]));
     for (const path of paths.filter((entry) => entry.startsWith('units/') || entry.startsWith('facilities/') || entry.startsWith('overlays/'))) {
       const rgba = decodeRgba(readPng(path));

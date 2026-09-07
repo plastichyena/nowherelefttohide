@@ -15,8 +15,8 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '5.0.0';
-export const DEFAULT_MAP_ID = 'fixed-51x51-v2';
+export const CONFIG_VERSION = '6.0.0';
+export const DEFAULT_MAP_ID = 'fixed-51x51-v3';
 
 const facilityIds: FacilityId[] = [
   'army-base-1',
@@ -117,7 +117,7 @@ const defaultUnitConfig: UnitConfigMap = {
   },
   soldierZombie: {
     maxAttackCharges: 1,
-    hp: 20, attack: 5, movement: 5, range: 1, vision: 5, population: 0, maxFuel: 0,
+    hp: 20, attack: 10, movement: 5, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
@@ -139,16 +139,17 @@ const defaultUnitConfig: UnitConfigMap = {
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
+  temporaryHousing: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 50, visionRadius: 1, zombieTargetValue: 0 },
   armyBase: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
   capital: {
     workerCapacity: 100,
-    production: production(emptyInputs(), { civilianGoods: 1 }, 'required', 5),
+    production: production(emptyInputs(), { civilianGoods: 1 }, 'required', 10),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   city: {
     workerCapacity: 50,
-    production: production(emptyInputs(), { civilianGoods: 1 }, 'required', 5),
+    production: production(emptyInputs(), { civilianGoods: 1 }, 'required', 10),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
@@ -160,25 +161,25 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
   },
   civilianFactory: {
     workerCapacity: 30,
-    production: production(emptyInputs(), { civilianGoods: 10 }, 'required', 5),
+    production: production(emptyInputs(), { civilianGoods: 10 }, 'required', 15),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   militaryFactory: {
     workerCapacity: 30,
-    production: production({ civilianGoods: 1 }, { militaryGoods: 4 }, 'required', 5),
+    production: production({ civilianGoods: 1 }, { militaryGoods: 4 }, 'required', 20),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   refinery: {
     workerCapacity: 30,
-    production: production(emptyInputs(), { fuel: 5 }, 'required', 5),
+    production: production(emptyInputs(), { fuel: 5 }, 'required', 10),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
   powerPlant: {
     workerCapacity: 30,
-    production: production(emptyInputs(), emptyOutputs(), 'none', 0, 10),
+    production: production(emptyInputs(), emptyOutputs(), 'none', 0, 15),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
@@ -186,19 +187,19 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
     workerCapacity: 0,
     production: production(emptyInputs(), emptyOutputs(), 'none', 0, 0, 15),
     overrunSpawnCount: 0,
-    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 5,
+    buildCivilianGoods: 100, visionRadius: 1, zombieTargetValue: 0,
   },
   simpleFarm: {
     workerCapacity: 10,
     production: production(emptyInputs(), { food: 5 }, 'none'),
     overrunSpawnCount: 2,
-    buildCivilianGoods: 15, visionRadius: 1, zombieTargetValue: 0,
+    buildCivilianGoods: 25, visionRadius: 1, zombieTargetValue: 0,
   },
   civilianDroneBase: {
     workerCapacity: 5,
     production: production(emptyInputs(), emptyOutputs(), 'required', 5),
     overrunSpawnCount: 2,
-    buildCivilianGoods: 25, visionRadius: 15, zombieTargetValue: 0,
+    buildCivilianGoods: 50, visionRadius: 15, zombieTargetValue: 0,
   },
 };
 
@@ -275,6 +276,7 @@ const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopula
  * independent copy that can be stored in GameState.
  */
 export const DEFAULT_CONFIG: GameConfig = {
+  windPower: { noiseRadius: 8 },
   armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 20 },
   version: CONFIG_VERSION,
   mapId: DEFAULT_MAP_ID,
@@ -543,6 +545,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   }
 
   const facilityTypes: FacilityType[] = [
+    'temporaryHousing',
     'armyBase',
     'capital',
     'city',
@@ -576,13 +579,15 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     if (!['required', 'none'].includes(facility.production.powerMode)) {
       errors.push(`facilities.${type}.production.powerMode must be required or none`);
     }
-    const expectedPowerMode = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'armyBase'].includes(type)
+    const expectedPowerMode = ['capital', 'city', 'temporaryHousing', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'armyBase'].includes(type)
       ? 'required'
       : 'none';
     if (facility.production.powerMode !== expectedPowerMode) {
       errors.push(`facilities.${type}.production.powerMode must be ${expectedPowerMode}`);
     }
-    const expectedPowerCapacity = expectedPowerMode === 'none' ? 0 : 5;
+    const expectedPowerCapacity = expectedPowerMode === 'none' ? 0
+      : type === 'capital' || type === 'city' || type === 'refinery' ? 10
+        : type === 'civilianFactory' ? 15 : type === 'militaryFactory' ? 20 : 5;
     if (facility.production.powerCapacity !== expectedPowerCapacity) {
       errors.push(`facilities.${type}.production.powerCapacity must be ${expectedPowerCapacity}`);
     }
@@ -859,6 +864,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     }
   }
 
+  requireInteger(errors, config.windPower?.noiseRadius, 'windPower.noiseRadius', 0);
   for (const key of ['maxMilitaryGoods','interceptionCost','attack','range','noiseRadius','staffedVision','rewardLastTurn'] as const) requireInteger(errors,config.armyBase?.[key],`armyBase.${key}`,key==='interceptionCost'?1:0);
   requireInteger(errors,config.units?.gasZombie?.explosionDamage,'units.gasZombie.explosionDamage',0);
   requireInteger(errors,config.units?.gasZombie?.explosionInfection,'units.gasZombie.explosionInfection',0);

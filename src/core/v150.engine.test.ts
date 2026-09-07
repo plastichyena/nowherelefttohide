@@ -52,8 +52,8 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     const police = state.units.find((unit) => unit.type === 'police')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
 
-    expect(state.gameVersion).toBe('5.0.0');
-    expect(config.version).toBe('5.0.0');
+    expect(state.gameVersion).toBe('6.0.0');
+    expect(config.version).toBe('6.0.0');
     expect(police).toMatchObject({
       proficiency: 'regular', recruitSurvivalTurns: 0, regularZombieKills: 0,
       veteranPromotionPending: false, attack: 8, maxAttackCharges: 1, attackChargesRemaining: 1,

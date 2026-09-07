@@ -44,28 +44,34 @@ describe('Agent Runner replay artifacts', () => {
     expect(first.artifact.observationTrace?.some((observation) => observation.horde.nextWaveIndex === 1)).toBe(true);
     expect(first.artifact.initialRoadArrivalSchedule).toHaveLength(4);
     expect(first.artifact.observationTrace).toHaveLength(first.actions.length + 1);
-    const fullHordeEvent = first.artifact.verificationEvents?.find((event) => (
-      event.type === 'horde_spawned' && Array.isArray(event.payload.units)
-    ));
-    expect(fullHordeEvent?.payload).toMatchObject({
-      spawnGroupIds: expect.arrayContaining([expect.any(String)]),
-      hordeZombieCount: expect.any(Number),
-      normalZombieCount: expect.any(Number),
-      units: expect.arrayContaining([
-        expect.objectContaining({
-          unitId: expect.any(String),
-          unitType: expect.any(String),
-          spawnGroupId: expect.any(String),
-        }),
-      ]),
+    const frozenWaveEvent = first.artifact.verificationEvents?.find((event) => event.type === 'horde_wave_started');
+    const spawnBatchEvent = first.artifact.verificationEvents?.find((event) => event.type === 'horde_spawn_batch');
+    expect(frozenWaveEvent?.payload).toMatchObject({
+      waveIndex: expect.any(Number),
+      direction: expect.any(String),
+      groupId: expect.any(String),
+      hordeKind: 'final',
+      baseWaveUnitCount: expect.any(Number),
+      committedWaveUnitCount: expect.any(Number),
+      spawnedSoFar: 0,
+      pendingCount: expect.any(Number),
+    });
+    expect(spawnBatchEvent?.payload).toMatchObject({
+      waveIndex: expect.any(Number),
+      direction: expect.any(String),
+      groupId: expect.any(String),
+      hordeKind: 'final',
+      spawnedThisBatch: expect.any(Number),
+      spawnedSoFar: expect.any(Number),
+      pendingCount: expect.any(Number),
     });
     const replay = replayArtifact(first.artifact);
     expect(replay.reproduced).toBe(true);
     expect(replay.mismatch).toBeNull();
     expect(replay.actionsReplayed).toBe(first.actions.length);
     const corruptedVerificationEvents = first.artifact.verificationEvents?.map((event) => (
-      event === fullHordeEvent
-        ? { ...event, payload: { ...event.payload, hordeZombieCount: 999 } }
+      event === frozenWaveEvent
+        ? { ...event, payload: { ...event.payload, committedWaveUnitCount: 999 } }
         : event
     ));
     const corruptedReplay = replayArtifact({

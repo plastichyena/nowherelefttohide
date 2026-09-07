@@ -8,6 +8,13 @@ import { writeJsonStream } from '../agent/json-stream';
 
 const DEFAULT_MAX_DECISIONS = 200;
 const HIDDEN_KEYS = new Set([
+  'previousFallbackPosition',
+  'fallbackTarget',
+  'waveCapitalAnchor',
+  'inheritedTarget',
+  'noiseTarget',
+  'rejectedRefugeesByDirection',
+  'roster',
   'verificationEvents',
   'normalZombiesNoiseTargeted',
   'noiseTargetsReached',

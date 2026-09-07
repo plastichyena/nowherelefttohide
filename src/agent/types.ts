@@ -34,17 +34,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.5.1 rejects v1.5.0-or-earlier data without migration. */
-export const APP_VERSION = '1.5.3';
-export const GAME_RULES_VERSION = '5.0.0';
-export const SAVE_FORMAT_VERSION = '12';
-export const AGENT_API_VERSION = '10.0.0';
-export const OBSERVATION_API_VERSION = '10.0.0';
-export const BRIDGE_API_VERSION = '10.0.0';
-export const BALANCED_AGENT_VERSION = '5.0.0';
-export const RANDOM_AGENT_VERSION = '3.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '9.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '6.0.0';
+/** v1.5.4 rejects all earlier state and public API schemas without migration. */
+export const APP_VERSION = '1.5.4';
+export const GAME_RULES_VERSION = '6.0.0';
+export const SAVE_FORMAT_VERSION = '13';
+export const AGENT_API_VERSION = '11.0.0';
+export const OBSERVATION_API_VERSION = '11.0.0';
+export const BRIDGE_API_VERSION = '11.0.0';
+export const BALANCED_AGENT_VERSION = '6.0.0';
+export const RANDOM_AGENT_VERSION = '4.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '10.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '7.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -52,6 +52,8 @@ export type CrisisSeverity = 'critical' | 'warning' | 'advisory';
 
 /** Stable, public reason codes used by Crisis Summary projections. */
 export const CRISIS_REASON_CODES = [
+  'overcrowding_forecast',
+  'temporary_housing_outage_forecast',
   'capital_infection_uncontained',
   'critical_site_infection_uncontained',
   'checkpoint_defense_degraded',
@@ -233,6 +235,22 @@ export interface AgentFacilityObservation {
   projectedCivilianDamage: number;
   /** Only an eligible Civilian Drone Base can expose this refund. */
   decommissionRefundCivilianGoods: number | null;
+  /** Public semantics for city-like, soft-capacity Temporary Housing. */
+  temporaryHousing: null | {
+    softCapacity: number;
+    totalResidents: number;
+    occupied: boolean;
+    populationPoolEligible: boolean;
+    outageReason: 'power_shortage' | 'supply_disconnected' | null;
+  };
+  /** Public operational state for both initial and Player-built Wind Power. */
+  windPower: null | {
+    operational: boolean;
+    generation: number;
+    emitsNoise: boolean;
+    playerBuildLimit: number;
+    playerBuiltCount: number;
+  };
 }
 
 export interface AgentUnitObservation {
@@ -575,14 +593,15 @@ export interface AgentApiInfo {
       destroyedUnitReturnsCarriedGoods: false;
     };
     constructibleFacilities: {
-      types: Array<'simpleFarm' | 'civilianDroneBase'>;
+      types: Array<'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant'>;
       limitFormula: string;
       buildConditions: string[];
-      costs: Record<'simpleFarm' | 'civilianDroneBase', number>;
+      costs: Record<'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant', number>;
       stateTransitions: string[];
       simpleFarm: { workerCapacity: number; requiredPower: number; foodPerWorker: number };
       civilianDroneBase: { workerCapacity: number; requiredPower: number; visionPerWorker: number };
-      windPowerPlant: { fixedPower: number; vision: number; zombieTargetValue: number; supplySource: false };
+      temporaryHousing: { softCapacity: number; requiredPower: number; vision: number; populationLimitKind: 'soft'; recruitmentHub: false };
+      windPowerPlant: { fixedPower: number; vision: number; noiseRadius: number; zombieTargetValue: 0; emitsNoise: true; playerBuildLimit: string; supplySource: false };
     };
     strategicForecast: {
       observationField: 'strategicForecast';
@@ -759,6 +778,28 @@ export interface AgentObservation {
     finalHordeStatus: 'notStarted' | 'active' | 'defeated';
     turnsRemaining: number;
     nextSpawnTurn: number | null;
+    /** Roster facts become public only after the Wave has been frozen. */
+    waves: Array<{
+      waveIndex: number;
+      direction: CardinalDirection;
+      groupId: string;
+      kind: 'periodic' | 'final';
+      baseWaveUnitCount: number;
+      committedWaveUnitCount: number;
+      spawnedSoFar: number;
+      pendingCount: number;
+    }>;
+    /** Wave-wide public totals across every frozen direction/group. */
+    waveTotals: Array<{
+      waveIndex: number;
+      kind: 'periodic' | 'final';
+      baseWaveUnitCount: number;
+      committedWaveUnitCount: number;
+      spawnedSoFar: number;
+      pendingCount: number;
+    }>;
+    /** Includes unspawned Final roster entries, without exposing their types or positions. */
+    finalPendingCount: number;
   };
   /** Public Victory progress; no hidden enemy count or coordinate is included. */
   victory: {
@@ -879,7 +920,7 @@ export interface AgentRunArtifact {
   /** Present for a Session artifact; absent for a standalone run. */
   sessionLineage?: { parentSessionId: string | null; parentCheckpointId: string | null };
   result: AgentGameResult | null;
-  /** Static map projection stored once per game by Artifact Schema 6.0.0. */
+  /** Static map projection stored once per game by Artifact Schema 10.0.0. */
   fixedMap?: AgentMapObservation;
   /** Dynamic public observations at reset and after each accepted action. */
   observationTrace?: AgentArtifactObservation[];
@@ -891,7 +932,7 @@ export interface AgentRunArtifact {
 }
 
 /**
- * Artifact Schema 6.0.0 stores topology once and keeps only dynamic map
+ * Artifact Schema 10.0.0 stores topology once and keeps only dynamic map
  * visibility in each trace entry.  Live observations remain complete.
  */
 export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {
@@ -932,13 +973,30 @@ export const HIDDEN_REJECTED_REFUGEE_METRIC_KEYS = [
 ] as const;
 
 export type HiddenRejectedRefugeeMetricKey = typeof HIDDEN_REJECTED_REFUGEE_METRIC_KEYS[number];
+
+/** Frozen Wave roster type draws are never part of a public Artifact or Session. */
+export const HIDDEN_HORDE_WAVE_METRIC_KEYS = [
+  'periodicHordeZombiesSpawned',
+  'periodicNormalZombiesSpawned',
+  'finalHordeZombiesSpawned',
+  'finalNormalZombiesSpawned',
+  'policeZombiesSpawned',
+  'soldierZombiesSpawned',
+  'riotZombiesSpawned',
+  'hunterZombiesSpawned',
+  'gasZombiesSpawned',
+  'hordeSpecialSpawnedByType',
+  'hordeDirectionSpawnCounts',
+] as const;
+
+export type HiddenHordeWaveMetricKey = typeof HIDDEN_HORDE_WAVE_METRIC_KEYS[number];
 /**
  * Runtime public Config is a redacted copy (see createAgentPublicConfig).
  * Keep the compile-time shape aligned with Core's Config so verification
  * artifacts can still be assembled without a second mutable config model.
  */
 export type AgentPublicConfig = GameConfig;
-export type AgentPublicMetrics = Omit<GameMetrics, HiddenNoiseMetricKey | HiddenRejectedRefugeeMetricKey | 'config'> & {
+export type AgentPublicMetrics = Omit<GameMetrics, HiddenNoiseMetricKey | HiddenRejectedRefugeeMetricKey | HiddenHordeWaveMetricKey | 'config'> & {
   config: AgentPublicConfig;
 };
 export type AgentPublicRunArtifact = Omit<

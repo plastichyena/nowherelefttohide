@@ -28,12 +28,12 @@ describe('v1.4.2 economy and required power grid', () => {
     disableWindInEngine(engine);
     const forecast = forecastEndTurn(engine.getState());
     expect(forecast.electricity).toMatchObject({
-      physicalGenerationCapacity: 30,
-      requiredPowerDemand: 20,
-      requiredPowerAllocated: 20,
+      physicalGenerationCapacity: 45,
+      requiredPowerDemand: 40,
+      requiredPowerAllocated: 40,
     });
-    // Five electricity now requires two Fuel: four complete allocations consume eight.
-    expect(forecast.fuel).toMatchObject({ generationFuelDemand: 8, projectedFuelUsed: 8 });
+    // Five electricity requires two Fuel and only actually allocated capacity burns it.
+    expect(forecast.fuel).toMatchObject({ generationFuelDemand: 16, projectedFuelUsed: 16 });
     expect(forecast.food).toMatchObject({ projectedProduction: 230, maintenanceRequired: 115, shortage: 0 });
     expect(forecast.civilianGoods.projectedProduction).toBe(271);
   });
@@ -65,6 +65,10 @@ describe('v1.4.2 economy and required power grid', () => {
     military.securedOrder = 10;
     military.populationOperationalTurn = 1;
     state.facilities.find((facility) => facility.id === 'capital')!.workers -= 5;
+    state.facilities
+      .filter((facility) => facility.id !== military.id && facility.powerSupplyEnabled)
+      .forEach((facility) => { facility.powerSupplyEnabled = false; });
+    state.resources.fuel = 1_000;
     synchronizePopulation(state);
     state.resources.civilianGoods = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
@@ -73,7 +77,10 @@ describe('v1.4.2 economy and required power grid', () => {
     expect(none.militaryGoods.projectedProduction).toBe(0);
 
     const withStock = editableState(engine);
-    withStock.resources.civilianGoods = 2;
+    withStock.resources.civilianGoods = Math.max(
+      0,
+      none.civilianGoods.maintenanceRequired - none.civilianGoods.projectedProduction,
+    ) + 2;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: withStock }).error).toBeNull();
     const partial = forecastEndTurn(engine.getState());
     expect(partial.civilianGoods.productionInputAllocated).toBe(2);
@@ -98,10 +105,12 @@ describe('v1.4.2 economy and required power grid', () => {
     const engine = new GameEngine(131, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     disableWindInEngine(engine);
     const before = forecastEndTurn(engine.getState());
-    expect(before.electricity.requiredPowerDemand).toBe(20);
+    expect(before.electricity.requiredPowerDemand).toBe(40);
     const result = engine.step({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false });
     expect(result.error).toBeNull();
-    expect(forecastEndTurn(engine.getState()).electricity.requiredPowerDemand).toBe(15);
+    expect(forecastEndTurn(engine.getState()).electricity.requiredPowerDemand).toBe(
+      before.electricity.requiredPowerDemand - engine.getState().config.facilities.farm.production.powerCapacity,
+    );
     const rejected = engine.step({ type: 'SetPowerSupply', facilityId: 'capital', enabled: false });
     expect(rejected.error?.code).toBe('power_supply_not_applicable');
   });

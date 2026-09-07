@@ -94,8 +94,8 @@ function stateWithArmyBaseReservation(seed = 42): GameState {
   return state;
 }
 
-describe('v1.5.3 Save Format 12', () => {
-  it('exposes stable per-stage timings without changing Save Format 12 bytes', () => {
+describe('v1.5.4 Save Format 13', () => {
+  it('exposes stable per-stage timings without changing Save Format 13 bytes', () => {
     const state = initialState(15152);
     const measured = measureSaveEncoding(state);
     expect(measured.code).toBe(encodeSaveCode(state));
@@ -107,7 +107,7 @@ describe('v1.5.3 Save Format 12', () => {
     }
   });
 
-  it('round-trips a detached complete Save Format 12 GameState through code and JSON', () => {
+  it('round-trips a detached complete Save Format 13 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -115,9 +115,9 @@ describe('v1.5.3 Save Format 12', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 12,
+      formatVersion: 13,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-51x51-v2',
+      mapId: 'fixed-51x51-v3',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -128,7 +128,7 @@ describe('v1.5.3 Save Format 12', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('preserves v1.5.3 Army Base, Gas, and pending Noise state without conversion', () => {
+  it('preserves v1.5.4 Army Base, Gas, Wind Noise, and pending Noise state without conversion', () => {
     const state = initialState(78);
     const riot = state.units.find((unit) => unit.type === 'police')!;
     const capital = state.facilities.find((facility) => facility.id === 'capital')!;
@@ -183,6 +183,15 @@ describe('v1.5.3 Save Format 12', () => {
       sourceUnitType: 'armyBase',
       emittedTurn: state.turn,
     });
+    const wind = state.facilities.find((facility) => facility.type === 'windPowerPlant')!;
+    state.pendingNoisePulses.push({
+      id: 'noise-wind-save',
+      center: { ...wind.position },
+      radius: state.config.windPower.noiseRadius,
+      sourceKind: 'windPower',
+      sourceUnitType: 'windPowerPlant',
+      emittedTurn: state.turn,
+    });
     state.events.push({
       id: 'event-army-base-save',
       turn: state.turn,
@@ -191,6 +200,7 @@ describe('v1.5.3 Save Format 12', () => {
       payload: { facilityId: armyBase.id, reward: 'pending' },
     });
     state.statistics.noisePulsesBySourceType.armyBase = 1;
+    state.statistics.noisePulsesBySourceType.windPowerPlant = 1;
     state.statistics.gasZombiesSpawned = state.initialGasPositions.length;
     synchronizePopulation(state);
     createCityPopulationSnapshot(state);
@@ -212,16 +222,16 @@ describe('v1.5.3 Save Format 12', () => {
     expect(loaded.state?.initialGasPositions).toEqual(state.initialGasPositions);
   });
 
-  it('writes the v1.5.3 version boundaries and complete v1.5.3 Config / Statistics / Event state', () => {
+  it('writes the v1.5.4 version boundaries and complete v1.5.4 Config / Statistics / Event state', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(12);
-    expect(envelope.gameVersion).toBe('5.0.0');
-    expect(config.version).toBe('5.0.0');
-    expect(config.mapId).toBe('fixed-51x51-v2');
+    expect(envelope.formatVersion).toBe(13);
+    expect(envelope.gameVersion).toBe('6.0.0');
+    expect(config.version).toBe('6.0.0');
+    expect(config.mapId).toBe('fixed-51x51-v3');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
@@ -258,6 +268,7 @@ describe('v1.5.3 Save Format 12', () => {
         gasZombieCapPerDirection: 1,
         movementNoiseRadius: 8,
       },
+      windPower: { noiseRadius: 8 },
       armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 20 },
       units: {
         police: { recruitAttack: 6, noiseClass: 'medium', noiseRadius: 4 },
@@ -292,7 +303,7 @@ describe('v1.5.3 Save Format 12', () => {
       gasZombiesKilled: 0,
       gasExplosions: 0,
       gasExplosionUnitDamage: 0,
-      noisePulsesBySourceType: expect.objectContaining({ armyBase: 0 }),
+      noisePulsesBySourceType: expect.objectContaining({ armyBase: 0, windPowerPlant: 0 }),
       hordeMovementNoisePulses: 0,
     });
   });
@@ -307,22 +318,29 @@ describe('v1.5.3 Save Format 12', () => {
     (config.infection as Record<string, unknown>).fallBackCapacityRate = 0.5;
     delete horde.warningDirections;
     delete horde.spawnGroupIdsByWave;
+    delete horde.pendingWaves;
+    delete horde.waves;
     delete map.hordeSpawnReserve;
     delete state.initialHunterPositions;
     delete ((map.tiles as Array<Record<string, unknown>>)[0]!).playerOccupancyAllowed;
     delete (state.statistics as Record<string, unknown>).noiseRespawnAttempts;
     delete config.unitExperience;
+    delete config.windPower;
     delete (config.horde as Record<string, unknown>).specialZombieWeights;
     delete state.pendingNoisePulses;
     delete (state.units as Array<Record<string, unknown>>)[0]!.proficiency;
+    delete (state.units as Array<Record<string, unknown>>)[0]!.previousFallbackPosition;
+    delete (state.units as Array<Record<string, unknown>>)[0]!.fallbackTarget;
+    delete (state.units as Array<Record<string, unknown>>)[0]!.waveCapitalAnchor;
     delete (state.statistics as Record<string, unknown>).riotPoliceProduced;
+    delete ((state.statistics as Record<string, unknown>).noisePulsesBySourceType as Record<string, unknown>).windPowerPlant;
 
     const result = importSaveJson(JSON.stringify(resign(envelope)));
     expect(result.valid).toBe(false);
-    expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|hordeSpawnReserve|playerOccupancyAllowed|initialHunterPositions|noiseRespawnAttempts|unitExperience|specialZombieWeights|pendingNoisePulses|proficiency|riotPoliceProduced/i);
+    expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|pendingWaves|horde\.waves|hordeSpawnReserve|playerOccupancyAllowed|initialHunterPositions|noiseRespawnAttempts|unitExperience|windPower|specialZombieWeights|pendingNoisePulses|proficiency|previousFallbackPosition|fallbackTarget|waveCapitalAnchor|riotPoliceProduced|windPowerPlant/i);
   });
 
-  it('rejects missing or invalid v1.5.3 Army Base, Gas, Noise, Event, and statistics data', () => {
+  it('rejects missing or invalid v1.5.4 Army Base, Gas, Wind Noise, Event, and statistics data', () => {
     const valid = exportedEnvelope(stateWithArmyBaseReservation(117));
 
     const missingBaseState = clone(valid);
@@ -368,9 +386,10 @@ describe('v1.5.3 Save Format 12', () => {
     const statistics = (missingStatisticState.state as Record<string, unknown>).statistics as Record<string, unknown>;
     delete statistics.gasExplosions;
     delete (statistics.noisePulsesBySourceType as Record<string, unknown>).armyBase;
+    delete (statistics.noisePulsesBySourceType as Record<string, unknown>).windPowerPlant;
     const missingStatisticResult = importSaveJson(JSON.stringify(resign(missingStatisticState)));
     expect(missingStatisticResult.valid).toBe(false);
-    expect(missingStatisticResult.errors.join(' ')).toMatch(/gasExplosions|noisePulsesBySourceType\.armyBase/i);
+    expect(missingStatisticResult.errors.join(' ')).toMatch(/gasExplosions|noisePulsesBySourceType\.armyBase|noisePulsesBySourceType\.windPowerPlant/i);
   });
 
   it('requires current Checkpoint history, Rejected Refugee counters, and reanimation statistics', () => {
@@ -424,6 +443,32 @@ describe('v1.5.3 Save Format 12', () => {
     );
     expect(state.statistics.terrainEntriesByType).toEqual({ plain: 0, forest: 0, mountain: 0, water: 0 });
     expect(decodeSaveCode(encodeSaveCode(state)).state).toEqual(state);
+  });
+
+  it('rejects duplicate or missing Pending Wave rosters that disagree with a public Wave count', () => {
+    const config = createDefaultConfig({
+      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+      horde: {
+        warningLeadTurns: 1,
+        waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 18 }, final: true }],
+      },
+    });
+    const state = new GameEngine(160, config).step({ type: 'EndTurn' }).state;
+    expect(state.horde.waves[0]!.pendingCount).toBeGreaterThan(0);
+
+    const duplicateEnvelope = exportedEnvelope(clone(state));
+    const duplicateHorde = ((duplicateEnvelope.state as Record<string, unknown>).horde as Record<string, unknown>);
+    const pendingWaves = duplicateHorde.pendingWaves as Array<Record<string, unknown>>;
+    pendingWaves.push(clone(pendingWaves[0]!));
+    const duplicateResult = importSaveJson(JSON.stringify(resign(duplicateEnvelope)));
+    expect(duplicateResult).toMatchObject({ valid: false, state: null, envelope: null });
+    expect(duplicateResult.errors.join(' ')).toMatch(/Pending Horde Wave.*match|groupId.*duplicated/i);
+
+    const missingEnvelope = exportedEnvelope(clone(state));
+    ((missingEnvelope.state as Record<string, unknown>).horde as Record<string, unknown>).pendingWaves = [];
+    const missingResult = importSaveJson(JSON.stringify(resign(missingEnvelope)));
+    expect(missingResult).toMatchObject({ valid: false, state: null, envelope: null });
+    expect(missingResult.errors.join(' ')).toMatch(/untracked pending roster/i);
   });
 
   it('preserves current overrun Event payloads and derived Statistics without adding UI-only state', () => {
@@ -538,11 +583,11 @@ describe('v1.5.3 Save Format 12', () => {
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
     expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.3\.0/i);
-    expect(result.errors.join(' ')).toContain('v1.5.2 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toContain('v1.5.3 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Save Format 12', () => {
+  it('rejects a stale state/config version even when the envelope has Save Format 13', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     state.gameVersion = '2.4.0';
@@ -580,7 +625,7 @@ describe('v1.5.3 Save Format 12', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v12 autosave key and never rewrites or removes a v11 legacy key', () => {
+  it('uses the v13 autosave key and never rewrites or removes the v12 legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
     legacy.formatVersion = 10;

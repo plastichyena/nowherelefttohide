@@ -177,7 +177,7 @@ describe('Session hash and input boundaries', () => {
 });
 
 describe('AI Portable Session lifecycle', () => {
-  it('restores v1.5.0 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
+  it('restores v1.5.4 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
     const root = tempRoot('real-wave-resume');
     const api = agentService(root);
     api.newSession({ sessionId: 'real-wave-resume', seed: 71, checkpointInterval: 99 });
@@ -224,11 +224,11 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '5.0.0',
-      mapId: 'fixed-51x51-v2',
+      gameVersion: '6.0.0',
+      mapId: 'fixed-51x51-v3',
       config: {
-        version: '5.0.0',
-        mapId: 'fixed-51x51-v2',
+        version: '6.0.0',
+        mapId: 'fixed-51x51-v3',
         infection: {
           zombieSpawnPopulationPerUnit: 5,
           maxZombieSpawnPerResolution: 6,

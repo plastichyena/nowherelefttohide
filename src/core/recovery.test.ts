@@ -70,7 +70,7 @@ describe('v1.2.6 unit recovery and automatic suppression', () => {
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     const police = snapshot.units.find((unit) => unit.id === 'police-1')!;
     const guard = snapshot.units.find((unit) => unit.id === 'national-guard-1')!;
-    police.position = { q: 1, r: 1 };
+    police.position = { q: 2, r: 2 };
     police.hp = 10;
     guard.hp = guard.maxHp - 2;
     rebalance(snapshot);

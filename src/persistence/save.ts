@@ -14,15 +14,15 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.5.3 saves. */
+/** The sole game-rules version accepted by v1.5.4 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 12;
-/** v1.5.3 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v12';
+export const SAVE_FORMAT_VERSION = 13;
+/** v1.5.4 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v13';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v11';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v12';
 const OLDER_AUTOSAVE_KEYS = [
   'nowhere-left-to-hide:auto-save:v9',
   'nowhere-left-to-hide:auto-save:v8',
@@ -33,7 +33,7 @@ const OLDER_AUTOSAVE_KEYS = [
   'nowhere-left-to-hide:auto-save:v3',
   'nowhere-left-to-hide:auto-save:v2',
 ] as const;
-/** Deprecated metadata exports. They are never migration targets in v1.5.3. */
+/** Deprecated metadata exports. They are never migration targets in v1.5.4. */
 export const V125_GAME_VERSION = '1.2.0';
 export const V126_GAME_VERSION = '1.2.1';
 export const LEGACY_GAME_VERSION = V125_GAME_VERSION;
@@ -106,9 +106,10 @@ const FACILITY_TYPES = [
   'windPowerPlant',
   'simpleFarm',
   'civilianDroneBase',
+  'temporaryHousing',
   'armyBase',
 ] as const;
-const CONSTRUCTIBLE_FACILITY_TYPES = ['simpleFarm', 'civilianDroneBase'] as const;
+const CONSTRUCTIBLE_FACILITY_TYPES = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const;
 const FACILITY_STATUSES = ['unowned', 'owned', 'ruined'] as const;
 const FACILITY_OPERATIONAL_STATUSES = [
   'building',
@@ -125,6 +126,8 @@ const CARDINAL_DIRECTIONS = ['north', 'east', 'south', 'west'] as const;
 const GAME_PHASES = ['player', 'economy', 'refugees', 'infection', 'zombie', 'horde', 'gameOver'] as const;
 const GAME_OVER_REASONS = ['capitalLost', 'healthyCiviliansLost', 'stateSecured', 'abandoned', 'error'] as const;
 const GAME_EVENT_TYPES = [
+  'horde_wave_started',
+  'horde_spawn_batch',
   'gas_explosion',
   'army_base_reward',
   'production_forfeited',
@@ -187,7 +190,6 @@ const GAME_EVENT_TYPES = [
   'riot_police_commissioned',
   'victory_progress_changed',
   'horde_warning',
-  'horde_spawned',
   'checkpoint_refugees_turned_away',
   'checkpoint_refugees_rejected',
   'horde_rejected_bonus_applied',
@@ -585,7 +587,7 @@ function hasCanonicalDirectionOrder(directions: unknown[]): boolean {
 }
 
 /**
- * Reject obsolete or partial pre-v1.5.3 container shapes before casting. The core
+ * Reject obsolete or partial pre-v1.5.4 container shapes before casting. The core
  * invariant checker performs relational validation; this guard makes the Wave
  * schedule, reserved map perimeter, and warning state an explicit save
  * boundary instead of silently accepting a partial snapshot.
@@ -634,6 +636,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       'constructibleFacility',
       'terrain',
       'vision',
+      'windPower',
       'armyBase',
     ]);
     if (hasOwn(config, 'maxTurns')) errors.push('state.config.maxTurns is obsolete; use horde.waves');
@@ -641,11 +644,17 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     if (config.version !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(config.version, 'state.config.version'));
     if (config.mapId !== FIXED_MAP_ID) errors.push(`state.config.mapId must be ${FIXED_MAP_ID}`);
     validateHordeConfigShape(config.horde, state.finalHordeTurn, errors);
+    if (!isRecord(config.windPower)) {
+      errors.push('state.config.windPower must be an object');
+    } else {
+      requireFields(errors, config.windPower, 'state.config.windPower', ['noiseRadius']);
+      if (!isInteger(config.windPower.noiseRadius)) errors.push('state.config.windPower.noiseRadius is invalid');
+    }
     const infection = config.infection;
     if (!isRecord(infection)) {
       errors.push('state.config.infection must be an object');
     } else {
-      // Save Format 12 deliberately has no conversion path for the old
+      // Save Format 13 deliberately has no conversion path for the old
       // fallback-capacity tuning. Reject a hand-edited v1.4.3-shaped
       // container even when its outer version strings were forged as current.
       for (const retiredField of ['fallBackCapacityRate', 'fallBackCapacityRounding']) {
@@ -837,7 +846,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (typeof facility.constructible !== 'boolean') errors.push(`${path}.constructible is invalid`);
       if (facility.builtTurn !== null && !isInteger(facility.builtTurn, 1)) errors.push(`${path}.builtTurn is invalid`);
       if (facility.recoveryOperationalTurn !== null && !isInteger(facility.recoveryOperationalTurn, 1)) errors.push(`${path}.recoveryOperationalTurn is invalid`);
-      if (CONSTRUCTIBLE_FACILITY_TYPES.includes(facility.type as typeof CONSTRUCTIBLE_FACILITY_TYPES[number]) !== (facility.constructible === true)) errors.push(`${path}.constructible does not match its facility type`);
+      if (facility.constructible && !CONSTRUCTIBLE_FACILITY_TYPES.includes(facility.type as typeof CONSTRUCTIBLE_FACILITY_TYPES[number])) errors.push(`${path}.constructible does not match its facility type`);
       if (facility.constructible && facility.builtTurn === null) errors.push(`${path}.constructible facilities require builtTurn`);
       if (!facility.constructible && facility.builtTurn !== null) errors.push(`${path}.fixed facilities cannot have builtTurn`);
       if (facility.type === 'armyBase') {
@@ -894,6 +903,9 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
         'canMove',
         'isPlayerUnit',
         'inheritedTarget',
+        'previousFallbackPosition',
+        'fallbackTarget',
+        'waveCapitalAnchor',
         'noiseTarget',
         'spawnGroupId',
         'hordeKind',
@@ -926,6 +938,9 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (!['ready', 'moved', 'acted', 'destroyed'].includes(unit.actionState as string)) errors.push(`${path}.actionState is invalid`);
       for (const field of ['canAttack', 'canMove', 'isPlayerUnit'] as const) if (typeof unit[field] !== 'boolean') errors.push(`${path}.${field} is invalid`);
       if (unit.inheritedTarget !== null) validateCoordinate(errors, unit.inheritedTarget, `${path}.inheritedTarget`);
+      if (unit.previousFallbackPosition !== null) validateCoordinate(errors, unit.previousFallbackPosition, `${path}.previousFallbackPosition`);
+      if (unit.fallbackTarget !== null) validateCoordinate(errors, unit.fallbackTarget, `${path}.fallbackTarget`);
+      if (unit.waveCapitalAnchor !== null) validateCoordinate(errors, unit.waveCapitalAnchor, `${path}.waveCapitalAnchor`);
       if (unit.noiseTarget !== null) validateCoordinate(errors, unit.noiseTarget, `${path}.noiseTarget`);
       if (unit.spawnGroupId !== null && (typeof unit.spawnGroupId !== 'string' || unit.spawnGroupId.length === 0)) errors.push(`${path}.spawnGroupId is invalid`);
       if (unit.hordeKind !== null && !HORDE_KINDS.includes(unit.hordeKind as typeof HORDE_KINDS[number])) errors.push(`${path}.hordeKind is invalid`);
@@ -1040,11 +1055,12 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (typeof pulse.id !== 'string' || pulse.id.length === 0) errors.push(`${path}.id is invalid`);
       validateCoordinate(errors, pulse.center, `${path}.center`);
       if (!isInteger(pulse.radius) || !isInteger(pulse.emittedTurn, 1)) errors.push(`${path}.radius or emittedTurn is invalid`);
-      if (!['humanCombat', 'hordeMovement', 'armyBase'].includes(pulse.sourceKind as string)) errors.push(`${path}.sourceKind is invalid`);
-      if (!['police', 'nationalGuard', 'riotPolice', 'hordeZombie', 'armyBase'].includes(pulse.sourceUnitType as string)) errors.push(`${path}.sourceUnitType is invalid`);
+      if (!['humanCombat', 'hordeMovement', 'armyBase', 'windPower'].includes(pulse.sourceKind as string)) errors.push(`${path}.sourceKind is invalid`);
+      if (!['police', 'nationalGuard', 'riotPolice', 'hordeZombie', 'armyBase', 'windPowerPlant'].includes(pulse.sourceUnitType as string)) errors.push(`${path}.sourceUnitType is invalid`);
       const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice'].includes(pulse.sourceUnitType as string))
         || (pulse.sourceKind === 'hordeMovement' && pulse.sourceUnitType === 'hordeZombie')
-        || (pulse.sourceKind === 'armyBase' && pulse.sourceUnitType === 'armyBase');
+        || (pulse.sourceKind === 'armyBase' && pulse.sourceUnitType === 'armyBase')
+        || (pulse.sourceKind === 'windPower' && pulse.sourceUnitType === 'windPowerPlant');
       if (!matchingSource) errors.push(`${path}.sourceKind and sourceUnitType do not match`);
     }
   }
@@ -1055,7 +1071,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
   if (!isRecord(horde)) {
     errors.push('state.horde must be an object');
   } else {
-    requireFields(errors, horde, 'state.horde', ['nextWaveIndex', 'totalSpawned', 'warningDirections', 'turnsRemaining', 'nextSpawnTurn', 'lastSpawnTurn', 'warningType', 'spawnedWaveIndices', 'spawnGroupIdsByWave', 'finalHordeStatus', 'finalSpawnGroupIds', 'finalSpawnedCount']);
+    requireFields(errors, horde, 'state.horde', ['pendingWaves', 'waves', 'nextWaveIndex', 'totalSpawned', 'warningDirections', 'turnsRemaining', 'nextSpawnTurn', 'lastSpawnTurn', 'warningType', 'spawnedWaveIndices', 'spawnGroupIdsByWave', 'finalHordeStatus', 'finalSpawnGroupIds', 'finalSpawnedCount']);
     for (const retiredField of ['spawnedCount', 'nextDirection', 'finalSpawnGroupId']) {
       if (hasOwn(horde, retiredField)) errors.push(`state.horde.${retiredField} is obsolete; use Wave Horde state`);
     }
@@ -1089,6 +1105,65 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       || horde.finalSpawnGroupIds.some((groupId) => typeof groupId !== 'string' || groupId.length === 0)
       || new Set(horde.finalSpawnGroupIds).size !== horde.finalSpawnGroupIds.length) {
       errors.push('state.horde.finalSpawnGroupIds is invalid');
+    }
+    const validateWaveIdentity = (wave: Record<string, unknown>, path: string, pending: boolean): void => {
+      requireFields(errors, wave, path, pending
+        ? ['waveIndex', 'direction', 'groupId', 'kind', 'baseWaveUnitCount', 'committedWaveUnitCount', 'spawnedSoFar', 'roster']
+        : ['waveIndex', 'direction', 'groupId', 'kind', 'baseWaveUnitCount', 'committedWaveUnitCount', 'spawnedSoFar', 'pendingCount']);
+      if (!isInteger(wave.waveIndex, 1)) errors.push(`${path}.waveIndex is invalid`);
+      if (!CARDINAL_DIRECTIONS.includes(wave.direction as typeof CARDINAL_DIRECTIONS[number])) errors.push(`${path}.direction is invalid`);
+      if (typeof wave.groupId !== 'string' || wave.groupId.length === 0) errors.push(`${path}.groupId is invalid`);
+      if (!HORDE_KINDS.includes(wave.kind as typeof HORDE_KINDS[number])) errors.push(`${path}.kind is invalid`);
+      for (const field of ['baseWaveUnitCount', 'committedWaveUnitCount', 'spawnedSoFar'] as const) {
+        if (!isInteger(wave[field])) errors.push(`${path}.${field} is invalid`);
+      }
+      if (isInteger(wave.baseWaveUnitCount) && isInteger(wave.committedWaveUnitCount) && wave.baseWaveUnitCount > wave.committedWaveUnitCount) errors.push(`${path}.baseWaveUnitCount cannot exceed committedWaveUnitCount`);
+      if (isInteger(wave.committedWaveUnitCount) && isInteger(wave.spawnedSoFar) && wave.spawnedSoFar > wave.committedWaveUnitCount) errors.push(`${path}.spawnedSoFar cannot exceed committedWaveUnitCount`);
+      if (pending) {
+        if (!Array.isArray(wave.roster) || wave.roster.some((type) => !ZOMBIE_UNIT_TYPES.includes(type as typeof ZOMBIE_UNIT_TYPES[number]))) errors.push(`${path}.roster is invalid`);
+        else if (isInteger(wave.committedWaveUnitCount) && isInteger(wave.spawnedSoFar) && wave.roster.length !== wave.committedWaveUnitCount - wave.spawnedSoFar) errors.push(`${path}.roster length must equal unspawned roster entries`);
+      } else if (!isInteger(wave.pendingCount) || (isInteger(wave.committedWaveUnitCount) && isInteger(wave.spawnedSoFar) && wave.pendingCount !== wave.committedWaveUnitCount - wave.spawnedSoFar)) {
+        errors.push(`${path}.pendingCount must equal unspawned roster entries`);
+      }
+    };
+    const pendingWaveGroupIds = new Set<string>();
+    if (!Array.isArray(horde.pendingWaves)) {
+      errors.push('state.horde.pendingWaves must be an array');
+    } else {
+      for (const [index, wave] of horde.pendingWaves.entries()) {
+        const path = `state.horde.pendingWaves[${index}]`;
+        if (!isRecord(wave)) { errors.push(`${path} must be an object`); continue; }
+        validateWaveIdentity(wave, path, true);
+        if (typeof wave.groupId === 'string' && !pendingWaveGroupIds.add(wave.groupId)) errors.push(`${path}.groupId is duplicated`);
+      }
+    }
+    const publicWavesByGroupId = new Map<string, Record<string, unknown>>();
+    if (!Array.isArray(horde.waves)) {
+      errors.push('state.horde.waves must be an array');
+    } else {
+      for (const [index, wave] of horde.waves.entries()) {
+        const path = `state.horde.waves[${index}]`;
+        if (!isRecord(wave)) { errors.push(`${path} must be an object`); continue; }
+        validateWaveIdentity(wave, path, false);
+        if (typeof wave.groupId === 'string') {
+          if (publicWavesByGroupId.has(wave.groupId)) errors.push(`${path}.groupId is duplicated`);
+          else publicWavesByGroupId.set(wave.groupId, wave);
+        }
+      }
+    }
+    if (Array.isArray(horde.pendingWaves)) {
+      for (const [index, wave] of horde.pendingWaves.entries()) {
+        if (!isRecord(wave) || typeof wave.groupId !== 'string') continue;
+        const publicWave = publicWavesByGroupId.get(wave.groupId);
+        if (!publicWave) {
+          errors.push(`state.horde.pendingWaves[${index}].groupId must have a public Wave state`);
+          continue;
+        }
+        for (const field of ['waveIndex', 'direction', 'kind', 'baseWaveUnitCount', 'committedWaveUnitCount', 'spawnedSoFar'] as const) {
+          if (wave[field] !== publicWave[field]) errors.push(`state.horde.pendingWaves[${index}].${field} must match its public Wave state`);
+        }
+        if (Array.isArray(wave.roster) && publicWave.pendingCount !== wave.roster.length) errors.push(`state.horde.pendingWaves[${index}].roster must match public pendingCount`);
+      }
     }
   }
 
@@ -1167,7 +1242,7 @@ function validateStatisticsShape(value: unknown, errors: string[], path: string)
   if (!isRecord(noiseBySource)) {
     errors.push(`${path}.noisePulsesBySourceType is invalid`);
   } else {
-    for (const sourceType of ['police', 'nationalGuard', 'riotPolice', 'hordeZombie', 'armyBase'] as const) {
+    for (const sourceType of ['police', 'nationalGuard', 'riotPolice', 'hordeZombie', 'armyBase', 'windPowerPlant'] as const) {
       if (!isInteger(noiseBySource[sourceType])) errors.push(`${path}.noisePulsesBySourceType.${sourceType} is invalid`);
     }
   }
@@ -1239,7 +1314,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.5.2以前 / v1.5.2 and earlier saves cannot be loaded or converted; earlier formats are rejected without conversion, deletion, or overwrite`);
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.5.3以前 / v1.5.3 and earlier saves cannot be loaded or converted; earlier formats are rejected without conversion, deletion, or overwrite`);
   }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (value.mapId !== FIXED_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID}`);
@@ -1284,7 +1359,7 @@ function clockMs(): number {
 
 /**
  * Encode one committed state and expose synchronous stage timings for the
- * v1.5.3 save benchmark. Gzip keeps level 9 for Save Format 12 compatibility;
+ * v1.5.4 save benchmark. Gzip keeps level 9 for Save Format 13 compatibility;
  * a zero mtime makes repeated encodes of one committed state byte-stable so
  * the shared autosave slot is not rewritten only because the clock advanced.
  */
@@ -1336,12 +1411,12 @@ export function measureSaveEncoding(state: GameState): SaveEncodingMeasurement {
   };
 }
 
-/** Create a checksummed, URL-safe v1.5.3 Save Format 12 code. */
+/** Create a checksummed, URL-safe v1.5.4 Save Format 13 code. */
 export function encodeSaveCode(state: GameState): string {
   return measureSaveEncoding(state).code;
 }
 
-/** Decode and validate a v1.5.3 save code without changing caller-owned state. */
+/** Decode and validate a v1.5.4 save code without changing caller-owned state. */
 export function decodeSaveCode(code: string): SaveValidationResult {
   if (typeof code !== 'string' || code.trim().length === 0) return reject(['Save code is empty']);
   try {
@@ -1443,7 +1518,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the current v1.5.3/v12 key; legacy data is deliberately preserved. */
+  /** Clears only the current v1.5.4/v13 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

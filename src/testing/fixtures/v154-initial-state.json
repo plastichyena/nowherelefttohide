@@ -1,0 +1,17 @@
+{
+  "sourceCommit": "v1.5.4-working-tree",
+  "fixtures": [
+    {
+      "seed": 1,
+      "sha256": "5688b7105afa191645dc7230035d28b20defd0dd4a3307ab88d27bbc84d05d43"
+    },
+    {
+      "seed": 17,
+      "sha256": "601c794444f7fa7597d854bb92acae2ff758acdd4ececefe579adc267531b598"
+    },
+    {
+      "seed": 20260905,
+      "sha256": "ce50fae8def442267b0bf49ba8b45bab043bcbe5a6852937a52efd0f29909d7e"
+    }
+  ]
+}

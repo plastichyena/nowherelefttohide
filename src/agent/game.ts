@@ -12,6 +12,7 @@ import {
   ARTIFACT_SCHEMA_VERSION,
   BRIDGE_API_VERSION,
   HIDDEN_NOISE_METRIC_KEYS,
+  HIDDEN_HORDE_WAVE_METRIC_KEYS,
   HIDDEN_REJECTED_REFUGEE_METRIC_KEYS,
   OBSERVATION_API_VERSION,
   type AgentActionError,
@@ -102,20 +103,30 @@ function publicMetrics(metrics: ReturnType<typeof collectGameMetrics>): AgentPub
   const value = cloneJson(metrics) as unknown as Record<string, unknown>;
   for (const key of HIDDEN_NOISE_METRIC_KEYS) delete value[key];
   for (const key of HIDDEN_REJECTED_REFUGEE_METRIC_KEYS) delete value[key];
+  for (const key of HIDDEN_HORDE_WAVE_METRIC_KEYS) delete value[key];
+  if (Array.isArray(value.hordeWaves)) {
+    value.hordeWaves = value.hordeWaves.map((wave) => {
+      if (!isPlainObject(wave)) return wave;
+      const {
+        index, spawnTurn, directions, final,
+        baseWaveUnitCount, committedWaveUnitCount, spawnedSoFar, pendingCount,
+      } = wave;
+      return {
+        index, spawnTurn, directions, final,
+        baseWaveUnitCount, committedWaveUnitCount, spawnedSoFar, pendingCount,
+      };
+    });
+  }
   value.config = createAgentPublicConfig(metrics.config);
   return value as AgentPublicMetrics;
 }
 
-/** Public AgentGame artifacts expose Noise classes, never exact radii. */
+/** Public artifacts expose static facility rules but never dynamic Pulse data. */
 export function createAgentPublicConfig(config: GameConfig): AgentPublicConfig {
   const value = cloneJson(config) as unknown as Record<string, unknown>;
   const noise = isPlainObject(value.noise) ? value.noise : null;
-  // Keep the public class contract while stripping all exact unit-radius
-  // diagnostics, including future aliases added to the Config. Horde movement
-  // radius is documented separately as a public rule, so it is not copied from
-  // this private Noise object. v1.5 stores unit Noise classes on each Human
-  // Unit Config; v1.4's top-level object is retained only when supplied by an
-  // older compatibility snapshot.
+  // Keep public Human-unit Noise classes while stripping exact Unit diagnostics.
+  // Static Horde and Wind facility rules are separately documented public data.
   if (noise) value.noise = { publicClass: cloneJson(noise.publicClass as JsonValue) };
   else delete value.noise;
   if (isPlainObject(value.units)) {
@@ -157,6 +168,18 @@ const SITE_PUBLIC_EVENT_FIELDS = new Set([
   'sourceUnitType',
 ]);
 
+const WAVE_PUBLIC_EVENT_FIELDS = new Set([
+  'waveIndex',
+  'direction',
+  'groupId',
+  'kind',
+  'baseWaveUnitCount',
+  'committedWaveUnitCount',
+  'spawnedThisBatch',
+  'spawnedSoFar',
+  'pendingCount',
+]);
+
 function publicEvents(
   before: Readonly<GameState>,
   after: Readonly<GameState>,
@@ -176,13 +199,6 @@ function publicEvents(
   );
   return events
     .filter((event) => !INTERNAL_EVENT_TYPES.has(event.type))
-    // Core emits one private bookkeeping event per placed Horde unit and a
-    // single aggregate event for the wave. Only the aggregate is a public
-    // decision-log fact; exposing the per-unit events would duplicate the
-    // wave, leak the internal placement order, and make one spawn appear as
-    // several public Horde events.
-    .filter((event) => !(event.type === 'horde_spawned' &&
-      isPlainObject(event.payload) && typeof event.payload.zombieId === 'string'))
     .map((event) => {
       let payload = cloneJson(event.payload) as JsonObject;
       if (SITE_PUBLIC_EVENT_TYPES.has(event.type)) {
@@ -197,53 +213,16 @@ function publicEvents(
             .map((field) => [field, payload[field]!]),
         ) as JsonObject;
       }
-      if (event.type === 'horde_spawned') {
-        const waveIndex = typeof payload.waveIndex === 'number' && Number.isSafeInteger(payload.waveIndex)
-          ? payload.waveIndex
-          : null;
-        const wave = waveIndex === null ? undefined : after.config.horde.waves[waveIndex - 1];
-        const directions = Array.isArray(payload.directions)
-          ? payload.directions.filter((direction): direction is 'north' | 'east' | 'south' | 'west' =>
-            direction === 'north' || direction === 'east' || direction === 'south' || direction === 'west',
-          )
-          : [];
-        // An internal bonus and exact hidden placement are deliberately not
-        // observable. Rebuild the payload from the fixed public Wave schedule,
-        // not from spawn counts. A malformed/internal event is still retained
-        // as a safe fact rather than dropped (dropping it changes the public
-        // event sequence and can make Session hashes diverge).
-        if (wave && directions.length > 0) {
-          const waveRecord = wave as unknown as Record<string, unknown>;
-          const composition = waveRecord.compositionPerDirection as Record<string, unknown>;
-          const slotValue = waveRecord.nonHordeSlotCountPerDirection
-            ?? waveRecord.nonHordeSlotsPerDirection
-            ?? composition.zombie;
-          const nonHordeSlotCountPerDirection = typeof slotValue === 'number' && Number.isSafeInteger(slotValue)
-            ? slotValue
-            : 0;
-          const possibleNonHordeTypes = Array.isArray(waveRecord.possibleNonHordeTypes)
-            ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
-            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', ...(waveIndex !== null && waveIndex >= Math.max(1,after.config.horde.waves.length-1) ? ['gasZombie'] : [])];
-          payload = {
-            hordeKind: wave.final ? 'final' : 'periodic',
-            waveIndex,
-            spawnTurn: wave.turn,
-            final: wave.final,
-            directions,
-            compositionPerDirection: cloneJson(wave.compositionPerDirection) as unknown as JsonValue,
-            hordeZombieCount: directions.length * wave.compositionPerDirection.hordeZombie,
-            normalZombieCount: directions.length * (nonHordeSlotCountPerDirection || wave.compositionPerDirection.zombie),
-            nonHordeSlotCountPerDirection,
-            possibleNonHordeTypes,
-          };
-        } else {
-          payload = {
-            waveIndex: waveIndex ?? null,
-            spawnTurn: typeof payload.spawnTurn === 'number' ? payload.spawnTurn : null,
-            final: payload.final === true,
-            directions,
-          };
-        }
+      if (event.type === 'horde_wave_started' || event.type === 'horde_spawn_batch') {
+        // Frozen aggregate roster counts are public. Whitelisting here keeps
+        // Pending roster types, rejected counters, and spawn coordinates out
+        // of every Agent, Browser Bridge, Replay, and Portable Session path.
+        const publicPayload = Object.fromEntries(
+          Object.entries(payload).filter(([field]) => WAVE_PUBLIC_EVENT_FIELDS.has(field)),
+        ) as JsonObject;
+        const kind = payload.kind ?? payload.hordeKind;
+        if (kind === 'periodic' || kind === 'final') publicPayload.kind = kind;
+        payload = publicPayload;
       }
       if (event.type === 'horde_warning') {
         const waveIndex = typeof payload.waveIndex === 'number' && Number.isSafeInteger(payload.waveIndex)

@@ -124,6 +124,10 @@ describe('v1.4 Horde composition and combat', () => {
     const schedule = engine.getState().config.horde.waves;
     let finalEvents: ReturnType<GameEngine['step']>['events'] = [];
     for (let waveIndex = 1; waveIndex <= schedule.length; waveIndex += 1) {
+      // Clear prior stationary waves so this composition test does not exercise Pending capacity.
+      const cleared = cloneState(engine.getState());
+      cleared.units = cleared.units.filter((unit) => unit.isPlayerUnit);
+      expect(engine.step({ type: 'LoadSnapshot', snapshot: cleared }).error).toBeNull();
       const wave = schedule[waveIndex - 1]!;
       while (engine.getState().turn <= wave.turn) {
         const result = engine.step({ type: 'EndTurn' });
@@ -166,8 +170,8 @@ describe('v1.4 Horde composition and combat', () => {
     finalProgress.units = finalProgress.units.filter((unit) => !unit.spawnGroupId || !finalIds.includes(unit.spawnGroupId));
     expect(deriveVictoryProgress(finalProgress).finalHordeDefeated).toBe(true);
     expect(finalEvents).toContainEqual(expect.objectContaining({
-      type: 'horde_spawned',
-      payload: expect.objectContaining({ hordeKind: 'final', waveIndex: 5, directions: ['north', 'east', 'south', 'west'] }),
+      type: 'horde_wave_started',
+      payload: expect.objectContaining({ hordeKind: 'final', waveIndex: 5, direction: 'north' }),
     }));
     expect(engine.getState().horde).toMatchObject({ finalSpawnedCount: expectedFinalSpawned, totalSpawned: expectedTotalSpawned });
     const statistics = engine.getState().statistics;

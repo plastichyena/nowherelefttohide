@@ -5,9 +5,16 @@ import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, GAME_RULES_VERSION, OBSERVATION_A
 import type { GameAction, GameState } from '../core/types';
 import packageMetadata from '../../package.json';
 
+function containsExactObjectKey(value: unknown, key: string): boolean {
+  if (Array.isArray(value)) return value.some((item) => containsExactObjectKey(item, key));
+  if (!value || typeof value !== 'object') return false;
+  return Object.entries(value as Record<string, unknown>).some(([entryKey, entryValue]) =>
+    entryKey === key || containsExactObjectKey(entryValue, key));
+}
+
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.5.3');
+    expect(APP_VERSION).toBe('1.5.4');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -47,8 +54,8 @@ describe('AgentGame public boundary', () => {
       typeof tile.visibleToPlayer === 'boolean' &&
       typeof tile.playerOccupancyAllowed === 'boolean',
     )).toBe(true);
-    expect(first.map.hordeSpawnReserve).toHaveLength(200);
-    expect(first.zombies.every((unit) => ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'].includes(unit.type))).toBe(true);
+    expect(first.map.hordeSpawnReserve).toHaveLength(392);
+    expect(first.zombies.every((unit) => ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'].includes(unit.type))).toBe(true);
     // The fixed v1.5 initial Zombies are outside initial shared vision; only
     // visible enemies may enter the public Observation.
     expect(first.zombies).toHaveLength(0);
@@ -107,14 +114,14 @@ describe('AgentGame public boundary', () => {
     )).toBe(true);
   });
 
-  it('describes the v1.5.0 API, proficiency, Riot, Crisis, Noise rules, and fixed Horde schedule from the same adapter boundary', () => {
+  it('describes the v1.5.4 API, Wave, Housing, Wind, Crisis, and Noise rules from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('12');
+    expect(info.saveFormatVersion).toBe('13');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -141,7 +148,7 @@ describe('AgentGame public boundary', () => {
     expect(info.rules.recovery).toMatchObject({ combatRate: 0.15, restRate: 0.3, timing: 'nextPlayerTurnStart' });
     expect(info.rules.production.workerCapacityByFacilityType.farm).toBe(30);
     expect(info.rules.production).toMatchObject({
-      powerPlantsGenerateCapacityPerWorker: 10,
+      powerPlantsGenerateCapacityPerWorker: 15,
       fuelPerFiveElectricity: 2,
       sameTurnProductionCanCoverMaintenance: true,
       sameTurnProductionCanCoverProductionInputs: false,
@@ -162,8 +169,8 @@ describe('AgentGame public boundary', () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
-    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v2', width: 51, height: 51 });
-    expect(info.rules.map.hordeSpawnReserve).toHaveLength(200);
+    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v3', width: 51, height: 51 });
+    expect(info.rules.map.hordeSpawnReserve).toHaveLength(392);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 50 });
     expect(info.rules.horde.waves).toEqual([
       expect.objectContaining({ index: 1, turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 3 }, final: false }),
@@ -206,10 +213,26 @@ describe('AgentGame public boundary', () => {
       terrainAttenuation: false,
       normalZombieAffected: true,
       hordeZombieAffected: false,
-      targetPriority: ['visible_population', 'inherited_horde', 'noise', 'idle'],
+      targetPriority: ['visible_population', 'wave_capital', 'inherited_horde', 'noise', 'idle'],
     });
+    expect(info.rules.constructibleFacilities).toMatchObject({
+      types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
+      costs: { simpleFarm: 25, civilianDroneBase: 50, temporaryHousing: 50, windPowerPlant: 100 },
+      temporaryHousing: { softCapacity: 10, requiredPower: 5, recruitmentHub: false },
+      windPowerPlant: { fixedPower: 15, noiseRadius: 8, zombieTargetValue: 0, emitsNoise: true },
+    });
+    expect(info.rules.production.powerAllocationOrder).toEqual([
+      'capital_and_cities',
+      'occupied_temporary_housing',
+      'farm_and_civilian_factory',
+      'input_ready_military_factory',
+      'refinery',
+      'civilian_drone_base',
+      'army_base_reservation',
+      'empty_temporary_housing',
+    ]);
     expect(info.prohibited.join(' ')).toContain('SuppressInfection');
-    expect(info.prohibited.join(' ')).toContain('exact Noise Radius');
+    expect(info.prohibited.join(' ')).toContain('Static Wind Noise Radius');
     info.methods.pop();
     expect(game.getApiInfo().methods).toContain('getRunArtifact');
   });
@@ -263,7 +286,8 @@ describe('AgentGame public boundary', () => {
     expect(game.getRunArtifact().metrics?.config.units).toMatchObject({
       police: { noiseClass: 'medium' }, nationalGuard: { noiseClass: 'large' }, riotPolice: { noiseClass: 'medium' },
     });
-    expect(JSON.stringify(game.getRunArtifact())).not.toContain('"noiseRadius"');
+    expect(game.getRunArtifact().config.windPower).toEqual({ noiseRadius: 8 });
+    expect(game.getRunArtifact().metrics?.config.windPower).toEqual({ noiseRadius: 8 });
     expect(() => game.reset({ seed: 10, configOverrides: { unknown: 1 } as never })).toThrow(/Unknown field/);
     expect(game.getObservation()).toEqual(before);
   });
@@ -290,7 +314,7 @@ describe('AgentGame public boundary', () => {
     }
   }, 20_000);
 
-  it('publishes fixed-wave Horde facts without leaking spawn identity or coordinates', () => {
+  it('publishes frozen Wave and Spawn-batch counts without leaking roster types or coordinates', () => {
     const game = createAgentGame();
     game.reset({
       seed: 21,
@@ -306,19 +330,27 @@ describe('AgentGame public boundary', () => {
     const result = game.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
     expect(result.observation.zombies).toHaveLength(0);
-    const hordeEvents = result.events.filter((event) => event.type === 'horde_spawned');
-    expect(hordeEvents).toHaveLength(1);
-    expect(hordeEvents[0]!.payload).toMatchObject({
-      hordeKind: 'final', waveIndex: 1, spawnTurn: 1, final: true,
-      directions: expect.any(Array), compositionPerDirection: { hordeZombie: 1, zombie: 3 },
-      hordeZombieCount: 1, normalZombieCount: 3,
+    const waveEvents = result.events.filter((event) => event.type === 'horde_wave_started');
+    const batchEvents = result.events.filter((event) => event.type === 'horde_spawn_batch');
+    expect(waveEvents).toHaveLength(1);
+    expect(batchEvents).toHaveLength(1);
+    expect(waveEvents[0]!.payload).toMatchObject({
+      waveIndex: 1, direction: expect.any(String), groupId: expect.any(String), kind: 'final',
+      baseWaveUnitCount: 4, committedWaveUnitCount: 4, spawnedSoFar: 0, pendingCount: 4,
     });
+    expect(batchEvents[0]!.payload).toMatchObject({
+      waveIndex: 1, direction: expect.any(String), groupId: expect.any(String), kind: 'final',
+      spawnedThisBatch: 4, spawnedSoFar: 4, pendingCount: 0,
+    });
+    expect(result.observation.horde.waveTotals).toEqual([{
+      waveIndex: 1, kind: 'final', baseWaveUnitCount: 4,
+      committedWaveUnitCount: 4, spawnedSoFar: 4, pendingCount: 0,
+    }]);
     for (const hiddenField of [
       'zombieId', 'q', 'r', 'spawnGroupId', 'spawnGroupIds', 'units', 'position',
-    ]) {
-      expect(hordeEvents[0]!.payload).not.toHaveProperty(hiddenField);
-    }
-    expect(JSON.stringify(hordeEvents)).not.toContain('final-horde-1');
+      'unitType', 'hordeZombieCount', 'normalZombieCount', 'compositionPerDirection', 'hordeKind',
+    ]) expect(containsExactObjectKey([...waveEvents, ...batchEvents], hiddenField)).toBe(false);
+    expect(JSON.stringify([...waveEvents, ...batchEvents])).not.toContain('final-horde-1');
   });
 
   it('keeps rejected-refugee Horde detail out of public events, artifacts, and metrics', () => {
@@ -354,20 +386,23 @@ describe('AgentGame public boundary', () => {
     for (const action of turnAway) expect(game.step(action).error).toBeNull();
 
     let result = game.step({ type: 'EndTurn' });
-    for (let turns = 0; turns < 3 && !result.events.some((event) => event.type === 'horde_spawned'); turns += 1) {
+    for (let turns = 0; turns < 3 && !result.events.some((event) => event.type === 'horde_spawn_batch'); turns += 1) {
       expect(result.error).toBeNull();
       result = game.step({ type: 'EndTurn' });
     }
-    const spawned = result.events.find((event) => event.type === 'horde_spawned');
-    expect(spawned?.payload).toMatchObject({ normalZombieCount: 3, hordeZombieCount: 1 });
-    const internalSpawn = [...(game.getDebugState() as GameState).events].reverse().find((event) => event.type === 'horde_spawned');
-    const internalPayload = internalSpawn?.payload as Record<string, unknown> | undefined;
-    // v1.5 draws only the base non-Horde slots. A private rejected-refugee
-    // Bonus remains a Normal Zombie in the same Horde group/kind.
-    expect(internalPayload).toMatchObject({ hordeZombieCount: 1 });
+    const spawned = result.events.find((event) => event.type === 'horde_spawn_batch');
+    expect(spawned?.payload).toMatchObject({ spawnedThisBatch: 5, spawnedSoFar: 5, pendingCount: 0 });
+    const publicWave = result.observation.horde.waveTotals.find((wave) => wave.waveIndex === 1);
+    expect(publicWave).toMatchObject({
+      baseWaveUnitCount: 4,
+      committedWaveUnitCount: 5,
+      spawnedSoFar: 5,
+      pendingCount: 0,
+    });
+    // The private roster may contain mixed types; the only public fact is the
+    // frozen aggregate count that includes the rejected-refugee bonus.
     expect((game.getDebugState() as GameState).units.filter(u=>u.hordeKind==='final'&&u.type!=='hordeZombie')).toHaveLength(4);
-    expect(Number(internalPayload?.normalZombieCount)).toBeGreaterThanOrEqual(1);
-    const publicTrace = JSON.stringify(game.getRunArtifact());
+    const publicArtifact = game.getRunArtifact();
     for (const privateField of [
       'rejectedRefugeesByDirection',
       'refugeesRejectedByDirectionAndPolicy',
@@ -375,7 +410,8 @@ describe('AgentGame public boundary', () => {
       'rejectedBonusZombiesByDirection',
       'rejectedCounterResetsByDirection',
       'horde_rejected_bonus_applied',
-    ]) expect(publicTrace).not.toContain(privateField);
+      'roster',
+    ]) expect(containsExactObjectKey(publicArtifact, privateField)).toBe(false);
   }, 20_000);
 
   it('makes Turn Away public only as a qualitative event', () => {

@@ -1,5 +1,5 @@
-import { stableFacilities, eligibleSnapshotCities, availableSupplyPopulation, calculateEconomyPlan, forecastEndTurn, forecastUnitRefills, forecastFacilityProduction } from './economy-query';
-export { forecastEndTurn, forecastUnitRefills, forecastFacilityProduction, forecastProductionCapacity } from './economy-query';
+import { stableFacilities, eligibleSnapshotCities, availableSupplyPopulation, calculateEconomyPlan, forecastEndTurn, forecastUnitRefills, forecastFacilityProduction, forecastNextTurnPenalties } from './economy-query';
+export { forecastEndTurn, forecastUnitRefills, forecastFacilityProduction, forecastProductionCapacity, forecastNextTurnPenalties } from './economy-query';
 import { getUnitLegalAttackProjections, forecastUnitSuppression, infectedSuppressionTarget } from './combat-query';
 export { getUnitLegalAttackProjections, forecastUnitSuppression } from './combat-query';
 export type { UnitLegalAttackProjection, SuppressionProjection } from './combat-query';
@@ -28,6 +28,7 @@ import { assertInvariants, validateInvariants } from './invariants';
 import {
   canPlayerOccupyHex,
   getHordeEntrance,
+  getHordeSpawnZone,
   getTile,
   initialZombiePositionsMatchSeed,
   initialHunterPositionsMatchSeed,
@@ -105,6 +106,7 @@ import type {
   JsonObject,
   MilitaryGoodsForecast,
   MoveAction,
+  PendingWave,
   PowerSupplyReason,
   ResourceType,
   StepResult,
@@ -346,21 +348,28 @@ function distributeToReceptionCities(state: GameState, amount: number): Array<{ 
   if (amount > 0 && cities.length === 0) return null;
   let remaining = amount;
   const assigned = new Map<string, number>();
-  for (const city of cities) {
+  const permanentCities = cities.filter((city) => city.type === 'capital' || city.type === 'city');
+  const housing = cities.filter((city) => city.type === 'temporaryHousing');
+  for (const city of [...permanentCities, ...housing]) {
     const softCap = state.config.facilities[city.type].workerCapacity;
-    const people = Math.min(remaining, Math.max(0, softCap - city.workers));
+    const occupancy = city.type === 'temporaryHousing' ? city.workers + city.infected : city.workers;
+    const people = Math.min(remaining, Math.max(0, softCap - occupancy));
     city.workers += people;
     assigned.set(city.id, (assigned.get(city.id) ?? 0) + people);
     remaining -= people;
     if (remaining === 0) break;
   }
-  let index = 0;
   while (remaining > 0) {
-    const city = cities[index % cities.length]!;
+    const city = cities.reduce((best, candidate) => {
+      const candidateCap = state.config.facilities[candidate.type].workerCapacity;
+      const bestCap = state.config.facilities[best.type].workerCapacity;
+      const candidateOccupancy = candidate.workers + (candidate.type === 'temporaryHousing' ? candidate.infected : 0);
+      const bestOccupancy = best.workers + (best.type === 'temporaryHousing' ? best.infected : 0);
+      return candidateOccupancy * bestCap < bestOccupancy * candidateCap ? candidate : best;
+    });
     city.workers += 1;
     assigned.set(city.id, (assigned.get(city.id) ?? 0) + 1);
     remaining -= 1;
-    index += 1;
   }
   return [...assigned.entries()]
     .filter(([, people]) => people > 0)
@@ -900,53 +909,15 @@ function nearestSpawnPositionMatching(
   );
 }
 
-function spawnZombies(
-  state: GameState,
-  origin: HexCoord,
-  count: number,
-  rng: SeededRng,
-  cause: string,
-  unitType: ZombieUnitType = 'zombie',
-  spawnGroupId: string | null = null,
-  hordeKind: UnitState['hordeKind'] = null,
-  positionAllowed: ((position: HexCoord) => boolean) | null = null,
-): UnitState[] {
-  const spawned: UnitState[] = [];
-  for (let index = 0; index < count; index += 1) {
-    const position = positionAllowed
-      ? nearestSpawnPositionMatching(state, origin, rng, positionAllowed)
-      : nearestSpawnPosition(state, origin, rng);
-    if (!position) {
-      return spawned;
-    }
-    const prefix = unitType === 'hordeZombie' ? 'horde-zombie'
-      : unitType === 'policeZombie' ? 'police-zombie'
-        : unitType === 'soldierZombie' ? 'soldier-zombie'
-          : unitType === 'riotZombie' ? 'riot-zombie' : unitType === 'hunterZombie' ? 'hunter-zombie' : 'zombie';
-    let id = `${prefix}-${state.nextUnitNumber}`;
-    while (state.units.some((unit) => unit.id === id)) {
-      state.nextUnitNumber += 1;
-      id = `${prefix}-${state.nextUnitNumber}`;
-    }
-    state.nextUnitNumber += 1;
-    const unit = createUnit(state, id, unitType, position);
-    unit.spawnGroupId = spawnGroupId;
-    unit.hordeKind = hordeKind;
-    state.units.push(unit);
-    spawned.push(unit);
-    emit(state, 'horde_spawned', { zombieId: id, q: position.q, r: position.r, cause, unitType, spawnGroupId });
-  }
-  return spawned;
-}
-
 function chooseHordeSlotType(
   state: Readonly<GameState>,
   rng: SeededRng,
+  waveIndex: number,
   riotCount: number,
   hunterCount: number,
   gasCount: number,
 ): Exclude<ZombieUnitType, 'hordeZombie'> {
-  const gasEligible = state.config.horde.waves.findIndex(w => w.turn === state.turn) >= Math.max(0, state.config.horde.waves.length - 2);
+  const gasEligible = waveIndex - 1 >= Math.max(0, state.config.horde.waves.length - 2);
   const entries = WAVE_NON_HORDE_TYPES
     .filter(type => type !== 'gasZombie' || (gasEligible && gasCount < state.config.horde.gasZombieCapPerDirection))
     .filter((type) => type !== 'riotZombie' || riotCount < state.config.horde.riotZombieCapPerDirection)
@@ -962,53 +933,48 @@ function chooseHordeSlotType(
   return entries.at(-1)!.type;
 }
 
-function spawnHordeComposition(
+function freezeWaveRoster(
   state: GameState,
-  origin: HexCoord,
-  composition: { hordeZombie: number; zombie: number },
-  rejectedBonusNormalZombies: number,
   rng: SeededRng,
-  cause: string,
-  spawnGroupId: string,
-  hordeKind: Exclude<UnitState['hordeKind'], null>,
-): UnitState[] {
-  const hordeUnits = spawnZombies(
-    state, origin, composition.hordeZombie, rng, cause, 'hordeZombie', spawnGroupId, hordeKind,
-  );
-  const slotUnits: UnitState[] = [];
+  waveIndex: number,
+  baseHordes: number,
+  baseSlots: number,
+  bonusSlots: number,
+): ZombieUnitType[] {
+  const roster: ZombieUnitType[] = Array.from({ length: baseHordes }, () => 'hordeZombie');
   let riotCount = 0;
   let hunterCount = 0;
   let gasCount = 0;
-  for (let slot = 0; slot < composition.zombie; slot += 1) {
-    const unitType = chooseHordeSlotType(state, rng, riotCount, hunterCount, gasCount);
+  for (let slot = 0; slot < baseSlots + bonusSlots; slot += 1) {
+    const unitType = chooseHordeSlotType(state, rng, waveIndex, riotCount, hunterCount, gasCount);
     if (unitType === 'riotZombie') riotCount += 1;
     if (unitType === 'hunterZombie') hunterCount += 1;
-    if (unitType === 'gasZombie') { gasCount += 1; state.statistics.gasZombiesSpawned += 1; }
-    const spawned = spawnZombies(
-      state,
-      origin,
-      1,
-      rng,
-      cause,
-      unitType,
-      spawnGroupId,
-      hordeKind,
-      (position) => hordeUnits.some((horde) => hexDistance(position, horde.position) <= horde.vision),
-    );
-    slotUnits.push(...spawned);
+    if (unitType === 'gasZombie') gasCount += 1;
+    roster.push(unitType);
   }
-  const rejectedBonusUnits = spawnZombies(
-    state,
-    origin,
-    rejectedBonusNormalZombies,
-    rng,
-    cause,
-    'zombie',
-    spawnGroupId,
-    hordeKind,
-    (position) => hordeUnits.some((horde) => hexDistance(position, horde.position) <= horde.vision),
-  );
-  return [...hordeUnits, ...slotUnits, ...rejectedBonusUnits];
+  return roster;
+}
+
+function createWaveZombie(
+  state: GameState,
+  pending: PendingWave,
+  unitType: ZombieUnitType,
+  position: HexCoord,
+): UnitState {
+  const prefix = unitType.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+  let id = `${prefix}-${state.nextUnitNumber}`;
+  while (state.units.some((unit) => unit.id === id)) id = `${prefix}-${++state.nextUnitNumber}`;
+  state.nextUnitNumber += 1;
+  const unit = createUnit(state, id, unitType, position);
+  unit.spawnGroupId = pending.groupId;
+  unit.hordeKind = pending.kind;
+  if (unitType !== 'hordeZombie') unit.waveCapitalAnchor = { ...getCapitalPosition(state.map) };
+  // A Pending entry is not a map unit and does not act in its spawn phase.
+  unit.canMove = false;
+  unit.canAttack = false;
+  unit.attackChargesRemaining = 0;
+  state.units.push(unit);
+  return unit;
 }
 
 
@@ -1056,7 +1022,7 @@ function resolveSiteZombieSpawn(
   queue: SpawnOccupancyEntry[],
   chainRootEventId: string | null,
   chainDepth: number,
-  originUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | null = null,
+  originUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant' | null = null,
 ): { remainingInfected: number; actualSpawnCount: number; eventId: string } {
   const perUnit = state.config.infection.zombieSpawnPopulationPerUnit;
   const requestedSpawnCount = Math.min(
@@ -1392,7 +1358,11 @@ function applyGeneratedZombieOccupancy(
 ): void {
   const facility = getFacilityAt(state, zombie.position);
   if (facility && facility.status !== 'ruined') {
-    if (facility.type === 'windPowerPlant' || ((facility.constructible || facility.type === 'armyBase') && facility.workers === 0 && facility.infected === 0)) {
+    if (facility.type === 'temporaryHousing' && facility.workers === 0 && facility.infected === 0) {
+      removeEmptyTemporaryHousing(state, facility, zombie.id);
+    } else if (facility.type === 'capital' && facility.workers === 0 && facility.infected === 0) {
+      fallFacility(state, facility, rng, queue, 'empty_zombie_occupation', chainRootEventId, chainDepth + 1);
+    } else if (facility.type === 'windPowerPlant' || ((facility.constructible || facility.type === 'armyBase') && facility.workers === 0 && facility.infected === 0)) {
       facility.operationalStatus = 'disabled';
       facility.infected = 0;
       emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type, source: zombie.id, immediateSpawnOccupation: true });
@@ -1644,7 +1614,7 @@ interface HumanTarget {
 
 interface ZombieDecision {
   target: HexCoord | null;
-  reason: 'visible_population' | 'inherited_horde' | 'noise' | 'capital' | 'idle';
+  reason: 'visible_population' | 'wave_capital' | 'inherited_horde' | 'noise' | 'capital' | 'idle';
   inheritedTarget: HexCoord | null;
   inheritedChanged: 'set' | 'cleared' | null;
   noiseTarget: HexCoord | null;
@@ -1702,6 +1672,103 @@ function targetPath(
   return candidates[0] ?? null;
 }
 
+function removeEmptyTemporaryHousing(state: GameState, facility: FacilityState, sourceZombieId: string): void {
+  state.facilities.splice(state.facilities.findIndex((candidate) => candidate.id === facility.id), 1);
+  emit(state, 'site_fallen', {
+    siteKind: 'facility', siteId: facility.id, siteType: facility.type,
+    q: facility.position.q, r: facility.position.r, cause: 'empty_zombie_occupation',
+    requestedSpawnCount: 0, actualSpawnCount: 0,
+  });
+  emit(state, 'facility_overrun', {
+    facilityId: facility.id, constructibleDestroyed: true, infectedAtFall: 0,
+    requestedSpawnCount: 0, actualSpawnCount: 0, remainingInfected: 0,
+    constructibleInfectedDeaths: 0, source: sourceZombieId,
+  });
+}
+
+function terrainDistanceMap(state: Readonly<GameState>, target: HexCoord): Map<string, number> {
+  const distances = new Map<string, number>([[hexKey(target), 0]]);
+  const pending: Array<{ position: HexCoord; distance: number }> = [{ position: { ...target }, distance: 0 }];
+  const push = (entry: { position: HexCoord; distance: number }): void => {
+    pending.push(entry);
+    let index = pending.length - 1;
+    while (index > 0) {
+      const parent = (index - 1) >>> 1;
+      if (pending[parent]!.distance <= entry.distance) break;
+      pending[index] = pending[parent]!;
+      index = parent;
+    }
+    pending[index] = entry;
+  };
+  const pop = (): { position: HexCoord; distance: number } => {
+    const first = pending[0]!;
+    const last = pending.pop()!;
+    if (pending.length > 0) {
+      let index = 0;
+      while (index * 2 + 1 < pending.length) {
+        let child = index * 2 + 1;
+        if (child + 1 < pending.length && pending[child + 1]!.distance < pending[child]!.distance) child += 1;
+        if (last.distance <= pending[child]!.distance) break;
+        pending[index] = pending[child]!;
+        index = child;
+      }
+      pending[index] = last;
+    }
+    return first;
+  };
+  while (pending.length > 0) {
+    const current = pop();
+    if (distances.get(hexKey(current.position)) !== current.distance) continue;
+    const enteredTile = getTile(state.map, current.position);
+    const enteredCost = enteredTile ? state.config.terrain.movementCost[enteredTile.terrain] : null;
+    if (enteredCost === null) continue;
+    for (const predecessor of hexNeighbors(current.position)) {
+      if (!hexWithinBounds(predecessor, state.map.width, state.map.height)) continue;
+      const predecessorTile = getTile(state.map, predecessor);
+      if (!predecessorTile || state.config.terrain.movementCost[predecessorTile.terrain] === null) continue;
+      const distance = current.distance + enteredCost;
+      const key = hexKey(predecessor);
+      if ((distances.get(key) ?? Number.POSITIVE_INFINITY) <= distance) continue;
+      distances.set(key, distance);
+      push({ position: predecessor, distance });
+    }
+  }
+  return distances;
+}
+
+function congestionFallback(
+  state: GameState,
+  zombie: UnitState,
+  target: HexCoord,
+  distances: ReadonlyMap<string, number>,
+): { path: HexCoord[] } | null {
+  const currentDistance = distances.get(hexKey(zombie.position)) ?? Number.POSITIVE_INFINITY;
+  const occupied = occupiedKeys(state, zombie.id);
+  if (zombie.previousFallbackPosition) occupied.add(hexKey(zombie.previousFallbackPosition));
+  const candidates = findReachablePaths(
+    state.map,
+    zombie.position,
+    zombie.movement,
+    occupied,
+    (position) => effectiveMovementCost(state, position),
+  )
+    .map((reachable) => ({
+      ...reachable,
+      targetDistance: distances.get(hexKey(reachable.position)) ?? Number.POSITIVE_INFINITY,
+      movementCost: effectiveMovementCost(state, reachable.position),
+    }))
+    .filter((candidate): candidate is typeof candidate & { movementCost: number } =>
+      Number.isFinite(candidate.targetDistance) && candidate.movementCost !== null,
+    );
+  const closer = candidates.filter((candidate) => candidate.targetDistance < currentDistance);
+  const pool = closer.length > 0 ? closer : candidates.filter((candidate) => candidate.targetDistance === currentDistance);
+  const selected = pool.sort((left, right) =>
+    left.targetDistance - right.targetDistance || left.movementCost - right.movementCost
+      || left.position.q - right.position.q || left.position.r - right.position.r,
+  )[0];
+  return selected ? { path: selected.path } : null;
+}
+
 function chooseVisiblePopulationTarget(state: GameState, zombie: UnitState, rng: SeededRng): HumanTarget | null {
   const candidates = zombieTargets(state)
     .filter((target) => canUnitSee(zombie, target.position))
@@ -1724,7 +1791,7 @@ function hasVisiblePopulationTarget(state: GameState, zombie: UnitState): boolea
 }
 
 interface CombatNoiseResolution {
-  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase';
+  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant';
   center: HexCoord;
   radius: number;
 }
@@ -1784,7 +1851,7 @@ function emitHordeMovementNoise(
 
 function resolveFallenSiteNoiseRespawns(
   state: GameState,
-  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase',
+  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant',
   center: HexCoord,
   radius: number,
   rng: SeededRng,
@@ -1815,7 +1882,8 @@ function resolveFallenSiteNoiseRespawns(
         },
         rng,
         'site_noise_respawn',
-        sourceUnitType === 'hordeZombie' ? 'horde_movement_noise' : 'combat_noise',
+        sourceUnitType === 'hordeZombie' ? 'horde_movement_noise'
+          : sourceUnitType === 'windPowerPlant' ? 'wind_power_noise' : 'combat_noise',
         queue,
         null,
         0,
@@ -1831,7 +1899,8 @@ function resolveFallenSiteNoiseRespawns(
         },
         rng,
         'site_noise_respawn',
-        sourceUnitType === 'hordeZombie' ? 'horde_movement_noise' : 'combat_noise',
+        sourceUnitType === 'hordeZombie' ? 'horde_movement_noise'
+          : sourceUnitType === 'windPowerPlant' ? 'wind_power_noise' : 'combat_noise',
         queue,
         null,
         0,
@@ -1906,6 +1975,17 @@ function targetDecisionSnapshot(
       });
       continue;
     }
+    if (zombie.waveCapitalAnchor) {
+      decisions.set(zombie.id, {
+        target: { ...zombie.waveCapitalAnchor },
+        reason: 'wave_capital',
+        inheritedTarget: zombie.inheritedTarget,
+        inheritedChanged: null,
+        noiseTarget: null,
+        noiseChanged: zombie.noiseTarget ? 'overridden_horde' : null,
+      });
+      continue;
+    }
     let memory = zombie.inheritedTarget;
     let noiseMemory = zombie.noiseTarget;
     let inheritedChanged: ZombieDecision['inheritedChanged'] = null;
@@ -1971,9 +2051,11 @@ function resolveZombieAttacks(state: GameState, zombieId: string, rng: SeededRng
 
 function processZombieTurn(state: GameState, rng: SeededRng): void {
   for (const f of state.facilities) if (f.armyBase) f.armyBase.interceptionsRemaining = f.workers;
+  emitOperationalWindNoise(state, rng);
   const pendingPulses = state.pendingNoisePulses.map((pulse) => ({ ...pulse, center: { ...pulse.center } }));
   state.pendingNoisePulses = [];
   const decisions = targetDecisionSnapshot(state, rng, pendingPulses);
+  const terrainDistances = new Map<string, Map<string, number>>();
   const zombieIds = state.units
     .filter(isZombieFaction)
     .map((unit) => unit.id)
@@ -1981,6 +2063,13 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
   for (const zombieId of zombieIds) {
     const zombie = getUnit(state, zombieId);
     if (!zombie) continue;
+    const occupiedCapital = getFacilityAt(state, zombie.position);
+    if (occupiedCapital?.type === 'capital' && occupiedCapital.status !== 'ruined'
+      && occupiedCapital.workers === 0 && occupiedCapital.infected === 0) {
+      overrunFacility(state, occupiedCapital, rng, 'empty_zombie_occupation');
+      zombie.waveCapitalAnchor = null;
+      if (checkImmediateDefeat(state)) return;
+    }
     // Site-spawned Zombies are created with both action flags disabled. They
     // can occupy/infect their spawn hex immediately, but do not receive a
     // normal Zombie action until startPlayerTurn arms them for the next cycle.
@@ -2028,6 +2117,8 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
       continue;
     }
     if (!decision.target) {
+      zombie.previousFallbackPosition = null;
+      zombie.fallbackTarget = null;
       if (isNormalAiZombie(zombie)) {
         state.statistics.normalZombieIdleCount += 1;
         emit(state, 'zombie_idle', { zombieId });
@@ -2035,13 +2126,49 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
       continue;
     }
     const target: HumanTarget = { position: decision.target, population: 0 };
+    if (zombie.fallbackTarget && hexKey(zombie.fallbackTarget) !== hexKey(decision.target)) {
+      zombie.previousFallbackPosition = null;
+      zombie.fallbackTarget = null;
+    }
     const route = targetPath(state, zombie, target);
-    const path = route?.path ?? null;
     const beforeMove = { ...zombie.position };
-    if (path && path.length > 1) {
-      applyMovement(state, zombie, path, zombie.movement, 'normal', rng);
+    if (route?.path && route.path.length > 1) {
+      applyMovement(state, zombie, route.path, zombie.movement, 'normal', rng);
+      if (hexKey(zombie.position) !== hexKey(beforeMove)) {
+        zombie.previousFallbackPosition = null;
+        zombie.fallbackTarget = null;
+      }
+    } else if (!route) {
+      const key = hexKey(decision.target);
+      let distances = terrainDistances.get(key);
+      if (!distances) {
+        distances = terrainDistanceMap(state, decision.target);
+        terrainDistances.set(key, distances);
+      }
+      const fallback = congestionFallback(state, zombie, decision.target, distances);
+      if (fallback) {
+        applyMovement(state, zombie, fallback.path, zombie.movement, 'normal', rng);
+        if (hexKey(zombie.position) !== hexKey(beforeMove)) {
+          const startDistance = distances.get(hexKey(beforeMove)) ?? Number.POSITIVE_INFINITY;
+          const reachedDistance = distances.get(hexKey(zombie.position)) ?? Number.POSITIVE_INFINITY;
+          if (reachedDistance < startDistance) {
+            zombie.previousFallbackPosition = null;
+            zombie.fallbackTarget = null;
+          } else {
+            zombie.previousFallbackPosition = beforeMove;
+            zombie.fallbackTarget = { ...decision.target };
+          }
+        }
+      }
     }
     const survivor = getUnit(state, zombieId);
+    const reachedCapital = survivor ? getFacilityAt(state, survivor.position) : undefined;
+    if (survivor && reachedCapital?.type === 'capital' && reachedCapital.status !== 'ruined'
+      && reachedCapital.workers === 0 && reachedCapital.infected === 0) {
+      overrunFacility(state, reachedCapital, rng, 'empty_zombie_occupation');
+      survivor.waveCapitalAnchor = null;
+      if (checkImmediateDefeat(state)) return;
+    }
     if (
       survivor !== undefined && isNormalAiZombie(survivor) &&
       decision.reason === 'noise' &&
@@ -2075,6 +2202,16 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
     const facility = getFacilityAt(state, zombie.position);
     if (facility) {
       if (
+        facility.status !== 'ruined' && facility.type === 'temporaryHousing'
+        && facility.workers === 0 && facility.infected === 0
+      ) {
+        removeEmptyTemporaryHousing(state, facility, zombie.id);
+      } else if (
+        facility.status !== 'ruined' && facility.type === 'capital'
+        && facility.workers === 0 && facility.infected === 0
+      ) {
+        overrunFacility(state, facility, rng, 'empty_zombie_occupation');
+      } else if (
         facility.status !== 'ruined' &&
         (facility.type === 'windPowerPlant' || ((facility.constructible || facility.type === 'armyBase') && facility.workers === 0 && facility.infected === 0))
       ) {
@@ -2097,6 +2234,9 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
         if (facility.workers === 0 && (converted > 0 || facility.infected > 0)) {
           overrunFacility(state, facility, rng, converted > 0 ? 'zombie_occupation' : 'infection_fall');
         }
+      }
+      if (facility.type === 'capital' && hexKey(zombie.position) === hexKey(facility.position)) {
+        zombie.waveCapitalAnchor = null;
       }
     }
     const checkpoint = getCheckpointAt(state, zombie.position);
@@ -2152,138 +2292,160 @@ function beginHordeWarningIfDue(state: GameState, rng: SeededRng): void {
 }
 
 function processHorde(state: GameState, rng: SeededRng): ActionError | null {
-  const due = state.horde.nextSpawnTurn !== null && state.turn === state.horde.nextSpawnTurn;
-  if (!due) {
-    state.horde.turnsRemaining = Math.max(0, (state.horde.nextSpawnTurn ?? state.turn) - state.turn);
-    return null;
-  }
-  const waveIndex = state.horde.nextWaveIndex;
-  const wave = waveIndex === null ? null : state.config.horde.waves[waveIndex - 1];
-  if (waveIndex === null || !wave || state.horde.warningDirections.length !== wave.directionCount) {
-    return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', 'Horde Wave warning directions are incomplete');
-  }
-  const kind = wave.final ? 'final' as const : 'periodic' as const;
-  const allSpawned: UnitState[] = [];
-  const groupIds: string[] = [];
-  const rejectedBonuses: Array<{ direction: CardinalDirection; rejectedTotal: number; extraNormalZombies: number }> = [];
-  for (const direction of state.horde.warningDirections) {
-    const entrance = getHordeEntrance(state.map, direction);
-    if (!entrance) {
-      return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', `Missing Horde entrance for ${direction}`);
+  const due = state.horde.nextSpawnTurn !== null && state.turn >= state.horde.nextSpawnTurn;
+  if (due) {
+    const waveIndex = state.horde.nextWaveIndex;
+    const wave = waveIndex === null ? null : state.config.horde.waves[waveIndex - 1];
+    if (waveIndex === null || !wave || state.horde.warningDirections.length !== wave.directionCount) {
+      return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', 'Horde Wave warning directions are incomplete');
     }
-    const groupId = `wave-${waveIndex}-${direction}`;
-    const counters = state.rejectedRefugeesByDirection[direction];
-    const rejectedTotal = counters.normalRejected + counters.strictRejected + counters.turnedAway;
-    const extraNormalZombies = Math.ceil(rejectedTotal / 5);
-    const composition = {
-      hordeZombie: wave.compositionPerDirection.hordeZombie,
-      zombie: wave.compositionPerDirection.zombie,
-    };
-    const spawned = spawnHordeComposition(
-      state,
-      entrance.tile,
-      composition,
-      extraNormalZombies,
-      rng,
-      wave.final ? 'final_horde' : 'periodic_horde',
-      groupId,
-      kind,
-    );
-    const expected = composition.hordeZombie + composition.zombie + extraNormalZombies;
-    if (spawned.length !== expected) {
-      return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', `Wave ${waveIndex} could not place every unit for ${direction}`);
+    const kind = wave.final ? 'final' as const : 'periodic' as const;
+    const groupIds: string[] = [];
+    for (const direction of state.horde.warningDirections) {
+      if (!getHordeEntrance(state.map, direction) || getHordeSpawnZone(state.map, direction).length !== 22) {
+        return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', `Invalid Horde Spawn Zone for ${direction}`);
+      }
+      const groupId = `wave-${waveIndex}-${direction}`;
+      const counters = state.rejectedRefugeesByDirection[direction];
+      const rejectedTotal = counters.normalRejected + counters.strictRejected + counters.turnedAway;
+      const bonusCount = Math.ceil(rejectedTotal / 5);
+      const baseWaveUnitCount = wave.compositionPerDirection.hordeZombie + wave.compositionPerDirection.zombie;
+      const roster = freezeWaveRoster(state, rng, waveIndex, wave.compositionPerDirection.hordeZombie, wave.compositionPerDirection.zombie, bonusCount);
+      const pending: PendingWave = {
+        waveIndex, direction, groupId, kind, baseWaveUnitCount,
+        committedWaveUnitCount: roster.length, spawnedSoFar: 0, roster,
+      };
+      state.horde.pendingWaves.push(pending);
+      state.horde.waves.push({
+        waveIndex, direction, groupId, kind, baseWaveUnitCount,
+        committedWaveUnitCount: roster.length, spawnedSoFar: 0, pendingCount: roster.length,
+      });
+      groupIds.push(groupId);
+      emit(state, 'horde_wave_started', {
+        waveIndex, direction, groupId, hordeKind: kind, baseWaveUnitCount,
+        committedWaveUnitCount: roster.length, spawnedSoFar: 0, pendingCount: roster.length,
+      });
+      emit(state, 'horde_rejected_bonus_applied', {
+        direction, normalRejected: counters.normalRejected, strictRejected: counters.strictRejected,
+        turnedAway: counters.turnedAway, rejectedTotal, extraNormalZombies: bonusCount, waveIndex,
+      });
+      state.statistics.rejectedBonusZombiesByDirection[direction] += bonusCount;
+      state.statistics.rejectedCounterResetsByDirection[direction] += 1;
+      counters.normalRejected = 0;
+      counters.strictRejected = 0;
+      counters.turnedAway = 0;
     }
-    groupIds.push(groupId);
-    allSpawned.push(...spawned);
-    rejectedBonuses.push({ direction, rejectedTotal, extraNormalZombies });
+    state.horde.spawnedWaveIndices.push(waveIndex);
+    state.horde.spawnGroupIdsByWave[String(waveIndex)] = groupIds;
+    if (wave.final) {
+      state.horde.finalSpawnGroupIds = [...groupIds];
+      state.horde.finalSpawnedCount = 0;
+      state.horde.finalHordeStatus = 'active';
+      for (const branch of state.roadBranches) branch.nextArrivalTurn = null;
+      emit(state, 'refugee_arrivals_ended', { finalWaveIndex: waveIndex, spawnTurn: state.turn });
+    }
+    const nextWave = state.config.horde.waves[waveIndex];
+    state.horde.nextWaveIndex = nextWave ? waveIndex + 1 : null;
+    state.horde.nextSpawnTurn = nextWave?.turn ?? null;
+    state.horde.warningDirections = [];
+    state.horde.warningType = 'none';
   }
-  const hordeZombieCount = allSpawned.filter((unit) => unit.type === 'hordeZombie').length;
-  const zombieCount = allSpawned.filter((unit) => unit.type === 'zombie').length;
-  const policeZombieCount = allSpawned.filter((unit) => unit.type === 'policeZombie').length;
-  const soldierZombieCount = allSpawned.filter((unit) => unit.type === 'soldierZombie').length;
-  const riotZombieCount = allSpawned.filter((unit) => unit.type === 'riotZombie').length;
-  const gasZombieCount = allSpawned.filter(unit=>unit.type==='gasZombie').length;
-  const hunterZombieCount = allSpawned.filter((unit) => unit.type === 'hunterZombie').length;
-  state.statistics.policeZombiesSpawned += policeZombieCount;
-  state.statistics.soldierZombiesSpawned += soldierZombieCount;
-  state.statistics.riotZombiesSpawned += riotZombieCount;
-  state.statistics.hunterZombiesSpawned += hunterZombieCount;
-  state.statistics.hordeSpecialSpawnedByType.policeZombie += policeZombieCount;
-  state.statistics.hordeSpecialSpawnedByType.soldierZombie += soldierZombieCount;
-  state.statistics.hordeSpecialSpawnedByType.riotZombie += riotZombieCount;
-  state.statistics.hordeSpecialSpawnedByType.hunterZombie += hunterZombieCount;
-  state.statistics.hordeSpecialSpawnedByType.gasZombie += gasZombieCount;
-  const count = allSpawned.length;
-  state.horde.spawnedWaveIndices.push(waveIndex);
-  state.horde.spawnGroupIdsByWave[String(waveIndex)] = groupIds;
-  state.horde.totalSpawned += count;
-  state.horde.lastSpawnTurn = state.turn;
-  for (const bonus of rejectedBonuses) {
-    const counters = state.rejectedRefugeesByDirection[bonus.direction];
-    emit(state, 'horde_rejected_bonus_applied', {
-      direction: bonus.direction,
-      normalRejected: counters.normalRejected,
-      strictRejected: counters.strictRejected,
-      turnedAway: counters.turnedAway,
-      rejectedTotal: bonus.rejectedTotal,
-      extraNormalZombies: bonus.extraNormalZombies,
-      waveIndex,
+
+  const directionOrder = new Map(CANONICAL_HORDE_DIRECTIONS.map((direction, index) => [direction, index]));
+  const pendingOrder = [...state.horde.pendingWaves].sort((left, right) =>
+    (directionOrder.get(left.direction) ?? 0) - (directionOrder.get(right.direction) ?? 0) || left.waveIndex - right.waveIndex,
+  );
+  const blockedDirections = new Set<CardinalDirection>();
+  for (const pending of pendingOrder) {
+    if (blockedDirections.has(pending.direction)) continue;
+    if (!state.horde.pendingWaves.includes(pending) || pending.roster.length === 0) continue;
+    const occupied = occupiedKeys(state);
+    const available = getHordeSpawnZone(state.map, pending.direction).filter((position) => !occupied.has(hexKey(position)));
+    if (available.length === 0) {
+      blockedDirections.add(pending.direction);
+      continue;
+    }
+    const remainingHordes = pending.roster.filter((type) => type === 'hordeZombie').length;
+    const remainingNonHordes = pending.roster.filter((type) => type !== 'hordeZombie');
+    const minimumBatches = Math.max(1, Math.ceil(pending.roster.length / available.length));
+    const hordeThisBatch = Math.min(available.length, remainingHordes, Math.ceil(remainingHordes / minimumBatches));
+    const nonHordeThisBatch = Math.min(available.length - hordeThisBatch, remainingNonHordes.length);
+    const types: ZombieUnitType[] = [
+      ...Array.from({ length: hordeThisBatch }, () => 'hordeZombie' as const),
+      ...remainingNonHordes.slice(0, nonHordeThisBatch),
+    ];
+    const spawned = types.map((type, index) => createWaveZombie(state, pending, type, available[index]!));
+    pending.roster = [
+      ...Array.from({ length: remainingHordes - hordeThisBatch }, () => 'hordeZombie' as const),
+      ...remainingNonHordes.slice(nonHordeThisBatch),
+    ];
+    pending.spawnedSoFar += spawned.length;
+    const publicWave = state.horde.waves.find((candidate) => candidate.groupId === pending.groupId);
+    if (publicWave) {
+      publicWave.spawnedSoFar = pending.spawnedSoFar;
+      publicWave.pendingCount = pending.roster.length;
+    }
+    state.horde.totalSpawned += spawned.length;
+    state.horde.lastSpawnTurn = state.turn;
+    const count = (type: ZombieUnitType) => spawned.filter((unit) => unit.type === type).length;
+    const hordeCount = count('hordeZombie');
+    const normalCount = count('zombie');
+    state.statistics.policeZombiesSpawned += count('policeZombie');
+    state.statistics.soldierZombiesSpawned += count('soldierZombie');
+    state.statistics.riotZombiesSpawned += count('riotZombie');
+    state.statistics.hunterZombiesSpawned += count('hunterZombie');
+    state.statistics.gasZombiesSpawned += count('gasZombie');
+    for (const type of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const) {
+      state.statistics.hordeSpecialSpawnedByType[type] += count(type);
+      if (pending.kind === 'final') state.statistics.finalSpecialZombiesSpawnedByType[type] += count(type);
+    }
+    if (pending.kind === 'final') {
+      state.horde.finalSpawnedCount += spawned.length;
+      state.statistics.finalHordeSpawned += spawned.length;
+      state.statistics.finalHordeZombiesSpawned += hordeCount;
+      state.statistics.finalNormalZombiesSpawned += normalCount;
+    } else {
+      state.statistics.periodicHordeZombiesSpawned += hordeCount;
+      state.statistics.periodicNormalZombiesSpawned += normalCount;
+    }
+    emit(state, 'horde_spawn_batch', {
+      waveIndex: pending.waveIndex, direction: pending.direction, groupId: pending.groupId,
+      hordeKind: pending.kind, spawnedThisBatch: spawned.length,
+      spawnedSoFar: pending.spawnedSoFar, pendingCount: pending.roster.length,
     });
-    state.statistics.rejectedBonusZombiesByDirection[bonus.direction] += bonus.extraNormalZombies;
-    state.statistics.rejectedCounterResetsByDirection[bonus.direction] += 1;
-    counters.normalRejected = 0;
-    counters.strictRejected = 0;
-    counters.turnedAway = 0;
+    if (pending.roster.length === 0) state.horde.pendingWaves.splice(state.horde.pendingWaves.indexOf(pending), 1);
+    else blockedDirections.add(pending.direction);
   }
-  if (wave.final) {
-    state.horde.finalSpawnGroupIds = [...groupIds];
-    state.horde.finalSpawnedCount = count;
-    state.horde.finalHordeStatus = 'active';
-    state.statistics.finalHordeSpawned = count;
-    state.statistics.finalHordeZombiesSpawned += hordeZombieCount;
-    state.statistics.finalNormalZombiesSpawned += zombieCount;
-    state.statistics.finalSpecialZombiesSpawnedByType.policeZombie += policeZombieCount;
-    state.statistics.finalSpecialZombiesSpawnedByType.soldierZombie += soldierZombieCount;
-    state.statistics.finalSpecialZombiesSpawnedByType.riotZombie += riotZombieCount;
-    state.statistics.finalSpecialZombiesSpawnedByType.hunterZombie += hunterZombieCount;
-    state.statistics.finalSpecialZombiesSpawnedByType.gasZombie += gasZombieCount;
-    for (const branch of state.roadBranches) branch.nextArrivalTurn = null;
-    emit(state, 'refugee_arrivals_ended', { finalWaveIndex: waveIndex, spawnTurn: state.turn });
-  } else {
-    state.statistics.periodicHordeZombiesSpawned += hordeZombieCount;
-    state.statistics.periodicNormalZombiesSpawned += zombieCount;
-  }
-  emit(state, 'horde_spawned', {
-    hordeKind: kind,
-    waveIndex,
-    spawnTurn: wave.turn,
-    final: wave.final,
-    directions: [...state.horde.warningDirections],
-    compositionPerDirection: { ...wave.compositionPerDirection },
-    spawnGroupIds: [...groupIds],
-    hordeZombieCount,
-    normalZombieCount: zombieCount,
-    policeZombieCount,
-    soldierZombieCount,
-    riotZombieCount,
-    hunterZombieCount,
-    units: allSpawned.map((unit) => ({
-      unitId: unit.id,
-      unitType: unit.type,
-      spawnGroupId: unit.spawnGroupId,
-      hordeKind: kind,
-      q: unit.position.q,
-      r: unit.position.r,
-    })),
-  });
-  const nextWave = state.config.horde.waves[waveIndex];
-  state.horde.nextWaveIndex = nextWave ? waveIndex + 1 : null;
-  state.horde.nextSpawnTurn = nextWave?.turn ?? null;
-  state.horde.turnsRemaining = nextWave ? Math.max(0, nextWave.turn - state.turn) : 0;
-  state.horde.warningDirections = [];
-  state.horde.warningType = 'none';
-  beginHordeWarningIfDue(state, rng);
+  state.horde.turnsRemaining = Math.max(0, (state.horde.nextSpawnTurn ?? state.turn) - state.turn);
   return null;
+}
+
+function emitOperationalWindNoise(state: GameState, rng: SeededRng): void {
+  const radius = state.config.windPower.noiseRadius;
+  const winds = stableFacilities(state).filter((facility) =>
+    facility.type === 'windPowerPlant'
+      && facility.owner === 'player'
+      && facility.status === 'owned'
+      && facility.operationalStatus === 'operational',
+  );
+  for (const wind of winds) {
+    const pulse: CombatNoiseResolution = { sourceUnitType: 'windPowerPlant', center: { ...wind.position }, radius };
+    state.pendingNoisePulses.push({
+      id: `noise-${state.nextEventNumber}`,
+      center: { ...wind.position },
+      radius,
+      sourceKind: 'windPower',
+      sourceUnitType: 'windPowerPlant',
+      emittedTurn: state.turn,
+    });
+    state.statistics.noisePulsesEmitted += 1;
+    state.statistics.noisePulsesBySourceType.windPowerPlant += 1;
+    emit(state, 'noise_emitted', {
+      sourceFacilityId: wind.id, sourceUnitType: 'windPowerPlant', sourceKind: 'windPower',
+      q: wind.position.q, r: wind.position.r, radius,
+    });
+    resolveFallenSiteNoiseRespawns(state, pulse.sourceUnitType, pulse.center, pulse.radius, rng);
+  }
 }
 
 function finishGame(state: GameState, outcome: 'won' | 'lost', reason: GameOverReason): void {
@@ -2322,7 +2484,8 @@ export interface VictoryProgress {
 export function deriveVictoryProgress(state: Readonly<GameState>): VictoryProgress {
   const supplied = new Set(getSuppliedTileKeys(state));
   const finalHordeDefeated =
-    state.horde.finalSpawnGroupIds.length > 0 &&
+    state.horde.finalHordeStatus !== 'notStarted' &&
+    !state.horde.pendingWaves.some((wave) => wave.kind === 'final' && wave.roster.length > 0) &&
     !state.units.some(
       (unit) => unit.spawnGroupId !== null && state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId),
     );
@@ -2378,7 +2541,7 @@ function checkImmediateGameEnd(state: GameState): boolean {
   if (progress.suppliedAreaInfectionClear && state.statistics.suppliedAreaInfectionClearTurn === null) {
     state.statistics.suppliedAreaInfectionClearTurn = state.turn;
   }
-  if (progress.finalHordeDefeated && progress.suppliedAreaZombieClear && progress.suppliedAreaInfectionClear) {
+  if (progress.finalHordeDefeated) {
     state.statistics.victoryTurn = state.turn;
     finishGame(state, 'won', 'stateSecured');
     return true;
@@ -2417,7 +2580,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
   for (const branch of state.roadBranches) branch.checkpointActionsThisTurn = 0;
   for (const facility of state.facilities) {
     if (facility.operationalStatus === 'building' && facility.builtTurn !== null && facility.builtTurn < state.turn) {
-      facility.operationalStatus = facility.workers > 0 ? 'operational' : 'stopped';
+      facility.operationalStatus = ['temporaryHousing', 'windPowerPlant'].includes(facility.type) || facility.workers > 0 ? 'operational' : 'stopped';
       facility.populationOperationalTurn = state.turn;
       facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
     } else if (
@@ -2460,6 +2623,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
     unit.activity = { moved: false, attacked: false, intercepted: false, suppressed: false };
   }
   for (const zombie of state.units.filter(isZombieFaction)) {
+    zombie.canMove = true;
     zombie.canAttack = true;
     zombie.maxAttackCharges = state.config.units[zombie.type as ZombieUnitType].maxAttackCharges;
     zombie.attackChargesRemaining = zombie.maxAttackCharges;
@@ -3352,7 +3516,8 @@ function wait(state: GameState, action: Extract<GameAction, { type: 'Wait' }>): 
 }
 
 function constructibleLimit(state: Readonly<GameState>, facilityType: ConstructibleFacilityType): number {
-  return facilityType === 'simpleFarm'
+  if (facilityType === 'temporaryHousing') return Number.MAX_SAFE_INTEGER;
+  return facilityType === 'simpleFarm' || facilityType === 'windPowerPlant'
     ? state.map.roadBranches.length
     : Math.ceil(state.map.roadBranches.length / state.config.constructibleFacility.limitPerTypeDivisor);
 }
@@ -3382,7 +3547,7 @@ function validateConstructibleFacilityAction(
 ): ActionError | null {
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
-  if (!['simpleFarm', 'civilianDroneBase'].includes(action.facilityType)) {
+  if (!['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'].includes(action.facilityType)) {
     return error(action, 'invalid_constructible_facility_type', 'Unknown constructible facility type');
   }
   if (state.facilities.filter((facility) => facility.constructible && facility.type === action.facilityType).length >= constructibleLimit(state, action.facilityType)) {
@@ -3441,7 +3606,7 @@ function getLegalConstructibleBuildActions(
   const context = constructibleValidationContext(state);
   const actions: Array<Extract<GameAction, { type: 'BuildConstructibleFacility' }>> = [];
   const suppliedTiles = state.map.tiles.filter((tile) => context.suppliedKeys.has(tile.key));
-  for (const facilityType of ['simpleFarm', 'civilianDroneBase'] as const) {
+  for (const facilityType of ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const) {
     for (const tile of suppliedTiles) {
       const action: Extract<GameAction, { type: 'BuildConstructibleFacility' }> = {
         type: 'BuildConstructibleFacility',
@@ -3462,7 +3627,9 @@ function buildConstructibleFacility(
   if (reason) return reason;
   const config = state.config.facilities[action.facilityType];
   const number = state.nextConstructibleFacilityNumber++;
-  const prefix = action.facilityType === 'simpleFarm' ? 'simple-farm' : 'civilian-drone-base';
+  const prefix = action.facilityType === 'simpleFarm' ? 'simple-farm'
+    : action.facilityType === 'civilianDroneBase' ? 'civilian-drone-base'
+      : action.facilityType === 'temporaryHousing' ? 'temporary-housing' : 'wind-power-plant-built';
   const securedOrder = state.facilities.reduce((maximum, facility) => Math.max(maximum, facility.securedOrder ?? -1), -1) + 1;
   const facility: FacilityState = {
     id: `${prefix}-${number}`,
@@ -3481,7 +3648,7 @@ function buildConstructibleFacility(
     securedOrder,
     lastAssignedOrder: state.nextAssignmentOrder++,
     populationOperationalTurn: state.turn + 1,
-    powerSupplyEnabled: action.facilityType !== 'simpleFarm',
+    powerSupplyEnabled: action.facilityType === 'civilianDroneBase',
     lastPowerSupplied: null,
     constructible: true,
     builtTurn: state.turn,
@@ -3508,8 +3675,8 @@ function validateDecommissionConstructibleFacility(
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   const facility = getFacilityState(state, action.facilityId);
-  if (!facility || !facility.constructible || facility.type !== 'civilianDroneBase') {
-    return error(action, 'facility_not_decommissionable', 'Only a constructed Civilian Drone Base can be decommissioned');
+  if (!facility || !facility.constructible || !['civilianDroneBase', 'temporaryHousing'].includes(facility.type)) {
+    return error(action, 'facility_not_decommissionable', 'Only constructed Civilian Drone Bases and Temporary Housing can be decommissioned');
   }
   if (facility.operationalStatus === 'building') {
     return error(action, 'facility_building', 'A facility under construction cannot be decommissioned');
@@ -3530,12 +3697,16 @@ function decommissionConstructibleFacility(
   const validation = validateDecommissionConstructibleFacility(state, action);
   if ('code' in validation) return validation;
   const { facility } = validation;
-  const refund = Math.ceil(state.config.facilities.civilianDroneBase.buildCivilianGoods / 2);
+  const refund = facility.type === 'temporaryHousing'
+    ? 0
+    : Math.ceil(state.config.facilities.civilianDroneBase.buildCivilianGoods / 2);
   state.facilities.splice(state.facilities.findIndex((candidate) => candidate.id === facility.id), 1);
   state.resources.civilianGoods += refund;
   state.actionsTakenThisTurn += 1;
-  state.statistics.civilianDroneBasesDecommissioned += 1;
-  state.statistics.civilianGoodsRefundedFromDecommission += refund;
+  if (facility.type === 'civilianDroneBase') {
+    state.statistics.civilianDroneBasesDecommissioned += 1;
+    state.statistics.civilianGoodsRefundedFromDecommission += refund;
+  }
   emit(state, 'constructible_decommissioned', {
     facilityId: facility.id,
     facilityType: facility.type,
@@ -3833,6 +4004,7 @@ export class GameEngine implements HeadlessGame {
     }));
     return createQueryContext(this.revision, {
       getEndTurnForecast: () => forecastEndTurn(state),
+      getNextTurnPenaltyForecast: () => memo('next-turn-penalties', () => forecastNextTurnPenalties(state)),
       getStrategicForecast: () => memo('strategic', () => deriveStrategicForecast(state)),
       getCrisisSummary: () => memo('crisis', () => deriveCrisisSummary(state)),
       getEndTurnRisk: () => memo('risk', () => deriveEndTurnRisk(state)),

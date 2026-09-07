@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import fixture from '../testing/fixtures/v153-initial-state.json';
+import fixture from '../testing/fixtures/v154-initial-state.json';
 import { createDefaultConfig } from './config';
 import { createInitialState } from './state';
 
-describe('v1.5.3 deterministic full initial-state fixture', () => {
+describe('v1.5.4 deterministic full initial-state fixture', () => {
   for (const entry of fixture.fixtures) {
     it(`preserves every initial field, unit order and RNG draw for seed ${entry.seed}`, () => {
       const state = createInitialState(entry.seed, createDefaultConfig());

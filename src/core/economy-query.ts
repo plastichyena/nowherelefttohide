@@ -1,6 +1,6 @@
-import type { GameState, FacilityState, EndTurnForecast, MilitaryGoodsForecast, HumanUnitType, PowerSupplyReason, ResourceType } from './types';
+import type { GameState, FacilityState, EndTurnForecast, MilitaryGoodsForecast, HumanUnitType, NextTurnPenaltyForecast, PowerSupplyReason, ResourceType } from './types';
 import type { ArmyBaseMilitaryGoodsProjection, FacilityProductionProjection } from './economy-types';
-import { isCityFacility, getFacilityState } from './state';
+import { cloneState, isCityFacility, getFacilityState } from './state';
 import { isHexSupplied } from './supply';
 import { forecastUnitSuppression, infectedSuppressionTarget } from './combat-query';
 import { detachedQueryValue } from './query-cache';
@@ -29,7 +29,8 @@ export function eligibleSnapshotCities(
         facility.status === 'owned' &&
         facility.infected === 0 &&
         facility.populationOperationalTurn <= state.turn &&
-        isCityFacility(facility),
+        isCityFacility(facility) &&
+        (facility.type !== 'temporaryHousing' || isHexSupplied(state, facility.position)),
     );
 }
 
@@ -220,10 +221,8 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const overcrowding = overcrowdingTerms(state);
   const normalFood = consumers * state.config.economy.populationConsumption.food;
   const normalCivilian = consumers * state.config.economy.populationConsumption.civilianGoods;
-  const maintenance = {
-    food: normalFood + overcrowdingAdditionalConsumption(normalFood, overcrowding),
-    civilianGoods: normalCivilian + overcrowdingAdditionalConsumption(normalCivilian, overcrowding),
-  };
+  const overcrowdingFood = overcrowdingAdditionalConsumption(normalFood, overcrowding);
+  const overcrowdingCivilian = overcrowdingAdditionalConsumption(normalCivilian, overcrowding);
 
   const powerPlantPhysicalCapacity = facilities
     .filter((facility) => facility.type === 'powerPlant' && canProduce(facility))
@@ -270,13 +269,51 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   };
 
   const cityTargets = facilities.filter(
-    (facility) => isOwned(facility) && isCityFacility(facility) && facility.workers > 0 && canProduce(facility),
+    (facility) => isOwned(facility) && ['capital', 'city'].includes(facility.type) && facility.workers > 0 && canProduce(facility),
   );
   let requiredPowerDemand = cityTargets.reduce(
     (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
     0,
   );
   let requiredPowerAllocated = allocate(cityTargets);
+
+  const housingCanRequestPower = (facility: FacilityState) =>
+    facility.type === 'temporaryHousing' &&
+    isOwned(facility) &&
+    !['building', 'disabled', 'recovering', 'ruined'].includes(facility.operationalStatus) &&
+    isHexSupplied(state, facility.position);
+  const occupiedHousingTargets = facilities.filter(
+    (facility) => housingCanRequestPower(facility) && facility.workers > 0,
+  );
+  requiredPowerDemand += occupiedHousingTargets.reduce(
+    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
+    0,
+  );
+  requiredPowerAllocated += allocate(occupiedHousingTargets);
+
+  const occupiedHousingOutages = facilities
+    .filter((facility) =>
+      facility.type === 'temporaryHousing' &&
+      isOwned(facility) &&
+      !['building', 'disabled', 'recovering', 'ruined'].includes(facility.operationalStatus) &&
+      facility.workers > 0 &&
+      !supplied.has(facility.id))
+    .map((facility) => ({
+      facilityId: facility.id,
+      reason: isHexSupplied(state, facility.position)
+        ? 'power_shortage' as const
+        : 'supply_disconnected' as const,
+    }));
+  const housingOutageFood = normalFood <= 0 || occupiedHousingOutages.length === 0
+    ? 0
+    : Math.ceil(normalFood * occupiedHousingOutages.length / 100);
+  const housingOutageCivilian = normalCivilian <= 0 || occupiedHousingOutages.length === 0
+    ? 0
+    : Math.ceil(normalCivilian * occupiedHousingOutages.length / 100);
+  const maintenance = {
+    food: normalFood + overcrowdingFood + housingOutageFood,
+    civilianGoods: normalCivilian + overcrowdingCivilian + housingOutageCivilian,
+  };
 
   const maintenanceTargets = facilities.filter(
     (facility) =>
@@ -359,19 +396,35 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   );
   requiredPowerAllocated += allocate(armyBaseTargets);
 
+  const emptyHousingTargets = facilities.filter(
+    (facility) => housingCanRequestPower(facility) && facility.workers === 0,
+  );
+  requiredPowerDemand += emptyHousingTargets.reduce(
+    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
+    0,
+  );
+  requiredPowerAllocated += allocate(emptyHousingTargets);
+
   const projections = facilities.map((facility): FacilityProductionProjection => {
     const rule = state.config.facilities[facility.type].production;
     const normalArmyBase = isNormallyOperatingArmyBase(facility);
     const armyBaseHasReservation = facility.type === 'armyBase' && armyBaseReservations.has(facility.id);
     const eligible = isOwned(facility) && facility.workers > 0;
-    const eligibleForPower = facility.type === 'armyBase' ? normalArmyBase : eligible;
+    const eligibleForPower = facility.type === 'armyBase'
+      ? normalArmyBase
+      : facility.type === 'temporaryHousing'
+        ? housingCanRequestPower(facility)
+        : eligible;
     let projectedPowerReason: PowerSupplyReason = reasons.get(facility.id) ?? 'not_applicable';
     let projectedPowerRequested = requested.has(facility.id);
     const powerMode = facility.type === 'armyBase' && !armyBaseHasReservation
       ? 'none' as const
       : rule.powerMode;
     const toggleable = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
-    if (facility.type === 'armyBase' && armyBaseHasReservation && !normalArmyBase) {
+    if (facility.type === 'temporaryHousing' && isOwned(facility) && !['building', 'disabled', 'recovering', 'ruined'].includes(facility.operationalStatus) && !isHexSupplied(state, facility.position)) {
+      projectedPowerRequested = false;
+      projectedPowerReason = 'supply_disconnected';
+    } else if (facility.type === 'armyBase' && armyBaseHasReservation && !normalArmyBase) {
       projectedPowerRequested = false;
       projectedPowerReason = 'not_eligible';
     } else if (powerMode === 'required' && toggleable && !facility.powerSupplyEnabled) projectedPowerReason = 'power_supply_off';
@@ -382,7 +435,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     }
     const projectedPowerSupplied = supplied.has(facility.id);
     const productionMultiplier = 1;
-    const potentialOperatingWorkers = !canProduce(facility)
+    const potentialOperatingWorkers = facility.type === 'temporaryHousing' || !canProduce(facility)
       ? 0
       : facility.type === 'militaryFactory'
         ? militaryInputWorkers.get(facility.id) ?? 0
@@ -540,10 +593,17 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     })),
     forecast: {
       populationConsumers: consumers,
+      housingOutage: {
+        facilities: occupiedHousingOutages,
+        outageCount: occupiedHousingOutages.length,
+        penaltyRatio: occupiedHousingOutages.length / 100,
+        additionalFood: housingOutageFood,
+        additionalCivilianGoods: housingOutageCivilian,
+      },
       overcrowding: {
         cities: overcrowding,
-        additionalFood: maintenance.food - normalFood,
-        additionalCivilianGoods: maintenance.civilianGoods - normalCivilian,
+        additionalFood: overcrowdingFood,
+        additionalCivilianGoods: overcrowdingCivilian,
       },
       food: resourceForecast('food', maintenance.food),
       civilianGoods: {
@@ -642,6 +702,140 @@ function overcrowdingAdditionalConsumption(normal: number, terms: ReturnType<typ
   }
   const amount = (BigInt(normal) * numerator + denominator - 1n) / denominator;
   return Math.max(1, Number(amount));
+}
+
+function overcrowdingPenaltyRatio(terms: ReturnType<typeof overcrowdingTerms>): number {
+  return terms.reduce((total, term) => total + term.excess / term.softCap, 0);
+}
+
+function applyKnownReception(
+  state: GameState,
+  recipients: readonly FacilityState[],
+  amount: number,
+): boolean {
+  if (amount <= 0) return true;
+  if (recipients.length === 0) return false;
+  const normalCities = recipients.filter((facility) => facility.type !== 'temporaryHousing');
+  const housings = recipients.filter((facility) => facility.type === 'temporaryHousing');
+  const stableOrder = new Map(recipients.map((facility, index) => [facility.id, index]));
+  let remaining = amount;
+  for (const group of [normalCities, housings]) {
+    for (const facility of group) {
+      if (remaining <= 0) break;
+      const occupied = facility.workers + (facility.type === 'temporaryHousing' ? facility.infected : 0);
+      const accepted = Math.min(remaining, Math.max(0, state.config.facilities[facility.type].workerCapacity - occupied));
+      facility.workers += accepted;
+      remaining -= accepted;
+    }
+  }
+  while (remaining > 0) {
+    const target = [...recipients].sort((left, right) => {
+      const leftCapacity = state.config.facilities[left.type].workerCapacity;
+      const rightCapacity = state.config.facilities[right.type].workerCapacity;
+      const leftPopulation = left.workers + (left.type === 'temporaryHousing' ? left.infected : 0);
+      const rightPopulation = right.workers + (right.type === 'temporaryHousing' ? right.infected : 0);
+      return leftPopulation * rightCapacity - rightPopulation * leftCapacity
+        || (stableOrder.get(left.id) ?? 0) - (stableOrder.get(right.id) ?? 0);
+    })[0]!;
+    target.workers += 1;
+    remaining -= 1;
+  }
+  return true;
+}
+
+function projectKnownNextTurnPopulation(state: Readonly<GameState>, targetTurn: number): GameState {
+  const projected = cloneState(state as GameState);
+  for (const checkpoint of [...projected.checkpoints].sort((left, right) => left.id.localeCompare(right.id))) {
+    if (!['operational', 'remnant'].includes(checkpoint.status) || checkpoint.screening <= 0 || checkpoint.remainingTurns !== 1) continue;
+    const policy = projected.config.refugees.policies[checkpoint.screeningPolicy];
+    if (policy.infectionRate > 0) continue;
+    const accepted = Math.floor(checkpoint.screening * policy.workerRate);
+    checkpoint.screening = 0;
+    checkpoint.remainingTurns = 0;
+    if (!applyKnownReception(projected, eligibleSnapshotCities(projected, 'reception'), accepted)) {
+      checkpoint.approved += accepted;
+    }
+  }
+  projected.turn = targetTurn;
+  for (const facility of projected.facilities) {
+    if (
+      facility.operationalStatus === 'building' &&
+      facility.builtTurn !== null &&
+      facility.builtTurn < targetTurn
+    ) {
+      facility.operationalStatus = facility.type === 'windPowerPlant' || facility.type === 'temporaryHousing'
+        ? 'operational'
+        : facility.workers > 0 ? 'operational' : 'stopped';
+      facility.populationOperationalTurn = targetTurn;
+    }
+    if (
+      facility.operationalStatus === 'recovering' &&
+      facility.recoveryOperationalTurn !== null &&
+      facility.recoveryOperationalTurn <= targetTurn
+    ) {
+      facility.operationalStatus = facility.type === 'windPowerPlant' || facility.type === 'temporaryHousing' || facility.type === 'armyBase' || facility.workers > 0
+        ? 'operational'
+        : 'stopped';
+      facility.populationOperationalTurn = targetTurn;
+      facility.recoveryOperationalTurn = null;
+    }
+  }
+
+  const recipients = projected.facilities
+    .filter((facility) =>
+      facility.owner === 'player' &&
+      facility.status === 'owned' &&
+      facility.infected === 0 &&
+      facility.populationOperationalTurn <= targetTurn &&
+      isCityFacility(facility) &&
+      (facility.type !== 'temporaryHousing' || isHexSupplied(projected, facility.position)))
+    .sort((left, right) => left.workers - right.workers || left.id.localeCompare(right.id));
+  const approved = projected.checkpoints
+    .filter((checkpoint) => ['operational', 'remnant'].includes(checkpoint.status))
+    .reduce((total, checkpoint) => total + checkpoint.approved, 0);
+  if (applyKnownReception(projected, recipients, approved)) {
+    for (const checkpoint of projected.checkpoints) {
+      if (['operational', 'remnant'].includes(checkpoint.status)) checkpoint.approved = 0;
+    }
+  }
+  return projected;
+}
+
+/**
+ * Exact next-player-turn warning based only on already committed facts. Random
+ * arrivals, screening outcomes, infections, combat, and spawn positions are
+ * deliberately absent. Build completions and already-approved refugees are
+ * deterministic and therefore included.
+ */
+export function forecastNextTurnPenalties(state: Readonly<GameState>): NextTurnPenaltyForecast {
+  return detachedQueryValue(state, 'next-turn-penalties', () => {
+    const current = calculateEconomyPlan(state);
+    const targetTurn = state.turn + 1;
+    const projected = projectKnownNextTurnPopulation(state, targetTurn);
+    projected.resources = {
+      food: current.forecast.food.endingStock,
+      civilianGoods: current.forecast.civilianGoods.endingStock,
+      militaryGoods: current.forecast.militaryGoods.projectedEndingStock,
+      fuel: current.forecast.fuel.endingStock,
+      electricityCapacity: current.forecast.electricity.physicalGenerationCapacity,
+      electricityRequired: current.forecast.electricity.requiredPowerDemand,
+    };
+    const forecast = computeEconomyPlan(projected).forecast;
+    return {
+      targetTurn,
+      overcrowding: {
+        active: forecast.overcrowding.cities.length > 0,
+        facilities: forecast.overcrowding.cities,
+        penaltyRatio: overcrowdingPenaltyRatio(forecast.overcrowding.cities),
+        additionalFood: forecast.overcrowding.additionalFood,
+        additionalCivilianGoods: forecast.overcrowding.additionalCivilianGoods,
+      },
+      housingOutage: {
+        active: forecast.housingOutage.outageCount > 0,
+        ...forecast.housingOutage,
+      },
+    };
+  });
 }
 
 /**

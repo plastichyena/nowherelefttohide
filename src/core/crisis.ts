@@ -1,4 +1,4 @@
-import { forecastEndTurn } from './economy-query';
+import { forecastEndTurn, forecastNextTurnPenalties } from './economy-query';
 import { forecastUnitSuppression, getUnitLegalAttackProjections } from './combat-query';
 import { deriveStrategicForecast } from './forecast';
 import { deriveCheckpointRole, isHexSupplied } from './supply';
@@ -9,6 +9,8 @@ const severityOrder: Record<CrisisSeverity, number> = { critical: 0, warning: 1,
 
 /** Public fact comparisons, exhaustive for the current crisis contract. */
 export const CRISIS_WORSENING_FACTS = {
+  overcrowding_forecast: { penaltyRatio: 'up', additionalFood: 'up', additionalCivilianGoods: 'up' },
+  temporary_housing_outage_forecast: { outageCount: 'up', penaltyRatio: 'up', additionalFood: 'up', additionalCivilianGoods: 'up' },
   capital_infection_uncontained: { infected: 'up', healthyPopulation: 'down', suppressionUnitAvailable: 'false' },
   critical_site_infection_uncontained: { infected: 'up', healthyPopulation: 'down', currentProductionLoss: 'up' },
   checkpoint_defense_degraded: { standbyCount: 'down', fallbackDepth: 'down', roleChangedThisTurn: 'true', activeCheckpointId: 'lost' },
@@ -141,6 +143,26 @@ export function deriveCrisisSummary(state: Readonly<GameState>): CrisisAlert[] {
   }
 
   const forecast = forecastEndTurn(state);
+  const nextTurnPenalties = forecastNextTurnPenalties(state);
+  if (nextTurnPenalties.overcrowding.active) {
+    alerts.push(alert('warning', 'resource', 'overcrowding_forecast', nextTurnPenalties.overcrowding.facilities.map((entry) => entry.facilityId), {
+      targetTurn: nextTurnPenalties.targetTurn,
+      penaltyRatio: nextTurnPenalties.overcrowding.penaltyRatio,
+      additionalFood: nextTurnPenalties.overcrowding.additionalFood,
+      additionalCivilianGoods: nextTurnPenalties.overcrowding.additionalCivilianGoods,
+      facilities: nextTurnPenalties.overcrowding.facilities,
+    }));
+  }
+  if (nextTurnPenalties.housingOutage.active) {
+    alerts.push(alert('warning', 'resource', 'temporary_housing_outage_forecast', nextTurnPenalties.housingOutage.facilities.map((entry) => entry.facilityId), {
+      targetTurn: nextTurnPenalties.targetTurn,
+      outageCount: nextTurnPenalties.housingOutage.outageCount,
+      penaltyRatio: nextTurnPenalties.housingOutage.penaltyRatio,
+      additionalFood: nextTurnPenalties.housingOutage.additionalFood,
+      additionalCivilianGoods: nextTurnPenalties.housingOutage.additionalCivilianGoods,
+      facilities: nextTurnPenalties.housingOutage.facilities,
+    }));
+  }
   const strategic = deriveStrategicForecast(state);
   const guaranteed = strategic.guaranteedDefeat.guaranteed;
   if (guaranteed) alerts.push(alert('critical', 'resource', 'guaranteed_resource_defeat', [], {

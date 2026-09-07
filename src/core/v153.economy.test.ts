@@ -47,7 +47,7 @@ describe('v1.5.3 economy query', () => {
     setPowerPriorityScenario(state, base);
     expect(isHexSupplied(state, base.position)).toBe(false);
 
-    state.resources.fuel = 3;
+    state.resources.fuel = 4;
     state.pendingUnitProductions = [];
     expect(forecastArmyBaseRecruitmentPower(state, base.id)).toEqual({
       hasReservation: true, requested: true, supplied: false, reason: 'fuel_shortage',
@@ -61,7 +61,7 @@ describe('v1.5.3 economy query', () => {
     }];
     let plan = calculateEconomyPlan(state);
     let baseProjection = plan.facilities.find((projection) => projection.facilityId === base.id)!;
-    expect(plan.forecast.electricity).toMatchObject({ availableGenerationCapacity: 5, requiredPowerDemand: 10, requiredPowerAllocated: 5 });
+    expect(plan.forecast.electricity).toMatchObject({ availableGenerationCapacity: 10, requiredPowerDemand: 15, requiredPowerAllocated: 10 });
     expect(baseProjection).toMatchObject({
       powerMode: 'required', projectedPowerRequested: true, projectedPowerSupplied: false,
       projectedPowerReason: 'fuel_shortage',
@@ -69,10 +69,10 @@ describe('v1.5.3 economy query', () => {
     });
     expect(plan.armyBasePowerOrders).toEqual([{ orderId: 'army-base-reservation', facilityId: base.id, powerSupplied: false }]);
 
-    state.resources.fuel = 4;
+    state.resources.fuel = 6;
     plan = calculateEconomyPlan(state);
     baseProjection = plan.facilities.find((projection) => projection.facilityId === base.id)!;
-    expect(plan.forecast.electricity).toMatchObject({ availableGenerationCapacity: 10, requiredPowerDemand: 10, requiredPowerAllocated: 10 });
+    expect(plan.forecast.electricity).toMatchObject({ availableGenerationCapacity: 15, requiredPowerDemand: 15, requiredPowerAllocated: 15 });
     expect(baseProjection.armyBaseMilitaryGoods?.recruitmentPower).toEqual({
       hasReservation: true, requested: true, supplied: true, reason: 'supplied',
     });
@@ -83,13 +83,13 @@ describe('v1.5.3 economy query', () => {
     const state = createInitialState(15302, config());
     const base = armyBase(state);
     setPowerPriorityScenario(state, base);
-    state.resources.fuel = 4;
+    state.resources.fuel = 6;
     base.infected = 1;
     base.operationalStatus = 'infected';
 
     const plan = calculateEconomyPlan(state);
     const projection = plan.facilities.find((candidate) => candidate.facilityId === base.id)!;
-    expect(plan.forecast.electricity).toMatchObject({ requiredPowerDemand: 5, requiredPowerAllocated: 5 });
+    expect(plan.forecast.electricity).toMatchObject({ requiredPowerDemand: 10, requiredPowerAllocated: 10 });
     expect(projection.armyBaseMilitaryGoods?.recruitmentPower).toEqual({
       hasReservation: true, requested: false, supplied: false, reason: 'not_eligible',
     });
@@ -139,14 +139,14 @@ describe('v1.5.3 economy query', () => {
     state.units = state.units.filter((unit) => unit.id === 'police-1');
     state.units[0]!.currentFuel = state.units[0]!.maxFuel - 1;
 
-    for (const [fuel, available] of [[0, 0], [1, 0], [2, 5], [3, 5]] as const) {
+    for (const [fuel, available] of [[0, 0], [1, 0], [2, 5], [3, 5], [4, 10], [5, 10]] as const) {
       state.resources.fuel = fuel;
       expect(forecastEndTurn(state).electricity.availableGenerationCapacity).toBe(available);
     }
-    state.resources.fuel = 3;
+    state.resources.fuel = 5;
     expect(forecastEndTurn(state).fuel).toMatchObject({
-      projectedPowerFuelDemand: 2,
-      projectedPowerFuelUsed: 2,
+      projectedPowerFuelDemand: 4,
+      projectedPowerFuelUsed: 4,
       fuelAfterPower: 1,
       projectedUnitFuelRefilled: 1,
       projectedEndingFuel: 0,

@@ -40,6 +40,7 @@ describe('board asset registry', () => {
       'windPowerPlant',
       'simpleFarm',
       'civilianDroneBase',
+      'temporaryHousing',
       'armyBase',
       'checkpoint',
     ]);
@@ -61,6 +62,7 @@ describe('board asset registry', () => {
     expect(getFacilityAssetPath('not-a-facility')).toBeNull();
     expect(getUnitAssetPath('not-a-unit')).toBeNull();
     expect(getFacilityAssetPath('armyBase')).toBe(BOARD_ASSET_REGISTRY.facilities.armyBase);
+    expect(getFacilityAssetPath('temporaryHousing')).toBe(BOARD_ASSET_REGISTRY.facilities.temporaryHousing);
     expect(getUnitAssetPath('policeZombie')).toBe(BOARD_ASSET_REGISTRY.units.policeZombie);
     expect(getUnitAssetPath('soldierZombie')).toBe(BOARD_ASSET_REGISTRY.units.soldierZombie);
     expect(getUnitAssetPath('riotPolice')).toBe(BOARD_ASSET_REGISTRY.units.riotPolice);

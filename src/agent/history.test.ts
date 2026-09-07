@@ -116,7 +116,7 @@ describe('bounded public history and artifact access', () => {
     expect(() => bridge.getArtifactPage({ expectedRevision: first.revision })).toThrow('stale_revision');
     expect(bridge.getArtifactPage({ target: 'invalid-attempts' }).total).toBe(1);
     expect(bridge.getObservation()).toEqual(before);
-    expect(JSON.stringify(bridge.getArtifactPage())).not.toContain('noiseRadius');
+    expect(JSON.stringify(bridge.getArtifactPage())).toContain('"windPower":{"noiseRadius":8}');
     expect(() => bridge.getArtifactPage(null as never)).toThrow('invalid_artifact_query');
     expect(() => bridge.getArtifactPage([] as never)).toThrow('invalid_artifact_query');
   });

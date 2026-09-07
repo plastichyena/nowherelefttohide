@@ -410,10 +410,38 @@ h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--primary); }
 .important-event-item:hover, .important-event-item:focus-visible { border-color: #8be8ff; background: #173743; outline: none; }
 .important-event-marker { flex: 0 0 18px; color: #ffcf66; font-weight: 800; text-align: center; }
 .important-event-history .muted { margin: 7px 0 0; }
+.horde-event-history { margin: 10px 0; padding: 9px 10px; border: 1px solid #6d5a32; border-radius: 9px; background: #282319; }
+.horde-event-history .section-heading { margin-bottom: 6px; }
+.horde-event-history h3 { margin: 0; color: #f3d682; }
+.horde-event-history ol { display: grid; gap: 5px; max-height: 310px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.horde-event-item { display: flex; min-height: 44px; align-items: flex-start; gap: 7px; padding: 7px 6px; border: 1px solid #72592d; border-radius: 7px; background: #3b301d; color: #fff2bf; font-size: 0.72rem; line-height: 1.35; }
+.horde-event-item > span:last-child { display: grid; min-width: 0; gap: 2px; }
+.horde-event-item small { color: #e8d9aa; overflow-wrap: anywhere; }
+.horde-event-history .muted { margin: 7px 0 0; }
+.next-turn-penalty-forecast { margin: 8px 0; }
+.next-turn-penalty-forecast .section-heading { margin-bottom: 6px; }
+.next-turn-penalty-forecast h3 { margin: 0; }
+.forecast-penalty-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.forecast-penalty-card { min-width: 0; margin: 0; padding: 8px 9px; border: 1px solid #3e7180; border-radius: 8px; background: #102d35; }
+.forecast-penalty-card h4 { margin: 0 0 6px; color: #9bdde0; }
+.forecast-penalty-card.is-warning { border-color: #a87846; background: #302819; }
+.forecast-penalty-card.is-warning h4 { color: #f3d682; }
+.forecast-penalty-card.is-clear { border-color: #3e7180; }
+.forecast-penalty-card .forecast-detail-grid { margin: 0; }
+.forecast-penalty-card .forecast-detail-grid > div { border-color: #2d5e68; background: #112832; }
+.forecast-penalty-card.is-warning .forecast-detail-grid > div { border-color: #72592d; background: #3b301d; }
+.forecast-clear-note { margin: 7px 0 0; }
+.housing-detail { margin: 9px 0; padding: 9px 10px; border: 1px solid #4b8980; border-radius: 9px; background: #112d2b; }
+.housing-detail h3 { margin: 0; }
+.housing-detail .section-heading { margin-bottom: 6px; }
+.housing-detail .forecast-detail-grid > div { border-color: #2c5962; background: #102a31; }
+.housing-detail .status-chip.is-warning { color: #ffb394; }
+.housing-detail .status-chip.is-clear { color: #8ff0d4; }
 @media (max-width: 560px) {
   .branch-panel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .branch-panel-grid > div:last-child { grid-column: 1 / -1; }
   .branch-candidate-actions { grid-template-columns: 1fr; }
+  .forecast-penalty-grid { grid-template-columns: 1fr; }
 }
 
 /* v1.4 fuel, constructible facilities, and strategic warning surfaces */

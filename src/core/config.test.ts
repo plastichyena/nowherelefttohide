@@ -5,11 +5,11 @@ import {
   validateGameConfig,
 } from './config';
 
-describe('v1.5.1 GameConfig', () => {
+describe('v1.5.4 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('5.0.0');
-    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v2');
+    expect(DEFAULT_CONFIG.version).toBe('6.0.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v3');
     expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(25);
     expect(DEFAULT_CONFIG.economy.initialResources).toMatchObject({
       food: 230,
@@ -17,9 +17,9 @@ describe('v1.5.1 GameConfig', () => {
       militaryGoods: 75,
       fuel: 92,
     });
-    expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(10);
+    expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(15);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, outputs: { food: 10 }, powerMode: 'required' });
-    expect(DEFAULT_CONFIG.facilities.refinery.production).toMatchObject({ outputs: { fuel: 5 }, powerMode: 'required', powerCapacity: 5 });
+    expect(DEFAULT_CONFIG.facilities.refinery.production).toMatchObject({ outputs: { fuel: 5 }, powerMode: 'required', powerCapacity: 10 });
     expect(DEFAULT_CONFIG.facilities.simpleFarm.production).toMatchObject({ outputs: { food: 5 }, powerMode: 'none', powerCapacity: 0 });
     expect(DEFAULT_CONFIG.horde.warningLeadTurns).toBe(2);
     expect(DEFAULT_CONFIG.horde.waves).toEqual([
@@ -82,10 +82,10 @@ describe('v1.5.1 GameConfig', () => {
       windPowerPlant: {
         workerCapacity: 0,
         production: { fixedPowerGeneration: 15 },
-        zombieTargetValue: 5,
+        zombieTargetValue: 0,
       },
-      simpleFarm: { workerCapacity: 10, buildCivilianGoods: 15 },
-      civilianDroneBase: { workerCapacity: 5, buildCivilianGoods: 25, visionRadius: 15 },
+      simpleFarm: { workerCapacity: 10, buildCivilianGoods: 25 },
+      civilianDroneBase: { workerCapacity: 5, buildCivilianGoods: 50, visionRadius: 15 },
     });
     expect(DEFAULT_CONFIG.economy.initialWorkersByFacility).toMatchObject({
       capital: 41,
@@ -96,11 +96,11 @@ describe('v1.5.1 GameConfig', () => {
     });
   });
 
-  it('enforces fixed five-capacity consumers and zero-capacity non-consumers', () => {
+  it('enforces type-specific capacity consumers and zero-capacity non-consumers', () => {
     const requiredThree = createDefaultConfig({ facilities: { capital: { production: { powerCapacity: 3 } } } });
     expect(validateGameConfig(requiredThree)).toMatchObject({
       valid: false,
-      errors: expect.arrayContaining(['facilities.capital.production.powerCapacity must be 5']),
+      errors: expect.arrayContaining(['facilities.capital.production.powerCapacity must be 10']),
     });
     const nonConsumerFive = createDefaultConfig({ facilities: { simpleFarm: { production: { powerCapacity: 5 } } } });
     expect(validateGameConfig(nonConsumerFive)).toMatchObject({

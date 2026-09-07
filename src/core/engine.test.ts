@@ -290,7 +290,7 @@ describe('GameEngine', () => {
     expect(checkpoint.status).toBe('operational');
   });
 
-  it('does not overrun a safely emptied facility merely because a zombie stands on it', () => {
+  it('loses an empty capital when a zombie occupies it', () => {
     const config = createDefaultConfig({ horde: singleFinalWave(3), units: { zombie: { movement: 0 } } });
     const engine = new GameEngine(103, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
@@ -304,7 +304,8 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const capital = engine.getState().facilities.find((facility) => facility.id === 'capital')!;
-    expect(capital.status).toBe('owned');
+    expect(capital.status).toBe('ruined');
+    expect(engine.getState().gameOver).toBe(true);
     expect(capital.infected).toBe(0);
   });
 
@@ -378,14 +379,14 @@ describe('GameEngine', () => {
     const before = JSON.stringify(snapshot);
     const forecast = forecastEndTurn(snapshot);
     expect(JSON.stringify(snapshot)).toBe(before);
-    // The full 20-electricity demand needs eight Fuel; five starting Fuel can fund two allocations.
-    expect(forecast.fuel).toMatchObject({ available: 5, generationFuelDemand: 8, projectedFuelUsed: 4 });
-    expect(forecast.electricity).toMatchObject({ physicalGenerationCapacity: 30, required: 20, shortage: 10 });
+    // Forty electricity requires sixteen Fuel; five Fuel can supply the capital only.
+    expect(forecast.fuel).toMatchObject({ available: 5, generationFuelDemand: 16, projectedFuelUsed: 4 });
+    expect(forecast.electricity).toMatchObject({ physicalGenerationCapacity: 45, required: 40, shortage: 30 });
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
-    // Two allocations consume four Fuel; the remaining starting Fuel cannot enable the lower-priority Refinery.
+    // The capital consumes four Fuel; the remaining Fuel cannot enable production.
     expect(result.state.resources.fuel).toBe(1);
-    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'food' && event.payload.amount === 230)).toBe(true);
+    expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'food' && event.payload.amount === 230)).toBe(false);
 
     const noPower = engine.getState() as ReturnType<typeof createInitialState>;
     noPower.turn = 1;
@@ -399,7 +400,7 @@ describe('GameEngine', () => {
     createCityPopulationSnapshot(noPower);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: noPower }).error).toBeNull();
     const unpowered = forecastEndTurn(engine.getState());
-    expect(unpowered.electricity).toMatchObject({ capacity: 0, required: 20, shortage: 20 });
+    expect(unpowered.electricity).toMatchObject({ capacity: 0, required: 40, shortage: 40 });
     expect(unpowered.fuel.projectedFuelUsed).toBe(0);
   });
 
@@ -644,7 +645,7 @@ describe('GameEngine', () => {
     expect(engine.getState()).toEqual(unchanged);
   });
 
-  it('fills reception cities to their soft caps, then distributes excess round-robin', () => {
+  it('fills reception cities to their soft caps, then balances occupancy ratios', () => {
     const engine = new GameEngine(209, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     const populations: Record<string, number> = { capital: 100, 'city-1': 49, 'city-2': 50 };
@@ -661,9 +662,9 @@ describe('GameEngine', () => {
     createCityPopulationSnapshot(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-1', workers: 0 }).error).toBeNull();
-    expect(engine.getState().facilities.find((facility) => facility.id === 'city-1')!.workers).toBe(52);
+    expect(engine.getState().facilities.find((facility) => facility.id === 'city-1')!.workers).toBe(51);
     expect(engine.getState().facilities.find((facility) => facility.id === 'city-2')!.workers).toBe(51);
-    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(101);
+    expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(102);
   });
 
   it('keeps newly secured production facilities unavailable until the next player turn', () => {

@@ -26,7 +26,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '5.0.0';
+export const GAME_VERSION = '6.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -47,7 +47,7 @@ function emptyDirectionValues<T>(factory: () => T): Record<CardinalDirection, T>
 }
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return facility.type === 'capital' || facility.type === 'city';
+  return facility.type === 'capital' || facility.type === 'city' || facility.type === 'temporaryHousing';
 }
 
 export function isProductionFacility(facility: Pick<FacilityState, 'type'>): boolean {
@@ -109,7 +109,7 @@ export function facilityZombieTargetValue(
   state: Pick<GameState, 'config'>,
   facility: Readonly<FacilityState>,
 ): number {
-  if (facility.type === 'windPowerPlant') return state.config.facilities.windPowerPlant.zombieTargetValue;
+  if (facility.type === 'windPowerPlant') return 0;
   return facility.workers;
 }
 
@@ -156,6 +156,9 @@ export function createUnit(
     canMove: !isZombieUnit({ type }),
     isPlayerUnit: !isZombieUnit({ type }),
     inheritedTarget: null,
+    previousFallbackPosition: null,
+    fallbackTarget: null,
+    waveCapitalAnchor: null,
     noiseTarget: null,
     spawnGroupId: null,
     hordeKind: null,
@@ -511,6 +514,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     nextEventNumber: 1,
     nextAssignmentOrder: securedOrder + 1,
     horde: {
+      pendingWaves: [],
+      waves: [],
       nextWaveIndex: 1,
       totalSpawned: 0,
       warningDirections: firstWave.turn - stateConfig.horde.warningLeadTurns <= 1
@@ -654,7 +659,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       riotPoliceReanimations: 0,
       hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0 },
       finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0 },
-      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, hordeZombie: 0, armyBase: 0 },
+      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, hordeZombie: 0, armyBase: 0, windPowerPlant: 0 },
       hordeMovementNoisePulses: 0,
       hordeNoiseRespawnedByType: { zombie: 0, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
     },

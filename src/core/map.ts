@@ -21,7 +21,7 @@ export { getTile, getFacility, getHordeEntrance, isRoad, isHordeSpawnReserve, ca
  * identifier here rather than deriving it from caller config: map validation
  * and save loading must reject a different fixed-map contract.
  */
-export const FIXED_MAP_ID = 'fixed-51x51-v2' as const;
+export const FIXED_MAP_ID = 'fixed-51x51-v3' as const;
 export const FIXED_MAP_WIDTH = 51 as const;
 export const FIXED_MAP_HEIGHT = 51 as const;
 export const FIXED_FACILITY_COUNT = 29 as const;
@@ -231,7 +231,7 @@ function createTiles(roads: Set<string>): HexTile[] {
         movementCost: terrain === 'forest' ? 2 : terrain === 'mountain' ? 3 : 1,
         facilityId: null,
         hordeEntranceDirections: [],
-        playerOccupancyAllowed: q !== 0 && q !== FIXED_MAP_WIDTH - 1 && r !== 0 && r !== FIXED_MAP_HEIGHT - 1,
+        playerOccupancyAllowed: q >= 2 && q < FIXED_MAP_WIDTH - 2 && r >= 2 && r < FIXED_MAP_HEIGHT - 2,
       });
     }
   }
@@ -316,6 +316,28 @@ function createRoadBranches(): RoadBranchDefinition[] {
   ];
 }
 
+/**
+ * Scheduled Waves use a deterministic 11x2 zone centred on the real road
+ * entrance.  Lateral offsets alternate around the road, and both reserve
+ * depths are adjacent in the order so a batch fills symmetrically.
+ */
+export function getHordeSpawnZone(map: FixedMap, direction: CardinalDirection): HexCoord[] {
+  const entrance = map.hordeEntrances.find((candidate) => candidate.direction === direction);
+  if (!entrance) return [];
+  const offsets = [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5];
+  const depths = direction === 'north' || direction === 'west' ? [0, 1] : [0, -1];
+  const positions: HexCoord[] = [];
+  for (const offset of offsets) {
+    for (const depth of depths) {
+      const position = direction === 'north' || direction === 'south'
+        ? coord(entrance.tile.q + offset, entrance.tile.r + depth)
+        : coord(entrance.tile.q + depth, entrance.tile.r + offset);
+      if (hexWithinBounds(position, map.width, map.height)) positions.push(position);
+    }
+  }
+  return positions;
+}
+
 function buildFixedMap(
   capacities: Readonly<Record<string, number>> = capacityByType,
 ): FixedMap {
@@ -372,7 +394,7 @@ export function getInitialZombieCandidates(map: FixedMap): HexCoord[] {
   const humanKeys = new Set(Object.values(FIXED_INITIAL_UNIT_POSITIONS).map(hexKey));
   return map.tiles
     .filter((tile) => {
-      if (tile.movementCost === null || isHordeSpawnReserve(map, tile)) return false;
+      if (tile.movementCost === null) return false;
       if (facilityKeys.has(tile.key) || humanKeys.has(tile.key)) return false;
       return hexDistance(capital.position, tile) >= 9;
     })
@@ -437,7 +459,7 @@ export function generateInitialHunterPositions(
     ...map.initialZombiePositions.map(hexKey),
   ]);
   const candidates = map.tiles.filter((tile) => tile.movementCost !== null
-    && !isHordeSpawnReserve(map, tile) && !occupied.has(tile.key)
+    && !occupied.has(tile.key)
     && hexDistance(capital.position, tile) >= options.initialHunterMinDistance)
     .map(({ q, r }) => ({ q, r })).sort((a, b) => a.q - b.q || a.r - b.r);
   const count = rng.nextInt(options.initialHunterCount.min, options.initialHunterCount.max);
@@ -599,11 +621,11 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
   }
   const reserve = Array.isArray(map?.hordeSpawnReserve) ? map.hordeSpawnReserve : [];
   const reserveKeys = new Set(reserve.map(hexKey));
-  if (reserve.length !== 200 || reserveKeys.size !== 200) {
-    errors.push('map must contain the 200 unique outer-ring Horde Spawn Reserve hexes');
+  if (reserve.length !== 392 || reserveKeys.size !== 392) {
+    errors.push('map must contain the 392 unique two-tile-deep Horde Spawn Reserve hexes');
   }
   for (const tile of map?.tiles ?? []) {
-    const expectedReserve = tile.q === 0 || tile.q === FIXED_MAP_WIDTH - 1 || tile.r === 0 || tile.r === FIXED_MAP_HEIGHT - 1;
+    const expectedReserve = tile.q < 2 || tile.q >= FIXED_MAP_WIDTH - 2 || tile.r < 2 || tile.r >= FIXED_MAP_HEIGHT - 2;
     if (reserveKeys.has(tile.key) !== expectedReserve || tile.playerOccupancyAllowed === expectedReserve) {
       errors.push(`tile ${tile.key} has inconsistent Horde Spawn Reserve metadata`);
     }
@@ -708,6 +730,11 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     }
     for (const direction of cardinalDirections) {
       if (!entranceDirections.has(direction)) errors.push(`map must contain one ${direction} Horde entrance`);
+      const zone = getHordeSpawnZone(map, direction);
+      const zoneKeys = new Set(zone.map(hexKey));
+      if (zone.length !== 22 || zoneKeys.size !== 22 || zone.some((position) => !reserveKeys.has(hexKey(position)))) {
+        errors.push(`${direction} Horde Spawn Zone must contain 22 unique in-reserve hexes`);
+      }
     }
   }
 
@@ -727,7 +754,6 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     if (mapFacilityKeys.has(key)) {
       errors.push(`initial zombie overlaps facility: ${key}`);
     }
-    if (reserveKeys.has(key)) errors.push(`initial zombie overlaps Horde Spawn Reserve: ${key}`);
     if (initialHumanKeys.has(key)) errors.push(`initial zombie overlaps initial Human Unit: ${key}`);
     const capital = map?.facilities.find((facility) => facility.type === 'capital');
     if (capital && hexDistance(position, capital.position) < 9) {

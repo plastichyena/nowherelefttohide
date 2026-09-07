@@ -69,6 +69,11 @@ export interface HordeWaveMetric {
   index: number;
   spawnTurn: number;
   directions: CardinalDirection[];
+  /** Frozen public totals across every selected direction. */
+  baseWaveUnitCount: number;
+  committedWaveUnitCount: number;
+  spawnedSoFar: number;
+  pendingCount: number;
   compositionPerDirection: {
     hordeZombie: number;
     zombie: number;
@@ -711,17 +716,16 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'riotZombie',
   ).length;
   const riotZombiesSpawned = statisticNumber(statistics, 'riotZombiesSpawned') ?? events.filter(
-    (event) => (event.type === 'human_unit_reanimated' && event.payload.zombieUnitType === 'riotZombie')
-      || (event.type === 'horde_spawned' && event.payload.unitType === 'riotZombie'),
+    (event) => event.type === 'human_unit_reanimated' && event.payload.zombieUnitType === 'riotZombie',
   ).length;
   const hunterZombiesKilled = statisticNumber(statistics, 'hunterZombiesKilled') ?? events.filter(
     (event) => event.type === 'unit_destroyed' && event.payload.unitType === 'hunterZombie',
   ).length;
   const hunterZombiesSpawned = statisticNumber(statistics, 'hunterZombiesSpawned') ?? 0;
   const hunterZombiesFinal = statisticNumber(statistics, 'hunterZombiesFinal') ?? Math.max(0, hunterZombiesSpawned - hunterZombiesKilled);
-  const finalHordeSpawned = statisticNumber(statistics, 'finalHordeSpawned') ?? events
-    .filter((event) => event.type === 'horde_spawned' && event.payload.hordeKind === 'final')
-    .reduce((total, event) => total + eventPayloadNumber(event, 'count'), 0);
+  const finalHordeSpawned = statisticNumber(statistics, 'finalHordeSpawned') ?? finalObservation.horde.waveTotals
+    .filter((wave) => wave.kind === 'final')
+    .reduce((total, wave) => total + wave.spawnedSoFar, 0);
   const finalHordeKilled = statisticNumber(statistics, 'finalHordeKilled') ?? 0;
   const periodicHordeZombiesSpawned = statisticNumber(statistics, 'periodicHordeZombiesSpawned') ?? 0;
   const periodicNormalZombiesSpawned = statisticNumber(statistics, 'periodicNormalZombiesSpawned') ?? 0;
@@ -1285,8 +1289,8 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   }).length;
   const hordeDirectionSpawnCounts = zeroDirectionMetric();
   const hordeDirectionKillCounts = zeroDirectionMetric();
-  const hordeSpawnEvents = events.filter((event) =>
-    event.type === 'horde_spawned' && Number.isSafeInteger(event.payload.waveIndex),
+  const hordeWaveStartEvents = events.filter((event) =>
+    event.type === 'horde_wave_started' && Number.isSafeInteger(event.payload.waveIndex),
   );
   const specialRecordFromStatistics = (
     key: string,
@@ -1318,7 +1322,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     return result;
   };
   const statHordeSpecialSpawned = specialRecordFromStatistics('hordeSpecialSpawnedByType');
-  const eventHordeSpecialSpawned = specialRecordFromEvents((event) => event.type === 'horde_spawned');
+  const eventHordeSpecialSpawned = specialRecordFromEvents(() => false);
   const hordeSpecialSpawnedByType = Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [
     type,
     statHordeSpecialSpawned[type] > 0 ? statHordeSpecialSpawned[type] : eventHordeSpecialSpawned[type],
@@ -1342,10 +1346,12 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   ])) as Record<typeof ZOMBIE_TYPES[number], number>;
   const hordeWaves: HordeWaveMetric[] = input.config.horde.waves.map((wave, index) => {
     const waveIndex = index + 1;
-    const event = hordeSpawnEvents.find((candidate) => candidate.payload.waveIndex === waveIndex);
-    const directions = Array.isArray(event?.payload.directions)
-      ? event!.payload.directions.filter((direction): direction is CardinalDirection => CARDINAL_DIRECTIONS.includes(direction as CardinalDirection))
-      : [];
+    const waveStarts = hordeWaveStartEvents.filter((candidate) => candidate.payload.waveIndex === waveIndex);
+    const directions = waveStarts
+      .map((event) => event.payload.direction)
+      .filter((direction): direction is CardinalDirection => CARDINAL_DIRECTIONS.includes(direction as CardinalDirection))
+      .sort((left, right) => CARDINAL_DIRECTIONS.indexOf(left) - CARDINAL_DIRECTIONS.indexOf(right));
+    const publicTotals = finalObservation.horde.waveTotals.find((candidate) => candidate.waveIndex === waveIndex);
     const composition = isRecord((wave as unknown as Record<string, unknown>).compositionPerDirection)
       ? (wave as unknown as Record<string, unknown>).compositionPerDirection as Record<string, unknown>
       : {};
@@ -1357,18 +1363,13 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       ...(numberOrZero(composition.hunterZombie) > 0 ? { hunterZombie: numberOrZero(composition.hunterZombie) } : {}),
       ...(numberOrZero(composition.riotZombie) > 0 ? { riotZombie: numberOrZero(composition.riotZombie) } : {}),
     };
-    const eventUnits = Array.isArray(event?.payload.units) ? event?.payload.units : [];
-    const spawnedByType = Object.fromEntries(ZOMBIE_TYPES.map((type) => [type, eventUnits.filter((unit) =>
-      isRecord(unit) && unit.unitType === type,
-    ).length])) as Record<typeof ZOMBIE_TYPES[number], number>;
-    const hordeZombieSpawned = numberOrZero(event?.payload.hordeZombieCount)
-      || (event ? directions.length * baseComposition.hordeZombie : 0);
-    const normalZombieSpawned = numberOrZero(event?.payload.normalZombieCount)
-      || (event ? directions.length * baseComposition.zombie : 0);
+    const hordeZombieSpawned = statisticNumber(statistics, wave.final ? 'finalHordeZombiesSpawned' : 'periodicHordeZombiesSpawned')
+      ?? directions.length * baseComposition.hordeZombie;
+    const normalZombieSpawned = statisticNumber(statistics, wave.final ? 'finalNormalZombiesSpawned' : 'periodicNormalZombiesSpawned')
+      ?? directions.length * baseComposition.zombie;
     const specialZombieSpawnedByType = Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [
       type,
-      numberOrZero((isRecord(event?.payload.specialZombieSpawnedByType) ? event?.payload.specialZombieSpawnedByType : {})[type])
-        || spawnedByType[type],
+      0,
     ])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
     const specialZombieKilledByType = Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [
       type,
@@ -1397,6 +1398,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       index: waveIndex,
       spawnTurn: wave.turn,
       directions,
+      baseWaveUnitCount: publicTotals?.baseWaveUnitCount ?? 0,
+      committedWaveUnitCount: publicTotals?.committedWaveUnitCount ?? 0,
+      spawnedSoFar: publicTotals?.spawnedSoFar ?? 0,
+      pendingCount: publicTotals?.pendingCount ?? 0,
       compositionPerDirection: baseComposition,
       ...(nonHordeSlotCountPerDirection === undefined ? {} : { nonHordeSlotCountPerDirection }),
       ...(possibleNonHordeTypes === undefined ? {} : { possibleNonHordeTypes }),

@@ -7,10 +7,10 @@ const v151Fixture = readFileSync(
   'utf8',
 ).trim();
 
-describe('v1.5.3 Save Format 12 compatibility boundary', () => {
+describe('v1.5.4 Save Format 13 compatibility boundary', () => {
   it('rejects the real v1.5.1 Save Format 11 fixture without a conversion path', () => {
     const decoded = decodeSaveCode(v151Fixture);
     expect(decoded).toMatchObject({ valid: false, state: null, envelope: null });
-    expect(decoded.errors.join(' ')).toMatch(/format version: 11|v1\.5\.2.*earlier|Game Rules 5\.0\.0/i);
+    expect(decoded.errors.join(' ')).toMatch(/format version: 11|v1\.5\.3.*earlier|Game Rules 5\.0\.0/i);
   });
 });

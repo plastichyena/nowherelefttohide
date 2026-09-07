@@ -10,7 +10,7 @@ import { createGameMetricsAccumulator } from '../agent/metrics-stream';
 import { ObservationHistory, lazyArray } from '../agent/history';
 import { compactArtifactObservation, restoreArtifactObservation } from '../agent/observation';
 import type { AgentMapObservation, AgentObservation, AgentPublicEvent } from '../agent/types';
-import { HIDDEN_NOISE_METRIC_KEYS, HIDDEN_REJECTED_REFUGEE_METRIC_KEYS } from '../agent/types';
+import { HIDDEN_HORDE_WAVE_METRIC_KEYS, HIDDEN_NOISE_METRIC_KEYS, HIDDEN_REJECTED_REFUGEE_METRIC_KEYS } from '../agent/types';
 import { applyLosslessJsonDiff, createLosslessJsonDiff } from './public-diff';
 import { assertSafeInputFile, assertSafeOutputPath, createSafePathRoot, ensureSafeOutputDirectory, type SafePathRoot } from './safe-path';
 import { assertSafeIdentifier, canonicalJson, decisionHash, hashesEqual, integrityHash, normalizeDecisionSummary, sha256Bytes, sha256Json } from './hash';
@@ -239,8 +239,23 @@ function metricsMetadata(descriptor: SessionDescriptor) {
 }
 
 function publicMetrics<T extends Record<string, unknown>>(metrics: T): T {
+  const mutable = metrics as Record<string, unknown>;
   for (const key of HIDDEN_NOISE_METRIC_KEYS) delete metrics[key];
   for (const key of HIDDEN_REJECTED_REFUGEE_METRIC_KEYS) delete metrics[key];
+  for (const key of HIDDEN_HORDE_WAVE_METRIC_KEYS) delete metrics[key];
+  if (Array.isArray(mutable.hordeWaves)) {
+    mutable.hordeWaves = mutable.hordeWaves.map((wave) => {
+      if (!isObject(wave)) return wave;
+      const {
+        index, spawnTurn, directions, final,
+        baseWaveUnitCount, committedWaveUnitCount, spawnedSoFar, pendingCount,
+      } = wave;
+      return {
+        index, spawnTurn, directions, final,
+        baseWaveUnitCount, committedWaveUnitCount, spawnedSoFar, pendingCount,
+      };
+    });
+  }
   return metrics;
 }
 

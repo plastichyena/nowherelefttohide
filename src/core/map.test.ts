@@ -17,6 +17,7 @@ import {
   canPlayerOccupyHex,
   createFixedMap,
   generateInitialZombiePositions,
+  getHordeSpawnZone,
   getInitialZombieCandidates,
   isHordeSpawnReserve,
   validateFixedMap,
@@ -26,9 +27,9 @@ const key = ({ q, r }: { q: number; r: number }) => `${q},${r}`;
 const at = (q: number, r: number) => FIXED_MAP.tiles.find((tile) => tile.q === q && tile.r === r);
 const rotate = ({ q, r }: { q: number; r: number }) => ({ q: 50 - q, r: 50 - r });
 
-describe('v1.4.4 fixed map', () => {
+describe('v1.5.4 fixed map', () => {
   it('uses the 51x51 fixed map contract and covers every hex exactly once', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v2');
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v3');
     expect(FIXED_MAP.width).toBe(FIXED_MAP_WIDTH);
     expect(FIXED_MAP.height).toBe(FIXED_MAP_HEIGHT);
     expect(FIXED_MAP.tiles).toHaveLength(51 * 51);
@@ -93,13 +94,29 @@ describe('v1.4.4 fixed map', () => {
     ]);
   });
 
-  it('publishes the 200-hex outer ring as the Horde Spawn Reserve', () => {
-    expect(FIXED_MAP.hordeSpawnReserve).toHaveLength(200);
-    expect(new Set(FIXED_MAP.hordeSpawnReserve.map(key)).size).toBe(200);
+  it('publishes the 392-hex outer two layers as the Horde Spawn Reserve', () => {
+    expect(FIXED_MAP.hordeSpawnReserve).toHaveLength(392);
+    expect(new Set(FIXED_MAP.hordeSpawnReserve.map(key)).size).toBe(392);
     for (const tile of FIXED_MAP.tiles) {
-      const expected = tile.q === 0 || tile.q === 50 || tile.r === 0 || tile.r === 50;
+      const expected = tile.q < 2 || tile.q > 48 || tile.r < 2 || tile.r > 48;
       expect(isHordeSpawnReserve(FIXED_MAP, tile)).toBe(expected);
       expect(tile.playerOccupancyAllowed).toBe(!expected);
+    }
+  });
+
+  it('derives each 22-hex scheduled Wave zone from its real road entrance in stable priority order', () => {
+    const expectedFirst = {
+      north: [{ q: 25, r: 0 }, { q: 25, r: 1 }, { q: 24, r: 0 }, { q: 24, r: 1 }],
+      east: [{ q: 50, r: 25 }, { q: 49, r: 25 }, { q: 50, r: 24 }, { q: 49, r: 24 }],
+      south: [{ q: 25, r: 50 }, { q: 25, r: 49 }, { q: 24, r: 50 }, { q: 24, r: 49 }],
+      west: [{ q: 0, r: 25 }, { q: 1, r: 25 }, { q: 0, r: 24 }, { q: 1, r: 24 }],
+    } as const;
+    for (const direction of ['north', 'east', 'south', 'west'] as const) {
+      const zone = getHordeSpawnZone(FIXED_MAP, direction);
+      expect(zone).toHaveLength(22);
+      expect(new Set(zone.map(key)).size).toBe(22);
+      expect(zone.slice(0, 4)).toEqual(expectedFirst[direction]);
+      expect(zone.every((position) => isHordeSpawnReserve(FIXED_MAP, position))).toBe(true);
     }
   });
 
@@ -175,8 +192,6 @@ describe('v1.4.4 fixed map', () => {
     expect(FIXED_MAP.initialZombiePositions).toEqual(FIXED_INITIAL_ZOMBIE_POSITIONS);
     const occupiedStaticKeys = new Set([
       ...FIXED_MAP.facilities.map((facility) => hexKey(facility.position)),
-      ...FIXED_MAP.roadTiles.map(hexKey),
-      ...FIXED_MAP.hordeSpawnReserve.map(hexKey),
       ...Object.values(FIXED_INITIAL_UNIT_POSITIONS).map(hexKey),
     ]);
     const capital = { q: 25, r: 25 };
@@ -189,6 +204,7 @@ describe('v1.4.4 fixed map', () => {
     expect(generateInitialZombiePositions(FIXED_MAP, 101)).toEqual(generateInitialZombiePositions(FIXED_MAP, 101));
     expect(generateInitialZombiePositions(FIXED_MAP, 101)).not.toEqual(generateInitialZombiePositions(FIXED_MAP, 102));
     expect(getInitialZombieCandidates(FIXED_MAP).length).toBeGreaterThan(FIXED_INITIAL_ZOMBIE_COUNT);
+    expect(getInitialZombieCandidates(FIXED_MAP).some((position) => isHordeSpawnReserve(FIXED_MAP, position))).toBe(true);
   });
 
   it('keeps starting Supply open for construction and extension bands populated', () => {

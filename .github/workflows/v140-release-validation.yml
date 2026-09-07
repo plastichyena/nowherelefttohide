@@ -1,4 +1,4 @@
-name: v1.5.3 Release Validation
+name: v1.5.4 Release Validation
 
 on:
   workflow_dispatch:
@@ -7,12 +7,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: v153-release-validation-${{ github.ref }}
+  group: v154-release-validation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   agent-validation:
-    name: v1.5.3 ${{ matrix.agent }} fixed seeds 1-100
+    name: v1.5.4 ${{ matrix.agent }} fixed seeds 1-100
     runs-on: ubuntu-latest
     timeout-minutes: 360
     strategy:
@@ -22,7 +22,7 @@ jobs:
           - agent: random
           - agent: balanced
     steps:
-      - name: Check out v1.5.3 candidate
+      - name: Check out v1.5.4 candidate
         uses: actions/checkout@v4
 
       - name: Set up Node.js 22
@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          OUTPUT="$GITHUB_WORKSPACE/output/simulations/v153-${{ matrix.agent }}-seeds-1-100"
+          OUTPUT="$GITHUB_WORKSPACE/output/simulations/v154-${{ matrix.agent }}-seeds-1-100"
           npx --no-install vite-node --script src/agent/sim-cli.ts \
             --agent=${{ matrix.agent }} \
             --games=100 \
@@ -47,7 +47,7 @@ jobs:
             --out="$OUTPUT" \
             --overwrite
 
-          cat > "$RUNNER_TEMP/verify-v153-replay.ts" <<'EOF'
+          cat > "$RUNNER_TEMP/verify-v154-replay.ts" <<'EOF'
           import { readFileSync, readdirSync } from 'node:fs';
           import { dirname, join, resolve } from 'node:path';
           import { replayArtifact } from '${{ github.workspace }}/src/agent/runner';
@@ -62,7 +62,7 @@ jobs:
             limitReachedCount?: number;
           };
           const expectedSeeds = Array.from({ length: 100 }, (_, index) => index + 1);
-          if (report.appVersion !== '1.5.3') throw new Error(`Unexpected app version: ${String(report.appVersion)}`);
+          if (report.appVersion !== '1.5.4') throw new Error(`Unexpected app version: ${String(report.appVersion)}`);
           if (JSON.stringify(report.execution?.agents) !== JSON.stringify(['${{ matrix.agent }}'])) throw new Error('Agent strategy metadata is not fixed');
           if (JSON.stringify(report.execution?.seeds) !== JSON.stringify(expectedSeeds)) throw new Error('Release seeds are not exactly 1..100');
           if (report.execution?.limits?.maxTurns !== 100) throw new Error('Runner maxTurns must remain 100');
@@ -83,23 +83,23 @@ jobs:
           }
           process.stdout.write(JSON.stringify({ appVersion: report.appVersion, agent: '${{ matrix.agent }}', seeds: 100, replayed: artifactPaths.length }) + '\n');
           EOF
-          npx --no-install vite-node --script "$RUNNER_TEMP/verify-v153-replay.ts" "$OUTPUT/run.json"
+          npx --no-install vite-node --script "$RUNNER_TEMP/verify-v154-replay.ts" "$OUTPUT/run.json"
 
       - name: Require a Balanced Final Horde run after turn 50
         if: matrix.agent == 'balanced'
-        run: node scripts/verify-release-final-horde.mjs output/simulations/v153-balanced-seeds-1-100/run.json
+        run: node scripts/verify-release-final-horde.mjs output/simulations/v154-balanced-seeds-1-100/run.json
 
-      - name: Upload v1.5.3 agent validation report
+      - name: Upload v1.5.4 agent validation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v153-${{ matrix.agent }}-validation-seeds-1-100
-          path: output/simulations/v153-${{ matrix.agent }}-seeds-1-100
+          name: v154-${{ matrix.agent }}-validation-seeds-1-100
+          path: output/simulations/v154-${{ matrix.agent }}-seeds-1-100
           if-no-files-found: warn
           retention-days: 30
 
   session-large-package-validation:
-    name: Session v1.5.3 physical 512 MiB Package validation
+    name: Session v1.5.4 physical 512 MiB Package validation
     # This is a separate manual-release job. It verifies actual Core EndTurn
     # transitions and a physical Artifact Package without gating Pages.
     runs-on: ubuntu-latest
@@ -124,7 +124,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: session-v153-large-512mib
+          name: session-v154-large-512mib
           path: output/session-release/large-512.json
           if-no-files-found: warn
           retention-days: 30

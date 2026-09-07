@@ -83,7 +83,7 @@ function containingUnitAt(state: Readonly<GameState>, q: number, r: number): Uni
 function projectionMaps(
   state: Readonly<GameState>,
   context: PublicEntityProjectionContext,
-): { refillByUnitId: ReadonlyMap<string, { demand: number; amount: number }>; militaryByUnitId: ReadonlyMap<string, EndTurnForecast['militaryGoods']['units'][number]>; productionByFacility: ReadonlyMap<string, ReturnType<typeof forecastFacilityProduction>[number]> } {
+): { refillByUnitId: ReadonlyMap<string, { demand: number; amount: number }>; militaryByUnitId: ReadonlyMap<string, EndTurnForecast['militaryGoods']['units'][number]>; productionByFacility: ReadonlyMap<string, ReturnType<typeof forecastFacilityProduction>[number]>; housingOutageByFacilityId: ReadonlyMap<string, 'power_shortage' | 'supply_disconnected'> } {
   const needsForecast = !context.refillByUnitId || !context.militaryByUnitId;
   const forecast = needsForecast ? forecastUnitForecast(state) : null;
   const refillByUnitId = context.refillByUnitId ?? forecast!.refillByUnitId;
@@ -91,7 +91,10 @@ function projectionMaps(
   const productionByFacility = context.productionByFacility ?? new Map(
     forecastFacilityProduction(state).map((projection) => [projection.facilityId, projection] as const),
   );
-  return { refillByUnitId, militaryByUnitId, productionByFacility };
+  const housingOutageByFacilityId = new Map(
+    forecastEndTurn(state).housingOutage.facilities.map((entry) => [entry.facilityId, entry.reason] as const),
+  );
+  return { refillByUnitId, militaryByUnitId, productionByFacility, housingOutageByFacilityId };
 }
 
 function forecastUnitForecast(state: Readonly<GameState>): {
@@ -282,6 +285,7 @@ export function createPublicFacilityProjection(
   const containingUnit = facility.infected > 0 ? containingUnitAt(state, facility.position.q, facility.position.r) : undefined;
   const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
   const productionProjection = maps.productionByFacility.get(facility.id);
+  const housingOutageReason = maps.housingOutageByFacilityId.get(facility.id) ?? null;
   const currentWorkers = productionProjection?.operatingWorkers ?? 0;
   const estimatedInputs = productionProjection?.inputs ?? multiplyResources(rule.inputs, currentWorkers);
   const estimatedOutputs = productionProjection?.outputs ?? multiplyResources(rule.outputs, currentWorkers);
@@ -350,6 +354,26 @@ export function createPublicFacilityProjection(
     projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
     decommissionRefundCivilianGoods: facility.constructible && facility.type === 'civilianDroneBase'
       ? Math.ceil(state.config.facilities.civilianDroneBase.buildCivilianGoods / 2)
+      : null,
+    temporaryHousing: facility.type === 'temporaryHousing'
+      ? {
+        softCapacity: facility.workerCapacity,
+        totalResidents: facility.workers + facility.infected,
+        occupied: facility.workers > 0,
+        populationPoolEligible: populationOperational && inSupply,
+        outageReason: housingOutageReason,
+      }
+      : null,
+    windPower: facility.type === 'windPowerPlant'
+      ? {
+        operational: facility.owner === 'player' && facility.status === 'owned' && facility.operationalStatus === 'operational',
+        generation: facility.owner === 'player' && facility.status === 'owned' && facility.operationalStatus === 'operational'
+          ? state.config.facilities.windPowerPlant.production.fixedPowerGeneration
+          : 0,
+        emitsNoise: facility.owner === 'player' && facility.status === 'owned' && facility.operationalStatus === 'operational',
+        playerBuildLimit: state.map.roadBranches.length,
+        playerBuiltCount: state.facilities.filter((candidate) => candidate.type === 'windPowerPlant' && candidate.constructible).length,
+      }
       : null,
   };
 }

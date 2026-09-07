@@ -101,7 +101,8 @@ function run(): void {
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
   for (const marker of [
-    '1.5.3', '5.0.0', '9.0.0', '10.0.0', 'fixed-51x51-v2', 'gasZombie', 'armyBase', 'SetPowerSupply',
+    '1.5.4', '6.0.0', '10.0.0', '11.0.0', 'fixed-51x51-v3', 'gasZombie', 'armyBase', 'SetPowerSupply',
+    'temporaryHousing', 'committedWaveUnitCount', 'pendingCount', 'horde_wave_started', 'horde_spawn_batch', 'nextTurnPenalties', 'housingOutage',
     'BuildConstructibleFacility', 'DecommissionConstructibleFacility', 'TurnAwayCheckpointRefugees',
     'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',
     'standbyCheckpointIds', 'dormantCheckpointIds', 'fallbackAvailable', 'checkpointPositionCandidates',
@@ -127,7 +128,7 @@ function run(): void {
     'hordeWaves', 'visionMode', 'terrainLosBlocking', 'site_zombies_spawned',
     'groundVisionBlockedHexes', 'infectedPopulationConvertedToZombies',
   ]) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.5.3 schema marker: ${marker}`);
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.5.4 schema marker: ${marker}`);
   }
   // Compatibility validation may legitimately retain the names of removed
   // fields so an old Config can be rejected with a useful reason. Only flag

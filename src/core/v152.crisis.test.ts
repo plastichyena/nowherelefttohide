@@ -4,6 +4,13 @@ import type { CrisisAlert, JsonObject } from './types';
 
 type FactCase = [CrisisAlert['reasonCode'], string, string | number | boolean | null, string | number | boolean | null];
 const worseningCases: FactCase[] = [
+  ['overcrowding_forecast', 'penaltyRatio', 0.1, 0.2],
+  ['overcrowding_forecast', 'additionalFood', 1, 2],
+  ['overcrowding_forecast', 'additionalCivilianGoods', 1, 2],
+  ['temporary_housing_outage_forecast', 'outageCount', 1, 2],
+  ['temporary_housing_outage_forecast', 'penaltyRatio', 0.01, 0.02],
+  ['temporary_housing_outage_forecast', 'additionalFood', 1, 2],
+  ['temporary_housing_outage_forecast', 'additionalCivilianGoods', 1, 2],
   ['capital_infection_uncontained', 'infected', 1, 2],
   ['capital_infection_uncontained', 'healthyPopulation', 20, 19],
   ['capital_infection_uncontained', 'suppressionUnitAvailable', true, false],
@@ -29,11 +36,12 @@ function alert(reasonCode: CrisisAlert['reasonCode'], publicFacts: JsonObject = 
   return { id: reasonCode + ':x', category: 'unit', severity: 'warning', reasonCode, entityIds: ['x'], publicFacts };
 }
 
-describe('v1.5.2 public crisis worsening contract', () => {
-  it('covers all seven reason codes and their declared comparison facts', () => {
+describe('v1.5.4 public crisis worsening contract', () => {
+  it('covers all nine reason codes and their declared comparison facts', () => {
     expect(Object.keys(CRISIS_WORSENING_FACTS).sort()).toEqual([
       'capital_infection_uncontained', 'critical_site_infection_uncontained', 'checkpoint_defense_degraded',
       'unit_out_of_supply_risk', 'horde_warning_active', 'guaranteed_resource_defeat', 'new_state_loss',
+      'overcrowding_forecast', 'temporary_housing_outage_forecast',
     ].sort());
     expect(worseningCases.map(([reason, key]) => `${reason}:${key}`).sort()).toEqual(
       Object.entries(CRISIS_WORSENING_FACTS).flatMap(([reason, facts]) => Object.keys(facts).map(key => `${reason}:${key}`)).sort());

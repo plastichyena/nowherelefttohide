@@ -93,6 +93,7 @@ export const BOARD_FACILITY_TYPES = [
   'windPowerPlant',
   'simpleFarm',
   'civilianDroneBase',
+  'temporaryHousing',
   'armyBase',
 ] as const satisfies readonly FacilityType[];
 
@@ -164,6 +165,7 @@ export const BOARD_ASSET_REGISTRY = {
     windPowerPlant: 'facilities/facility_wind_power_plant.png',
     simpleFarm: 'facilities/facility_simple_farm.png',
     civilianDroneBase: 'facilities/facility_civilian_drone_base.png',
+    temporaryHousing: 'facilities/facility_temporary_housing.png',
     armyBase: 'facilities/facility_army_base.png',
     checkpoint: 'facilities/facility_checkpoint.png',
   },

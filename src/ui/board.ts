@@ -291,6 +291,7 @@ const FALLBACK_FACILITY_SYMBOL: Record<string, string> = {
   windPowerPlant: '≋',
   simpleFarm: 'f',
   civilianDroneBase: '✈',
+  temporaryHousing: '▥',
   checkpoint: '▤',
 };
 

@@ -72,16 +72,16 @@ function adjacentPassable(state: Readonly<GameState>, origin: HexCoord): HexCoor
 function movePlayersAway(state: MutableState): void {
   const police = state.units.find((unit) => unit.type === 'police');
   const guard = state.units.find((unit) => unit.type === 'nationalGuard');
-  if (police) police.position = { q: 1, r: 1 };
-  if (guard) guard.position = { q: 2, r: 1 };
+  if (police) police.position = { q: 2, r: 2 };
+  if (guard) guard.position = { q: 3, r: 2 };
 }
 
 describe('v1.5.1 Core version, map, and initial state', () => {
-  it('creates a v4.0.0 state on fixed-51x51-v2 with all 25 initial Normal Zombies', () => {
+  it('creates a v6.0.0 state on fixed-51x51-v3 with all 25 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('5.0.0');
-    expect(state.mapId).toBe('fixed-51x51-v2');
-    expect(state.map.id).toBe('fixed-51x51-v2');
+    expect(state.gameVersion).toBe('6.0.0');
+    expect(state.mapId).toBe('fixed-51x51-v3');
+    expect(state.map.id).toBe('fixed-51x51-v3');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');
     expect(zombies).toHaveLength(25);
     expect(zombies.map((unit) => unit.position)).toEqual(state.map.initialZombiePositions);
@@ -371,7 +371,7 @@ describe('v1.4.4 Combat Noise respawn', () => {
     guard.actionState = 'ready';
     guard.canAttack = true;
     guard.canMove = true;
-    police.position = { q: 1, r: 1 };
+    police.position = { q: 2, r: 2 };
     police.vision = 0;
     setup.units = setup.units.filter((unit) => unit.isPlayerUnit);
     const fallen = setup.facilities.find((facility) => facility.id === 'farm-1')!;

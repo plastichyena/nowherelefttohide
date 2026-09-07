@@ -20,6 +20,7 @@ import type {
 /** Keep v1.4.0 scenarios deterministic and independent of normal economy noise. */
 function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): GameConfig {
   return createDefaultConfig({
+    windPower: { noiseRadius: 0 },
     horde: singleFinalWave(100),
     economy: {
       initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
@@ -163,7 +164,7 @@ function makeNoiseScenario(
   human.position = { ...center };
   human.vision = 2;
   resetHuman(human);
-  otherHuman.position = { q: 1, r: 1 };
+  otherHuman.position = { q: 2, r: 2 };
   otherHuman.vision = 0;
   resetHuman(otherHuman);
   // Keep this focused combat fixture free of map-seeded Zombies.  The noise
@@ -238,7 +239,7 @@ describe('v1.4 Checkpoint Role / Fallback / Supply', () => {
       police.position = { q: 30, r: 25 };
       police.vision = visible ? 4 : 0;
       const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
-      guard.position = { q: 1, r: 1 };
+      guard.position = { q: 2, r: 2 };
       guard.vision = 0;
       const target = { q: 34, r: 25 };
       const blockerPosition = visible
@@ -541,7 +542,7 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
     police.vision = 0;
     resetHuman(police);
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.position = { q: 1, r: 1 };
+    guard.position = { q: 2, r: 2 };
     guard.vision = 0;
     resetHuman(guard);
     const source = addZombie(state, 'zombie-a-noise-source', { q: 26, r: 25 });
@@ -658,7 +659,7 @@ describe('v1.4 Combat Noise / Priority / FoW', () => {
     atCenter.position = { q: 28, r: 25 };
     atCenter.noiseTarget = { q: 28, r: 25 };
     // Keep the state legal by moving the police away from the arrival center.
-    arrived.units.find((unit) => unit.id === police.id)!.position = { q: 1, r: 1 };
+    arrived.units.find((unit) => unit.id === police.id)!.position = { q: 2, r: 2 };
     synchronizePopulation(arrived);
     stepOk(engine, { type: 'LoadSnapshot', snapshot: arrived });
     const cleared = endTurn(engine);

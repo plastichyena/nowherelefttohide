@@ -80,7 +80,7 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const snapshot = cloneState(engine.getState());
     const police = snapshot.units.find((unit) => unit.type === 'police')!;
     const guard = snapshot.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.position = { q: 1, r: 1 };
+    guard.position = { q: 2, r: 2 };
     police.currentFuel = 1;
     loadScenario(engine, snapshot);
     const before = engine.getState();
@@ -99,7 +99,7 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const snapshot = cloneState(engine.getState());
     const police = snapshot.units.find((unit) => unit.type === 'police')!;
     const guard = snapshot.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.position = { q: 1, r: 1 };
+    guard.position = { q: 2, r: 2 };
     police.currentFuel = 12;
     const hidden = createUnit(snapshot, 'hidden-fuel-blocker', 'zombie', { q: 31, r: 25 });
     hidden.movement = 0;
@@ -140,13 +140,13 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const guard = snapshot.units.find((unit) => unit.type === 'nationalGuard')!;
     police.currentFuel = 10;
     guard.currentFuel = 20;
-    guard.position = { q: 1, r: 1 };
+    guard.position = { q: 2, r: 2 };
     loadScenario(engine, snapshot);
     const before = engine.getState();
     const forecast = forecastEndTurn(before);
     expect(forecast.fuel).toMatchObject({
       turnStartFuel: 5,
-      projectedPowerFuelDemand: 6,
+      projectedPowerFuelDemand: 12,
       projectedPowerFuelUsed: 4,
       fuelAfterPower: 1,
       projectedUnitRefillDemand: 2,
@@ -208,9 +208,9 @@ describe('v1.4 Wind Power Plant', () => {
     facilityAt(snapshot, 'capital').workers -= 1;
     loadScenario(engine, snapshot);
     const forecast = forecastEndTurn(engine.getState());
-    expect(forecast.electricity.requiredPowerDemand).toBe(25);
+    expect(forecast.electricity.requiredPowerDemand).toBe(50);
     expect(forecast.fuel.windPowerAvailable).toBe(15);
-    expect(forecast.fuel.projectedPowerFuelDemand).toBe(4);
+    expect(forecast.fuel.projectedPowerFuelDemand).toBe(14);
     expect(forecast.fuel.projectedPowerFuelUsed).toBe(0);
   });
 
@@ -272,7 +272,9 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
       populationOperationalTurn: before.turn + 1,
       powerSupplyEnabled: false,
     });
-    expect(engine.getState().resources.civilianGoods).toBe(before.resources.civilianGoods - 15);
+    expect(engine.getState().resources.civilianGoods).toBe(
+      before.resources.civilianGoods - before.config.facilities.simpleFarm.buildCivilianGoods,
+    );
     expect(engine.getState().actionsTakenThisTurn).toBe(before.actionsTakenThisTurn + 1);
     expect(engine.step({ type: 'AssignWorkers', facilityId: built.id, workers: 1 }).error?.code).toBe('facility_not_yet_operational');
     expect(engine.step({ type: 'SetPowerSupply', facilityId: built.id, enabled: false }).error).not.toBeNull();

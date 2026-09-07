@@ -42,9 +42,9 @@ describe('v1.4.2 Horde Spawn Reserve', () => {
     const engine = reserveEngine(14202);
     const state = cloneState(engine.getState());
     const police = state.units.find((unit) => unit.id === 'police-1')!;
-    police.position = { q: 2, r: 15 };
+    police.position = { q: 3, r: 15 };
     police.vision = 4;
-    const zombie = createUnit(state, 'reserve-interceptor', 'zombie', { q: 0, r: 15 });
+    const zombie = createUnit(state, 'reserve-interceptor', 'zombie', { q: 1, r: 15 });
     zombie.movement = 0;
     zombie.attack = 5;
     zombie.vision = 0;
@@ -52,22 +52,22 @@ describe('v1.4.2 Horde Spawn Reserve', () => {
     rebalance(state);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
 
-    const result = engine.step({ type: 'Move', unitId: police.id, destination: { q: 1, r: 15 } });
+    const result = engine.step({ type: 'Move', unitId: police.id, destination: { q: 2, r: 15 } });
     expect(result.error).toBeNull();
     expect(result.events).toContainEqual(expect.objectContaining({
       type: 'interception',
       payload: expect.objectContaining({ attackerId: zombie.id, defenderId: police.id }),
     }));
     expect(result.state.units.find((unit) => unit.id === police.id)?.hp).toBeLessThan(police.hp);
-    expect(result.state.units.find((unit) => unit.id === zombie.id)?.position).toEqual({ q: 0, r: 15 });
+    expect(result.state.units.find((unit) => unit.id === zombie.id)?.position).toEqual({ q: 1, r: 15 });
   });
 
   it('allows attacks into the Reserve and counterattacks against a Reserve attacker', () => {
     const directEngine = reserveEngine(14203);
     const direct = cloneState(directEngine.getState());
     const guard = direct.units.find((unit) => unit.id === 'national-guard-1')!;
-    guard.position = { q: 1, r: 15 };
-    const target = createUnit(direct, 'reserve-target', 'zombie', { q: 0, r: 15 });
+    guard.position = { q: 2, r: 15 };
+    const target = createUnit(direct, 'reserve-target', 'zombie', { q: 1, r: 15 });
     target.hp = 1;
     direct.units.push(target);
     rebalance(direct);
@@ -79,8 +79,8 @@ describe('v1.4.2 Horde Spawn Reserve', () => {
     const counterEngine = reserveEngine(14204);
     const counter = cloneState(counterEngine.getState());
     const defender = counter.units.find((unit) => unit.id === 'national-guard-1')!;
-    defender.position = { q: 1, r: 15 };
-    const attacker = createUnit(counter, 'reserve-attacker', 'zombie', { q: 0, r: 15 });
+    defender.position = { q: 2, r: 15 };
+    const attacker = createUnit(counter, 'reserve-attacker', 'zombie', { q: 1, r: 15 });
     attacker.movement = 0;
     attacker.attack = 1;
     counter.units.push(attacker);

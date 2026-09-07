@@ -54,7 +54,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('10.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('11.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -122,13 +122,13 @@ describe('Agent Metrics', () => {
       expect(run.result!.statistics).not.toHaveProperty(hiddenNoiseMetric);
     }
     expect(run.result).not.toBeNull();
-    expect(run.metrics.periodicHordeZombiesSpawned).toBe(run.result!.statistics.periodicHordeZombiesSpawned);
-    expect(run.metrics.periodicNormalZombiesSpawned).toBe(run.result!.statistics.periodicNormalZombiesSpawned);
-    expect(run.metrics.finalHordeZombiesSpawned).toBe(run.result!.statistics.finalHordeZombiesSpawned);
-    expect(run.metrics.finalNormalZombiesSpawned).toBe(run.result!.statistics.finalNormalZombiesSpawned);
-    expect(run.metrics.finalHordeSpawned).toBe(
-      run.metrics.finalHordeZombiesSpawned + run.metrics.finalNormalZombiesSpawned,
-    );
+    for (const hiddenWaveMetric of [
+      'periodicHordeZombiesSpawned',
+      'periodicNormalZombiesSpawned',
+      'finalHordeZombiesSpawned',
+      'finalNormalZombiesSpawned',
+    ]) expect(run.result!.statistics).not.toHaveProperty(hiddenWaveMetric);
+    expect(run.metrics.finalHordeSpawned).toBe(run.result!.statistics.finalHordeSpawned);
   }, 20_000);
 
   it('keeps branch, policy, checkpoint, and supply metrics in the public result', () => {
@@ -276,7 +276,9 @@ describe('Agent Metrics', () => {
       horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 4, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
     });
     const first = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } }).metrics;
-    const second = runAgentGame(11, { strategy: 'random', config, limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 } }).metrics;
+    // Aggregation needs equivalent completed metric rows; a second full replay
+    // adds no coverage and can exceed Vitest's worker update interval.
+    const second = structuredClone(first);
     const aggregate = aggregateMetrics([first, second]);
     expect(aggregate.executions).toBe(2);
     expect(aggregate.completed).toBe(2);

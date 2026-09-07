@@ -50,9 +50,10 @@ export type FacilityType =
   | 'windPowerPlant'
   | 'simpleFarm'
   | 'civilianDroneBase'
+  | 'temporaryHousing'
   | 'armyBase';
 
-export type ConstructibleFacilityType = 'simpleFarm' | 'civilianDroneBase';
+export type ConstructibleFacilityType = 'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant';
 
 export type FacilityId = string;
 
@@ -121,6 +122,7 @@ export type ResourceType = 'food' | 'civilianGoods' | 'militaryGoods' | 'fuel';
 export type PowerMode = 'required' | 'none';
 
 export type PowerSupplyReason =
+  | 'supply_disconnected'
   | 'supplied'
   | 'physical_capacity_shortage'
   | 'fuel_shortage'
@@ -299,6 +301,9 @@ export interface UnitState {
   isPlayerUnit: boolean;
   /** Internal-only remembered coordinate inherited from a visible Horde Zombie. */
   inheritedTarget: HexCoord | null;
+  previousFallbackPosition: HexCoord | null;
+  fallbackTarget: HexCoord | null;
+  waveCapitalAnchor: HexCoord | null;
   /** Internal-only remembered combat-noise coordinate for a normal Zombie. */
   noiseTarget: HexCoord | null;
   /** Identifies periodic/final Horde membership without exposing it through public APIs. */
@@ -382,7 +387,31 @@ export interface UnitProductionOrder {
   powerReady?: boolean;
 }
 
+export interface WavePublicState {
+  waveIndex: number;
+  direction: CardinalDirection;
+  groupId: string;
+  kind: 'periodic' | 'final';
+  baseWaveUnitCount: number;
+  committedWaveUnitCount: number;
+  spawnedSoFar: number;
+  pendingCount: number;
+}
+
+export interface PendingWave {
+  waveIndex: number;
+  direction: CardinalDirection;
+  groupId: string;
+  kind: 'periodic' | 'final';
+  baseWaveUnitCount: number;
+  committedWaveUnitCount: number;
+  spawnedSoFar: number;
+  roster: ZombieUnitType[];
+}
+
 export interface HordeState {
+  pendingWaves: PendingWave[];
+  waves: WavePublicState[];
   /** One-based index of the next configured wave, or null after the Final Wave. */
   nextWaveIndex: number | null;
   totalSpawned: number;
@@ -399,7 +428,7 @@ export interface HordeState {
   finalSpawnedCount: number;
 }
 
-export type NoisePulseSourceKind = 'humanCombat' | 'hordeMovement' | 'armyBase';
+export type NoisePulseSourceKind = 'humanCombat' | 'hordeMovement' | 'armyBase' | 'windPower';
 
 /** Internal deterministic work item. Public projections never expose center or source id. */
 export interface NoisePulse {
@@ -407,11 +436,13 @@ export interface NoisePulse {
   center: HexCoord;
   radius: number;
   sourceKind: NoisePulseSourceKind;
-  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase';
+  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant';
   emittedTurn: number;
 }
 
 export type GameEventType =
+  | 'horde_wave_started'
+  | 'horde_spawn_batch'
   | 'gas_explosion'
   | 'army_base_reward'
   | 'production_forfeited'
@@ -620,7 +651,7 @@ export interface GameStatistics {
   riotPoliceReanimations: number;
   hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number>;
   finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number>;
-  noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie' | 'armyBase', number>;
+  noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant', number>;
   hordeMovementNoisePulses: number;
   hordeNoiseRespawnedByType: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
 }
@@ -731,6 +762,7 @@ export interface GuaranteedDefeatForecast {
 export type QueuePressureClass = 'none' | 'low' | 'medium' | 'high';
 
 export interface StrategicForecast {
+  nextTurnPenalties: NextTurnPenaltyForecast;
   resources: Record<StrategicResourceType, CriticalResourceDependencyForecast>;
   guaranteedDefeat: GuaranteedDefeatForecast;
   productionCapacity: ProductionCapacityForecast;
@@ -790,7 +822,28 @@ export interface UnpoweredFacilityForecast {
   reason: PowerSupplyReason;
 }
 
+export interface HousingOutageForecast {
+  facilities: Array<{ facilityId: FacilityId; reason: 'power_shortage' | 'supply_disconnected' }>;
+  outageCount: number;
+  penaltyRatio: number;
+  additionalFood: number;
+  additionalCivilianGoods: number;
+}
+
+export interface NextTurnPenaltyForecast {
+  targetTurn: number;
+  overcrowding: {
+    active: boolean;
+    facilities: Array<{ facilityId: FacilityId; excess: number; softCap: number }>;
+    penaltyRatio: number;
+    additionalFood: number;
+    additionalCivilianGoods: number;
+  };
+  housingOutage: HousingOutageForecast & { active: boolean };
+}
+
 export interface EndTurnForecast {
+  housingOutage: HousingOutageForecast;
   populationConsumers: number;
   overcrowding: {
     /** Exact sum represented as per-city rational terms. */
@@ -819,6 +872,8 @@ export interface EndTurnForecast {
 export type CrisisSeverity = 'critical' | 'warning' | 'advisory';
 
 export type CrisisReasonCode =
+  | 'overcrowding_forecast'
+  | 'temporary_housing_outage_forecast'
   | 'capital_infection_uncontained'
   | 'critical_site_infection_uncontained'
   | 'checkpoint_defense_degraded'
@@ -1240,6 +1295,7 @@ export interface NaturalRecoveryConfig {
 }
 
 export interface GameConfig {
+  windPower: { noiseRadius: number };
   armyBase: { maxMilitaryGoods: number; interceptionCost: number; attack: number; range: number; noiseRadius: number; staffedVision: number; rewardLastTurn: number };
   version: string;
   mapId: string;

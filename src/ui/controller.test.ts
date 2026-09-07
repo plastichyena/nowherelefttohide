@@ -14,7 +14,7 @@ import type { AgentFacilityObservation } from '../agent/types';
 import { createDefaultConfig } from '../core/config';
 import { forecastEndTurn, GameEngine } from '../core/engine';
 import { createAgentObservation } from '../agent/observation';
-import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, hordeCompositionLabel, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, newGameRefugeeDefaults, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectImportantEvent, recruitmentOptionsForFacility, renderArmyBaseDetails, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderHordeWarningCard, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNoiseEventLog, renderRecruitmentAccordion, renderUnitMilitaryGoodsDetails, resolveTileSelection, roadBranchForPosition, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep } from './controller';
+import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, hordeCompositionLabel, hordePublicCounts, hordePublicEventViewModels, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, newGameRefugeeDefaults, nextTurnPenaltyForecastSummary, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectHordePublicEvent, projectImportantEvent, recruitmentOptionsForFacility, renderArmyBaseDetails, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderHordePublicEventHistory, renderHordeWarningCard, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNextTurnPenaltyForecast, renderNoiseEventLog, renderRecruitmentAccordion, renderUnitMilitaryGoodsDetails, renderVictoryProgress, resolveTileSelection, roadBranchForPosition, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep, victoryProgressViewModel } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
@@ -45,10 +45,24 @@ function siteEvent(
   };
 }
 
+function hordeEvent(
+  id: string,
+  type: Extract<GameEvent['type'], `horde_${string}`>,
+  payload: Record<string, unknown>,
+): GameEvent {
+  return {
+    id,
+    turn: 50,
+    phase: 'zombie',
+    type,
+    payload: payload as GameEvent['payload'],
+  };
+}
+
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.5.3');
-    expect(titleVersionLabel('en')).toContain('1.5.3');
+    expect(titleVersionLabel('ja')).toContain('1.5.4');
+    expect(titleVersionLabel('en')).toContain('1.5.4');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -142,6 +156,49 @@ describe('controller view models', () => {
     expect(markup).toContain('data-bind="horde-warning"');
     expect(markup).toContain('data-bind="horde-status"');
     expect(markup).toContain('data-bind="horde-directions"');
+  });
+
+  it('aggregates public direction rows so Final base and committed counts remain visible', () => {
+    const counts = hordePublicCounts({
+      nextWaveIndex: 5,
+      waves: [
+        { waveIndex: 5, direction: 'north', groupId: 'wave-5-north', kind: 'final', baseWaveUnitCount: 26, committedWaveUnitCount: 33, spawnedSoFar: 20, pendingCount: 13 },
+        { waveIndex: 5, direction: 'east', groupId: 'wave-5-east', kind: 'final', baseWaveUnitCount: 26, committedWaveUnitCount: 34, spawnedSoFar: 19, pendingCount: 15 },
+      ],
+    }, 5);
+    expect(counts).toMatchObject({
+      waveIndex: 5,
+      kind: 'final',
+      directionCount: 2,
+      baseWaveUnitCount: 52,
+      committedWaveUnitCount: 67,
+      spawnedSoFar: 39,
+      pendingCount: 28,
+    });
+  });
+
+  it('renders only public Wave-start and Spawn-batch event fields', () => {
+    const event = hordeEvent('wave-start', 'horde_wave_started', {
+      waveIndex: 5,
+      direction: 'north',
+      groupId: 'wave-5-north',
+      kind: 'final',
+      baseWaveUnitCount: 26,
+      committedWaveUnitCount: 33,
+      spawnedThisBatch: 0,
+      spawnedSoFar: 0,
+      pendingCount: 33,
+      rejectedTotal: 99,
+      spawnedPositions: [{ q: 1, r: 2 }],
+    });
+    const view = projectHordePublicEvent(event);
+    expect(view).toMatchObject({ waveIndex: 5, direction: 'north', baseWaveUnitCount: 26, committedWaveUnitCount: 33, pendingCount: 33 });
+    expect(hordePublicEventViewModels([event])).toHaveLength(1);
+    const rendered = renderHordePublicEventHistory([event], 'en');
+    expect(rendered).toContain('Horde Wave committed');
+    expect(rendered).toContain('Committed roster 33');
+    expect(rendered).not.toContain('rejectedTotal');
+    expect(rendered).not.toContain('spawnedPositions');
   });
 
   it('derives action-menu availability only from legal actions for the selected unit', () => {
@@ -249,26 +306,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.5.2-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.5.3-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.2以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.3');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.3以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.4');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.2 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.3');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.3 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.4');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 5.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 12');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 5.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 12');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 6.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 13');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 6.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 13');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.2以前' : 'v1.5.2-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3-or-earlier');
     }
   });
 
@@ -528,6 +585,74 @@ describe('controller view models', () => {
     expect(noUnpowered).toContain('Unpowered forecast</strong>: 0 facilities');
   });
 
+  it('renders overcrowding and Temporary Housing outage forecasts independently', () => {
+    const markup = renderNextTurnPenaltyForecast({
+      nextTurnPenalties: {
+        targetTurn: 12,
+        overcrowding: {
+          active: true,
+          facilities: [{ facilityId: 'city-1', excess: 2, softCap: 10 }],
+          penaltyRatio: 0.2,
+          additionalFood: 2,
+          additionalCivilianGoods: 2,
+        },
+        housingOutage: {
+          active: true,
+          facilities: [
+            { facilityId: 'housing-1', reason: 'power_shortage' },
+            { facilityId: 'housing-2', reason: 'supply_disconnected' },
+          ],
+          outageCount: 2,
+          penaltyRatio: 0.02,
+          additionalFood: 2,
+          additionalCivilianGoods: 2,
+        },
+      },
+    }, 'en');
+    expect(markup).toContain('data-penalty-kind="overcrowding"');
+    expect(markup).toContain('data-penalty-kind="housing-outage"');
+    expect(markup).toContain(createTranslator('en')('nextTurnPenaltyForecast'));
+    expect(markup).toContain('Target turn</dt><dd>12');
+    expect(markup).toContain('Power shortage');
+    expect(markup).toContain('Supply disconnected');
+    expect(markup).toContain('2%');
+  });
+
+  it('includes the target Turn in the collapsed independent penalty summary', () => {
+    expect(nextTurnPenaltyForecastSummary({ nextTurnPenalties: { targetTurn: 12 } }, 'en')).toBe('Target turn 12');
+    expect(nextTurnPenaltyForecastSummary({ nextTurnPenalties: { targetTurn: 12 } }, 'ja')).toBe('対象Turn 12');
+    expect(nextTurnPenaltyForecastSummary({ nextTurnPenalties: {} }, 'en')).toBe('Target turn —');
+  });
+
+  it('renders only Final Pending and Final Map as v1.5.4 Victory progress', () => {
+    const state = {
+      horde: {
+        finalHordeStatus: 'active',
+        pendingWaves: [{ kind: 'final', roster: ['zombie', 'hordeZombie'] }],
+        finalSpawnGroupIds: ['final-group'],
+      },
+      units: [
+        { isPlayerUnit: false, actionState: 'ready', hordeKind: 'final', spawnGroupId: 'final-group' },
+        { isPlayerUnit: false, actionState: 'ready', hordeKind: 'periodic', spawnGroupId: 'periodic-group' },
+      ],
+    } as unknown as GameState;
+    expect(victoryProgressViewModel(state)).toMatchObject({
+      finalPendingCount: 2,
+      finalMapCount: 1,
+      finalPendingClear: false,
+      finalMapClear: false,
+    });
+    state.horde.pendingWaves = [];
+    state.horde.finalHordeStatus = 'defeated';
+    state.units = [state.units[1]!];
+    const markup = renderVictoryProgress(state, 'en');
+    expect(markup).toContain('Final Pending 0');
+    expect(markup).toContain('Final Map 0');
+    expect(markup).not.toContain('Final Horde defeated');
+    expect(markup).not.toContain('No Zombies in Supply');
+    expect(markup).not.toContain('No infection in Supply');
+  });
+
   it('localizes Power Supply action errors', () => {
     expect(localizeActionError('power_supply_not_applicable', 'ja')).toContain('Farm');
     expect(localizeActionError('power_supply_unavailable', 'en')).toContain('owned');
@@ -612,8 +737,10 @@ describe('controller view models', () => {
       'finalWaveTurn', 'finalHordeWarning', 'spawnTurn', 'hordeStatusNotStarted', 'hordeSchedule', 'nextWave', 'directionCount', 'directions', 'composition', 'finalWave',
       'terrain', 'baseTerrain', 'terrainPlain', 'terrainForest', 'terrainMountain', 'terrainWater',
       'roadOverlay', 'urbanOverlay', 'effectiveMovementCost', 'defenseSource', 'damageMultiplier',
-      'vision', 'visible', 'hidden', 'visionMode', 'visionGround', 'visionAerial', 'terrainLosBlocking', 'visionGroundRule', 'visionAerialRule', 'victoryProgress', 'finalHordeDefeated',
-      'suppliedAreaZombieClear', 'suppliedAreaInfectionClear', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipVictory',
+      'vision', 'visible', 'hidden', 'visionMode', 'visionGround', 'visionAerial', 'terrainLosBlocking', 'visionGroundRule', 'visionAerialRule', 'victoryProgress', 'finalPending', 'finalMap', 'finalHordeDefeated',
+      'suppliedAreaZombieClear', 'suppliedAreaInfectionClear', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipWaveRoster', 'tipHousing', 'tipNextTurnPenaltyForecast', 'tipVictory',
+      'waveBaseCount', 'waveCommittedCount', 'waveSpawnedSoFar', 'wavePendingCount', 'hordeWaveStarted', 'hordeSpawnBatch', 'finalRejectedBonusNone',
+      'temporaryHousing', 'buildTemporaryHousing', 'buildWindPowerPlant', 'housingOutageForecast', 'housingOutagePowerReason', 'housingOutageSupplyReason', 'nextTurnPenaltyForecast', 'penaltyRatio', 'forecastTargetTurn', 'noNextTurnPenalty', 'unlimited',
       'finalHordeSpawned', 'finalHordeKilled', 'normalZombiesKilled', 'hordeZombiesKilled', 'victoryTurn',
     ];
     for (const key of keys) {
@@ -622,6 +749,32 @@ describe('controller view models', () => {
     }
     expect(createTranslator('ja')('finalWaveTurn')).toContain('Final Wave');
     expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
+  });
+
+  it('keeps v1.5.4 Help values aligned for power, reserve, Soldier, Army Base, and Wind', () => {
+    for (const locale of ['ja', 'en'] as const) {
+      const t = createTranslator(locale);
+      const production = t('tipProduction');
+      for (const value of ['Capital 10', 'City 10', 'Farm 5', '15', '20', 'Refinery 10', 'Civilian Drone Base 5', 'Temporary Housing 5']) {
+        expect(production).toContain(value);
+      }
+      expect(production).not.toContain(locale === 'ja'
+        ? 'Capital・City・Farm・民需工場・軍需工場・Refinery・Civilian Drone BaseはRequired電力5'
+        : 'Capital, City, Farm, Civilian Factory, Military Factory, Refinery, and Civilian Drone Base use Required power 5');
+      expect(t('spawnReserveRule')).toContain('392');
+      expect(t('helpBody')).toContain('392');
+      expect(t('legendOverlayDescription.spawnReserve')).toContain('392');
+      expect(t('spawnReserveRule')).not.toContain('200');
+      expect(t('helpBody')).not.toContain('200');
+      expect(t('legendOverlayDescription.spawnReserve')).not.toContain('200');
+      expect(t('legendDescription.soldierZombie')).toContain('10');
+      expect(t('tipArmyBaseRecruitment')).toContain('10');
+      expect(t('tipArmyBaseRecruitment')).toContain(locale === 'ja' ? 'empty Housing' : 'empty Housing');
+      expect(t('armyBaseRecruitmentRule')).toContain(locale === 'ja' ? 'empty Housing' : 'empty Housing');
+      expect(t('windPowerPlantUse')).toContain('15');
+      expect(t('windPowerPlantUse')).toContain('Noise');
+      expect(t('windPowerPlantUse')).not.toMatch(locale === 'ja' ? /静音/ : /silent/i);
+    }
   });
 
   it('has bilingual mixed-Horde composition and checkpoint explainability labels', () => {

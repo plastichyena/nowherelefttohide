@@ -112,8 +112,8 @@ describe('Phaser board asset boundary helpers', () => {
   it('exposes exactly the fixed outer Spawn Reserve tiles', () => {
     const map = createFixedMap();
     const reserve = spawnReserveTileKeys(map);
-    expect(reserve).toHaveLength(200);
-    expect(new Set(reserve).size).toBe(200);
+    expect(reserve).toHaveLength(392);
+    expect(new Set(reserve).size).toBe(392);
     expect(map.tiles.filter((tile) => tile.playerOccupancyAllowed === false).map((tile) => tile.key)).toEqual(reserve);
   });
 

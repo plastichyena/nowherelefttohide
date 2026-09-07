@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultConfig, validateGameConfig } from './config';
 import { GameEngine } from './engine';
 import { hexDistance, hexKey } from './hex';
-import { ARMY_BASE_CANDIDATES, generateInitialHunterPositions, generateInitialZombiePositions, initialHunterPositionsMatchSeed, isHordeSpawnReserve } from './map';
+import { ARMY_BASE_CANDIDATES, generateInitialHunterPositions, generateInitialZombiePositions, initialHunterPositionsMatchSeed } from './map';
 import { SeededRng } from './rng';
 import { createInitialState, createUnit } from './state';
 import type { GameState } from './types';
@@ -34,7 +34,7 @@ function load(engine: GameEngine, state: GameState) {
 describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
   it('keeps all seven zombie configurations separate and derives human ranks', () => {
     const state = createInitialState(1, createDefaultConfig());
-    const expected = { zombie: [15, 5, 3, 1], hordeZombie: [40, 5, 3, 2], policeZombie: [10, 5, 3, 1], soldierZombie: [20, 5, 5, 1], riotZombie: [60, 5, 3, 1], hunterZombie: [20, 15, 15, 1], gasZombie: [35, 5, 3, 1] };
+    const expected = { zombie: [15, 5, 3, 1], hordeZombie: [40, 5, 3, 2], policeZombie: [10, 5, 3, 1], soldierZombie: [20, 10, 5, 1], riotZombie: [60, 5, 3, 1], hunterZombie: [20, 15, 15, 1], gasZombie: [35, 5, 3, 1] };
     for (const type of Object.keys(expected) as Array<keyof typeof expected>) {
       const unit = createUnit(state, type, type, { q: 20, r: 20 });
       expect([unit.hp, unit.attack, unit.movement, unit.maxAttackCharges]).toEqual(expected[type]);
@@ -62,7 +62,7 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
       expect(new Set(occupied).size).toBe(occupied.length);
       for (const hunter of state.units.filter((unit) => unit.type === 'hunterZombie')) {
         expect(hexDistance(hunter.position, { q: 25, r: 25 })).toBeGreaterThanOrEqual(20);
-        expect(isHordeSpawnReserve(state.map, hunter.position)).toBe(false);
+        // Initial Zombies may use legal Spawn Reserve terrain in map v3.
         expect(state.facilities.some((facility) => hexKey(facility.position) === hexKey(hunter.position))).toBe(false);
         expect([hunter.spawnGroupId, hunter.hordeKind]).toEqual([null, null]);
       }

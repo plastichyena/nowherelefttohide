@@ -96,7 +96,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
     zombie.canAttack = false;
     police.position = { q: 29, r: 25 };
     const guard = editable.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.position = { q: 1, r: 1 };
+    guard.position = { q: 2, r: 2 };
     guard.vision = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: editable }).error).toBeNull();
 
@@ -116,9 +116,10 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
     const zombie = editable.units.find((unit: { id: string }) => unit.id === 'zombie-1');
     zombie.position = { q: 31, r: 25 };
     zombie.canAttack = true;
+    editable.units = editable.units.filter((unit: { isPlayerUnit: boolean; id: string }) => unit.isPlayerUnit || unit.id === zombie.id);
     police.position = { q: 29, r: 25 };
     const guard = editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard');
-    guard.position = { q: 1, r: 1 };
+    guard.position = { q: 2, r: 2 };
     guard.vision = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: editable }).error).toBeNull();
     expect(engine.getLegalActions()).toContainEqual({ type: 'Move', unitId: police.id, destination: { q: 31, r: 25 } });
@@ -139,7 +140,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
     normal.vision = 1;
     const horde = createUnit(editable, 'horde-test', 'hordeZombie', { q: 24, r: 23 });
     horde.vision = 0;
-    editable.units.find((unit: { type: string }) => unit.type === 'police')!.position = { q: 1, r: 1 };
+    editable.units.find((unit: { type: string }) => unit.type === 'police')!.position = { q: 2, r: 2 };
     editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard')!.position = { q: 48, r: 48 };
     editable.units.find((unit: { type: string }) => unit.type === 'police')!.vision = 0;
     editable.units.find((unit: { type: string }) => unit.type === 'nationalGuard')!.vision = 0;
@@ -162,7 +163,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
     const engine = new GameEngine(17, config);
     const editable = JSON.parse(JSON.stringify(engine.getState()));
     editable.units = editable.units.filter((unit: { isPlayerUnit: boolean }) => unit.isPlayerUnit);
-    const target = { q: 25, r: 1 };
+    const target = { q: 25, r: 2 };
     const visible = getPlayerVisibleTileKeys(editable);
     const occupied = new Set([
       ...editable.facilities.map((facility: { position: { q: number; r: number } }) => hexKey(facility.position)),

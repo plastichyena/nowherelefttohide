@@ -31,6 +31,7 @@ import type {
 } from '../core/types';
 import {
   HIDDEN_NOISE_METRIC_KEYS,
+  HIDDEN_HORDE_WAVE_METRIC_KEYS,
   HIDDEN_REJECTED_REFUGEE_METRIC_KEYS,
   OBSERVATION_API_VERSION,
   type AgentGameResult,
@@ -81,6 +82,7 @@ function publicResult(result: GameResult | null): AgentGameResult | null {
   const statistics = cloneJson(result.statistics) as unknown as Record<string, unknown>;
   for (const key of HIDDEN_NOISE_METRIC_KEYS) delete statistics[key];
   for (const key of HIDDEN_REJECTED_REFUGEE_METRIC_KEYS) delete statistics[key];
+  for (const key of HIDDEN_HORDE_WAVE_METRIC_KEYS) delete statistics[key];
   return cloneJson({
     outcome: result.outcome,
     reason: result.reason,
@@ -265,6 +267,49 @@ function createAgentObservationInScope(
   const publicFinalHordeStatus = victory.finalHordeDefeated
     ? 'defeated' as const
     : state.horde.finalHordeStatus;
+  // A frozen Wave has no hidden outcome left in its aggregate counts. Its
+  // roster and every unspawned type/position remain private.
+  const publicWaves = [...state.horde.waves]
+    .sort((left, right) => left.waveIndex - right.waveIndex || left.direction.localeCompare(right.direction) || left.groupId.localeCompare(right.groupId))
+    .map((wave) => ({
+      waveIndex: wave.waveIndex,
+      direction: wave.direction,
+      groupId: wave.groupId,
+      kind: wave.kind,
+      baseWaveUnitCount: wave.baseWaveUnitCount,
+      committedWaveUnitCount: wave.committedWaveUnitCount,
+      spawnedSoFar: wave.spawnedSoFar,
+      pendingCount: wave.pendingCount,
+    }));
+  const finalPendingCount = publicWaves
+    .filter((wave) => wave.kind === 'final')
+    .reduce((total, wave) => total + wave.pendingCount, 0);
+  const waveTotals = [...publicWaves
+    .reduce((totals, wave) => {
+      const current = totals.get(wave.waveIndex) ?? {
+        waveIndex: wave.waveIndex,
+        kind: wave.kind,
+        baseWaveUnitCount: 0,
+        committedWaveUnitCount: 0,
+        spawnedSoFar: 0,
+        pendingCount: 0,
+      };
+      current.baseWaveUnitCount += wave.baseWaveUnitCount;
+      current.committedWaveUnitCount += wave.committedWaveUnitCount;
+      current.spawnedSoFar += wave.spawnedSoFar;
+      current.pendingCount += wave.pendingCount;
+      totals.set(wave.waveIndex, current);
+      return totals;
+    }, new Map<number, {
+      waveIndex: number;
+      kind: 'periodic' | 'final';
+      baseWaveUnitCount: number;
+      committedWaveUnitCount: number;
+      spawnedSoFar: number;
+      pendingCount: number;
+    }>())
+    .values()]
+    .sort((left, right) => left.waveIndex - right.waveIndex);
   const nextWave = state.horde.nextWaveIndex === null
     ? null
     : state.config.horde.waves[state.horde.nextWaveIndex - 1] ?? null;
@@ -340,7 +385,7 @@ function createAgentObservationInScope(
     checkpoints,
     importantSiteEvents: importantSiteEvents(state),
     checkpointPositionCandidates: projectionCache.checkpointPositionCandidates ?? getCheckpointPositionCandidates(state),
-    constructibleFacilityPositionCandidates: (['simpleFarm', 'civilianDroneBase'] as const)
+    constructibleFacilityPositionCandidates: (['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const)
       .flatMap((facilityType) => getConstructibleFacilityPositionCandidates(state, facilityType))
       .sort((left, right) =>
         left.facilityType.localeCompare(right.facilityType) ||
@@ -369,6 +414,9 @@ function createAgentObservationInScope(
       finalHordeStatus: publicFinalHordeStatus,
       turnsRemaining: state.horde.turnsRemaining,
       nextSpawnTurn: state.horde.nextSpawnTurn,
+      waves: publicWaves,
+      waveTotals,
+      finalPendingCount,
     },
     victory,
     finalHordeDefeated: victory.finalHordeDefeated,
@@ -383,7 +431,7 @@ function createAgentObservationInScope(
   } satisfies AgentObservation as unknown as JsonValue) as unknown as AgentObservation;
 }
 
-/** Remove fixed topology from one Artifact Schema 6.0.0 trace entry. */
+/** Remove fixed topology from one Artifact Schema 10.0.0 trace entry. */
 export function compactArtifactObservation(observation: AgentObservation): AgentArtifactObservation {
   const copy = cloneJson(observation);
   const { map, ...dynamic } = copy;

@@ -128,7 +128,9 @@ describe('Developer / Browser Bridge', () => {
       police: { noiseClass: 'medium' }, nationalGuard: { noiseClass: 'large' }, riotPolice: { noiseClass: 'medium' },
     });
     const encodedArtifact = JSON.stringify(artifact);
-    expect(encodedArtifact).not.toContain('"noiseRadius"');
+    expect(artifact.config.windPower).toEqual({ noiseRadius: 8 });
+    expect(artifact.metrics!.config.windPower).toEqual({ noiseRadius: 8 });
+    expect(encodedArtifact).toContain('"windPower":{"noiseRadius":8}');
     expect(encodedArtifact).not.toContain('"artifactType"');
     expect('verificationEvents' in artifact).toBe(false);
     artifact.config.horde.waves[0]!.turn = 1;

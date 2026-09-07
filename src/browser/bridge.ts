@@ -189,7 +189,7 @@ function isBridgeAction(value: unknown): value is GameAction {
           (value.branchId === undefined || isSafeId(value.branchId));
       case 'BuildConstructibleFacility':
         return hasOnlyKeys(value, ['type', 'facilityType', 'position']) &&
-          (value.facilityType === 'simpleFarm' || value.facilityType === 'civilianDroneBase') &&
+          (value.facilityType === 'simpleFarm' || value.facilityType === 'civilianDroneBase' || value.facilityType === 'temporaryHousing' || value.facilityType === 'windPowerPlant') &&
           isCoordinate(value.position);
       case 'DecommissionConstructibleFacility':
         return hasOnlyKeys(value, ['type', 'facilityId']) && isSafeId(value.facilityId);

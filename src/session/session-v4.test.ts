@@ -25,7 +25,7 @@ function observation(turn: number): AgentObservation {
     population: { healthyCivilians: 1, cityResidents: 1, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
     facilities: [], units: [], zombies: [], checkpoints: [], importantSiteEvents: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [], roadBranches: [],
     supply: { initialRadius: 0, suppliedTileKeys: ['0,0'], branchRadii: [] },
-    horde: { warningType: 'none', warningDirections: [], nextWaveIndex: null, nextWave: null, spawnTurn: null, finalHordeStatus: 'notStarted', turnsRemaining: 0, nextSpawnTurn: null },
+    horde: { warningType: 'none', warningDirections: [], nextWaveIndex: null, nextWave: null, spawnTurn: null, finalHordeStatus: 'notStarted', turnsRemaining: 0, nextSpawnTurn: null, waves: [], waveTotals: [], finalPendingCount: 0 },
     victory: { finalHordeDefeated: false, suppliedAreaZombieClear: true, suppliedAreaInfectionClear: true },
     finalHordeDefeated: false, suppliedAreaZombieClear: true, suppliedAreaInfectionClear: true,
     crisisSummary: { items: [], highestSeverity: null } as never,
@@ -63,7 +63,7 @@ const factory: SessionGameFactory = {
 const identity: SessionVersionIdentity = { appVersion: '1.5.1', gameRulesVersion: '4.0.0', saveFormatVersion: 11, artifactSchemaVersion: '7.0.0', agentApiVersion: '8.0.0', observationApiVersion: '8.0.0', bridgeApiVersion: '8.0.0', buildId: 'test-build', gitCommit: 'a'.repeat(40), mapId: 'test-map' };
 function service(path: string): SessionService { return new SessionService(new SessionStore(path), factory, identity); }
 
-describe('Session Schema 5 bounded storage and queries', () => {
+describe('Session Schema 7 bounded storage and queries', () => {
   it('supports bounded release-fixture compression and snapshot interval overrides', () => {
     const path = root('release-options');
     const store = new SessionStore(path, undefined, { gzipLevel: 0 });
@@ -174,7 +174,7 @@ describe('Session Schema 5 bounded storage and queries', () => {
   }, 60_000);
 });
 
-describe.runIf(process.env.NLTH_SESSION_DAILY === '1').sequential('Session Schema 5 daily 1000-decision chain', () => {
+describe.runIf(process.env.NLTH_SESSION_DAILY === '1').sequential('Session Schema 7 daily 1000-decision chain', () => {
   const path = root('daily-1000');
   const api = service(path);
   for (let block = 0; block < 10; block += 1) {

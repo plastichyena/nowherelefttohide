@@ -74,6 +74,8 @@ export function createAgentApiInfo(
     Object.entries(productionProficiencyByType).map(([key, value]) => [key, publicProficiency(value)]),
   );
   const crisisCategories: Record<CrisisReasonCode, { severity: CrisisSeverity; category: string }> = {
+    overcrowding_forecast: { severity: 'warning', category: 'resource' },
+    temporary_housing_outage_forecast: { severity: 'warning', category: 'resource' },
     capital_infection_uncontained: { severity: 'critical', category: 'infection' },
     critical_site_infection_uncontained: { severity: 'critical', category: 'infection' },
     checkpoint_defense_degraded: { severity: 'critical', category: 'checkpoint_defense' },
@@ -101,7 +103,7 @@ export function createAgentApiInfo(
       step: { arguments: 'one GameAction from getLegalActions()', returns: 'AgentStepResult', description: 'Validates and applies exactly one action through GameEngine.' },
       isGameOver: { arguments: 'none', returns: 'boolean', description: 'Reports whether the Agent session ended.' },
       getResult: { arguments: 'none', returns: 'AgentGameResult|null', description: 'Returns the public result when the game has ended.' },
-      getRunArtifact: { arguments: 'none', returns: `AgentPublicRunArtifact ${ARTIFACT_SCHEMA_VERSION}`, description: 'Returns an in-memory public play trace without verification-only fields or exact Noise radii.' },
+      getRunArtifact: { arguments: 'none', returns: `AgentPublicRunArtifact ${ARTIFACT_SCHEMA_VERSION}`, description: 'Returns an in-memory public play trace without verification-only fields or dynamic Pulse centers/radii.' },
     },
     recommendedCallOrder: [...PUBLIC_METHODS],
     productionCapacitySchema: {
@@ -124,7 +126,7 @@ export function createAgentApiInfo(
       'Facilities publish actual population and separate zombieTargetValue; Wind is a target value 5 but has no civilian population.',
       'strategicForecast is the Core projection for resource dependencies, Guaranteed Defeat, and Checkpoint Queue Pressure.',
       'The fixed outer-ring Horde Spawn Reserve is public; Player units and Player placements cannot occupy it, while Zombies and attacks may use it under normal rules.',
-      'Horde schedule, selected warning directions, and per-direction planned composition are public at the documented warning boundary; future unselected directions and hidden spawn details are not.',
+      'Horde schedule and selected warning directions are public at the documented warning boundary. At roster freeze, each direction/group and whole-wave count are public; pending Type breakdowns and hidden Spawn details are not.',
       'Required facilities produce their standard output only when powered. Simple Farm is a power-free Food 5/worker redundancy and has no SetPowerSupply action.',
       'Combat and Horde movement Noise expose only public centers, unit type/class, and documented movement radius rules. Police/Riot Police are Medium, National Guard is Large, and Horde movement uses radius 8.',
       'Ground Vision uses deterministic hex-line LOS: Forest and Mountain are visible blockers and hide Hexes beyond them. Civilian Drone Base provides terrain-ignoring Aerial Vision.',
@@ -138,14 +140,14 @@ export function createAgentApiInfo(
       'AI Portable Session Decision responses include a public State Delta derived from adjacent public Observations; ordinary Observation remains pure and delta-free.',
     ],
     prohibited: [
-      'GameState, PRNG state, future random outcomes, hidden enemy positions/counts, and unspawned Horde size are not public.',
+      'GameState, PRNG state, future random outcomes, hidden enemy positions/counts, and future unstarted Horde size are not public.',
       'Direction/policy rejected-refugee counters and the calculated extra Horde Zombies are private validation data, not public facts.',
       'Zombie Current Target, Inherited Target, Target Reason, hidden Spawn coordinates, and hidden enemy history are not public.',
-      'Zombie Noise Target, exact Noise Radius, and affected hidden Zombie IDs or counts are not public.',
+      'Zombie Noise Target, exact active Pulse center/radius, and affected hidden Zombie IDs or counts are not public. Static Wind Noise Radius is a public rule.',
       'Checkpoint candidates never reveal blocker unit IDs; hidden enemies do not block a candidate or change its reason code.',
       'Constructible candidates and actions use only visible Zombies. Hidden Zombies never make an otherwise legal Build candidate illegal.',
       'Before a Horde warning starts, its randomly selected directions are not public. Spawn coordinates, non-visible individual IDs, internal targets, and hidden metrics are never public.',
-      'Warning-time special Zombie Type draws are not public until the Wave is Spawned; exact Noise Radius and hidden Noise reactions remain private.',
+      'Warning-time special Zombie Type draws are not public; exact active Pulse center/radius and hidden Noise reactions remain private.',
       'LoadSnapshot, StartNewGame, SuppressInfection, arbitrary code, files, saves, localStorage, network, and Batch execution are not public actions.',
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
@@ -429,18 +431,20 @@ export function createAgentApiInfo(
         destroyedUnitReturnsCarriedGoods: false,
       },
       constructibleFacilities: {
-        types: ['simpleFarm', 'civilianDroneBase'],
-        limitFormula: 'ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor)',
+        types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
+        limitFormula: 'Simple Farm / Drone: ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor); Temporary Housing: unlimited; Wind: roadBranchCount',
         buildConditions: [
           'inside_player_supply',
           'plain_base_terrain',
           'no_road_urban_horde_entrance_or_spawn_reserve',
           'no_facility_checkpoint_player_unit_or_visible_zombie',
-          'per_type_limit_resources_and_action_budget',
+          'type_limit_resources_and_action_budget',
         ],
         costs: {
           simpleFarm: config.facilities.simpleFarm.buildCivilianGoods,
           civilianDroneBase: config.facilities.civilianDroneBase.buildCivilianGoods,
+          temporaryHousing: config.facilities.temporaryHousing.buildCivilianGoods,
+          windPowerPlant: config.facilities.windPowerPlant.buildCivilianGoods,
         },
         stateTransitions: [
           'build_turn: building_empty_no_power_or_vision',
@@ -459,10 +463,20 @@ export function createAgentApiInfo(
           requiredPower: config.facilities.civilianDroneBase.production.powerCapacity,
           visionPerWorker: 2,
         },
+        temporaryHousing: {
+          softCapacity: config.facilities.temporaryHousing.workerCapacity,
+          requiredPower: config.facilities.temporaryHousing.production.powerCapacity,
+          vision: config.facilities.temporaryHousing.visionRadius,
+          populationLimitKind: 'soft',
+          recruitmentHub: false,
+        },
         windPowerPlant: {
           fixedPower: config.facilities.windPowerPlant.production.fixedPowerGeneration,
           vision: config.facilities.windPowerPlant.visionRadius,
-          zombieTargetValue: config.facilities.windPowerPlant.zombieTargetValue,
+          noiseRadius: config.windPower.noiseRadius,
+          zombieTargetValue: 0,
+          emitsNoise: true,
+          playerBuildLimit: 'roadBranchCount',
           supplySource: false,
         },
       },
@@ -487,7 +501,7 @@ export function createAgentApiInfo(
         terrainAttenuation: false,
         normalZombieAffected: true,
         hordeZombieAffected: false,
-        targetPriority: ['visible_population', 'inherited_horde', 'noise', 'idle'],
+        targetPriority: ['visible_population', 'wave_capital', 'inherited_horde', 'noise', 'idle'],
       },
       production: {
         workerCapacityByFacilityType: Object.fromEntries(
@@ -508,7 +522,7 @@ export function createAgentApiInfo(
         sameTurnProductionCanCoverProductionInputs: false,
         sameTurnCivilianGoodsCannotDirectlyFeedMilitaryFactories: true,
         civilianProductionCanReleaseTurnStartStockFromMaintenanceReservation: true,
-        powerAllocationOrder: ['capital_and_cities', 'farm_and_civilian_factory', 'input_ready_military_factory', 'refinery', 'civilian_drone_base', 'army_base_reservation'],
+        powerAllocationOrder: ['capital_and_cities', 'occupied_temporary_housing', 'farm_and_civilian_factory', 'input_ready_military_factory', 'refinery', 'civilian_drone_base', 'army_base_reservation', 'empty_temporary_housing'],
       },
     },
     minimalExample: [
