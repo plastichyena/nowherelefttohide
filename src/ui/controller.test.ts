@@ -724,7 +724,7 @@ describe('controller view models', () => {
       'armyBaseInterceptionRefresh', 'armyBasePendingRecruitment', 'armyBaseNoPendingRecruitment',
       'armyBaseRecruitmentRule', 'armyBaseForfeitRule', 'armyBaseReward.claimed',
       'armyBaseRecruitment.waiting_power', 'legendInitialGasCount', 'legendInitialGasDistance',
-      'legendGasExplosion', 'legendDescription.gasZombie', 'legendDescription.armyBase',
+      'legendGasExplosion', 'legendDescription.gasZombie', 'legendDescription.armyBase', 'legendDescription.riotPolice', 'legendDescription.riotZombie',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);
@@ -868,8 +868,16 @@ describe('controller view models', () => {
     const english = renderBoardLegend(current.config, 'en');
     expect(japanese).toContain('標準Config（ゲーム開始前）');
     expect(japanese).toContain('平地');
+    expect(japanese).toContain('機動隊');
+    expect(japanese).toContain('機動隊ゾンビ');
+    expect(japanese).toContain('感染鎮圧の切り札です。高いHPを持ち感染鎮圧時に民間犠牲者を出しません。');
+    expect(japanese).toContain('再活性化したriotpolice由来の通常ゾンビ。生前の防具がそのまま高いHPとして機能しています。');
     expect(japanese).toContain('盤面と同じAsset Registry');
     expect(english).toContain('Current GameState Config');
+    expect(english).toContain('Riot Police');
+    expect(english).toContain('Riot Zombie');
+    expect(english).toContain('A decisive unit for infection suppression. It has high HP and causes no civilian casualties during infection suppression.');
+    expect(english).toContain('A normal Zombie reanimated from a Riot Police unit. The armor it wore in life gives it high HP.');
     expect(english).toContain('Periodic Horde');
     expect(english).toContain('data-legend-section="dynamic"');
     expect(english).toContain('Secured + stopped');
