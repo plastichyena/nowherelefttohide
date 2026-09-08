@@ -42,6 +42,10 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 
 ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.5.5の変更目標は [`Doc/Nowhere Left to Hide PoC v1.5.5 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.5.5%20アップデート要件%20確定版.md) です。v1.5.5の実装・テスト・ローカル動作確認を現行仕様へ反映済みです。長時間のGitHub検証Jobは起動確認までとし、結果未確認のJobを成功済みとは扱いません。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
+## v1.5.5 公開検証
+
+公開コードは `85d7e3b`。GitHub Pagesの660テストとデプロイ、[Linux/Windows AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34238541866) が成功しています。公開PagesでSeed 1/7の終局・再実行一致、ZIP観戦とautosave保全を確認しました。[検証記録](src/testing/fixtures/v155-release-validation.json) に実測条件を保存しています。その他の長時間Batch・1,000判断・512 MiB検証は開始確認までで、成功扱いにはしていません。
+
 ## ローカルで起動する
 
 Node.js 22系を推奨します。

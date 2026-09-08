@@ -1936,5 +1936,9 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - 道路の設定・全基地候補hash・3段階MP/経路長/Fuel/Hunter到達範囲・接触ターンの静的推定は `src/testing/fixtures/v155-roads.json`、図は同ディレクトリの `v155-roads-none/required/optional.svg`。必須142辺、任意込み147辺、閉路数0→1。全4基地候補が幹線へ接続する。接触ターンは無妨害の移動予算推定であり、戦闘結果や勝率を保証しない。
 - 観戦はv1.5.5対応。ZIPのNDJSONは非圧縮格納を必要とし、配布CLIのZIPを用いる。ZIP64、分割、暗号化は非対応。論理Payload64 MiB、1行4 MiB、中央ディレクトリ32 MiB、100万Decision、Snapshot Cache16 MiBを上限とする。全体50 MB超だけでは拒否しない。ブラウザの作業メモリ不足は別の再生不能条件となる。
 - 内部展開bytesと累積Observation読込bytesは再読込を含む計測値として区別する。1,000判断・物理512 MiB超の耐久検証はGitHubの専用Jobで、同じ観戦Readerの読込・シーク・中止も検証する。長時間Workflowは開始確認までとし、結果未確認を成功済みとは扱わない。
-- GitHub PagesとLinux/Windows AI Portableの対象Commitでの結果は、公開後にGitHub Actionsおよび実ブラウザで確認する。
+- 公開対象コードは `85d7e3b2a1e8c7d12c29de8d077117a49e9abf90`。GitHubの [Pages検証・デプロイ](https://github.com/plastichyena/nowherelefttohide/actions/runs/34238522394) が成功し、71 Test File・660 Test成功、11件Skipを確認した。
+- [AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34238541866) はLinux x64・Windows x64とも成功。Bundled NodeでSeed 1/7のSession終局、Artifact取得、Replay一致を確認した配布ZIPを保存した。
+- 公開PagesのBuild ID一致、通常UIのEndTurn・autosave・復帰、公開BridgeのSeed 1（Turn 10）／7（Turn 8）の終局と再実行一致、Artifact各ページ一致、Hidden情報非公開を確認した。観戦は1280×720・390×844で表示し、50,131,022 bytesのZIPを操作込み867msで読込、通常autosave不変、復帰成功、pageerror 0を確認した。
+- 通常終局ZIPはSeed 1が322,724 bytes／10判断、Seed 7が271,109 bytes／8判断。バンドルしたNode 22 Readerで初回読込3,292／3,053ms、末尾シーク3,331／2,683ms、RSS約195／201 MB。開発用Viteランナーの常駐量とは分けた参照値であり、長期戦・実機電話の保証ではない。
+- 長時間 [Release Validation](https://github.com/plastichyena/nowherelefttohide/actions/runs/34238545597) のRandom/ Balanced各100 Seed、物理512 MiB、およびCIのBalanced 1～30・通常1,000判断Jobは開始を確認した。完了を待たない指定のため、結果未確認として扱う。公開後の証跡は `src/testing/fixtures/v155-release-validation.json`。
 - 今回の指示により確定要件をDoc直下に残し、Doc/archive内の履歴資料は参照・編集していない。
