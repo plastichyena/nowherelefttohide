@@ -45,7 +45,7 @@ export interface FacilityProductionProjection {
   lastPowerSupplied: boolean | null;
   productionMultiplier: number;
   baseOutputs: Partial<Record<ResourceType, number>>;
-  stoppedReason: 'ruined' | 'infection' | 'not_owned' | 'no_workers' | 'power_unavailable' | 'input_shortage' | null;
+  stoppedReason: 'building' | 'recovering' | 'disabled' | 'ruined' | 'infection' | 'not_owned' | 'no_workers' | 'power_unavailable' | 'input_shortage' | null;
   /** Present only for Army Base facilities; it does not consume production inputs. */
   armyBaseMilitaryGoods: ArmyBaseMilitaryGoodsProjection | null;
 }

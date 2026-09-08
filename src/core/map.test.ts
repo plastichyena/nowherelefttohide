@@ -27,9 +27,9 @@ const key = ({ q, r }: { q: number; r: number }) => `${q},${r}`;
 const at = (q: number, r: number) => FIXED_MAP.tiles.find((tile) => tile.q === q && tile.r === r);
 const rotate = ({ q, r }: { q: number; r: number }) => ({ q: 50 - q, r: 50 - r });
 
-describe('v1.5.4 fixed map', () => {
+describe('v1.5.5 fixed map', () => {
   it('uses the 51x51 fixed map contract and covers every hex exactly once', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v3');
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v4');
     expect(FIXED_MAP.width).toBe(FIXED_MAP_WIDTH);
     expect(FIXED_MAP.height).toBe(FIXED_MAP_HEIGHT);
     expect(FIXED_MAP.tiles).toHaveLength(51 * 51);

@@ -54,7 +54,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('11.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('12.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -145,8 +145,7 @@ describe('Agent Metrics', () => {
 
   it('counts policy branch-turns from the Active post only', () => {
     const config = createDefaultConfig({ maxActionsPerTurn: 1 });
-    const run = runAgentGame(4, { strategy: 'random', config, limits: { maxTurns: 2, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 10 } });
-    const observation = structuredClone(run.initialObservation!);
+    const observation = createAgentObservation(createInitialState(4, config));
     const baseCheckpoint = {
       branchId: 'west',
       direction: 'west' as const,

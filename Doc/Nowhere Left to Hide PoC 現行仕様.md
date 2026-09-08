@@ -3,12 +3,12 @@
 ## PoC 現行仕様
 
 - ステータス: 現行正本
-- 現行Version: v1.5.4
-- 基準日: 2026-09-07
-- 実装照合日: 2026-09-07
-- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.5.4 アップデート要件 確定版.md`
+- 現行Version: v1.5.5
+- 基準日: 2026-09-08
+- 実装照合日: 2026-09-08
+- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.5.5 アップデート要件 確定版.md`
 
-本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。過去の資料は現行判断には使用しない。v1.5.4の実装と検証状況は18.2に記録する。
+本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。過去の資料は現行判断には使用しない。v1.5.5の実装と検証状況は18.3に記録する。
 
 ---
 
@@ -56,13 +56,14 @@
 - 同一Seed比較、Metrics、Replay／Failure Artifact、JSON／CSV出力を持つBatch Simulation CLI
 - 通常UI・保存領域と分離したDeveloper / Browser Bridge
 - 外部AIが複数プロセスで継続できるAI Portable Session、Public Decision Log、Checkpoint、分岐、Artifact
+- タイトルから公開ZIPを開く、コメント付きの読み取り専用AI観戦
 - Unit Test、不変条件試験、複数Seed自動完走試験
 - GitHub Actionsによるテスト、ビルド、GitHub Pages公開
 
 ## 2.2 対象外
 
 - ランダムマップ、Terrain自動生成、高低差、Waterを使う標準Map
-- Replay UI、外部LLM自体の同梱、`balanced`以外の組み込みStrategy
+- 外部LLM自体の同梱、`balanced`以外の組み込みStrategy
 - AI観戦、AI思考表示、After Action Report、Browser BridgeからのBatch実行
 - 強化学習、Minimax、MCTS、人間より強いAIの保証
 - リアルタイム操作、大量個体描画、複雑な基地建築
@@ -175,7 +176,7 @@ UI / Phaser / Test Agent
 
 - 初回ガイドで移動、攻撃、人口配置、ターン終了を説明する。
 - 日本語・英語の常設ヘルプを提供する。
-- 人口は盤面上の所在地から消せないこと、施設撤収時の帰還、都市過密、Army Base Workerの都市住民・避難民・徴用対象外、編成拠点制限、v1.5.3以前の通常SaveおよびAI Replay／Artifact／Session／Checkpointの非互換を説明する。
+- 人口は盤面上の所在地から消せないこと、施設撤収時の帰還、都市過密、Army Base Workerの都市住民・避難民・徴用対象外、編成拠点制限、v1.5.4以前の通常SaveおよびAI Replay／Artifact／Session／Checkpointの非互換を説明する。
 - 道路別の次回到着（Final Wave Spawn後は新規到着停止）、未管理時の素通りリスク、都市のソフトキャップ超過受入を表示する。
 - 補給オーバーレイは常設切替を持ち、新設・移設、検問所選択、労働者配置で自動表示する。補給範囲、セクター境界、検問所半径、候補の将来範囲、建設を妨げるZombieを盤面上で識別できる。
 - Farm、Civilian Factory、Military Factory、Refinery、Civilian Drone BaseはBottom SheetからPower Supply ON/OFFを切り替え、現在配置とTurn-start Fuelに基づく次回EndTurnの予測要求・給電、基本出力、予測出力、停止理由、直前EndTurnの実績給電を区別して表示する。Army Baseは通常州兵予約を持つ正常稼働Turnだけ、Worker 0でも編成専用の電力5を要求する。Required施設は未給電またはOFFなら対象生産・機能を停止する。
@@ -208,12 +209,67 @@ UI / Phaser / Test Agent
 - Runtime PNG合計は3 MiB以下とし、生成・後加工・出所・第三者Asset不使用・再生成方法を`public/assets/board/ASSET_MANIFEST.md`へ記録する。Hunterの生成Promptと後加工記録は`Art/reference/v1.5.1-hunter-concept/README.md`へ記録する。App VersionまたはBuild IDをURLへ付与してCache Bustingする。
 - ゲーム盤面を表示する前にRegistryの全Assetを一括Preloadし、Loading進捗を表示する。Missing、Load、Decode、Texture登録の失敗はAsset単位で記録し、成功済みAssetを維持したまま失敗対象だけ既存図形・文字描画へFallbackする。読込成否は操作、GameState、RNG、Save、Observationへ影響させない。
 - 描画順は`Terrain → Road → Urban → Facility Base → Facility State → Fog暗転 → Unit → 動的Overlay`とする。視界外でもTerrain、Road、Urban、施設、Checkpointを暗転して識別可能にし、Enemy Unitは描画しない。自軍Unitと選択・移動・攻撃・HP・感染・停止予測・Vision・Supply・Horde方向等の操作情報はFogより上に置く。
-- Roadは単一透過Assetを隣接する道路Hexの方向へ回転・合成して連続させ、形状別PNGを持たない。施設とUnitが同じHexにある場合は施設を中央、Unitを右下へOffsetし、双方を識別可能にする。
+- Roadは保存済みの明示接続辺だけを描画し、幹線／集散路／進入路を幅6／3.5／2で区別する。隣接するだけの道路を接続せず、形状別PNGを持たない。施設とUnitが同じHexにある場合は施設を中央、Unitを右下へOffsetし、双方を識別可能にする。
 - Camera Zoomが`0.75`未満ではPNGの細部を省いたLODへ切り替え、最小Zoom`0.35`でも陣営、Police／National Guard／Riot Police、Normal／Horde／Police／Soldier／Riot／Hunter／Gas Zombie、Army Baseを含む主要施設状態を色とSilhouetteで区別する。LODは旧`P / G / Z / H / F`固定文字へ戻さず、閾値と表示状態をGameStateへ保存しない。
 - Help内に折りたたみ可能な`盤面アイコン / Board Legend`を設け、Terrain、Road／Urban、10 Unit、Scheduled／Final Horde、Army BaseとTemporary Housingを含む13施設Type、一般施設とCheckpointの複合状態、通常Zoom／LOD、動的Overlay、Config由来のRule値を日本語・英語で説明する。進行中は現在GameState Config、GameStateがない場合は標準Configを表示する。Player向けLegendには強制Fallback表示を含めない。
 - 上部電力HUDは`requiredPowerDemand / availableGenerationCapacity`を`予測需要量 / 利用可能供給量`で表示する。日本語Labelは`電力 需要/供給`、英語Labelは`Power Demand/Available`とし、TooltipとAccessible Nameで需要、供給、Core Forecastの不足量を名前付きで伝える。`electricity.shortage > 0`の場合だけ不足状態とし、`0/0`を安全に表示する。実消費量とは呼ばない。
 
 ---
+
+## 5.7. コメント付き観戦リプレイ
+
+### 5.7.1 再生方式
+
+- 公開Artifact内の記録済みObservation / Action / Event / decisionSummaryを再生する。
+- 観戦でGameEngineによるAction列の再実行を必須条件にせず、記録済み盤面を読む。
+- 検証用の決定的Replayと、プレイヤー向け観戦再生を区別する。
+- 通常ゲームのState、autosave、進行中Sessionを変更しない。
+- FoWはその時点でAIに公開された情報に従う。全知視点は追加しない。
+
+### 5.7.2 v1.5.5の基本操作
+
+- タイトル画面の「AIリプレイ観戦」から端末内の単一ZIPをファイル選択で読み込む。読込後は先頭の判断直前で一時停止し、再生操作で開始する。観戦終了時はタイトルへ戻り、通常ゲームのautosaveを維持する。
+- 再生・一時停止・速度変更・前後のDecisionへの移動・ターン指定移動を提供する。
+- 現在Turn、Decision、行動主体、Action、結果を表示する。
+- 攻撃・撃破・施設陥落・Wave到来等の重要Eventを盤面とログで識別できる。
+- コメント表示、盤面操作、ログ閲覧がモバイル画面で両立する。
+- 移動を補間表示する場合も、記録にない経路や敵移動を推測して事実として再生しない。
+- EndTurnは処理前後の記録済み盤面を切り替え、その間の公開Eventを記録順のログで表示する。中間盤面や敵移動経路を推測しない。ログは次の判断へ進んだ後も閲覧できる。
+
+### 5.7.3 意思決定コメント
+
+- 既存decisionSummaryを利用する。非公開の詳細な思考過程は収集しない。
+- 判断直前の公開盤面でコメントを提示し、その後に行動と結果を表示する。
+- 「AIの判断コメント」と「ゲームの結果ログ」を区別し、AIの誤認を仕様説明として表示しない。
+- コメントがない記録でも再生可能とし、後付けでAIの意図を捏造しない。
+- 拒否されたActionは状態を進めず、拒否理由を表示する。未実行計画は実行履歴へ追加しない。
+- コメントは通常テキストとして表示し、HTML等として実行しない。
+- AIプレイ用文書に、短い目的・判断根拠を記す推奨例を追加する。
+
+- 自動再生は「判断直前の盤面とコメント → 行動結果の盤面とログ → 次の判断」の順。標準速度は1倍。コメントは文字数に応じて3～8秒、結果は1秒とする。文字数換算の初期値は min(8, max(3, ceil(Unicode code point数 / 20))) 秒とする。
+- 速度は0.5倍・1倍・2倍・4倍。コメントと結果の時間を倍率で割る。一時停止中は残時間を進めず、コメントを時間制限なく読める。コメント欠損時は意図を補作せず、コメント待ち時間を省略する。
+- 前後Decision・Turn指定は判断直前へ移動し、一時停止する。指定Turnに複数Decisionがある場合は最初へ移動する。記録のないTurnは理由を表示し、盤面を捏造しない。末尾で停止し、自動ループしない。
+
+### 5.7.4 読込・互換性・性能
+
+- v1.5.5で作成した公開Artifactを必須対応とする。
+- v1.5.4以前のArtifactは観戦でも非対応とし、理由付きで拒否する。変換・移行しない。
+- 公開Artifact Packageを単一ZIPにまとめて出力する。AIプレイ終了後に取得でき、既存の途中記録exportも維持する。Manifest、固定Map、公開Decision / Event、必要な差分・Snapshot・Payload・lineageを自己完結させる。Private Stateや外部Sessionへの依存を含めない。
+- ZIPは端末内で読み込む。サーバーアップロード、GitHub Pages上の記録保存・配信基盤は追加しない。Pagesはゲーム本体を配信し、展開・再生はブラウザ側で行う。
+- 圧縮済み観戦ZIPの対応容量は50 MB（50,000,000 bytes）を暫定目標とする。強制的な上限ではなく、超過だけを理由に拒否しない。標準50ターン10 MB以下、圧縮1 GiB・展開4 GiBは必須要件にしない。
+- 50 MB超の事例は、ZIP実容量、ZIP内データと内部圧縮Payloadそれぞれの展開量、Turn数、Decision数、端末・ブラウザ、読込・シーク時間、取得可能なメモリ指標、成否・原因を検証記録へ残す。実装完了後の現行仕様に制約・注釈と記録の参照先を反映する。端末資源不足等で読込不能なら理由を表示して中止し、再選択・タイトル復帰を可能にする。
+- ZIP容量、内部Payload展開量、全差分から復元したObservationの累積量、ピークメモリを別指標にする。いずれも同じ「展開後サイズ」として扱わない。
+- ZIPエントリ名・重複・Manifest参照・hash・Versionを検証し、外部URLを取得しない。宣言サイズだけを信用せず展開量を監視する。解析・展開単位とキャッシュに有限の上限を設けるが、50 MB超の一律拒否で代用しない。
+- 欠損、破損、未対応Versionは読込理由を表示して停止し、通常ゲームへ影響させない。
+- 全履歴を単一文字列や全Observation配列へ一括展開しない。ZIP・内部Payloadを必要範囲で読み、索引・Snapshotからの差分展開・上限付きキャッシュを利用する。読込を中止でき、処理分割またはWorkerによりUIの長時間停止を避ける。
+- シーク時もコメント・盤面・結果の対応を維持する。分岐Sessionの履歴はArtifactのlineageに従う。
+
+### 5.7.5 今回含めないもの
+
+- 音声実況、動画書き出し、SNS投稿、オンライン共有基盤。
+- 自動ハイライト編集、高度な演出カメラ、全知視点。
+- リプレイ途中から通常ゲームを開始する機能。
+
 
 # 6. GameState・GameAction・乱数
 
@@ -298,9 +354,9 @@ interface HeadlessGame {
 
 ## 6.5 Version境界
 
-- App / Release `1.5.4`、Rules / State / Config `6.0.0`、Map `fixed-51x51-v3`、Save Format `13`。
-- Agent / Observation / Bridge `11.0.0`、Artifact `10.0.0`、Session / Checkpoint `7.0.0`、Balanced `6.0.0`、Random `4.0.0`。
-- v1.5.3以前の通常SaveおよびAIデータは移行せず、現在状態・旧データを変更せずにVersion mismatchとして拒否する。Map IDとSave Formatを独立に検証し、必須metadataを旧値で補わない。
+- App / Release `1.5.5`、Rules / State / Config `7.0.0`、Map `fixed-51x51-v4`、Save Format `14`。
+- Agent / Observation / Bridge `12.0.0`、Artifact `11.0.0`、Session / Checkpoint `8.0.0`、Balanced `7.0.0`、Random `5.0.0`。
+- v1.5.4以前の通常SaveおよびAIデータは移行せず、現在状態・旧データを変更せずにVersion mismatchとして拒否する。Map IDとSave Formatを独立に検証し、必須metadataを旧値で補わない。
 - Build IDはCIではcommit SHA、ローカルではSHAとdirty状態またはlocal-unknown。乱数やゲーム結果には影響しない。Session / CheckpointはBuildを含む完全な境界を照合する。
 
 ## 6.6 Agent ObservationとAgentGame
@@ -340,7 +396,7 @@ interface AgentGame {
 
 - `random`と`balanced`は同じAgentGame、Runner、安全上限、Metrics、Artifact形式を使用する。各Decisionは非公開思考過程ではなく、優先目標、理由コード、上位候補を500 Unicode code point以下で要約した`decisionSummary`を公開する。
 - Random Agentの選択乱数はGameEngineから独立したSeed付き乱数とする。
-- Balanced Agent Versionは`6.0.0`、Random Agent Versionは`4.0.0`とする。Balancedは独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
+- Balanced Agent Versionは`7.0.0`、Random Agent Versionは`5.0.0`とする。Balancedは独自乱数を使わず、ObservationとLegal Actionsだけから、安定したActionキーで決定する。
 - VisibleなGasを含む6種Normal AI系ZombieとHorde Zombie、Terrain Movement Cost、Urban／Forest防御、Vision Coverage、Horde警告、Checkpoint Role／Fallback深度、Crisis、残Attack Charge、熟練度、公開Noise Class、Final PendingとMap上のFinal所属Zombieを評価する。非Final Zombieや感染が残っていてもFinal勝利条件を満たし得ることを前提に行動する。
 - BalancedはGuaranteed Defeat回避をHard Priorityとし、施設接触拒否、施設／Checkpoint Queue感染の鎮圧、Horde防衛、軍需備蓄、食料・民需品・燃料・電力、州都人口バッファ、過密、生産冗長性を含む施設確保、部隊編成と損傷、全支線のActive Checkpoint確立、状況に応じた後方Standby、支線方針、有益なActionがない場合のEndTurnを評価する。州全体感染時はStrict方針を加点し、Normal／Pass Throughを減点する。
 - Food単一障害点ではSimple Farm、Horde方向・Fog・給電余力ではCivilian Drone Base、CheckpointではProjected Supply Effect、前線ではQueue Pressureを評価する。Move距離、Unit Type別Fuel Cost、移動後Fuel、Supply内補給見込みを評価し、Horde緊急防衛を除いてSupply外で移動不能になる進出を減点する。Horde Spawn Reserveへ移動・配置するActionを生成せず、Reserve内のVisible Zombieへの合法Attackは評価する。`checkpoint_supply_zombie_blocked`はCheckpoint戦略の放棄理由にしない。
@@ -379,11 +435,71 @@ interface AgentGame {
 
 ---
 
+## 6.9. AI向け情報開示
+
+### 6.9.1 共通原則
+
+- 公開Observationから導出できる情報を、判断する対象と同じ場所へまとめる。
+- Compactは反復判断に必要な小さな要約を持ち、施設別・Action別の詳細はQueryで取得する。
+- Hidden Enemy、内部Target、将来乱数、拒絶Counter等の非公開境界は維持する。
+- 確定結果、条件付き結果、未計算の結果を区別する。公開情報だけでは確定しない将来の敵行動を保証として出さない。
+- UIとAIで共通のCore Queryを利用し、予測用のルールを別実装しない。維持費内訳、Gas撃破時の被害予測、施設復旧・生産停止理由は人間向けUIでも提供する。通常画面は要約、詳細パネルは内訳と条件を表示し、日英UI・ヘルプを整合させる。
+- フィールドは `maintenancePopulation`、`maintenanceBreakdown`、`gasExplosion`、`recovery`、`populationTransferCandidates`、`turnAwayPreview` を使用する。
+
+### 6.9.2 維持人口と資源収支
+
+CompactのEndTurn予測に以下を追加する。
+
+- 維持人口の内訳: 都市・住宅住民、生産施設等の労働者、部隊人口、Checkpoint健常Queue。
+- Queueはwaiting / screening / approvedを区別し、維持対象外の感染者と混同しない。
+- Food / Civilian Goodsの基本維持費、過密追加費、住宅停電追加費、合計維持費。
+- Civilian Goodsの生産、軍需工場投入、維持消費を分離した収支。
+- 給電不足・感染・復旧待ち等の主な生産停止原因と詳細Queryへの導線。
+
+「維持可能人口＝Civilian Goods生産量」という無条件の人口上限は表示しない。人口配置、過密、電力、投入資源に依存するため、現在の構成の予測収支を正本にする。
+
+### 6.9.3 Gas Zombieの攻撃プレビュー
+
+- 直接攻撃による撃破時に起きる死亡爆発について、影響する隣接Hexを示す。
+- 公開範囲のUnitについて、地形軽減・残HPを反映した被害と死亡見込みを示す。
+- 公開Facility / Checkpointについて、予測感染数、健常人口0への到達、陥落・停止への影響を示す。
+- 爆発による敵への利益と、自軍への損失を同じプレビューで示す。
+- 公開情報で求められる連鎖と、隠蔽情報のため確定できない範囲を区別する。隠蔽個体の存在を示すフラグは出さない。
+- 非致死攻撃では即時爆発が発生しないことを区別する。
+- 敵フェーズの追跡・迎撃・反撃による将来爆発を、この即時プレビューの確定結果に含めない。
+
+### 6.9.4 施設復旧・防御の説明
+
+- ruined / disabled等の状態とは別に、施設種別に応じた復旧可否を示す。
+- 奪還、感染鎮圧、敵排除、復旧待ち等、現在不足している条件を示す。
+- 復旧開始前の日時nullと、回復不能を区別する。
+- 生産再開には別途人口・補給・電力等が必要な場合、それを奪還と区別する。
+- 地形防御の理由と倍率が一致することを確認し、Urban Overlayを施設・Checkpointと対応付けて説明する。
+
+### 6.9.5 Action契約と候補検索
+
+- `PLAY_WITH_AI.md`と機械可読API情報に、主要Actionの必須フィールド・例・対象条件を示す。
+- Move / Attack / AssignWorkers / TransferPopulation / SetCheckpointPolicy / TurnAwayCheckpointRefugees等を対象にする。
+- TransferPopulationはCoreで許可される任意整数人数をAgent APIからも指定可能にする。
+- 移送元・移送先ごとに、指定可能な整数人数の最小値・最大値・制約・RevisionをQueryで取得する。TransferPopulationのfromFacilityId / toFacilityId / peopleを指定して実行する。0人は実行候補にせず、合法範囲が空なら理由を返す。
+- 列挙型Legal Actionsは有限の具体例として維持し、人口移送の全合法人数を網羅する契約にはしない。例に存在しない人数もCoreが合法と判定すれば受理する。機械可読APIでパラメータ候補の取得先と列挙の非網羅性を明示し、既存Agentの具体例利用経路も維持する。
+- 人数・対象資格・ターン開始Snapshot・Action予算は既存Core検証を使用し、不正Actionの状態不変を維持する。
+- 建設候補を支線・施設種別等で絞り込めるようにし、Checkpointの補給差分へ全候補取得なしで到達できるようにする。
+- Turn Awayはwaitingのみが対象であること、退去可能人数、対応する維持費減少を示す。全Queueを退去可能と誤認させない。
+- Normal / Strictの審査拒否とTurn Awayのどれも将来Wave強化に関係し得ることを説明する。ただし現行どおりFinal roster freeze後の拒絶はBonusを増加させない。正確な非公開CounterやBonus計算状態は公開しない。
+
+### 6.9.6 実行確認
+
+- 既存play-turnの実行済み・拒否・未実行の結果を推奨経路にする。
+- バッチ停止後は未実行Actionを適用済みとして扱わないことを文書化する。
+- 受理された結果のRevisionと観測された状態を確認する例を載せる。
+
+
 # 7. 固定マップと初期状態
 
 ## 7.1 マップ
 
-- Map IDは`fixed-51x51-v3`、寸法は51×51、有効座標は`q=0..50`、`r=0..50`とする。Capitalは`(25,25)`、Horde EntranceはNorth `(25,0)`、East `(50,25)`、South `(25,50)`、West `(0,25)`とする。
+- Map IDは`fixed-51x51-v4`、寸法は51×51、有効座標は`q=0..50`、`r=0..50`とする。Capitalは`(25,25)`、Horde EntranceはNorth `(25,0)`、East `(50,25)`、South `(25,50)`、West `(0,25)`とする。
 - 外周2列、すなわち`q = 0 | 1 | 49 | 50`または`r = 0 | 1 | 49 | 50`の重複を除く392 Hexを、公開の静的Map Rule `hordeSpawnReserve`とする。各Tileは`playerOccupancyAllowed`を持ち、Reserveではfalse、その他ではtrueである。
 - RoadはCapital Junctionを含む`q=25`の全Hexと`r=25`の全Hexから成り、North／East／South／Westの4支線はCapitalから各Entranceまで25 Hexとする。Entranceと恒久FacilityのRoad Hexも支線へ含めるが、Facility HexはCheckpoint候補外とする。
 - 基礎Terrainは`plain`、`forest`、`mountain`、`water`。Road、Urban、Facility、CheckpointはOverlay／属性として分離する。標準MapにWaterは置かず、Random MapやSeedによるTerrain生成も行わない。
@@ -419,7 +535,7 @@ r=16: q=6..14
 r=17: q=7..15
 ```
 
-- Mountainを先、Forestを後に配置し、重複時はMountainを優先する。その後、Roadと恒久Facilityの座標をPlainへ戻す。最終内訳はPlain 1961、Forest 514、Mountain 126、Water 0の全2601 Hexである。
+- Mountainを先、Forestを後に配置し、重複時はMountainを優先する。その後、従来の幹線Roadと恒久Facilityの座標をPlainへ戻す。追加の集散路・進入路は基礎Terrainを変更しない。最終内訳はPlain 1961、Forest 514、Mountain 126、Water 0の全2601 Hexである。
 - 進入先の実効Costを消費し、開始Hexは消費しない。Plain 1、Forest 2、Mountain 3、Waterは進入不能とする。RoadまたはUrban Hexは基礎Terrainに関係なくCost 1とする。
 - HumanとGasを含む6種Normal AI系Zombieは同じ決定的な重み付き最短経路を使い、同Cost経路は安定座標順で決める。
 - Player UnitはReserveへ進入、通過、停止、初期・完成・復帰配置できない。CheckpointのBuild／Relocate／ActivateとConstructible FacilityのBuildもReserveを拒否する。候補、Pathfinding、Legal Actions、Save validation、不変条件は同じMap RuleとReason Codeを使い、拒否はState、Resource、Action回数、RNGを変更しない。ZombieのSpawn、移動、停止、およびReserve内ZombieへのAttack、Counterattack、Interception、Damageは許可する。
@@ -501,6 +617,197 @@ Wind Power PlantはWorker 0固定である。初期未配置人口は存在し�
 - 新規確保・復旧した施設は次のプレイヤーターンから人口操作・編成に使用できる。
 
 ---
+
+## 7.5. 固定マップの施設間接続道路
+
+### 7.5.1 採用方針と今回の対象
+
+2026-09-08のユーザー合意に基づき、「既存幹線を固定の骨格として維持し、地区連絡道・施設進入路・少数の周回路を決定的に生成する」方式を採用する。本章の採用方針は、方式選択から再確認する対象にしない。数値は4.8の実装開始値として具体化し、検証済みの最適値とは扱わない。
+
+- 目的は、災害前から地方都市・農工業地区を支えていた道路網の表現である。美術上の基準を「平地の多い、農工業地区と複数の地方都市が点在する架空のアメリカ内陸州」とする。特定の実在州、実測道路密度、実寸の街区の再現は要求しない。
+- 51×51の固定マップ、既存4幹線、州都、29静的恒久施設の位置・種類・初期人口、Army Baseの配置候補と抽選方式、Wave体系を維持する。
+- 接続対象は29静的恒久施設と初期配置Army Base 1基とする。初期所有・未所有を問わず接続する。すでに幹線や生成道路上にある施設には、接続本数を満たすためだけの追加道を作らない。
+- 基本道路網は固定入力から自動生成し、ゲームごとに作り替えない。Army Baseだけは配置決定後に局所的な進入路を追加する。固定マップ用生成器の導入であり、ランダムマップの提供ではない。
+- 都市・工業地区の周囲は相対的に密に、地区間は疎にする。全域を均等な格子で埋めず、すべての施設を州都へ個別に直結せず、すべての施設間を相互接続しない。
+- Playerが後から建設する施設への自動敷設、道路の建設Action・費用・維持費・破壊・修復は追加しない。施設の所有変更・陥落・撤去でも初期道路を再生成しない。
+- 橋、トンネル、立体交差、高速道路の出入口、市街地発展シミュレーション、本格的な方位場生成は今回含めない。
+
+### 7.5.2 ゲーム効果と変更しない境界
+
+- 接続道路Hexへ入る移動コストは1とし、Human / Zombie双方に適用する。ZombieにはHorde・特殊Zombieを含む。道路の種類によるMP差は付けない。
+- 現行の「進入先Hexで移動コストを決める」方式を維持する。道路の描画上の接続方向に沿った移動だけを割引する方式へは変更しない。道路外との出入りにも既存のHex移動規則を使う。
+- 通行可否を先に判定する。水域などの通行不可地形、PlayerのSpawn Reserve進入禁止、その他の既存移動制約を道路で解除しない。
+- 接続道路は完成済み基礎地形へ重ねるOverlayとし、Forest / MountainをPlainへ変換しない。道路だけではUrban防御を付与せず、基礎地形の防御・LOS遮蔽を変更しない。施設やCheckpointによる既存Urban判定は維持する。
+- Supply Source、Supply Sector、幹線の支線所属、Checkpoint配置資格・候補・Fallback、避難民の入口・到着方面・経路、Wave入口・Spawn Zone・Spawn Reserveを変更しない。接続道路を新たな幹線支線として登録しない。
+- 接続道路の有無だけでは施設の建設資格を変えない。接続道路上のPlainは、Supply・占有・施設重複等の既存条件を満たせば建設可能とする。既存幹線上の建設禁止は維持する。建設後も道路は残り、施設によるUrban効果は従来どおり適用する。
+- 燃料消費式、移動力、Unit能力値、Noise、Target選択、道路優先AIは変更しない。ただし実効MPの変化による経路・実移動距離・燃料消費・接触時期の変化は許容し、7.5.13で比較する。
+- Plainは道路なしでもMP1であるため主に景観効果となる。見た目を道路に沿わせる目的で、同コスト経路の優先順位を新設・変更しない。
+- 入口やWave設定の不変と、出現後のZombieの進路・到達時期の不変を混同しない。後者は保証しない。
+
+### 7.5.3 道路の階層と生成入出力
+
+| 区分 | 役割 | 生成・描画上の扱い |
+| --- | --- | --- |
+| 幹線 `trunk` | 既存の広域流入軸 | 既存経路・支線定義を保持。最も強く表示する |
+| 地区連絡道 `collector` | 都市・施設群・幹線を結ぶ | 基本道路網を形成し、地区ごとに方向のまとまりを持たせる |
+| 施設進入路 `access` | 個別施設と道路網を結ぶ | 短い枝道。農場・生産施設・Army Baseでの行き止まりを許容する |
+
+- `collector`と`access`は生成・描画・検証用の分類であり、新たなゲーム性能の区分ではない。都市内の細街路をすべて盤面道路として敷くことはしない。
+- 生成器はCore内の純粋処理とし、地形・マップ境界・道路新設禁止区域・初期恒久施設・既存幹線・Layout Seed・道路Style設定を入力に取る。Phaser、DOM、現在のUnit、所有者、現在人口、感染、Supply状態を参照しない。
+- 出力は道路区分付きの連続Hex経路、正規化した接続辺、生成器Version、入力・設定の識別情報、および検証用の生成結果レポートとする。正本と派生情報の関係は7.5.10に従う。
+- 固定座標への依存は固定マップ側の入力作成に閉じ込める。生成器内部へ「q=25だから幹線」「特定Facility IDだけ特別な経路」といった分岐を埋め込まない。
+
+```text
+固定地形・既存幹線・29静的恒久施設
+  → 地区の抽出
+  → 地区連絡道による必須接続
+  → 個別施設の必須進入路
+  → 有効な周回路・横の連絡を予算内で追加
+  → 基本道路網を確定
+  → 既存方式で配置を決めたArmy Baseの進入路を追加
+  → 不変条件検証・保存用道路データの確定
+```
+
+### 7.5.4 地区の抽出と接続点
+
+- 州都と各地方都市を別々の地区中心とする。近接する都市を一つへ併合しない。道路用の地区はSupply Sector・幹線支線とは独立した生成上の分類であり、ゲームルールへ持ち込まない。
+- 都市から6 Hex以内の非都市施設は、到達可能な最寄り都市へ割り当てる。同距離は座標q、r、Facility IDの安定順で決める。水域・禁止区域を隔て、道路として接続できない都市への所属は認めない。
+- 都市へ割り当てられない施設は、安定順で未所属施設を起点にし、全メンバー間の最大Hex距離が6以下となる範囲で施設群にする。隣接関係の連鎖だけで長大な地区を作らない。単独施設の地区も許容する。
+- 都市地区の代表接続点は都市Hexとする。非都市の施設群では、メンバーとの距離合計が最小の施設を代表とし、その近傍の通行可能・新設可能な非施設Hexから距離合計最小の接続点を選ぶ。候補不足時は探索範囲を段階的に広げ、上限はマップ内全候補とする。同評価は座標順で決める。
+- 非都市施設の敷地を他施設への新設通過路にしない。地区道を施設群の近くへ通し、各施設へ短い進入路を付ける。都市Hexの通過と、既存幹線が元から施設Hexを通る部分は許容する。
+- 地区・施設の重要度は静的な種別に基づく。初期値は州都4、地方都市3、複数施設群2、単独施設1とし、現在人口・戦況では変えない。これは道路生成の優先度であり、施設のゲーム能力値ではない。
+
+### 7.5.5 必須接続の作成
+
+- 既存幹線を接続済みの根として、未接続の地区を順次つなぐ。最小全域木の考え方を用いたPrim法に近い貪欲接続とし、道路共用で評価が変化するため厳密な最小全域木とは称さない。
+- 各地区の近傍4地区と近隣の幹線接続点を初期候補とする。候補グラフが分断される、または実経路が作れない場合は近傍数を拡大し、最終的に全地区・利用可能な既存ネットワーク接続点を調べる。近傍4件を接続保証の前提にしない。
+- 直線距離・Hex距離は候補の絞り込みにだけ使う。採否は4.6による地形込みの実経路と生成用コストで決める。山を横断する直近の相手を先に確定してから経路を押し込まない。
+- 接続済みと未接続の間の実現可能候補のうち、生成用コストの小さいものを採用する。同コストは新設辺数、曲がり数、端点座標・ID、経路の座標列の順で決める。採用ごとに接続状況・共用コストを更新する。
+- 新設経路が先に既存ネットワークへ到達した場合、その地点で合流させる。元の目標点まで不要な並走区間を増設しない。近接する接続点は原則2 Hex以内で合流を検討し、独立した隣接交差点を乱造しない。合流までの実経路も隣接Hex列で作り、座標の飛びや描画だけの接続で代用しない。新設5方向以上の交差点になる場合は別の接続点を選ぶ。
+- 地区連絡道を確保した後、未接続の各施設を既存道路網へ最小負担の進入路でつなぐ。非都市施設は原則1本の進入路でよく、施設間を直接結ぶためだけの貫通路は作らない。
+- 必須接続は任意道路の予算では打ち切らない。すべての対象施設が幹線へ到達できたことを検証してから、任意道路の追加へ進む。
+- 幹線の根への縮約は接続判定に限る。経路評価・迂回距離の測定では幹線の実距離を使い、幹線内を距離0で移動した扱いにしない。
+
+### 7.5.6 道路生成専用の経路評価
+
+ゲーム中のMP最短経路とは別の生成用コストを使う。下表は敷設しやすさを表す無次元の重みであり、Playerが支払う建設費・移動MP・燃料消費ではない。
+
+| 通過・新設対象 | 初期コスト |
+| --- | ---: |
+| Plainへ新設 | 10 |
+| Forestへ新設 | 25 |
+| Mountainへ新設 | 80 |
+| 既存道路の接続辺を共用 | 3 |
+| 水域・マップ外・道路新設禁止区域・Spawn Reserveへの新設 | 不可 |
+
+- 土地の基礎コストに、不要な方向変更、地区の基準方向からの逸脱、既存道路直近での不要な並走への非負ペナルティを加える。既存道路の共用優遇は実際の接続辺にだけ適用し、道路Hexが隣接するだけでは共用とみなさない。
+- 方向変更の初期ペナルティは60度相当3、120度相当6とし、直前の辺への即時逆行は禁止する。地区基準方向からの逸脱は2、1 Hex以内での不要な並走は8を初期値とする。施設入口・合流のために不可欠な短い近接区間は並走罰から除く。
+- 地区の基準方向はHexの三つの対向軸から二つを選ぶ。固定マップの初期設定はq軸・r軸とし、地区単位で統一する。完全な90度格子は要求せず、Hexへの近似による細かな折れは描画で目立たなくする。毎Hexに独立した強いノイズを与えて蛇行させない。
+- 共用優遇なしで求めた同じ端点間の実現可能経路の延長を基準に、共用による大回りは原則1.5倍までとする。超過する場合は共用優遇なしで再探索する。水域や禁止区域を横断する直線を基準距離にしない。
+- 曲がりを評価する探索状態は少なくとも「Hex位置＋直前の進行方向」とする。位置だけをキーにすると異なる向きからの到達を誤って同一視するため、既存の移動用検索へ曲率ペナルティだけを追加しない。
+- 道路専用の決定的なDijkstra探索を基本とする。A*へ最適化する場合は最小コスト3を含めて下界を守る。ゲーム中のUnit経路探索の同コスト時の順序は変更しない。
+- 禁止区域は優先度を下げる対象ではなく、経路から除外する対象である。接続不能を解消するために禁止を解除したり地形を書き換えたりしない。既存幹線のSpawn Reserve内区間はそのまま維持し、追加道はReserve外で接続する。
+
+### 7.5.7 周回路・横の連絡と道路量
+
+- 必須接続後、都市・施設群・既存交差点の間で「近いが、道路上では大きく迂回する」候補を評価する。非都市施設の敷地やArmy Baseを周回路の中継点にしない。
+- 道路延長は、隣接Hexを結ぶ重複のない無向辺の数で測る。同じ区間の複数回利用、逆向き表現、複数RoadSegmentへの所属を重複計上しない。道路Hex数も補助指標として別に記録する。
+- 29静的恒久施設の必須接続で新設した辺数をBとし、任意道路の新設辺数上限を`floor(B × 0.30)`とする。既存幹線とArmy Base進入路はBに含めない。予算は使い切る目標ではなく上限であり、価値のない道を足して消化しない。
+- 候補追加の前後で、端点間の道路グラフ上の実最短距離を測る。初期採用条件は「追加前距離が追加後の1.5倍以上」かつ「3辺以上短縮」とする。距離は地形上の移動MPではなく、明示的な道路接続辺の長さである。
+- 採用条件を満たした候補を`(追加前距離 − 追加後距離) × 端点重要度の合計 ÷ 新設辺数`で評価し、高いものから採用する。新設辺数0は除外する。採用ごとに距離・予算・候補評価を更新する。同点は新設辺数の少ない順、端点座標・ID順で決める。
+- 任意接続の端点間Hex距離は、初期値で`max(6, floor(min(width, height) / 4))`以下とする。現行51×51では12 Hexとなる。地区単位の連絡を優先し、州全体を横断する別の幹線や州都を必ず囲む環状道路を作らない。
+- 追加によって6辺未満の短い閉路を作る候補、新たに5方向以上が集中する交差点、実質的な重複・不要な並走を作る候補は採用しない。新設交差点は原則3方向、上限4方向とする。既存幹線の接続形状は変更しない。
+- 農場・Army Base等の行き止まりは許容する。一方、施設にも交差点にもつながらない意味のない末端は残さない。任意道路を削減・不採用にしても必須接続を失わないよう、接続を再検証する。
+
+### 7.5.8 初期パラメータと調整の裁量
+
+| 項目 | 実装開始値・扱い |
+| --- | --- |
+| 都市への施設割当半径 | 6 Hex |
+| 都市に属さない施設群の最大直径 | 6 Hex |
+| 初期近傍候補数 | 4。接続失敗時は全候補まで拡大 |
+| 接続点の合流検討範囲 | 2 Hex |
+| 地形・共用・方向等の重み | 4.6の表とペナルティを使う |
+| 共用による迂回上限 | 優遇なしの実現可能経路延長の1.5倍 |
+| 任意道路予算 | 必須新設辺数Bの30%を上限とする |
+| 任意接続の最低効果 | 距離比1.5以上、かつ3辺以上短縮 |
+| 最短の新規閉路 | 6辺 |
+| 新設交差点の接続方向数 | 原則3、上限4 |
+| 任意接続の距離上限 | 4.7のマップ寸法連動式。現行12 Hex |
+
+これらは本書で選定した設計初期値であり、生成図・経路・難度の実測で妥当性を確認する。個々の係数、線幅、地区半径、候補数について、ユーザーに数値を個別選択させる必要はない。
+
+実装側は4.1・7.5.2の境界と7.5.13の受入条件を守り、変更前後の生成図・指標・理由を残して調整できる。任意道路予算はまず20～40%の範囲で調整する。ほかの調整で対応できないとして対象施設・MP効果・幹線・補給・建設資格等の採用方針そのものを変える場合だけ、具体的な矛盾や検証結果を添えて判断へ戻す。未測定であることだけを理由に、方式や係数を未確定事項へ差し戻さない。
+
+### 7.5.9 Army Base・Seed・生成タイミング
+
+- 基本道路網は29静的恒久施設から先に生成する。固定マップのLayout Seed初期値は0とし、Game Seedを使って基本道路網を変化させない。生成器Version初期名は`connector-roads-v1`とする。
+- Army Baseの位置は既存のGame Seedと既存の抽選処理で決め、その後に基地から基本道路網へ1本の必須進入路を追加する。すでに道路網上なら追加は不要とする。基地のために既存経路・地区・周回路を引き直さない。
+- 基地進入路は必須接続として任意道路予算から除外し、既存経路へ最初に接続した地点で終える。基地を通過して別地区へ抜ける道や、基地由来の追加周回路は作らない。
+- 道路生成は独立した乱数系列を使い、Army Base・初期Zombie・Hunter・Gas・避難民・感染・Wave用の既存RNGを消費しない。初期配置候補を道路の有無で変えない。
+- 基地進入路の再現キーは基本道路網の識別情報と基地座標とする。基地位置が同じなら異なるGame Seedでも同じ進入路となる。乱数が不要な同点処理は座標・IDの安定順で決める。
+- 生成はNew Gameのマップ初期化時に完了させる。毎Turn、Query、描画、Save読込、観戦シークでは生成し直さない。キャッシュする場合はMap IDだけでなく地形・施設・設定・Versionを含む内容識別子を使い、保持上限を設ける。
+- RNG分離は道路以外の乱数列を不要にずらさないための保証であり、道路追加後のゲーム展開をv1.5.4と同一にする保証ではない。
+
+### 7.5.10 接続データ・描画・保存
+
+- 道路の正本は、区分と安定IDを持つ連続した隣接Hex経路とする。例となる意味上の型は`RoadSegment { id, role: 'trunk' | 'collector' | 'access', path: HexCoord[] }`である。実際の型名・配置先は既存構造へ合わせてよい。
+- 正本から重複のない無向辺と六方向接続マスクを導出する。A→BとB→Aの接続が一致し、非隣接Hex・マップ外・自己辺を拒否する。派生情報も保存する場合は正本との一致を検証し、独立した二重の正本にしない。
+- 既存幹線の接続辺は`roadBranches`等の実経路から導出する。道路Hexが隣接しているという理由だけで辺を作らない。道路が同じHexで交わる場合は平面交差として接続し、今回実装しない立体交差として隠して通さない。
+- 描画は接続マスクに従う。幹線を最も太く・強く、地区連絡道を一段細く、施設進入路を控えめに表示する。同じ辺を共用する場合は幹線、地区連絡道、進入路の順で上位の見た目を使うが、幹線資格を新設道路へ伝播させない。
+- 線端・曲がりを整えてHexの細かな折れを目立たなくしてよい。ただし非道路Hexへ経路があるように見せず、描画だけで別の道を接続しない。道路表示の区分は凡例・Hex情報へ反映する。
+- 遠景では進入路を簡略化できるが、選択・経路確認時には必要な道筋を読めるようにする。道路のためにFacility / Checkpoint / Unitの表示・選択・タッチ領域を阻害しない。通常盤面と観戦で同じ描画規則を使う。
+- Save / Session / 公開Artifactには確定した道路配置と生成器Version・Layout Seed・設定識別情報を保持する。Seedだけを保存し、読み込み時の最新生成器に道路を任せる方式にはしない。Version番号そのものの一覧は第6・9章で扱う。
+- HumanとAgentの道路・実効移動情報を一致させ、道路・施設の公開範囲は既存の静的Map / FoW契約に従う。敵位置・内部Target・現在人口等を道路生成メタデータへ混入させない。
+- 対応VersionのArtifactはその記録に保存された道路を使い、現在の生成器で置き換えない。旧Versionは拒否する。破損・不一致は理由を付けて拒否し、通常State・autosaveを変更しない。
+
+### 7.5.11 現行コードへ統合する際の必須注意点
+
+以下は追記時点の実装との接続上の注意であり、新機能の実装済み宣言ではない。
+
+- `src/core/map.ts`の既存道路集合は地形生成時のPlain化と固定マップ検証にも使われている。接続道路をこの集合へ単純に足してForest / Mountainを消す変更は禁止する。基礎地形の生成後に別Overlayとして追加する。
+- `road` / `isRoad()`の参照箇所を用途別に監査する。幹線資格用と移動道路用の判定を分離し、例えば`isTrunkRoad()`と`hasMovementRoad()`に相当する責務を持たせる。既存フラグの意味を一括で「全道路」へ広げない。
+- `terrain.ts`の単体・検索用の移動コスト、移動Query、Human / Zombieの経路、UI / Agentの公開MPを同じCore規則へ統合する。タイルの基礎地形コストとOverlay適用後の実効コストを混同しない。
+- Supply、Checkpoint候補、施設建設候補、初期配置、Map検証、Save / Session信頼境界、公開Map Projectionを確認する。特に既存の「道路では建設不可」を接続道路へ誤適用しない。
+- Mapの正規化・同一性検証は「不変の基礎地形・幹線」「確定した接続道路」「Seed依存の基地進入路」を区別する。旧Mapの正規化結果をそのまま通す、または道路検証を省略して互換を装う変更はしない。
+- `src/core/path.ts`の位置ベースの検索を道路生成へ流用する場合も、方向依存コストが必要な部分は4.6の専用探索へ分離する。既存ゲーム経路のタイブレーク変更を道路実装へ混ぜない。
+
+### 7.5.12 将来のランダムマップと失敗時の扱い
+
+- 地区抽出・地区道・施設進入路を分離し、将来の生成地形・幹線・施設も同じ入力契約から渡せるようにする。本版で地形・施設配置をランダム化する必要はない。
+- 将来は「地形→都市中心・幹線→地区道→道路付近への施設配置→進入路」の順にも組み替えられる境界を保つ。現行固定配置をこの順序へ作り替えることはしない。
+- 必須接続ができない場合は、近傍候補拡大、接続点の再選択、共用・曲がり等の美観上の優遇を外した再探索の順に有限回で試す。それでも不可能なら、対象施設・遮断条件・探索結果を含む生成エラーを返す。接続済みと偽って道路のない施設を残さない。
+- 固定マップと全Army Base候補はリリース前に接続成功を必須とする。実行時に失敗した場合は理由を表示して新規開始を止め、既存Saveを維持する。失敗した部分道路だけでゲームを開始しない。
+- 将来のランダムマップで必須接続に失敗した場合は上位の施設配置・マップ生成側へ差し戻す。上位側が上限付き・決定的な再配置または再生成を行う。道路生成器が水域・禁止区域を解除したり、無限再試行したりしない。
+- 任意道路の候補が成立しない場合は単に不採用とする。任意予算を使い切れないことだけでは生成失敗にしない。
+
+### 7.5.13 道路の受入条件と検証証跡
+
+**構造・決定性**
+
+- 全29静的恒久施設とArmy Baseが、明示的な道路接続辺を通って既存幹線へ到達できる。全Army Base候補位置を網羅して検証する。
+- 追加経路は連続・範囲内で、新設禁止区域・水域・Spawn Reserveを踏まない。接続マスクが双方向で一致し、隣接しているだけの別道路が勝手につながらない。
+- 道路区分、総延長、必須・任意別新設辺数、幹線共有率、地形別通過数、交差点次数、行き止まり数、閉路・迂回改善をレポートへ記録する。新設5方向交差点、短すぎる閉路、無意味な孤立末端を残さない。
+- 同一入力・設定・Version・Layout Seedから正規化道路データとhashが一致する。入力配列を並べ替えても同じ結果になるよう安定順を固定する。`Math.random()`、日時、描画順へ依存しない。
+- Game Seedを変えても基本道路網は同一であり、基地位置が同じなら基地進入路も同一となる。基地位置変更では基本道路網の辺・区分が変わらない。道路処理による既存RNGの追加消費が0であることを確認する。
+- 切断地形、端点候補不足、任意予算0等の小さな合成Mapで、失敗・不採用・候補拡大を試験する。ランダムマップ機能の実装はこの試験の条件にしない。
+
+**既存ルールの保全**
+
+- 同一地形・施設・Unit・Checkpoint状態で道路Overlayだけを切り替え、Supply、支線所属、Checkpoint候補・理由、施設建設候補、防御、LOS、入口・Spawn Zone・Reserveが一致する。
+- Plain / Forest / Mountain上の接続道路でHuman / 通常Zombie / 特殊Zombie / Hordeの実効MPが1となる。非道路は従来の地形コストのままで、Player Reserve進入禁止・水域禁止を解除しない。
+- 接続道路上のPlainへの合法建設と、幹線・占有・Supply等による従来の不許可をそれぞれ試験する。道路方向に沿わない出入りも7.5.2の進入先Hex規則と一致する。
+- UI / Agent / Coreの実効移動情報、Save Round Trip、Session再開、検証Replay、公開Artifact観戦の道路表示が一致する。
+
+**景観・性能・間接的難度**
+
+- 同じ基礎マップを「追加道路なし」「必須接続のみ」「任意道路込み」の3段階で可視化する。地形、施設、道路区分、基地進入路、禁止区域を識別できる検証図を残す。
+- 都市・施設群では道がまとまり、地区間に余白があり、すべての施設を周回路へ押し込んでいないことを確認する。全域の道路Hex率だけで合否を決めない。地図画像・測定値が未作成の時点では、景観確認済みと記載しない。
+- 住宅・AI変更をそろえた同一条件で3段階を比較し、主要施設間の到達MP・経路長・燃料消費、Waveから州都・主要防衛点への接触時期、Hunterの到達範囲を記録する。1戦の勝敗だけで難度を断定しない。
+- Forest / Mountainを横切る追加道路を一覧化し、著しい短絡がある場合は経路重み、任意道路、または明示的な道路新設禁止区域で調整する。禁止区域は入力データとして理由付きで保持し、生成器内の座標例外にしない。
+- New Game生成時間、道路データ量、道路描画による負荷を測定する。毎Turn・Query・パン・ズームで再探索せず、PCとモバイル相当viewportで施設・Unit・Checkpointの可読性と選択を確認する。実機未測定の場合は実機性能を保証しない。
+- 最終採用した設定、生成図、正規化道路hash、全基地候補の接続結果、3段階比較の結果を検証用fixture・レポートへ残す。具体的な生成座標やhashを要件確定時点で捏造しない。
+
 
 # 8. ユニット・戦闘
 
@@ -660,7 +967,7 @@ Human Unitは次のプレイヤーターン開始時、判定時に補給圏内�
 | Simple Farm | none | 0 | — | 食料5 / worker |
 | Power Plant | none | 0 | — | 燃料2で電力5（物理Capacity 15 / worker） |
 | Wind Power Plant | none | 0 | — | Electricity 15 |
-| Temporary Housing | required | 5 | 居住者がいれば追加維持費 | 資源出力なし |
+| Temporary Housing | required | 5 | 居住者がいれば追加維持費 | 条件付きでCivilian Goods最大5 |
 
 ## 10.2 同ターン生産と備蓄原則
 
@@ -811,11 +1118,11 @@ EndTurn の順序を次のようにする。
 ### 10.13.1 基本
 
 - 新 Constructible Facility `temporaryHousing` を追加する。
-- 建設費: Civilian Goods 50
+- 建設費: Civilian Goods 25
 - 電力需要: 5
 - Soft Capacity: 10
 - 建設上限: なし
-- Civilian Goods output: なし
+- Civilian Goods output: 正常稼働・Supply内・給電中・感染者0のとき、住宅ごとに `floor(min(健常住民,10) × 0.5)`。0/1人は0、2人は1、9人は4、10人以上は5。完成前は生産せず、通常経済処理の順序で当ターン維持費へ利用する。
 - Recruitment Hub 能力: なし
 - Unit recruitment / production action は提供しない。
 - Player-built Temporary Housing 自身は recruitment hub ではないが、Supply 内の健常住民は既存の共通 population pool に参加し、Capital 等の合法 Recruitment Hub での人口 cost に利用可能。
@@ -823,7 +1130,7 @@ EndTurn の順序を次のようにする。
 ### 10.13.2 建設
 
 - Plain + Supply 上のみ建設可。
-- 既存 Constructible の禁止条件をすべて維持する。Road / Entrance / Reserve / existing Facility / Checkpoint / Player Unit / visible Zombie 等がある Hex は不可。
+- 既存 Constructible の禁止条件をすべて維持する。幹線Road / Entrance / Reserve / existing Facility / Checkpoint / Player Unit / visible Zombie 等がある Hex は不可。
 - Hidden Zombie は既存 public legality の扱いを維持する。
 - 建設 Turn は `building` で効果なし。次 Player Turn Start に Operational 化する。
 - Operational 化した Turn から Capacity / population function / Power Demand が有効になる。
@@ -919,6 +1226,12 @@ Power allocation priority は次のとおり。
 - Supply 接続は不要。
 - 1 Player Action を消費。
 - Refund 0。
+
+### 10.13.12 民需品生産とMetrics
+
+正常稼働・Supply内・給電中・感染者0の全条件で、健常住民10人まで×0.5を住宅ごとに切り捨てて生産する。感染者が残る間は健常者がいても停止する。生産は既存経済フェーズのみで実行し、感染解消直後の即時生産は行わない。給電順位・通常維持費・過密・追加停電維持費は維持する。満員住宅でも通常民需品維持費10に対し生産は5であり、食料・電力を別途必要とする。
+
+公開統計は `housingBuilt`、`housingResidentTurns`（健常住民の累積人ターン）、`housingCivilianGoodsProduced`、`housingOutageFacilityTurns`（棟ターン）。Metricsの `housingResidentsFinal` は終局時点の健常住民数であり、累積値と区別する。
 
 ## 10.14 次ターン過密・住宅停電予測
 
@@ -1135,7 +1448,7 @@ Zombie陣営は`zombie`、`hordeZombie`、`policeZombie`、`soldierZombie`、`ri
 - 51x51 Map の外周 2 rows / columns を Horde Spawn Reserve とする。
 - Reserve は Player Unit の進入・建設を禁止する。
 - 2列 Reserve 全体を Scheduled Horde 専用にはしない。Initial Zombie、facility fall、Noise Respawn 等は各既存 Spawn rule を維持し、合法なら Reserve 上へ Spawn し得る。
-- このReserveとDirection Spawn Zoneを含むMap IDは`fixed-51x51-v3`とする。
+- このReserveとDirection Spawn Zoneを含むMap IDは`fixed-51x51-v4`とする。
 
 ### 13.3.2 Directionごとの22 Hex Spawn Zone
 
@@ -1367,9 +1680,9 @@ ZOMBIE TURN / INFECTION
 - 初期および直前の完全Snapshotから50 Decision経過ごとに完全公開Snapshotを置き、その間は保存用の完全lossless diffと小さなDecision記録を積む。固定Map参照、圧縮、Content-Addressed Store（CAS）による内容Hash重複排除、chunk分割を併用し、Traceの1行にObservation／合法手全文を戻さない。履歴全体の復元済みObservation配列を通常経路で保持しない。
 - 各Decisionは前Decision hashを含むcanonical JSONのSHA-256でchain化する。参照先Payload、Snapshot、commit、Version、Build ID、Map、公開Configの不一致・破損を状態不変で拒否し、Active破損時に暗黙の巻き戻しをしない。大きなTrace、Snapshot、Artifactはstreamと上限付き作業バッファで処理し、全履歴を単一文字列化または一括JSON化しない。
 - 更新は新しいimmutable generationへPrivate／Public StateとDecisionを書き、最後にActive commitを確定する。Session単位の排他lockを使い、同時更新は状態不変で拒否し、同一hostで終了済みPIDのlockだけをstaleとして回収する。
-- 既定で5完了Turnごと、手動要求時、Game Over時にCheckpointを作る。Checkpoint／Session Schemaは`7.0.0`で、immutableな`branchBase`を必須とする。Rootはnull、子は`rootSessionId`、`parentSessionId`、`parentCheckpointId`、`baseDecision`、`baseTraceHeadHash`、`basePublicSnapshotHash`、`ancestorManifestHash`を持つ。`load-checkpoint`は新Session IDへ分岐し、親Sessionと親Checkpointを変更しない。
+- 既定で5完了Turnごと、手動要求時、Game Over時にCheckpointを作る。Checkpoint／Session Schemaは`8.0.0`で、immutableな`branchBase`を必須とする。Rootはnull、子は`rootSessionId`、`parentSessionId`、`parentCheckpointId`、`baseDecision`、`baseTraceHeadHash`、`basePublicSnapshotHash`、`ancestorManifestHash`を持つ。`load-checkpoint`は新Session IDへ分岐し、親Sessionと親Checkpointを変更しない。
 - RootのDecision chainはDecision 0／ZERO_HASHから始め、子のlocal chainは`baseDecision + 1`と`baseTraceHeadHash`から始める。RootのStore Manifestは共有Payload Poolと祖先履歴範囲を定義し、子へ祖先の展開済みObservation／Decision全文を複製しない。完全Artifactは分岐点までの祖先履歴と子の履歴を必要なPayload各1回で梱包する。
-- `.git`を含まないPortable PackageでもWorkflowから注入したfull commit SHAをBuild IDとGit Commitとして固定し、別Buildまたはv1.5.3以前のSession／Checkpointを拒否する。Portable PackageはLinux／Windows x64のBundled Nodeだけで既存8コマンドとJSONL `play-turn`のSmokeを行い、公開Observation／Legal Actionsだけを使う外部AI Seed 1／7 Game Over・Artifact・Replay一致を確認する。
+- `.git`を含まないPortable PackageでもWorkflowから注入したfull commit SHAをBuild IDとGit Commitとして固定し、別Buildまたはv1.5.4以前のSession／Checkpointを拒否する。Portable PackageはLinux／Windows x64のBundled Nodeだけで既存8コマンドとJSONL `play-turn`のSmokeを行い、公開Observation／Legal Actionsだけを使う外部AI Seed 1／7 Game Over・Artifact・Replay一致を確認する。
 
 ---
 
@@ -1382,10 +1695,10 @@ ZOMBIE TURN / INFECTION
 - 同内容をJSONファイルで入出力できる。
 - Version不一致、破損、不正Config、不変条件違反を検出し、現在状態へ適用しない。
 - ロード後は保存時Configを使う。
-- v1.5.4はGame Rules / GameState / Config `6.0.0`、Fixed Map `fixed-51x51-v3`、Save Format `13`を使う。
-- v1.5.3以前の自動保存、セーブコード、JSON Save、AI Replay、Artifact、Session、Checkpointは変換・移行しない。Version不一致は現在Stateを変更せず、日本語・英語の理由付きで拒否する。旧autosave keyは読み取り確認だけを行って上書き・削除せず、新規ゲームはautosave key `nowhere-left-to-hide:auto-save:v13`を使う。
-- Save 13は51×51 Map、静的29施設とSeedで決まるArmy Base 1基、Temporary Housingと建設Wind、Seed付き初期Normal Zombie 25体、Hunter 1～4体、Gas 1～2体と配置metadata、Reserve／Direction Spawn Zone、Unit熟練度／昇格Counter／Attack Charge／Fuel／軍需、Army Base専用軍需・迎撃残回数・報酬・予約`powerReady`、特殊Horde Slot／Weight／Cap／provenance、Frozen Roster／出現済み数／Pending Spawn、Horde最大Charge 2、Warning／Wave／Final Group、RNG、Rejected Counter、Zombie Target／`waveCapitalAnchor`／`previousFallbackPosition`／`fallbackTarget`、`pendingNoisePulses`、拠点感染者Pool、Noise／Reanimation／Gas爆発結果、Event、Statisticsを完全に検証する。Forecast、Crisis Summary、EndTurn Risk、Supply、Visibility等の導出値は保存せず再計算する。必須のv1.5.4 metadataやVersion値を旧値で黙って補わない。
-- Artifact Schema `10.0.0`は固定Map情報をゲーム単位で1回だけ保存し、Turn Observation Traceでは`mapId`から参照する。Public Decision Log、受理Action列、不正試行、公開Observation／Event、Metrics、Seed、公開Config、Version、Build ID、Session lineageを欠落させず、保存用lossless diffから各Decisionの前後情報を完全に読み出せるようにする。Artifactはstreamでファイル／Packageへ書き、標準出力には小さなManifestだけを返す。Player-facing Artifact／ReplayはWaveの公開人数とPendingを保持するが、Rejected Counter、拒絶人数の由来、正確なBonus Type内訳、Hidden Noise情報を残さない。
+- v1.5.5はGame Rules / GameState / Config `7.0.0`、Fixed Map `fixed-51x51-v4`、Save Format `14`を使う。
+- v1.5.4以前の自動保存、セーブコード、JSON Save、AI Replay、Artifact、Session、Checkpointは変換・移行しない。Version不一致は現在Stateを変更せず、日本語・英語の理由付きで拒否する。旧autosave keyは読み取り確認だけを行って上書き・削除せず、新規ゲームはautosave key `nowhere-left-to-hide:auto-save:v14`を使う。
+- Save 14は51×51 Map、静的29施設とSeedで決まるArmy Base 1基、Temporary Housingと建設Wind、Seed付き初期Normal Zombie 25体、Hunter 1～4体、Gas 1～2体と配置metadata、Reserve／Direction Spawn Zone、Unit熟練度／昇格Counter／Attack Charge／Fuel／軍需、Army Base専用軍需・迎撃残回数・報酬・予約`powerReady`、特殊Horde Slot／Weight／Cap／provenance、Frozen Roster／出現済み数／Pending Spawn、Horde最大Charge 2、Warning／Wave／Final Group、RNG、Rejected Counter、Zombie Target／`waveCapitalAnchor`／`previousFallbackPosition`／`fallbackTarget`、`pendingNoisePulses`、拠点感染者Pool、Noise／Reanimation／Gas爆発結果、Event、Statisticsを完全に検証する。Forecast、Crisis Summary、EndTurn Risk、Supply、Visibility等の導出値は保存せず再計算する。必須のv1.5.4 metadataやVersion値を旧値で黙って補わない。
+- Artifact Schema `11.0.0`は固定Map情報をゲーム単位で1回だけ保存し、Turn Observation Traceでは`mapId`から参照する。Public Decision Log、受理Action列、不正試行、公開Observation／Event、Metrics、Seed、公開Config、Version、Build ID、Session lineageを欠落させず、保存用lossless diffから各Decisionの前後情報を完全に読み出せるようにする。Artifactはstreamでファイル／Packageへ書き、標準出力には小さなManifestだけを返す。Player-facing Artifact／ReplayはWaveの公開人数とPendingを保持するが、Rejected Counter、拒絶人数の由来、正確なBonus Type内訳、Hidden Noise情報を残さない。
 - Player-facing ReplayにはFoWを適用し、Browser BridgeのArtifactへ内部情報を含めない。Browser Bridge ArtifactのConfigは公開情報だけを含む。ローカル／CI Runnerの完全な検証Artifactだけが`verificationEvents`、完全Config、Internal Event列を保持し、Replay時に一致確認する。Live Observation、`query`のFull Snapshot、Browser Bridgeは完全な公開情報へ明示的にアクセスでき、公開情報を参照差分だけに制限しない。
 
 ---
@@ -1479,9 +1792,9 @@ Session Metricsはゲーム成績と分離し、Active Session復帰、手動／
 - Combat Noiseによる陥落拠点のID安定順再Spawn、未生成感染者保持、後続Pulse再試行、即時感染／連鎖、Hidden Spawn個体情報の非公開、最新50件の重要イベント履歴とToast集約を試験する。
 - Production UI／Agent API／公開Event／終了結果／Browser Bridge ArtifactがNoise Classだけを公開し、正確Radius、反応Hidden ZombieのID／数、Noise Target、Hidden Noise Metricsを漏らさないこと。Development Buildの読み取り専用診断だけが正確なCenter／Radius／範囲／反応／Targetを確認できること。
 - Scheduled Waveの規模・Timing・22 Hex Direction Zone、roster freeze、oldest-first Pending、batch分散、Spawn次Turn行動、特殊Type provenance、Turn 50後の継続、Final Pending 0かつMap上Final所属Zombie 0のVictory、非Final Zombie／感染の非ゲート化、Defeat優先、Runner 100 Turn到達の`limit_reached`分類
-- 勝利・即時敗北、v1.5.4 Save Format 13の保存・復元、v1.5.3以前の通常SaveおよびAI Replay／Artifact／Session／Checkpointの状態不変な拒否
+- 勝利・即時敗北、v1.5.5 Save Format 14の保存・復元、v1.5.4以前の通常SaveおよびAI Replay／Artifact／Session／Checkpointの状態不変な拒否
 - UI数値入力とスライダー同期
-- 51×51固定Map `fixed-51x51-v3`、外周2列392 HexのReserve、方向別22 Hex Spawn Zone、静的29恒久FacilityとSeed固定Army Base 1基、初期Unit、初期Normal Zombie 25体・Hunter 1～4体・Gas 1～2体のSeed付き決定配置・非重複・Normal／Gas Distance 9以上・Hunter Distance 20以上・PRNG順、Terrain生成順、4支線距離25、建設用Plain候補
+- 51×51固定Map `fixed-51x51-v4`、外周2列392 HexのReserve、方向別22 Hex Spawn Zone、静的29恒久FacilityとSeed固定Army Base 1基、初期Unit、初期Normal Zombie 25体・Hunter 1～4体・Gas 1～2体のSeed付き決定配置・非重複・Normal／Gas Distance 9以上・Hunter Distance 20以上・PRNG順、Terrain生成順、4支線距離25、建設用Plain候補
 - Police Movement Budget 15／National Guard・Riot Police 10、Type別Fuel表、Fuel不足拒否、Hidden Enemy途中停止、発電後Round Robin補給、新Unit有償補給、死亡時Fuel喪失
 - Police・Riot Police 5／National Guard 20の携行軍需、固定消費、補充、距離別Combat Cost、軍需0弱体、National Guard距離2拒否、残Charge鎮圧／封じ込め、死亡時喪失
 - Fuel 0でだけ使えるPolice 3 MP／National Guard・Riot Police 2 MPのEmergency Movement、Terrain実効Cost、Hidden Enemy途中停止、補給圏帰還、Fuel非消費
@@ -1569,7 +1882,7 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - Random／Balancedの同一Seed比較、決定性、JSON／CSV／通常モードのゲーム単位Artifact、`--summary-only`のコンパクト出力、失敗継続、fail-fast、Replay一致を試験する。
 - Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
 - 公開Pagesでは公開Observation／Legal Actionsだけを読むブラウザ操作可能な外部Agentを使い、API発見、不正Action訂正、Seed 1と7のGame Over、Result／Artifact取得とReplayを手動E2E確認する。PagesのWorkflow成功を必須とし、個別ゲームの勝利は合格条件にしない。
-- v1.5.4 Release ValidationはVersion Metadata、Rules／Map／Save拒否、Reserve／Direction Zone、Frozen Roster／Pending Spawn、Rejected Bonus、Final Victory、Zombie fallback、Temporary Housing、Wind、電力／予測の固定fixture、同Version Replay／Session決定性を確認する。Pages deploy成功後、独立したAI Portable Package Workflowを確認する。Linux／Windows x64 ZIPはCommit SHA・App・Node Versionを記録し、Bundled Nodeで既存8コマンド、JSONL play-turn、外部AI Seed 1／7のGame Over・Artifact・Replay一致を検証する。公開Pages／Portable結果は確認前に成功済みと扱わない。既存v1.5.3以前の性能証跡は履歴の測定記録として保持し、v1.5.4の結果一致ゲートにはしない。SOG05は実測がないため、PC・モバイルviewportの確認結果と混同しない。
+- v1.5.4 Release ValidationはVersion Metadata、Rules／Map／Save拒否、Reserve／Direction Zone、Frozen Roster／Pending Spawn、Rejected Bonus、Final Victory、Zombie fallback、Temporary Housing、Wind、電力／予測の固定fixture、同Version Replay／Session決定性を確認する。Pages deploy成功後、独立したAI Portable Package Workflowを確認する。Linux／Windows x64 ZIPはCommit SHA・App・Node Versionを記録し、Bundled Nodeで既存8コマンド、JSONL play-turn、外部AI Seed 1／7のGame Over・Artifact・Replay一致を検証する。公開Pages／Portable結果は確認前に成功済みと扱わない。既存v1.5.4以前の性能証跡は履歴の測定記録として保持し、v1.5.4の結果一致ゲートにはしない。SOG05は実測がないため、PC・モバイルviewportの確認結果と混同しない。
 
 ---
 
@@ -1578,17 +1891,17 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 1. PC Chromeと390×844相当のスマートフォン縦向きで、51×51盤面、主要Action、3段階Bottom Sheet、対象別Panel、Unit編成Accordion、未選択Accordion、上部資源Accordionを利用できる。
 2. 初期Regular、新規Recruit、5 Turn生存のRegular化、直接Kill 5体のVeteran化、Veteran 2 Attack ChargeとWait保持がCore、UI、Agent、Save、Replayで一致する。
 3. 全Zombieの足止め・隣接攻撃、混雑時fallback、直前Hexへの即時帰還禁止、Gas Zombieの死亡爆発／連鎖、Hunterの服装Assetと既存性能がCore、UI、Agent、Save、Replayで一致する。
-4. `fixed-51x51-v3`の外周2列Reserveと方向別22 Hex Spawn Zone、静的29施設とSeed固定Army Base 1基、Worker視界・人口敗北例外・早期報酬・都市限定州兵予約・編成電力・迎撃・専用軍需が決定的に機能する。
+4. `fixed-51x51-v4`の外周2列Reserveと方向別22 Hex Spawn Zone、静的29施設とSeed固定Army Base 1基、Worker視界・人口敗北例外・早期報酬・都市限定州兵予約・編成電力・迎撃・専用軍需が決定的に機能する。
 5. 固定Wave Turn 5 / 10 / 20 / 35 / 50、roster freeze、oldest-first Pending Spawn、Horde batch分散、Gasを含む6種Normal AI系Zombie、Base後に同じweighted tableとDirection別Capを共有するRejected Bonusが決定的に機能する。Human／AIは基礎人数、Bonus込み確定人数、出現済み人数、Pending人数を確認できる。
 6. Human Combat、Horde移動、Army Base迎撃のNoise、pendingの次Zombie Phase評価、Windの同EndTurn snapshot前Noise、最短Pulse再選択、Radius内陥落拠点即時再Spawnが決定的に機能する。
 7. Final roster freeze後は自然到着とRejected Counter加算を終了し、Final Pending 0かつMap上のFinal roster所属Zombie 0で勝利する。非Final Zombieや感染は勝利ゲートにせず、各判定では敗北を優先する。
 8. Temporary Housingの建設、City-like人口、通常City優先の受入、Supply切断、occupied／empty電力Tier、停電追加維持費、感染時消滅、撤去が機能する。Overcrowdingと住宅停電を通常維持費から独立計算し、確定済み建設・審査結果だけを含む次ターン予測が受理mutation後に更新される。
 9. 初期／建設WindがFuelなしで15発電し、Supply外でも稼働とNoiseを継続する。Power PlantはWind不足の実割当電力5ごとにTurn-start Fuel 2を使い、Fuel 1で部分発電せず、HousingとBaseを含む優先順位がForecast／EndTurnで一致する。避難民は各到着10..20人である。
 10. Core由来Crisis SummaryとEndTurn RiskをHuman UI／Agentで共有し、UIは段階表示、Agentは全件構造化を維持する。FoWはGas・Army Base・Wind・Horde EventでもHidden情報を漏らさない。
-11. Save Format 13のautosave v13、セーブコード、JSON復元、Artifact 10.0.0、Session／Checkpoint 7.0.0がHousing、建設Wind、Frozen Roster／Pending Spawn、fallback履歴、Gas、Army Base、pending Noiseを再現する。v1.5.3以前の通常SaveとAIデータは状態不変で拒否し、新metadataを旧値で補わない。
+11. Save Format 14のautosave v14、セーブコード、JSON復元、Artifact 10.0.0、Session／Checkpoint 7.0.0がHousing、建設Wind、Frozen Roster／Pending Spawn、fallback履歴、Gas、Army Base、pending Noiseを再現する。v1.5.4以前の通常SaveとAIデータは状態不変で拒否し、新metadataを旧値で補わない。
 12. AI Portableの8コマンド、Compact／`query`、Public Decision Log、State Delta、保存用lossless diff、chunk／圧縮／内容Hash参照、stream出力、hash chain、`branchBase`付きCheckpoint分岐、外部AI Seed 1／7 Game Over・Artifact・Replay一致をBundled Nodeだけで完遂する。
-13. App `1.5.4`、Rules／State／Config `6.0.0`、Map `fixed-51x51-v3`、Save `13`、Agent／Observation／Bridge `11.0.0`、Artifact `10.0.0`、Session／Checkpoint `7.0.0`、Balanced `6.0.0`、Random `4.0.0`の境界が整合する。
-14. Headless、Unit／UI／Replay／Sessionテストを通過し、100 Turn到達を`limit_reached`として別分類する。同Versionの決定性を検証し、旧v1.5.3以前との比較を結果一致ゲートにしない。
+13. App `1.5.4`、Rules／State／Config `7.0.0`、Map `fixed-51x51-v4`、Save `13`、Agent／Observation／Bridge `12.0.0`、Artifact `11.0.0`、Session／Checkpoint `7.0.0`、Balanced `7.0.0`、Random `5.0.0`の境界が整合する。
+14. Headless、Unit／UI／Replay／Sessionテストを通過し、100 Turn到達を`limit_reached`として別分類する。同Versionの決定性を検証し、旧v1.5.4以前との比較を結果一致ゲートにしない。
 15. Waterを除く256×256透過PNG、10 Unit、Army Base、Temporary Housingを含むUI専用Registry、一括Preload、個別Fallback、LOD、Board Legendが機能し、Runtime PNG合計が3 MiB以下である。
 16. GitHub Actionsでテスト・本番Build・GitHub Pages公開を確認し、Pages上のHuman UIと`window.NLTH`を実ブラウザで検証する。
 17. PagesとAI Portable Package Workflowを検証する。公開結果が未確認の間は、実装・ローカル検証済みであっても公開成功済みと扱わない。
@@ -1613,3 +1926,15 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - ローカルAI Portableは同じSeed 1／7について、バンドル済みSession CLIをローカルNodeで実行し、プロセス間継続、Game Over、Artifact取得、Replay一致を確認した。Runtime同梱配布物は対象CommitのWorkflowで別途検証する。
 - PC 1280×720・モバイル相当390×844で住宅画像と詳細、電力・独立Penalty、建設Windの確定予測、Final基本52／確定67／出現済39／Pending28の表示、日英Help、Save復元を確認した。ブラウザconsole errorは0件だった。
 - 対象CommitのGitHub PagesとAI Portable Package結果はGitHub Actionsで確認する。長時間のその他Jobは起動とJob開始までを確認対象とし、完了未確認のJobを成功済みと扱わない。
+
+## 18.3 v1.5.5 検証状況と実装上の制約
+
+- 型検査・本番Build成功。長時間Balancedを除く回帰658件成功後、計測テスト1件の不要なゲーム実行を初期状態生成へ修正し、関連89件の再検証が成功した。長時間Batchは別Workflowで確認する。
+- Gas即時連鎖は実Core AttackとのHP・感染一致、Hidden Enemy変更時の公開予測不変、非致死時の爆発なしを確認した。人口移送は列挙されない合法整数7人を受理し、0・小数は状態不変で拒否する。建設の種類・合法・供給・座標絞込とRevision拒否を確認した。
+- ZIPは拒否Decision、分岐履歴、別Build ID、破損、中止、50 MB超の有効コンテナを検証した。50 MB試験は公開追加ファイルを含むコンテナであり、長大な展開Observationの測定と混同しない。
+- ブラウザ390×844で観戦の0.5/1/2/4倍、シーク、存在しないTurnの拒否、末尾停止、ログ保持とlocalStorage不変を確認した。3秒コメントの実操作込み待ち時間は6,327/3,260/1,744/988ms。物理スマートフォンは未計測。
+- 道路の設定・全基地候補hash・3段階MP/経路長/Fuel/Hunter到達範囲・接触ターンの静的推定は `src/testing/fixtures/v155-roads.json`、図は同ディレクトリの `v155-roads-none/required/optional.svg`。必須142辺、任意込み147辺、閉路数0→1。全4基地候補が幹線へ接続する。接触ターンは無妨害の移動予算推定であり、戦闘結果や勝率を保証しない。
+- 観戦はv1.5.5対応。ZIPのNDJSONは非圧縮格納を必要とし、配布CLIのZIPを用いる。ZIP64、分割、暗号化は非対応。論理Payload64 MiB、1行4 MiB、中央ディレクトリ32 MiB、100万Decision、Snapshot Cache16 MiBを上限とする。全体50 MB超だけでは拒否しない。ブラウザの作業メモリ不足は別の再生不能条件となる。
+- 内部展開bytesと累積Observation読込bytesは再読込を含む計測値として区別する。1,000判断・物理512 MiB超の耐久検証はGitHubの専用Jobで、同じ観戦Readerの読込・シーク・中止も検証する。長時間Workflowは開始確認までとし、結果未確認を成功済みとは扱わない。
+- GitHub PagesとLinux/Windows AI Portableの対象Commitでの結果は、公開後にGitHub Actionsおよび実ブラウザで確認する。
+- 今回の指示により確定要件をDoc直下に残し、Doc/archive内の履歴資料は参照・編集していない。

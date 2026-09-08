@@ -37,7 +37,7 @@ function observation(state: RuntimeState): AgentObservation {
     population: { healthyCivilians: 1, cityResidents: 1, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
     facilities: [], units: state.unitPresent ? [unit] as never : [],
     zombies: state.enemy ? [{ id: 'enemy-1', type: 'zombie', unitType: 'zombie', position: { q: 1, r: 0 }, hp: 10, maxHp: 10 }] as never : [],
-    checkpoints: [], importantSiteEvents: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [], roadBranches: [],
+    checkpoints: [], importantSiteEvents: [], populationTransferCandidates: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [], roadBranches: [],
     supply: { initialRadius: 0, suppliedTileKeys: ['0,0'], branchRadii: [] },
     horde: { warningType: 'none', warningDirections: [], nextWaveIndex: null, nextWave: null, spawnTurn: null, finalHordeStatus: 'notStarted', turnsRemaining: 0, nextSpawnTurn: null, waves: [], waveTotals: [], finalPendingCount: 0 },
     victory: { finalHordeDefeated: false, suppliedAreaZombieClear: !state.enemy, suppliedAreaInfectionClear: true },

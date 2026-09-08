@@ -18,9 +18,9 @@ import type { GameState, JsonValue } from '../core/types';
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 13;
+export const SAVE_FORMAT_VERSION = 14;
 /** v1.5.4 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v13';
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v14';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
 export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v12';
 const OLDER_AUTOSAVE_KEYS = [
@@ -306,6 +306,7 @@ const STATISTIC_INTEGER_FIELDS = [
   'hunterZombiesSpawned',
   'riotZombiesKilled',
   'hunterZombiesKilled',
+  'housingBuilt', 'housingResidentTurns', 'housingCivilianGoodsProduced', 'housingOutageFacilityTurns',
   'gasZombiesKilled', 'gasZombiesSpawned', 'gasExplosions', 'gasExplosionUnitDamage',
   'riotPoliceReanimations',
   'hordeMovementNoisePulses',
@@ -495,7 +496,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.5.2 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.5.4 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {

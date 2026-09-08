@@ -55,7 +55,7 @@ describe('v1.5.4 engine integration', () => {
     expect(built.state.facilities.find((facility) => facility.id === housingId)).toMatchObject({
       type: 'temporaryHousing', operationalStatus: 'building', workers: 0, infected: 0,
     });
-    expect(built.state.resources.civilianGoods).toBe(beforeBuild - 50);
+    expect(built.state.resources.civilianGoods).toBe(beforeBuild - 25);
 
     const nextTurn = engine.step({ type: 'EndTurn' });
     expect(nextTurn.error).toBeNull();

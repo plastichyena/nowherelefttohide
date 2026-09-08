@@ -259,6 +259,22 @@ export function createPublicUnitProjection(
   };
 }
 
+export function facilityRecoveryProjection(state: Readonly<GameState>, facility: FacilityState) {
+  const visible = getPlayerVisibleTileKeys(state);
+  const enemies = state.units.some(u => !u.isPlayerUnit && visible.has(hexKey(u.position)) && hexKey(u.position) === hexKey(facility.position));
+  const needed: string[] = [];
+  if (facility.infected > 0) needed.push('suppress_infection');
+  if (enemies) needed.push('clear_visible_enemy');
+  if (facility.owner !== 'player' || facility.operationalStatus === 'disabled') needed.push('station_human_unit');
+  if (facility.operationalStatus === 'recovering' || facility.operationalStatus === 'building' || facility.populationOperationalTurn > state.turn) needed.push('wait_until_operational');
+  const recoverable = !(facility.constructible && facility.status === 'ruined');
+  const productionRequirements: string[] = [];
+  if (facility.workers === 0 && facility.type !== 'windPowerPlant') productionRequirements.push('healthy_population');
+  if (facility.type === 'temporaryHousing' && !isHexSupplied(state, facility.position)) productionRequirements.push('supply');
+  if (state.config.facilities[facility.type].production.powerMode === 'required') productionRequirements.push('allocated_power');
+  return { recoverable, status: !recoverable ? 'cannot_recover' : needed.length ? 'conditions_required' : 'ready', missingConditions: needed, scheduledOperationalTurn: facility.recoveryOperationalTurn, productionRequirements, terrainDefense: { source: 'urban', multiplier: state.config.terrain.damageMultiplier.urban, reason: 'facility_urban_overlay' } };
+}
+
 /** Project one public facility using the shared facility forecast map. */
 export function createPublicFacilityProjection(
   facility: FacilityState,
@@ -291,6 +307,7 @@ export function createPublicFacilityProjection(
   const estimatedOutputs = productionProjection?.outputs ?? multiplyResources(rule.outputs, currentWorkers);
   const stoppedReason = productionProjection ? productionProjection.stoppedReason : 'stopped';
   return {
+    recovery: facilityRecoveryProjection(state, facility),
     armyBase: armyBaseProjection(state, facility, productionProjection),
     id: facility.id,
     type: facility.type,
@@ -399,6 +416,7 @@ export function createPublicCheckpointProjection(
     terrainLosBlocking: true,
     status: checkpoint.status,
     role,
+    turnAwayPreview: { waitingOnly: true, maxPeople: checkpoint.waiting, foodMaintenanceReduction: checkpoint.waiting * state.config.economy.populationConsumption.food, civilianGoodsMaintenanceReduction: checkpoint.waiting * state.config.economy.populationConsumption.civilianGoods, additionalPenalties: 'recalculated_after_action', futureWaveRisk: state.horde.finalHordeStatus === 'notStarted' },
     waiting: checkpoint.waiting,
     screening: checkpoint.screening,
     approved: checkpoint.approved,

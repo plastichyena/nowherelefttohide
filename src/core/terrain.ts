@@ -1,3 +1,4 @@
+import { roadConnections } from './roads';
 import { hexKey } from './hex';
 import { createMapReference, getTile } from './map-reference';
 import type { MovementCostResolver } from './path';
@@ -7,6 +8,15 @@ import type {
   TerrainDefenseSource,
   UnitState,
 } from './types';
+
+const movementRoadCache = new WeakMap<object, Set<string>>();
+export function hasMovementRoad(map: GameState['map'], position: HexCoord): boolean {
+  if (getTile(map, position)?.road) return true;
+  if (!map.roads) return false;
+  let keys = movementRoadCache.get(map.roads);
+  if (!keys) { keys = new Set(roadConnections(map.roads).keys()); movementRoadCache.set(map.roads, keys); }
+  return keys.has(hexKey(position));
+}
 
 type TerrainState = Pick<GameState, 'map' | 'facilities' | 'checkpoints' | 'config'>;
 
@@ -29,8 +39,8 @@ export function effectiveMovementCost(
   position: HexCoord,
 ): number | null {
   const tile = getTile(state.map, position);
-  if (!tile) return null;
-  if (tile.road || isUrbanHex(state, position)) return 1;
+  if (!tile || state.config.terrain.movementCost[tile.terrain] === null) return null;
+  if (hasMovementRoad(state.map, position) || isUrbanHex(state, position)) return 1;
   return state.config.terrain.movementCost[tile.terrain];
 }
 
@@ -44,10 +54,12 @@ export function createMovementCostResolver(
     ...state.facilities.map((facility) => hexKey(facility.position)),
     ...state.checkpoints.map((checkpoint) => hexKey(checkpoint.position)),
   ]);
+  const roads = new Set(state.map.roads ? roadConnections(state.map.roads).keys() : []);
   return (position) => {
     const tile = reference.getTile(position);
     if (!tile || (playerMovement && !reference.canPlayerOccupyHex(position))) return null;
-    if (tile.road || tile.facilityId || urban.has(hexKey(position))) return 1;
+    if (state.config.terrain.movementCost[tile.terrain] === null) return null;
+    if (tile.road || roads.has(hexKey(position)) || tile.facilityId || urban.has(hexKey(position))) return 1;
     return state.config.terrain.movementCost[tile.terrain];
   };
 }

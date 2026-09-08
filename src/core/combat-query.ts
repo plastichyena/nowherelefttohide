@@ -1,3 +1,4 @@
+import { gasAttackPreview, type GasAttackPreview } from './gas-preview';
 import { hexKey, hexDistance } from './hex';
 import { getUnit } from './state';
 import { getVisibleEnemyUnits } from './visibility';
@@ -84,6 +85,7 @@ export function forecastUnitCombatAtDistance(
 
 
 export interface UnitLegalAttackProjection {
+  gasExplosion: GasAttackPreview | null;
   targetUnitId: string;
   distance: number;
   militaryGoodsCost: number;
@@ -116,6 +118,7 @@ export function getUnitLegalAttackProjections(
       if (!projection.canAttack) return null;
       const terrainDamage = terrainAdjustedDamage(snapshot, target, projection.effectiveAttack);
       return {
+        gasExplosion: gasAttackPreview(state, target, terrainDamage.finalDamage),
         targetUnitId: target.id,
         distance,
         militaryGoodsCost: projection.militaryGoodsCost,

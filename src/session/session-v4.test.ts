@@ -23,7 +23,7 @@ function observation(turn: number): AgentObservation {
     apiVersion: '8.0.0', gameRulesVersion: '4.0.0', turn, finalHordeTurn: 50, phase: 'player', map,
     resources: { food: 10 + turn, civilianGoods: 10, militaryGoods: 10, fuel: 10, electricityCapacity: 0, electricityRequired: 0 },
     population: { healthyCivilians: 1, cityResidents: 1, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
-    facilities: [], units: [], zombies: [], checkpoints: [], importantSiteEvents: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [], roadBranches: [],
+    facilities: [], units: [], zombies: [], checkpoints: [], importantSiteEvents: [], populationTransferCandidates: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [], roadBranches: [],
     supply: { initialRadius: 0, suppliedTileKeys: ['0,0'], branchRadii: [] },
     horde: { warningType: 'none', warningDirections: [], nextWaveIndex: null, nextWave: null, spawnTurn: null, finalHordeStatus: 'notStarted', turnsRemaining: 0, nextSpawnTurn: null, waves: [], waveTotals: [], finalPendingCount: 0 },
     victory: { finalHordeDefeated: false, suppliedAreaZombieClear: true, suppliedAreaInfectionClear: true },

@@ -1,3 +1,4 @@
+import { generateRoadNetwork, fixedRoadInput, connectRoadAccess, roadHash } from './roads';
 import type {
   BaseTerrain,
   CardinalDirection,
@@ -21,7 +22,7 @@ export { getTile, getFacility, getHordeEntrance, isRoad, isHordeSpawnReserve, ca
  * identifier here rather than deriving it from caller config: map validation
  * and save loading must reject a different fixed-map contract.
  */
-export const FIXED_MAP_ID = 'fixed-51x51-v3' as const;
+export const FIXED_MAP_ID = 'fixed-51x51-v4' as const;
 export const FIXED_MAP_WIDTH = 51 as const;
 export const FIXED_MAP_HEIGHT = 51 as const;
 export const FIXED_FACILITY_COUNT = 29 as const;
@@ -338,6 +339,7 @@ export function getHordeSpawnZone(map: FixedMap, direction: CardinalDirection): 
   return positions;
 }
 
+let baseRoadCache: { key: string; roads: import('./roads').RoadNetwork } | null = null;
 function buildFixedMap(
   capacities: Readonly<Record<string, number>> = capacityByType,
 ): FixedMap {
@@ -364,7 +366,11 @@ function buildFixedMap(
     tile.hordeEntranceDirections.push(entrance.direction);
   }
 
+  const roadInput = fixedRoadInput({ tiles, facilities, roadBranches, width: FIXED_MAP_WIDTH, height: FIXED_MAP_HEIGHT });
+  const cacheKey = roadHash(roadInput);
+  if (!baseRoadCache || baseRoadCache.key !== cacheKey) baseRoadCache = { key: cacheKey, roads: generateRoadNetwork(roadInput) };
   return {
+    roads: structuredClone(baseRoadCache.roads),
     id: FIXED_MAP_ID,
     width: FIXED_MAP_WIDTH,
     height: FIXED_MAP_HEIGHT,
@@ -777,6 +783,14 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
   // structure, matching the legacy API while preserving one canonical map.
   const canonicalCandidate = map ? cloneMap(map) : null;
   if (canonicalCandidate) {
+    if (!canonicalCandidate.roads) errors.push('Missing connector road network');
+    else {
+      const expected = structuredClone(baseFixedMap.roads!);
+      const base = canonicalCandidate.facilities.find(f => f.type === 'armyBase');
+      if (base) connectRoadAccess(fixedRoadInput(canonicalCandidate), expected, base.position, 'access-army-base-1');
+      if (canonicalMapJson(canonicalCandidate.roads) !== canonicalMapJson(expected)) errors.push('Invalid saved road network');
+      canonicalCandidate.roads = structuredClone(baseFixedMap.roads!);
+    }
     canonicalCandidate.facilities=canonicalCandidate.facilities.filter(f=>f.type!=='armyBase');
     for(const tile of canonicalCandidate.tiles) if(tile.facilityId==='army-base-1') tile.facilityId=null;
     for (const facility of canonicalCandidate.facilities) {
@@ -801,6 +815,7 @@ export function placeArmyBase(map: FixedMap, rng: SeededRng, capacity = 10): voi
   const tile = map.tiles.find(tile => hexKey(tile) === hexKey(position));
   if (!tile || tile.facilityId || !tile.playerOccupancyAllowed || tile.movementCost === null) throw new Error('Invalid Army Base candidate');
   tile.facilityId = 'army-base-1';
+  if (map.roads) connectRoadAccess(fixedRoadInput(map), map.roads, position, 'access-army-base-1');
   map.facilities.push({id:'army-base-1', type:'armyBase', nameKey:'facility.armyBase', position, workerCapacity:capacity, startingOwned:false, startingWorkers:0, startingInfected:0});
 }
 export function generateInitialGasPositions(map: FixedMap, rng: SeededRng, hunters: HexCoord[], options: import('./types').EconomyConfig): HexCoord[] {

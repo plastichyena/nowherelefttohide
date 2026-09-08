@@ -448,6 +448,7 @@ export class AgentGameAdapter implements AgentGame {
     try {
       const candidateKey = actionKey(action);
       matched = legal.find((candidate) => actionKey(candidate) === candidateKey);
+      if (action.type === 'TransferPopulation' && !validateAction(this.engine.getState(), action)) matched = cloneAction(action);
     } catch {
       matched = undefined;
     }

@@ -713,6 +713,10 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
   synchronizePopulation(state);
   const plan = calculateEconomyPlan(state);
   const forecast = plan.forecast;
+  const housing = state.facilities.filter(f => f.type === 'temporaryHousing' && f.owner === 'player');
+  state.statistics.housingResidentTurns += housing.reduce((n, f) => n + f.workers, 0);
+  state.statistics.housingOutageFacilityTurns += forecast.housingOutage.outageCount;
+  state.statistics.housingCivilianGoodsProduced += plan.facilities.filter(p => housing.some(f => f.id === p.facilityId)).reduce((n,p) => n + (p.outputs.civilianGoods ?? 0), 0);
   const queuePopulation = state.checkpoints.reduce(
     (total, checkpoint) => total + checkpoint.waiting + checkpoint.screening + checkpoint.approved,
     0,
@@ -760,7 +764,7 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
         ? 'ruined'
         : facility.infected > 0
           ? 'infected'
-          : facility.type === 'windPowerPlant' || facility.type === 'armyBase' || facility.workers > 0
+          : facility.type === 'windPowerPlant' || facility.type === 'armyBase' || facility.type === 'temporaryHousing' || facility.workers > 0
             ? 'operational'
             : 'stopped';
     }
@@ -1720,7 +1724,7 @@ function terrainDistanceMap(state: Readonly<GameState>, target: HexCoord): Map<s
     const current = pop();
     if (distances.get(hexKey(current.position)) !== current.distance) continue;
     const enteredTile = getTile(state.map, current.position);
-    const enteredCost = enteredTile ? state.config.terrain.movementCost[enteredTile.terrain] : null;
+    const enteredCost = enteredTile ? effectiveMovementCost(state, current.position) : null;
     if (enteredCost === null) continue;
     for (const predecessor of hexNeighbors(current.position)) {
       if (!hexWithinBounds(predecessor, state.map.width, state.map.height)) continue;
@@ -2588,7 +2592,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
       facility.recoveryOperationalTurn !== null &&
       facility.recoveryOperationalTurn <= state.turn
     ) {
-      facility.operationalStatus = facility.type === 'windPowerPlant' || facility.type === 'armyBase' || facility.workers > 0 ? 'operational' : 'stopped';
+      facility.operationalStatus = facility.type === 'windPowerPlant' || facility.type === 'armyBase' || facility.type === 'temporaryHousing' || facility.workers > 0 ? 'operational' : 'stopped';
       facility.populationOperationalTurn = state.turn;
       facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
       facility.recoveryOperationalTurn = null;
@@ -2825,6 +2829,16 @@ function validateTransferPopulation(
     return error(action, 'insufficient_city_population', 'The source city does not have enough residents');
   }
   return { from, to };
+}
+
+/** Parameter domains use the same validation as execution, including turn-start eligibility. */
+export function populationTransferCandidates(state: Readonly<GameState>) {
+  const cities = state.facilities.filter(isCityFacility).sort((a, b) => a.id.localeCompare(b.id));
+  return cities.flatMap(from => cities.filter(to => to.id !== from.id).map(to => {
+    const result = validateTransferPopulation(state, { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 });
+    const reason = 'code' in result ? result.code : null;
+    return { fromFacilityId: from.id, toFacilityId: to.id, min: reason ? null : 1, max: reason ? null : from.workers, integerOnly: true as const, legal: reason === null, reason, constraints: ['turn_start_snapshot', 'safe_city', 'action_budget', 'source_healthy_residents'] };
+  }));
 }
 
 function transferPopulation(
@@ -3655,6 +3669,7 @@ function buildConstructibleFacility(
     recoveryOperationalTurn: null,
   };
   state.facilities.push(facility);
+  if (action.facilityType === 'temporaryHousing') state.statistics.housingBuilt += 1;
   if (action.facilityType === 'civilianDroneBase') state.statistics.civilianDroneBasesBuilt += 1;
   state.resources.civilianGoods -= config.buildCivilianGoods;
   state.actionsTakenThisTurn += 1;

@@ -26,7 +26,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '6.0.0';
+export const GAME_VERSION = '7.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -655,6 +655,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       hunterZombiesSpawned: initialHunterPositions.length,
       riotZombiesKilled: 0,
       hunterZombiesKilled: 0,
+      housingBuilt: 0, housingResidentTurns: 0, housingCivilianGoodsProduced: 0, housingOutageFacilityTurns: 0,
       gasZombiesKilled: 0, gasZombiesSpawned: initialGasPositions.length, gasExplosions: 0, gasExplosionUnitDamage: 0,
       riotPoliceReanimations: 0,
       hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0 },

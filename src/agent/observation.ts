@@ -1,5 +1,7 @@
+import { roadConnections } from '../core/roads';
 import {
   deriveVictoryProgress,
+  populationTransferCandidates,
   forecastEndTurn,
   forecastFacilityProduction,
   forecastUnitRefills,
@@ -171,6 +173,7 @@ function createAgentObservationInScope(
   const refillByUnitId = new Map(
     forecastUnitRefills(state).map((refill) => [refill.unitId, refill] as const),
   );
+  const roadGraph = state.map.roads ? roadConnections(state.map.roads) : new Map();
   const endTurnForecast = forecastEndTurn(state);
   const militaryByUnitId = new Map(
     endTurnForecast.militaryGoods.units.map((unit) => [unit.unitId, unit] as const),
@@ -343,6 +346,7 @@ function createAgentObservationInScope(
       width: state.map.width,
       height: state.map.height,
       coordinateSystem: 'axial-q-r' as const,
+      roads: cloneJson(state.map.roads),
       tiles: [...state.map.tiles]
         .sort((left, right) => left.q - right.q || left.r - right.r)
         .map((tile) => {
@@ -355,6 +359,8 @@ function createAgentObservationInScope(
             terrain: tile.terrain,
             passable: movementCost !== null,
             road: tile.road,
+            movementRoad: tile.road || roadGraph.has(hexKey(tile)),
+            roadRoles: [...new Set((roadGraph.get(hexKey(tile)) ?? []).map((e: {role: import('../core/roads').RoadRole}) => e.role))] as import('../core/roads').RoadRole[],
             urban: isUrbanHex(state, tile),
             facilityId: tile.facilityId,
             checkpointId: checkpoint?.id ?? null,
@@ -384,6 +390,7 @@ function createAgentObservationInScope(
     zombies,
     checkpoints,
     importantSiteEvents: importantSiteEvents(state),
+    populationTransferCandidates: populationTransferCandidates(state),
     checkpointPositionCandidates: projectionCache.checkpointPositionCandidates ?? getCheckpointPositionCandidates(state),
     constructibleFacilityPositionCandidates: (['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const)
       .flatMap((facilityType) => getConstructibleFacilityPositionCandidates(state, facilityType))
@@ -458,10 +465,11 @@ export function restoreArtifactObservation(
   const visible = new Set(trace.visibleTileKeys);
   const facilityByPosition = new Map(trace.facilities.map((facility) => [hexKey(facility.position), facility.id] as const));
   const checkpointByPosition = new Map(trace.checkpoints.map((checkpoint) => [hexKey(checkpoint.position), checkpoint.id] as const));
+  const movementRoads = new Set(fixedMap.roads ? roadConnections(fixedMap.roads).keys() : []);
   const terrainMovement = new Map<string, number | null>();
   const terrainDefense = new Map<string, { source: TerrainDefenseSource; multiplier: number }>();
   for (const tile of fixedMap.tiles) {
-    if (!terrainMovement.has(tile.terrain) && !tile.road && !tile.urban) {
+    if (!terrainMovement.has(tile.terrain) && !tile.road && !movementRoads.has(hexKey(tile)) && !tile.urban) {
       terrainMovement.set(tile.terrain, tile.effectiveMovementCost);
     }
     if (!terrainDefense.has(tile.terrain) && !tile.urban) {
@@ -481,7 +489,7 @@ export function restoreArtifactObservation(
       const facilityId = tile.facilityId;
       const checkpointId = checkpointByPosition.get(key) ?? null;
       const urban = facilityId !== null || dynamicFacilityId !== null || checkpointId !== null;
-      const effectiveMovementCost = urban || tile.road
+      const effectiveMovementCost = tile.terrain === 'water' ? null : urban || tile.road || movementRoads.has(key)
         ? 1
         : terrainMovement.get(tile.terrain) ?? tile.effectiveMovementCost;
       const defense = urban

@@ -101,7 +101,7 @@ function run(): void {
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
   for (const marker of [
-    '1.5.4', '6.0.0', '10.0.0', '11.0.0', 'fixed-51x51-v3', 'gasZombie', 'armyBase', 'SetPowerSupply',
+    '1.5.5', '7.0.0', '11.0.0', '12.0.0', 'fixed-51x51-v4', 'gasZombie', 'armyBase', 'SetPowerSupply',
     'temporaryHousing', 'committedWaveUnitCount', 'pendingCount', 'horde_wave_started', 'horde_spawn_batch', 'nextTurnPenalties', 'housingOutage',
     'BuildConstructibleFacility', 'DecommissionConstructibleFacility', 'TurnAwayCheckpointRefugees',
     'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',

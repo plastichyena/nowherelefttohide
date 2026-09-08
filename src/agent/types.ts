@@ -35,16 +35,16 @@ import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
 /** v1.5.4 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.5.4';
-export const GAME_RULES_VERSION = '6.0.0';
-export const SAVE_FORMAT_VERSION = '13';
-export const AGENT_API_VERSION = '11.0.0';
-export const OBSERVATION_API_VERSION = '11.0.0';
-export const BRIDGE_API_VERSION = '11.0.0';
-export const BALANCED_AGENT_VERSION = '6.0.0';
-export const RANDOM_AGENT_VERSION = '4.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '10.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '7.0.0';
+export const APP_VERSION = '1.5.5';
+export const GAME_RULES_VERSION = '7.0.0';
+export const SAVE_FORMAT_VERSION = '14';
+export const AGENT_API_VERSION = '12.0.0';
+export const OBSERVATION_API_VERSION = '12.0.0';
+export const BRIDGE_API_VERSION = '12.0.0';
+export const BALANCED_AGENT_VERSION = '7.0.0';
+export const RANDOM_AGENT_VERSION = '5.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '11.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '8.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -108,6 +108,8 @@ export interface AgentMapTileObservation {
   terrain: BaseTerrain;
   passable: boolean;
   road: boolean;
+  movementRoad?: boolean;
+  roadRoles?: import('../core/roads').RoadRole[];
   /** True when a facility or checkpoint occupies this tile. */
   urban: boolean;
   facilityId: string | null;
@@ -122,6 +124,7 @@ export interface AgentMapTileObservation {
 }
 
 export interface AgentMapObservation {
+  roads?: import('../core/roads').RoadNetwork;
   id: string;
   width: number;
   height: number;
@@ -167,6 +170,7 @@ export interface AgentSupplyObservation {
 }
 
 export interface AgentFacilityObservation {
+  recovery: ReturnType<typeof import('../core/public-entities').facilityRecoveryProjection>;
   armyBase?: null | {
     militaryGoods:number; maxMilitaryGoods:number; interceptionsRemaining:number; interceptionsRefresh:'zombie_phase_start';
     interceptionAttack:number; interceptionRange:number; interceptionCost:number; interceptionNoiseRadius:number;
@@ -315,6 +319,7 @@ export interface AgentUnitObservation {
     effectiveMovementCost: number;
   }>;
   attackPreviews: Array<{
+    gasExplosion: import('../core/gas-preview').GasAttackPreview | null;
     targetUnitId: string;
     distance: number;
     militaryGoodsCost: number;
@@ -350,6 +355,7 @@ export interface AgentUnitObservation {
 }
 
 export interface AgentCheckpointObservation {
+  turnAwayPreview?: { waitingOnly: boolean; maxPeople: number; foodMaintenanceReduction: number; civilianGoodsMaintenanceReduction: number; additionalPenalties: string; futureWaveRisk: boolean };
   id: string;
   branchId: string;
   position: HexCoord;
@@ -388,6 +394,8 @@ export interface AgentCheckpointObservation {
 }
 
 export interface AgentApiInfo {
+  actionContracts: Record<string, { required: string[]; example: import('../core/types').GameAction; conditions: string[] }>;
+  parameterQueries: { transferPopulation: string; legalActionsExhaustive: false; revisionRequiredForSession: true };
   appVersion: string;
   gameRulesVersion: string;
   saveFormatVersion: string;
@@ -600,7 +608,7 @@ export interface AgentApiInfo {
       stateTransitions: string[];
       simpleFarm: { workerCapacity: number; requiredPower: number; foodPerWorker: number };
       civilianDroneBase: { workerCapacity: number; requiredPower: number; visionPerWorker: number };
-      temporaryHousing: { softCapacity: number; requiredPower: number; vision: number; populationLimitKind: 'soft'; recruitmentHub: false };
+      temporaryHousing: { civilianGoodsProduction: string; productionConditions: string[]; softCapacity: number; requiredPower: number; vision: number; populationLimitKind: 'soft'; recruitmentHub: false };
       windPowerPlant: { fixedPower: number; vision: number; noiseRadius: number; zombieTargetValue: 0; emitsNoise: true; playerBuildLimit: string; supplySource: false };
     };
     strategicForecast: {
@@ -755,6 +763,7 @@ export interface AgentObservation {
   checkpoints: AgentCheckpointObservation[];
   /** Last 50 public site infection/fall/spawn events, including off-screen sites. */
   importantSiteEvents: AgentPublicEvent[];
+  populationTransferCandidates: ReturnType<typeof import('../core/engine').populationTransferCandidates>;
   checkpointPositionCandidates: CheckpointPositionCandidate[];
   constructibleFacilityPositionCandidates: ConstructibleFacilityPositionCandidate[];
   roadBranches: AgentRoadBranchObservation[];

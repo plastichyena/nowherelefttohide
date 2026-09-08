@@ -1,0 +1,51 @@
+import { it, expect } from 'vitest';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { SessionStore } from '../session/store';
+import { SessionService } from '../session/service';
+import { createAgentSessionGameFactory, resolveSessionIdentity } from '../session/agent-adapter';
+import { writeArtifactZip } from '../session/artifact-zip';
+import { ReplayPackage, ReplayZip } from './package';
+
+it('exports and seeks a self-contained public ZIP, preserving rejection and comments across a different viewer build',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'nlth-v155-replay-'));
+  const identity=resolveSessionIdentity({NLTH_BUILD_ID:'recorded-build',NLTH_GIT_COMMIT:'a'.repeat(40)});
+  const service=new SessionService(new SessionStore(root),createAgentSessionGameFactory(identity.buildId),identity);
+  service.newSession({sessionId:'replay-test',seed:1,agentId:'external'});
+  const construction=service.query('replay-test',{target:'construction',filters:{facilityType:'temporaryHousing',legalOnly:true,inSupply:true},pageSize:1});
+  expect(construction.count).toBe(1);expect(construction.hasMore).toBe(true);
+  const candidate=construction.items![0] as unknown as {position:{q:number;r:number};legal:boolean;inSupply:boolean};
+  expect(candidate.legal&&candidate.inSupply).toBe(true);
+  expect(service.query('replay-test',{target:'construction',filters:{facilityType:'temporaryHousing',q:candidate.position.q,r:candidate.position.r}}).count).toBe(1);
+  const transfers=service.query('replay-test',{target:'population-transfers',filters:{fromFacilityId:'capital'},pageSize:1});expect(transfers.count).toBe(1);
+  const revision=service.status('replay-test').revision;
+  expect(()=>service.query('replay-test',{target:'construction',expectedRevision:revision+1})).toThrow(/revision/i);
+  expect(service.status('replay-test').revision).toBe(revision);
+  service.step('replay-test',{action:{type:'Wait',unitId:'missing'},decisionSummary:'<script>not executed</script>'});
+  service.step('replay-test',{action:{type:'EndTurn'},decisionSummary:'Maintain defenses.'});
+  const manifest=service.exportArtifact('replay-test',join(root,'package'));
+  expect(service.replayArtifact(manifest.artifactPath).matched).toBe(true);
+  const bytes=readFileSync(`${manifest.artifactPath}.zip`);
+  const replay=await new ReplayPackage(new ReplayZip(new Blob([bytes]),new AbortController().signal)).open();
+  expect(replay.index.length).toBe(2);
+  const rejected=await replay.decision(0);expect(rejected.record.accepted).toBe(false);expect(rejected.after).toEqual(rejected.before);expect(rejected.record.decisionSummary).toContain('<script>');
+  const turn=await replay.decision(1);expect(turn.record.inputAction.type).toBe('EndTurn');expect(turn.after.observation.turn).toBeGreaterThan(turn.before.observation.turn);
+  expect(replay.map.roads).toBeDefined();
+  const checkpoint=service.saveCheckpoint('replay-test');
+  service.loadCheckpoint('replay-test',checkpoint.checkpointId,'branch-test');
+  service.step('branch-test',{action:{type:'EndTurn'},decisionSummary:'Branch continuation.'});
+  const branch=service.exportArtifact('branch-test',join(root,'branch'));
+  const branchView=await new ReplayPackage(new ReplayZip(new Blob([readFileSync(`${branch.artifactPath}.zip`)]),new AbortController().signal)).open();
+  expect(branchView.index.length).toBe(3);expect((await branchView.decision(2)).record.decisionSummary).toBe('Branch continuation.');
+  // A valid ZIP may contain public supplemental data that seeking never needs.
+  // The container's 50 MB target is not an unconditional rejection threshold.
+  writeFileSync(join(root,'package','public-supplement.bin'),Buffer.alloc(50000001));
+  writeArtifactZip(join(root,'package'),join(root,'over-50mb.zip'));
+  const large=readFileSync(join(root,'over-50mb.zip'));expect(large.length).toBeGreaterThan(50000000);
+  const largeView=await new ReplayPackage(new ReplayZip(new Blob([large]),new AbortController().signal)).open();
+  expect((await largeView.decision(1)).record.accepted).toBe(true);
+  const corrupt=Buffer.from(bytes);corrupt[45]=corrupt[45]!^1;
+  await expect(new ReplayPackage(new ReplayZip(new Blob([corrupt]),new AbortController().signal)).open()).rejects.toThrow();
+  const abort=new AbortController();abort.abort();await expect(new ReplayPackage(new ReplayZip(new Blob([bytes]),abort.signal)).open()).rejects.toThrow();
+},120000);

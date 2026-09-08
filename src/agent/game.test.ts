@@ -14,7 +14,7 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
 
 describe('AgentGame public boundary', () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.5.4');
+    expect(APP_VERSION).toBe('1.5.5');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -114,14 +114,14 @@ describe('AgentGame public boundary', () => {
     )).toBe(true);
   });
 
-  it('describes the v1.5.4 API, Wave, Housing, Wind, Crisis, and Noise rules from the same adapter boundary', () => {
+  it('describes the v1.5.5 API, Wave, Housing, Wind, Crisis, and Noise rules from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('13');
+    expect(info.saveFormatVersion).toBe('14');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -169,7 +169,7 @@ describe('AgentGame public boundary', () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
-    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v3', width: 51, height: 51 });
+    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v4', width: 51, height: 51 });
     expect(info.rules.map.hordeSpawnReserve).toHaveLength(392);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 50 });
     expect(info.rules.horde.waves).toEqual([
@@ -217,7 +217,7 @@ describe('AgentGame public boundary', () => {
     });
     expect(info.rules.constructibleFacilities).toMatchObject({
       types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
-      costs: { simpleFarm: 25, civilianDroneBase: 50, temporaryHousing: 50, windPowerPlant: 100 },
+      costs: { simpleFarm: 25, civilianDroneBase: 50, temporaryHousing: 25, windPowerPlant: 100 },
       temporaryHousing: { softCapacity: 10, requiredPower: 5, recruitmentHub: false },
       windPowerPlant: { fixedPower: 15, noiseRadius: 8, zombieTargetValue: 0, emitsNoise: true },
     });

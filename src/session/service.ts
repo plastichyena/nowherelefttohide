@@ -1,3 +1,4 @@
+import { writeArtifactZip } from './artifact-zip';
 import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, readSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -70,7 +71,7 @@ import {
   type SessionVersionIdentity,
 } from './types';
 
-const QUERY_TARGETS: SessionQueryTarget[] = ['api', 'map', 'units', 'facilities', 'checkpoints', 'branches', 'construction', 'legal-actions', 'forecast', 'history', 'full-snapshot'];
+const QUERY_TARGETS: SessionQueryTarget[] = ['api', 'map', 'units', 'facilities', 'checkpoints', 'branches', 'construction', 'legal-actions', 'forecast', 'history', 'full-snapshot', 'population-transfers'];
 const ARTIFACT_CHUNK_BYTES = 1024 * 1024;
 const MAX_ARTIFACT_PAYLOAD_BYTES = 256 * 1024 * 1024;
 const MAX_CONTINUATION_CONTEXTS = 4;
@@ -434,7 +435,9 @@ function matchesFilters(item: JsonValue, filters: Record<string, JsonValue>): bo
       const actual = position[axis];
       return typeof actual === 'number' && typeof expected === 'number' && (key.endsWith('Min') ? actual >= expected : actual <= expected);
     }
-    if (key === 'actionType') return item.type === expected;
+    if (key === 'legalOnly') return expected !== true || item.legal === true;
+    if (key === 'q' || key === 'r') { const position = isObject(item.position) ? item.position : item; return position[key] === expected; }
+    if (key === 'actionType') return (item.actionType ?? item.type) === expected;
     return item[key] === expected;
   });
 }
@@ -777,7 +780,11 @@ export class SessionService {
           case 'facilities': items = observation.facilities as unknown as JsonValue[]; break;
           case 'checkpoints': items = observation.checkpoints as unknown as JsonValue[]; break;
           case 'branches': items = observation.roadBranches as unknown as JsonValue[]; break;
-          case 'construction': items = [...observation.checkpointPositionCandidates, ...observation.constructibleFacilityPositionCandidates] as unknown as JsonValue[]; break;
+          case 'population-transfers': items = observation.populationTransferCandidates.map(item => ({ ...item, revision })) as unknown as JsonValue[]; break;
+          case 'construction': {
+            const supplied = new Set(observation.supply.suppliedTileKeys);
+            items = [...observation.checkpointPositionCandidates, ...observation.constructibleFacilityPositionCandidates].map(item => ({ ...item, inSupply: supplied.has(`${item.position.q},${item.position.r}`), revision })) as unknown as JsonValue[]; break;
+          }
           case 'legal-actions': items = loaded.publicState.legalActions as unknown as JsonValue[]; break;
           case 'forecast': value = { endTurnForecast: observation.endTurnForecast, strategicForecast: observation.strategicForecast } as unknown as JsonValue; break;
           case 'full-snapshot': value = { observation, legalActions: loaded.publicState.legalActions } as unknown as JsonValue; break;
@@ -871,6 +878,7 @@ export class SessionService {
       const withoutHash = { ...this.identity, packageVersion: SESSION_ARTIFACT_PACKAGE_VERSION, sessionSchemaVersion: SESSION_SCHEMA_VERSION, sessionId, lineage: { parentSessionId: loaded.descriptor.parentSessionId, parentCheckpointId: loaded.descriptor.parentCheckpointId }, branchBase: loaded.descriptor.branchBase, decisionCount, acceptedActionCount, invalidActionCount, payloadCount, artifactPath: packagePath, streamHash: streamHash.digest('hex') } satisfies Omit<SessionArtifactManifest, 'manifestHash'>;
       const manifest: SessionArtifactManifest = { ...withoutHash, manifestHash: sha256Json(withoutHash) };
       writeFileSync(assertSafeOutputPath(packageRoot, join(packagePath, 'manifest.json')), `${canonicalJson(manifest)}\n`, { encoding: 'utf8', flag: 'wx' });
+      writeArtifactZip(packagePath, `${packagePath}.zip`);
       return manifest;
     } catch (error) { return this.rejectWithDiagnostics(sessionId, 'artifact', error); }
   }

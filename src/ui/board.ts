@@ -1,3 +1,4 @@
+import { roadConnections } from '../core/roads';
 import Phaser from 'phaser';
 import { forecastFacilityProduction } from '../core/engine';
 import { HEX_DIRECTION_ORDER, hexDistance, hexKey, hexNeighbor } from '../core/hex';
@@ -1325,7 +1326,23 @@ export class HexBoardScene extends Phaser.Scene {
     this.drawTerrainPattern(this.terrainFallbackGraphics, center, tile.terrain);
   }
 
+  private drawnRoadNetwork: unknown;
+  private roadConnectionCache: ReturnType<typeof roadConnections> = new Map();
   private drawRoadPass(state: Readonly<GameState>, tile: HexTile): void {
+    if (state.map.roads) {
+      if (this.drawnRoadNetwork !== state.map.roads) {
+        this.drawnRoadNetwork = state.map.roads;
+        this.roadConnectionCache = roadConnections(state.map.roads);
+      }
+      const center = this.hexToWorld(state, tile);
+      for (const edge of this.roadConnectionCache.get(hexKey(tile)) ?? []) {
+        const other = this.hexToWorld(state, edge.position);
+        const width = edge.role === 'trunk' ? 6 : edge.role === 'collector' ? 3.5 : 2;
+        this.roadFallbackGraphics.lineStyle(width, edge.role === 'trunk' ? 0xb5a98d : edge.role === 'collector' ? 0x968e7b : 0x777467, 1);
+        this.roadFallbackGraphics.lineBetween(center.x, center.y, (center.x + other.x) / 2, (center.y + other.y) / 2);
+      }
+      return;
+    }
     if (!tile.road) return;
     const center = this.hexToWorld(state, tile);
     const path = BOARD_ASSET_REGISTRY.overlays.road;

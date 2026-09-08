@@ -64,6 +64,9 @@ function emptyFacilityProjection(
 
 function facilityStoppedReason(facility: Readonly<FacilityState>): FacilityProductionProjection['stoppedReason'] {
   if (facility.status === 'ruined') return 'ruined';
+  if (facility.operationalStatus === 'building') return 'building';
+  if (facility.operationalStatus === 'recovering') return 'recovering';
+  if (facility.operationalStatus === 'disabled') return 'disabled';
   if (facility.infected > 0) return 'infection';
   if (facility.owner !== 'player' || facility.status !== 'owned') return 'not_owned';
   if (facility.workers <= 0) return 'no_workers';
@@ -336,7 +339,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     const perWorker = rule.outputs.civilianGoods ?? 0;
     if (perWorker <= 0 || facility.type === 'militaryFactory') return total;
     if (rule.powerMode === 'required' && !supplied.has(facility.id)) return total;
-    return total + staffed(facility) * perWorker;
+    return total + Math.floor(staffed(facility) * perWorker);
   }, 0);
   const maintenanceReservation = Math.max(0, maintenance.civilianGoods - preliminaryCivilianProduction);
   let civilianInputAvailable = Math.max(0, state.resources.civilianGoods - maintenanceReservation);
@@ -435,7 +438,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     }
     const projectedPowerSupplied = supplied.has(facility.id);
     const productionMultiplier = 1;
-    const potentialOperatingWorkers = facility.type === 'temporaryHousing' || !canProduce(facility)
+    const potentialOperatingWorkers = !canProduce(facility)
       ? 0
       : facility.type === 'militaryFactory'
         ? militaryInputWorkers.get(facility.id) ?? 0
@@ -444,7 +447,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       ? 0
       : potentialOperatingWorkers;
     const baseOutputs = Object.fromEntries(
-      Object.entries(rule.outputs).map(([resource, amount]) => [resource, amount * potentialOperatingWorkers]),
+      Object.entries(rule.outputs).map(([resource, amount]) => [resource, Math.floor(amount * potentialOperatingWorkers)]),
     ) as Partial<Record<ResourceType, number>>;
     const outputs = powerMode === 'required' && !projectedPowerSupplied
       ? {}
@@ -593,6 +596,16 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     })),
     forecast: {
       populationConsumers: consumers,
+      maintenancePopulation: {
+        residents: facilities.filter(f => f.owner === 'player' && isCityFacility(f)).reduce((n, f) => n + f.workers, 0),
+        workers: facilities.filter(f => f.owner === 'player' && !isCityFacility(f)).reduce((n, f) => n + f.workers, 0),
+        units: state.population.unitPopulation,
+        queue: { waiting: state.checkpoints.reduce((n, c) => n + c.waiting, 0), screening: state.checkpoints.reduce((n, c) => n + c.screening, 0), approved: state.checkpoints.reduce((n, c) => n + c.approved, 0) },
+      },
+      maintenanceBreakdown: {
+        food: { base: normalFood, overcrowding: overcrowdingFood, housingOutage: housingOutageFood, total: maintenance.food },
+        civilianGoods: { base: normalCivilian, overcrowding: overcrowdingCivilian, housingOutage: housingOutageCivilian, total: maintenance.civilianGoods },
+      },
       housingOutage: {
         facilities: occupiedHousingOutages,
         outageCount: occupiedHousingOutages.length,

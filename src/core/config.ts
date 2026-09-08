@@ -15,8 +15,8 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '6.0.0';
-export const DEFAULT_MAP_ID = 'fixed-51x51-v3';
+export const CONFIG_VERSION = '7.0.0';
+export const DEFAULT_MAP_ID = 'fixed-51x51-v4';
 
 const facilityIds: FacilityId[] = [
   'army-base-1',
@@ -139,7 +139,7 @@ const defaultUnitConfig: UnitConfigMap = {
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
-  temporaryHousing: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 50, visionRadius: 1, zombieTargetValue: 0 },
+  temporaryHousing: { workerCapacity: 10, production: production({}, { civilianGoods: 0.5 }, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 25, visionRadius: 1, zombieTargetValue: 0 },
   armyBase: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
   capital: {
     workerCapacity: 100,
@@ -605,7 +605,9 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       errors.push(`facilities.${type}.production.outputs is required`);
     } else {
       for (const [resource, amount] of Object.entries(facility.production.outputs)) {
-        requireInteger(errors, amount, `facilities.${type}.production.outputs.${resource}`, 0);
+        if (type === 'temporaryHousing' && resource === 'civilianGoods') {
+          if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0) errors.push('Invalid housing output');
+        } else requireInteger(errors, amount, `facilities.${type}.production.outputs.${resource}`, 0);
       }
     }
   }

@@ -10,8 +10,8 @@ import type {
 } from '../agent/types';
 
 /** v1.5.4 deliberately rejects Session/Checkpoint v6 instead of migrating it. */
-export const CHECKPOINT_SCHEMA_VERSION = '7.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '7.0.0' as const;
+export const CHECKPOINT_SCHEMA_VERSION = '8.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '8.0.0' as const;
 export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
 export const SESSION_ARTIFACT_PACKAGE_VERSION = '1.0.0' as const;
 export const PLAY_TURN_PROTOCOL_VERSION = '1.0.0' as const;
@@ -369,7 +369,7 @@ export interface SessionGameFactory {
   restore(options: { privateState: JsonValue; seed: number; agentId: string; sessionId: string; decision: number; traceHeadHash: string }): SessionGameRuntime;
 }
 
-export type SessionQueryTarget = 'api' | 'map' | 'units' | 'facilities' | 'checkpoints' | 'branches' | 'construction' | 'legal-actions' | 'forecast' | 'history' | 'full-snapshot';
+export type SessionQueryTarget = 'api' | 'map' | 'units' | 'facilities' | 'checkpoints' | 'branches' | 'construction' | 'legal-actions' | 'forecast' | 'history' | 'full-snapshot' | 'population-transfers';
 export interface SessionQueryInput { target: SessionQueryTarget; expectedRevision?: number; cursor?: string; pageSize?: number; filters?: Record<string, JsonValue> }
 export interface SessionQueryResult {
   sessionId: string;

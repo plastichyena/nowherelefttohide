@@ -1,3 +1,5 @@
+import { roadConnections } from '../core/roads';
+import { showReplay } from '../replay/view';
 import { createDefaultConfig } from '../core/config';
 import {
   forecastEndTurn,
@@ -546,7 +548,7 @@ function nonNegativeCount(value: unknown): number {
 }
 
 /**
- * Project the v1.5.4 Victory facts for the Human UI.
+ * Project the v1.5.5 Victory facts for the Human UI.
  *
  * Final victory is based on the Final roster's Pending entries and the
  * remaining Final roster Zombies on the Map. Supply cleanup is deliberately
@@ -598,7 +600,7 @@ export function victoryProgressViewModel(state: Readonly<GameState>): VictoryPro
   };
 }
 
-/** Render only the two v1.5.4 Victory progress conditions. */
+/** Render only the two v1.5.5 Victory progress conditions. */
 export function renderVictoryProgress(state: Readonly<GameState>, locale: Locale): string {
   const t = createTranslator(locale);
   const progress = victoryProgressViewModel(state);
@@ -1974,6 +1976,8 @@ function publicMapTileForPosition(
     terrain: tile.terrain,
     passable: movementCost !== null,
     road: tile.road,
+    movementRoad: tile.road || (state.map.roads ? roadConnections(state.map.roads).has(hexKey(tile)) : false),
+    roadRoles: state.map.roads ? [...new Set((roadConnections(state.map.roads).get(hexKey(tile)) ?? []).map(e => e.role))] : [],
     urban,
     facilityId: tile.facilityId,
     checkpointId: checkpoint?.id ?? null,
@@ -2172,6 +2176,12 @@ function renderResourceAccordionPanel(
         [t('endingStock'), String(detail.endingStock ?? 0)],
         [t('shortage'), String(resourceShortageAmount(resource, forecast))],
       );
+    }
+    if (resource === 'food' || resource === 'civilianGoods') {
+      const breakdown = forecast.maintenanceBreakdown?.[resource];
+      if (breakdown) rows.push([locale === 'ja' ? '基本維持費 / 過密 / 住宅停電' : 'Base / overcrowding / housing outage', `${breakdown.base} / ${breakdown.overcrowding} / ${breakdown.housingOutage}`]);
+      const people = forecast.maintenancePopulation;
+      if (people) rows.push([locale === 'ja' ? '住民 / 労働者 / 部隊' : 'Residents / workers / units', `${people.residents} / ${people.workers} / ${people.units}`], ['Queue waiting / screening / approved', `${people.queue.waiting} / ${people.queue.screening} / ${people.queue.approved}`]);
     }
     if (resource === 'civilianGoods') {
       rows.push(
@@ -2460,7 +2470,10 @@ type AgentAttackPreview = AgentUnitObservation['attackPreviews'][number];
 export function renderAttackPreview(preview: AgentAttackPreview, locale: Locale, baseAttack?: number): string {
   const t = createTranslator(locale);
   const shortage = baseAttack !== undefined && preview.effectiveAttack < baseAttack;
-  return `<div class="attack-preview-detail" data-attack-preview="${escapeHtml(preview.targetUnitId)}"><span>${escapeHtml(t('distance'))} <b>${preview.distance}</b></span><span>${escapeHtml(t('attackMilitaryGoodsCost'))} <b>${preview.militaryGoodsCost}</b></span><span>${escapeHtml(t('militaryGoodsAfterAttack'))} <b>${preview.projectedMilitaryGoodsAfterAttack}</b></span><span>${escapeHtml(t('effectiveAttack'))} <b>${preview.effectiveAttack}</b></span><span>${escapeHtml(t('damageBeforeTerrain'))} <b>${preview.projectedDamageBeforeTerrain}</b> → ${escapeHtml(t('damageAfterTerrain'))} <b>${preview.projectedDamageAfterTerrain}</b></span>${shortage ? `<strong class="warning-text">${escapeHtml(t('militaryGoodsWeakAttackWarning'))}</strong>` : ''}</div>`;
+  const gas = preview.gasExplosion;
+  const gasDetail = !gas ? '' : `<details class="gas-preview"><summary>${locale === 'ja' ? 'Gas死亡爆発' : 'Gas death explosion'}: ${gas.trigger === 'nonlethal_no_explosion' ? (locale === 'ja' ? '非致死・即時爆発なし' : 'Nonlethal: no immediate explosion') : gas.explosions.length}</summary><p>${locale === 'ja' ? '現在公開されている対象のみ。隠蔽範囲、再蘇生・拠点Spawnの二次効果、将来の敵行動は予測しません。' : 'Currently public entities only. Unobserved entities, reanimation/site-spawn consequences and future enemy actions are not predicted.'}</p>${gas.units.map(u => `<p>${escapeHtml(u.unitId)} (${escapeHtml(u.side)}): HP ${u.hpBefore} → ${u.hpAfter}${u.lethal ? ' ×' : ''}</p>`).join('')}${gas.sites.map(f => `<p>${escapeHtml(f.siteId)}: ${locale === 'ja' ? '感染' : 'Infection'} +${f.infected}, ${f.healthyBefore} → ${f.healthyAfter}${f.falls ? (locale === 'ja' ? ' / 陥落' : ' / Falls') : ''}</p>`).join('')}</details>`;
+
+  return `<div class="attack-preview-detail" data-attack-preview="${escapeHtml(preview.targetUnitId)}"><span>${escapeHtml(t('distance'))} <b>${preview.distance}</b></span><span>${escapeHtml(t('attackMilitaryGoodsCost'))} <b>${preview.militaryGoodsCost}</b></span><span>${escapeHtml(t('militaryGoodsAfterAttack'))} <b>${preview.projectedMilitaryGoodsAfterAttack}</b></span><span>${escapeHtml(t('effectiveAttack'))} <b>${preview.effectiveAttack}</b></span><span>${escapeHtml(t('damageBeforeTerrain'))} <b>${preview.projectedDamageBeforeTerrain}</b> → ${escapeHtml(t('damageAfterTerrain'))} <b>${preview.projectedDamageAfterTerrain}</b></span>${shortage ? `<strong class="warning-text">${escapeHtml(t('militaryGoodsWeakAttackWarning'))}</strong>` : ''}${gasDetail}</div>`;
 }
 
 /** Human-facing projection of the public carried-Military-Goods fields. */
@@ -2497,6 +2510,9 @@ function recoveryClassLabel(recoveryClass: AgentUnitObservation['recoveryClassIf
 function stoppedReasonLabel(reason: string | null | undefined, locale: Locale): string {
   const t = createTranslator(locale);
   const labels: Record<string, string> = {
+    building: locale === 'ja' ? '建設中' : 'Under construction',
+    recovering: locale === 'ja' ? '復旧中' : 'Recovering',
+    disabled: locale === 'ja' ? '人間ユニットによる復旧が必要' : 'A human unit must restore this facility',
     ruined: t('stopReasonRuined'),
     infection: t('stopReasonInfection'),
     no_workers: t('stopReasonNoWorkers'),
@@ -3133,6 +3149,7 @@ export class GameUiController {
         <div class="title-actions">
           <button class="primary-button large-button" data-action="new-game">${escapeHtml(t('start'))}</button>
           <button class="secondary-button large-button" data-action="continue" ${canContinue ? '' : 'disabled'}>${escapeHtml(t('continue'))}</button>
+          <button class="ghost-button large-button" data-action="watch-replay">${this.locale === 'ja' ? 'AIリプレイ観戦' : 'Watch AI replay'}</button>
           <button class="ghost-button large-button" data-action="load">${escapeHtml(t('load'))}</button>
           <button class="ghost-button large-button" data-action="options">${escapeHtml(t('options'))}</button>
           <button class="ghost-button large-button" data-action="help">${escapeHtml(t('help'))}</button>
@@ -3417,6 +3434,7 @@ export class GameUiController {
 
   private onAction(action: string, element: HTMLElement): void {
     switch (action) {
+      case 'watch-replay': this.destroyBoard(); showReplay(this.root, this.locale, () => this.showTitle()); break;
       case 'new-game': this.beginNewGame(); break;
       case 'continue': this.loadAutosave(); break;
       case 'load': this.showLoadModal(); break;
@@ -5763,7 +5781,7 @@ export class GameUiController {
     if (!tile) return '';
     const t = this.translator();
     const overlays = [
-      tile.road ? t('roadOverlay') : null,
+      tile.movementRoad || tile.road ? `${t('roadOverlay')} (${(tile.roadRoles ?? []).map(r => this.locale === 'ja' ? ({trunk:'幹線',collector:'地区連絡道',access:'施設進入路'})[r] : r).join(' / ')})` : null,
       tile.urban ? t('urbanOverlay') : null,
     ].filter((value): value is string => Boolean(value));
     const defenseSource = source?.terrainDefenseSource ?? tile.terrainDefenseSource;
@@ -5830,6 +5848,14 @@ export class GameUiController {
       : production.lastPowerSupplied === null
         ? t('unavailable')
         : production.lastPowerSupplied ? t('powerSupplied') : t('powerNotSupplied');
+    const recovery = publicFacility.recovery;
+    const recoveryLabels: Record<string, string> = this.locale === 'ja' ? {
+      cannot_recover: '復旧不可', conditions_required: '復旧条件が不足', ready: '復旧条件を充足',
+      suppress_infection: '感染者を鎮圧', clear_visible_enemy: '施設上のゾンビを排除', station_human_unit: '人間ユニットを配置',
+      wait_until_operational: '稼働開始ターンを待つ', healthy_population: '健康な人口を配置', supply: '供給網へ接続', allocated_power: '必要電力を確保',
+    } : { cannot_recover: 'Cannot recover', conditions_required: 'Recovery conditions missing', ready: 'Recovery conditions met', suppress_infection: 'Suppress infection', clear_visible_enemy: 'Clear the visible enemy', station_human_unit: 'Station a human unit', wait_until_operational: 'Wait for the operational turn', healthy_population: 'Assign healthy population', supply: 'Connect supply', allocated_power: 'Secure allocated power' };
+    const recoveryText = (keys: string[]) => escapeHtml(keys.map(key => recoveryLabels[key] ?? key).join(' · ') || t('none'));
+    const recoveryDetail = recovery ? `<details><summary>${this.locale === 'ja' ? '復旧と生産再開条件' : 'Recovery and production requirements'}</summary><p>${recoveryText([recovery.status])} · ${recoveryText(recovery.missingConditions)}</p><p>${this.locale === 'ja' ? '復旧予定ターン' : 'Scheduled recovery turn'}: ${recovery.scheduledOperationalTurn ?? '—'}</p><p>${recoveryText(recovery.productionRequirements)}</p><p>${this.locale === 'ja' ? '施設ヘックスの都市地形による被ダメージ補正' : 'Facility urban terrain damage multiplier'} ×${recovery.terrainDefense.multiplier}</p></details>` : '';
     const stopped = production.stoppedReason
       ? `<p class="warning-text"><strong>${escapeHtml(t('stoppedReason'))}</strong>: ${escapeHtml(stoppedReasonLabel(production.stoppedReason, this.locale))}</p>`
       : '';
@@ -5846,7 +5872,7 @@ export class GameUiController {
         : type === 'civilianDroneBase'
           ? `<p class="muted">${escapeHtml(t('droneVisionFormula'))}: ${publicFacility.healthyPopulation} × 3 = ${currentVision} · ${escapeHtml(t('powerRequirement'))}: 5 · ${escapeHtml(t('buildCost'))}: ${buildCost}</p><p class="muted">${escapeHtml(t('droneVisionValues'))}</p>`
           : '';
-    return `${facilityFacts}<section class="production-forecast"><h3>${escapeHtml(t('productionForecast'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('powerMode'))}</dt><dd>${escapeHtml(powerModeLabel(powerMode, this.locale))}</dd></div><div><dt>${escapeHtml(t('powerSupply'))}</dt><dd>${escapeHtml(powerSupply)}</dd></div><div><dt>${escapeHtml(t('projectedPower'))}</dt><dd>${escapeHtml(projectedPower)}</dd></div><div><dt>${escapeHtml(t('powerReason'))}</dt><dd>${escapeHtml(powerReason || t('none'))}</dd></div><div><dt>${escapeHtml(t('lastPowerSupplied'))}</dt><dd>${escapeHtml(lastPower)}</dd></div><div><dt>${escapeHtml(t('productionMultiplier'))}</dt><dd>×${production.projectedProductionMultiplier ?? 1}</dd></div><div><dt>${escapeHtml(t('baseProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(baseProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedInput'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedInput, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('powerRequirement'))}</dt><dd>${escapeHtml(powerRequirement)}</dd></div><div><dt>${escapeHtml(t('powerGeneration'))}</dt><dd>${escapeHtml(powerGeneration)}</dd></div></dl><p class="muted">${escapeHtml(t('perWorker'))}: ${escapeHtml(t('currentProduction'))} ${escapeHtml(formatResourceAmounts(production.outputsPerWorker, this.locale))} · ${escapeHtml(t('inputConsumption'))} ${escapeHtml(formatResourceAmounts(production.inputsPerWorker, this.locale))}</p>${specialRule}${powerWarning}${stopped}<p class="muted">${escapeHtml(t('projectedLoss'))}: ${escapeHtml(formatResourceAmounts(production.projectedOutputLossIfInfectedOrOverrun, this.locale))} · ${escapeHtml(t('powerGeneration'))} ${production.projectedPowerLossIfInfectedOrOverrun}</p></section>${infection}`;
+    return `${facilityFacts}<section class="production-forecast"><h3>${escapeHtml(t('productionForecast'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('powerMode'))}</dt><dd>${escapeHtml(powerModeLabel(powerMode, this.locale))}</dd></div><div><dt>${escapeHtml(t('powerSupply'))}</dt><dd>${escapeHtml(powerSupply)}</dd></div><div><dt>${escapeHtml(t('projectedPower'))}</dt><dd>${escapeHtml(projectedPower)}</dd></div><div><dt>${escapeHtml(t('powerReason'))}</dt><dd>${escapeHtml(powerReason || t('none'))}</dd></div><div><dt>${escapeHtml(t('lastPowerSupplied'))}</dt><dd>${escapeHtml(lastPower)}</dd></div><div><dt>${escapeHtml(t('productionMultiplier'))}</dt><dd>×${production.projectedProductionMultiplier ?? 1}</dd></div><div><dt>${escapeHtml(t('baseProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(baseProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedProduction'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedProduction, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('projectedInput'))}</dt><dd>${escapeHtml(formatResourceAmounts(projectedInput, this.locale, true))}</dd></div><div><dt>${escapeHtml(t('powerRequirement'))}</dt><dd>${escapeHtml(powerRequirement)}</dd></div><div><dt>${escapeHtml(t('powerGeneration'))}</dt><dd>${escapeHtml(powerGeneration)}</dd></div></dl><p class="muted">${escapeHtml(t('perWorker'))}: ${escapeHtml(t('currentProduction'))} ${escapeHtml(formatResourceAmounts(production.outputsPerWorker, this.locale))} · ${escapeHtml(t('inputConsumption'))} ${escapeHtml(formatResourceAmounts(production.inputsPerWorker, this.locale))}</p>${specialRule}${powerWarning}${stopped}${recoveryDetail}<p class="muted">${escapeHtml(t('projectedLoss'))}: ${escapeHtml(formatResourceAmounts(production.projectedOutputLossIfInfectedOrOverrun, this.locale))} · ${escapeHtml(t('powerGeneration'))} ${production.projectedPowerLossIfInfectedOrOverrun}</p></section>${infection}`;
   }
 
   private renderCheckpointSheet(
@@ -5917,7 +5943,9 @@ export class GameUiController {
     const turnAwayReason = turnAwayEligible
       ? actionReasonFor(this.state!, turnAwayAction, this.locale)
       : (role === 'active' || role === 'remnant' ? null : t('checkpointTurnAwayRole'));
-    const turnAwayControl = `<section class="checkpoint-turn-away" data-turn-away-section="true"><h3>${escapeHtml(t('turnAwayRefugees'))}</h3><p class="muted">${escapeHtml(t('turnAwayHint'))}</p><label>${escapeHtml(t('turnAwayCount'))}<input type="number" min="1" max="${checkpoint.waiting}" step="1" value="${turnAwayRequestedCount || 1}" inputmode="numeric" data-turn-away-count="true" data-checkpoint-id="${escapeHtml(checkpoint.id)}" ${turnAwayEligible ? '' : 'disabled'} /></label><button class="secondary-button" data-action="turn-away-refugees" data-checkpoint-id="${escapeHtml(checkpoint.id)}" ${turnAwayReason || !turnAwayEligible ? 'disabled' : ''}>${escapeHtml(t('turnAwayRefugees'))}</button>${turnAwayReason ? `<p class="warning-text" data-turn-away-reason="true">${escapeHtml(turnAwayReason)}</p>` : '<p class="warning-text" data-turn-away-reason="true" hidden></p>'}<p class="muted">${escapeHtml(t(arrivalsStopped ? 'refugeeRejectionAfterFinal' : 'refugeeRejectionWarning'))}</p></section>`;
+    const away = publicCheckpoint?.turnAwayPreview;
+    const awayDetails = away ? `<details><summary>${this.locale === 'ja' ? '全審査待ち人口を拒否した場合の維持費' : 'Upkeep if all waiting people are turned away'}</summary><p>${away.maxPeople}${this.locale === 'ja' ? '人が対象。通常食料維持費' : ' waiting people. Base food upkeep'} −${away.foodMaintenanceReduction} · ${this.locale === 'ja' ? '通常民需品維持費' : 'base Civilian Goods upkeep'} −${away.civilianGoodsMaintenanceReduction}</p><p>${this.locale === 'ja' ? '審査中・合格済み人口は対象外です。追加維持費は拒否後の人口で再計算します。' : 'Screening and approved people are excluded. Additional penalties are recalculated after rejection.'}</p></details>` : '';
+    const turnAwayControl = `<section class="checkpoint-turn-away" data-turn-away-section="true"><h3>${escapeHtml(t('turnAwayRefugees'))}</h3><p class="muted">${escapeHtml(t('turnAwayHint'))}</p><label>${escapeHtml(t('turnAwayCount'))}<input type="number" min="1" max="${checkpoint.waiting}" step="1" value="${turnAwayRequestedCount || 1}" inputmode="numeric" data-turn-away-count="true" data-checkpoint-id="${escapeHtml(checkpoint.id)}" ${turnAwayEligible ? '' : 'disabled'} /></label><button class="secondary-button" data-action="turn-away-refugees" data-checkpoint-id="${escapeHtml(checkpoint.id)}" ${turnAwayReason || !turnAwayEligible ? 'disabled' : ''}>${escapeHtml(t('turnAwayRefugees'))}</button>${turnAwayReason ? `<p class="warning-text" data-turn-away-reason="true">${escapeHtml(turnAwayReason)}</p>` : '<p class="warning-text" data-turn-away-reason="true" hidden></p>'}<p class="muted">${escapeHtml(t(arrivalsStopped ? 'refugeeRejectionAfterFinal' : 'refugeeRejectionWarning'))}</p>${awayDetails}</section>`;
     const queueMaintenance = `<section class="checkpoint-queue-maintenance" data-checkpoint-queue-maintenance="true"><h3>${escapeHtml(t('checkpointQueueMaintenance'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('checkpointMaintenanceHealthy'))}</dt><dd>${queuePeople}</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceFood'))}</dt><dd>${queueFoodMaintenance}</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceCivilianGoods'))}</dt><dd>${queueCivilianGoodsMaintenance}</dd></div></dl><p class="muted">${escapeHtml(t('infected'))}: ${checkpoint.infected} · ${escapeHtml(t('checkpointMaintenanceHealthy'))} ${escapeHtml(t('checkpointMaintenanceHealthyHint'))}</p></section>`;
     const arrivalStopNotice = arrivalsStopped ? `<p class="warning-text refugee-arrivals-stopped" data-refugee-arrivals-stopped="true">${escapeHtml(t('refugeeArrivalsStopped'))}</p>` : '';
     const newPolicies: CheckpointPolicy[] = ['passThrough', 'normal', 'strict'];

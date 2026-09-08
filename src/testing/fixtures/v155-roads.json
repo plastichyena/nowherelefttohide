@@ -1,0 +1,6672 @@
+{
+  "version": "1.5.5",
+  "recordedAt": "2026-09-08T14:20:04.643Z",
+  "platform": "win32",
+  "node": "v22.14.0",
+  "settings": {
+    "districtRadius": 6,
+    "optionalRatio": 0.3,
+    "plain": 10,
+    "forest": 25,
+    "mountain": 80,
+    "shared": 3,
+    "turn": 3,
+    "offAxis": 2,
+    "parallel": 8
+  },
+  "candidates": [
+    {
+      "position": {
+        "q": 26,
+        "r": 19
+      },
+      "connected": true,
+      "hash": "344c3cdf"
+    },
+    {
+      "position": {
+        "q": 31,
+        "r": 24
+      },
+      "connected": true,
+      "hash": "cd74eb2b"
+    },
+    {
+      "position": {
+        "q": 24,
+        "r": 31
+      },
+      "connected": true,
+      "hash": "748dd3cd"
+    },
+    {
+      "position": {
+        "q": 19,
+        "r": 26
+      },
+      "connected": true,
+      "hash": "7412ed25"
+    }
+  ],
+  "rows": [
+    {
+      "stage": "none",
+      "generationMs": 0.12540000000444707,
+      "roles": {
+        "trunk": 100,
+        "collector": 0,
+        "access": 0
+      },
+      "trunkShare": 1,
+      "sharedEdgeFraction": 0,
+      "hash": "dcf76a52",
+      "roadBytes": 1938,
+      "edgeCount": 100,
+      "hexCount": 101,
+      "degree": {
+        "1": 4,
+        "2": 96,
+        "4": 1
+      },
+      "terrain": {
+        "plain": 101
+      },
+      "nonPlain": [],
+      "deadEnds": 4,
+      "cycleRank": 0,
+      "mandatoryNewEdges": 0,
+      "optionalNewEdges": 0,
+      "paths": [
+        {
+          "from": "capital",
+          "to": "city-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "city-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "city-3",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "capital",
+          "to": "city-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "city-5",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "capital",
+          "to": "city-6",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "capital",
+          "to": "city-7",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "capital",
+          "to": "city-8",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "farm-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "farm-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "farm-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "farm-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "farm-5",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-2",
+          "mp": 12,
+          "edges": 12,
+          "policeFuel": 8
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-3",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "military-factory-1",
+          "mp": 4,
+          "edges": 4,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "military-factory-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "military-factory-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "refinery-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "refinery-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "capital",
+          "to": "refinery-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "refinery-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "power-plant-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "power-plant-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "capital",
+          "to": "power-plant-3",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "capital",
+          "to": "wind-power-plant-1",
+          "mp": 1,
+          "edges": 1,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "capital",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "city-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "city-3",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "city-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-1",
+          "to": "city-5",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "city-6",
+          "mp": 24,
+          "edges": 24,
+          "policeFuel": 20
+        },
+        {
+          "from": "city-1",
+          "to": "city-7",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-1",
+          "to": "city-8",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-1",
+          "to": "farm-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "farm-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "farm-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "farm-4",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-1",
+          "to": "farm-5",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-2",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "military-factory-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "military-factory-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "military-factory-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-1",
+          "mp": 3,
+          "edges": 3,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-2",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-3",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "power-plant-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-1",
+          "to": "power-plant-2",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-1",
+          "to": "power-plant-3",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-1",
+          "to": "wind-power-plant-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-2",
+          "to": "capital",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-2",
+          "to": "city-1",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-2",
+          "to": "city-3",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-2",
+          "to": "city-4",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-2",
+          "to": "city-5",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-2",
+          "to": "city-6",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-2",
+          "to": "city-7",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-2",
+          "to": "city-8",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-2",
+          "to": "farm-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-2",
+          "to": "farm-2",
+          "mp": 3,
+          "edges": 3,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-2",
+          "to": "farm-3",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-2",
+          "to": "farm-4",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-2",
+          "to": "farm-5",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-2",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-3",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-4",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "military-factory-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-2",
+          "to": "military-factory-2",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-2",
+          "to": "military-factory-3",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-1",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-3",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-2",
+          "to": "power-plant-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "power-plant-2",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-2",
+          "to": "power-plant-3",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "wind-power-plant-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-3",
+          "to": "capital",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-3",
+          "to": "city-1",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-3",
+          "to": "city-2",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "city-4",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-3",
+          "to": "city-5",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-3",
+          "to": "city-6",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-3",
+          "to": "city-7",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-3",
+          "to": "city-8",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "farm-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-3",
+          "to": "farm-2",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "farm-3",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-3",
+          "to": "farm-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-3",
+          "to": "farm-5",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-1",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-2",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-3",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-3",
+          "to": "military-factory-1",
+          "mp": 12,
+          "edges": 12,
+          "policeFuel": 8
+        },
+        {
+          "from": "city-3",
+          "to": "military-factory-2",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "military-factory-3",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-2",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-3",
+          "to": "power-plant-1",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-3",
+          "to": "power-plant-2",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-3",
+          "to": "power-plant-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-3",
+          "to": "wind-power-plant-1",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-4",
+          "to": "capital",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "city-1",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-4",
+          "to": "city-2",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-4",
+          "to": "city-3",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-4",
+          "to": "city-5",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "city-6",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-4",
+          "to": "city-7",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-4",
+          "to": "city-8",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-4",
+          "to": "farm-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-4",
+          "to": "farm-2",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-4",
+          "to": "farm-3",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-4",
+          "to": "farm-4",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-4",
+          "to": "farm-5",
+          "mp": 33,
+          "edges": 33,
+          "policeFuel": 29
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-1",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-2",
+          "mp": 25,
+          "edges": 25,
+          "policeFuel": 21
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-3",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-4",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-4",
+          "to": "military-factory-1",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-4",
+          "to": "military-factory-2",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-4",
+          "to": "military-factory-3",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-2",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-4",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-4",
+          "to": "power-plant-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "power-plant-2",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-4",
+          "to": "power-plant-3",
+          "mp": 33,
+          "edges": 33,
+          "policeFuel": 29
+        },
+        {
+          "from": "city-4",
+          "to": "wind-power-plant-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-5",
+          "to": "capital",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "city-1",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-5",
+          "to": "city-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-5",
+          "to": "city-3",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "city-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-5",
+          "to": "city-6",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-5",
+          "to": "city-7",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-5",
+          "to": "city-8",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-5",
+          "to": "farm-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-5",
+          "to": "farm-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-5",
+          "to": "farm-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-5",
+          "to": "farm-4",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "farm-5",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-1",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-2",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-3",
+          "mp": 4,
+          "edges": 4,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-4",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-5",
+          "to": "military-factory-1",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-5",
+          "to": "military-factory-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-5",
+          "to": "military-factory-3",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-3",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-5",
+          "to": "power-plant-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-5",
+          "to": "power-plant-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-5",
+          "to": "power-plant-3",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-5",
+          "to": "wind-power-plant-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-6",
+          "to": "capital",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-6",
+          "to": "city-1",
+          "mp": 24,
+          "edges": 24,
+          "policeFuel": 20
+        },
+        {
+          "from": "city-6",
+          "to": "city-2",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-6",
+          "to": "city-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-6",
+          "to": "city-4",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-6",
+          "to": "city-5",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-6",
+          "to": "city-7",
+          "mp": 28,
+          "edges": 28,
+          "policeFuel": 24
+        },
+        {
+          "from": "city-6",
+          "to": "city-8",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-6",
+          "to": "farm-1",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-6",
+          "to": "farm-2",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-6",
+          "to": "farm-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-6",
+          "to": "farm-4",
+          "mp": 4,
+          "edges": 4,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-6",
+          "to": "farm-5",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-2",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-3",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-4",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-6",
+          "to": "military-factory-1",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-6",
+          "to": "military-factory-2",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-6",
+          "to": "military-factory-3",
+          "mp": 3,
+          "edges": 3,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-1",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-2",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-3",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-4",
+          "mp": 28,
+          "edges": 28,
+          "policeFuel": 24
+        },
+        {
+          "from": "city-6",
+          "to": "power-plant-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-6",
+          "to": "power-plant-2",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-6",
+          "to": "power-plant-3",
+          "mp": 31,
+          "edges": 31,
+          "policeFuel": 27
+        },
+        {
+          "from": "city-6",
+          "to": "wind-power-plant-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-7",
+          "to": "capital",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "city-1",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "city-2",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-7",
+          "to": "city-3",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-7",
+          "to": "city-4",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-7",
+          "to": "city-5",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-7",
+          "to": "city-6",
+          "mp": 28,
+          "edges": 28,
+          "policeFuel": 24
+        },
+        {
+          "from": "city-7",
+          "to": "city-8",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "farm-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-7",
+          "to": "farm-2",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-7",
+          "to": "farm-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-7",
+          "to": "farm-4",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-7",
+          "to": "farm-5",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-3",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-4",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-7",
+          "to": "military-factory-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-7",
+          "to": "military-factory-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-7",
+          "to": "military-factory-3",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-1",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-2",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-4",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-7",
+          "to": "power-plant-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-7",
+          "to": "power-plant-2",
+          "mp": 24,
+          "edges": 24,
+          "policeFuel": 20
+        },
+        {
+          "from": "city-7",
+          "to": "power-plant-3",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-7",
+          "to": "wind-power-plant-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-8",
+          "to": "capital",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "city-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "city-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "city-3",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-8",
+          "to": "city-4",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-8",
+          "to": "city-5",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-8",
+          "to": "city-6",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-8",
+          "to": "city-7",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-8",
+          "to": "farm-1",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-8",
+          "to": "farm-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-8",
+          "to": "farm-3",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-8",
+          "to": "farm-4",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-8",
+          "to": "farm-5",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-2",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-3",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-4",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-8",
+          "to": "military-factory-1",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-8",
+          "to": "military-factory-2",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-8",
+          "to": "military-factory-3",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-2",
+          "mp": 31,
+          "edges": 31,
+          "policeFuel": 27
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-3",
+          "mp": 31,
+          "edges": 31,
+          "policeFuel": 27
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-4",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-8",
+          "to": "power-plant-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-8",
+          "to": "power-plant-2",
+          "mp": 33,
+          "edges": 33,
+          "policeFuel": 29
+        },
+        {
+          "from": "city-8",
+          "to": "power-plant-3",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-8",
+          "to": "wind-power-plant-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        }
+      ],
+      "entrances": [
+        {
+          "direction": "north",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "city-1",
+          "mp": 20,
+          "pathLength": 20,
+          "unopposedMovementTurns": 7
+        },
+        {
+          "direction": "north",
+          "target": "city-2",
+          "mp": 8,
+          "pathLength": 8,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "north",
+          "target": "city-3",
+          "mp": 33,
+          "pathLength": 33,
+          "unopposedMovementTurns": 11
+        },
+        {
+          "direction": "north",
+          "target": "city-4",
+          "mp": 42,
+          "pathLength": 42,
+          "unopposedMovementTurns": 14
+        },
+        {
+          "direction": "north",
+          "target": "city-5",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "north",
+          "target": "city-6",
+          "mp": 44,
+          "pathLength": 44,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "north",
+          "target": "city-7",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "city-8",
+          "mp": 26,
+          "pathLength": 26,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "farm-1",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "farm-2",
+          "mp": 11,
+          "pathLength": 11,
+          "unopposedMovementTurns": 4
+        },
+        {
+          "direction": "north",
+          "target": "farm-3",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "north",
+          "target": "farm-4",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "north",
+          "target": "farm-5",
+          "mp": 29,
+          "pathLength": 29,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "east",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "city-1",
+          "mp": 30,
+          "pathLength": 30,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "east",
+          "target": "city-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "east",
+          "target": "city-3",
+          "mp": 17,
+          "pathLength": 17,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "east",
+          "target": "city-4",
+          "mp": 8,
+          "pathLength": 8,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "east",
+          "target": "city-5",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "city-6",
+          "mp": 25,
+          "pathLength": 24,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "city-7",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "east",
+          "target": "city-8",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "east",
+          "target": "farm-1",
+          "mp": 27,
+          "pathLength": 27,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "farm-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "east",
+          "target": "farm-3",
+          "mp": 16,
+          "pathLength": 16,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "east",
+          "target": "farm-4",
+          "mp": 22,
+          "pathLength": 22,
+          "unopposedMovementTurns": 8
+        },
+        {
+          "direction": "east",
+          "target": "farm-5",
+          "mp": 40,
+          "pathLength": 40,
+          "unopposedMovementTurns": 14
+        },
+        {
+          "direction": "south",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "city-1",
+          "mp": 30,
+          "pathLength": 30,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "south",
+          "target": "city-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "south",
+          "target": "city-3",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "city-4",
+          "mp": 26,
+          "pathLength": 26,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "city-5",
+          "mp": 16,
+          "pathLength": 16,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "south",
+          "target": "city-6",
+          "mp": 7,
+          "pathLength": 7,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "south",
+          "target": "city-7",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "south",
+          "target": "city-8",
+          "mp": 42,
+          "pathLength": 42,
+          "unopposedMovementTurns": 14
+        },
+        {
+          "direction": "south",
+          "target": "farm-1",
+          "mp": 27,
+          "pathLength": 27,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "farm-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "south",
+          "target": "farm-3",
+          "mp": 30,
+          "pathLength": 30,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "south",
+          "target": "farm-4",
+          "mp": 11,
+          "pathLength": 11,
+          "unopposedMovementTurns": 4
+        },
+        {
+          "direction": "south",
+          "target": "farm-5",
+          "mp": 36,
+          "pathLength": 36,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "west",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "west",
+          "target": "city-1",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "west",
+          "target": "city-2",
+          "mp": 25,
+          "pathLength": 24,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "west",
+          "target": "city-3",
+          "mp": 33,
+          "pathLength": 33,
+          "unopposedMovementTurns": 11
+        },
+        {
+          "direction": "west",
+          "target": "city-4",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "west",
+          "target": "city-5",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "west",
+          "target": "city-6",
+          "mp": 44,
+          "pathLength": 44,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "west",
+          "target": "city-7",
+          "mp": 16,
+          "pathLength": 16,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "west",
+          "target": "city-8",
+          "mp": 8,
+          "pathLength": 8,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "west",
+          "target": "farm-1",
+          "mp": 23,
+          "pathLength": 23,
+          "unopposedMovementTurns": 8
+        },
+        {
+          "direction": "west",
+          "target": "farm-2",
+          "mp": 22,
+          "pathLength": 21,
+          "unopposedMovementTurns": 8
+        },
+        {
+          "direction": "west",
+          "target": "farm-3",
+          "mp": 39,
+          "pathLength": 39,
+          "unopposedMovementTurns": 13
+        },
+        {
+          "direction": "west",
+          "target": "farm-4",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "west",
+          "target": "farm-5",
+          "mp": 14,
+          "pathLength": 14,
+          "unopposedMovementTurns": 5
+        }
+      ],
+      "hunterRange": [
+        {
+          "position": {
+            "q": 14,
+            "r": 2
+          },
+          "reachableHexes": 255
+        },
+        {
+          "position": {
+            "q": 48,
+            "r": 49
+          },
+          "reachableHexes": 145
+        }
+      ]
+    },
+    {
+      "stage": "required",
+      "generationMs": 163.9108999999953,
+      "roles": {
+        "trunk": 100,
+        "collector": 7,
+        "access": 35
+      },
+      "trunkShare": 0.704225352112676,
+      "sharedEdgeFraction": 0,
+      "hash": "13d0db60",
+      "roadBytes": 4032,
+      "edgeCount": 142,
+      "hexCount": 143,
+      "degree": {
+        "1": 23,
+        "2": 102,
+        "3": 15,
+        "4": 3
+      },
+      "terrain": {
+        "plain": 143
+      },
+      "nonPlain": [],
+      "deadEnds": 23,
+      "cycleRank": 0,
+      "mandatoryNewEdges": 41,
+      "optionalNewEdges": 0,
+      "paths": [
+        {
+          "from": "capital",
+          "to": "city-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "city-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "city-3",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "capital",
+          "to": "city-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "city-5",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "capital",
+          "to": "city-6",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "capital",
+          "to": "city-7",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "capital",
+          "to": "city-8",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "farm-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "farm-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "farm-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "farm-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "farm-5",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-2",
+          "mp": 12,
+          "edges": 12,
+          "policeFuel": 8
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-3",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "military-factory-1",
+          "mp": 4,
+          "edges": 4,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "military-factory-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "military-factory-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "refinery-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "refinery-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "capital",
+          "to": "refinery-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "refinery-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "power-plant-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "power-plant-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "capital",
+          "to": "power-plant-3",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "capital",
+          "to": "wind-power-plant-1",
+          "mp": 1,
+          "edges": 1,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "capital",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "city-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "city-3",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "city-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-1",
+          "to": "city-5",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "city-6",
+          "mp": 24,
+          "edges": 24,
+          "policeFuel": 20
+        },
+        {
+          "from": "city-1",
+          "to": "city-7",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-1",
+          "to": "city-8",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-1",
+          "to": "farm-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "farm-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "farm-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "farm-4",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-1",
+          "to": "farm-5",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-2",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "military-factory-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "military-factory-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "military-factory-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-1",
+          "mp": 3,
+          "edges": 3,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-2",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-3",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "power-plant-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-1",
+          "to": "power-plant-2",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-1",
+          "to": "power-plant-3",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-1",
+          "to": "wind-power-plant-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-2",
+          "to": "capital",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-2",
+          "to": "city-1",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-2",
+          "to": "city-3",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-2",
+          "to": "city-4",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-2",
+          "to": "city-5",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-2",
+          "to": "city-6",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-2",
+          "to": "city-7",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-2",
+          "to": "city-8",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-2",
+          "to": "farm-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-2",
+          "to": "farm-2",
+          "mp": 3,
+          "edges": 3,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-2",
+          "to": "farm-3",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-2",
+          "to": "farm-4",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-2",
+          "to": "farm-5",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-2",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-3",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-4",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "military-factory-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-2",
+          "to": "military-factory-2",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-2",
+          "to": "military-factory-3",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-1",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-3",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-2",
+          "to": "power-plant-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "power-plant-2",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-2",
+          "to": "power-plant-3",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "wind-power-plant-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-3",
+          "to": "capital",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-3",
+          "to": "city-1",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-3",
+          "to": "city-2",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "city-4",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-3",
+          "to": "city-5",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-3",
+          "to": "city-6",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-3",
+          "to": "city-7",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-3",
+          "to": "city-8",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "farm-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-3",
+          "to": "farm-2",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "farm-3",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-3",
+          "to": "farm-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-3",
+          "to": "farm-5",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-1",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-2",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-3",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-3",
+          "to": "military-factory-1",
+          "mp": 12,
+          "edges": 12,
+          "policeFuel": 8
+        },
+        {
+          "from": "city-3",
+          "to": "military-factory-2",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "military-factory-3",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-2",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-3",
+          "to": "power-plant-1",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-3",
+          "to": "power-plant-2",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-3",
+          "to": "power-plant-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-3",
+          "to": "wind-power-plant-1",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-4",
+          "to": "capital",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "city-1",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-4",
+          "to": "city-2",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-4",
+          "to": "city-3",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-4",
+          "to": "city-5",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "city-6",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-4",
+          "to": "city-7",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-4",
+          "to": "city-8",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-4",
+          "to": "farm-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-4",
+          "to": "farm-2",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-4",
+          "to": "farm-3",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-4",
+          "to": "farm-4",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-4",
+          "to": "farm-5",
+          "mp": 33,
+          "edges": 33,
+          "policeFuel": 29
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-1",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-2",
+          "mp": 25,
+          "edges": 25,
+          "policeFuel": 21
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-3",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-4",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-4",
+          "to": "military-factory-1",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-4",
+          "to": "military-factory-2",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-4",
+          "to": "military-factory-3",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-2",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-4",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-4",
+          "to": "power-plant-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "power-plant-2",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-4",
+          "to": "power-plant-3",
+          "mp": 33,
+          "edges": 33,
+          "policeFuel": 29
+        },
+        {
+          "from": "city-4",
+          "to": "wind-power-plant-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-5",
+          "to": "capital",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "city-1",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-5",
+          "to": "city-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-5",
+          "to": "city-3",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "city-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-5",
+          "to": "city-6",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-5",
+          "to": "city-7",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-5",
+          "to": "city-8",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-5",
+          "to": "farm-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-5",
+          "to": "farm-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-5",
+          "to": "farm-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-5",
+          "to": "farm-4",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "farm-5",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-1",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-2",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-3",
+          "mp": 4,
+          "edges": 4,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-4",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-5",
+          "to": "military-factory-1",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-5",
+          "to": "military-factory-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-5",
+          "to": "military-factory-3",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-3",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-5",
+          "to": "power-plant-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-5",
+          "to": "power-plant-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-5",
+          "to": "power-plant-3",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-5",
+          "to": "wind-power-plant-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-6",
+          "to": "capital",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-6",
+          "to": "city-1",
+          "mp": 24,
+          "edges": 24,
+          "policeFuel": 20
+        },
+        {
+          "from": "city-6",
+          "to": "city-2",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-6",
+          "to": "city-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-6",
+          "to": "city-4",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-6",
+          "to": "city-5",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-6",
+          "to": "city-7",
+          "mp": 28,
+          "edges": 28,
+          "policeFuel": 24
+        },
+        {
+          "from": "city-6",
+          "to": "city-8",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-6",
+          "to": "farm-1",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-6",
+          "to": "farm-2",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-6",
+          "to": "farm-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-6",
+          "to": "farm-4",
+          "mp": 4,
+          "edges": 4,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-6",
+          "to": "farm-5",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-2",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-3",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-4",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-6",
+          "to": "military-factory-1",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-6",
+          "to": "military-factory-2",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-6",
+          "to": "military-factory-3",
+          "mp": 3,
+          "edges": 3,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-1",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-2",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-3",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-4",
+          "mp": 28,
+          "edges": 28,
+          "policeFuel": 24
+        },
+        {
+          "from": "city-6",
+          "to": "power-plant-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-6",
+          "to": "power-plant-2",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-6",
+          "to": "power-plant-3",
+          "mp": 31,
+          "edges": 31,
+          "policeFuel": 27
+        },
+        {
+          "from": "city-6",
+          "to": "wind-power-plant-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-7",
+          "to": "capital",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "city-1",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "city-2",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-7",
+          "to": "city-3",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-7",
+          "to": "city-4",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-7",
+          "to": "city-5",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-7",
+          "to": "city-6",
+          "mp": 28,
+          "edges": 28,
+          "policeFuel": 24
+        },
+        {
+          "from": "city-7",
+          "to": "city-8",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "farm-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-7",
+          "to": "farm-2",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-7",
+          "to": "farm-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-7",
+          "to": "farm-4",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-7",
+          "to": "farm-5",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-3",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-4",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-7",
+          "to": "military-factory-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-7",
+          "to": "military-factory-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-7",
+          "to": "military-factory-3",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-1",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-2",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-4",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-7",
+          "to": "power-plant-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-7",
+          "to": "power-plant-2",
+          "mp": 24,
+          "edges": 24,
+          "policeFuel": 20
+        },
+        {
+          "from": "city-7",
+          "to": "power-plant-3",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-7",
+          "to": "wind-power-plant-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-8",
+          "to": "capital",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "city-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "city-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "city-3",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-8",
+          "to": "city-4",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-8",
+          "to": "city-5",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-8",
+          "to": "city-6",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-8",
+          "to": "city-7",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-8",
+          "to": "farm-1",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-8",
+          "to": "farm-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-8",
+          "to": "farm-3",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-8",
+          "to": "farm-4",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-8",
+          "to": "farm-5",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-2",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-3",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-4",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-8",
+          "to": "military-factory-1",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-8",
+          "to": "military-factory-2",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-8",
+          "to": "military-factory-3",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-2",
+          "mp": 31,
+          "edges": 31,
+          "policeFuel": 27
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-3",
+          "mp": 31,
+          "edges": 31,
+          "policeFuel": 27
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-4",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-8",
+          "to": "power-plant-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-8",
+          "to": "power-plant-2",
+          "mp": 33,
+          "edges": 33,
+          "policeFuel": 29
+        },
+        {
+          "from": "city-8",
+          "to": "power-plant-3",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-8",
+          "to": "wind-power-plant-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        }
+      ],
+      "entrances": [
+        {
+          "direction": "north",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "city-1",
+          "mp": 20,
+          "pathLength": 20,
+          "unopposedMovementTurns": 7
+        },
+        {
+          "direction": "north",
+          "target": "city-2",
+          "mp": 8,
+          "pathLength": 8,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "north",
+          "target": "city-3",
+          "mp": 33,
+          "pathLength": 33,
+          "unopposedMovementTurns": 11
+        },
+        {
+          "direction": "north",
+          "target": "city-4",
+          "mp": 42,
+          "pathLength": 42,
+          "unopposedMovementTurns": 14
+        },
+        {
+          "direction": "north",
+          "target": "city-5",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "north",
+          "target": "city-6",
+          "mp": 44,
+          "pathLength": 44,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "north",
+          "target": "city-7",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "city-8",
+          "mp": 26,
+          "pathLength": 26,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "farm-1",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "farm-2",
+          "mp": 11,
+          "pathLength": 11,
+          "unopposedMovementTurns": 4
+        },
+        {
+          "direction": "north",
+          "target": "farm-3",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "north",
+          "target": "farm-4",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "north",
+          "target": "farm-5",
+          "mp": 29,
+          "pathLength": 29,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "east",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "city-1",
+          "mp": 30,
+          "pathLength": 30,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "east",
+          "target": "city-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "east",
+          "target": "city-3",
+          "mp": 17,
+          "pathLength": 17,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "east",
+          "target": "city-4",
+          "mp": 8,
+          "pathLength": 8,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "east",
+          "target": "city-5",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "city-6",
+          "mp": 25,
+          "pathLength": 24,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "city-7",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "east",
+          "target": "city-8",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "east",
+          "target": "farm-1",
+          "mp": 27,
+          "pathLength": 27,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "farm-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "east",
+          "target": "farm-3",
+          "mp": 16,
+          "pathLength": 16,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "east",
+          "target": "farm-4",
+          "mp": 22,
+          "pathLength": 22,
+          "unopposedMovementTurns": 8
+        },
+        {
+          "direction": "east",
+          "target": "farm-5",
+          "mp": 40,
+          "pathLength": 40,
+          "unopposedMovementTurns": 14
+        },
+        {
+          "direction": "south",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "city-1",
+          "mp": 30,
+          "pathLength": 30,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "south",
+          "target": "city-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "south",
+          "target": "city-3",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "city-4",
+          "mp": 26,
+          "pathLength": 26,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "city-5",
+          "mp": 16,
+          "pathLength": 16,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "south",
+          "target": "city-6",
+          "mp": 7,
+          "pathLength": 7,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "south",
+          "target": "city-7",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "south",
+          "target": "city-8",
+          "mp": 42,
+          "pathLength": 42,
+          "unopposedMovementTurns": 14
+        },
+        {
+          "direction": "south",
+          "target": "farm-1",
+          "mp": 27,
+          "pathLength": 27,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "farm-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "south",
+          "target": "farm-3",
+          "mp": 30,
+          "pathLength": 30,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "south",
+          "target": "farm-4",
+          "mp": 11,
+          "pathLength": 11,
+          "unopposedMovementTurns": 4
+        },
+        {
+          "direction": "south",
+          "target": "farm-5",
+          "mp": 36,
+          "pathLength": 36,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "west",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "west",
+          "target": "city-1",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "west",
+          "target": "city-2",
+          "mp": 25,
+          "pathLength": 24,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "west",
+          "target": "city-3",
+          "mp": 33,
+          "pathLength": 33,
+          "unopposedMovementTurns": 11
+        },
+        {
+          "direction": "west",
+          "target": "city-4",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "west",
+          "target": "city-5",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "west",
+          "target": "city-6",
+          "mp": 44,
+          "pathLength": 44,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "west",
+          "target": "city-7",
+          "mp": 16,
+          "pathLength": 16,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "west",
+          "target": "city-8",
+          "mp": 8,
+          "pathLength": 8,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "west",
+          "target": "farm-1",
+          "mp": 23,
+          "pathLength": 23,
+          "unopposedMovementTurns": 8
+        },
+        {
+          "direction": "west",
+          "target": "farm-2",
+          "mp": 22,
+          "pathLength": 21,
+          "unopposedMovementTurns": 8
+        },
+        {
+          "direction": "west",
+          "target": "farm-3",
+          "mp": 39,
+          "pathLength": 39,
+          "unopposedMovementTurns": 13
+        },
+        {
+          "direction": "west",
+          "target": "farm-4",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "west",
+          "target": "farm-5",
+          "mp": 14,
+          "pathLength": 14,
+          "unopposedMovementTurns": 5
+        }
+      ],
+      "hunterRange": [
+        {
+          "position": {
+            "q": 14,
+            "r": 2
+          },
+          "reachableHexes": 255
+        },
+        {
+          "position": {
+            "q": 48,
+            "r": 49
+          },
+          "reachableHexes": 145
+        }
+      ]
+    },
+    {
+      "stage": "optional",
+      "generationMs": 589.3088999999964,
+      "roles": {
+        "trunk": 100,
+        "collector": 12,
+        "access": 35
+      },
+      "trunkShare": 0.6802721088435374,
+      "sharedEdgeFraction": 0.026490066225165563,
+      "hash": "344c3cdf",
+      "roadBytes": 4248,
+      "edgeCount": 147,
+      "hexCount": 147,
+      "degree": {
+        "1": 23,
+        "2": 104,
+        "3": 17,
+        "4": 3
+      },
+      "terrain": {
+        "plain": 147
+      },
+      "nonPlain": [],
+      "deadEnds": 23,
+      "cycleRank": 1,
+      "mandatoryNewEdges": 41,
+      "optionalNewEdges": 5,
+      "paths": [
+        {
+          "from": "capital",
+          "to": "city-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "city-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "city-3",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "capital",
+          "to": "city-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "city-5",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "capital",
+          "to": "city-6",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "capital",
+          "to": "city-7",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "capital",
+          "to": "city-8",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "farm-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "farm-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "farm-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "farm-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "farm-5",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-2",
+          "mp": 12,
+          "edges": 12,
+          "policeFuel": 8
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-3",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "capital",
+          "to": "civilian-factory-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "military-factory-1",
+          "mp": 4,
+          "edges": 4,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "military-factory-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "military-factory-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "capital",
+          "to": "refinery-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "refinery-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "capital",
+          "to": "refinery-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "refinery-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "capital",
+          "to": "power-plant-1",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "capital",
+          "to": "power-plant-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "capital",
+          "to": "power-plant-3",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "capital",
+          "to": "wind-power-plant-1",
+          "mp": 1,
+          "edges": 1,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "capital",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "city-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "city-3",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "city-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-1",
+          "to": "city-5",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "city-6",
+          "mp": 24,
+          "edges": 24,
+          "policeFuel": 20
+        },
+        {
+          "from": "city-1",
+          "to": "city-7",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-1",
+          "to": "city-8",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-1",
+          "to": "farm-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "farm-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "farm-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "farm-4",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-1",
+          "to": "farm-5",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-2",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-1",
+          "to": "civilian-factory-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "military-factory-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "military-factory-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-1",
+          "to": "military-factory-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-1",
+          "mp": 3,
+          "edges": 3,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-2",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-3",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-1",
+          "to": "refinery-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-1",
+          "to": "power-plant-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-1",
+          "to": "power-plant-2",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-1",
+          "to": "power-plant-3",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-1",
+          "to": "wind-power-plant-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-2",
+          "to": "capital",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-2",
+          "to": "city-1",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-2",
+          "to": "city-3",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-2",
+          "to": "city-4",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-2",
+          "to": "city-5",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-2",
+          "to": "city-6",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-2",
+          "to": "city-7",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-2",
+          "to": "city-8",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-2",
+          "to": "farm-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-2",
+          "to": "farm-2",
+          "mp": 3,
+          "edges": 3,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-2",
+          "to": "farm-3",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-2",
+          "to": "farm-4",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-2",
+          "to": "farm-5",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-2",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-3",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-2",
+          "to": "civilian-factory-4",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "military-factory-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-2",
+          "to": "military-factory-2",
+          "mp": 2,
+          "edges": 2,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-2",
+          "to": "military-factory-3",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-1",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-3",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-2",
+          "to": "refinery-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-2",
+          "to": "power-plant-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "power-plant-2",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-2",
+          "to": "power-plant-3",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-2",
+          "to": "wind-power-plant-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-3",
+          "to": "capital",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-3",
+          "to": "city-1",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-3",
+          "to": "city-2",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "city-4",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-3",
+          "to": "city-5",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-3",
+          "to": "city-6",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-3",
+          "to": "city-7",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-3",
+          "to": "city-8",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "farm-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-3",
+          "to": "farm-2",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "farm-3",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-3",
+          "to": "farm-4",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-3",
+          "to": "farm-5",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-1",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-2",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-3",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-3",
+          "to": "civilian-factory-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-3",
+          "to": "military-factory-1",
+          "mp": 12,
+          "edges": 12,
+          "policeFuel": 8
+        },
+        {
+          "from": "city-3",
+          "to": "military-factory-2",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-3",
+          "to": "military-factory-3",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-2",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-3",
+          "to": "refinery-4",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-3",
+          "to": "power-plant-1",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-3",
+          "to": "power-plant-2",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-3",
+          "to": "power-plant-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-3",
+          "to": "wind-power-plant-1",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-4",
+          "to": "capital",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "city-1",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-4",
+          "to": "city-2",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-4",
+          "to": "city-3",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-4",
+          "to": "city-5",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "city-6",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-4",
+          "to": "city-7",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-4",
+          "to": "city-8",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-4",
+          "to": "farm-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-4",
+          "to": "farm-2",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-4",
+          "to": "farm-3",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-4",
+          "to": "farm-4",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-4",
+          "to": "farm-5",
+          "mp": 33,
+          "edges": 33,
+          "policeFuel": 29
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-1",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-2",
+          "mp": 25,
+          "edges": 25,
+          "policeFuel": 21
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-3",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-4",
+          "to": "civilian-factory-4",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-4",
+          "to": "military-factory-1",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-4",
+          "to": "military-factory-2",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-4",
+          "to": "military-factory-3",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-2",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "refinery-4",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-4",
+          "to": "power-plant-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-4",
+          "to": "power-plant-2",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-4",
+          "to": "power-plant-3",
+          "mp": 33,
+          "edges": 33,
+          "policeFuel": 29
+        },
+        {
+          "from": "city-4",
+          "to": "wind-power-plant-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-5",
+          "to": "capital",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "city-1",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-5",
+          "to": "city-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-5",
+          "to": "city-3",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "city-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-5",
+          "to": "city-6",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-5",
+          "to": "city-7",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-5",
+          "to": "city-8",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-5",
+          "to": "farm-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-5",
+          "to": "farm-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-5",
+          "to": "farm-3",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-5",
+          "to": "farm-4",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "farm-5",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-1",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-2",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-3",
+          "mp": 4,
+          "edges": 4,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-5",
+          "to": "civilian-factory-4",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-5",
+          "to": "military-factory-1",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-5",
+          "to": "military-factory-2",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-5",
+          "to": "military-factory-3",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-3",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-5",
+          "to": "refinery-4",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-5",
+          "to": "power-plant-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-5",
+          "to": "power-plant-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-5",
+          "to": "power-plant-3",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-5",
+          "to": "wind-power-plant-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-6",
+          "to": "capital",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-6",
+          "to": "city-1",
+          "mp": 24,
+          "edges": 24,
+          "policeFuel": 20
+        },
+        {
+          "from": "city-6",
+          "to": "city-2",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-6",
+          "to": "city-3",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-6",
+          "to": "city-4",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-6",
+          "to": "city-5",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-6",
+          "to": "city-7",
+          "mp": 28,
+          "edges": 28,
+          "policeFuel": 24
+        },
+        {
+          "from": "city-6",
+          "to": "city-8",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-6",
+          "to": "farm-1",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-6",
+          "to": "farm-2",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-6",
+          "to": "farm-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-6",
+          "to": "farm-4",
+          "mp": 4,
+          "edges": 4,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-6",
+          "to": "farm-5",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-2",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-3",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-6",
+          "to": "civilian-factory-4",
+          "mp": 30,
+          "edges": 30,
+          "policeFuel": 26
+        },
+        {
+          "from": "city-6",
+          "to": "military-factory-1",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-6",
+          "to": "military-factory-2",
+          "mp": 37,
+          "edges": 37,
+          "policeFuel": 33
+        },
+        {
+          "from": "city-6",
+          "to": "military-factory-3",
+          "mp": 3,
+          "edges": 3,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-1",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-2",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-3",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-6",
+          "to": "refinery-4",
+          "mp": 28,
+          "edges": 28,
+          "policeFuel": 24
+        },
+        {
+          "from": "city-6",
+          "to": "power-plant-1",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-6",
+          "to": "power-plant-2",
+          "mp": 21,
+          "edges": 21,
+          "policeFuel": 17
+        },
+        {
+          "from": "city-6",
+          "to": "power-plant-3",
+          "mp": 31,
+          "edges": 31,
+          "policeFuel": 27
+        },
+        {
+          "from": "city-6",
+          "to": "wind-power-plant-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-7",
+          "to": "capital",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "city-1",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "city-2",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-7",
+          "to": "city-3",
+          "mp": 17,
+          "edges": 17,
+          "policeFuel": 13
+        },
+        {
+          "from": "city-7",
+          "to": "city-4",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-7",
+          "to": "city-5",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-7",
+          "to": "city-6",
+          "mp": 28,
+          "edges": 28,
+          "policeFuel": 24
+        },
+        {
+          "from": "city-7",
+          "to": "city-8",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "farm-1",
+          "mp": 7,
+          "edges": 7,
+          "policeFuel": 3
+        },
+        {
+          "from": "city-7",
+          "to": "farm-2",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-7",
+          "to": "farm-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-7",
+          "to": "farm-4",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-7",
+          "to": "farm-5",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-2",
+          "mp": 13,
+          "edges": 13,
+          "policeFuel": 9
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-3",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-7",
+          "to": "civilian-factory-4",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-7",
+          "to": "military-factory-1",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-7",
+          "to": "military-factory-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-7",
+          "to": "military-factory-3",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-1",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-2",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-3",
+          "mp": 23,
+          "edges": 23,
+          "policeFuel": 19
+        },
+        {
+          "from": "city-7",
+          "to": "refinery-4",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-7",
+          "to": "power-plant-1",
+          "mp": 11,
+          "edges": 11,
+          "policeFuel": 7
+        },
+        {
+          "from": "city-7",
+          "to": "power-plant-2",
+          "mp": 24,
+          "edges": 24,
+          "policeFuel": 20
+        },
+        {
+          "from": "city-7",
+          "to": "power-plant-3",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-7",
+          "to": "wind-power-plant-1",
+          "mp": 10,
+          "edges": 10,
+          "policeFuel": 6
+        },
+        {
+          "from": "city-8",
+          "to": "capital",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "city-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "city-2",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "city-3",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-8",
+          "to": "city-4",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-8",
+          "to": "city-5",
+          "mp": 26,
+          "edges": 26,
+          "policeFuel": 22
+        },
+        {
+          "from": "city-8",
+          "to": "city-6",
+          "mp": 36,
+          "edges": 36,
+          "policeFuel": 32
+        },
+        {
+          "from": "city-8",
+          "to": "city-7",
+          "mp": 9,
+          "edges": 9,
+          "policeFuel": 5
+        },
+        {
+          "from": "city-8",
+          "to": "farm-1",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-8",
+          "to": "farm-2",
+          "mp": 15,
+          "edges": 15,
+          "policeFuel": 11
+        },
+        {
+          "from": "city-8",
+          "to": "farm-3",
+          "mp": 32,
+          "edges": 32,
+          "policeFuel": 28
+        },
+        {
+          "from": "city-8",
+          "to": "farm-4",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-8",
+          "to": "farm-5",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-1",
+          "mp": 20,
+          "edges": 20,
+          "policeFuel": 16
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-2",
+          "mp": 22,
+          "edges": 22,
+          "policeFuel": 18
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-3",
+          "mp": 27,
+          "edges": 27,
+          "policeFuel": 23
+        },
+        {
+          "from": "city-8",
+          "to": "civilian-factory-4",
+          "mp": 6,
+          "edges": 6,
+          "policeFuel": 2
+        },
+        {
+          "from": "city-8",
+          "to": "military-factory-1",
+          "mp": 14,
+          "edges": 14,
+          "policeFuel": 10
+        },
+        {
+          "from": "city-8",
+          "to": "military-factory-2",
+          "mp": 16,
+          "edges": 16,
+          "policeFuel": 12
+        },
+        {
+          "from": "city-8",
+          "to": "military-factory-3",
+          "mp": 35,
+          "edges": 35,
+          "policeFuel": 31
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-1",
+          "mp": 18,
+          "edges": 18,
+          "policeFuel": 14
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-2",
+          "mp": 31,
+          "edges": 31,
+          "policeFuel": 27
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-3",
+          "mp": 31,
+          "edges": 31,
+          "policeFuel": 27
+        },
+        {
+          "from": "city-8",
+          "to": "refinery-4",
+          "mp": 8,
+          "edges": 8,
+          "policeFuel": 4
+        },
+        {
+          "from": "city-8",
+          "to": "power-plant-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        },
+        {
+          "from": "city-8",
+          "to": "power-plant-2",
+          "mp": 33,
+          "edges": 33,
+          "policeFuel": 29
+        },
+        {
+          "from": "city-8",
+          "to": "power-plant-3",
+          "mp": 5,
+          "edges": 5,
+          "policeFuel": 1
+        },
+        {
+          "from": "city-8",
+          "to": "wind-power-plant-1",
+          "mp": 19,
+          "edges": 19,
+          "policeFuel": 15
+        }
+      ],
+      "entrances": [
+        {
+          "direction": "north",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "city-1",
+          "mp": 20,
+          "pathLength": 20,
+          "unopposedMovementTurns": 7
+        },
+        {
+          "direction": "north",
+          "target": "city-2",
+          "mp": 8,
+          "pathLength": 8,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "north",
+          "target": "city-3",
+          "mp": 33,
+          "pathLength": 33,
+          "unopposedMovementTurns": 11
+        },
+        {
+          "direction": "north",
+          "target": "city-4",
+          "mp": 42,
+          "pathLength": 42,
+          "unopposedMovementTurns": 14
+        },
+        {
+          "direction": "north",
+          "target": "city-5",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "north",
+          "target": "city-6",
+          "mp": 44,
+          "pathLength": 44,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "north",
+          "target": "city-7",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "city-8",
+          "mp": 26,
+          "pathLength": 26,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "farm-1",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "north",
+          "target": "farm-2",
+          "mp": 11,
+          "pathLength": 11,
+          "unopposedMovementTurns": 4
+        },
+        {
+          "direction": "north",
+          "target": "farm-3",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "north",
+          "target": "farm-4",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "north",
+          "target": "farm-5",
+          "mp": 29,
+          "pathLength": 29,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "east",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "city-1",
+          "mp": 30,
+          "pathLength": 30,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "east",
+          "target": "city-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "east",
+          "target": "city-3",
+          "mp": 17,
+          "pathLength": 17,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "east",
+          "target": "city-4",
+          "mp": 8,
+          "pathLength": 8,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "east",
+          "target": "city-5",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "city-6",
+          "mp": 25,
+          "pathLength": 24,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "city-7",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "east",
+          "target": "city-8",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "east",
+          "target": "farm-1",
+          "mp": 27,
+          "pathLength": 27,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "east",
+          "target": "farm-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "east",
+          "target": "farm-3",
+          "mp": 16,
+          "pathLength": 16,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "east",
+          "target": "farm-4",
+          "mp": 22,
+          "pathLength": 22,
+          "unopposedMovementTurns": 8
+        },
+        {
+          "direction": "east",
+          "target": "farm-5",
+          "mp": 40,
+          "pathLength": 40,
+          "unopposedMovementTurns": 14
+        },
+        {
+          "direction": "south",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "city-1",
+          "mp": 30,
+          "pathLength": 30,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "south",
+          "target": "city-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "south",
+          "target": "city-3",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "city-4",
+          "mp": 26,
+          "pathLength": 26,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "city-5",
+          "mp": 16,
+          "pathLength": 16,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "south",
+          "target": "city-6",
+          "mp": 7,
+          "pathLength": 7,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "south",
+          "target": "city-7",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "south",
+          "target": "city-8",
+          "mp": 42,
+          "pathLength": 42,
+          "unopposedMovementTurns": 14
+        },
+        {
+          "direction": "south",
+          "target": "farm-1",
+          "mp": 27,
+          "pathLength": 27,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "south",
+          "target": "farm-2",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "south",
+          "target": "farm-3",
+          "mp": 30,
+          "pathLength": 30,
+          "unopposedMovementTurns": 10
+        },
+        {
+          "direction": "south",
+          "target": "farm-4",
+          "mp": 11,
+          "pathLength": 11,
+          "unopposedMovementTurns": 4
+        },
+        {
+          "direction": "south",
+          "target": "farm-5",
+          "mp": 36,
+          "pathLength": 36,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "west",
+          "target": "capital",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "west",
+          "target": "city-1",
+          "mp": 25,
+          "pathLength": 25,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "west",
+          "target": "city-2",
+          "mp": 25,
+          "pathLength": 24,
+          "unopposedMovementTurns": 9
+        },
+        {
+          "direction": "west",
+          "target": "city-3",
+          "mp": 33,
+          "pathLength": 33,
+          "unopposedMovementTurns": 11
+        },
+        {
+          "direction": "west",
+          "target": "city-4",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "west",
+          "target": "city-5",
+          "mp": 34,
+          "pathLength": 34,
+          "unopposedMovementTurns": 12
+        },
+        {
+          "direction": "west",
+          "target": "city-6",
+          "mp": 44,
+          "pathLength": 44,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "west",
+          "target": "city-7",
+          "mp": 16,
+          "pathLength": 16,
+          "unopposedMovementTurns": 6
+        },
+        {
+          "direction": "west",
+          "target": "city-8",
+          "mp": 8,
+          "pathLength": 8,
+          "unopposedMovementTurns": 3
+        },
+        {
+          "direction": "west",
+          "target": "farm-1",
+          "mp": 23,
+          "pathLength": 23,
+          "unopposedMovementTurns": 8
+        },
+        {
+          "direction": "west",
+          "target": "farm-2",
+          "mp": 22,
+          "pathLength": 21,
+          "unopposedMovementTurns": 8
+        },
+        {
+          "direction": "west",
+          "target": "farm-3",
+          "mp": 39,
+          "pathLength": 39,
+          "unopposedMovementTurns": 13
+        },
+        {
+          "direction": "west",
+          "target": "farm-4",
+          "mp": 43,
+          "pathLength": 43,
+          "unopposedMovementTurns": 15
+        },
+        {
+          "direction": "west",
+          "target": "farm-5",
+          "mp": 14,
+          "pathLength": 14,
+          "unopposedMovementTurns": 5
+        }
+      ],
+      "hunterRange": [
+        {
+          "position": {
+            "q": 14,
+            "r": 2
+          },
+          "reachableHexes": 255
+        },
+        {
+          "position": {
+            "q": 48,
+            "r": 49
+          },
+          "reachableHexes": 145
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Path and contact-turn values are unopposed static estimates, not combat outcome guarantees.",
+    "Fuel quotes the Core distance formula for one uninterrupted path; long routes require multiple turns and their per-move rounding differs.",
+    "No physical mobile-device measurement."
+  ]
+}

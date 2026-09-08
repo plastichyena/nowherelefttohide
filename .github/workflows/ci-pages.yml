@@ -121,7 +121,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run v1.5.4 Balanced seed regression
+      - name: Run v1.5.5 Balanced seed regression
         env:
           AGENT_STRATEGY: balanced
           BALANCED_SEED_START: ${{ matrix.start }}
@@ -130,7 +130,7 @@ jobs:
         run: npx --no-install vitest run src/agent/balancedAgent.batch.test.ts --pool=threads --maxWorkers=1
 
   session-release-validation:
-    name: Session v1.5.4 normal 1,000-action validation
+    name: Session v1.5.5 normal 1,000-action validation
     # This long-running job is independent of verify: Pages deployment must
     # not wait for release persistence validation.
     runs-on: ubuntu-latest
@@ -151,12 +151,15 @@ jobs:
       - name: Validate 1,000 accepted Core actions through SessionService
         run: npx --no-install vite-node --script src/testing/session-release-validation.ts --decisions=1000 --json-out=output/session-release/normal-1000.json
 
+      - name: Validate public ZIP viewer, seeks and cancellation
+        run: npx --no-install vite-node --script src/testing/v155-replay-validation.ts output/session-release/normal-1000.json
+
       - name: Upload Session validation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: session-v154-normal-1000
-          path: output/session-release/normal-1000.json
+          name: session-v155-normal-1000
+          path: output/session-release/normal-1000*.json
           if-no-files-found: error
           retention-days: 30
 
@@ -164,7 +167,7 @@ jobs:
     name: Deploy to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Long fixed-seed release batches live in the separately dispatched
-    # v1.5.4 Release Validation workflow and never delay Pages or AI Portable.
+    # v1.5.5 Release Validation workflow and never delay Pages or AI Portable.
     needs: verify
     runs-on: ubuntu-latest
     permissions:

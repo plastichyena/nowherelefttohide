@@ -61,8 +61,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.5.4');
-    expect(titleVersionLabel('en')).toContain('1.5.4');
+    expect(titleVersionLabel('ja')).toContain('1.5.5');
+    expect(titleVersionLabel('en')).toContain('1.5.5');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -310,15 +310,15 @@ describe('controller view models', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
     expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.3以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.4');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.5');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
     expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.3 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.4');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.5');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 6.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 13');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 6.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 13');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 7.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 14');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 7.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 14');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
       expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3 or earlier');
@@ -624,7 +624,7 @@ describe('controller view models', () => {
     expect(nextTurnPenaltyForecastSummary({ nextTurnPenalties: {} }, 'en')).toBe('Target turn —');
   });
 
-  it('renders only Final Pending and Final Map as v1.5.4 Victory progress', () => {
+  it('renders only Final Pending and Final Map as v1.5.5 Victory progress', () => {
     const state = {
       horde: {
         finalHordeStatus: 'active',
@@ -684,7 +684,7 @@ describe('controller view models', () => {
       expect(details).toContain(createTranslator(locale)('unitStoresLostOnDestruction'));
       expect(details).toContain(createTranslator(locale)('guardRangeTwoMilitaryGoodsRule'));
 
-      const attack = renderAttackPreview({
+      const attack = renderAttackPreview({ gasExplosion: null,
         targetUnitId: 'zombie-visible',
         distance: 1,
         militaryGoodsCost: 0,
@@ -751,7 +751,7 @@ describe('controller view models', () => {
     expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
   });
 
-  it('keeps v1.5.4 Help values aligned for power, reserve, Soldier, Army Base, and Wind', () => {
+  it('keeps v1.5.5 Help values aligned for power, reserve, Soldier, Army Base, and Wind', () => {
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
       const production = t('tipProduction');

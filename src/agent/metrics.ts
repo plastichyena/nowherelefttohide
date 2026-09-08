@@ -160,6 +160,11 @@ export interface GameMetrics {
   maxOvercrowding: number;
   maxOvercrowdingAdditionalFood: number;
   maxOvercrowdingAdditionalCivilianGoods: number;
+  housingBuilt: number;
+  housingResidentTurns: number;
+  housingCivilianGoodsProduced: number;
+  housingOutageFacilityTurns: number;
+  housingResidentsFinal: number;
   facilitiesCaptured: number;
   facilitiesLost: number;
   finalSecuredFacilities: number;
@@ -1536,6 +1541,11 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     maxOvercrowding: maxOvercrowdingObservation,
     maxOvercrowdingAdditionalFood: maxAdditionalFood,
     maxOvercrowdingAdditionalCivilianGoods: maxAdditionalCivilianGoods,
+    housingBuilt: statisticNumber(statistics, 'housingBuilt') ?? 0,
+    housingResidentTurns: statisticNumber(statistics, 'housingResidentTurns') ?? 0,
+    housingCivilianGoodsProduced: statisticNumber(statistics, 'housingCivilianGoodsProduced') ?? 0,
+    housingOutageFacilityTurns: statisticNumber(statistics, 'housingOutageFacilityTurns') ?? 0,
+    housingResidentsFinal: finalObservation.facilities.filter(f => f.type === 'temporaryHousing' && f.owner === 'player').reduce((n,f) => n + f.healthyPopulation, 0),
     facilitiesCaptured: events.filter((event) => event.type === 'facility_captured').length,
     facilitiesLost: events.filter((event) => event.type === 'facility_overrun' && typeof event.payload.facilityId === 'string').length,
     finalSecuredFacilities,

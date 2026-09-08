@@ -188,6 +188,7 @@ export interface FacilityDefinition {
 }
 
 export interface FixedMap {
+  roads?: import('./roads').RoadNetwork;
   id: string;
   width: number;
   height: number;
@@ -646,6 +647,10 @@ export interface GameStatistics {
   hunterZombiesKilled: number;
   gasZombiesKilled: number;
   gasZombiesSpawned: number;
+  housingBuilt: number;
+  housingResidentTurns: number;
+  housingCivilianGoodsProduced: number;
+  housingOutageFacilityTurns: number;
   gasExplosions: number;
   gasExplosionUnitDamage: number;
   riotPoliceReanimations: number;
@@ -845,6 +850,9 @@ export interface NextTurnPenaltyForecast {
 export interface EndTurnForecast {
   housingOutage: HousingOutageForecast;
   populationConsumers: number;
+  maintenancePopulation: { residents: number; workers: number; units: number; queue: { waiting: number; screening: number; approved: number } };
+  maintenanceBreakdown: { food: { base: number; overcrowding: number; housingOutage: number; total: number }; civilianGoods: { base: number; overcrowding: number; housingOutage: number; total: number } };
+
   overcrowding: {
     /** Exact sum represented as per-city rational terms. */
     cities: Array<{ facilityId: FacilityId; excess: number; softCap: number }>;

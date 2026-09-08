@@ -24,7 +24,7 @@ export function deriveProductionCapacity(
     if (f.operationalStatus === 'stopped' && f.workers === 0) inactiveReasons.push('no_workers');
     if (projection?.projectedPowerReason && !['not_applicable', 'supplied'].includes(projection.projectedPowerReason)) inactiveReasons.push(projection.projectedPowerReason);
     if (projection?.stoppedReason === 'input_shortage') inactiveReasons.push('production_input_shortage');
-    const output = (workers: number) => Object.fromEntries(Object.entries(rule.outputs).map(([r, per]) => [r, per * workers]));
+    const output = (workers: number) => Object.fromEntries(Object.entries(rule.outputs).map(([r, per]) => [r, Math.floor(per * workers)]));
     const residentWorkers = city ? Math.min(f.workers, config.workerCapacity) : 0;
     return {
       facilityId: f.id, inactiveReasons: [...new Set(inactiveReasons)],
@@ -32,7 +32,7 @@ export function deriveProductionCapacity(
       currentWorkerRatedOutputs: city ? {} : output(f.workers),
       residentRatedOutputs: city ? output(residentWorkers) : {},
       residentSoftCapRatedCeiling: city ? output(config.workerCapacity) : {},
-      residentSoftCapGap: city ? output(config.workerCapacity - residentWorkers) : {},
+      residentSoftCapGap: city ? Object.fromEntries(Object.entries(output(config.workerCapacity)).map(([r, n]) => [r, n - (output(residentWorkers)[r] ?? 0)])) : {},
       installedPowerCapacity: rule.powerGeneration * config.workerCapacity + rule.fixedPowerGeneration,
       currentWorkerPowerCapacity: rule.powerGeneration * f.workers + rule.fixedPowerGeneration,
     };

@@ -609,3 +609,15 @@ button.crisis-alert:hover, button.crisis-alert:focus-visible { border-color: #ff
   .resource-accordion-toggle small { font-size: 0.55rem; }
   .resource-accordion-grid, .population-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.replay-view { width: min(1100px, 100%); margin: auto; padding: 12px; box-sizing: border-box; }
+.replay-view header, .replay-view nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.replay-view header h1 { font-size: 1.3rem; flex: 1; }
+.replay-view button, .replay-view select, .replay-view input { min-height: 44px; }
+.replay-view input[type=number] { width: 70px; }
+.replay-view canvas { display: block; width: 100%; height: clamp(250px, 48vh, 600px); border-radius: 12px; margin: 10px 0; }
+.replay-comment, .replay-log { padding: 12px; margin-top: 10px; background: #202d29; border-radius: 10px; overflow-wrap: anywhere; }
+.replay-comment h2, .replay-log h2 { font-size: 1rem; }
+.replay-comment p { white-space: pre-wrap; }
+.replay-log ol { max-height: 220px; overflow: auto; font-size: .85rem; }
+.replay-screen { overflow: auto; }

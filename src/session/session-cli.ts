@@ -235,8 +235,10 @@ export function executeSessionCommand(
         revision: result.revision, count: result.count, total: result.total, hasMore: result.hasMore,
         nextCursor: result.nextCursor, outputPath };
     }
-    case 'artifact':
-      return { ok: true, command: parsed.command, artifact: service.exportArtifact(parsed.sessionId!, parsed.outputPath ? resolve(parsed.outputPath) : undefined) };
+    case 'artifact': {
+      const artifact = service.exportArtifact(parsed.sessionId!, parsed.outputPath ? resolve(parsed.outputPath) : undefined);
+      return { ok: true, command: parsed.command, artifact, replayZipPath: `${artifact.artifactPath}.zip` };
+    }
   }
 }
 
