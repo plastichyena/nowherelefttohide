@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { replayArtifact } from '../agent/runner';
+import { openReplayJson } from '../agent/json-file';
 import type { AgentRunArtifact } from '../agent/types';
 import type { SimulationReport } from '../agent/sim-cli';
 import { validateReleaseSeedCoverage, validateReleaseSeedReport } from './release-seed-report';
@@ -31,11 +32,14 @@ try {
     const paths = readdirSync(join(output, 'games')).filter(name => name.endsWith('.json')).sort();
     if (paths.length !== count) throw new Error(`Expected ${count} replay artifacts, got ${paths.length}`);
     for (const [index, name] of paths.entries()) {
-      const artifact = JSON.parse(readFileSync(join(output, 'games', name), 'utf8')) as AgentRunArtifact;
-      if (artifact.artifactType !== 'replay' || artifact.agent.strategy !== agent || artifact.seed !== start + index) throw new Error(`Artifact metadata mismatch: ${name}`);
-      const replay = replayArtifact(artifact);
-      if (!replay.reproduced || replay.error !== null) throw new Error(`Replay mismatch: ${name}: ${JSON.stringify(replay)}`);
-      console.log(JSON.stringify({ agent, seed: artifact.seed, replayed: true }));
+      const file = openReplayJson(join(output, 'games', name));
+      try {
+        const artifact = file.value as unknown as AgentRunArtifact;
+        if (artifact.artifactType !== 'replay' || artifact.agent.strategy !== agent || artifact.seed !== start + index) throw new Error(`Artifact metadata mismatch: ${name}`);
+        const replay = replayArtifact(artifact);
+        if (!replay.reproduced || replay.error !== null) throw new Error(`Replay mismatch: ${name}: ${replay.mismatch ?? replay.error?.message ?? 'unknown'}`);
+        console.log(JSON.stringify({ agent, seed: artifact.seed, replayed: true }));
+      } finally { file.close(); }
     }
     writeFileSync(join(output, 'replay-validation.json'), JSON.stringify({ agent, seeds: report.execution.seeds, replayed: paths.length }) + '\n');
   } else {
