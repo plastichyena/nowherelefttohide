@@ -1,0 +1,1149 @@
+{
+  "seed": 3,
+  "sourceRun": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34238545597",
+  "actions": [
+    {
+      "type": "BuildConstructibleFacility",
+      "facilityType": "simpleFarm",
+      "position": {
+        "q": 26,
+        "r": 27
+      }
+    },
+    {
+      "type": "Move",
+      "unitId": "police-1",
+      "destination": {
+        "q": 27,
+        "r": 18
+      }
+    },
+    {
+      "type": "BuildConstructibleFacility",
+      "facilityType": "simpleFarm",
+      "position": {
+        "q": 26,
+        "r": 26
+      }
+    },
+    {
+      "type": "Move",
+      "unitId": "national-guard-1",
+      "destination": {
+        "q": 26,
+        "r": 31
+      }
+    },
+    {
+      "type": "BuildConstructibleFacility",
+      "facilityType": "simpleFarm",
+      "position": {
+        "q": 26,
+        "r": 23
+      }
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 8
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 18
+    },
+    {
+      "type": "BuildConstructibleFacility",
+      "facilityType": "temporaryHousing",
+      "position": {
+        "q": 26,
+        "r": 22
+      }
+    },
+    {
+      "type": "BuildConstructibleFacility",
+      "facilityType": "windPowerPlant",
+      "position": {
+        "q": 22,
+        "r": 23
+      }
+    },
+    {
+      "type": "BuildConstructibleFacility",
+      "facilityType": "civilianDroneBase",
+      "position": {
+        "q": 29,
+        "r": 26
+      }
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 23
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 10
+    },
+    {
+      "type": "BuildCheckpoint",
+      "branchId": "south",
+      "position": {
+        "q": 25,
+        "r": 33
+      }
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 5
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 4
+    },
+    {
+      "type": "SetCheckpointPolicy",
+      "branchId": "south",
+      "policy": "strict"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 8
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 14
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 23
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 10
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 19
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 3
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 3
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 16
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 25
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 14
+    },
+    {
+      "type": "SetPowerSupply",
+      "facilityId": "farm-1",
+      "enabled": false
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 0
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 1
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 18
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 11
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 16
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 26
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 2
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 12
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 18
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 19
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 26
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 2
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 13
+    },
+    {
+      "type": "EndTurn"
+    },
+    {
+      "type": "ProduceUnit",
+      "unitType": "riotPolice",
+      "destination": {
+        "q": 25,
+        "r": 25
+      }
+    },
+    {
+      "type": "Move",
+      "unitId": "national-guard-1",
+      "destination": {
+        "q": 25,
+        "r": 35
+      }
+    },
+    {
+      "type": "Move",
+      "unitId": "police-1",
+      "destination": {
+        "q": 36,
+        "r": 14
+      }
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 19
+    },
+    {
+      "type": "BuildCheckpoint",
+      "branchId": "west",
+      "position": {
+        "q": 20,
+        "r": 25
+      }
+    },
+    {
+      "type": "RelocateCheckpoint",
+      "checkpointId": "checkpoint-south-1",
+      "branchId": "south",
+      "position": {
+        "q": 25,
+        "r": 28
+      }
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 6
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 19
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 5
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 7
+    },
+    {
+      "type": "BuildCheckpoint",
+      "branchId": "north",
+      "position": {
+        "q": 25,
+        "r": 18
+      }
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 9
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 24
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 10
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 9
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 2
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 16
+    },
+    {
+      "type": "SetCheckpointPolicy",
+      "branchId": "north",
+      "policy": "passThrough"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 25
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 26
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 18
+    },
+    {
+      "type": "SetCheckpointPolicy",
+      "branchId": "west",
+      "policy": "passThrough"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 26
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 20
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 6
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 30
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-2",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 28
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 25
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 4
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 26
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 2
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 18
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 22
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 1
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 6
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 9
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 9
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 18
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 8
+    },
+    {
+      "type": "SetCheckpointPolicy",
+      "branchId": "south",
+      "policy": "passThrough"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 9
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 13
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 3
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-2",
+      "workers": 9
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-drone-base-6",
+      "workers": 1
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 16
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-2",
+      "workers": 10
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 8
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 23
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 4
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 11
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 19
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 8
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 0
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-2",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 27
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 2
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 11
+    },
+    {
+      "type": "SetPowerSupply",
+      "facilityId": "civilian-factory-1",
+      "enabled": false
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 12
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 10
+    },
+    {
+      "type": "SetPowerSupply",
+      "facilityId": "civilian-factory-1",
+      "enabled": true
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 6
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 11
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 21
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 1
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 8
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 27
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 6
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 15
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-drone-base-6",
+      "workers": 2
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 5
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 12
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 21
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-drone-base-6",
+      "workers": 0
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 6
+    },
+    {
+      "type": "SetPowerSupply",
+      "facilityId": "farm-1",
+      "enabled": true
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 29
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 8
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 10
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 3
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 26
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-2",
+      "workers": 6
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 14
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 0
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 25
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 1
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 29
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 15
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-2",
+      "workers": 9
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 15
+    },
+    {
+      "type": "DecommissionConstructibleFacility",
+      "facilityId": "temporary-housing-4"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 11
+    },
+    {
+      "type": "EndTurn"
+    },
+    {
+      "type": "Move",
+      "unitId": "police-1",
+      "destination": {
+        "q": 20,
+        "r": 16
+      }
+    },
+    {
+      "type": "Move",
+      "unitId": "national-guard-1",
+      "destination": {
+        "q": 33,
+        "r": 30
+      }
+    },
+    {
+      "type": "BuildConstructibleFacility",
+      "facilityType": "temporaryHousing",
+      "position": {
+        "q": 24,
+        "r": 19
+      }
+    },
+    {
+      "type": "Move",
+      "unitId": "riot-police-2",
+      "destination": {
+        "q": 27,
+        "r": 30
+      }
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 28
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 13
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 21
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 6
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 27
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 16
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 30
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 1
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-2",
+      "workers": 0
+    },
+    {
+      "type": "ActivateCheckpoint",
+      "branchId": "south",
+      "checkpointId": "checkpoint-south-1"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 25
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 27
+    },
+    {
+      "type": "SetCheckpointPolicy",
+      "branchId": "south",
+      "policy": "normal"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 3
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 21
+    },
+    {
+      "type": "SetCheckpointPolicy",
+      "branchId": "west",
+      "policy": "normal"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 23
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 25
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 22
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 20
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 4
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 25
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 7
+    },
+    {
+      "type": "SetCheckpointPolicy",
+      "branchId": "west",
+      "policy": "strict"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 14
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 16
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 3
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 13
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 22
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 18
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-drone-base-6",
+      "workers": 4
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 14
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 28
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 21
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 1
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 24
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 19
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 28
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 23
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-2",
+      "workers": 8
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 3
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 19
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 0
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 0
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 17
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 4
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-drone-base-6",
+      "workers": 0
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 14
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-1",
+      "workers": 5
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 8
+    },
+    {
+      "type": "ProduceUnit",
+      "unitType": "police",
+      "destination": {
+        "q": 25,
+        "r": 25
+      }
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 7
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 14
+    },
+    {
+      "type": "SetCheckpointPolicy",
+      "branchId": "south",
+      "policy": "passThrough"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 12
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 26
+    },
+    {
+      "type": "Wait",
+      "unitId": "national-guard-1"
+    },
+    {
+      "type": "SetCheckpointPolicy",
+      "branchId": "west",
+      "policy": "passThrough"
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 9
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 4
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "farm-1",
+      "workers": 23
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-2",
+      "workers": 4
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 23
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-drone-base-6",
+      "workers": 1
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "power-plant-1",
+      "workers": 17
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 4
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 10
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "refinery-1",
+      "workers": 18
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "simple-farm-3",
+      "workers": 4
+    },
+    {
+      "type": "AssignWorkers",
+      "facilityId": "civilian-factory-1",
+      "workers": 12
+    },
+    {
+      "type": "EndTurn"
+    }
+  ]
+}

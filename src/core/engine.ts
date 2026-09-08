@@ -1105,6 +1105,10 @@ function fallFacility(
   chainRootEventId: string | null,
   chainDepth: number,
 ): void {
+  // A prior spawn chain may already have destroyed this site while a caller
+  // is iterating a stable facility list. Never resolve or splice it twice.
+  const facilityIndex = state.facilities.indexOf(facility);
+  if (facilityIndex < 0) return;
   if (facility.type === 'windPowerPlant') {
     facility.operationalStatus = 'disabled';
     facility.infected = 0;
@@ -1129,7 +1133,7 @@ function fallFacility(
       chainDepth,
     );
     state.population.cumulativeDeaths += result.remainingInfected;
-    state.facilities.splice(state.facilities.findIndex((candidate) => candidate.id === facility.id), 1);
+    state.facilities.splice(facilityIndex, 1);
     emit(state, 'facility_overrun', {
       facilityId: facility.id,
       constructibleDestroyed: true,
@@ -1551,6 +1555,7 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
 
 function processInternalInfection(state: GameState, rng: SeededRng): void {
   for (const facility of stableFacilities(state)) {
+    if (!state.facilities.includes(facility)) continue;
     if (facility.infected <= 0) {
       continue;
     }
