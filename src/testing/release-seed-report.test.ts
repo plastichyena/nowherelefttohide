@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { SimulationReport } from '../agent/sim-cli';
+import { APP_VERSION } from '../agent/types';
 import { RELEASE_SEED_STARTS, validateReleaseSeedCoverage, validateReleaseSeedReport } from './release-seed-report';
 
 function report(agent = 'balanced', start = 1): SimulationReport {
   const seeds = Array.from({ length: 10 }, (_, index) => start + index);
   return {
-    appVersion: '1.5.5',
+    appVersion: APP_VERSION,
     execution: { agents: [agent], seeds, limits: { maxTurns: 100 } },
     games: seeds.map(seed => ({ agentId: agent, seed, outcome: 'lost', finalTurn: 60, finalHordeSpawned: 1 })),
     failures: [], technicalFailureCount: 0, limitReachedCount: 0, exitCode: 0,
@@ -13,6 +14,14 @@ function report(agent = 'balanced', start = 1): SimulationReport {
 }
 
 describe('release seed validation gates', () => {
+  it('accepts the shipped package version and rejects the previous release', async () => {
+    const { default: metadata } = await import('../../package.json');
+    const value = report();
+    value.appVersion = metadata.version;
+    expect(() => validateReleaseSeedReport(value, 'balanced', 1, 10)).not.toThrow();
+    value.appVersion = '1.5.5';
+    expect(() => validateReleaseSeedReport(value, 'balanced', 1, 10)).toThrow(/Unexpected app version/);
+  });
   it('accepts exactly 100 completed games per agent across all shards', () => {
     const reports = ['random', 'balanced'].flatMap(agent => RELEASE_SEED_STARTS.map(start => report(agent, start)));
     expect(validateReleaseSeedCoverage(reports)).toMatchObject({ games: 200, seedsPerAgent: 100, finalHordeReachableRuns: 100, finalHordeSpawnedRuns: 100, balancedMaxFinalTurn: 60 });

@@ -1,10 +1,11 @@
 import type { SimulationReport } from '../agent/sim-cli';
+import { APP_VERSION } from '../agent/types';
 
 export const RELEASE_SEED_STARTS = [1, 11, 21, 31, 41, 51, 61, 71, 81, 91];
 
 export function validateReleaseSeedReport(report: SimulationReport, agent: string, start: number, count: number): void {
   const seeds = Array.from({ length: count }, (_, index) => start + index);
-  if (report.appVersion !== '1.5.5') throw new Error('Unexpected app version');
+  if (report.appVersion !== APP_VERSION) throw new Error(`Unexpected app version: expected ${APP_VERSION}, received ${report.appVersion}`);
   if (JSON.stringify(report.execution?.agents) !== JSON.stringify([agent])) throw new Error('Agent metadata mismatch');
   if (JSON.stringify(report.execution?.seeds) !== JSON.stringify(seeds)) throw new Error('Seed coverage mismatch');
   if (report.execution?.limits?.maxTurns !== 100) throw new Error('Runner maxTurns must remain 100');
@@ -30,7 +31,7 @@ export function validateReleaseSeedCoverage(reports: SimulationReport[]) {
     }
   }
   const balanced = reports.filter(report => report.execution.agents[0] === 'balanced').flatMap(report => report.games);
-  // The v1.5.5 acceptance criteria require measuring progression, not a
+  // The release acceptance criteria require measuring progression, not a
   // minimum win/survival rate for Balanced. A normal loss is a completed game.
   // Keep zero coverage explicit instead of treating AI strength as a crash.
   return {

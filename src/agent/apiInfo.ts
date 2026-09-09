@@ -449,9 +449,11 @@ export function createAgentApiInfo(
         limitFormula: 'Simple Farm / Drone: ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor); Temporary Housing: unlimited; Wind: roadBranchCount',
         buildConditions: [
           'inside_player_supply',
+          'currently_visible_hex',
           'plain_base_terrain',
           'no_trunk_road_urban_horde_entrance_or_spawn_reserve',
           'no_facility_checkpoint_player_unit_or_visible_zombie',
+          'no_barbed_wire',
           'type_limit_resources_and_action_budget',
         ],
         costs: {

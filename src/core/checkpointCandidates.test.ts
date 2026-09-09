@@ -167,7 +167,7 @@ describe('v1.4 position candidates', () => {
     expect(engine.getState()).toEqual(before);
   });
 
-  it('does not expose a hidden Zombie in Constructible candidates and accepts hidden co-location', () => {
+  it('does not expose a hidden Zombie when rejecting unseen Constructible destinations', () => {
     const config = createDefaultConfig({
       economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
@@ -176,7 +176,7 @@ describe('v1.4 position candidates', () => {
     const engine = new GameEngine(46, config);
     const baseline = engine.getConstructibleFacilityPositionCandidates('simpleFarm');
     const visible = getPlayerVisibleTileKeys(engine.getState());
-    const legal = baseline.find((candidate) => candidate.legal && !visible.has(hexKey(candidate.position)))!;
+    const legal = baseline.find((candidate) => candidate.reasonCode === 'constructible_not_visible' && !visible.has(hexKey(candidate.position)))!;
     expect(legal).toBeDefined();
     const hidden = createUnit(engine.getState(), 'hidden-build-zombie', 'zombie', legal.position);
     const snapshot = cloneState(engine.getState());
@@ -185,8 +185,9 @@ describe('v1.4 position candidates', () => {
     const withHidden = engine.getConstructibleFacilityPositionCandidates('simpleFarm');
     expect(withHidden).toEqual(baseline);
     expect(JSON.stringify(withHidden)).not.toContain(hidden.id);
-    expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: legal.position }).error).toBeNull();
-    expect(engine.getState().facilities.find((facility) => facility.constructible)?.position).toEqual(legal.position);
+    const before = cloneState(engine.getState());
+    expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: legal.position }).error?.code).toBe('constructible_not_visible');
+    expect(engine.getState()).toEqual(before);
   });
 
   it('rejects a Build target that is outside the current Player Vision', () => {

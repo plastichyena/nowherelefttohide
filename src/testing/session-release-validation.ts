@@ -12,6 +12,7 @@ import { ZERO_HASH } from '../session/types';
 import type { SessionGameFactory, SessionGameRuntime, SessionQueryResult } from '../session/types';
 import { createSessionReleaseFixtureFactory } from './session-release-fixture';
 import type { SessionStatusProbeReport } from './session-status-probe';
+import { artifactPayloadBytes } from './session-release-size';
 interface ParsedArguments {
     decisions: number;
     largeMiB: number | null;
@@ -36,7 +37,7 @@ interface StageTimings {
 }
 const STATUS_SAMPLES = 9;
 const NORMAL_STORAGE_SAMPLE_INTERVAL = 25;
-const LARGE_STORAGE_SAMPLE_INTERVAL = 1000;
+const LARGE_STORAGE_SAMPLE_INTERVAL = 100;
 const LARGE_MAX_DECISIONS = 2000000;
 function usage(): string {
     return [
@@ -282,6 +283,7 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
         ? NORMAL_STORAGE_SAMPLE_INTERVAL
         : LARGE_STORAGE_SAMPLE_INTERVAL;
     let largeTargetReached = largeTargetBytes === null;
+    let publicArtifactPayloadBytes = 0;
     let decisionsExecuted = 0;
     while (decisionsExecuted < options.decisions || !largeTargetReached) {
         if (decisionsExecuted >= LARGE_MAX_DECISIONS)
@@ -319,7 +321,14 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
         peakRssBytes = Math.max(peakRssBytes, process.memoryUsage().rss);
         if (decision % storageSampleInterval === 0 || decision === options.decisions) {
             storage = measure(timings, 'storageScanMs', () => directoryStats(sessionRoot));
-            largeTargetReached = largeTargetBytes === null || storage.bytes > largeTargetBytes;
+            // Private checkpoints and unused pool payloads are not exported.
+            // Count the deduplicated physical chunks referenced by this public
+            // history, a lower bound on the eventual branched Package size.
+            if (largeTargetBytes !== null) {
+                publicArtifactPayloadBytes = measure(timings, 'storageScanMs', () => artifactPayloadBytes(store, sessionId));
+                largeTargetReached = publicArtifactPayloadBytes > largeTargetBytes;
+                process.stdout.write(`${JSON.stringify({ stage: 'large-package-generation', decisions: decision, storeBytes: storage.bytes, publicArtifactPayloadBytes, targetBytes: largeTargetBytes })}\n`);
+            }
         }
     }
     const historyLengthComparison = measure(timings, 'historyLengthComparisonMs', () => {
@@ -525,6 +534,7 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
             publicSnapshotInterval: largeFixture ? 1 : 50,
             checkpointInterval: largeFixture ? 1 : 5,
             physicalArtifactPackageTargetReached: largeTargetBytes === null || artifact.bytes > largeTargetBytes,
+            publicArtifactPayloadBytes,
             node: process.version,
             platform: process.platform,
             arch: process.arch,

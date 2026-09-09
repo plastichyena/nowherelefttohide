@@ -2612,6 +2612,7 @@ export function localizeActionError(code: string | undefined, locale: Locale): s
     invalid_power_supply: locale === 'ja' ? 'Power SupplyはONまたはOFFで指定してください。' : 'Power Supply must be ON or OFF.',
     insufficient_unit_fuel: locale === 'ja' ? '移動Fuelが不足しています。' : 'The Unit does not have enough Fuel for this move.',
     constructible_out_of_supply: t('buildSupplyRequired'),
+    constructible_not_visible: locale === 'ja' ? '建設先Hexを現在の視界に入れてください。' : 'Bring the construction Hex into current vision.',
     constructible_invalid_terrain: locale === 'ja' ? '建設にはPlainが必要です。' : 'Only Plain terrain can be built on.',
     constructible_road_blocked: locale === 'ja' ? 'Road Hexには建設できません。' : 'Road Hexes cannot be built on.',
     constructible_entrance_blocked: locale === 'ja' ? 'Horde Entranceには建設できません。' : 'Horde Entrances cannot be built on.',

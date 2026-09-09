@@ -1146,9 +1146,9 @@ EndTurn の順序を次のようにする。
 
 ### 10.13.2 建設
 
-- Plain + Supply 上のみ建設可。
+- 現在視認中のPlain + Supply 上のみ建設可（全Constructible共通）。
 - 既存 Constructible の禁止条件をすべて維持する。幹線Road / Entrance / Reserve / existing Facility / Checkpoint / Player Unit / visible Zombie 等がある Hex は不可。
-- Hidden Zombie は既存 public legality の扱いを維持する。
+- 視界外の建設先はHidden Zombie／壁の有無と無関係に`constructible_not_visible`で拒否する。視認判定より先にHiddenな占有状態を理由へ出さない。
 - 建設 Turn は `building` で効果なし。次 Player Turn Start に Operational 化する。
 - Operational 化した Turn から Capacity / population function / Power Demand が有効になる。
 
@@ -1326,6 +1326,7 @@ Human / AIへ、各Reasonについて以下を公開する。
 - 10.15.3で新設壁と不適格な前後関係になる可能性がある距離1/2のHexも、現在視認できることを要求する。そこでの既存壁の有無を公開情報だけで判定し、視界外の壁破壊を建設候補の変化から漏らさない。視認不足は敵/壁の実在にかかわらず同じ理由で拒否する。
 - 補給喪失や視界喪失で既存壁を消滅させない。
 - 壁のあるHexへの後続の施設/Checkpoint建設・移設を禁止する。建設順で施設共存禁止を回避できないようにする。
+- 建設施設の対象Hexも現在視認を必須とする。壁建設後に視界を失った場合、壁が残っていても消滅していても同じ視認不足理由で拒否する。候補・実行・建設可能範囲の予測へ共通適用する。
 - 資源不足、不適格、古いRevisionの拒否は資源・Action枠・State・RNGを変更しない。
 
 ### 10.15.3 放射方向の間隔制限
@@ -2071,3 +2072,11 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - この比較は感染管理もHuman再配置も行わない限定的な異なるAction列の実験であり、壁の戦闘性能や勝率の推定ではない。突破・肩代わり・Charge・MP・Gas・再生例外は専用の決定的シナリオテストで検証した。HP10・費用5/5・MP5は変更していない。
 - 公開・配布の完了条件は、このコードRevisionのPages deploy成功、公開Pagesの実ブラウザ動作、Linux/Windows AI PortableのBundled Nodeでの完走・Replay一致である。結果は同RevisionのGitHub Actionsとリリース作業の最終報告を参照する。長時間の200ゲーム、1,000 Action、512 MiB検証は起動確認までとし、未確認の結果を成功と扱わない。
 - 今回はユーザーの指示によりサブエージェントを使用していない。ユーザーが先に行ったv1.5.5要件のarchive移動をコミットに含め、archive内の文書本文は変更していない。v1.5.6要件は比較用としてDoc直下に残す。
+
+## 18.6 v1.5.6 Validation追補修正（2026-09-10）
+
+- 前回Release Validation（Run 34346108127、Attempt 2）は失敗。レポート検証がApp 1.5.5を固定要求していたため、全20 shardがReplay検証前に停止した。アプリのAPP_VERSIONと共通化し、配布package.jsonとの一致と旧版拒否を回帰テストへ追加した。
+- レポート内訳は199ゲーム正常終局、Random Seed 69のみ技術的失敗。Turn 2・47判断目に、視界を失った壁（21,37）の上へSimple Farmを建設しようとして不変条件違反となった。失敗直前Stateをfixture化し、視認必須・壁共存禁止・Hidden壁の非公開・拒否時の資源／RNG／State不変を検証した。既存Save Format 15を維持する。
+- 大容量試験は非公開Checkpoint等を含むStore全体で停止判定しており、公開Artifact実容量434,491,566 bytesで512 MiB基準未達だった。公開履歴から実際に参照する圧縮chunkだけを重複排除して実測し、基準を超えるまで実Core Actionを継続する。最終Artifact本体の実容量チェックも保持する。ダミーpaddingや検証基準の緩和は行わない。
+- ローカル通常ゲート78ファイル・728テスト成功、専用長時間テスト11件skip。型検査、本番Build、Browser Bridge smoke、検証ツール8件成功。小規模の大容量モードは3受理Action＋分岐1 Action、公開Package 4,176,373 bytesで出力／読込／Replay一致。512 MiBの結果を代用する値ではない。
+- 元Commit e8a7a4871f9e410973e7bdd37304ae279a7216f5の通常CI（Run 34346049509）は全Job成功。1,000 Action、Balanced Seed 198、Seed 1～30を含む。今回の修正後は200ゲーム・全Replay・物理512 MiBを再実行し、結果を当該Actionsと追補検証記録へ残す。

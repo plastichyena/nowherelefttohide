@@ -3581,6 +3581,8 @@ function constructibleLimit(state: Readonly<GameState>, facilityType: Constructi
 }
 
 interface ConstructibleValidationContext {
+  visibleKeys: ReadonlySet<string>;
+  wallKeys: ReadonlySet<string>;
   suppliedKeys: ReadonlySet<string>;
   facilityKeys: ReadonlySet<string>;
   checkpointKeys: ReadonlySet<string>;
@@ -3590,6 +3592,8 @@ interface ConstructibleValidationContext {
 
 function constructibleValidationContext(state: Readonly<GameState>): ConstructibleValidationContext {
   return {
+    visibleKeys: getPlayerVisibleTileKeys(state),
+    wallKeys: new Set(state.barbedWire.map(wall => hexKey(wall.position))),
     suppliedKeys: new Set(getSuppliedTileKeys(state)),
     facilityKeys: new Set(state.facilities.map((facility) => hexKey(facility.position))),
     checkpointKeys: new Set(state.checkpoints.map((checkpoint) => hexKey(checkpoint.position))),
@@ -3603,7 +3607,6 @@ function validateConstructibleFacilityAction(
   action: Extract<GameAction, { type: 'BuildConstructibleFacility' }>,
   context?: ConstructibleValidationContext,
 ): ActionError | null {
-  if (getPlayerVisibleTileKeys(state).has(hexKey(action.position)) && wireAt(state, action.position)) return error(action, 'barbed_wire_occupied', 'Barbed Wire occupies this Hex');
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   if (!['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'].includes(action.facilityType)) {
@@ -3630,6 +3633,10 @@ function validateConstructibleFacilityAction(
   if (tile.road) return error(action, 'constructible_road_blocked', 'Road Hexes cannot be used');
   if (tile.hordeEntranceDirections.length > 0) return error(action, 'constructible_entrance_blocked', 'Horde Entrances cannot be used');
   const key = hexKey(action.position);
+  // Reject unseen destinations before inspecting obstacles. Hidden wall
+  // destruction must not change public construction legality or its reason.
+  if (!(context?.visibleKeys ?? getPlayerVisibleTileKeys(state)).has(key)) return error(action, 'constructible_not_visible', 'The construction Hex must be currently visible');
+  if (context ? context.wallKeys.has(key) : wireAt(state, action.position)) return error(action, 'barbed_wire_occupied', 'Barbed Wire occupies this Hex');
   if (context ? context.facilityKeys.has(key) : getFacilityAt(state as GameState, action.position) !== undefined) return error(action, 'constructible_facility_occupied', 'A facility already occupies this Hex');
   if (context ? context.checkpointKeys.has(key) : getCheckpointAt(state as GameState, action.position) !== undefined) return error(action, 'constructible_checkpoint_occupied', 'A Checkpoint already occupies this Hex');
   if (context ? context.playerUnitKeys.has(key) : state.units.some((unit) => unit.isPlayerUnit && hexKey(unit.position) === key)) {
@@ -3844,6 +3851,7 @@ function staticConstructibleEligibleHexKeys(state: Readonly<GameState>): Set<str
   const checkpointKeys = new Set(state.checkpoints.map((checkpoint) => hexKey(checkpoint.position)));
   return new Set(state.map.tiles
     .filter((tile) =>
+      visibleTiles.has(tile.key) &&
       tile.terrain === 'plain' &&
       tile.playerOccupancyAllowed &&
       !tile.road &&

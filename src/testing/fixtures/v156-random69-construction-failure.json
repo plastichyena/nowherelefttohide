@@ -1,0 +1,4194 @@
+{
+  "sourceRun": 34346108127,
+  "sourceCommit": "e8a7a4871f9e410973e7bdd37304ae279a7216f5",
+  "seed": 69,
+  "action": {
+    "type": "BuildConstructibleFacility",
+    "facilityType": "simpleFarm",
+    "position": {
+      "q": 21,
+      "r": 37
+    }
+  },
+  "state": {
+    "initialHunterPositions": [
+      {
+        "q": 1,
+        "r": 15
+      },
+      {
+        "q": 33,
+        "r": 3
+      },
+      {
+        "q": 4,
+        "r": 19
+      }
+    ],
+    "initialGasPositions": [
+      {
+        "q": 38,
+        "r": 18
+      }
+    ],
+    "gameVersion": "8.0.0",
+    "seed": 69,
+    "rngState": {
+      "algorithm": "xorshift32-v1",
+      "seed": 69,
+      "state": 3178657539,
+      "calls": 36
+    },
+    "turn": 2,
+    "finalHordeTurn": 50,
+    "actionsTakenThisTurn": 6,
+    "phase": "player",
+    "mapId": "fixed-51x51-v4",
+    "facilities": [
+      {
+        "id": "capital",
+        "type": "capital",
+        "nameKey": "facility.capital",
+        "position": {
+          "q": 25,
+          "r": 25
+        },
+        "workerCapacity": 100,
+        "startingOwned": true,
+        "startingWorkers": 41,
+        "startingInfected": 0,
+        "owner": "player",
+        "status": "owned",
+        "operationalStatus": "operational",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": 0,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 1,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": true,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "city-1",
+        "type": "city",
+        "nameKey": "facility.city",
+        "position": {
+          "q": 25,
+          "r": 20
+        },
+        "workerCapacity": 50,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "city-2",
+        "type": "city",
+        "nameKey": "facility.city",
+        "position": {
+          "q": 24,
+          "r": 8
+        },
+        "workerCapacity": 50,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "city-3",
+        "type": "city",
+        "nameKey": "facility.city",
+        "position": {
+          "q": 33,
+          "r": 25
+        },
+        "workerCapacity": 50,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "city-4",
+        "type": "city",
+        "nameKey": "facility.city",
+        "position": {
+          "q": 43,
+          "r": 24
+        },
+        "workerCapacity": 50,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "city-5",
+        "type": "city",
+        "nameKey": "facility.city",
+        "position": {
+          "q": 25,
+          "r": 34
+        },
+        "workerCapacity": 50,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "city-6",
+        "type": "city",
+        "nameKey": "facility.city",
+        "position": {
+          "q": 26,
+          "r": 43
+        },
+        "workerCapacity": 50,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "city-7",
+        "type": "city",
+        "nameKey": "facility.city",
+        "position": {
+          "q": 16,
+          "r": 25
+        },
+        "workerCapacity": 50,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "city-8",
+        "type": "city",
+        "nameKey": "facility.city",
+        "position": {
+          "q": 7,
+          "r": 26
+        },
+        "workerCapacity": 50,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "farm-1",
+        "type": "farm",
+        "nameKey": "facility.farm",
+        "position": {
+          "q": 23,
+          "r": 25
+        },
+        "workerCapacity": 30,
+        "startingOwned": true,
+        "startingWorkers": 23,
+        "startingInfected": 0,
+        "owner": "player",
+        "status": "owned",
+        "operationalStatus": "operational",
+        "workers": 11,
+        "infected": 0,
+        "securedOrder": 1,
+        "lastAssignedOrder": 29,
+        "populationOperationalTurn": 1,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": true,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "farm-2",
+        "type": "farm",
+        "nameKey": "facility.farm",
+        "position": {
+          "q": 21,
+          "r": 11
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "farm-3",
+        "type": "farm",
+        "nameKey": "facility.farm",
+        "position": {
+          "q": 39,
+          "r": 20
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "farm-4",
+        "type": "farm",
+        "nameKey": "facility.farm",
+        "position": {
+          "q": 29,
+          "r": 39
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "farm-5",
+        "type": "farm",
+        "nameKey": "facility.farm",
+        "position": {
+          "q": 10,
+          "r": 29
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "civilian-factory-1",
+        "type": "civilianFactory",
+        "nameKey": "facility.civilianFactory",
+        "position": {
+          "q": 27,
+          "r": 25
+        },
+        "workerCapacity": 30,
+        "startingOwned": true,
+        "startingWorkers": 23,
+        "startingInfected": 0,
+        "owner": "player",
+        "status": "owned",
+        "operationalStatus": "operational",
+        "workers": 6,
+        "infected": 0,
+        "securedOrder": 2,
+        "lastAssignedOrder": 34,
+        "populationOperationalTurn": 1,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "civilian-factory-2",
+        "type": "civilianFactory",
+        "nameKey": "facility.civilianFactory",
+        "position": {
+          "q": 29,
+          "r": 13
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "civilian-factory-3",
+        "type": "civilianFactory",
+        "nameKey": "facility.civilianFactory",
+        "position": {
+          "q": 22,
+          "r": 38
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "civilian-factory-4",
+        "type": "civilianFactory",
+        "nameKey": "facility.civilianFactory",
+        "position": {
+          "q": 11,
+          "r": 28
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "military-factory-1",
+        "type": "militaryFactory",
+        "nameKey": "facility.militaryFactory",
+        "position": {
+          "q": 21,
+          "r": 25
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "military-factory-2",
+        "type": "militaryFactory",
+        "nameKey": "facility.militaryFactory",
+        "position": {
+          "q": 22,
+          "r": 10
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "military-factory-3",
+        "type": "militaryFactory",
+        "nameKey": "facility.militaryFactory",
+        "position": {
+          "q": 28,
+          "r": 40
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "refinery-1",
+        "type": "refinery",
+        "nameKey": "facility.refinery",
+        "position": {
+          "q": 25,
+          "r": 23
+        },
+        "workerCapacity": 30,
+        "startingOwned": true,
+        "startingWorkers": 10,
+        "startingInfected": 0,
+        "owner": "player",
+        "status": "owned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": 3,
+        "lastAssignedOrder": 37,
+        "populationOperationalTurn": 1,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": true,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "refinery-2",
+        "type": "refinery",
+        "nameKey": "facility.refinery",
+        "position": {
+          "q": 38,
+          "r": 21
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "refinery-3",
+        "type": "refinery",
+        "nameKey": "facility.refinery",
+        "position": {
+          "q": 25,
+          "r": 39
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "refinery-4",
+        "type": "refinery",
+        "nameKey": "facility.refinery",
+        "position": {
+          "q": 11,
+          "r": 30
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "power-plant-1",
+        "type": "powerPlant",
+        "nameKey": "facility.powerPlant",
+        "position": {
+          "q": 25,
+          "r": 27
+        },
+        "workerCapacity": 30,
+        "startingOwned": true,
+        "startingWorkers": 3,
+        "startingInfected": 0,
+        "owner": "player",
+        "status": "owned",
+        "operationalStatus": "operational",
+        "workers": 19,
+        "infected": 0,
+        "securedOrder": 4,
+        "lastAssignedOrder": 38,
+        "populationOperationalTurn": 1,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": null,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "power-plant-2",
+        "type": "powerPlant",
+        "nameKey": "facility.powerPlant",
+        "position": {
+          "q": 40,
+          "r": 22
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": null,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "power-plant-3",
+        "type": "powerPlant",
+        "nameKey": "facility.powerPlant",
+        "position": {
+          "q": 10,
+          "r": 28
+        },
+        "workerCapacity": 30,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": null,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "wind-power-plant-1",
+        "type": "windPowerPlant",
+        "nameKey": "facility.windPowerPlant",
+        "position": {
+          "q": 26,
+          "r": 24
+        },
+        "workerCapacity": 0,
+        "startingOwned": true,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "player",
+        "status": "owned",
+        "operationalStatus": "operational",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": 5,
+        "lastAssignedOrder": 5,
+        "populationOperationalTurn": 1,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": null,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "army-base-1",
+        "type": "armyBase",
+        "nameKey": "facility.armyBase",
+        "position": {
+          "q": 31,
+          "r": 24
+        },
+        "workerCapacity": 10,
+        "startingOwned": false,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "armyBase": {
+          "militaryGoods": 40,
+          "interceptionsRemaining": 0,
+          "reward": "unclaimed"
+        },
+        "owner": "none",
+        "status": "unowned",
+        "operationalStatus": "operational",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": null,
+        "lastAssignedOrder": 0,
+        "populationOperationalTurn": 9007199254740991,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": null,
+        "constructible": false,
+        "builtTurn": null,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "temporary-housing-2",
+        "type": "temporaryHousing",
+        "nameKey": "temporaryHousing",
+        "position": {
+          "q": 27,
+          "r": 21
+        },
+        "workerCapacity": 10,
+        "startingOwned": true,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "player",
+        "status": "owned",
+        "operationalStatus": "operational",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": 7,
+        "lastAssignedOrder": 9,
+        "populationOperationalTurn": 2,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": false,
+        "constructible": true,
+        "builtTurn": 1,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "wind-power-plant-built-3",
+        "type": "windPowerPlant",
+        "nameKey": "windPowerPlant",
+        "position": {
+          "q": 30,
+          "r": 24
+        },
+        "workerCapacity": 0,
+        "startingOwned": true,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "player",
+        "status": "owned",
+        "operationalStatus": "operational",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": 8,
+        "lastAssignedOrder": 10,
+        "populationOperationalTurn": 2,
+        "powerSupplyEnabled": false,
+        "lastPowerSupplied": null,
+        "constructible": true,
+        "builtTurn": 1,
+        "recoveryOperationalTurn": null
+      },
+      {
+        "id": "civilian-drone-base-4",
+        "type": "civilianDroneBase",
+        "nameKey": "civilianDroneBase",
+        "position": {
+          "q": 23,
+          "r": 23
+        },
+        "workerCapacity": 5,
+        "startingOwned": true,
+        "startingWorkers": 0,
+        "startingInfected": 0,
+        "owner": "player",
+        "status": "owned",
+        "operationalStatus": "stopped",
+        "workers": 0,
+        "infected": 0,
+        "securedOrder": 9,
+        "lastAssignedOrder": 11,
+        "populationOperationalTurn": 2,
+        "powerSupplyEnabled": true,
+        "lastPowerSupplied": false,
+        "constructible": true,
+        "builtTurn": 1,
+        "recoveryOperationalTurn": null
+      }
+    ],
+    "cityPopulationSnapshot": {
+      "turn": 2,
+      "supply": [
+        {
+          "facilityId": "capital",
+          "population": 0,
+          "eligible": true
+        },
+        {
+          "facilityId": "temporary-housing-2",
+          "population": 0,
+          "eligible": true
+        }
+      ],
+      "reception": [
+        {
+          "facilityId": "capital",
+          "population": 0,
+          "eligible": true
+        },
+        {
+          "facilityId": "temporary-housing-2",
+          "population": 0,
+          "eligible": true
+        }
+      ]
+    },
+    "population": {
+      "initialPopulation": 115,
+      "cumulativeReinforcements": 0,
+      "cityResidents": 0,
+      "productionWorkers": 36,
+      "healthyCivilians": 36,
+      "police": 5,
+      "nationalGuard": 10,
+      "riotPolice": 0,
+      "unitPopulation": 15,
+      "facilityWorkers": [
+        {
+          "facilityId": "capital",
+          "workers": 0
+        },
+        {
+          "facilityId": "civilian-drone-base-4",
+          "workers": 0
+        },
+        {
+          "facilityId": "civilian-factory-1",
+          "workers": 6
+        },
+        {
+          "facilityId": "farm-1",
+          "workers": 11
+        },
+        {
+          "facilityId": "power-plant-1",
+          "workers": 19
+        },
+        {
+          "facilityId": "refinery-1",
+          "workers": 0
+        },
+        {
+          "facilityId": "temporary-housing-2",
+          "workers": 0
+        },
+        {
+          "facilityId": "wind-power-plant-1",
+          "workers": 0
+        },
+        {
+          "facilityId": "wind-power-plant-built-3",
+          "workers": 0
+        }
+      ],
+      "waitingRefugees": 0,
+      "screeningRefugees": 0,
+      "approvedRefugees": 0,
+      "facilityInfected": 0,
+      "checkpointInfected": 0,
+      "cumulativeDeaths": 64,
+      "cumulativeArrivals": 0,
+      "cumulativeDepartures": 0,
+      "cumulativeDiscoveredInfected": 0
+    },
+    "resources": {
+      "food": 225,
+      "civilianGoods": 25,
+      "militaryGoods": 49,
+      "fuel": 182,
+      "electricityCapacity": 165,
+      "electricityRequired": 25
+    },
+    "units": [
+      {
+        "id": "police-1",
+        "type": "police",
+        "position": {
+          "q": 23,
+          "r": 30
+        },
+        "hp": 25,
+        "maxHp": 25,
+        "attack": 8,
+        "movement": 15,
+        "range": 1,
+        "vision": 5,
+        "population": 5,
+        "proficiency": "regular",
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 11,
+        "maxFuel": 12,
+        "currentMilitaryGoods": 5,
+        "maxMilitaryGoods": 5,
+        "actionState": "moved",
+        "canAttack": true,
+        "canMove": false,
+        "isPlayerUnit": true,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": true,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "national-guard-1",
+        "type": "nationalGuard",
+        "position": {
+          "q": 33,
+          "r": 33
+        },
+        "hp": 50,
+        "maxHp": 50,
+        "attack": 15,
+        "movement": 10,
+        "range": 2,
+        "vision": 5,
+        "population": 10,
+        "proficiency": "regular",
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 21,
+        "maxFuel": 22,
+        "currentMilitaryGoods": 20,
+        "maxMilitaryGoods": 20,
+        "actionState": "moved",
+        "canAttack": true,
+        "canMove": false,
+        "isPlayerUnit": true,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": true,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-1",
+        "type": "zombie",
+        "position": {
+          "q": 21,
+          "r": 19
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-2",
+        "type": "zombie",
+        "position": {
+          "q": 8,
+          "r": 48
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-3",
+        "type": "zombie",
+        "position": {
+          "q": 3,
+          "r": 17
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-4",
+        "type": "zombie",
+        "position": {
+          "q": 37,
+          "r": 46
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-5",
+        "type": "zombie",
+        "position": {
+          "q": 19,
+          "r": 7
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-6",
+        "type": "zombie",
+        "position": {
+          "q": 23,
+          "r": 18
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-7",
+        "type": "zombie",
+        "position": {
+          "q": 47,
+          "r": 2
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-8",
+        "type": "zombie",
+        "position": {
+          "q": 5,
+          "r": 40
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-9",
+        "type": "zombie",
+        "position": {
+          "q": 36,
+          "r": 22
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-10",
+        "type": "zombie",
+        "position": {
+          "q": 29,
+          "r": 48
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-11",
+        "type": "zombie",
+        "position": {
+          "q": 33,
+          "r": 37
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-12",
+        "type": "zombie",
+        "position": {
+          "q": 31,
+          "r": 20
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": {
+          "q": 26,
+          "r": 24
+        },
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-13",
+        "type": "zombie",
+        "position": {
+          "q": 7,
+          "r": 13
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-14",
+        "type": "zombie",
+        "position": {
+          "q": 19,
+          "r": 12
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-15",
+        "type": "zombie",
+        "position": {
+          "q": 4,
+          "r": 27
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-16",
+        "type": "zombie",
+        "position": {
+          "q": 13,
+          "r": 47
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-17",
+        "type": "zombie",
+        "position": {
+          "q": 1,
+          "r": 10
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-18",
+        "type": "zombie",
+        "position": {
+          "q": 7,
+          "r": 48
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-19",
+        "type": "zombie",
+        "position": {
+          "q": 25,
+          "r": 9
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-20",
+        "type": "zombie",
+        "position": {
+          "q": 5,
+          "r": 9
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-21",
+        "type": "zombie",
+        "position": {
+          "q": 41,
+          "r": 11
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-22",
+        "type": "zombie",
+        "position": {
+          "q": 21,
+          "r": 2
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-23",
+        "type": "zombie",
+        "position": {
+          "q": 16,
+          "r": 46
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-24",
+        "type": "zombie",
+        "position": {
+          "q": 11,
+          "r": 46
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "zombie-25",
+        "type": "zombie",
+        "position": {
+          "q": 2,
+          "r": 3
+        },
+        "hp": 15,
+        "maxHp": 15,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "hunter-zombie-initial-1",
+        "type": "hunterZombie",
+        "position": {
+          "q": 1,
+          "r": 15
+        },
+        "hp": 20,
+        "maxHp": 20,
+        "attack": 15,
+        "movement": 15,
+        "range": 1,
+        "vision": 5,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "hunter-zombie-initial-2",
+        "type": "hunterZombie",
+        "position": {
+          "q": 33,
+          "r": 3
+        },
+        "hp": 20,
+        "maxHp": 20,
+        "attack": 15,
+        "movement": 15,
+        "range": 1,
+        "vision": 5,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "hunter-zombie-initial-3",
+        "type": "hunterZombie",
+        "position": {
+          "q": 4,
+          "r": 19
+        },
+        "hp": 20,
+        "maxHp": 20,
+        "attack": 15,
+        "movement": 15,
+        "range": 1,
+        "vision": 5,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      },
+      {
+        "id": "gas-zombie-initial-1",
+        "type": "gasZombie",
+        "position": {
+          "q": 38,
+          "r": 18
+        },
+        "hp": 35,
+        "maxHp": 35,
+        "attack": 5,
+        "movement": 3,
+        "range": 1,
+        "vision": 3,
+        "population": 0,
+        "proficiency": null,
+        "recruitSurvivalTurns": 0,
+        "regularZombieKills": 0,
+        "veteranPromotionPending": false,
+        "attackChargesRemaining": 1,
+        "maxAttackCharges": 1,
+        "currentFuel": 0,
+        "maxFuel": 0,
+        "currentMilitaryGoods": 0,
+        "maxMilitaryGoods": 0,
+        "actionState": "ready",
+        "canAttack": true,
+        "canMove": true,
+        "isPlayerUnit": false,
+        "inheritedTarget": null,
+        "previousFallbackPosition": null,
+        "fallbackTarget": null,
+        "waveCapitalAnchor": null,
+        "noiseTarget": null,
+        "spawnGroupId": null,
+        "hordeKind": null,
+        "activity": {
+          "moved": false,
+          "attacked": false,
+          "intercepted": false,
+          "suppressed": false
+        }
+      }
+    ],
+    "checkpoints": [
+      {
+        "id": "checkpoint-south-1",
+        "position": {
+          "q": 25,
+          "r": 37
+        },
+        "direction": "south",
+        "branchId": "south",
+        "status": "operational",
+        "waiting": 0,
+        "screening": 0,
+        "approved": 0,
+        "remainingTurns": 0,
+        "screeningPolicy": "normal",
+        "nextArrivalTurn": 4,
+        "infected": 0,
+        "overrunProcessed": false
+      }
+    ],
+    "barbedWire": [
+      {
+        "id": "barbed-wire-1",
+        "position": {
+          "q": 25,
+          "r": 28
+        },
+        "hp": 10,
+        "maxHp": 10,
+        "builtTurn": 1
+      },
+      {
+        "id": "barbed-wire-2",
+        "position": {
+          "q": 25,
+          "r": 24
+        },
+        "hp": 10,
+        "maxHp": 10,
+        "builtTurn": 1
+      },
+      {
+        "id": "barbed-wire-3",
+        "position": {
+          "q": 27,
+          "r": 23
+        },
+        "hp": 10,
+        "maxHp": 10,
+        "builtTurn": 1
+      },
+      {
+        "id": "barbed-wire-4",
+        "position": {
+          "q": 24,
+          "r": 26
+        },
+        "hp": 10,
+        "maxHp": 10,
+        "builtTurn": 1
+      },
+      {
+        "id": "barbed-wire-5",
+        "position": {
+          "q": 21,
+          "r": 37
+        },
+        "hp": 10,
+        "maxHp": 10,
+        "builtTurn": 1
+      }
+    ],
+    "nextBarbedWireNumber": 6,
+    "roadBranches": [
+      {
+        "branchId": "east",
+        "nextArrivalTurn": 4,
+        "checkpointActionsThisTurn": 0,
+        "activeCheckpointId": null,
+        "standbyCheckpointIds": [],
+        "currentPolicy": "normal",
+        "hasBuiltCheckpoint": false
+      },
+      {
+        "branchId": "north",
+        "nextArrivalTurn": 4,
+        "checkpointActionsThisTurn": 0,
+        "activeCheckpointId": null,
+        "standbyCheckpointIds": [],
+        "currentPolicy": "normal",
+        "hasBuiltCheckpoint": false
+      },
+      {
+        "branchId": "south",
+        "nextArrivalTurn": 4,
+        "checkpointActionsThisTurn": 0,
+        "activeCheckpointId": "checkpoint-south-1",
+        "standbyCheckpointIds": [],
+        "currentPolicy": "passThrough",
+        "hasBuiltCheckpoint": true
+      },
+      {
+        "branchId": "west",
+        "nextArrivalTurn": 3,
+        "checkpointActionsThisTurn": 0,
+        "activeCheckpointId": null,
+        "standbyCheckpointIds": [],
+        "currentPolicy": "normal",
+        "hasBuiltCheckpoint": false
+      }
+    ],
+    "rejectedRefugeesByDirection": {
+      "north": {
+        "normalRejected": 0,
+        "strictRejected": 0,
+        "turnedAway": 0
+      },
+      "east": {
+        "normalRejected": 0,
+        "strictRejected": 0,
+        "turnedAway": 0
+      },
+      "south": {
+        "normalRejected": 0,
+        "strictRejected": 0,
+        "turnedAway": 0
+      },
+      "west": {
+        "normalRejected": 0,
+        "strictRejected": 0,
+        "turnedAway": 0
+      }
+    },
+    "pendingNoisePulses": [],
+    "pendingUnitProductions": [],
+    "nextCheckpointNumber": 2,
+    "nextConstructibleFacilityNumber": 5,
+    "nextUnitNumber": 2,
+    "nextEventNumber": 120,
+    "nextAssignmentOrder": 39,
+    "horde": {
+      "pendingWaves": [],
+      "waves": [],
+      "nextWaveIndex": 1,
+      "totalSpawned": 0,
+      "warningDirections": [],
+      "turnsRemaining": 3,
+      "nextSpawnTurn": 5,
+      "lastSpawnTurn": null,
+      "warningType": "none",
+      "spawnedWaveIndices": [],
+      "spawnGroupIdsByWave": {},
+      "finalHordeStatus": "notStarted",
+      "finalSpawnGroupIds": [],
+      "finalSpawnedCount": 0
+    },
+    "events": [
+      {
+        "id": "event-1",
+        "turn": 1,
+        "phase": "player",
+        "type": "barbed_wire_built",
+        "payload": {
+          "wireId": "barbed-wire-1",
+          "q": 25,
+          "r": 28
+        }
+      },
+      {
+        "id": "event-2",
+        "turn": 1,
+        "phase": "player",
+        "type": "constructible_built",
+        "payload": {
+          "facilityId": "civilian-drone-base-1",
+          "facilityType": "civilianDroneBase",
+          "q": 29,
+          "r": 26,
+          "civilianGoods": 50
+        }
+      },
+      {
+        "id": "event-3",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "farm-1",
+          "workers": 7,
+          "difference": -16,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 16
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-4",
+        "turn": 1,
+        "phase": "player",
+        "type": "unit_moved",
+        "payload": {
+          "unitId": "national-guard-1",
+          "unitType": "nationalGuard",
+          "q": 28,
+          "r": 33,
+          "hexesMoved": 10,
+          "effectiveMovementCost": 10,
+          "movementMode": "normal",
+          "fuelUsed": 11
+        }
+      },
+      {
+        "id": "event-5",
+        "turn": 1,
+        "phase": "player",
+        "type": "unit_moved",
+        "payload": {
+          "unitId": "police-1",
+          "unitType": "police",
+          "q": 21,
+          "r": 34,
+          "hexesMoved": 9,
+          "effectiveMovementCost": 9,
+          "movementMode": "normal",
+          "fuelUsed": 5
+        }
+      },
+      {
+        "id": "event-6",
+        "turn": 1,
+        "phase": "player",
+        "type": "barbed_wire_built",
+        "payload": {
+          "wireId": "barbed-wire-2",
+          "q": 25,
+          "r": 24
+        }
+      },
+      {
+        "id": "event-7",
+        "turn": 1,
+        "phase": "player",
+        "type": "constructible_built",
+        "payload": {
+          "facilityId": "temporary-housing-2",
+          "facilityType": "temporaryHousing",
+          "q": 27,
+          "r": 21,
+          "civilianGoods": 25
+        }
+      },
+      {
+        "id": "event-8",
+        "turn": 1,
+        "phase": "player",
+        "type": "constructible_built",
+        "payload": {
+          "facilityId": "wind-power-plant-built-3",
+          "facilityType": "windPowerPlant",
+          "q": 30,
+          "r": 24,
+          "civilianGoods": 100
+        }
+      },
+      {
+        "id": "event-9",
+        "turn": 1,
+        "phase": "player",
+        "type": "constructible_built",
+        "payload": {
+          "facilityId": "civilian-drone-base-4",
+          "facilityType": "civilianDroneBase",
+          "q": 23,
+          "r": 23,
+          "civilianGoods": 50
+        }
+      },
+      {
+        "id": "event-10",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 28,
+          "difference": 18,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 18
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-11",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 7,
+          "difference": -21,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 21
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-12",
+        "turn": 1,
+        "phase": "player",
+        "type": "power_supply_changed",
+        "payload": {
+          "facilityId": "civilian-factory-1",
+          "enabled": false
+        }
+      },
+      {
+        "id": "event-13",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 15,
+          "difference": 12,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 12
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-14",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 15,
+          "difference": 8,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 8
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-15",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 17,
+          "difference": 2,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 2
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-16",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 20,
+          "difference": 3,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 3
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-17",
+        "turn": 1,
+        "phase": "player",
+        "type": "barbed_wire_built",
+        "payload": {
+          "wireId": "barbed-wire-3",
+          "q": 27,
+          "r": 23
+        }
+      },
+      {
+        "id": "event-18",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 20,
+          "difference": 5,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 5
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-19",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 8,
+          "difference": -12,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 12
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-20",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "farm-1",
+          "workers": 14,
+          "difference": 7,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 7
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-21",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 1,
+          "difference": -19,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 19
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-22",
+        "turn": 1,
+        "phase": "player",
+        "type": "checkpoint_built",
+        "payload": {
+          "checkpointId": "checkpoint-south-1",
+          "branchId": "south",
+          "direction": "south",
+          "role": "active",
+          "civilianGoods": 5,
+          "retreat": false
+        }
+      },
+      {
+        "id": "event-23",
+        "turn": 1,
+        "phase": "player",
+        "type": "supply_changed",
+        "payload": {
+          "branchId": "south",
+          "reason": "checkpoint_built",
+          "beforeTileCount": 91,
+          "afterTileCount": 191,
+          "radius": 12
+        }
+      },
+      {
+        "id": "event-24",
+        "turn": 1,
+        "phase": "player",
+        "type": "barbed_wire_built",
+        "payload": {
+          "wireId": "barbed-wire-4",
+          "q": 24,
+          "r": 26
+        }
+      },
+      {
+        "id": "event-25",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "civilian-factory-1",
+          "workers": 17,
+          "difference": -6,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 6
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-26",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "civilian-factory-1",
+          "workers": 29,
+          "difference": 12,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 12
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-27",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 1,
+          "difference": -7,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 7
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-28",
+        "turn": 1,
+        "phase": "player",
+        "type": "barbed_wire_built",
+        "payload": {
+          "wireId": "barbed-wire-5",
+          "q": 21,
+          "r": 37
+        }
+      },
+      {
+        "id": "event-29",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 26,
+          "difference": 25,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 25
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-30",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 14,
+          "difference": -12,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 12
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-31",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 16,
+          "difference": 15,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 15
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-32",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 20,
+          "difference": 4,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 4
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-33",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "farm-1",
+          "workers": 11,
+          "difference": -3,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 3
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-34",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 3,
+          "difference": -11,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 11
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-35",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 28,
+          "difference": 8,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 8
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-36",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 13,
+          "difference": -15,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 15
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-37",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 15,
+          "difference": 12,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 12
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-38",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "civilian-factory-1",
+          "workers": 6,
+          "difference": -23,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 23
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-39",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 10,
+          "difference": -5,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 5
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-40",
+        "turn": 1,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 22,
+          "difference": 9,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 9
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-41",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_consumed",
+        "payload": {
+          "resource": "militaryGoods",
+          "amount": 1,
+          "reason": "unit_fixed_upkeep",
+          "unitId": "national-guard-1",
+          "unitType": "nationalGuard"
+        }
+      },
+      {
+        "id": "event-42",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "capital",
+          "supplied": true,
+          "reason": "supplied",
+          "amount": 10
+        }
+      },
+      {
+        "id": "event-43",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "farm-1",
+          "supplied": true,
+          "reason": "supplied",
+          "amount": 5
+        }
+      },
+      {
+        "id": "event-44",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "civilian-factory-1",
+          "supplied": false,
+          "reason": "power_supply_off",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-45",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "refinery-1",
+          "supplied": true,
+          "reason": "supplied",
+          "amount": 10
+        }
+      },
+      {
+        "id": "event-46",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "civilian-drone-base-1",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-47",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "temporary-housing-2",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-48",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "civilian-drone-base-4",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-49",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "city-1",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-50",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "city-2",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-51",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "city-3",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-52",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "city-4",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-53",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "city-5",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-54",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "city-6",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-55",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "city-7",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-56",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "city-8",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-57",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "civilian-factory-2",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-58",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "civilian-factory-3",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-59",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "civilian-factory-4",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-60",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "farm-2",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-61",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "farm-3",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-62",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "farm-4",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-63",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "farm-5",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-64",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "military-factory-1",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-65",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "military-factory-2",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-66",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "military-factory-3",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-67",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "refinery-2",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-68",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "refinery-3",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-69",
+        "turn": 1,
+        "phase": "economy",
+        "type": "power_allocated",
+        "payload": {
+          "facilityId": "refinery-4",
+          "supplied": false,
+          "reason": "no_population",
+          "amount": 0
+        }
+      },
+      {
+        "id": "event-70",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_consumed",
+        "payload": {
+          "resource": "fuel",
+          "amount": 4,
+          "reason": "power_generation"
+        }
+      },
+      {
+        "id": "event-71",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_consumed",
+        "payload": {
+          "resource": "fuel",
+          "amount": 11,
+          "reason": "unit_refill",
+          "unitId": "national-guard-1"
+        }
+      },
+      {
+        "id": "event-72",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_consumed",
+        "payload": {
+          "resource": "fuel",
+          "amount": 5,
+          "reason": "unit_refill",
+          "unitId": "police-1"
+        }
+      },
+      {
+        "id": "event-73",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_produced",
+        "payload": {
+          "resource": "food",
+          "amount": 110
+        }
+      },
+      {
+        "id": "event-74",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_produced",
+        "payload": {
+          "resource": "civilianGoods",
+          "amount": 51
+        }
+      },
+      {
+        "id": "event-75",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_produced",
+        "payload": {
+          "resource": "fuel",
+          "amount": 110
+        }
+      },
+      {
+        "id": "event-76",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_consumed",
+        "payload": {
+          "resource": "militaryGoods",
+          "amount": 1,
+          "reason": "unit_refill",
+          "unitId": "national-guard-1",
+          "unitType": "nationalGuard"
+        }
+      },
+      {
+        "id": "event-77",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_consumed",
+        "payload": {
+          "resource": "food",
+          "amount": 115,
+          "population": 115,
+          "overcrowding": 0
+        }
+      },
+      {
+        "id": "event-78",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_consumed",
+        "payload": {
+          "resource": "civilianGoods",
+          "amount": 51,
+          "population": 115,
+          "overcrowding": 0
+        }
+      },
+      {
+        "id": "event-79",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_shortage",
+        "payload": {
+          "food": 0,
+          "civilianGoods": 64
+        }
+      },
+      {
+        "id": "event-80",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_shortage",
+        "payload": {
+          "resource": "civilianGoods",
+          "facilityId": "capital",
+          "populationLost": 51
+        }
+      },
+      {
+        "id": "event-81",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_shortage",
+        "payload": {
+          "resource": "civilianGoods",
+          "facilityId": "power-plant-1",
+          "populationLost": 10
+        }
+      },
+      {
+        "id": "event-82",
+        "turn": 1,
+        "phase": "economy",
+        "type": "resource_shortage",
+        "payload": {
+          "resource": "civilianGoods",
+          "facilityId": "refinery-1",
+          "populationLost": 3
+        }
+      },
+      {
+        "id": "event-83",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "noise_emitted",
+        "payload": {
+          "sourceFacilityId": "wind-power-plant-1",
+          "sourceUnitType": "windPowerPlant",
+          "sourceKind": "windPower",
+          "q": 26,
+          "r": 24,
+          "radius": 8
+        }
+      },
+      {
+        "id": "event-84",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "gas-zombie-initial-1"
+        }
+      },
+      {
+        "id": "event-85",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "hunter-zombie-initial-1"
+        }
+      },
+      {
+        "id": "event-86",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "hunter-zombie-initial-2"
+        }
+      },
+      {
+        "id": "event-87",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "hunter-zombie-initial-3"
+        }
+      },
+      {
+        "id": "event-88",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-1"
+        }
+      },
+      {
+        "id": "event-89",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-10"
+        }
+      },
+      {
+        "id": "event-90",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-11"
+        }
+      },
+      {
+        "id": "event-91",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "noise_targeted",
+        "payload": {
+          "zombieId": "zombie-12"
+        }
+      },
+      {
+        "id": "event-92",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "unit_moved",
+        "payload": {
+          "unitId": "zombie-12",
+          "unitType": "zombie",
+          "q": 31,
+          "r": 20,
+          "hexesMoved": 3,
+          "effectiveMovementCost": 3,
+          "movementMode": "normal",
+          "fuelUsed": 0
+        }
+      },
+      {
+        "id": "event-93",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-13"
+        }
+      },
+      {
+        "id": "event-94",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-14"
+        }
+      },
+      {
+        "id": "event-95",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-15"
+        }
+      },
+      {
+        "id": "event-96",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-16"
+        }
+      },
+      {
+        "id": "event-97",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-17"
+        }
+      },
+      {
+        "id": "event-98",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-18"
+        }
+      },
+      {
+        "id": "event-99",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-19"
+        }
+      },
+      {
+        "id": "event-100",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-2"
+        }
+      },
+      {
+        "id": "event-101",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-20"
+        }
+      },
+      {
+        "id": "event-102",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-21"
+        }
+      },
+      {
+        "id": "event-103",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-22"
+        }
+      },
+      {
+        "id": "event-104",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-23"
+        }
+      },
+      {
+        "id": "event-105",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-24"
+        }
+      },
+      {
+        "id": "event-106",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-25"
+        }
+      },
+      {
+        "id": "event-107",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-3"
+        }
+      },
+      {
+        "id": "event-108",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-4"
+        }
+      },
+      {
+        "id": "event-109",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-5"
+        }
+      },
+      {
+        "id": "event-110",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-6"
+        }
+      },
+      {
+        "id": "event-111",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-7"
+        }
+      },
+      {
+        "id": "event-112",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-8"
+        }
+      },
+      {
+        "id": "event-113",
+        "turn": 1,
+        "phase": "zombie",
+        "type": "zombie_idle",
+        "payload": {
+          "zombieId": "zombie-9"
+        }
+      },
+      {
+        "id": "event-114",
+        "turn": 2,
+        "phase": "player",
+        "type": "unit_moved",
+        "payload": {
+          "unitId": "police-1",
+          "unitType": "police",
+          "q": 23,
+          "r": 30,
+          "hexesMoved": 4,
+          "effectiveMovementCost": 4,
+          "movementMode": "normal",
+          "fuelUsed": 1
+        }
+      },
+      {
+        "id": "event-115",
+        "turn": 2,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "refinery-1",
+          "workers": 0,
+          "difference": -19,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 19
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-116",
+        "turn": 2,
+        "phase": "player",
+        "type": "unit_moved",
+        "payload": {
+          "unitId": "national-guard-1",
+          "unitType": "nationalGuard",
+          "q": 33,
+          "r": 33,
+          "hexesMoved": 5,
+          "effectiveMovementCost": 5,
+          "movementMode": "normal",
+          "fuelUsed": 1
+        }
+      },
+      {
+        "id": "event-117",
+        "turn": 2,
+        "phase": "player",
+        "type": "enemy_spotted",
+        "payload": {
+          "unitId": "zombie-11",
+          "unitType": "zombie",
+          "q": 33,
+          "r": 37
+        }
+      },
+      {
+        "id": "event-118",
+        "turn": 2,
+        "phase": "player",
+        "type": "workers_assigned",
+        "payload": {
+          "facilityId": "power-plant-1",
+          "workers": 19,
+          "difference": 19,
+          "movements": [
+            {
+              "facilityId": "capital",
+              "people": 19
+            }
+          ]
+        }
+      },
+      {
+        "id": "event-119",
+        "turn": 2,
+        "phase": "player",
+        "type": "constructible_decommissioned",
+        "payload": {
+          "facilityId": "civilian-drone-base-1",
+          "facilityType": "civilianDroneBase",
+          "q": 29,
+          "r": 26,
+          "civilianGoodsRefunded": 25
+        }
+      }
+    ],
+    "statistics": {
+      "maxPopulation": 115,
+      "maxSecuredFacilities": 10,
+      "civilianLosses": 64,
+      "unitLosses": 0,
+      "infectionLosses": 0,
+      "resourceShortageLosses": 64,
+      "hordeInterceptions": 0,
+      "refugeeArrivalsByBranch": {
+        "east": 0,
+        "north": 0,
+        "south": 0,
+        "west": 0
+      },
+      "unmanagedPassThrough": 0,
+      "refugeesScreenedByPolicy": {
+        "passThrough": 0,
+        "normal": 0,
+        "strict": 0
+      },
+      "refugeesAccepted": 0,
+      "refugeesDeparted": 0,
+      "checkpointsBuilt": 1,
+      "checkpointsRelocated": 0,
+      "checkpointRetreats": 0,
+      "checkpointsRuined": 0,
+      "checkpointsRecovered": 0,
+      "checkpointsAbandoned": 0,
+      "checkpointsRemoved": 0,
+      "unmanagedBranchTurns": 3,
+      "maxSuppliedFacilities": 13,
+      "maxSupplyRadius": 12,
+      "supplyLosses": 0,
+      "supplyRejections": 0,
+      "finalHordeSpawned": 0,
+      "finalHordeKilled": 0,
+      "finalHordeDefeated": false,
+      "periodicHordeZombiesSpawned": 0,
+      "periodicNormalZombiesSpawned": 0,
+      "finalHordeZombiesSpawned": 0,
+      "finalNormalZombiesSpawned": 0,
+      "normalZombiesKilled": 0,
+      "hordeZombiesKilled": 0,
+      "maxVisibleZombies": 1,
+      "turnsAfterFinalHorde": 0,
+      "suppliedAreaZombieClearTurn": 1,
+      "suppliedAreaInfectionClearTurn": 1,
+      "victoryTurn": null,
+      "terrainEntriesByType": {
+        "plain": 31,
+        "forest": 0,
+        "mountain": 0,
+        "water": 0
+      },
+      "urbanDefenseApplications": 0,
+      "urbanDefenseDamagePrevented": 0,
+      "forestDefenseApplications": 0,
+      "forestDefenseDamagePrevented": 0,
+      "normalZombieIdleCount": 28,
+      "hordeTargetInheritedCount": 0,
+      "hordeTargetClearedCount": 0,
+      "standbyCheckpointsCreated": 0,
+      "dormantCheckpointsCreated": 0,
+      "checkpointActivations": 0,
+      "checkpointFallbacks": 0,
+      "checkpointFallbacksByBranch": {
+        "east": 0,
+        "north": 0,
+        "south": 0,
+        "west": 0
+      },
+      "checkpointFallbacksFromStandby": 0,
+      "checkpointFallbacksFromDormant": 0,
+      "checkpointFallbacksPreventingUnmanagedArrival": 0,
+      "maxCheckpointPostsPerBranch": 1,
+      "maxPreparedCheckpointPostsPerBranch": 1,
+      "activeCheckpointLosses": 0,
+      "noisePulsesEmitted": 1,
+      "policeNoisePulses": 0,
+      "nationalGuardNoisePulses": 0,
+      "normalZombiesNoiseTargeted": 1,
+      "noiseTargetsReached": 0,
+      "noiseTargetsOverriddenByHorde": 0,
+      "noiseTargetsOverriddenByVisiblePopulation": 0,
+      "initialNormalZombies": 25,
+      "fallenSitesTriggeredByNoise": 0,
+      "noiseRespawnAttempts": 0,
+      "noiseRespawnZombiesSpawned": 0,
+      "infectedPopulationConvertedToZombies": 0,
+      "unspawnedInfectedPopulation": 0,
+      "immediateInfectionsFromSpawn": 0,
+      "chainOverruns": 0,
+      "maximumOverrunChainLength": 0,
+      "constructibleInfectedDeaths": 0,
+      "groundVisionPotentialHexes": 243,
+      "groundVisionVisibleHexes": 243,
+      "groundVisionBlockedHexes": 0,
+      "maxGroundVisionBlockedHexes": 0,
+      "cumulativeGroundVisionBlockedHexes": 0,
+      "groundVisionSamples": 2,
+      "civilianDroneBasesBuilt": 2,
+      "maxCivilianDroneVisionRadius": 0,
+      "aerialDiscoveriesInGroundBlockedArea": 0,
+      "checkpointQueueFoodDemand": 0,
+      "checkpointQueueCivilianGoodsDemand": 0,
+      "checkpointQueueFoodConsumed": 0,
+      "checkpointQueueCivilianGoodsConsumed": 0,
+      "refugeesRejectedByDirectionAndPolicy": {
+        "north": {
+          "normal": 0,
+          "strict": 0
+        },
+        "east": {
+          "normal": 0,
+          "strict": 0
+        },
+        "south": {
+          "normal": 0,
+          "strict": 0
+        },
+        "west": {
+          "normal": 0,
+          "strict": 0
+        }
+      },
+      "refugeesTurnedAwayByDirection": {
+        "north": 0,
+        "east": 0,
+        "south": 0,
+        "west": 0
+      },
+      "rejectedBonusZombiesByDirection": {
+        "north": 0,
+        "east": 0,
+        "south": 0,
+        "west": 0
+      },
+      "rejectedCounterResetsByDirection": {
+        "north": 0,
+        "east": 0,
+        "south": 0,
+        "west": 0
+      },
+      "policeZombiesSpawned": 0,
+      "soldierZombiesSpawned": 0,
+      "policeZombiesKilled": 0,
+      "soldierZombiesKilled": 0,
+      "policeZombiesFinal": 0,
+      "soldierZombiesFinal": 0,
+      "riotZombiesFinal": 0,
+      "hunterZombiesFinal": 0,
+      "policeReanimations": 0,
+      "nationalGuardReanimations": 0,
+      "reanimationImmediateInfections": 0,
+      "reanimationFacilityInfections": 0,
+      "reanimationCheckpointInfections": 0,
+      "reanimationSiteFalls": 0,
+      "reanimationChainOverruns": 0,
+      "preventedRefugeeArrivalsAfterFinal": 0,
+      "civilianDroneBasesDecommissioned": 1,
+      "civilianGoodsRefundedFromDecommission": 25,
+      "policeLongRangeMoves": 0,
+      "recruitsCommissionedByType": {
+        "police": 0,
+        "nationalGuard": 0,
+        "riotPolice": 0
+      },
+      "regularPromotionsByType": {
+        "police": 0,
+        "nationalGuard": 0,
+        "riotPolice": 0
+      },
+      "veteranPromotionsByType": {
+        "police": 0,
+        "nationalGuard": 0,
+        "riotPolice": 0
+      },
+      "veteranZombieKillsByType": {
+        "police": 0,
+        "nationalGuard": 0,
+        "riotPolice": 0
+      },
+      "riotPoliceProduced": 0,
+      "riotPoliceLost": 0,
+      "riotZombiesSpawned": 0,
+      "hunterZombiesSpawned": 3,
+      "riotZombiesKilled": 0,
+      "hunterZombiesKilled": 0,
+      "housingBuilt": 1,
+      "housingResidentTurns": 0,
+      "housingCivilianGoodsProduced": 0,
+      "housingOutageFacilityTurns": 0,
+      "gasZombiesKilled": 0,
+      "gasZombiesSpawned": 1,
+      "gasExplosions": 0,
+      "gasExplosionUnitDamage": 0,
+      "riotPoliceReanimations": 0,
+      "hordeSpecialSpawnedByType": {
+        "policeZombie": 0,
+        "soldierZombie": 0,
+        "riotZombie": 0,
+        "hunterZombie": 0,
+        "gasZombie": 0
+      },
+      "finalSpecialZombiesSpawnedByType": {
+        "policeZombie": 0,
+        "soldierZombie": 0,
+        "riotZombie": 0,
+        "hunterZombie": 0,
+        "gasZombie": 0
+      },
+      "noisePulsesBySourceType": {
+        "police": 0,
+        "nationalGuard": 0,
+        "riotPolice": 0,
+        "hordeZombie": 0,
+        "armyBase": 0,
+        "windPowerPlant": 1
+      },
+      "hordeMovementNoisePulses": 0,
+      "hordeNoiseRespawnedByType": {
+        "zombie": 0,
+        "policeZombie": 0,
+        "soldierZombie": 0,
+        "riotZombie": 0
+      }
+    },
+    "gameOver": false,
+    "result": null
+  }
+}
