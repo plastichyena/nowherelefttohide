@@ -1,4 +1,4 @@
-name: AI Portable Package v1.5.5
+name: AI Portable Package v1.5.6
 
 on:
   workflow_run:
@@ -168,7 +168,7 @@ jobs:
           test -x "${ROOT}/run-session.sh"
           "${ROOT}/run-session.sh" --help | grep -F '"play-turn"'
           VERSION="$(node -p "require('${ROOT}/game/package.json').version")"
-          test "${VERSION}" = "1.5.5"
+          test "${VERSION}" = "1.5.6"
           grep -F "App version: ${VERSION}" "${ROOT}/BUILD_INFO.txt"
           grep -F "Build ID:" "${ROOT}/BUILD_INFO.txt"
           grep -F "Platform: linux-x64" "${ROOT}/BUILD_INFO.txt"
@@ -370,7 +370,7 @@ jobs:
           @('PLAY_WITH_AI.md', 'BUILD_INFO.txt', 'runtime/identity.cmd', 'runtime/node/node.exe', 'run-npm.cmd', 'run-vite-node.cmd', 'run-session.cmd', 'game/package.json', 'game/package-lock.json', 'game/dist/portable/session-cli.mjs', 'game/public/assets/board/units/unit_hunter_zombie.png', 'game/public/assets/board/units/unit_gas_zombie.png', 'game/public/assets/board/facilities/facility_army_base.png', 'game/public/assets/board/facilities/facility_temporary_housing.png') |
             ForEach-Object { if (-not (Test-Path (Join-Path $root $_))) { throw "Missing portable package entry: $_" } }
           $version = (Get-Content -Raw -LiteralPath (Join-Path $root 'game/package.json') | ConvertFrom-Json).version
-          if ($version -ne '1.5.5') { throw "Expected app version 1.5.5, received $version" }
+          if ($version -ne '1.5.6') { throw "Expected app version 1.5.6, received $version" }
           if (-not (Select-String -Quiet -Path (Join-Path $root 'BUILD_INFO.txt') -Pattern 'Platform: win-x64')) { throw 'BUILD_INFO platform is missing' }
 
       - name: Smoke test bundled Windows Node runtime

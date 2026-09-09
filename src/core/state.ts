@@ -26,7 +26,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '7.0.0';
+export const GAME_VERSION = '8.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -504,6 +504,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       (unit) => createUnit({ config: stateConfig }, unit.id, unit.type, unit.position, 'ready', unit.proficiency),
     ),
     checkpoints: [],
+    barbedWire: [],
+    nextBarbedWireNumber: 1,
     roadBranches,
     rejectedRefugeesByDirection: emptyRejectedRefugeeCounterByDirection(),
     pendingNoisePulses: [],

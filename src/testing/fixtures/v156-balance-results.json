@@ -1,0 +1,507 @@
+{
+  "appVersion": "1.5.6",
+  "comparison": "Same initial conditions; different action sequences, not an identical-action causal experiment or a win-rate guarantee.",
+  "policyLimitations": "EndTurn-only control versus one legal wall per turn; no worker transfers, checkpoint management, or Human relocation. All six games lost to infection before wire absorption; this does not establish wall combat effectiveness or win rate. Dedicated tests cover breach and protection.",
+  "reports": [
+    {
+      "seed": 1,
+      "condition": "information-and-recovery-only-EndTurn",
+      "actionSequencesDiffer": false,
+      "steps": 10,
+      "turn": 10,
+      "built": 0,
+      "civilianGoodsCost": 0,
+      "militaryGoodsCost": 0,
+      "visibleDestroyed": 0,
+      "humanDamageAbsorbed": 0,
+      "firstPublicContactTurn": {
+        "civilian-factory-1": 9
+      },
+      "powerOperation": [
+        {
+          "turn": 1,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 2,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 3,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 4,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 5,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 6,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 7,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 8,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 9,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 10,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        }
+      ],
+      "technicalFailure": false,
+      "outcome": "lost",
+      "reason": "capitalLost",
+      "losses": {
+        "infectionLosses": 147,
+        "resourceShortageLosses": 0,
+        "unitLosses": 0
+      }
+    },
+    {
+      "seed": 1,
+      "condition": "one-legal-wall-per-turn-then-EndTurn",
+      "actionSequencesDiffer": true,
+      "steps": 20,
+      "turn": 10,
+      "built": 10,
+      "civilianGoodsCost": 50,
+      "militaryGoodsCost": 50,
+      "visibleDestroyed": 0,
+      "humanDamageAbsorbed": 0,
+      "firstPublicContactTurn": {
+        "civilian-factory-1": 9
+      },
+      "powerOperation": [
+        {
+          "turn": 1,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 2,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 3,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 4,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 5,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 6,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 7,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 8,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 9,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 10,
+          "runningPowerPlants": [
+            "wind-power-plant-1"
+          ]
+        }
+      ],
+      "technicalFailure": false,
+      "outcome": "lost",
+      "reason": "capitalLost",
+      "losses": {
+        "infectionLosses": 147,
+        "resourceShortageLosses": 0,
+        "unitLosses": 0
+      }
+    },
+    {
+      "seed": 7,
+      "condition": "information-and-recovery-only-EndTurn",
+      "actionSequencesDiffer": false,
+      "steps": 8,
+      "turn": 8,
+      "built": 0,
+      "civilianGoodsCost": 0,
+      "militaryGoodsCost": 0,
+      "visibleDestroyed": 0,
+      "humanDamageAbsorbed": 0,
+      "firstPublicContactTurn": {
+        "civilian-factory-1": 7
+      },
+      "powerOperation": [
+        {
+          "turn": 1,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 2,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 3,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 4,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 5,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 6,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 7,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 8,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        }
+      ],
+      "technicalFailure": false,
+      "outcome": "lost",
+      "reason": "capitalLost",
+      "losses": {
+        "infectionLosses": 117,
+        "resourceShortageLosses": 0,
+        "unitLosses": 0
+      }
+    },
+    {
+      "seed": 7,
+      "condition": "one-legal-wall-per-turn-then-EndTurn",
+      "actionSequencesDiffer": true,
+      "steps": 16,
+      "turn": 8,
+      "built": 8,
+      "civilianGoodsCost": 40,
+      "militaryGoodsCost": 40,
+      "visibleDestroyed": 0,
+      "humanDamageAbsorbed": 0,
+      "firstPublicContactTurn": {
+        "civilian-factory-1": 7
+      },
+      "powerOperation": [
+        {
+          "turn": 1,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 2,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 3,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 4,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 5,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 6,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 7,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 8,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        }
+      ],
+      "technicalFailure": false,
+      "outcome": "lost",
+      "reason": "capitalLost",
+      "losses": {
+        "infectionLosses": 117,
+        "resourceShortageLosses": 0,
+        "unitLosses": 0
+      }
+    },
+    {
+      "seed": 17,
+      "condition": "information-and-recovery-only-EndTurn",
+      "actionSequencesDiffer": false,
+      "steps": 8,
+      "turn": 8,
+      "built": 0,
+      "civilianGoodsCost": 0,
+      "militaryGoodsCost": 0,
+      "visibleDestroyed": 0,
+      "humanDamageAbsorbed": 0,
+      "firstPublicContactTurn": {
+        "refinery-1": 4,
+        "wind-power-plant-1": 5,
+        "farm-1": 6,
+        "civilian-factory-1": 8
+      },
+      "powerOperation": [
+        {
+          "turn": 1,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 2,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 3,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 4,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 5,
+          "runningPowerPlants": [
+            "power-plant-1"
+          ]
+        },
+        {
+          "turn": 6,
+          "runningPowerPlants": [
+            "power-plant-1"
+          ]
+        },
+        {
+          "turn": 7,
+          "runningPowerPlants": [
+            "power-plant-1"
+          ]
+        },
+        {
+          "turn": 8,
+          "runningPowerPlants": [
+            "power-plant-1"
+          ]
+        }
+      ],
+      "technicalFailure": false,
+      "outcome": "lost",
+      "reason": "capitalLost",
+      "losses": {
+        "infectionLosses": 158,
+        "resourceShortageLosses": 0,
+        "unitLosses": 1
+      }
+    },
+    {
+      "seed": 17,
+      "condition": "one-legal-wall-per-turn-then-EndTurn",
+      "actionSequencesDiffer": true,
+      "steps": 16,
+      "turn": 8,
+      "built": 8,
+      "civilianGoodsCost": 40,
+      "militaryGoodsCost": 40,
+      "visibleDestroyed": 0,
+      "humanDamageAbsorbed": 0,
+      "firstPublicContactTurn": {
+        "refinery-1": 4,
+        "wind-power-plant-1": 5,
+        "farm-1": 6,
+        "civilian-factory-1": 8
+      },
+      "powerOperation": [
+        {
+          "turn": 1,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 2,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 3,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 4,
+          "runningPowerPlants": [
+            "power-plant-1",
+            "wind-power-plant-1"
+          ]
+        },
+        {
+          "turn": 5,
+          "runningPowerPlants": [
+            "power-plant-1"
+          ]
+        },
+        {
+          "turn": 6,
+          "runningPowerPlants": [
+            "power-plant-1"
+          ]
+        },
+        {
+          "turn": 7,
+          "runningPowerPlants": [
+            "power-plant-1"
+          ]
+        },
+        {
+          "turn": 8,
+          "runningPowerPlants": [
+            "power-plant-1"
+          ]
+        }
+      ],
+      "technicalFailure": false,
+      "outcome": "lost",
+      "reason": "capitalLost",
+      "losses": {
+        "infectionLosses": 158,
+        "resourceShortageLosses": 0,
+        "unitLosses": 1
+      }
+    }
+  ]
+}

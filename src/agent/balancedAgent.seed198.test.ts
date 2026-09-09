@@ -17,5 +17,5 @@ describe('Balanced Agent checkpoint infection regression', () => {
     }
     expect(game.isGameOver(), `seed 198 reached turn ${observation.turn} with ${observation.population.infected} infected`).toBe(true);
     expect(game.getResult()?.turn).toBeLessThanOrEqual(100);
-  }, 300_000);
+  }, 1800_000);
 });

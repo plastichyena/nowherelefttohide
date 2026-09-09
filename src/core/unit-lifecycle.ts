@@ -3,6 +3,7 @@ import type { SeededRng } from './rng';
 import { createUnit, isHumanUnit, getUnit } from './state';
 import { isHexSupplied } from './supply';
 import { terrainAdjustedDamage } from './terrain';
+import { damageWire, wireAt } from './barbed-wire';
 import { emit } from './events-internal';
 import { hexKey, hexNeighbors, hexWithinBounds } from './hex';
 
@@ -102,6 +103,8 @@ function destroyUnit(
     }
     state.nextUnitNumber += 1;
     const reanimated = createUnit(state, id, reanimatedType, unit.position);
+    const survivingWire = wireAt(state, unit.position);
+    if (survivingWire) reanimated.reanimatedOnBarbedWireId = survivingWire.id;
     reanimated.canMove = false;
     reanimated.canAttack = false;
     state.units.push(reanimated);
@@ -155,6 +158,9 @@ function applyDamageWithoutDeath(
   sourceId: string,
   cause: string,
 ): number {
+  if (target.isPlayerUnit && ['attack', 'counterattack', 'interception'].includes(cause)) {
+    amount -= damageWire(state, target.position, amount, true);
+  }
   const adjusted = terrainAdjustedDamage(state, target, amount);
   const damage = Math.max(0, Math.min(target.hp, adjusted.finalDamage));
   target.hp -= damage;

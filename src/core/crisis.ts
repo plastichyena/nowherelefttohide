@@ -1,4 +1,4 @@
-import { forecastEndTurn, forecastNextTurnPenalties } from './economy-query';
+import { forecastEndTurn, forecastNextTurnPenalties, forecastFacilityProduction } from './economy-query';
 import { forecastUnitSuppression, getUnitLegalAttackProjections } from './combat-query';
 import { deriveStrategicForecast } from './forecast';
 import { deriveCheckpointRole, isHexSupplied } from './supply';
@@ -18,6 +18,7 @@ export const CRISIS_WORSENING_FACTS = {
   horde_warning_active: { turnsRemaining: 'down', directionCount: 'up', final: 'true' },
   guaranteed_resource_defeat: { foodShortage: 'up', civilianGoodsShortage: 'up', healthyCivilians: 'down' },
   new_state_loss: { eventId: 'changed' },
+  production_outage: { stoppedWorkers: 'up' },
 } satisfies Record<CrisisAlert['reasonCode'], Record<string, string>>;
 
 type ComparableCrisis = Pick<CrisisAlert, 'id' | 'reasonCode' | 'entityIds' | 'severity' | 'publicFacts'>;
@@ -143,6 +144,15 @@ export function deriveCrisisSummary(state: Readonly<GameState>): CrisisAlert[] {
   }
 
   const forecast = forecastEndTurn(state);
+  for (const source of state.facilities.filter(f => ['powerPlant', 'windPowerPlant'].includes(f.type) && (f.status === 'ruined' || f.operationalStatus === 'disabled'))) {
+    alerts.push(alert('warning', 'resource', 'production_outage', [source.id], { stoppedWorkers: source.workers, reason: 'power_source_lost', currentStatus: source.status, forecastOnly: false }));
+  }
+  for (const production of forecastFacilityProduction(state)) {
+    const facility = state.facilities.find(f => f.id === production.facilityId)!;
+    if (facility.owner === 'player' && facility.workers >= 5 && production.stoppedReason && !['capital', 'city', 'temporaryHousing'].includes(facility.type)) {
+      alerts.push(alert('warning', 'resource', 'production_outage', [facility.id], { stoppedWorkers: facility.workers, reason: production.stoppedReason, powerReason: production.projectedPowerReason, forecastOnly: true }));
+    }
+  }
   const nextTurnPenalties = forecastNextTurnPenalties(state);
   if (nextTurnPenalties.overcrowding.active) {
     alerts.push(alert('warning', 'resource', 'overcrowding_forecast', nextTurnPenalties.overcrowding.facilities.map((entry) => entry.facilityId), {

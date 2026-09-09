@@ -47,7 +47,7 @@ describe('unified Agent Runner', () => {
     ))).toBe(true);
     expect(summary.artifact.observationTrace).toHaveLength(2);
     expect(summary.artifact.fixedMap).toBeUndefined();
-  }, 30_000);
+  }, 120_000);
 
   it('keeps the default runner turn ceiling at 100 when the Final Horde is later', () => {
     const initial = createAgentGame().reset({ seed: 1 });

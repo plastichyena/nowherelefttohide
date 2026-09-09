@@ -61,8 +61,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.5.5');
-    expect(titleVersionLabel('en')).toContain('1.5.5');
+    expect(titleVersionLabel('ja')).toContain('1.5.6');
+    expect(titleVersionLabel('en')).toContain('1.5.6');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -306,26 +306,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.5.3-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.5.5-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.3以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.5');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.5以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.6');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.3 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.5');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.5 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.6');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 7.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 14');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 7.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 14');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 8.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 15');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 8.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 15');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.3以前' : 'v1.5.3-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5-or-earlier');
     }
   });
 
@@ -624,7 +624,7 @@ describe('controller view models', () => {
     expect(nextTurnPenaltyForecastSummary({ nextTurnPenalties: {} }, 'en')).toBe('Target turn —');
   });
 
-  it('renders only Final Pending and Final Map as v1.5.5 Victory progress', () => {
+  it('renders only Final Pending and Final Map as v1.5.6 Victory progress', () => {
     const state = {
       horde: {
         finalHordeStatus: 'active',
@@ -751,7 +751,7 @@ describe('controller view models', () => {
     expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
   });
 
-  it('keeps v1.5.5 Help values aligned for power, reserve, Soldier, Army Base, and Wind', () => {
+  it('keeps v1.5.6 Help values aligned for power, reserve, Soldier, Army Base, and Wind', () => {
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
       const production = t('tipProduction');

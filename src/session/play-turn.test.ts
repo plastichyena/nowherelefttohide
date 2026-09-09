@@ -35,6 +35,7 @@ function observation(state: RuntimeState): AgentObservation {
     map: { id: 'test-map', width: 2, height: 1, coordinateSystem: 'axial-q-r', hordeSpawnReserve: [], tiles: [] } as never,
     resources: { food: 10, civilianGoods: 10, militaryGoods: 10, fuel: 10, electricityCapacity: 0, electricityRequired: 0 },
     population: { healthyCivilians: 1, cityResidents: 1, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
+    barbedWire: [], barbedWireCandidates: [], workerAssignmentCandidates: [],
     facilities: [], units: state.unitPresent ? [unit] as never : [],
     zombies: state.enemy ? [{ id: 'enemy-1', type: 'zombie', unitType: 'zombie', position: { q: 1, r: 0 }, hp: 10, maxHp: 10 }] as never : [],
     checkpoints: [], importantSiteEvents: [], populationTransferCandidates: [], checkpointPositionCandidates: [], constructibleFacilityPositionCandidates: [], roadBranches: [],

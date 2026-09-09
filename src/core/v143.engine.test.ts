@@ -79,7 +79,7 @@ function movePlayersAway(state: MutableState): void {
 describe('v1.5.1 Core version, map, and initial state', () => {
   it('creates a v7.0.0 state on fixed-51x51-v4 with all 25 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('7.0.0');
+    expect(state.gameVersion).toBe('8.0.0');
     expect(state.mapId).toBe('fixed-51x51-v4');
     expect(state.map.id).toBe('fixed-51x51-v4');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');

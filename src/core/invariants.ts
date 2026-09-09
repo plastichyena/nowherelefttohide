@@ -3,6 +3,9 @@ import { hexKey, hexWithinBounds } from './hex';
 import { initialArmyBaseMatchesSeed, isHordeSpawnReserve, isRoad, validateFixedMap } from './map';
 import { civilianWorkerCount, effectiveAttackForProficiency, isCityFacility, populationLedgerTotal, resourceConsumerPopulation } from './state';
 import type { GameState } from './types';
+import { radialConflict } from './barbed-wire';
+import { getCapitalPosition } from './supply';
+import { getTile } from './map-reference';
 
 export interface InvariantResult {
   valid: boolean;
@@ -32,6 +35,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     !state.resources ||
     !state.statistics ||
     !state.horde ||
+    !Array.isArray(state.barbedWire) ||
     !Array.isArray(state.facilities) ||
     !Array.isArray(state.units) ||
     !Array.isArray(state.checkpoints) ||
@@ -46,6 +50,25 @@ export function validateInvariants(state: GameState): InvariantResult {
     errors.push('State pending queues must be arrays');
   }
   const config = validateGameConfig(state.config);
+  const wireIds = new Set<string>();
+  if (!Number.isSafeInteger(state.nextBarbedWireNumber) || state.nextBarbedWireNumber < 1) errors.push('Invalid next Barbed Wire number');
+  const wirePositions = new Set<string>();
+  for (const wire of state.barbedWire) {
+    if (!wire || typeof wire.id !== 'string' || !wire.position || !hexWithinBounds(wire.position, state.map.width, state.map.height) || !Number.isInteger(wire.hp) || wire.hp <= 0 || wire.hp > 10 || wire.maxHp !== 10 || !Number.isInteger(wire.builtTurn) || wire.builtTurn < 1 || wire.builtTurn > state.turn) {
+      errors.push('Invalid Barbed Wire state');
+      continue;
+    }
+    const key = hexKey(wire.position);
+    if (wireIds.has(wire.id) || wirePositions.has(key)) errors.push('Duplicate Barbed Wire');
+    wireIds.add(wire.id); wirePositions.add(key);
+    if (wire.id.length === 0 || (/^barbed-wire-\d+$/.test(wire.id) && Number(wire.id.slice(12)) >= state.nextBarbedWireNumber)) errors.push('Invalid Barbed Wire ID counter');
+    const tile = getTile(state.map, wire.position);
+    if (!tile || state.config.terrain.movementCost[tile.terrain] === null) errors.push('Barbed Wire on impassable terrain');
+    if (state.barbedWire.some(other => other !== wire && other?.position && radialConflict(getCapitalPosition(state.map), wire.position, other.position))) errors.push('Barbed Wire radial spacing violation');
+    if (isHordeSpawnReserve(state.map, wire.position) || state.facilities.some(f => hexKey(f.position) === key) || state.checkpoints.some(c => hexKey(c.position) === key)) errors.push('Barbed Wire overlaps a forbidden site');
+    if (state.units.some(u => !u.isPlayerUnit && hexKey(u.position) === key && u.reanimatedOnBarbedWireId !== wire.id)) errors.push('Zombie cannot occupy intact Barbed Wire');
+  }
+  for (const unit of state.units) if (unit.reanimatedOnBarbedWireId !== undefined && (unit.isPlayerUnit || !state.barbedWire.some(w => w.id === unit.reanimatedOnBarbedWireId && hexKey(w.position) === hexKey(unit.position)))) errors.push('Invalid Barbed Wire reanimation exception');
   if (!config.valid) {
     errors.push(...config.errors.map((error) => `config: ${error}`));
   }

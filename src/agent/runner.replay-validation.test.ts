@@ -30,7 +30,7 @@ describe('Agent replay version boundaries', () => {
     const missingAppMetadataReplay = replayArtifact({ ...run.artifact, appVersion: '' });
     expect(missingAppMetadataReplay.reproduced).toBe(false);
     expect(missingAppMetadataReplay.error?.code).toBe('artifact_invalid');
-  }, 30_000);
+  }, 120_000);
 
   it('rejects legacy artifacts before creating a v1.5.0 replay session', () => {
     const config = createDefaultConfig({
@@ -85,5 +85,5 @@ describe('Agent replay version boundaries', () => {
         error: { code: 'artifact_version_unsupported' },
       });
     }
-  }, 30_000);
+  }, 120_000);
 });

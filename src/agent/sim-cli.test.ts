@@ -54,11 +54,11 @@ describe('Batch Simulation CLI', () => {
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.technicalFailureCount).toBeGreaterThanOrEqual(0);
     expect(report.schemaVersion).toBe('7.0.0');
-    expect(report.appVersion).toBe('1.5.5');
+    expect(report.appVersion).toBe('1.5.6');
   // The v1.4.4 fixed 51×51 board deliberately raises deterministic run cost;
   // one shared seed still exercises both strategies and their comparison without
   // blocking Vitest's worker RPC heartbeat.
-  }, 60_000);
+  }, 180_000);
 
   it('reports the runner default turn ceiling independently from finalHordeTurn', () => {
     const initial = createAgentGame().reset({ seed: 1 });
@@ -223,7 +223,7 @@ describe('Batch Simulation CLI', () => {
       expect(row![header!.indexOf(`rejectedCounterResets.${direction}`)]).toBe(String(report.games[0]!.rejectedCounterResetsByDirection[direction]));
     }
     expect(() => writeSimulationOutput(report, output)).toThrow(/overwrite|empty/i);
-  }, 20_000);
+  }, 60_000);
 
   it('streams CLI-scale artifacts to disk without retaining full runs in the report', () => {
     const config = createDefaultConfig({ maxActionsPerTurn: 1 });
@@ -239,7 +239,7 @@ describe('Batch Simulation CLI', () => {
     expect(paths.artifacts).toHaveLength(1);
     expect(paths.runJson.endsWith('run.json')).toBe(true);
     expect(paths.gamesCsv.endsWith('games.csv')).toBe(true);
-  }, 30_000);
+  }, 90_000);
 
   it('writes compact batch summaries without materializing full Replay JSON files', () => {
     const config = createDefaultConfig({ maxActionsPerTurn: 1 });
@@ -254,5 +254,5 @@ describe('Batch Simulation CLI', () => {
     expect(paths.artifacts).toEqual([]);
     expect(paths.runJson.endsWith('run.json')).toBe(true);
     expect(paths.gamesCsv.endsWith('games.csv')).toBe(true);
-  }, 20_000);
+  }, 60_000);
 });

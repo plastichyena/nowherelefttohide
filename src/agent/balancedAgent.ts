@@ -1,4 +1,5 @@
 import { hexDistance, hexKey } from '../core/hex';
+import { wireBreakCost } from '../core/barbed-wire';
 import type { FacilityType, GameAction, HexCoord } from '../core/types';
 import { actionKey, cloneAction, sortActions } from './action';
 import { BALANCED_AGENT_VERSION, type AgentCandidateScore, type AgentDecision, type AgentObservation, type AgentPriorityGoal, type GameAgent } from './types';
@@ -9,7 +10,7 @@ function nearestDistance(position: HexCoord, targets: readonly HexCoord[]): numb
   return Math.min(...targets.map((target) => hexDistance(position, target)));
 }
 
-function weightedDistance(observation: AgentObservation, start: HexCoord, target: HexCoord): number {
+function weightedDistance(observation: AgentObservation, start: HexCoord, target: HexCoord, zombie?: AgentObservation['zombies'][number]): number {
   const byKey = new Map(observation.map.tiles.map((tile) => [`${tile.q},${tile.r}`, tile]));
   const best = new Map<string, number>([[`${start.q},${start.r}`, 0]]);
   const pending: Array<{ position: HexCoord; cost: number }> = [{ position: start, cost: 0 }];
@@ -25,7 +26,9 @@ function weightedDistance(observation: AgentObservation, start: HexCoord, target
       const nextKey = `${next.q},${next.r}`;
       const tile = byKey.get(nextKey);
       if (!tile || tile.effectiveMovementCost === null) continue;
-      const cost = current.cost + tile.effectiveMovementCost;
+      const wire = observation.barbedWire.find(w => hexKey(w.position) === nextKey);
+      const baseCost = wire && zombie ? (tile.unobstructedMovementCost ?? tile.effectiveMovementCost) : tile.effectiveMovementCost;
+      const cost = current.cost + baseCost + (wire && zombie ? wireBreakCost(wire.hp, zombie) : 0);
       if (cost >= (best.get(nextKey) ?? Number.POSITIVE_INFINITY)) continue;
       best.set(nextKey, cost);
       pending.push({ position: next, cost });
@@ -83,7 +86,7 @@ function zombieThreats(observation: AgentObservation): ZombieThreat[] {
   const facilities = ownedOperationalFacilities(observation);
   return observation.zombies.map((zombie) => {
     const candidates = facilities.map((facility) => {
-      const distance = weightedDistance(observation, zombie.position, facility.position);
+      const distance = weightedDistance(observation, zombie.position, facility.position, zombie);
       const contactNow = distance === 0;
       const contactNextTurn = distance <= zombie.movement;
       const threatensCapital = facility.type === 'capital';
@@ -700,7 +703,9 @@ function scoreAction(
         const exposureWeight = unit.type === 'police' || unit.type === 'riotPolice'
           ? weights.policePreservation
           : weights.criticalFacilityDefense;
-        const healthMultiplier = unit.hp / unit.maxHp < 0.7 ? 1.5 : 1;
+        const wallHp = observation.barbedWire.find(w => hexKey(w.position) === hexKey(action.destination))?.hp ?? 0;
+        const healthMultiplier = (unit.hp + wallHp) / unit.maxHp < 0.7 ? 1.5 : 1;
+        if (wallHp > 0) reasonCodes.push('VISIBLE_WALL_ABSORPTION_BUFFER');
         score -= followUpExposure * exposureWeight * healthMultiplier;
         reasonCodes.push('AVOID_MULTI_ZOMBIE_EXPOSURE');
       }
@@ -848,6 +853,14 @@ function scoreAction(
       score -= 250;
       reasonCodes.push('PRESERVE_CIVILIANS');
     }
+  } else if (action.type === 'BuildBarbedWire') {
+    const threats = observation.zombies.filter(z => hexDistance(z.position, action.position) <= z.movement + 2);
+    const protectedSites = observation.facilities.filter(f => f.owner === 'player' && f.healthyPopulation > 0 && hexDistance(f.position, action.position) <= 3);
+    score -= 60;
+    if (threats.length && protectedSites.length && observation.resources.civilianGoods >= 20 && observation.resources.militaryGoods >= 20) {
+      score += Math.min(3, threats.length) * 35;
+      reasonCodes.push('BUILD_VISIBLE_DEFENSIVE_OBSTACLE');
+    } else reasonCodes.push('PRESERVE_WALL_CONSTRUCTION_RESOURCES');
   } else if (action.type === 'BuildConstructibleFacility') {
     const candidate = observation.constructibleFacilityPositionCandidates.find((entry) =>
       entry.facilityType === action.facilityType &&

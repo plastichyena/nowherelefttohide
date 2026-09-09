@@ -598,6 +598,8 @@ button.crisis-alert:hover, button.crisis-alert:focus-visible { border-color: #ff
   .resource-strip { flex-wrap: wrap; gap: 4px; }
   .resource-strip > .resource-accordion { flex-basis: 100%; }
   .resource-strip > .resource-pill { flex: 1 1 0; justify-content: center; min-height: 25px; padding-block: 2px; }
+  .resource-strip > .resource-pill small { white-space: nowrap; }
+  .resource-strip > .save-status { flex: 0 0 100%; min-width: 0; font-size: 0.7rem; line-height: 1.2; }
   .resource-accordion { padding-inline: 6px; }
   .resource-accordion-details { right: 6px; left: 6px; }
   .resource-accordion-buttons { gap: 3px; }

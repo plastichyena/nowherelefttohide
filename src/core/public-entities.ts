@@ -1,3 +1,5 @@
+import { facilityRecaptureConditions } from './facility-recovery';
+import { wireAt, wireCombatProjection } from './barbed-wire';
 /**
  * Public entity projections shared by the Human UI and Agent Query API.
  *
@@ -176,6 +178,10 @@ export function createPublicUnitProjection(
   const attackPreviews = unit.isPlayerUnit ? getUnitLegalAttackProjections(state, unit.id) : [];
   return {
     id: unit.id,
+    ...(unit.reanimatedOnBarbedWireId ? { spawnedInsideBarbedWire: true } : {}),
+    ...(unit.isPlayerUnit && wireAt(state, unit.position) ? { conditionalIncomingCombat: state.units
+      .filter(enemy => !enemy.isPlayerUnit && (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(enemy.position)))
+      .map(enemy => ({ enemyId: enemy.id, condition: 'if_this_visible_enemy_attacks' as const, ...wireCombatProjection(state, unit, enemy.attack) })) } : {}),
     type: unit.type,
     ...(unit.type === 'gasZombie' ? { deathExplosion: {
       radius:1, excludesCenter:true as const, baseUnitDamage:state.config.units.gasZombie.explosionDamage, maxSiteInfection:state.config.units.gasZombie.explosionInfection,
@@ -198,7 +204,7 @@ export function createPublicUnitProjection(
     visionMode: 'ground',
     terrainLosBlocking: unit.isPlayerUnit,
     positionTerrain: positionTile?.terrain ?? 'plain',
-    effectiveMovementCostAtPosition: effectiveMovementCost(state, unit.position),
+    effectiveMovementCostAtPosition: effectiveMovementCost(state, unit.position, unit.isPlayerUnit),
     terrainDefenseSource: defense.source,
     terrainDamageMultiplier: defense.multiplier,
     hp: unit.hp,
@@ -265,9 +271,11 @@ export function facilityRecoveryProjection(state: Readonly<GameState>, facility:
   const needed: string[] = [];
   if (facility.infected > 0) needed.push('suppress_infection');
   if (enemies) needed.push('clear_visible_enemy');
-  if (facility.owner !== 'player' || facility.operationalStatus === 'disabled') needed.push('station_human_unit');
+  if ((facility.owner !== 'player' || facility.operationalStatus === 'disabled') && !state.units.some(u => u.isPlayerUnit && u.hp > 0 && hexKey(u.position) === hexKey(facility.position))) needed.push('station_human_unit');
   if (facility.operationalStatus === 'recovering' || facility.operationalStatus === 'building' || facility.populationOperationalTurn > state.turn) needed.push('wait_until_operational');
-  const recoverable = !(facility.constructible && facility.status === 'ruined');
+  const recapture = facilityRecaptureConditions({ ...state, units: state.units.filter(u => u.isPlayerUnit || visible.has(hexKey(u.position))) }, facility);
+  if (facility.status === 'ruined' && facility.type !== 'windPowerPlant') { needed.splice(0, needed.length, ...recapture.missing); }
+  const recoverable = !state.gameOver && !(facility.constructible && facility.status === 'ruined');
   const productionRequirements: string[] = [];
   if (facility.workers === 0 && facility.type !== 'windPowerPlant') productionRequirements.push('healthy_population');
   if (facility.type === 'temporaryHousing' && !isHexSupplied(state, facility.position)) productionRequirements.push('supply');

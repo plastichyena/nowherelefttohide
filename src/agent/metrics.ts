@@ -23,6 +23,7 @@ import {
 
 /** Keep these orders stable: they are also the canonical CSV column order. */
 export const ACTION_TYPES = [
+  'BuildBarbedWire',
   'Move',
   'Attack',
   'Wait',
@@ -100,6 +101,10 @@ export interface MetricFailureInfo {
 }
 
 export interface GameMetrics {
+  barbedWireBuilt: number;
+  barbedWireVisibleDestroyed: number;
+  barbedWireVisibleDamage: number;
+  barbedWireAbsorbedHumanDamage: number;
   appVersion: string;
   gameRulesVersion: string;
   agentId: string;
@@ -1481,6 +1486,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
 
   return {
     appVersion: input.appVersion ?? APP_VERSION,
+    barbedWireBuilt: input.actions.filter(a => a.type === 'BuildBarbedWire').length,
+    barbedWireVisibleDestroyed: events.filter(e => e.type === 'barbed_wire_damaged' && e.payload.destroyed === true).length,
+    barbedWireVisibleDamage: events.filter(e => e.type === 'barbed_wire_damaged').reduce((sum, e) => sum + Number(e.payload.damage ?? 0), 0),
+    barbedWireAbsorbedHumanDamage: events.filter(e => e.type === 'barbed_wire_damaged' && e.payload.protectingHuman === true).reduce((sum, e) => sum + Number(e.payload.damage ?? 0), 0),
     gameRulesVersion: input.gameRulesVersion ?? input.initialObservation.gameRulesVersion,
     agentId: input.agent.id,
     agentVersion: input.agent.version,

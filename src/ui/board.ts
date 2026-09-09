@@ -1281,6 +1281,16 @@ export class HexBoardScene extends Phaser.Scene {
       this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKeys.has(key), reserveKeys.has(key), hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview, constructibleLegalPreview, constructibleInvalidPreview, selectedConstructiblePreview);
       if (facility) this.drawFacilityDynamic(facility, productionByFacility.get(facility.id), center, tileSelected, render, suppliedTiles, key, t);
       if (checkpoint) this.drawCheckpointDynamic(state, checkpoint, center, tileSelected, suppliedTiles, key, t);
+      const wire = state.barbedWire?.find(w => hexKey(w.position) === key && visibleTileKeys.has(key));
+      if (wire) {
+        this.graphics.lineStyle(2, 0xd6dce0, 1);
+        this.graphics.strokePoints(this.hexPoints(center), true);
+        for (const dx of [-14, 0, 14]) {
+          this.graphics.lineBetween(center.x + dx - 4, center.y - 13, center.x + dx + 4, center.y - 5);
+          this.graphics.lineBetween(center.x + dx - 4, center.y - 5, center.x + dx + 4, center.y - 13);
+        }
+        this.addLabel(`wire:${wire.id}`, `W ${wire.hp}/10`, center.x, center.y - 24, '#e4e9ed', 8, true);
+      }
       const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
       units.forEach((unit, index) => this.drawUnitDynamic(unit, center, getFacilityUnitOffset(Boolean(facility || checkpoint)), index, units.length, tileSelected, render, suppliedTiles, key, attackTargets, blockedZombies, t));
     }

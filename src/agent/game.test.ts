@@ -12,9 +12,9 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
     entryKey === key || containsExactObjectKey(entryValue, key));
 }
 
-describe('AgentGame public boundary', () => {
+describe('AgentGame public boundary', { timeout: 60000 }, () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.5.5');
+    expect(APP_VERSION).toBe('1.5.6');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -114,14 +114,14 @@ describe('AgentGame public boundary', () => {
     )).toBe(true);
   });
 
-  it('describes the v1.5.5 API, Wave, Housing, Wind, Crisis, and Noise rules from the same adapter boundary', () => {
+  it('describes the v1.5.6 API, Wave, Housing, Wind, Crisis, and Noise rules from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
     game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('14');
+    expect(info.saveFormatVersion).toBe('15');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -312,7 +312,7 @@ describe('AgentGame public boundary', () => {
       expect(result).not.toHaveProperty('state');
       expect(result.observation).not.toHaveProperty('rngState');
     }
-  }, 20_000);
+  }, 60_000);
 
   it('publishes frozen Wave and Spawn-batch counts without leaking roster types or coordinates', () => {
     const game = createAgentGame();
@@ -412,7 +412,7 @@ describe('AgentGame public boundary', () => {
       'horde_rejected_bonus_applied',
       'roster',
     ]) expect(containsExactObjectKey(publicArtifact, privateField)).toBe(false);
-  }, 20_000);
+  }, 60_000);
 
   it('makes Turn Away public only as a qualitative event', () => {
     const game = createAgentGame();

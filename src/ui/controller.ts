@@ -122,6 +122,7 @@ export interface UiGameEngine extends HeadlessGame {
  * doubles while the Core rolls the typed context out incrementally.
  */
 export interface UiQueryContext {
+  getBarbedWireCandidates?: () => ReturnType<typeof import('../core/barbed-wire').wireCandidates>;
   readonly revision?: number;
   getEndTurnForecast?: () => EndTurnForecast;
   getStrategicForecast?: () => unknown;
@@ -548,7 +549,7 @@ function nonNegativeCount(value: unknown): number {
 }
 
 /**
- * Project the v1.5.5 Victory facts for the Human UI.
+ * Project the v1.5.6 Victory facts for the Human UI.
  *
  * Final victory is based on the Final roster's Pending entries and the
  * remaining Final roster Zombies on the Map. Supply cleanup is deliberately
@@ -600,7 +601,7 @@ export function victoryProgressViewModel(state: Readonly<GameState>): VictoryPro
   };
 }
 
-/** Render only the two v1.5.5 Victory progress conditions. */
+/** Render only the two v1.5.6 Victory progress conditions. */
 export function renderVictoryProgress(state: Readonly<GameState>, locale: Locale): string {
   const t = createTranslator(locale);
   const progress = victoryProgressViewModel(state);
@@ -1809,7 +1810,7 @@ export function renderBoardLegend(
   const view = boardLegendViewModel(config, locale, registry);
   const source = view.configSource === 'current' ? t('legendConfigCurrent') : t('legendConfigStandard');
   const sections = view.sections.map((section) => `<section class="board-legend-section" data-legend-section="${escapeHtml(section.key)}"><h4>${escapeHtml(section.title)}</h4><ul class="board-legend-list">${section.entries.map((entry) => `<li class="board-legend-entry" data-legend-key="${escapeHtml(entry.key)}">${legendImage(entry)}<span class="board-legend-copy"><strong>${escapeHtml(entry.label)}</strong><span>${escapeHtml(entry.description)}</span></span>${entry.key === 'config' ? `<b class="board-legend-value">${escapeHtml(entry.description)}</b>` : ''}</li>`).join('')}</ul></section>`).join('');
-  return `<div class="board-legend" data-board-legend="true"><h3 class="board-legend-heading">${escapeHtml(t('legendTitle'))}</h3><p class="board-legend-source"><strong>${escapeHtml(t('legendConfigSource'))}</strong>: ${escapeHtml(source)}</p><p class="muted">${escapeHtml(t('legendIntro'))}</p>${sections}<section class="board-legend-rules"><h4>${escapeHtml(t('legendRules'))}</h4><p>${escapeHtml(t('legendTerrainRule'))}</p><p>${escapeHtml(t('legendOverlayRule'))}</p><p>${escapeHtml(t('legendUnitRule'))}</p><p>${escapeHtml(t('legendHordeRule'))}</p><p>${escapeHtml(t('legendStateRule'))}</p><p>${escapeHtml(t('legendPowerRule'))}</p><p>${escapeHtml(t('legendFogRule'))}</p><p>${escapeHtml(t('legendDynamicRule'))}</p><p>${escapeHtml(t('legendInfectionRule'))}</p><p>${escapeHtml(t('spawnReserveRule'))}</p><p>${escapeHtml(t('checkpointCapacityRule'))}</p></section></div>`;
+  return `<div class="board-legend" data-board-legend="true"><h3 class="board-legend-heading">${escapeHtml(t('legendTitle'))}</h3><p class="board-legend-source"><strong>${escapeHtml(t('legendConfigSource'))}</strong>: ${escapeHtml(source)}</p><p class="muted">${escapeHtml(t('legendIntro'))}</p>${sections}<section class="board-legend-rules"><h4>${escapeHtml(t('legendRules'))}</h4><p>${escapeHtml(t('barbedWireRule'))}</p><p>${escapeHtml(t('legendTerrainRule'))}</p><p>${escapeHtml(t('legendOverlayRule'))}</p><p>${escapeHtml(t('legendUnitRule'))}</p><p>${escapeHtml(t('legendHordeRule'))}</p><p>${escapeHtml(t('legendStateRule'))}</p><p>${escapeHtml(t('legendPowerRule'))}</p><p>${escapeHtml(t('legendFogRule'))}</p><p>${escapeHtml(t('legendDynamicRule'))}</p><p>${escapeHtml(t('legendInfectionRule'))}</p><p>${escapeHtml(t('spawnReserveRule'))}</p><p>${escapeHtml(t('checkpointCapacityRule'))}</p></section></div>`;
 }
 
 export function loadValidationError(
@@ -1964,7 +1965,7 @@ function publicMapTileForPosition(
   if (!tile) return undefined;
   const checkpoint = state.checkpoints.find((candidate) => samePosition(candidate.position, position));
   const urban = isUrbanHex(state, tile);
-  const movementCost = effectiveMovementCost(state, tile);
+  const movementCost = effectiveMovementCost(state, tile, visibleTileKeys.has(hexKey(tile)));
   const defense = urban
     ? { source: 'urban' as const, multiplier: state.config.terrain.damageMultiplier.urban }
     : tile.terrain === 'forest'
@@ -1982,6 +1983,7 @@ function publicMapTileForPosition(
     facilityId: tile.facilityId,
     checkpointId: checkpoint?.id ?? null,
     effectiveMovementCost: movementCost,
+    unobstructedMovementCost: effectiveMovementCost(state, tile, false),
     terrainDefenseSource: defense.source,
     terrainDamageMultiplier: defense.multiplier,
     visibleToPlayer: visibleTileKeys.has(tile.key) || visibleTileKeys.has(hexKey(tile)),
@@ -3481,6 +3483,7 @@ export class GameUiController {
         const details = element.closest<HTMLDetailsElement>('[data-recruitment-accordion="true"]');
         element.setAttribute('aria-expanded', String(details?.open ?? false));
       }); break;
+      case 'build-barbed-wire': this.apply({ type: 'BuildBarbedWire', position: { q: Number(element.dataset.q), r: Number(element.dataset.r) } }); break;
       case 'build-constructible-local': this.buildConstructibleAtSelectedHex(element.dataset.facilityType); break;
       case 'build-simple-farm': this.startConstructibleBuild('simpleFarm'); break;
       case 'build-civilian-drone-base': this.startConstructibleBuild('civilianDroneBase'); break;
@@ -5428,12 +5431,22 @@ export class GameUiController {
     }).join('');
     const reasonCode = candidates.find((candidate) => candidate && !candidate.legal)?.reasonCode;
     const selectedReason = this.constructiblePlacementMessage ?? (reasonCode ? localizeActionError(reasonCode, this.locale) : null);
-    title.textContent = t('hex');
+    const wire = publicTile?.visibleToPlayer ? this.state?.barbedWire.find(w => samePosition(w.position, position)) : undefined;
+    title.textContent = wire ? `${this.locale === 'ja' ? '有刺鉄線' : 'Barbed Wire'} · HP ${wire.hp}/${wire.maxHp}` : t('hex');
     summary.textContent = `${t('location')} ${position.q},${position.r} · ${publicTile?.road ? t('roadOverlay') : ''}${publicTile?.urban ? ` · ${t('urbanOverlay')}` : ''}`;
     const buildBody = this.navMode === 'domestic'
       ? `<section class="constructible-placement constructible-local" data-constructible-local="true"><h3>${escapeHtml(t('buildFacility'))}</h3><p class="muted">${escapeHtml(t('localBuildOnly'))}</p>${buttons || `<p class="warning-text constructible-inline-message" data-constructible-inline-message role="status">${escapeHtml(selectedReason ?? t('noConstructibleHere'))}</p>`}</section>`
       : `<p class="muted">${escapeHtml(t('domesticBuildHint'))}</p>`;
-    body.innerHTML = `${this.renderTerrainDetails(publicTile, 0)}${buildBody}`;
+    body.innerHTML = `${this.renderSameHexTabs(position, { kind: 'hex', position })}${this.renderWirePanel(position, publicTile)}${this.renderTerrainDetails(publicTile, 0)}${buildBody}`;
+  }
+
+  private renderWirePanel(position: HexCoord, publicTile?: AgentMapTileObservation): string {
+    const wireCandidate = this.query()?.getBarbedWireCandidates?.().find(c => samePosition(c.position, position));
+    const wire = this.state?.barbedWire.find(w => samePosition(w.position, position) && publicTile?.visibleToPlayer);
+    const wireName = this.locale === 'ja' ? '有刺鉄線' : 'Barbed Wire';
+    const wireHelp = this.locale === 'ja' ? 'HP10・民需品5＋軍需品5。Human進入MP5、Zombieは攻撃して突破。通常戦闘を肩代わりし超過分は貫通。Gas対象外・修理不可・索敵なし。同じ州都距離で横につなげられます。州都へ向かう前後の壁は間に2Hex必要です。' : 'HP10; Civilian Goods 5 + Military Goods 5. Human entry MP5. Zombies attack to breach. Absorbs normal combat; excess penetrates. No Gas protection, repair or vision. Side-by-side at equal capital distance is allowed; radial layers need two intervening hexes.';
+    const wireControl = this.navMode === 'domestic' ? `<button class="secondary-button" data-action="build-barbed-wire" data-q="${position.q}" data-r="${position.r}" ${wireCandidate?.legal ? '' : 'disabled'}>${wireName} · 5/5</button><p>${escapeHtml(wireBuildReasonLabel(wireCandidate?.reason ?? (publicTile?.visibleToPlayer ? null : 'visibility_required'), this.locale))}</p>` : '';
+    return `<section data-wire-panel><h3>${wireName}${wire ? ` HP ${wire.hp}/${wire.maxHp}` : ''}</h3>${wireControl}<details><summary>${this.locale === 'ja' ? '性能・配置例（C＝州都）' : 'Rules and spacing (C = capital)'}</summary><p>${wireHelp}</p><img style="width:100%" alt="Barbed Wire spacing" src="${new URL('../testing/fixtures/v156-spacing.svg', import.meta.url).href}" /></details></section>`;
   }
 
   /** Same-Hex tabs expose alternate public targets without changing Core. */
@@ -5455,7 +5468,7 @@ export class GameUiController {
     } else if (!targets.some((target) => target.kind === 'hex')) {
       // Keep the full public terrain view reachable from every occupied
       // target. Target tabs remain ordered Unit → Facility/Checkpoint → Hex.
-      targets.push({ kind: 'hex', label: this.translator()('hex') });
+      targets.push({ kind: 'hex', label: this.state.barbedWire.some(w => samePosition(w.position, position) && this.queryVisibleTileKeys().has(hexKey(position))) ? (this.locale === 'ja' ? '有刺鉄線 / Hex' : 'Barbed Wire / Hex') : this.translator()('hex') });
     }
     if (targets.length < 2) return '';
     return `<nav class="same-hex-tabs" data-same-hex-tabs="true" role="tablist" aria-label="${escapeHtml(this.translator()('sameHexActions'))}">${targets.map((target) => {
@@ -5509,13 +5522,16 @@ export class GameUiController {
         ? ` · ${proficiencyLabel(proficiency.proficiency, this.locale)} · ${t('attackCharge')} ${proficiency.attackChargesRemaining}/${proficiency.maxAttackCharges}`
         : '';
       title.textContent = `${unitLabel(unit.type, this.locale)} · ${unit.id}`;
+      const protectingWire = this.state.barbedWire.find(w => samePosition(w.position, unit.position));
+      if (protectingWire) title.textContent += ` · ${this.locale === 'ja' ? '壁' : 'Wire'} HP ${protectingWire.hp}/${protectingWire.maxHp}`;
       summary.textContent = `HP ${unit.hp}/${unit.maxHp}${proficiencySummary} · ${t('unitFuel')} ${publicUnit?.currentFuel ?? unit.currentFuel}/${publicUnit?.maxFuel ?? unit.maxFuel} · ${t('carriedMilitaryGoods')} ${publicUnit?.currentMilitaryGoods ?? unit.currentMilitaryGoods}/${publicUnit?.maxMilitaryGoods ?? unit.maxMilitaryGoods} · ${t('move')} ${unit.movement} · ${t('attack')} ${publicUnit?.attack ?? unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range} · ${t('vision')} ${publicUnit?.vision ?? unit.vision}`;
       const risk = this.pendingMove?.interceptionRisk;
       const riskText = typeof risk === 'number' ? risk <= 0.2 ? t('low') : risk <= 0.5 ? t('medium') : t('high') : String(risk ?? t('none'));
       const canWait = actions.some((action) => action.type === 'Wait');
       const supplied = isHexSupplied(this.state, unit.position);
       const supplyReason = supplied ? '' : localizeActionError('recovery_out_of_supply', this.locale);
-      body.innerHTML = this.renderSameHexTabs(unit.position, selected) + this.renderUnitSheet(unit, publicUnit, publicTile, actions, riskText, supplied, supplyReason);
+      const incoming = publicUnit?.conditionalIncomingCombat?.map(p => `<li>${escapeHtml(p.enemyId)}: ${this.locale === 'ja' ? '攻撃された場合' : 'if attacked'} D${p.attack} → ${this.locale === 'ja' ? '壁' : 'Wire'} -${p.wallDamage} / HP${p.remainingWallHp}; Human -${p.humanDamage} / HP${p.remainingHumanHp}</li>`).join('');
+      body.innerHTML = this.renderSameHexTabs(unit.position, selected) + (incoming ? `<details><summary>${this.locale === 'ja' ? '条件付き被攻撃予測（移動予測を含まない）' : 'Conditional attacks (no movement prediction)'}</summary><ul>${incoming}</ul></details>` : '') + this.renderUnitSheet(unit, publicUnit, publicTile, actions, riskText, supplied, supplyReason);
       return;
     }
     if (selected.kind === 'zombie') {
@@ -5543,7 +5559,7 @@ export class GameUiController {
       body.innerHTML = this.renderSameHexTabs(selected.position, selected);
       const content = document.createElement('div');
       this.renderRoadSheet(selected.position, content, title, summary, publicTile);
-      body.insertAdjacentHTML('beforeend', content.innerHTML);
+      body.insertAdjacentHTML('beforeend', content.innerHTML + this.renderWirePanel(selected.position, publicTile));
       return;
     }
     if (selected.kind === 'checkpoint') {
@@ -6000,4 +6016,20 @@ export class GameUiController {
     const status = this.root.querySelector<HTMLElement>('.title-status');
     if (status && this.toastMessage) status.textContent = this.toastMessage;
   }
+}
+
+function wireBuildReasonLabel(reason: string | null, locale: Locale): string {
+  if (!reason) return '';
+  const reasons: Record<string, [string, string]> = {
+    wrong_phase: ['現在は建設できません。', 'Construction is unavailable now.'],
+    action_limit: ['内政Action枠が残っていません。', 'No action budget remains.'],
+    insufficient_resources: ['民需品5と軍需品5が必要です。', 'Requires Civilian Goods 5 and Military Goods 5.'],
+    impassable: ['通行禁止地形・出現用外周には建設できません。', 'Cannot build on impassable terrain or the Spawn Reserve.'],
+    visibility_required: ['周囲と前後2Hexの必要範囲を視認してください。', 'Reveal the neighboring and radial inspection area.'],
+    out_of_supply: ['補給圏内で建設してください。', 'Build inside supply.'],
+    occupied: ['施設・検問所跡・部隊・壁のないHexが必要です。', 'Requires a Hex without a facility, checkpoint site, unit or wall.'],
+    enemy_adjacent: ['敵に隣接する場所には建設できません。', 'Cannot build next to an enemy.'],
+    radial_spacing: ['州都へ向かう前後の壁は間に2Hex必要です。', 'Radial wall layers require two intervening hexes.'],
+  };
+  return reasons[reason]?.[locale === 'ja' ? 0 : 1] ?? reason;
 }

@@ -18,12 +18,16 @@ import type { GameState, JsonValue } from '../core/types';
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 14;
+export const SAVE_FORMAT_VERSION = 15;
 /** v1.5.4 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v14';
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v15';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v12';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v14';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v13',
+  'nowhere-left-to-hide:auto-save:v12',
+  'nowhere-left-to-hide:auto-save:v11',
+  'nowhere-left-to-hide:auto-save:v10',
   'nowhere-left-to-hide:auto-save:v9',
   'nowhere-left-to-hide:auto-save:v8',
   'nowhere-left-to-hide:auto-save:v7',
@@ -157,6 +161,8 @@ const GAME_EVENT_TYPES = [
   'site_chain_fallen',
   'site_noise_respawn',
   'facility_recovered',
+  'barbed_wire_built',
+  'barbed_wire_damaged',
   'checkpoint_built',
   'checkpoint_relocated',
   'checkpoint_remnant_created',
@@ -496,7 +502,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.5.4 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.5.5 or earlier / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {

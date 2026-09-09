@@ -30,6 +30,7 @@ const worseningCases: FactCase[] = [
   ['guaranteed_resource_defeat', 'foodShortage', 1, 2],
   ['guaranteed_resource_defeat', 'civilianGoodsShortage', 1, 2],
   ['guaranteed_resource_defeat', 'healthyCivilians', 20, 19],
+  ['production_outage', 'stoppedWorkers', 5, 10],
   ['new_state_loss', 'eventId', 'event-1', 'event-2'],
 ];
 function alert(reasonCode: CrisisAlert['reasonCode'], publicFacts: JsonObject = {}): CrisisAlert {
@@ -37,11 +38,11 @@ function alert(reasonCode: CrisisAlert['reasonCode'], publicFacts: JsonObject = 
 }
 
 describe('v1.5.4 public crisis worsening contract', () => {
-  it('covers all nine reason codes and their declared comparison facts', () => {
+  it('covers all reason codes and their declared comparison facts', () => {
     expect(Object.keys(CRISIS_WORSENING_FACTS).sort()).toEqual([
       'capital_infection_uncontained', 'critical_site_infection_uncontained', 'checkpoint_defense_degraded',
       'unit_out_of_supply_risk', 'horde_warning_active', 'guaranteed_resource_defeat', 'new_state_loss',
-      'overcrowding_forecast', 'temporary_housing_outage_forecast',
+      'production_outage', 'overcrowding_forecast', 'temporary_housing_outage_forecast',
     ].sort());
     expect(worseningCases.map(([reason, key]) => `${reason}:${key}`).sort()).toEqual(
       Object.entries(CRISIS_WORSENING_FACTS).flatMap(([reason, facts]) => Object.keys(facts).map(key => `${reason}:${key}`)).sort());

@@ -1,7 +1,9 @@
 import { roadConnections } from '../core/roads';
+import { wireCandidates } from '../core/barbed-wire';
 import {
   deriveVictoryProgress,
   populationTransferCandidates,
+  workerAssignmentCandidates,
   forecastEndTurn,
   forecastFacilityProduction,
   forecastUnitRefills,
@@ -219,6 +221,9 @@ function createAgentObservationInScope(
       const nextArrivalTurn = branchState?.nextArrivalTurn ?? null;
       return {
         branchId: definition.id,
+        managed: Boolean(activeCheckpoint),
+        currentQueue: state.checkpoints.filter(c => (c.branchId ?? c.direction) === definition.id).reduce((sum, c) => ({ waiting: sum.waiting + c.waiting, screening: sum.screening + c.screening, approved: sum.approved + c.approved, infected: sum.infected + c.infected }), { waiting: 0, screening: 0, approved: 0, infected: 0 }),
+        latestPublicFlow: state.events.filter(e => (e.type === 'refugees_arrived' || e.type === 'refugees_screened') && (e.payload.branchId === definition.id || state.checkpoints.some(c => (c.branchId ?? c.direction) === definition.id && e.payload.checkpointId === c.id))).slice(-4).map(e => ({ turn: e.turn, type: e.type, payload: cloneJson(e.payload) })),
         direction: definition.direction,
         capitalConnection: { ...definition.capitalConnection },
         roadTiles: definition.roadTiles.map((position) => ({ ...position })),
@@ -337,6 +342,9 @@ function createAgentObservationInScope(
   const endTurnRisk = publicEndTurnRisk(state);
   return cloneJson({
     apiVersion: OBSERVATION_API_VERSION,
+    barbedWire: state.barbedWire.filter(w => visibleTileKeys.has(hexKey(w.position))),
+    barbedWireCandidates: wireCandidates(state),
+    workerAssignmentCandidates: workerAssignmentCandidates(state),
     gameRulesVersion: state.gameVersion,
     turn: state.turn,
     finalHordeTurn: state.finalHordeTurn,
@@ -352,7 +360,7 @@ function createAgentObservationInScope(
         .map((tile) => {
           const checkpoint = state.checkpoints.find((candidate) => samePosition(candidate.position, tile));
           const defense = publicTileDefense(state, tile);
-          const movementCost = effectiveMovementCost(state, tile);
+          const movementCost = effectiveMovementCost(state, tile, visibleTileKeys.has(hexKey(tile)));
           return {
             q: tile.q,
             r: tile.r,
@@ -365,6 +373,7 @@ function createAgentObservationInScope(
             facilityId: tile.facilityId,
             checkpointId: checkpoint?.id ?? null,
             effectiveMovementCost: movementCost,
+            unobstructedMovementCost: effectiveMovementCost(state, tile, false),
             terrainDefenseSource: defense.source,
             terrainDamageMultiplier: defense.multiplier,
              visibleToPlayer: visibleTileKeys.has(tile.key),
@@ -470,7 +479,7 @@ export function restoreArtifactObservation(
   const terrainDefense = new Map<string, { source: TerrainDefenseSource; multiplier: number }>();
   for (const tile of fixedMap.tiles) {
     if (!terrainMovement.has(tile.terrain) && !tile.road && !movementRoads.has(hexKey(tile)) && !tile.urban) {
-      terrainMovement.set(tile.terrain, tile.effectiveMovementCost);
+      terrainMovement.set(tile.terrain, tile.unobstructedMovementCost ?? tile.effectiveMovementCost);
     }
     if (!terrainDefense.has(tile.terrain) && !tile.urban) {
       terrainDefense.set(tile.terrain, { source: tile.terrainDefenseSource, multiplier: tile.terrainDamageMultiplier });
@@ -489,7 +498,7 @@ export function restoreArtifactObservation(
       const facilityId = tile.facilityId;
       const checkpointId = checkpointByPosition.get(key) ?? null;
       const urban = facilityId !== null || dynamicFacilityId !== null || checkpointId !== null;
-      const effectiveMovementCost = tile.terrain === 'water' ? null : urban || tile.road || movementRoads.has(key)
+      const effectiveMovementCost = tile.terrain === 'water' ? null : trace.barbedWire.some(w => hexKey(w.position) === key) ? 5 : urban || tile.road || movementRoads.has(key)
         ? 1
         : terrainMovement.get(tile.terrain) ?? tile.effectiveMovementCost;
       const defense = urban
@@ -502,6 +511,7 @@ export function restoreArtifactObservation(
         checkpointId,
         passable: effectiveMovementCost !== null,
         effectiveMovementCost,
+        ...(Object.hasOwn(tile, 'unobstructedMovementCost') ? { unobstructedMovementCost: tile.terrain === 'water' ? null : urban || tile.road || movementRoads.has(key) ? 1 : terrainMovement.get(tile.terrain) ?? tile.effectiveMovementCost } : {}),
         terrainDefenseSource: defense.source,
         terrainDamageMultiplier: defense.multiplier,
         visibleToPlayer: visible.has(key),

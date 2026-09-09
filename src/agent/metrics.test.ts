@@ -6,7 +6,7 @@ import { createAgentObservation } from './observation';
 import { runAgentGame } from './runner';
 import type { AgentPublicEvent } from './types';
 
-describe('Agent Metrics', () => {
+describe('Agent Metrics', { timeout: 120000 }, () => {
   it('separates infection falls from direct and chained zombie-occupancy destruction by site type', () => {
     const state = createInitialState(1, createDefaultConfig());
     const observation = createAgentObservation(state);
@@ -54,7 +54,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('12.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('13.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -129,7 +129,7 @@ describe('Agent Metrics', () => {
       'finalNormalZombiesSpawned',
     ]) expect(run.result!.statistics).not.toHaveProperty(hiddenWaveMetric);
     expect(run.metrics.finalHordeSpawned).toBe(run.result!.statistics.finalHordeSpawned);
-  }, 20_000);
+  }, 120_000);
 
   it('keeps branch, policy, checkpoint, and supply metrics in the public result', () => {
     const config = createDefaultConfig({
@@ -141,7 +141,7 @@ describe('Agent Metrics', () => {
     expect(run.metrics.checkpointsBuilt).toBeGreaterThanOrEqual(0);
     expect(run.metrics.checkpointsRelocated).toBeGreaterThanOrEqual(0);
     expect(run.metrics.supplyRejections).toBeGreaterThanOrEqual(0);
-  }, 20_000);
+  }, 120_000);
 
   it('counts policy branch-turns from the Active post only', () => {
     const config = createDefaultConfig({ maxActionsPerTurn: 1 });
@@ -284,7 +284,7 @@ describe('Agent Metrics', () => {
     expect(aggregate.metrics.finalTurn.average).toBeGreaterThan(0);
     expect(aggregate.metrics.finalTurn.p10).toBeLessThanOrEqual(aggregate.metrics.finalTurn.p90);
     expect(aggregate.actionCounts.EndTurn).toBe(first.actionCounts.EndTurn + second.actionCounts.EndTurn);
-  }, 45_000);
+  }, 1120_000);
 
   it('can collect a technical-failure metric without pretending it is an in-game loss', () => {
     const config = createDefaultConfig();

@@ -1,3 +1,4 @@
+import { BARBED_WIRE_RULES } from '../core/barbed-wire';
 import type { GameConfig } from '../core/types';
 import { FIXED_MAP } from '../core/map';
 import {
@@ -83,6 +84,7 @@ export function createAgentApiInfo(
     horde_warning_active: { severity: 'advisory', category: 'horde' },
     guaranteed_resource_defeat: { severity: 'critical', category: 'resources' },
     new_state_loss: { severity: 'advisory', category: 'loss' },
+    production_outage: { severity: 'warning', category: 'resource' },
   };
   return cloneJson({
     appVersion: APP_VERSION,
@@ -96,6 +98,7 @@ export function createAgentApiInfo(
     methods: [...PUBLIC_METHODS],
     parameterQueries: { construction: 'query construction; filters facilityType, legalOnly, inSupply, reasonCode, q/r or qMin/qMax/rMin/rMax; paginated and revision-bound', transferPopulation: 'query population-transfers; filters fromFacilityId/toFacilityId; min/max inclusive, positive integers, expectedRevision', legalActionsExhaustive: false, revisionRequiredForSession: true },
     actionContracts: {
+      BuildBarbedWire: { required: ['position'], example: { type: 'BuildBarbedWire', position: { q: 21, r: 26 } }, conditions: ['query construction facilityType=barbedWire', 'visible supplied empty passable hex', 'visible adjacent and radial inspection area', 'no adjacent enemy', 'radial separation at least 3', 'Civilian Goods 5 + Military Goods 5; one action'] },
       Move: { required: ['unitId', 'destination'], example: { type: 'Move', unitId: 'police-1', destination: { q: 24, r: 25 } }, conditions: ['legal destination', 'move budget', 'supply/fuel projection'] },
       Attack: { required: ['attackerId', 'targetId'], example: { type: 'Attack', attackerId: 'police-1', targetId: 'zombie-1' }, conditions: ['visible enemy', 'range', 'charge', 'military goods'] },
       AssignWorkers: { required: ['facilityId', 'workers'], example: { type: 'AssignWorkers', facilityId: 'farm-1', workers: 20 }, conditions: ['absolute worker count', 'safe eligible facility', 'city population snapshot'] },
@@ -161,6 +164,7 @@ export function createAgentApiInfo(
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
     rules: {
+      barbedWire: BARBED_WIRE_RULES,
       gasZombie: { explosionDamage:config.units.gasZombie.explosionDamage, explosionInfection:config.units.gasZombie.explosionInfection,radius:1,excludesCenter:true,initialCount:cloneJson(config.economy.initialGasCount),initialMinDistance:config.economy.initialGasMinDistance,finalWaves:2,capPerDirection:config.horde.gasZombieCapPerDirection },
       armyBase: {maxMilitaryGoods:config.armyBase.maxMilitaryGoods,interceptionCost:config.armyBase.interceptionCost,attack:config.armyBase.attack,range:config.armyBase.range,staffedVision:config.armyBase.staffedVision,rewardLastTurn:config.armyBase.rewardLastTurn,interceptionNoiseRadius:config.armyBase.noiseRadius,recruitmentPower:config.facilities.armyBase.production.powerCapacity,cityPopulationOnly:true},
       zombies: Object.fromEntries((['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const).map((type) => {

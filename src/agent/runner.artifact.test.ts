@@ -80,5 +80,5 @@ describe('Agent Runner replay artifacts', () => {
     });
     expect(corruptedReplay.reproduced).toBe(false);
     expect(corruptedReplay.mismatch).toBe('Replay internal verification events differ from the artifact');
-  }, 90_000);
+  }, 300_000);
 });

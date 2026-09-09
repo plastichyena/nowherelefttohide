@@ -8,7 +8,7 @@ import {
 describe('v1.5.5 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('7.0.0');
+    expect(DEFAULT_CONFIG.version).toBe('8.0.0');
     expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v4');
     expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(25);
     expect(DEFAULT_CONFIG.economy.initialResources).toMatchObject({

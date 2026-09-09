@@ -15,7 +15,7 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '7.0.0';
+export const CONFIG_VERSION = '8.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v4';
 
 const facilityIds: FacilityId[] = [

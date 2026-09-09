@@ -6,6 +6,7 @@ import { canPlayerOccupyHex, getTile } from './map';
 import { effectiveMovementCost } from './terrain';
 import { unitMoveFuelCost } from './movement-query';
 import { emit } from './events-internal';
+import { wireAt, damageWire } from './barbed-wire';
 interface MovementHooks {
   interceptArmyBase(state: GameState, mover: UnitState, rng: SeededRng): boolean;
   interceptorsAt(state: GameState, mover: UnitState, position: HexCoord): UnitState[];
@@ -29,12 +30,22 @@ function applyMovement(
   const pinned = () => !mover.isPlayerUnit && state.units.some(u => u.isPlayerUnit && u.hp > 0 && hexDistance(u.position, mover.position) === 1);
   for (const position of (pinned() ? [] : path.slice(1))) {
     if (mover.isPlayerUnit && !canPlayerOccupyHex(state.map, position)) break;
-    const cost = effectiveMovementCost(state, position);
-    if (cost === null || spent + cost > movementBudget) break;
+    const cost = effectiveMovementCost(state, position, mover.isPlayerUnit);
+    if (cost === null) break;
     const occupant = getUnitAt(state, position);
     if (occupant && occupant.id !== mover.id) break;
+    if (!mover.isPlayerUnit) {
+      while (wireAt(state, position) && mover.canAttack && mover.attackChargesRemaining > 0) {
+        mover.attackChargesRemaining--;
+        mover.canAttack = mover.attackChargesRemaining > 0;
+        damageWire(state, position, mover.attack);
+      }
+      if (wireAt(state, position)) break;
+    }
+    if (spent + cost > movementBudget) break;
     spent += cost;
     mover.position = { ...position };
+    delete mover.reanimatedOnBarbedWireId;
     reached = { ...position };
     traversed.push(position);
     const enteredTile = getTile(state.map, position);

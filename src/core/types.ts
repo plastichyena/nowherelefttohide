@@ -272,6 +272,8 @@ export interface CityPopulationSnapshot {
 }
 
 export interface UnitState {
+  /** Same-Hex Human reanimation only; cleared on exit or obstacle destruction. */
+  reanimatedOnBarbedWireId?: string;
   id: string;
   type: UnitType;
   position: HexCoord;
@@ -442,6 +444,8 @@ export interface NoisePulse {
 }
 
 export type GameEventType =
+  | 'barbed_wire_built'
+  | 'barbed_wire_damaged'
   | 'horde_wave_started'
   | 'horde_spawn_batch'
   | 'gas_explosion'
@@ -888,7 +892,8 @@ export type CrisisReasonCode =
   | 'unit_out_of_supply_risk'
   | 'horde_warning_active'
   | 'guaranteed_resource_defeat'
-  | 'new_state_loss';
+  | 'new_state_loss'
+  | 'production_outage';
 
 export interface CrisisAlert {
   id: string;
@@ -916,7 +921,17 @@ export interface EndTurnRisk {
   forecastGuaranteedDefeat: boolean;
 }
 
+export interface BarbedWireState {
+  id: string;
+  position: HexCoord;
+  hp: number;
+  maxHp: number;
+  builtTurn: number;
+}
+
 export interface GameState {
+  barbedWire: BarbedWireState[];
+  nextBarbedWireNumber: number;
   /** Private seed-bound initial Hunter placement; never part of Agent map. */
   initialHunterPositions: HexCoord[];
   initialGasPositions: HexCoord[];
@@ -1063,6 +1078,7 @@ export interface LoadSnapshotAction {
 }
 
 export type GameAction =
+  | { type: 'BuildBarbedWire'; position: HexCoord }
   | MoveAction
   | AttackAction
   | WaitAction

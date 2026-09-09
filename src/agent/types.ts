@@ -35,16 +35,16 @@ import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
 /** v1.5.4 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.5.5';
-export const GAME_RULES_VERSION = '7.0.0';
-export const SAVE_FORMAT_VERSION = '14';
-export const AGENT_API_VERSION = '12.0.0';
-export const OBSERVATION_API_VERSION = '12.0.0';
-export const BRIDGE_API_VERSION = '12.0.0';
-export const BALANCED_AGENT_VERSION = '7.0.0';
-export const RANDOM_AGENT_VERSION = '5.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '11.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '8.0.0';
+export const APP_VERSION = '1.5.6';
+export const GAME_RULES_VERSION = '8.0.0';
+export const SAVE_FORMAT_VERSION = '15';
+export const AGENT_API_VERSION = '13.0.0';
+export const OBSERVATION_API_VERSION = '13.0.0';
+export const BRIDGE_API_VERSION = '13.0.0';
+export const BALANCED_AGENT_VERSION = '8.0.0';
+export const RANDOM_AGENT_VERSION = '6.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '12.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '9.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -61,6 +61,7 @@ export const CRISIS_REASON_CODES = [
   'horde_warning_active',
   'guaranteed_resource_defeat',
   'new_state_loss',
+  'production_outage',
 ] as const;
 
 export type CrisisReasonCode = typeof CRISIS_REASON_CODES[number];
@@ -102,6 +103,7 @@ export interface EndTurnRisk {
 }
 
 export interface AgentMapTileObservation {
+  unobstructedMovementCost?: number | null;
   q: number;
   r: number;
   /** Base terrain is public even outside the current visibility union. */
@@ -135,6 +137,9 @@ export interface AgentMapObservation {
 }
 
 export interface AgentRoadBranchObservation {
+  managed?: boolean;
+  currentQueue?: { waiting: number; screening: number; approved: number; infected: number };
+  latestPublicFlow?: Array<{ turn: number; type: string; payload: import('../core/types').JsonObject }>;
   branchId: string;
   direction: CardinalDirection;
   capitalConnection: HexCoord;
@@ -258,6 +263,9 @@ export interface AgentFacilityObservation {
 }
 
 export interface AgentUnitObservation {
+  spawnedInsideBarbedWire?: boolean;
+  /** Independent conditional attacks, not an enemy movement/target prediction. */
+  conditionalIncomingCombat?: Array<{ enemyId: string; condition: 'if_this_visible_enemy_attacks' } & ReturnType<typeof import('../core/barbed-wire').wireCombatProjection>>;
   deathExplosion?: { radius:number; excludesCenter:true; baseUnitDamage:number; maxSiteInfection:number; units:Array<{unitId:string;damage:number}>; sites:Array<{siteId:string;infection:number}> };
   id: string;
   type: UnitType;
@@ -416,6 +424,7 @@ export interface AgentApiInfo {
   };
   prohibited: string[];
   rules: {
+    barbedWire: typeof import('../core/barbed-wire').BARBED_WIRE_RULES;
     gasZombie?: { explosionDamage:number; explosionInfection:number; radius:number; excludesCenter:boolean; initialCount:{min:number;max:number}; initialMinDistance:number; finalWaves:number; capPerDirection:number };
     armyBase?: Omit<GameConfig['armyBase'], 'noiseRadius'> & { interceptionNoiseRadius:number; recruitmentPower:number; cityPopulationOnly:boolean };
     zombies: Record<import('../core/types').ZombieUnitType, { hp: number; attack: number; movement: number; range: number; vision: number; maxAttackCharges: number; ai: 'normal' | 'horde' }>;
@@ -740,6 +749,9 @@ export interface AgentGameResult {
 }
 
 export interface AgentObservation {
+  workerAssignmentCandidates: ReturnType<typeof import('../core/engine').workerAssignmentCandidates>;
+  barbedWire: import('../core/types').BarbedWireState[];
+  barbedWireCandidates: ReturnType<typeof import('../core/barbed-wire').wireCandidates>;
   apiVersion: string;
   gameRulesVersion: string;
   turn: number;
@@ -844,6 +856,8 @@ export interface AgentActionError {
 }
 
 export interface AgentStepResult {
+  facilityChanges?: ReturnType<typeof import('./facility-changes').facilityChanges>;
+  branchFlowChanges?: ReturnType<typeof import('./facility-changes').branchFlowChanges>;
   observation: AgentObservation;
   events: AgentPublicEvent[];
   error: AgentActionError | null;

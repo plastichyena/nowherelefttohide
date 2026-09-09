@@ -78,7 +78,7 @@ export function getMovePath(state: GameState, action: MoveAction): {
     unit.position,
     action.destination,
     publicBlocked,
-    createMovementCostResolver(state, true),
+    createMovementCostResolver(state, true, visible),
   );
   if (!path) {
     return error(action, 'no_path', 'No path is available');
@@ -87,7 +87,7 @@ export function getMovePath(state: GameState, action: MoveAction): {
   const movementBudget = movementMode === 'emergency'
     ? state.config.units[unit.type as HumanUnitType].emergencyMovementPoints
     : unit.movement;
-  const effectiveCost = pathMovementCost(path, (position) => effectiveMovementCost(state, position));
+  const effectiveCost = pathMovementCost(path, createMovementCostResolver(state, true, visible));
   if (path.length <= 1 || effectiveCost > movementBudget) {
     return error(action, 'out_of_range', 'Destination exceeds movement range');
   }
@@ -118,7 +118,7 @@ function computeReachableMovePaths(state: GameState, unit: UnitState) {
     unit.position,
     movementBudget,
     blocked,
-    createMovementCostResolver(state, true),
+    createMovementCostResolver(state, true, visible),
   ).filter((entry) => movementMode === 'emergency' || unit.currentFuel >= unitMoveFuelCost(unit.type as HumanUnitType, entry.path.length - 1));
 }
 
@@ -177,7 +177,7 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
     if (interceptors[0]) {
       const entered = candidate.path.findIndex((step) => hexKey(step) === hexKey(position));
       const partialPath = candidate.path.slice(0, entered + 1);
-      const effectiveCost = pathMovementCost(partialPath, (step) => effectiveMovementCost(snapshot, step));
+      const effectiveCost = pathMovementCost(partialPath, createMovementCostResolver(snapshot, true, initiallyVisible));
       const fuelCost = candidate.movementMode === 'normal'
         ? unitMoveFuelCost(mover.type as HumanUnitType, entered)
         : 0;

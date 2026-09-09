@@ -18,7 +18,7 @@ export function hasMovementRoad(map: GameState['map'], position: HexCoord): bool
   return keys.has(hexKey(position));
 }
 
-type TerrainState = Pick<GameState, 'map' | 'facilities' | 'checkpoints' | 'config'>;
+type TerrainState = Pick<GameState, 'map' | 'facilities' | 'checkpoints' | 'config'> & Partial<Pick<GameState, 'barbedWire'>>;
 
 export interface TerrainDefense {
   source: TerrainDefenseSource;
@@ -37,9 +37,11 @@ export function isUrbanHex(state: Readonly<TerrainState>, position: HexCoord): b
 export function effectiveMovementCost(
   state: Readonly<TerrainState>,
   position: HexCoord,
+  playerMovement = true,
 ): number | null {
   const tile = getTile(state.map, position);
   if (!tile || state.config.terrain.movementCost[tile.terrain] === null) return null;
+  if (playerMovement && state.barbedWire?.some(w => w.hp > 0 && hexKey(w.position) === hexKey(position))) return 5;
   if (hasMovementRoad(state.map, position) || isUrbanHex(state, position)) return 1;
   return state.config.terrain.movementCost[tile.terrain];
 }
@@ -48,6 +50,7 @@ export function effectiveMovementCost(
 export function createMovementCostResolver(
   state: Readonly<TerrainState>,
   playerMovement = false,
+  visible?: ReadonlySet<string>,
 ): MovementCostResolver {
   const reference = createMapReference(state.map);
   const urban = new Set([
@@ -55,10 +58,12 @@ export function createMovementCostResolver(
     ...state.checkpoints.map((checkpoint) => hexKey(checkpoint.position)),
   ]);
   const roads = new Set(state.map.roads ? roadConnections(state.map.roads).keys() : []);
+  const wires = new Set(state.barbedWire?.filter(w => w.hp > 0 && (!visible || visible.has(hexKey(w.position)))).map(w => hexKey(w.position)) ?? []);
   return (position) => {
     const tile = reference.getTile(position);
     if (!tile || (playerMovement && !reference.canPlayerOccupyHex(position))) return null;
     if (state.config.terrain.movementCost[tile.terrain] === null) return null;
+    if (playerMovement && wires.has(hexKey(position))) return 5;
     if (tile.road || roads.has(hexKey(position)) || tile.facilityId || urban.has(hexKey(position))) return 1;
     return state.config.terrain.movementCost[tile.terrain];
   };

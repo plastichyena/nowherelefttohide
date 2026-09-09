@@ -5,6 +5,7 @@ export function cloneJson<T>(value: T): T {
 }
 
 export function actionKey(action: GameAction): string {
+  if (action.type === 'BuildBarbedWire') return `BuildBarbedWire|${action.position.q},${action.position.r}`;
   if (action.type === 'Move') return `Move|${action.unitId}|${action.destination.q},${action.destination.r}`;
   if (action.type === 'Attack') return `Attack|${action.attackerId}|${action.targetId}`;
   if (action.type === 'Wait') return `Wait|${action.unitId}`;

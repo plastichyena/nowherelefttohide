@@ -1,0 +1,98 @@
+[
+  {
+    "name": "Lateral",
+    "capital": {
+      "q": 0,
+      "r": 0
+    },
+    "a": {
+      "q": 3,
+      "r": 0
+    },
+    "b": {
+      "q": 3,
+      "r": -1
+    },
+    "conflict": false
+  },
+  {
+    "name": "Radial 1",
+    "capital": {
+      "q": 0,
+      "r": 0
+    },
+    "a": {
+      "q": 3,
+      "r": 0
+    },
+    "b": {
+      "q": 4,
+      "r": 0
+    },
+    "conflict": true
+  },
+  {
+    "name": "Radial 2",
+    "capital": {
+      "q": 0,
+      "r": 0
+    },
+    "a": {
+      "q": 3,
+      "r": 0
+    },
+    "b": {
+      "q": 5,
+      "r": 0
+    },
+    "conflict": true
+  },
+  {
+    "name": "Radial 3",
+    "capital": {
+      "q": 0,
+      "r": 0
+    },
+    "a": {
+      "q": 3,
+      "r": 0
+    },
+    "b": {
+      "q": 6,
+      "r": 0
+    },
+    "conflict": false
+  },
+  {
+    "name": "Bent shortest path",
+    "capital": {
+      "q": 0,
+      "r": 0
+    },
+    "a": {
+      "q": 2,
+      "r": 1
+    },
+    "b": {
+      "q": 3,
+      "r": 2
+    },
+    "conflict": true
+  },
+  {
+    "name": "Equal radius",
+    "capital": {
+      "q": 0,
+      "r": 0
+    },
+    "a": {
+      "q": 2,
+      "r": 1
+    },
+    "b": {
+      "q": 1,
+      "r": 2
+    },
+    "conflict": false
+  }
+]

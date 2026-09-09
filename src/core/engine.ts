@@ -37,6 +37,8 @@ import {
 import { findNearestOpenTiles, findReachablePaths, findShortestPath, pathMovementCost } from './path';
 import { SeededRng } from './rng';
 import { deriveUnitRecovery } from './recovery';
+import { facilityRecaptureConditions } from './facility-recovery';
+import { wireAt, wireBuildReason, wireCandidates, wireRoutePenalty } from './barbed-wire';
 import { createMovementCostResolver, effectiveMovementCost, terrainAdjustedDamage } from './terrain';
 import {
   canUnitSee,
@@ -288,7 +290,18 @@ function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRn
     emit(state, 'facility_recovered', { facilityId: facility.id, unitId: unit.id, recovering: true });
     return;
   }
-  if (facility?.type === 'armyBase' && facility.status === 'ruined' && facility.infected === 0) { facility.owner='player'; facility.status='owned'; facility.operationalStatus='recovering'; facility.recoveryOperationalTurn=state.turn+1; facility.populationOperationalTurn=state.turn+1; return; }
+  if (facility && facilityRecaptureConditions(state, facility).ready) {
+    facility.owner = 'player';
+    facility.status = 'owned';
+    facility.workers = 0;
+    facility.operationalStatus = 'recovering';
+    facility.recoveryOperationalTurn = state.turn + 1;
+    facility.populationOperationalTurn = state.turn + 1;
+    facility.securedOrder ??= state.facilities.reduce((max, f) => Math.max(max, f.securedOrder ?? -1), -1) + 1;
+    facility.lastAssignedOrder = state.nextAssignmentOrder++;
+    emit(state, 'facility_recovered', { facilityId: facility.id, unitId: unit.id, recovering: true });
+    return;
+  }
   if (!facility || facility.status !== 'unowned') {
     return;
   }
@@ -875,7 +888,7 @@ function nearestSpawnPosition(state: GameState, origin: HexCoord, rng: SeededRng
   let frontier = [{ ...origin }];
   const seen = new Set<string>([hexKey(origin)]);
   while (frontier.length > 0) {
-    const available = frontier.filter((position) => !occupied.has(hexKey(position)));
+    const available = frontier.filter((position) => !occupied.has(hexKey(position)) && !wireAt(state, position));
     if (available.length > 0) {
       return rng.pick(available.sort((a, b) => a.q - b.q || a.r - b.r));
     }
@@ -995,7 +1008,7 @@ function eligibleAdjacentZombieSpawnPositions(state: Readonly<GameState>, origin
   const occupied = occupiedKeys(state as GameState);
   return hexNeighbors(origin)
     .filter((position) => hexWithinBounds(position, state.map.width, state.map.height))
-    .filter((position) => !occupied.has(hexKey(position)))
+    .filter((position) => !occupied.has(hexKey(position)) && !wireAt(state, position))
     .filter((position) => {
       const tile = getTile(state.map, position);
       return tile !== undefined && state.config.terrain.movementCost[tile.terrain] !== null;
@@ -1470,13 +1483,7 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
   }
   else if (facility.status === 'owned') facility.operationalStatus = facility.type === 'armyBase' || facility.workers > 0 ? 'operational' : 'stopped';
   if (facility.infected === 0 && facility.status === 'ruined') {
-    facility.owner = 'player';
-    facility.status = 'owned';
-    facility.operationalStatus = facility.type === 'armyBase' ? 'recovering' : 'stopped';
-    if (facility.type === 'armyBase') facility.recoveryOperationalTurn = state.turn + 1;
-    facility.workers = 0;
-    facility.populationOperationalTurn = state.turn + 1;
-    emit(state, 'facility_recovered', { facilityId: facility.id, unitId: unit.id });
+    tryCapture(state, unit);
   }
   return true;
 }
@@ -1556,6 +1563,8 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
 function processInternalInfection(state: GameState, rng: SeededRng): void {
   for (const facility of stableFacilities(state)) {
     if (!state.facilities.includes(facility)) continue;
+    const recapture = facilityRecaptureConditions(state, facility);
+    if (recapture.ready && recapture.human) tryCapture(state, recapture.human, rng);
     if (facility.infected <= 0) {
       continue;
     }
@@ -1662,7 +1671,11 @@ function targetPath(
   // No search will run when every adjacent arrival hex is occupied. In
   // particular, do not build a terrain index for this common late-game case.
   if (destinations.length === 0) return null;
-  const resolveCost = queryValue(state, 'zombieMovementCostResolver', () => createMovementCostResolver(state));
+  const terrainCost = queryValue(state, 'zombieMovementCostResolver', () => createMovementCostResolver(state));
+  const resolveCost = (position: HexCoord) => {
+    const cost = terrainCost(position);
+    return cost === null ? null : cost + (state.barbedWire.length ? wireRoutePenalty(state, zombie, position) : 0);
+  };
   const candidates = destinations
     .map((destination) => {
       const path = findShortestPath(
@@ -1695,7 +1708,7 @@ function removeEmptyTemporaryHousing(state: GameState, facility: FacilityState, 
   });
 }
 
-function terrainDistanceMap(state: Readonly<GameState>, target: HexCoord): Map<string, number> {
+function terrainDistanceMap(state: Readonly<GameState>, target: HexCoord, zombie: UnitState): Map<string, number> {
   const distances = new Map<string, number>([[hexKey(target), 0]]);
   const pending: Array<{ position: HexCoord; distance: number }> = [{ position: { ...target }, distance: 0 }];
   const push = (entry: { position: HexCoord; distance: number }): void => {
@@ -1729,7 +1742,8 @@ function terrainDistanceMap(state: Readonly<GameState>, target: HexCoord): Map<s
     const current = pop();
     if (distances.get(hexKey(current.position)) !== current.distance) continue;
     const enteredTile = getTile(state.map, current.position);
-    const enteredCost = enteredTile ? effectiveMovementCost(state, current.position) : null;
+    const terrainCost = enteredTile ? effectiveMovementCost(state, current.position, false) : null;
+    const enteredCost = terrainCost === null ? null : terrainCost + wireRoutePenalty(state, zombie, current.position);
     if (enteredCost === null) continue;
     for (const predecessor of hexNeighbors(current.position)) {
       if (!hexWithinBounds(predecessor, state.map.width, state.map.height)) continue;
@@ -1759,12 +1773,12 @@ function congestionFallback(
     zombie.position,
     zombie.movement,
     occupied,
-    (position) => effectiveMovementCost(state, position),
+    (position) => effectiveMovementCost(state, position, false),
   )
     .map((reachable) => ({
       ...reachable,
       targetDistance: distances.get(hexKey(reachable.position)) ?? Number.POSITIVE_INFINITY,
-      movementCost: effectiveMovementCost(state, reachable.position),
+      movementCost: effectiveMovementCost(state, reachable.position, false),
     }))
     .filter((candidate): candidate is typeof candidate & { movementCost: number } =>
       Number.isFinite(candidate.targetDistance) && candidate.movementCost !== null,
@@ -2148,10 +2162,10 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
         zombie.fallbackTarget = null;
       }
     } else if (!route) {
-      const key = hexKey(decision.target);
+      const key = `${hexKey(decision.target)}:${zombie.attack}:${zombie.attackChargesRemaining}:${zombie.maxAttackCharges}:${zombie.movement}:${state.barbedWire.map(w => `${w.id}:${w.hp}`).join(',')}`;
       let distances = terrainDistances.get(key);
       if (!distances) {
-        distances = terrainDistanceMap(state, decision.target);
+        distances = terrainDistanceMap(state, decision.target, zombie);
         terrainDistances.set(key, distances);
       }
       const fallback = congestionFallback(state, zombie, decision.target, distances);
@@ -2369,7 +2383,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
     if (blockedDirections.has(pending.direction)) continue;
     if (!state.horde.pendingWaves.includes(pending) || pending.roster.length === 0) continue;
     const occupied = occupiedKeys(state);
-    const available = getHordeSpawnZone(state.map, pending.direction).filter((position) => !occupied.has(hexKey(position)));
+    const available = getHordeSpawnZone(state.map, pending.direction).filter((position) => !occupied.has(hexKey(position)) && !wireAt(state, position));
     if (available.length === 0) {
       blockedDirections.add(pending.direction);
       continue;
@@ -2837,12 +2851,36 @@ function validateTransferPopulation(
 }
 
 /** Parameter domains use the same validation as execution, including turn-start eligibility. */
+export function populationCityReason(state: Readonly<GameState>, city: FacilityState): string | null {
+  if (city.status === 'ruined') return 'ruined';
+  if (city.owner !== 'player') return 'not_owned';
+  if (city.infected > 0) return 'infected';
+  if (city.populationOperationalTurn > state.turn || city.operationalStatus === 'recovering') return 'next_turn_wait';
+  if (!eligibleSnapshotCities(state as GameState, 'supply').some(c => c.id === city.id)) return 'turn_start_snapshot_ineligible';
+  return null;
+}
+
+export function workerAssignmentCandidates(state: Readonly<GameState>) {
+  const availablePopulation = availableSupplyPopulation(state as GameState);
+  return state.facilities.filter(isProductionFacility).map(facility => {
+    const result = validateAssignWorkers(state, { type: 'AssignWorkers', facilityId: facility.id, workers: Math.min(facility.workerCapacity, facility.workers + 1) });
+    const targetReason = facility.status === 'ruined' ? 'ruined' : facility.owner !== 'player' ? 'not_owned'
+      : facility.infected > 0 ? 'infected' : facility.populationOperationalTurn > state.turn ? 'next_turn_wait'
+      : ['building', 'disabled', 'recovering'].includes(facility.operationalStatus) ? 'facility_not_operational'
+      : facility.workers >= facility.workerCapacity ? 'capacity_reached' : !isHexSupplied(state, facility.position) ? 'facility_out_of_supply' : null;
+    return { facilityId: facility.id, availablePopulation, currentWorkers: facility.workers, targetReason,
+      populationReason: availablePopulation <= 0 ? 'insufficient_city_population' : null,
+      actionBudgetReason: playerActionBudgetError(state, { type: 'AssignWorkers', facilityId: facility.id, workers: facility.workers + 1 })?.code ?? null,
+      reason: 'code' in result ? result.code : null, populationSources: state.facilities.filter(isCityFacility).map(city => ({ facilityId: city.id, healthyPopulation: city.workers, reason: populationCityReason(state, city), availablePopulation: populationCityReason(state, city) === null ? city.workers : 0 })) };
+  });
+}
+
 export function populationTransferCandidates(state: Readonly<GameState>) {
   const cities = state.facilities.filter(isCityFacility).sort((a, b) => a.id.localeCompare(b.id));
   return cities.flatMap(from => cities.filter(to => to.id !== from.id).map(to => {
     const result = validateTransferPopulation(state, { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 });
     const reason = 'code' in result ? result.code : null;
-    return { fromFacilityId: from.id, toFacilityId: to.id, min: reason ? null : 1, max: reason ? null : from.workers, integerOnly: true as const, legal: reason === null, reason, constraints: ['turn_start_snapshot', 'safe_city', 'action_budget', 'source_healthy_residents'] };
+    return { fromFacilityId: from.id, toFacilityId: to.id, fromReason: populationCityReason(state, from) ?? (from.workers <= 0 ? 'insufficient_city_population' : null), toReason: populationCityReason(state, to), actionBudgetReason: playerActionBudgetError(state, { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 })?.code ?? null, min: reason ? null : 1, max: reason ? null : from.workers, integerOnly: true as const, legal: reason === null, reason, constraints: ['turn_start_snapshot', 'safe_city', 'action_budget', 'source_healthy_residents'] };
   }));
 }
 
@@ -2918,6 +2956,7 @@ function validateCheckpointDestination(
     const visibilityError = validateCheckpointVisibility(state, action, branchId, visibleTileKeys);
     if (visibilityError) return visibilityError;
   }
+  if (wireAt(state, action.position)) return error(action, 'barbed_wire_occupied', 'Barbed Wire occupies this Hex');
   const tile = getTile(state.map, action.position);
   if (isHordeSpawnReserve(state.map, action.position)) {
     return error(action, 'horde_spawn_reserve', 'Player checkpoints cannot occupy the Horde Spawn Reserve');
@@ -3564,6 +3603,7 @@ function validateConstructibleFacilityAction(
   action: Extract<GameAction, { type: 'BuildConstructibleFacility' }>,
   context?: ConstructibleValidationContext,
 ): ActionError | null {
+  if (getPlayerVisibleTileKeys(state).has(hexKey(action.position)) && wireAt(state, action.position)) return error(action, 'barbed_wire_occupied', 'Barbed Wire occupies this Hex');
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   if (!['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'].includes(action.facilityType)) {
@@ -3771,6 +3811,10 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   if (action.type === 'RelocateCheckpoint') return validateRelocateCheckpointAction(state, action).error;
   if (action.type === 'ActivateCheckpoint') return validateActivateCheckpointAction(state, action).error;
   if (action.type === 'BuildConstructibleFacility') return validateConstructibleFacilityAction(state, action);
+  if (action.type === 'BuildBarbedWire') {
+    const reason = wireBuildReason(state, action.position);
+    return reason ? error(action, reason, reason) : null;
+  }
   if (action.type === 'TurnAwayCheckpointRefugees') return validationError(validateTurnAwayCheckpointRefugees(state, action));
   if (action.type === 'DecommissionConstructibleFacility') return validationError(validateDecommissionConstructibleFacility(state, action));
   if (action.type === 'Move') return validationError(getMovePath(state as GameState, action));
@@ -3792,6 +3836,8 @@ function staticConstructibleHexKeys(
 }
 
 function staticConstructibleEligibleHexKeys(state: Readonly<GameState>): Set<string> {
+  const visibleTiles = getPlayerVisibleTileKeys(state);
+  const visibleWallKeys = new Set(state.barbedWire.filter(w => visibleTiles.has(hexKey(w.position))).map(w => hexKey(w.position)));
   const visibleEnemyKeys = new Set(getVisibleEnemyUnits(state).map((unit) => hexKey(unit.position)));
   const playerUnitKeys = new Set(state.units.filter((unit) => unit.isPlayerUnit).map((unit) => hexKey(unit.position)));
   const facilityKeys = new Set(state.facilities.map((facility) => hexKey(facility.position)));
@@ -3805,6 +3851,7 @@ function staticConstructibleEligibleHexKeys(state: Readonly<GameState>): Set<str
       !facilityKeys.has(tile.key) &&
       !checkpointKeys.has(tile.key) &&
       !playerUnitKeys.has(tile.key) &&
+      !visibleWallKeys.has(tile.key) &&
       !visibleEnemyKeys.has(tile.key))
     .map((tile) => tile.key));
 }
@@ -4023,6 +4070,7 @@ export class GameEngine implements HeadlessGame {
       visibleTileKeys: getPlayerVisibleTileKeys(state),
     }));
     return createQueryContext(this.revision, {
+      getBarbedWireCandidates: () => memo('barbed-wire', () => wireCandidates(state)),
       getEndTurnForecast: () => forecastEndTurn(state),
       getNextTurnPenaltyForecast: () => memo('next-turn-penalties', () => forecastNextTurnPenalties(state)),
       getStrategicForecast: () => memo('strategic', () => deriveStrategicForecast(state)),
@@ -4181,6 +4229,7 @@ export class GameEngine implements HeadlessGame {
           : { type: 'BuildCheckpoint', branchId: candidate.branchId, position: { ...candidate.position } });
     }
     actions.push(...getLegalConstructibleBuildActions(this.state));
+    actions.push(...wireCandidates(this.state).filter(c => c.legal).map(c => ({ type: 'BuildBarbedWire' as const, position: c.position })));
     for (const facility of stableFacilities(this.state)) {
       const action: Extract<GameAction, { type: 'DecommissionConstructibleFacility' }> = {
         type: 'DecommissionConstructibleFacility',
@@ -4267,6 +4316,18 @@ export class GameEngine implements HeadlessGame {
     else if (action.type === 'SetCheckpointPolicy') actionError = setCheckpointPolicy(candidate, action);
     else if (action.type === 'SetPowerSupply') actionError = setPowerSupply(candidate, action);
     else if (action.type === 'BuildConstructibleFacility') actionError = buildConstructibleFacility(candidate, action);
+    else if (action.type === 'BuildBarbedWire') {
+      const reason = wireBuildReason(candidate, action.position);
+      if (reason) actionError = error(action, reason, reason);
+      else {
+        const id = `barbed-wire-${candidate.nextBarbedWireNumber++}`;
+        candidate.barbedWire.push({ id, position: { ...action.position }, hp: 10, maxHp: 10, builtTurn: candidate.turn });
+        candidate.resources.civilianGoods -= 5;
+        candidate.resources.militaryGoods -= 5;
+        candidate.actionsTakenThisTurn++;
+        emit(candidate, 'barbed_wire_built', { wireId: id, q: action.position.q, r: action.position.r });
+      }
+    }
     else if (action.type === 'BuildCheckpoint') actionError = buildCheckpoint(candidate, action);
     else if (action.type === 'RelocateCheckpoint') actionError = relocateCheckpoint(candidate, action);
     else if (action.type === 'ActivateCheckpoint') actionError = activateCheckpoint(candidate, action);

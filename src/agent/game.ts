@@ -1,3 +1,4 @@
+import { facilityChanges, branchFlowChanges } from './facility-changes';
 import { ObservationHistory, metricObservation } from './history';
 import { assertValidGameConfig, cloneConfig, createDefaultConfig, DEFAULT_MAP_ID } from '../core/config';
 import { GameEngine, getCheckpointPositionCandidates, validateAction } from '../core/engine';
@@ -297,6 +298,7 @@ function checkpointCandidateProjectionKey(state: Readonly<GameState>): string {
     actionBudgetReached: state.actionsTakenThisTurn >= state.config.maxActionsPerTurn,
     civilianGoods: state.resources.civilianGoods,
     visibleTiles: [...visibleTiles].sort(),
+    visibleWalls: state.barbedWire.filter(w => visibleTiles.has(hexKey(w.position))).map(w => hexKey(w.position)).sort(),
     facilities: state.facilities
       .map((facility) => [facility.id, facility.position.q, facility.position.r] as const)
       .sort((left, right) => left[0].localeCompare(right[0])),
@@ -455,6 +457,9 @@ export class AgentGameAdapter implements AgentGame {
     if (!matched) {
       let error = publicError('action_not_legal', 'Action is not in the current legal action list');
       if (
+        action.type === 'BuildBarbedWire' ||
+        action.type === 'AssignWorkers' ||
+        action.type === 'TransferPopulation' ||
         action.type === 'BuildCheckpoint' ||
         action.type === 'RelocateCheckpoint' ||
         action.type === 'ActivateCheckpoint' ||
@@ -481,6 +486,7 @@ export class AgentGameAdapter implements AgentGame {
         result: this.getResult(),
       };
     }
+    const beforeObservation = this.currentObservation();
     const before = this.engine.getState();
     const result = this.engine.step(matched);
     if (result.error) {
@@ -500,6 +506,8 @@ export class AgentGameAdapter implements AgentGame {
     if (this.recordHistory) this.observations.push(observation);
     return {
       observation: cloneJson(observation),
+      facilityChanges: facilityChanges(beforeObservation, observation, events),
+      branchFlowChanges: branchFlowChanges(beforeObservation, observation),
       events,
       error: null,
       gameOver: result.gameOver,

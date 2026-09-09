@@ -94,8 +94,8 @@ function stateWithArmyBaseReservation(seed = 42): GameState {
   return state;
 }
 
-describe('v1.5.5 Save Format 14', () => {
-  it('exposes stable per-stage timings without changing Save Format 14 bytes', () => {
+describe('v1.5.6 Save Format 15', () => {
+  it('exposes stable per-stage timings without changing Save Format 15 bytes', () => {
     const state = initialState(15152);
     const measured = measureSaveEncoding(state);
     expect(measured.code).toBe(encodeSaveCode(state));
@@ -107,7 +107,7 @@ describe('v1.5.5 Save Format 14', () => {
     }
   });
 
-  it('round-trips a detached complete Save Format 14 GameState through code and JSON', () => {
+  it('round-trips a detached complete Save Format 15 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -115,7 +115,7 @@ describe('v1.5.5 Save Format 14', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 14,
+      formatVersion: 15,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-51x51-v4',
       seed: 77,
@@ -128,7 +128,7 @@ describe('v1.5.5 Save Format 14', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('preserves v1.5.5 Army Base, Gas, Wind Noise, and pending Noise state without conversion', () => {
+  it('preserves v1.5.6 Army Base, Gas, Wind Noise, and pending Noise state without conversion', () => {
     const state = initialState(78);
     const riot = state.units.find((unit) => unit.type === 'police')!;
     const capital = state.facilities.find((facility) => facility.id === 'capital')!;
@@ -222,15 +222,15 @@ describe('v1.5.5 Save Format 14', () => {
     expect(loaded.state?.initialGasPositions).toEqual(state.initialGasPositions);
   });
 
-  it('writes the v1.5.5 version boundaries and complete v1.5.5 Config / Statistics / Event state', () => {
+  it('writes the v1.5.6 version boundaries and complete v1.5.6 Config / Statistics / Event state', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(14);
-    expect(envelope.gameVersion).toBe('7.0.0');
-    expect(config.version).toBe('7.0.0');
+    expect(envelope.formatVersion).toBe(15);
+    expect(envelope.gameVersion).toBe('8.0.0');
+    expect(config.version).toBe('8.0.0');
     expect(config.mapId).toBe('fixed-51x51-v4');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
@@ -340,7 +340,7 @@ describe('v1.5.5 Save Format 14', () => {
     expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|pendingWaves|horde\.waves|hordeSpawnReserve|playerOccupancyAllowed|initialHunterPositions|noiseRespawnAttempts|unitExperience|windPower|specialZombieWeights|pendingNoisePulses|proficiency|previousFallbackPosition|fallbackTarget|waveCapitalAnchor|riotPoliceProduced|windPowerPlant/i);
   });
 
-  it('rejects missing or invalid v1.5.5 Army Base, Gas, Wind Noise, Event, and statistics data', () => {
+  it('rejects missing or invalid v1.5.6 Army Base, Gas, Wind Noise, Event, and statistics data', () => {
     const valid = exportedEnvelope(stateWithArmyBaseReservation(117));
 
     const missingBaseState = clone(valid);
@@ -587,7 +587,7 @@ describe('v1.5.5 Save Format 14', () => {
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Save Format 14', () => {
+  it('rejects a stale state/config version even when the envelope has Save Format 15', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     state.gameVersion = '2.4.0';
@@ -625,7 +625,7 @@ describe('v1.5.5 Save Format 14', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v14 autosave key and never rewrites or removes the v12 legacy key', () => {
+  it('uses the v15 autosave key and never rewrites or removes the v14 legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
     legacy.formatVersion = 10;

@@ -42,7 +42,7 @@ jobs:
         # The full 1..30 deterministic regression is split into the matrix job
         # below so this Pages gate stays responsive. Worker threads avoid fork IPC
         # task-update timeouts during CPU-heavy deterministic simulations.
-        run: npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts
+        run: npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts --exclude src/agent/balancedAgent.seed198.test.ts
 
       - name: Test release validation report tools
         run: node --test scripts/normalize-baseline-report.test.mjs scripts/verify-release-baseline.test.mjs scripts/verify-release-reuse.test.mjs
@@ -121,7 +121,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run v1.5.5 Balanced seed regression
+      - name: Run v1.5.6 Balanced seed regression
         env:
           AGENT_STRATEGY: balanced
           BALANCED_SEED_START: ${{ matrix.start }}
@@ -129,8 +129,21 @@ jobs:
           BALANCED_BATCH_TIMEOUT_MS: 1500000
         run: npx --no-install vitest run src/agent/balancedAgent.batch.test.ts --pool=threads --maxWorkers=1
 
+  balanced-seed198-regression:
+    name: Balanced seed 198 checkpoint endurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install vitest run src/agent/balancedAgent.seed198.test.ts --pool=threads --maxWorkers=1
+
   session-release-validation:
-    name: Session v1.5.5 normal 1,000-action validation
+    name: Session v1.5.6 normal 1,000-action validation
     # This long-running job is independent of verify: Pages deployment must
     # not wait for release persistence validation.
     runs-on: ubuntu-latest
@@ -158,7 +171,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: session-v155-normal-1000
+          name: session-v156-normal-1000
           path: output/session-release/normal-1000*.json
           if-no-files-found: error
           retention-days: 30
@@ -167,7 +180,7 @@ jobs:
     name: Deploy to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Long fixed-seed release batches live in the separately dispatched
-    # v1.5.5 Release Validation workflow and never delay Pages or AI Portable.
+    # v1.5.6 Release Validation workflow and never delay Pages or AI Portable.
     needs: verify
     runs-on: ubuntu-latest
     permissions:

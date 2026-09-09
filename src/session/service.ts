@@ -1,3 +1,4 @@
+import { facilityChanges, branchFlowChanges } from '../agent/facility-changes';
 import { writeArtifactZip } from './artifact-zip';
 import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, readSync, writeFileSync, writeSync } from 'node:fs';
@@ -71,7 +72,7 @@ import {
   type SessionVersionIdentity,
 } from './types';
 
-const QUERY_TARGETS: SessionQueryTarget[] = ['api', 'map', 'units', 'facilities', 'checkpoints', 'branches', 'construction', 'legal-actions', 'forecast', 'history', 'full-snapshot', 'population-transfers'];
+const QUERY_TARGETS: SessionQueryTarget[] = ['api', 'map', 'units', 'facilities', 'checkpoints', 'branches', 'construction', 'legal-actions', 'forecast', 'history', 'full-snapshot', 'population-transfers', 'worker-assignments'];
 const ARTIFACT_CHUNK_BYTES = 1024 * 1024;
 const MAX_ARTIFACT_PAYLOAD_BYTES = 256 * 1024 * 1024;
 const MAX_CONTINUATION_CONTEXTS = 4;
@@ -202,6 +203,8 @@ function compactSnapshot(loaded: LoadedSession): SessionCompactSnapshot {
   }
   return {
     apiVersion: observation.apiVersion,
+    barbedWire: clone(observation.barbedWire),
+    roadBranches: observation.roadBranches.map(({ branchId, direction, managed, activeCheckpointId, currentPolicy, nextArrivalTurn, arrivalsEnded, currentQueue, latestPublicFlow }) => ({ branchId, direction, managed, activeCheckpointId, currentPolicy, nextArrivalTurn, arrivalsEnded, currentQueue, latestPublicFlow: clone(latestPublicFlow ?? []) })),
     gameRulesVersion: observation.gameRulesVersion,
     turn: observation.turn,
     phase: observation.phase,
@@ -217,6 +220,12 @@ function compactSnapshot(loaded: LoadedSession): SessionCompactSnapshot {
     endTurnRisk: clone(observation.endTurnRisk),
     forecastSummary: forecastSummary(observation),
     productionCapacity: productionCapacitySummary(observation),
+    availableCityPopulation: observation.workerAssignmentCandidates[0]?.availablePopulation ?? 0,
+    productionStops: {
+      items: observation.facilities.filter(f => f.owner === 'player' && f.production.stoppedReason).slice(0, 8).map(f => ({ facilityId: f.id, reason: f.production.stoppedReason, powerReason: f.production.projectedPowerReason, output: f.production.projectedProduction })),
+      total: observation.facilities.filter(f => f.owner === 'player' && f.production.stoppedReason).length,
+      detailQuery: 'facilities', omitted: Math.max(0, observation.facilities.filter(f => f.owner === 'player' && f.production.stoppedReason).length - 8),
+    },
     gameOver: observation.gameOver,
     result: clone(observation.result),
     availableActionTypes: [...actionGroups].sort(([a], [b]) => a.localeCompare(b)).map(([type, value]) => ({ type, count: value.count, targetIds: [...value.ids].sort(), modes: [...value.modes].sort() })),
@@ -350,6 +359,8 @@ export function deriveSessionStateDelta(before: AgentObservation, after: AgentOb
   const beforeCheckpoints = new Map(before.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint] as const));
   return {
     newlyInfectedSites: sortedUnique([...afterSites.values()].filter((site) => site.infected > 0 && (beforeSites.get(site.id)?.infected ?? 0) <= 0).map((site) => site.id)),
+    facilityChanges: facilityChanges(before, after, events),
+    branchFlowChanges: branchFlowChanges(before, after),
     newlyRuinedSites: sortedUnique([...afterSites.values()].filter((site) => ['ruined', 'abandoned'].includes(site.status) && !['ruined', 'abandoned'].includes(beforeSites.get(site.id)?.status ?? '')).map((site) => site.id)),
     newlySpottedEnemies: sortedUnique([...afterEnemyIds].filter((id) => !beforeEnemyIds.has(id))),
     lostEnemies: sortedUnique(publicLostEnemyIds.filter((id) => beforeEnemyIds.has(id) && !afterEnemyIds.has(id))),
@@ -780,10 +791,11 @@ export class SessionService {
           case 'facilities': items = observation.facilities as unknown as JsonValue[]; break;
           case 'checkpoints': items = observation.checkpoints as unknown as JsonValue[]; break;
           case 'branches': items = observation.roadBranches as unknown as JsonValue[]; break;
+          case 'worker-assignments': items = observation.workerAssignmentCandidates.map(item => ({ ...item, revision })) as unknown as JsonValue[]; break;
           case 'population-transfers': items = observation.populationTransferCandidates.map(item => ({ ...item, revision })) as unknown as JsonValue[]; break;
           case 'construction': {
             const supplied = new Set(observation.supply.suppliedTileKeys);
-            items = [...observation.checkpointPositionCandidates, ...observation.constructibleFacilityPositionCandidates].map(item => ({ ...item, inSupply: supplied.has(`${item.position.q},${item.position.r}`), revision })) as unknown as JsonValue[]; break;
+            items = [...observation.checkpointPositionCandidates, ...observation.constructibleFacilityPositionCandidates, ...observation.barbedWireCandidates.map(c => ({ ...c, actionType: 'BuildBarbedWire', facilityType: 'barbedWire', reasonCode: c.reason }))].map(item => ({ ...item, inSupply: supplied.has(`${item.position.q},${item.position.r}`), revision })) as unknown as JsonValue[]; break;
           }
           case 'legal-actions': items = loaded.publicState.legalActions as unknown as JsonValue[]; break;
           case 'forecast': value = { endTurnForecast: observation.endTurnForecast, strategicForecast: observation.strategicForecast } as unknown as JsonValue; break;

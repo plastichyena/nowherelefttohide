@@ -1,0 +1,37 @@
+import { it, expect } from 'vitest';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { SessionStore } from './store';
+import { SessionService } from './service';
+import { createAgentSessionGameFactory, resolveSessionIdentity } from './agent-adapter';
+import { ReplayPackage, ReplayZip } from '../replay/package';
+
+it('preserves a wall through Session resume, checkpoint branching, executable replay and public ZIP seek', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'nlth-v156-wall-'));
+  const identity = resolveSessionIdentity({ NLTH_BUILD_ID: 'v156-test', NLTH_GIT_COMMIT: 'a'.repeat(40) });
+  const service = () => new SessionService(new SessionStore(root), createAgentSessionGameFactory(identity.buildId), identity);
+  const api = service();
+  api.newSession({ sessionId: 'wall', seed: 1 });
+  const before = api.status('wall');
+  expect(before.observation.roadBranches).toHaveLength(4);
+  expect(before.observation.roadBranches.every(b => b.activeCheckpointId === null && b.managed === false)).toBe(true);
+  expect(before.observation.availableCityPopulation).toBeGreaterThan(0);
+  const candidates = api.query('wall', { target: 'construction', filters: { facilityType: 'barbedWire', legalOnly: true }, pageSize: 1 });
+  const candidate = candidates.items![0] as unknown as { position: { q: number; r: number } };
+  expect(api.step('wall', { action: { type: 'BuildBarbedWire', position: candidate.position }, decisionSummary: 'Build a defensive obstacle', expectedRevision: before.revision }).accepted).toBe(true);
+  const built = api.status('wall');
+  expect(built.observation.barbedWire).toHaveLength(1);
+  expect(() => api.step('wall', { action: { type: 'EndTurn' }, decisionSummary: 'Reject old revision', expectedRevision: before.revision })).toThrow(/revision/i);
+  expect(api.status('wall').observation).toEqual(built.observation);
+  expect(service().status('wall').observation).toEqual(built.observation);
+  const checkpoint = api.saveCheckpoint('wall');
+  api.loadCheckpoint('wall', checkpoint.checkpointId, 'branch');
+  expect(api.status('branch').observation.barbedWire).toEqual(built.observation.barbedWire);
+  const exported = api.exportArtifact('branch', join(root, 'public'));
+  expect(api.replayArtifact(exported.artifactPath).matched).toBe(true);
+  const replay = await new ReplayPackage(new ReplayZip(new Blob([readFileSync(`${exported.artifactPath}.zip`)]), new AbortController().signal)).open();
+  const decision = await replay.decision(0);
+  expect(decision.before.observation.barbedWire).toEqual([]);
+  expect(decision.after.observation.barbedWire).toEqual(built.observation.barbedWire);
+}, 120000);

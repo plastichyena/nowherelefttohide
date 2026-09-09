@@ -1,4 +1,5 @@
 import { gasAttackPreview, type GasAttackPreview } from './gas-preview';
+import { wireCombatProjection } from './barbed-wire';
 import { hexKey, hexDistance } from './hex';
 import { getUnit } from './state';
 import { getVisibleEnemyUnits } from './visibility';
@@ -85,6 +86,7 @@ export function forecastUnitCombatAtDistance(
 
 
 export interface UnitLegalAttackProjection {
+  conditionalCounterattack: ReturnType<typeof wireCombatProjection> | null;
   gasExplosion: GasAttackPreview | null;
   targetUnitId: string;
   distance: number;
@@ -118,6 +120,7 @@ export function getUnitLegalAttackProjections(
       if (!projection.canAttack) return null;
       const terrainDamage = terrainAdjustedDamage(snapshot, target, projection.effectiveAttack);
       return {
+        conditionalCounterattack: terrainDamage.finalDamage < target.hp && target.canAttack && forecastUnitCombatAtDistance(snapshot, target, distance).canAttack ? wireCombatProjection(snapshot, unit, forecastUnitCombatAtDistance(snapshot, target, distance).effectiveAttack) : null,
         gasExplosion: gasAttackPreview(state, target, terrainDamage.finalDamage),
         targetUnitId: target.id,
         distance,
