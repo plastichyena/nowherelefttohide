@@ -451,3 +451,7 @@ Zombieの能力値、Wave構成、回復率、地形防御倍率は今回変更�
 ## 10. 実装反映記録（2026-09-08）
 
 v1.5.5コード `85d7e3b` の実装と検証済みの結果・制約を現行仕様18.3へ反映した。GitHub PagesとLinux/Windows AI Portableの成功、公開ブラウザの終局・再現・観戦・保存保全を確認した。長時間のその他Workflowは今回の指定どおり開始確認までとし、結果未確認を明記した。今回の指示により本書をDoc直下に維持し、Doc/archiveは変更しない。
+
+### 追補（2026-09-09）
+
+長時間Validationで判明した感染連鎖の二重陥落処理、Job時間制限、巨大JSON読込、到達状況の集約判定を修正した。Random／Balanced各100 Seedの全終局・Replay一致、通常1,000判断と物理512 MiB超の耐久試験、最終Validation、PagesとLinux/Windows AI Portableの成功を確認し、現行仕様18.4と `src/testing/fixtures/v155-validation-followup.json` に記録した。BalancedのFinal Horde到達は0/100、最大Turn 25であり、8章の到達状況として明記する。AIの強さを新たな受入ゲートにせず、ゲームルールと本書の要求は変更していない。

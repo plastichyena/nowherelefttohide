@@ -40,11 +40,13 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 - 1 Turnを同じNodeプロセスで対話できる`play-turn`、互換用の既存8コマンド、Active Session、Public Decision Log、履歴Checkpoint、分岐Session、Compact応答と詳細query
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.5.5の変更目標は [`Doc/Nowhere Left to Hide PoC v1.5.5 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.5.5%20アップデート要件%20確定版.md) です。v1.5.5の実装・テスト・ローカル動作確認を現行仕様へ反映済みです。長時間のGitHub検証Jobは起動確認までとし、結果未確認のJobを成功済みとは扱いません。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.5.5の変更目標は [`Doc/Nowhere Left to Hide PoC v1.5.5 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.5.5%20アップデート要件%20確定版.md) です。v1.5.5の実装・テスト・ローカル動作確認を現行仕様へ反映済みです。2026-09-09に長時間検証の完了結果と修正内容も現行仕様18.4へ追記しました。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## v1.5.5 公開検証
 
-公開コードは `85d7e3b`。GitHub Pagesの660テストとデプロイ、[Linux/Windows AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34238541866) が成功しています。公開PagesでSeed 1/7の終局・再実行一致、ZIP観戦とautosave保全を確認しました。[検証記録](src/testing/fixtures/v155-release-validation.json) に実測条件を保存しています。その他の長時間Batch・1,000判断・512 MiB検証は開始確認までで、成功扱いにはしていません。
+感染連鎖による施設陥落の二重処理を修正した公開Pagesは `5b6325d` です。[CIとPages公開](https://github.com/plastichyena/nowherelefttohide/actions/runs/34291663498) は672テスト成功・11件Skip、Balanced Seed 1～30、通常1,000判断を含め完了しました。[Linux/Windows AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34300922082) は `95f1c14` で両方成功し、Bundled NodeでSeed 1/7の終局・Artifact・Replayを確認しています。公開Pagesでも不具合のSeed 3 Action列、通常UIのターン進行、autosaveと390×844表示を再確認しました。
+
+[最終Release Validation](https://github.com/plastichyena/nowherelefttohide/actions/runs/34296947610) は成功しました。Random／Balanced各100 Seedの全200ゲームとReplayが一致し、技術的失敗と上限到達は0件です。物理512 MiB超のPackage・ZIPについても読込、Replay、シーク、中止を確認しました。[追補検証記録](src/testing/fixtures/v155-validation-followup.json) に元Run・Commit・実測値を保存しています。Balancedの最大到達はTurn 25、Final Horde到達は0/100であり、このBatchによる最終波の実戦検証はありません。以前の[公開時検証記録](src/testing/fixtures/v155-release-validation.json)は当時の記録として保持します。
 
 ## ローカルで起動する
 
@@ -112,7 +114,7 @@ npx --no-install vite-node --script src/session/session-cli.ts artifact --sessio
 
 `CI and GitHub Pages`が`main`で成功すると、独立した`AI Portable Package` Workflowが同じCommitからLinux x64とWindows x64のZIPを生成します。ZIPにはソース、lockfile固定済み依存、対象OSのNode.js、事前bundle済みSession CLI、`PLAY_WITH_AI.md`、Commit SHA・Build ID・App Version・Node Version入り`BUILD_INFO.txt`を同梱します。展開先にNode.jsを別途インストールする必要はありません。
 
-長時間のCI Jobを待たずに配布確認する場合は、対象CommitのPagesデプロイ成功後に`AI Portable Package`を同じrefで手動実行します。Linux／WindowsのPortable検証は完了まで確認し、その他の長時間Jobは開始確認までとします。
+長時間のCI Jobを待たずに配布確認する場合は、対象CommitのPagesデプロイ成功後に`AI Portable Package`を同じrefで手動実行します。Linux／WindowsのPortable検証は完了まで確認します。その他の長時間Jobを開始確認で区切る場合は、結果未確認と記録し、成功済みの検証と分けます。
 
 GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロードし、展開後は次でBundled Nodeによる永続Sessionを開始できます。
 
@@ -205,11 +207,13 @@ npm run test:browser-bridge
 
 Coreテストでは、移動・戦闘、資源・電力、不足被害、感染・鎮圧・陥落・復旧、避難民、Horde、勝敗、保存往復、不変条件、Seed再現性を確認します。Random／Balancedは公開Observationと合法手だけを使う統一Runnerで実行し、失敗時にはVersion、Config、Map ID、Seed、Action列、直前Observationとデバッグ用Stateを出力します。
 
-リリース前にはv1.5.5の正しいConfigでRandom／Balancedをそれぞれ固定Seed 1～100、Runner上限100 Turnで実行し、各Runの技術的失敗とReplay再現を確認します。v1.5.5では移動、Wave、仮設住宅、風力発電、電力と建設費が変わるため、v1.5.3との結果完全一致は要求しません。Sessionは実Coreの51×51・Human Unit 21体を使い、1,000件の受理Action、Compact／旧full比率、保存容量、RSS、status p50/p95、I/O、Page query、分岐復帰、Artifact read/replayを検証します。長履歴と同一現在状態のゼロ履歴を別fresh processで比較し、履歴Decision数、展開済み履歴bytes、RSS／peak RSSの差分と比率をReportへ残します。この比較には固定MBの合格値を設けず、単一の比較Reportが成功してもRAM改善または有界な増加を証明したとは扱いません。専用Release jobは有効な完全Snapshot履歴とArtifact Packageの実体が512 MiBを超えることも確認します。時間のかかるRelease Workflowは実装とJob dispatchの確認を行い、全Jobの完了待ちは不要です。
+リリース前にはv1.5.5の正しいConfigでRandom／Balancedをそれぞれ固定Seed 1～100、Runner上限100 Turnで実行し、各Runの技術的失敗とReplay再現を確認します。v1.5.5では移動、Wave、仮設住宅、風力発電、電力と建設費が変わるため、v1.5.3との結果完全一致は要求しません。Sessionは実Coreの51×51・Human Unit 21体を使い、1,000件の受理Action、Compact／旧full比率、保存容量、RSS、status p50/p95、I/O、Page query、分岐復帰、Artifact read/replayを検証します。長履歴と同一現在状態のゼロ履歴を別fresh processで比較し、履歴Decision数、展開済み履歴bytes、RSS／peak RSSの差分と比率をReportへ残します。この比較には固定MBの合格値を設けず、単一の比較Reportが成功してもRAM改善または有界な増加を証明したとは扱いません。専用Release jobは有効な完全Snapshot履歴とArtifact Packageの実体が512 MiBを超えることも確認します。Workflowの起動と検証成功は区別し、完了したJobのReportに基づいて結果を記録します。
 
 `test:random`と`test:balanced`は標準ConfigのSeed群を共通Batch CLIで実行します。通常CIはUnit／Invariant、Observation境界、Replay、Production Bridge smokeに加え、独立したBalanced Seed `1..30` jobと、Pagesを待たせないSession 1,000 Action jobを検証します。Random／Balanced各100 Seed検証とSession 512 MiB Package境界は手動Release検証へ分離します。
 
-`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.5.5手動Release検証です。v1.5.5のRandom／Balanced各100ゲームを固定Seed 1～100、同じ100 Turn上限で実行し、技術的失敗0件、全Replay一致、JSON／CSV Reportと各Replay Artifactを保存します。v1.5.4以前のbaseline完全一致はルール変更のため要求しません。Sessionの512 MiB Package境界も専用JobでReportを保存します。長時間BatchはPages公開を待たせず、手動Workflowの起動とJob開始を確認すればよいものとします。
+`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.5.5手動Release検証です。v1.5.5のRandom／Balanced各100ゲームを固定Seed 1～100、同じ100 Turn上限で実行し、技術的失敗0件、全Replay一致、JSON／CSV Reportと各Replay Artifactを保存します。v1.5.4以前のbaseline完全一致はルール変更のため要求しません。Sessionの512 MiB Package境界も専用JobでReportを保存します。各Agentを10 Seedずつの20 Jobへ分割し、全200ゲームの終局と全Replay一致を集約確認します。ゲーム内敗北は正常完了です。Final Horde到達は実測値として記録し、未到達を技術的失敗には分類しません。長時間BatchはPages公開を待たせません。
+
+手動入力`reuse_run_id`を空にすると全件を新規実行します。Report検証だけを修正した場合は、同じリポジトリの完了済みRun IDを指定できます。元Runの20 Seed Jobと大容量Jobの成功、ゲーム実行コード・依存関係・耐久試験コードの不変、ReportのBuild IDと全Seed・Replay・物理容量の証跡を再検証します。再利用元RunとCommitを集約Artifactへ記録し、条件を満たさない場合は失敗します。
 
 ## GitHub ActionsとPages
 

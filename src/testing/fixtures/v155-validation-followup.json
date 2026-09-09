@@ -1,0 +1,545 @@
+{
+  "date": "2026-09-09",
+  "runtimeCommit": "5b6325d6c829e2bbd754b46ec4e2f258514abd46",
+  "validationCommit": "e4fc835960f7ae79e056cfb4e564d1f4827fc3a6",
+  "originalFailure": {
+    "run": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34238545597",
+    "random": {
+      "seed": 3,
+      "turn": 3,
+      "decision": 218,
+      "action": "EndTurn",
+      "error": "Population conservation ledger is out of balance",
+      "cause": "A constructible facility removed by a spawn chain remained in the stable iteration list; repeated fall double-counted four deaths and splice(-1,1) removed unrelated housing."
+    },
+    "balanced": "Job timed out at the six-hour limit; no completed 100-seed evidence.",
+    "physical512MiB": "success"
+  },
+  "additionalValidationDefect": {
+    "bytes": 782270373,
+    "seed": 61,
+    "error": "ERR_STRING_TOO_LONG",
+    "cause": "readFileSync(path, utf8) cannot represent the whole JSON replay above the V8 string limit.",
+    "fix": "Index observationTrace on disk and feed every parsed element to the unchanged replayArtifact validator."
+  },
+  "local": {
+    "regressionFailedBeforeFixAtDecision": 218,
+    "regressionPassedAfterFix": true,
+    "relatedTestsPassed": 78,
+    "typecheck": "passed",
+    "seed3": {
+      "seed": 3,
+      "outcome": "lost",
+      "finalTurn": 4,
+      "acceptedActionCount": 264
+    },
+    "seed3AllActionsReplayed": true,
+    "largeJsonReplay": {
+      "reproduced": true,
+      "error": null,
+      "mismatch": null,
+      "actionsReplayed": 536,
+      "ms": 148502.26979999998,
+      "rss": 205107200
+    },
+    "restoreFailureSnapshot": {
+      "loaded": true,
+      "endTurnAccepted": true,
+      "turn": 4,
+      "invariants": {
+        "valid": true,
+        "errors": []
+      },
+      "housingPreserved": true
+    },
+    "reuseGuardTestsPassed": 3
+  },
+  "runs": {
+    "ci": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34291663498",
+    "release": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34292039724",
+    "portable": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34300922082",
+    "finalValidation": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34296947610"
+  },
+  "completionChecked": true,
+  "pages": {
+    "ok": true,
+    "buildId": "5b6325d6c829e2bbd754b46ec4e2f258514abd46",
+    "decisions": 218,
+    "turn": 4,
+    "housingPreserved": true,
+    "autosaveUnchanged": true,
+    "humanUiEndTurn": 2,
+    "autosaveTurn": 2,
+    "browserErrors": 0,
+    "mobileViewport": [
+      390,
+      844
+    ],
+    "horizontalOverflow": false,
+    "environment": {
+      "browser": "152.0.7977.76",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+    }
+  },
+  "ci": {
+    "testFilesPassed": 73,
+    "testsPassed": 672,
+    "testsSkipped": 11,
+    "balancedSeeds1to30": "success",
+    "deploy": "success",
+    "normal1000": "success"
+  },
+  "portable": {
+    "linuxX64": "success",
+    "windowsX64": "success",
+    "sourceCommit": "95f1c1490444d9b7f1b5245a2d2622f638ae3d6e"
+  },
+  "reportVerifierCommit": "95f1c1490444d9b7f1b5245a2d2622f638ae3d6e",
+  "seedCoverage": {
+    "games": 200,
+    "seedsPerAgent": 100,
+    "finalHordeSpawnedRuns": 0,
+    "finalHordeReachableRuns": 0,
+    "balancedMaxFinalTurn": 25,
+    "finalHordeCoverageNote": "Measured Balanced progression; zero means the standard-seed batch provides no Final Horde gameplay coverage. It is not a technical failure.",
+    "randomCompleted": 100,
+    "balancedCompleted": 100,
+    "replaysMatched": 200,
+    "technicalFailures": 0,
+    "limitReached": 0,
+    "randomMaxFinalTurn": 8
+  },
+  "additionalReportGateDefect": {
+    "message": "No Balanced run reached a spawned Final Horde and continued past turn 50",
+    "interpretation": "The v1.5.5 requirements request progression measurements, and the current specification defines in-game defeat as normal completion. Final Horde reach is recorded as zero, not counted as a technical failure.",
+    "scope": "No AI policy, difficulty, gameplay rule or runner ceiling was changed."
+  },
+  "measurements": {
+    "random": {
+      "games": 100,
+      "finalTurns": {
+        "min": 1,
+        "max": 8,
+        "mean": 3.38
+      },
+      "gameOverReasons": {
+        "healthyCiviliansLost": 97,
+        "capitalLost": 3
+      },
+      "totals": {
+        "resourceShortageLosses": 10738,
+        "checkpointsRuined": 3,
+        "activeCheckpointLosses": 3,
+        "housingBuilt": 337,
+        "housingResidentTurns": 652,
+        "housingCivilianGoodsProduced": 156,
+        "housingOutageFacilityTurns": 4,
+        "housingResidentsFinal": 9,
+        "powerPlantStoppedTurns": 1,
+        "powerShortageTurns": 9,
+        "fuelShortageTurns": 0,
+        "finalHordeSpawned": 0
+      }
+    },
+    "balanced": {
+      "games": 100,
+      "finalTurns": {
+        "min": 6,
+        "max": 25,
+        "mean": 16.04
+      },
+      "gameOverReasons": {
+        "healthyCiviliansLost": 75,
+        "capitalLost": 25
+      },
+      "totals": {
+        "resourceShortageLosses": 16466,
+        "checkpointsRuined": 413,
+        "activeCheckpointLosses": 169,
+        "housingBuilt": 1091,
+        "housingResidentTurns": 2412,
+        "housingCivilianGoodsProduced": 599,
+        "housingOutageFacilityTurns": 274,
+        "housingResidentsFinal": 148,
+        "powerPlantStoppedTurns": 1,
+        "powerShortageTurns": 99,
+        "fuelShortageTurns": 3,
+        "finalHordeSpawned": 0
+      }
+    }
+  },
+  "finalValidation": {
+    "status": "completed",
+    "conclusion": "success",
+    "provenance": {
+      "sourceRunId": 34292039724,
+      "sourceCommit": "e4fc835960f7ae79e056cfb4e564d1f4827fc3a6",
+      "sourceUrl": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34292039724",
+      "validatedJobs": 21,
+      "sessionDecisions": 2000,
+      "packageBytes": 790116083,
+      "zipBytes": 791230291
+    },
+    "summary": {
+      "games": 200,
+      "seedsPerAgent": 100,
+      "finalHordeSpawnedRuns": 0,
+      "finalHordeReachableRuns": 0,
+      "balancedMaxFinalTurn": 25,
+      "finalHordeCoverageNote": "Measured Balanced progression; zero means the standard-seed batch provides no Final Horde gameplay coverage. It is not a technical failure."
+    }
+  },
+  "session": {
+    "normal1000": {
+      "ok": true,
+      "fixture": {
+        "map": "fixed-51x51-v4",
+        "width": 51,
+        "height": 51,
+        "humanUnits": 21,
+        "actionPattern": [
+          "Move",
+          "Wait",
+          "EndTurn"
+        ]
+      },
+      "execution": {
+        "requestedDecisions": 1000,
+        "executedDecisions": 1000,
+        "largeMiB": null,
+        "largeTargetBytes": null,
+        "gzipLevel": 9,
+        "publicSnapshotInterval": 50,
+        "checkpointInterval": 5,
+        "physicalArtifactPackageTargetReached": true,
+        "node": "v22.23.2",
+        "platform": "linux",
+        "arch": "x64"
+      },
+      "compact": {
+        "bytes": 53427,
+        "oldFullBytes": 2273575,
+        "ratio": 0.02349911483016835,
+        "acceptanceLimit": 0.25
+      },
+      "storage": {
+        "bytes": 23510497,
+        "files": 12868,
+        "oldFullGenerationBytes": 5990264398,
+        "ratio": 0.003924784523342504,
+        "acceptanceLimit": 0.5,
+        "compressionAcceptanceApplies": true
+      },
+      "performance": {
+        "peakRssBytes": 582000640,
+        "statusSamples": 9,
+        "statusP50Ms": 1843.1360909999348,
+        "statusP95Ms": 1879.1056590001099,
+        "ioReadBytes": 0,
+        "stageTimingsMs": {
+          "setupMs": 2378.7051629999996,
+          "oldFormatCaptureMs": 106687.10320599904,
+          "referenceStepMs": 342353.6061999992,
+          "sessionStepMs": 925792.4396340023,
+          "storageScanMs": 2991.0112410000993,
+          "queryMs": 290.400260000024,
+          "statusMs": 16638.190369999968,
+          "checkpointBranchMs": 14566.020743000088,
+          "artifactMs": 1222898.389003,
+          "historyLengthComparisonMs": 13956.848545999965,
+          "totalMs": 2714633.872433
+        }
+      },
+      "historyLengthComparison": {
+        "sameCurrentPrivateState": true,
+        "sameCurrentPublicState": true,
+        "currentPrivateStateHash": "3613d50acc619f154420c449c24e3920526f365a3da2ffc81f2b2588105be251",
+        "currentPublicStateHash": "a743f2a320e96a79f654bfe5632a77958071a4fc23a902f043a55c2124844ef4",
+        "historyDecisions": 1000,
+        "shortHistoryDecisions": 0,
+        "historyExpandedBytes": 5990264398,
+        "shortHistoryExpandedBytes": 0,
+        "historyLengthRatioLongOverShort": null,
+        "expandedHistoryBytesRatioLongOverShort": null,
+        "measurementValidity": {
+          "sameCurrentStateVerified": true,
+          "freshProcessPerProbe": true,
+          "samplesPerHistoryLength": 1,
+          "shortHistoryIsZeroDecisionControl": true,
+          "fixedRssThresholdBytes": null,
+          "nonProportionalGrowthAcceptanceTested": false,
+          "doesNotEstablishMemoryImprovement": true,
+          "interpretation": "Informational long-versus-zero-history comparison only; ok=true does not establish bounded or improved RSS."
+        },
+        "longHistoryPeakRssOverShortBytes": 97701888,
+        "longHistoryRssOverShortBytes": 97615872,
+        "longHistoryPeakRssRatioOverShort": 1.2713621005449312,
+        "longHistoryRssRatioOverShort": 1.273258880454973,
+        "longHistory": {
+          "ok": true,
+          "elapsedMs": 3081.197,
+          "statusElapsedMs": 3081.197,
+          "fullSnapshotLoadMeasured": true,
+          "fullSnapshotElapsedMs": 49.375,
+          "peakRssBytes": 457744384,
+          "rssBytes": 454844416,
+          "compactResponseBytes": 53426,
+          "revision": 1000,
+          "publicObservationLegalSha256": "a743f2a320e96a79f654bfe5632a77958071a4fc23a902f043a55c2124844ef4",
+          "readBytesDelta": 0,
+          "rcharDelta": 10223538
+        },
+        "shortHistory": {
+          "ok": true,
+          "elapsedMs": 1196.977,
+          "statusElapsedMs": 1196.977,
+          "fullSnapshotLoadMeasured": true,
+          "fullSnapshotElapsedMs": 49.471,
+          "peakRssBytes": 360042496,
+          "rssBytes": 357228544,
+          "compactResponseBytes": 53434,
+          "revision": 0,
+          "publicObservationLegalSha256": "a743f2a320e96a79f654bfe5632a77958071a4fc23a902f043a55c2124844ef4",
+          "readBytesDelta": 0,
+          "rcharDelta": 466668
+        }
+      },
+      "query": {
+        "mapPages": {
+          "pages": 6,
+          "tiles": 2601,
+          "hash": "f077eec7809cccefe2e38de30ccf2d90cf88d82673ab0f69da34dd91fb3261db"
+        },
+        "fullSnapshotMatched": true
+      },
+      "branch": {
+        "checkpointId": "manual-turn-333-d001000-001",
+        "baseRevision": 1000,
+        "resumedRevision": 1001
+      },
+      "artifact": {
+        "path": "/home/runner/work/nowherelefttohide/nowherelefttohide/output/session-release/normal-1000-store/release-branch.nlth-artifact",
+        "bytes": 4538590,
+        "files": 2013,
+        "manifestHash": "dc41baefc0c84d213b19ac99d46c600b177acc1d40be5bfd7aede00a83b6cc5c",
+        "decisionCount": 1001,
+        "readMatched": true,
+        "replayMatched": true
+      }
+    },
+    "normal1000Viewer": {
+      "ok": true,
+      "decisions": 1001,
+      "zipBytes": 5097910,
+      "zipDeclaredExpandedBytes": 4538590,
+      "internalPayloadReadExpandedBytes": 37956801,
+      "observationReadCumulativeBytes": 1403877582,
+      "loadMs": 194415.00042599998,
+      "seeks": [
+        {
+          "index": 0,
+          "ms": 189.61435999997775
+        },
+        {
+          "index": 1000,
+          "ms": 356.6664940000046
+        },
+        {
+          "index": 500,
+          "ms": 358.09801400001743
+        },
+        {
+          "index": 1,
+          "ms": 379.0075240000151
+        },
+        {
+          "index": 1000,
+          "ms": 186.24868999997852
+        }
+      ],
+      "cancelled": true,
+      "rssBytes": 508530688,
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "linux",
+        "browser": false
+      },
+      "note": "Uses the same browser-safe reader with a disk-backed Blob; browser UI and physical mobile RAM are separate checks."
+    },
+    "physical512MiB": {
+      "ok": true,
+      "fixture": {
+        "map": "fixed-51x51-v4",
+        "width": 51,
+        "height": 51,
+        "humanUnits": 21,
+        "actionPattern": [
+          "EndTurn"
+        ]
+      },
+      "execution": {
+        "requestedDecisions": 1000,
+        "executedDecisions": 2000,
+        "largeMiB": 512,
+        "largeTargetBytes": 536870912,
+        "gzipLevel": 0,
+        "publicSnapshotInterval": 1,
+        "checkpointInterval": 1,
+        "physicalArtifactPackageTargetReached": true,
+        "node": "v22.23.2",
+        "platform": "linux",
+        "arch": "x64"
+      },
+      "compact": {
+        "bytes": 53299,
+        "oldFullBytes": 2274558,
+        "ratio": 0.023432684503978354,
+        "acceptanceLimit": 0.25
+      },
+      "storage": {
+        "bytes": 1068092325,
+        "files": 30573,
+        "oldFullGenerationBytes": 21804489958,
+        "ratio": 0.04898497176762074,
+        "acceptanceLimit": null,
+        "compressionAcceptanceApplies": false
+      },
+      "performance": {
+        "peakRssBytes": 1045467136,
+        "statusSamples": 9,
+        "statusP50Ms": 82876.79619699903,
+        "statusP95Ms": 84429.23359999992,
+        "ioReadBytes": 0,
+        "stageTimingsMs": {
+          "setupMs": 2332.43577,
+          "oldFormatCaptureMs": 540158.4614560365,
+          "referenceStepMs": 1257647.8431359802,
+          "sessionStepMs": 8531488.193889992,
+          "storageScanMs": 633.3842389994161,
+          "queryMs": 313.5297929998487,
+          "statusMs": 748110.0170619991,
+          "checkpointBranchMs": 345415.4385979995,
+          "artifactMs": 3483084.2789630014,
+          "historyLengthComparisonMs": 109703.11663600057,
+          "totalMs": 15524595.112394
+        }
+      },
+      "historyLengthComparison": {
+        "sameCurrentPrivateState": true,
+        "sameCurrentPublicState": true,
+        "currentPrivateStateHash": "228f3d9a3935424fab935c0a58c3ce27e4fdc595344881133d79fdde211b8214",
+        "currentPublicStateHash": "0ca9f8ccaed6d1d86b23cc87a55e0fdbe2e97c5ea5f1f66ab42a2f6f5cd4f90c",
+        "historyDecisions": 2000,
+        "shortHistoryDecisions": 0,
+        "historyExpandedBytes": 21804489958,
+        "shortHistoryExpandedBytes": 0,
+        "historyLengthRatioLongOverShort": null,
+        "expandedHistoryBytesRatioLongOverShort": null,
+        "measurementValidity": {
+          "sameCurrentStateVerified": true,
+          "freshProcessPerProbe": true,
+          "samplesPerHistoryLength": 1,
+          "shortHistoryIsZeroDecisionControl": true,
+          "fixedRssThresholdBytes": null,
+          "nonProportionalGrowthAcceptanceTested": false,
+          "doesNotEstablishMemoryImprovement": true,
+          "interpretation": "Informational long-versus-zero-history comparison only; ok=true does not establish bounded or improved RSS."
+        },
+        "longHistoryPeakRssOverShortBytes": 246972416,
+        "longHistoryRssOverShortBytes": 316104704,
+        "longHistoryPeakRssRatioOverShort": 1.3555419278373009,
+        "longHistoryRssRatioOverShort": 1.5073265009630619,
+        "longHistory": {
+          "ok": true,
+          "elapsedMs": 90155.091,
+          "statusElapsedMs": 90155.091,
+          "fullSnapshotLoadMeasured": true,
+          "fullSnapshotElapsedMs": 57.919,
+          "peakRssBytes": 941608960,
+          "rssBytes": 939184128,
+          "compactResponseBytes": 53298,
+          "revision": 2000,
+          "publicObservationLegalSha256": "0ca9f8ccaed6d1d86b23cc87a55e0fdbe2e97c5ea5f1f66ab42a2f6f5cd4f90c",
+          "readBytesDelta": 0,
+          "rcharDelta": 5990312237
+        },
+        "shortHistory": {
+          "ok": true,
+          "elapsedMs": 2129.944,
+          "statusElapsedMs": 2129.944,
+          "fullSnapshotLoadMeasured": true,
+          "fullSnapshotElapsedMs": 50.09,
+          "peakRssBytes": 694636544,
+          "rssBytes": 623079424,
+          "compactResponseBytes": 53304,
+          "revision": 0,
+          "publicObservationLegalSha256": "0ca9f8ccaed6d1d86b23cc87a55e0fdbe2e97c5ea5f1f66ab42a2f6f5cd4f90c",
+          "readBytesDelta": 0,
+          "rcharDelta": 31531240
+        }
+      },
+      "query": {
+        "mapPages": {
+          "pages": 6,
+          "tiles": 2601,
+          "hash": "fc20cf72ca35cad1d672a910b21a044f8a5e314fcf4b47b809a300b022ae478a"
+        },
+        "fullSnapshotMatched": true
+      },
+      "branch": {
+        "checkpointId": "manual-turn-2000-d002000-001",
+        "baseRevision": 2000,
+        "resumedRevision": 2001
+      },
+      "artifact": {
+        "path": "/home/runner/work/nowherelefttohide/nowherelefttohide/output/session-release/large-512-store/release-branch.nlth-artifact",
+        "bytes": 790116083,
+        "files": 4009,
+        "manifestHash": "297c2843699a32e1791c4d7d7d16312a9fbf197cdb01d12e039d87aeef5daac8",
+        "decisionCount": 2001,
+        "readMatched": true,
+        "replayMatched": true
+      }
+    },
+    "physical512MiBViewer": {
+      "ok": true,
+      "decisions": 2001,
+      "zipBytes": 791230291,
+      "zipDeclaredExpandedBytes": 790116083,
+      "internalPayloadReadExpandedBytes": 2884885030,
+      "observationReadCumulativeBytes": 2796945315,
+      "loadMs": 641367.404194,
+      "seeks": [
+        {
+          "index": 0,
+          "ms": 315.1319150000345
+        },
+        {
+          "index": 2000,
+          "ms": 556.1603889999678
+        },
+        {
+          "index": 1000,
+          "ms": 640.7309609999647
+        },
+        {
+          "index": 1,
+          "ms": 547.9484190000221
+        },
+        {
+          "index": 2000,
+          "ms": 301.7404379999498
+        }
+      ],
+      "cancelled": true,
+      "rssBytes": 613687296,
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "linux",
+        "browser": false
+      },
+      "note": "Uses the same browser-safe reader with a disk-backed Blob; browser UI and physical mobile RAM are separate checks."
+    }
+  },
+  "sourceRunConclusionNote": "The source run retains its old aggregate failure for zero Final Horde reach. All 21 execution jobs succeeded; the final run revalidated their provenance and results with the corrected reporting requirement."
+}

@@ -1942,3 +1942,16 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - 通常終局ZIPはSeed 1が322,724 bytes／10判断、Seed 7が271,109 bytes／8判断。バンドルしたNode 22 Readerで初回読込3,292／3,053ms、末尾シーク3,331／2,683ms、RSS約195／201 MB。開発用Viteランナーの常駐量とは分けた参照値であり、長期戦・実機電話の保証ではない。
 - 長時間 [Release Validation](https://github.com/plastichyena/nowherelefttohide/actions/runs/34238545597) のRandom/ Balanced各100 Seed、物理512 MiB、およびCIのBalanced 1～30・通常1,000判断Jobは開始を確認した。完了を待たない指定のため、結果未確認として扱う。公開後の証跡は `src/testing/fixtures/v155-release-validation.json`。
 - 今回の指示により確定要件をDoc直下に残し、Doc/archive内の履歴資料は参照・編集していない。
+
+## 18.4 v1.5.5 Validation修正と追補検証（2026-09-09）
+
+- 18.3で開始だけを確認した[旧Release Validation](https://github.com/plastichyena/nowherelefttohide/actions/runs/34238545597)は、Random Seed 3のTurn 3・218手目EndTurnで人口台帳の不変条件違反、Balancedは6時間のJob上限で失敗した。感染連鎖で既に陥落・消滅した施設を再処理し、死者を二重計上して無関係な住宅を除去する実装不具合を修正した。陥落済み施設を処理対象から除外し、存在を確認した位置だけを取り除く。同じ失敗直前StateからEndTurnが受理され、Turn 4へ進むことも確認した。
+- `5b6325d`の[CI／Pages](https://github.com/plastichyena/nowherelefttohide/actions/runs/34291663498)は73 Test File・672 Test成功、11件Skip、Balanced Seed 1～30、通常Session 1,000判断を含め成功した。修正前に失敗する実Action列を回帰fixture化し、修正後の関連テスト78件と証跡再利用ガード3件、型検査を確認した。
+- 公開PagesのBuild ID `5b6325d6c829e2bbd754b46ec4e2f258514abd46`でSeed 3の218 Actionすべてが受理され、Turn 4、住宅維持、Bridge実行による通常autosave不変を確認した。通常UIのEndTurnとTurn 2 autosave、390×844の横はみ出しなし、Chrome 152でconsole error 0件を確認した。物理スマートフォンでの測定ではない。
+- [AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34300922082)は `95f1c1490444d9b7f1b5245a2d2622f638ae3d6e`でLinux x64・Windows x64の両方が成功した。Bundled Nodeによるコマンド検証、Seed 1/7の終局、Artifact取得、Replay一致を含む。
+- Release検証をAgent別10 Seedずつの20 Jobへ分割し、元の100 Turn上限と全Replay検証を維持した。大きな旧形式JSON Replayは全体を1文字列に変換せず、ディスク上のObservation位置を索引化して既存Replay検証へ渡す。実際の782,270,373 bytes・536 Actionの記録でV8文字列上限エラーを再現し、修正後は全Replay一致、約148.5秒、RSS 205,107,200 bytesを測定した。ファイル全体の容量と、単一JSON値64 MiBの読込上限は区別する。
+- [実行元Run](https://github.com/plastichyena/nowherelefttohide/actions/runs/34292039724)ではRandom／Balanced各Seed 1～100の全200ゲームが正常終局し、全Replayが一致した。技術的失敗0、上限到達0、勝利0である。Randomは最大Turn 8、Balancedは平均16.04・最大25、Final Horde到達0/100だった。施設停止、Checkpoint喪失、資源不足死、住宅利用を証跡へ集計した。このBatchは最終波の実戦動作を検証していない。
+- 旧集約処理の「BalancedがFinal Horde出現後のTurn 50を越えなければ失敗」という追加条件を修正した。確定要件8章は到達・処理状況の記録を要求し、ゲーム内敗北は正常完了であるため、到達0を明示して技術的失敗と分ける。AI方針、難易度、ゲームルール、Runner上限は変更していない。
+- 同実行元の耐久試験は2,000受理Action、Artifact Package実体790,116,083 bytes、公開ZIP実容量791,230,291 bytesで成功した。Package read／Replay一致、観戦Readerの読込・前後シーク・中止を確認した。ZIP Reader初回読込は641,367ms、RSS 613,687,296 bytes。LinuxのNode上で同じBrowser-safe Readerを使った耐久試験であり、ブラウザUIや実機モバイルのメモリ保証ではない。内部展開量・累積Observation読込量は別値としてJSONに保持する。
+- [最終Validation](https://github.com/plastichyena/nowherelefttohide/actions/runs/34296947610)は成功した。ゲーム実行コード・依存関係・耐久試験コードが不変の実行元Commit `e4fc835960f7ae79e056cfb4e564d1f4827fc3a6`から、成功済み21 Jobの証跡を再利用した。元Runの同一リポジトリ・完了状態・Job成功、Report Build ID、全Seed・Replay・容量を再検証し、元Run IDとCommitを記録した。実行元Runの旧集約失敗表示は履歴として残るが、最終Validationで修正済み集約が成功している。
+- 追補証跡は `src/testing/fixtures/v155-validation-followup.json`。9月8日の記録は当時の事実として保持する。今回もサブエージェントを使用せず、Doc/archiveは参照・変更していない。
