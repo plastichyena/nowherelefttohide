@@ -2,9 +2,16 @@ name: v1.5.5 Release Validation
 
 on:
   workflow_dispatch:
+    inputs:
+      reuse_run_id:
+        description: 'Optional completed run whose 200 replays and large Session passed; runtime must be unchanged'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: v155-release-validation-${{ github.ref }}
@@ -12,6 +19,7 @@ concurrency:
 
 jobs:
   agent-validation:
+    if: inputs.reuse_run_id == ''
     name: v1.5.5 ${{ matrix.agent }} seeds ${{ matrix.start }} + 9
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -68,7 +76,7 @@ jobs:
           retention-days: 30
 
   agent-coverage:
-    name: Verify all 200 games, replays, and Balanced Final Horde coverage
+    name: Verify all 200 games and replays, record Final Horde coverage
     needs: agent-validation
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -90,6 +98,7 @@ jobs:
           path: output/release-reports/release-summary.json
 
   session-large-package-validation:
+    if: inputs.reuse_run_id == ''
     name: Session v1.5.5 physical 512 MiB Package validation
     # This is a separate manual-release job. It verifies actual Core EndTurn
     # transitions and a physical Artifact Package without gating Pages.
@@ -122,3 +131,47 @@ jobs:
           path: output/session-release/large-512*.json
           if-no-files-found: warn
           retention-days: 30
+
+  verify-existing-executions:
+    name: Verify unchanged runtime against successful recorded executions
+    if: inputs.reuse_run_id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Verify source jobs and unchanged runtime
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.reuse_run_id }}
+        run: node scripts/verify-release-reuse.mjs source "$SOURCE_RUN"
+      - name: Test evidence reuse guards
+        run: node --test scripts/verify-release-reuse.test.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.reuse_run_id }}
+          pattern: v155-report-*
+          path: output/release-reuse/reports
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.reuse_run_id }}
+          name: session-v155-large-512mib
+          path: output/release-reuse/session
+      - name: Verify artifact source and physical endurance evidence
+        run: node scripts/verify-release-reuse.mjs artifacts
+      - name: Recheck all seeds, replay evidence, and progression metrics
+        run: npx --no-install vite-node --script src/testing/release-seed-validation.ts aggregate output/release-reuse/reports
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v155-release-summary
+          path: |
+            output/release-reuse/source.json
+            output/release-reuse/reports/release-summary.json
