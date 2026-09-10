@@ -223,3 +223,10 @@
 - 公開Incoming/Counterattack予測、壁建設・可視Damage Metrics、候補・理由、可視性とSession/ZIP往復を追加した。ローカル通常ゲート725成功、追加回帰54成功、レポートツール8成功。PC/モバイルviewport、日英UI、通常保存と観戦ZIPを実ブラウザで確認した。
 - Seed1/7/17の壁なし／1Turn1壁比較結果は`src/testing/fixtures/v156-balance-results.json`。感染が先行する限定条件で全6戦終局し、技術エラーなし。壁Damage0の結果から戦闘バランスや勝率を断定しない。
 - PagesとLinux/Windows AI Portableの完了を本リリースの確認対象とする。その他の長時間GitHub workflowはユーザー指示に従って起動だけ確認し、後日の結果確認へ委ねる。Doc/archive内の本文は変更しない。
+
+### 8.1 Validation追補完了（2026-09-10）
+
+- 後日のユーザー依頼により長時間検証も完了まで確認した。App版チェック、視界外の壁上への施設建設、512 MiBの容量判定を修正し、現行仕様18.6へ原因・修正・検証結果を反映した。
+- 修正Commit `b1e18e2a31278b6c90047e09cac1dbd6553aecc4`の[Release Validation](https://github.com/plastichyena/nowherelefttohide/actions/runs/34414098409)、[CI／Pages](https://github.com/plastichyena/nowherelefttohide/actions/runs/34414084286)、[Linux／Windows AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34414095984)はすべて成功。200ゲーム正常終局・全Replay一致・技術的失敗0・上限到達0、通常1,000 Action、物理512 MiB超のPackage／ZIPの読込・Replay・シーク・中止を確認した。
+- 大容量試験は1,300受理Action、Package 563,981,768 bytes、ZIP 564,706,776 bytes。Linux Node上のBrowser-safe Reader試験であり、実機スマートフォンのメモリ保証ではない。公開Pagesでは同Build ID、実際の失敗Saveの読込、建設拒否、EndTurn／autosaveを別途実ブラウザで確認した。
+- 証跡は `src/testing/fixtures/v156-validation-followup.json`。200戦は全敗・Final Horde到達0であり、最終波の実戦検証や勝率保証とは区別する。サブエージェントとDoc/archiveは使用していない。

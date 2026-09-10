@@ -1,0 +1,170 @@
+{
+  "appVersion": "1.5.6",
+  "commit": "b1e18e2a31278b6c90047e09cac1dbd6553aecc4",
+  "originalRun": 34346108127,
+  "originalFailure": {
+    "technicalFailures": 1,
+    "failureSeed": 69,
+    "failureAction": 47,
+    "failureTurn": 2,
+    "targetBytes": 536870912,
+    "failurePosition": [
+      21,
+      37
+    ],
+    "largeArtifactBytes": 434491566,
+    "versionGate": "hard-coded 1.5.5",
+    "normalGameCompletions": 199
+  },
+  "local": {
+    "skippedLongTests": 11,
+    "files": 78,
+    "passed": 728,
+    "smallLargeMode": {
+      "readMatched": true,
+      "branchedDecisions": 4,
+      "packageBytes": 4176373,
+      "replayMatched": true,
+      "actions": 3
+    },
+    "build": true,
+    "bridgeSmoke": true,
+    "typecheck": true,
+    "reportToolTests": 8
+  },
+  "browser": {
+    "languages": [
+      "ja",
+      "en"
+    ],
+    "loadedActualFailureSave": true,
+    "target": [
+      21,
+      37
+    ],
+    "javascriptErrors": 0,
+    "horizontalOverflow": false,
+    "rejectedWithVisibilityReason": true,
+    "physicalPhone": false,
+    "viewports": [
+      [
+        929,
+        917
+      ],
+      [
+        390,
+        844
+      ]
+    ]
+  },
+  "runs": {
+    "portable": 34414095984,
+    "releaseValidation": 34414098409,
+    "verified": true,
+    "ci": 34414084286
+  },
+  "subagentsUsed": 0,
+  "archiveChanged": false,
+  "pages": {
+    "url": "https://plastichyena.github.io/nowherelefttohide/",
+    "actualFailureSaveLoaded": true,
+    "verified": true,
+    "endTurnAndAutosave": 3,
+    "consoleErrors": 0,
+    "buildId": "b1e18e2a31278b6c90047e09cac1dbd6553aecc4",
+    "hiddenWallBuildRefused": true
+  },
+  "portable": {
+    "run": 34414095984,
+    "linux": "success",
+    "artifacts": [
+      "nowhere-left-to-hide-ai-1.5.6-b1e18e2a3127-linux-x64",
+      "nowhere-left-to-hide-ai-1.5.6-b1e18e2a3127-win-x64"
+    ],
+    "windows": "success"
+  },
+  "fixedSeedBatch": {
+    "random": {
+      "maxTurn": 10,
+      "averageTurn": 3.45
+    },
+    "games": 200,
+    "technicalFailures": 0,
+    "limitsReached": 0,
+    "replaysMatched": 200,
+    "wins": 0,
+    "seedsPerAgent": 100,
+    "balanced": {
+      "maxTurn": 26,
+      "finalHordeSpawnedRuns": 0,
+      "averageTurn": 15.89
+    },
+    "run": 34414098409,
+    "losses": 200,
+    "seed69": {
+      "replayMatched": true,
+      "outcome": "lost",
+      "turn": 3
+    },
+    "aggregate": "success"
+  },
+  "normalSession": {
+    "actions": 1000,
+    "viewerSeeks": true,
+    "packageBytes": 4663920,
+    "viewerCancellation": true,
+    "readMatched": true,
+    "conclusion": "success",
+    "branchedDecisions": 1001,
+    "replayMatched": true,
+    "run": 34414084286,
+    "browser": false,
+    "zipBytes": 5223240
+  },
+  "checkedAtUtc": "2026-09-10T01:35:19.7761087Z",
+  "largeSession": {
+    "run": 34414098409,
+    "conclusion": "success",
+    "actions": 1300,
+    "branchedDecisions": 1301,
+    "targetBytes": 536870912,
+    "publicArtifactPayloadBytes": 553885716,
+    "packageBytes": 563981768,
+    "zipBytes": 564706776,
+    "readMatched": true,
+    "replayMatched": true,
+    "viewerOk": true,
+    "viewerSeeks": [
+      {
+        "index": 0,
+        "ms": 309.8388229999691
+      },
+      {
+        "index": 1300,
+        "ms": 617.1696900000097
+      },
+      {
+        "index": 650,
+        "ms": 541.5395900000003
+      },
+      {
+        "index": 1,
+        "ms": 540.5353009999963
+      },
+      {
+        "index": 1300,
+        "ms": 313.7157639999641
+      }
+    ],
+    "viewerCancellation": true,
+    "viewerLoadMs": 435745.70746999996,
+    "viewerRssBytes": 515383296,
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "linux",
+      "browser": false
+    },
+    "limitation": "Uses the same browser-safe reader with a disk-backed Blob; browser UI and physical mobile RAM are separate checks.",
+    "memoryImprovementEstablished": false
+  }
+}
