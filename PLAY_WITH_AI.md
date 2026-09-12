@@ -1,10 +1,34 @@
 # Play Nowhere Left to Hide with an AI
 
-This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.5.6.
+This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.5.7.
 
-The portable AI packages produced by GitHub Actions contain this repository, installed dependencies, and either a Linux x64 or Windows x64 Node.js runtime. No separate Node.js installation or `npm install` is required after extracting a package.
+The portable Player packages produced by GitHub Actions contain a bundled Session CLI, a standalone Linux x64 or Windows x64 Node.js runtime, the Session launcher, this guide, build identity, and the required license notices. They deliberately do not contain the repository checkout, `node_modules`, TypeScript, Vite, Vitest, development scripts, or board images. No separate Node.js installation or `npm install` is required after extracting a package.
 
-## Intended use
+## v1.5.7 decision aids and query discovery
+
+Read `observation.importantChanges` after an action and on resume. Status retains important changes from the latest accepted EndTurn through the current decision, so an intervening move does not erase a production loss. Summaries are capped at ten entries and inner arrays at ten values; use their count/omission metadata and revision-pinned history hint for the full record. Branches exclude the parent's later decisions. `observation.combatHazards` lists up to five legal lethal Gas attacks that would kill public friendly units or topple owned sites; query units for complete attack previews before choosing an attack.
+
+Resource `runway` under strategic forecast distinguishes current conditions from a hypothetical loss of the largest producer. Shortage turn 1 means the next EndTurn; zero remaining stock is not itself a shortage if that turn's demand was met. These are static estimates, not predictions of enemy actions. A null estimate carries `not_depleting`, `non_storable`, or a calculation-unavailable reason. Keep the existing `forecastSummary.endTurn.maintenanceBreakdown` in your assessment. Query road branches for `preparedPostCount` and `fallbackAvailable`; the latter describes structural fallback, not safety from hidden enemies.
+
+Discover the JSON Schema 2020-12 query contract from your own Session:
+
+```bash
+./run-session.sh query --session=my-game --target=api --revision=0
+./run-session.sh query --session=my-game --target=strategic-map --revision=0 --input=graph-filters.json
+./run-session.sh query --session=my-game --target=route --revision=0 --input=route-filters.json
+```
+
+Replace revision 0 with the current returned revision. `graph-filters.json` contains `{"collection":"nodes"}` (use `edges` for the edge pages). `route-filters.json` can contain `{"moverUnitId":"police-1","destination":{"kind":"facility","id":"capital"}}`, using actual IDs from your Session. Without a mover, provide both `source` and `destination`; that is a general reference route, not a promise that a unit can move there this action. Raw Hex paths are opt-in with `includeHexPath`; `ranges` pages strategicNodes, supplyTransitions and hexPath independently (default 100, maximum 500).
+
+The CLI input file is the filter object itself. In a play-turn query it goes inside the `filters` envelope:
+
+```json
+{"type":"query","target":"strategic-map","expectedRevision":0,"filters":{"collection":"nodes"},"pageSize":100}
+```
+
+Unknown filters, invalid types and unsupported enum values are errors, not empty successful queries. CLI failures emit `{ "ok": false, "code": "...", "error": "..." }` to stderr and exit nonzero. `RelocateCheckpoint` requires both `checkpointId` and `position`. v1.5.6 and older Saves, Artifacts, Sessions and Checkpoints are incompatible; start a new v1.5.7 game. Wall HP is 20 and Horde Zombie maximum Attack Charge is 4; other zombie types retain their own configuration.
+
+## Playing a Session
 
 Give the extracted package (or its ZIP) to an AI environment that can inspect files and execute local commands, then ask it to play the game. A useful prompt is:
 
@@ -109,30 +133,33 @@ Use the exact Checkpoint ID returned by `save-checkpoint` or `list-checkpoints`;
 
 Session data defaults to `output/sessions`; pass the same `--root=PATH` to every command to use another root. Active state is committed after each well-formed Decision, so a later `status` continues the same Decision Log and Run Artifact. `artifact --out=PATH` creates a self-contained public Artifact Package directory without placing its full JSON on standard output; the response is a small manifest with the package path, schema, hash, and count. The result is stored in the Artifact stream footer. The directory contains `manifest.json`, streaming `artifact.ndjson`, and deduplicated public payloads. If Active data is reported corrupt or incompatible, do not edit private files and do not expect an automatic rollback: list the valid Checkpoints and explicitly create a new branch with `load-checkpoint`.
 
-The Session directory includes a private Save Format 15 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 9 stores immutable generation data, persistent request IDs, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. v1.5.5 and earlier AI Session, Checkpoint, Artifact, and Replay data are not migrated; start a new v1.5.6 AI Session and retain old data for use with its old release. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 12.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
+The Session directory includes a private Save Format 15 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 9 stores immutable generation data, persistent request IDs, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. v1.5.6 and earlier AI Session, Checkpoint, Artifact, and Replay data are not migrated; start a new v1.5.7 AI Session and retain old data for use with its old release. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 12.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
 
-For a quick built-in-agent smoke test instead of an interactive Session:
-
-```bash
-./run-npm.sh run sim -- --agent=balanced --games=1 --seed=1 --summary-only --out=output/ai-smoke --overwrite
-```
-
-This runs the built-in Balanced Agent and is a quick way to verify that the bundled runtime works. The package workflow separately exercises all nine Session commands, file Artifact export, and public API drivers for Seeds 1 and 7 with the bundled Node.js runtime.
-
-For custom TypeScript driver scripts, use the bundled `vite-node` launcher instead of installing tools globally:
+For a quick built-in-agent smoke test from the repository checkout:
 
 ```bash
-./run-vite-node.sh game/path/to/your-driver.ts
+npm run sim -- --agent=balanced --games=1 --seed=1 --summary-only --out=output/ai-smoke --overwrite
 ```
 
-On Windows, the launcher runs from the package's `game` directory so Vite resolves
-the bundled dependencies. Pass an absolute driver path or a path relative to `game`:
+The Player package has one runtime entry point, `run-session.sh` or `run-session.cmd`. The package workflow exercises all nine Session commands, file Artifact export, Session resume, Checkpoint branching, and external public drivers for Seeds 1 and 7 with the bundled Node.js runtime. The built-in Balanced Agent and simulation CLI are development tools and remain available from a repository checkout.
+
+## Repository development
+
+Custom TypeScript drivers, built-in Agents, UI development, and tests run from a repository checkout. Install the locked dependencies and use the normal development commands:
+
+```bash
+npm ci
+npm run session -- status --session=my-game
+npm run test
+```
+
+For a checkout-side TypeScript driver, use the repository's `vite-node` command:
 
 ```powershell
-.\run-vite-node.cmd path/to/your-driver.ts
+npx vite-node --script path/to/your-driver.ts
 ```
 
-A custom LLM player should import `createAgentGame` from `game/src/agent/game.ts` and interact only through the public AgentGame methods:
+A custom LLM player should import `createAgentGame` from `src/agent/game.ts` and interact only through the public AgentGame methods:
 
 - `getApiInfo()`
 - `reset(options?)`
@@ -158,7 +185,7 @@ Recommended loop:
 
 `getRunArtifact()` remains the complete public Artifact API. For a bounded read of a large trace, use `getArtifactPage({ target, offset?, pageSize?, expectedRevision? })`. The allowed targets are `manifest`, `observations`, `actions`, `events`, and `invalid-attempts`; it returns the current Revision, target, `count`, `total`, `hasMore`, `nextOffset`, and public `items`. Pages default to 100 items and cannot exceed 500. It is read-only; an old `expectedRevision` is rejected without changing the game.
 
-## v1.5.6 tactical context
+## v1.5.7 tactical context
 
 Use the current `AgentObservation` as the source of truth for conditional forecasts. It does not reveal future random draws or private state.
 
@@ -199,7 +226,7 @@ There is no public `SuppressInfection` action. Infection response is resolved by
 
 When using the Session CLI, each `step` response also contains `stateDelta`, a public-only summary of newly infected/ruined sites, newly spotted or publicly lost enemies, Unit HP/supply changes, and Checkpoint role changes since the previous Decision. Ordinary `AgentObservation` and Human UI responses do not contain this Session-only field.
 
-## v1.5.6 Wave and housing decisions
+## v1.5.7 Wave and housing decisions
 
 - Each scheduled Wave freezes its roster on schedule, consumes the participating directions' rejection counters, and starts even with zero free Spawn slots. Each direction has a dedicated 22-Hex zone. Pending Waves spawn oldest first as slots become available; newly spawned Units act from the next Zombie Phase.
 - Read `baseWaveUnitCount`, `committedWaveUnitCount`, `spawnedSoFar`, and `pendingCount`, plus public direction/group/kind. `horde_wave_started` and `horde_spawn_batch` are separate events. Exact type composition, private counters, anchors, and hidden positions remain private.
@@ -213,33 +240,32 @@ When using the Session CLI, each `step` response also contains `stateDelta`, a p
 
 The AI player should not use `GameEngine.getState()`, `AgentGameAdapter.getDebugState()`, save internals, hidden future random values, or other non-public implementation details to make decisions. Those exist for development and diagnostics, not as player-visible information.
 
-The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.5.6` uses Game Rules `8.0.0`, Agent/Observation/Browser Bridge API `13.0.0`, Fixed Map `fixed-51x51-v4`, Save Format `15`, Artifact Schema `12.0.0`, Checkpoint/Session Schema `9.0.0`, Balanced Agent `8.0.0`, and Random Agent `6.0.0`. Artifact Schema 12.0.0 packages public Wave/Warning/Site Event, Gas/Army Base state, production-capacity state, Metrics, a lossless public Decision Log, request identity, and lineage without private Checkpoint state. v1.5.5 and earlier AI Replay, Artifact, Session, Checkpoint, and normal Save data are rejected without conversion or overwrite.
+The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.5.7` uses Game Rules `8.0.0`, Agent/Observation/Browser Bridge API `13.0.0`, Fixed Map `fixed-51x51-v4`, Save Format `15`, Artifact Schema `12.0.0`, Checkpoint/Session Schema `9.0.0`, Balanced Agent `8.0.0`, and Random Agent `6.0.0`. Artifact Schema 12.0.0 packages public Wave/Warning/Site Event, Gas/Army Base state, production-capacity state, Metrics, a lossless public Decision Log, request identity, and lineage without private Checkpoint state. v1.5.6 and earlier AI Replay, Artifact, Session, Checkpoint, and normal Save data are rejected without conversion or overwrite.
 
 ## Package layout
 
 A generated package has this general structure:
 
 ```text
-nowhere-left-to-hide-ai-<version>-<commit>-linux-x64/
+nowhere-left-to-hide-ai-<version>-<commit>-<platform>/
 ├─ PLAY_WITH_AI.md
+├─ LICENSE
+├─ THIRD_PARTY_NOTICES
+├─ ASSETS_LICENSE.md
 ├─ BUILD_INFO.txt
-├─ run-npm.sh
-├─ run-vite-node.sh
-├─ run-session.sh / run-session.cmd
-├─ runtime/
-│  └─ node/              # bundled Linux x64 Node.js runtime
-└─ game/
-   ├─ src/
-   ├─ dist/portable/session-cli.mjs  # pre-bundled Session CLI
-   ├─ Doc/
-   ├─ package.json
-   ├─ package-lock.json
-   └─ node_modules/      # already installed by GitHub Actions
+├─ PORTABLE_PACKAGE.json
+├─ session-cli.mjs       # pre-bundled Session CLI
+├─ run-session.sh        # Linux package (or run-session.cmd on Windows)
+└─ runtime/
+   ├─ identity.env       # Linux package (or identity.cmd on Windows)
+   └─ node/node           # standalone bundled Node executable
 ```
+
+The Player package intentionally has no `package.json`, `node_modules`, source tree, development launcher, or board runtime assets. Use a repository checkout for custom TypeScript drivers, built-in Agent development, UI work, and tests.
 
 The package is tied to a specific Git commit. `BUILD_INFO.txt` records the app version, commit SHA, and bundled Node.js version so a playthrough can be reproduced against the correct source revision.
 
-## v1.5.6 parameter queries and ZIP spectator
+## v1.5.7 parameter queries and ZIP spectator
 
 Read `status.observation.forecastSummary.endTurn.maintenancePopulation` and `maintenanceBreakdown` for healthy city/housing residents, production/base workers, unit personnel, and waiting/screening/approved upkeep. Facility queries expose production, inputs, stopping reasons, and `recovery` conditions separately. Attack previews expose visible Gas chains; they do not estimate hidden entities, reanimation/site-spawn consequences, or the later enemy phase. Turn Away affects waiting people only; its future Wave risk is qualitative.
 
@@ -258,9 +284,9 @@ The list of legal actions is finite and does not enumerate every legal integer. 
 
 `artifact` exports the public directory and sibling ZIP; `replayZipPath` identifies the file. The ZIP includes public ancestry, fixed map and explicit roads, comments, results, and verified payload references; it excludes private checkpoint state. Open **AIリプレイ観戦 / Watch AI replay** from the game title and select this ZIP locally. The viewer starts paused before the first Decision, supports 0.5/1/2/4× playback, previous/next Decision, exact-turn seeking, and stops at the end. Comments use Unicode code points: `min(8, max(3, ceil(length/20)))` seconds; absent comments skip directly to the one-second result phase. Logs retain 100 visited Decisions; older Decisions remain seekable.
 
-The spectator does not resume a Session or touch normal autosave. It supports v1.5.6 public packages with different viewer Build IDs, while executable replay/resume retains strict build checks. Old versions, unsafe paths, bad hashes, missing payloads, corrupt ZIP entries and incompatible maps are rejected. Use the exported ZIP: its NDJSON stream must be stored, not recompressed. ZIP64/multivolume/encrypted archives are unsupported. Limits are 64 MiB per logical payload, 4 MiB per Decision line, 32 MiB ZIP directory, and one million Decisions; snapshot cache is bounded to 16 MiB. A total ZIP size over 50 MB is not by itself an error. Payload parsing and rendering still require browser working memory; cancel and choose another file if loading cannot complete. Physical phone memory and 512 MiB endurance are separate measurements, not universal guarantees.
+The spectator does not resume a Session or touch normal autosave. It supports v1.5.7 public packages with different viewer Build IDs, while executable replay/resume retains strict build checks. Old versions, unsafe paths, bad hashes, missing payloads, corrupt ZIP entries and incompatible maps are rejected. Use the exported ZIP: its NDJSON stream must be stored, not recompressed. ZIP64/multivolume/encrypted archives are unsupported. Limits are 64 MiB per logical payload, 4 MiB per Decision line, 32 MiB ZIP directory, and one million Decisions; snapshot cache is bounded to 16 MiB. A total ZIP size over 50 MB is not by itself an error. Payload parsing and rendering still require browser working memory; cancel and choose another file if loading cannot complete. Physical phone memory and 512 MiB endurance are separate measurements, not universal guarantees.
 
-## v1.5.6 decision checklist (Linux and Windows)
+## v1.5.7 decision checklist (Linux and Windows)
 
 Keep the complete Compact response from `status` and every `play-turn` result. Do not print only resources and unit HP: that drops the reasons needed to operate the economy. Review all of these on every decision:
 

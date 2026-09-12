@@ -7,3 +7,8 @@ export * from './balancedAgent';
 export * from './randomAgent';
 export * from './metrics';
 export * from './runner';
+
+export * from './strategic-map';
+export * from './route-query';
+export * from './decision-summary';
+export * from './query-contract';

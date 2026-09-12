@@ -54,7 +54,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('13.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('14.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);

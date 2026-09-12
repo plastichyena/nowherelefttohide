@@ -94,7 +94,21 @@ function stateWithArmyBaseReservation(seed = 42): GameState {
   return state;
 }
 
-describe('v1.5.6 Save Format 15', () => {
+describe('v1.5.7 Save Format 16', () => {
+  it('rejects the v1.5.6 Save 15 boundary with a valid checksum without changing its input', () => {
+    const legacy = exportedEnvelope();
+    legacy.formatVersion = 15;
+    legacy.gameVersion = '8.0.0';
+    const state = legacy.state as Record<string, unknown>;
+    state.gameVersion = '8.0.0';
+    (state.config as Record<string, unknown>).version = '8.0.0';
+    const text = JSON.stringify(resign(legacy));
+    const result = importSaveJson(text);
+    expect(result.valid).toBe(false);
+    expect(result.state).toBeNull();
+    expect(result.errors.join(' ')).toMatch(/version|format|新規/i);
+    expect(JSON.stringify(resign(legacy))).toBe(text);
+  });
   it('exposes stable per-stage timings without changing Save Format 15 bytes', () => {
     const state = initialState(15152);
     const measured = measureSaveEncoding(state);
@@ -115,7 +129,7 @@ describe('v1.5.6 Save Format 15', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 15,
+      formatVersion: 16,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-51x51-v4',
       seed: 77,
@@ -228,9 +242,9 @@ describe('v1.5.6 Save Format 15', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(15);
-    expect(envelope.gameVersion).toBe('8.0.0');
-    expect(config.version).toBe('8.0.0');
+    expect(envelope.formatVersion).toBe(16);
+    expect(envelope.gameVersion).toBe('9.0.0');
+    expect(config.version).toBe('9.0.0');
     expect(config.mapId).toBe('fixed-51x51-v4');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);

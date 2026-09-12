@@ -26,7 +26,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '8.0.0';
+export const GAME_VERSION = '9.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -537,6 +537,13 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     },
     events: [],
     statistics: {
+      barbedWireBuilt: 0,
+      barbedWireDestroyed: 0,
+      barbedWireDamageTaken: 0,
+      barbedWireAbsorbedDamage: 0,
+      barbedWireEmptyAttackCharges: 0,
+      barbedWireOccupiedAttackCharges: 0,
+
       maxPopulation: 0,
       maxSecuredFacilities: 0,
       civilianLosses: 0,

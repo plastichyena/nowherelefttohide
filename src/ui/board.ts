@@ -7,6 +7,7 @@ import { effectiveMovementCost, isUrbanHex } from '../core/terrain';
 import { getPlayerVisionCoverage, getPlayerVisibleTileKeys, type VisionCoverage } from '../core/visibility';
 import type {
   CardinalDirection,
+  BarbedWireState,
   CheckpointState,
   ConstructibleFacilityType,
   FacilityState,
@@ -166,6 +167,7 @@ export const BOARD_RENDER_LAYER_ORDER = [
   'facility-base',
   'facility-state',
   'fog',
+  'obstacle',
   'unit',
   'dynamic',
 ] as const;
@@ -246,6 +248,9 @@ const TERRAIN_TEXTURE_SIZE = HEX_SIZE * 2;
 const OVERLAY_TEXTURE_SIZE = HEX_SIZE * 1.85;
 const FACILITY_TEXTURE_SIZE = HEX_SIZE * 1.75;
 const UNIT_TEXTURE_SIZE = HEX_SIZE * 0.95;
+// The source has transparent padding; this keeps the visible Fence silhouette
+// near the existing 24–34px board readability target without covering Units.
+const OBSTACLE_TEXTURE_SIZE = HEX_SIZE * 1.55;
 const ROAD_TEXTURE_WIDTH = HEX_WIDTH * 2.2;
 const ROAD_TEXTURE_HEIGHT = HEX_HEIGHT;
 
@@ -515,6 +520,7 @@ export class HexBoardScene extends Phaser.Scene {
   private facilityBaseFallbackGraphics!: Phaser.GameObjects.Graphics;
   private facilityStateFallbackGraphics!: Phaser.GameObjects.Graphics;
   private fogGraphics!: Phaser.GameObjects.Graphics;
+  private obstacleFallbackGraphics!: Phaser.GameObjects.Graphics;
   private unitFallbackGraphics!: Phaser.GameObjects.Graphics;
   private terrainLayer!: Phaser.GameObjects.Container;
   private roadLayer!: Phaser.GameObjects.Container;
@@ -522,6 +528,7 @@ export class HexBoardScene extends Phaser.Scene {
   private facilityBaseLayer!: Phaser.GameObjects.Container;
   private facilityStateLayer!: Phaser.GameObjects.Container;
   private fogLayer!: Phaser.GameObjects.Container;
+  private obstacleLayer!: Phaser.GameObjects.Container;
   private unitLayer!: Phaser.GameObjects.Container;
   private dynamicLayer!: Phaser.GameObjects.Container;
   private layersReady = false;
@@ -552,6 +559,7 @@ export class HexBoardScene extends Phaser.Scene {
   private mapStaticKey: string | null = null;
   private facilityBaseKey: string | null = null;
   private facilityStateKey: string | null = null;
+  private obstacleKey: string | null = null;
   private unitKey: string | null = null;
   private fogKey: string | null = null;
   private fogDirty = true;
@@ -718,8 +726,9 @@ export class HexBoardScene extends Phaser.Scene {
     this.facilityBaseLayer = createLayer(BOARD_RENDER_LAYER_ORDER[3], 40);
     this.facilityStateLayer = createLayer(BOARD_RENDER_LAYER_ORDER[4], 50);
     this.fogLayer = createLayer(BOARD_RENDER_LAYER_ORDER[5], 60);
-    this.unitLayer = createLayer(BOARD_RENDER_LAYER_ORDER[6], 70);
-    this.dynamicLayer = createLayer(BOARD_RENDER_LAYER_ORDER[7], 80);
+    this.obstacleLayer = createLayer(BOARD_RENDER_LAYER_ORDER[6], 65);
+    this.unitLayer = createLayer(BOARD_RENDER_LAYER_ORDER[7], 70);
+    this.dynamicLayer = createLayer(BOARD_RENDER_LAYER_ORDER[8], 80);
 
     this.terrainFallbackGraphics = this.add.graphics();
     this.roadFallbackGraphics = this.add.graphics();
@@ -727,6 +736,7 @@ export class HexBoardScene extends Phaser.Scene {
     this.facilityBaseFallbackGraphics = this.add.graphics();
     this.facilityStateFallbackGraphics = this.add.graphics();
     this.fogGraphics = this.add.graphics();
+    this.obstacleFallbackGraphics = this.add.graphics();
     this.unitFallbackGraphics = this.add.graphics();
     this.graphics = this.add.graphics();
     this.terrainLayer.add(this.terrainFallbackGraphics);
@@ -735,6 +745,7 @@ export class HexBoardScene extends Phaser.Scene {
     this.facilityBaseLayer.add(this.facilityBaseFallbackGraphics);
     this.facilityStateLayer.add(this.facilityStateFallbackGraphics);
     this.fogLayer.add(this.fogGraphics);
+    this.obstacleLayer.add(this.obstacleFallbackGraphics);
     this.unitLayer.add(this.unitFallbackGraphics);
     this.dynamicLayer.add(this.graphics);
     this.layersReady = true;
@@ -908,6 +919,7 @@ export class HexBoardScene extends Phaser.Scene {
     this.clearLayerRender(this.urbanLayer, this.urbanFallbackGraphics);
     this.clearLayerRender(this.facilityBaseLayer, this.facilityBaseFallbackGraphics);
     this.clearLayerRender(this.facilityStateLayer, this.facilityStateFallbackGraphics);
+    this.clearLayerRender(this.obstacleLayer, this.obstacleFallbackGraphics);
     this.clearLayerRender(this.unitLayer, this.unitFallbackGraphics);
   }
 
@@ -1114,6 +1126,14 @@ export class HexBoardScene extends Phaser.Scene {
     return `${visible}#${units}`;
   }
 
+  private obstacleRenderKey(state: Readonly<GameState>, visibleTileKeys: ReadonlySet<string>): string {
+    return state.barbedWire
+      .filter((wire) => wire.hp > 0 && visibleTileKeys.has(hexKey(wire.position)))
+      .map((wire) => `${wire.id}:${wire.position.q},${wire.position.r}`)
+      .sort()
+      .join('|');
+  }
+
   private draw(render: BoardRenderState): void {
     if (!this.layersReady) return;
     this.renderCounters.drawCalls += 1;
@@ -1168,22 +1188,30 @@ export class HexBoardScene extends Phaser.Scene {
       units.push(unit);
       unitsByTile.set(hexKey(unit.position), units);
     }
+    const wiresByTile = new Map<string, BarbedWireState>();
+    for (const wire of state.barbedWire) {
+      if (wire.hp <= 0 || !visibleTileKeys.has(hexKey(wire.position))) continue;
+      wiresByTile.set(hexKey(wire.position), wire);
+    }
 
     const lod = this.boardLodActive();
     const mapKey = this.mapRenderKey(state);
     const facilityBaseKey = this.facilityBaseRenderKey(state);
     const facilityStateKey = this.facilityStateRenderKey(state);
+    const obstacleKey = this.obstacleRenderKey(state, visibleTileKeys);
     const unitKey = this.unitRenderKey(state, visibleTileKeys);
     const nextFogKey = `${mapKey}:${render.visibilityOverlay !== false}:${[...visibleTileKeys].sort().join(',')}`;
     const lodChanged = this.staticLod !== lod;
     const rebuildMap = this.staticDirty || lodChanged || this.mapStaticKey !== mapKey;
     const rebuildFacilityBase = rebuildMap || lodChanged || this.facilityBaseKey !== facilityBaseKey;
     const rebuildFacilityState = rebuildMap || lodChanged || this.facilityStateKey !== facilityStateKey;
+    const rebuildObstacles = rebuildMap || lodChanged || this.obstacleKey !== obstacleKey;
     // A newly built/removed Facility or Checkpoint changes stacked Unit
     // offsets even when no Unit field changed, so keep the Unit layer coupled
-    // to the base occupancy key.
-    const rebuildUnits = rebuildMap || rebuildFacilityBase || lodChanged || this.unitKey !== unitKey;
-    if (rebuildMap || rebuildFacilityBase || rebuildFacilityState || rebuildUnits) {
+    // to the base occupancy key.  A visible Barbed Wire uses the same offset
+    // so a co-located Human remains identifiable when the wall is added.
+    const rebuildUnits = rebuildMap || rebuildFacilityBase || rebuildObstacles || lodChanged || this.unitKey !== unitKey;
+    if (rebuildMap || rebuildFacilityBase || rebuildFacilityState || rebuildObstacles || rebuildUnits) {
       this.renderCounters.staticRebuilds += 1;
     }
 
@@ -1238,6 +1266,18 @@ export class HexBoardScene extends Phaser.Scene {
       this.facilityStateKey = facilityStateKey;
     }
 
+    if (rebuildObstacles) {
+      this.clearLayerRender(this.obstacleLayer, this.obstacleFallbackGraphics);
+      this.beginImagePass(this.obstacleLayer);
+      for (const tile of state.map.tiles) {
+        const key = hexKey(tile);
+        const wire = wiresByTile.get(key);
+        if (wire) this.drawObstaclePass(this.hexToWorld(state, tile));
+      }
+      this.endImagePass(this.obstacleLayer);
+      this.obstacleKey = obstacleKey;
+    }
+
     if (rebuildUnits) {
       this.clearLayerRender(this.unitLayer, this.unitFallbackGraphics);
       this.beginImagePass(this.unitLayer);
@@ -1246,7 +1286,8 @@ export class HexBoardScene extends Phaser.Scene {
         const facility = facilitiesByTile.get(key);
         const checkpoint = checkpointsByTile.get(key);
         const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
-        units.forEach((unit, index) => this.drawUnitPass(unit, this.hexToWorld(state, tile), getFacilityUnitOffset(Boolean(facility || checkpoint)), index, units.length));
+        const offset = getFacilityUnitOffset(Boolean(facility || checkpoint || wiresByTile.has(key)));
+        units.forEach((unit, index) => this.drawUnitPass(unit, this.hexToWorld(state, tile), offset, index, units.length));
       }
       this.endImagePass(this.unitLayer);
       this.unitKey = unitKey;
@@ -1281,18 +1322,11 @@ export class HexBoardScene extends Phaser.Scene {
       this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKeys.has(key), reserveKeys.has(key), hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview, constructibleLegalPreview, constructibleInvalidPreview, selectedConstructiblePreview);
       if (facility) this.drawFacilityDynamic(facility, productionByFacility.get(facility.id), center, tileSelected, render, suppliedTiles, key, t);
       if (checkpoint) this.drawCheckpointDynamic(state, checkpoint, center, tileSelected, suppliedTiles, key, t);
-      const wire = state.barbedWire?.find(w => hexKey(w.position) === key && visibleTileKeys.has(key));
-      if (wire) {
-        this.graphics.lineStyle(2, 0xd6dce0, 1);
-        this.graphics.strokePoints(this.hexPoints(center), true);
-        for (const dx of [-14, 0, 14]) {
-          this.graphics.lineBetween(center.x + dx - 4, center.y - 13, center.x + dx + 4, center.y - 5);
-          this.graphics.lineBetween(center.x + dx - 4, center.y - 5, center.x + dx + 4, center.y - 13);
-        }
-        this.addLabel(`wire:${wire.id}`, `W ${wire.hp}/10`, center.x, center.y - 24, '#e4e9ed', 8, true);
-      }
+      const wire = wiresByTile.get(key);
+      if (wire) this.drawObstacleDynamic(wire, center, tileSelected, t);
       const units = (unitsByTile.get(key) ?? []).filter((unit) => isUnitVisible(unit, visibleTileKeys));
-      units.forEach((unit, index) => this.drawUnitDynamic(unit, center, getFacilityUnitOffset(Boolean(facility || checkpoint)), index, units.length, tileSelected, render, suppliedTiles, key, attackTargets, blockedZombies, t));
+      const offset = getFacilityUnitOffset(Boolean(facility || checkpoint || wire));
+      units.forEach((unit, index) => this.drawUnitDynamic(unit, center, offset, index, units.length, tileSelected, render, suppliedTiles, key, attackTargets, blockedZombies, t));
     }
     if (render.supplyOverlay) this.drawSupplyBoundary(state, suppliedTiles);
     if (render.pendingPath && render.pendingPath.length > 1) {
@@ -1397,6 +1431,56 @@ export class HexBoardScene extends Phaser.Scene {
     for (const [index, path] of mapping.overlays.entries()) {
       if (!this.boardLodActive() && this.drawTexture(this.facilityStateLayer, path, center, FACILITY_TEXTURE_SIZE, FACILITY_TEXTURE_SIZE)) continue;
       this.drawCheckpointStateFallback(this.facilityStateFallbackGraphics, center, mapping.layers[index]!, index);
+    }
+  }
+
+  private drawObstaclePass(center: { x: number; y: number }): void {
+    const path = BOARD_ASSET_REGISTRY.obstacles.barbedWire;
+    // The approved sprite is intentionally dark and transparent.  A compact
+    // translucent plate keeps its mesh and concertina silhouette legible on
+    // both deep Forest and mid-gray Mountain without masking the Hex below.
+    this.drawObstacleBackdrop(this.obstacleFallbackGraphics, center);
+    if (!this.boardLodActive() && this.drawTexture(this.obstacleLayer, path, center, OBSTACLE_TEXTURE_SIZE, OBSTACLE_TEXTURE_SIZE)) return;
+    this.drawObstacleFallback(this.obstacleFallbackGraphics, center);
+  }
+
+  private drawObstacleBackdrop(graphics: Phaser.GameObjects.Graphics, center: { x: number; y: number }): void {
+    graphics.fillStyle(0x071019, 0.58);
+    graphics.fillRoundedRect(center.x - 21, center.y - 10, 42, 20, 5);
+    graphics.lineStyle(1.5, 0xa8c5c4, 0.78);
+    graphics.strokeRoundedRect(center.x - 21, center.y - 10, 42, 20, 5);
+  }
+
+  /** Compact LOD and load-failure fallback for a Barbed Wire obstacle. */
+  private drawObstacleFallback(graphics: Phaser.GameObjects.Graphics, center: { x: number; y: number }): void {
+    graphics.lineStyle(2, 0xb9c8cf, 0.95);
+    graphics.lineBetween(center.x - 17, center.y + 7, center.x + 17, center.y + 7);
+    graphics.lineStyle(1.5, 0x8fa3ac, 0.95);
+    graphics.lineBetween(center.x - 17, center.y - 1, center.x + 17, center.y - 1);
+    for (const x of [-15, 0, 15]) {
+      graphics.lineStyle(2.5, 0xd6e2e6, 0.95);
+      graphics.lineBetween(center.x + x, center.y - 14, center.x + x, center.y + 13);
+      graphics.lineStyle(1.5, 0xc2d1d6, 0.95);
+      graphics.strokeCircle(center.x + x, center.y - 8, 5);
+      graphics.lineBetween(center.x + x - 4, center.y - 12, center.x + x + 4, center.y - 4);
+      graphics.lineBetween(center.x + x - 4, center.y - 4, center.x + x + 4, center.y - 12);
+    }
+    for (const x of [-10, -3, 3, 10]) {
+      graphics.lineBetween(center.x + x - 3, center.y + 1, center.x + x + 3, center.y + 7);
+      graphics.lineBetween(center.x + x - 3, center.y + 7, center.x + x + 3, center.y + 1);
+    }
+  }
+
+  private drawObstacleDynamic(
+    wire: BarbedWireState,
+    center: { x: number; y: number },
+    tileSelected: boolean,
+    t: ReturnType<typeof createTranslator>,
+  ): void {
+    const ratio = wire.hp / Math.max(1, wire.maxHp);
+    if (tileSelected || wire.hp < wire.maxHp) {
+      this.drawHealth(this.graphics, { x: center.x, y: center.y - 24 }, ratio);
+      this.addLabel(`wire:${wire.id}`, `${t('barbedWire')} · HP ${wire.hp}/${wire.maxHp}`, center.x, center.y - 28, '#e4e9ed', 8, true);
     }
   }
 
@@ -2003,6 +2087,7 @@ export class HexBoardScene extends Phaser.Scene {
     this.mapStaticKey = null;
     this.facilityBaseKey = null;
     this.facilityStateKey = null;
+    this.obstacleKey = null;
     this.unitKey = null;
     this.fogKey = null;
     this.fogDirty = true;

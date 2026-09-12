@@ -34,7 +34,7 @@ function load(engine: GameEngine, state: GameState) {
 describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
   it('keeps all seven zombie configurations separate and derives human ranks', () => {
     const state = createInitialState(1, createDefaultConfig());
-    const expected = { zombie: [15, 5, 3, 1], hordeZombie: [40, 5, 3, 2], policeZombie: [10, 5, 3, 1], soldierZombie: [20, 10, 5, 1], riotZombie: [60, 5, 3, 1], hunterZombie: [20, 15, 15, 1], gasZombie: [35, 5, 3, 1] };
+    const expected = { zombie: [15, 5, 3, 1], hordeZombie: [40, 5, 3, 4], policeZombie: [10, 5, 3, 1], soldierZombie: [20, 10, 5, 1], riotZombie: [60, 5, 3, 1], hunterZombie: [20, 15, 15, 1], gasZombie: [35, 5, 3, 1] };
     for (const type of Object.keys(expected) as Array<keyof typeof expected>) {
       const unit = createUnit(state, type, type, { q: 20, r: 20 });
       expect([unit.hp, unit.attack, unit.movement, unit.maxAttackCharges]).toEqual(expected[type]);
@@ -89,14 +89,14 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
     }
   });
 
-  it('attacks a surviving adjacent target twice and never moves after attacking', () => {
+  it('attacks a surviving adjacent target four times and never moves after attacking', () => {
     const { engine, state, horde } = combatFixture();
     load(engine, state);
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error?.message ?? null).toBeNull();
-    expect(result.events.filter((event) => event.type === 'attack' && event.payload.attackerId === horde.id && !event.payload.counterattack)).toHaveLength(2);
+    expect(result.events.filter((event) => event.type === 'attack' && event.payload.attackerId === horde.id && !event.payload.counterattack)).toHaveLength(4);
     expect(result.events.some((event) => event.type === 'unit_moved' && event.payload.unitId === horde.id)).toBe(false);
-    expect(result.state.units.find((unit) => unit.id === horde.id)?.attackChargesRemaining).toBe(2);
+    expect(result.state.units.find((unit) => unit.id === horde.id)?.attackChargesRemaining).toBe(4);
   });
 
   it('does not refill a Player-phase counterattack charge at Zombie-phase start', () => {
@@ -104,9 +104,9 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
     load(engine, state);
     const attacked = engine.step({ type: 'Attack', attackerId: 'police-1', targetId: horde.id });
     expect(attacked.error?.message ?? null).toBeNull();
-    expect(attacked.state.units.find((unit) => unit.id === horde.id)?.attackChargesRemaining).toBe(1);
+    expect(attacked.state.units.find((unit) => unit.id === horde.id)?.attackChargesRemaining).toBe(3);
     const result = engine.step({ type: 'EndTurn' });
-    expect(result.events.filter((event) => event.type === 'attack' && event.payload.attackerId === horde.id && !event.payload.counterattack)).toHaveLength(1);
+    expect(result.events.filter((event) => event.type === 'attack' && event.payload.attackerId === horde.id && !event.payload.counterattack)).toHaveLength(3);
   });
 
   it('stops when the first counterattack kills the Horde', () => {
@@ -126,7 +126,7 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
     load(engine, state);
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error?.message ?? null).toBeNull();
-    expect(result.events.filter((event) => event.type === 'attack' && event.payload.attackerId === horde.id && !event.payload.counterattack).map((event) => event.payload.defenderId)).toEqual([guard.id, 'police-1']);
+    expect(result.events.filter((event) => event.type === 'attack' && event.payload.attackerId === horde.id && !event.payload.counterattack).map((event) => event.payload.defenderId)).toEqual([guard.id, 'police-1', 'police-1', 'police-1']);
   });
 
   it('round trips initial Hunter provenance and partly spent Horde charges', () => {

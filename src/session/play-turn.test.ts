@@ -23,7 +23,7 @@ interface RuntimeState { turn: number; hp: number; enemy: boolean; crisis: numbe
 
 function observation(state: RuntimeState): AgentObservation {
   const unit = {
-    id: 'unit-1', type: 'police', unitType: 'police', position: { q: 0, r: 0 }, hp: state.hp, maxHp: 10,
+    attackPreviews: [], id: 'unit-1', type: 'police', unitType: 'police', position: { q: 0, r: 0 }, hp: state.hp, maxHp: 10,
     proficiency: 'regular', attackChargesRemaining: 1, maxAttackCharges: 1, canMove: true, canAttack: false,
     inSupply: true, currentFuel: 1, maxFuel: 1, currentMilitaryGoods: 1, maxMilitaryGoods: 1,
     fixedMilitaryGoodsUpkeepPerTurn: 0, attack: 1, baseRecruitAttack: 1, effectiveAttack: 1, movement: 1,

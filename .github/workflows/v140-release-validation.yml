@@ -1,4 +1,4 @@
-name: v1.5.6 Release Validation
+name: v1.5.7 Release Validation
 
 on:
   workflow_dispatch:
@@ -14,13 +14,13 @@ permissions:
   actions: read
 
 concurrency:
-  group: v156-release-validation-${{ github.ref }}
+  group: v157-release-validation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   agent-validation:
     if: inputs.reuse_run_id == ''
-    name: v1.5.6 ${{ matrix.agent }} seeds ${{ matrix.start }} + 9
+    name: v1.5.7 ${{ matrix.agent }} seeds ${{ matrix.start }} + 9
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -29,7 +29,7 @@ jobs:
         agent: [random, balanced]
         start: [1, 11, 21, 31, 41, 51, 61, 71, 81, 91]
     steps:
-      - name: Check out v1.5.6 candidate
+      - name: Check out v1.5.7 candidate
         uses: actions/checkout@v4
 
       - name: Set up Node.js 22
@@ -58,7 +58,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v156-report-${{ matrix.agent }}-${{ matrix.start }}
+          name: v157-report-${{ matrix.agent }}-${{ matrix.start }}
           path: |
             output/release-shard/run.json
             output/release-shard/games.csv
@@ -70,7 +70,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v156-replays-${{ matrix.agent }}-${{ matrix.start }}
+          name: v157-replays-${{ matrix.agent }}-${{ matrix.start }}
           path: output/release-shard/games
           if-no-files-found: error
           retention-days: 30
@@ -89,17 +89,17 @@ jobs:
       - run: npm ci
       - uses: actions/download-artifact@v4
         with:
-          pattern: v156-report-*
+          pattern: v157-report-*
           path: output/release-reports
       - run: npx --no-install vite-node --script src/testing/release-seed-validation.ts aggregate output/release-reports
       - uses: actions/upload-artifact@v4
         with:
-          name: v156-release-summary
+          name: v157-release-summary
           path: output/release-reports/release-summary.json
 
   session-large-package-validation:
     if: inputs.reuse_run_id == ''
-    name: Session v1.5.6 physical 512 MiB Package validation
+    name: Session v1.5.7 physical 512 MiB Package validation
     # This is a separate manual-release job. It verifies actual Core EndTurn
     # transitions and a physical Artifact Package without gating Pages.
     runs-on: ubuntu-latest
@@ -127,7 +127,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: session-v156-large-512mib
+          name: session-v157-large-512mib
           path: output/session-release/large-512*.json
           if-no-files-found: warn
           retention-days: 30
@@ -157,13 +157,13 @@ jobs:
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.reuse_run_id }}
-          pattern: v156-report-*
+          pattern: v157-report-*
           path: output/release-reuse/reports
       - uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.reuse_run_id }}
-          name: session-v156-large-512mib
+          name: session-v157-large-512mib
           path: output/release-reuse/session
       - name: Verify artifact source and physical endurance evidence
         run: node scripts/verify-release-reuse.mjs artifacts
@@ -171,7 +171,7 @@ jobs:
         run: npx --no-install vite-node --script src/testing/release-seed-validation.ts aggregate output/release-reuse/reports
       - uses: actions/upload-artifact@v4
         with:
-          name: v156-release-summary
+          name: v157-release-summary
           path: |
             output/release-reuse/source.json
             output/release-reuse/reports/release-summary.json

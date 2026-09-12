@@ -445,6 +445,7 @@ export interface NoisePulse {
 
 export type GameEventType =
   | 'barbed_wire_built'
+  | 'barbed_wire_attack_charge'
   | 'barbed_wire_damaged'
   | 'horde_wave_started'
   | 'horde_spawn_batch'
@@ -529,6 +530,12 @@ export interface GameEvent {
 }
 
 export interface GameStatistics {
+  barbedWireBuilt: number;
+  barbedWireDestroyed: number;
+  barbedWireDamageTaken: number;
+  barbedWireAbsorbedDamage: number;
+  barbedWireEmptyAttackCharges: number;
+  barbedWireOccupiedAttackCharges: number;
   maxPopulation: number;
   maxSecuredFacilities: number;
   civilianLosses: number;
@@ -748,6 +755,7 @@ export interface ResourceContributorForecast {
 }
 
 export interface CriticalResourceDependencyForecast {
+  runway: import('./resource-runway').ResourceRunwayForecast;
   resource: StrategicResourceType;
   currentSupply: number;
   currentDemand: number;
@@ -893,7 +901,8 @@ export type CrisisReasonCode =
   | 'horde_warning_active'
   | 'guaranteed_resource_defeat'
   | 'new_state_loss'
-  | 'production_outage';
+  | 'production_outage'
+  | 'resource_runway_risk';
 
 export interface CrisisAlert {
   id: string;

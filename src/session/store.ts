@@ -797,7 +797,7 @@ export class SessionStore {
     if (!existsSync(path)) throw new SessionError('session_not_found', `No Session exists at ${directory}`);
     const descriptor = parseJson<SessionDescriptor>(readFileSync(assertSafeInputFile(this.safeRoot, path), 'utf8'), 'session.json');
     ensureObject(descriptor, 'session.json');
-    if (descriptor.sessionSchemaVersion !== SESSION_SCHEMA_VERSION || descriptor.checkpointSchemaVersion !== CHECKPOINT_SCHEMA_VERSION) throw new SessionError('session_version_mismatch', 'Session or Checkpoint Schema Version is unsupported');
+    if (descriptor.sessionSchemaVersion !== SESSION_SCHEMA_VERSION || descriptor.checkpointSchemaVersion !== CHECKPOINT_SCHEMA_VERSION) throw new SessionError('session_version_mismatch', 'Session or Checkpoint Schema Version is unsupported; start a new v1.5.7 Session. 旧データは変換・上書きしません。');
     assertSafeIdentifier(descriptor.sessionId, 'sessionId');
     if (descriptor.storeId !== this.manifest.storeId) throw new SessionError('session_corrupt', 'Session belongs to a different Store');
     const expected = integrityHash(descriptor as unknown as Record<string, unknown>, 'descriptorIntegrityHash');
@@ -933,7 +933,7 @@ export class SessionStore {
   private readCheckpointMetadata(directory: string, descriptor: SessionDescriptor, path: string): SessionCheckpointMetadata {
     if (!existsSync(path)) throw new SessionError('checkpoint_not_found', `Checkpoint metadata not found: ${path}`);
     const metadata = parseJson<SessionCheckpointMetadata>(readFileSync(assertSafeInputFile(this.safeRoot, path), 'utf8'), 'Checkpoint metadata');
-    if (metadata.checkpointSchemaVersion !== CHECKPOINT_SCHEMA_VERSION || metadata.sessionSchemaVersion !== SESSION_SCHEMA_VERSION || metadata.sessionId !== descriptor.sessionId) throw new SessionError('checkpoint_version_mismatch', 'Checkpoint does not match Session Schema');
+    if (metadata.checkpointSchemaVersion !== CHECKPOINT_SCHEMA_VERSION || metadata.sessionSchemaVersion !== SESSION_SCHEMA_VERSION || metadata.sessionId !== descriptor.sessionId) throw new SessionError('checkpoint_version_mismatch', 'Checkpoint does not match Session Schema; start a new v1.5.7 Session.');
     const expected = integrityHash(metadata as unknown as Record<string, unknown>, 'metadataIntegrityHash');
     if (!hashesEqual(expected, metadata.metadataIntegrityHash)) throw new SessionError('checkpoint_corrupt', 'Checkpoint metadata integrity hash mismatch');
     for (const field of ['appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit', 'mapId', 'seed'] as const) {

@@ -100,6 +100,11 @@ export const BOARD_FACILITY_TYPES = [
 export const BOARD_FACILITY_ASSET_TYPES = [...BOARD_FACILITY_TYPES, 'checkpoint'] as const;
 export type BoardFacilityAssetType = (typeof BOARD_FACILITY_ASSET_TYPES)[number];
 
+/** Obstacles remain a separate UI asset category; they are not Facilities. */
+export const BOARD_OBSTACLE_TYPES = ['barbedWire'] as const;
+export type BoardObstacleAssetType = (typeof BOARD_OBSTACLE_TYPES)[number];
+export const BOARD_OBSTACLE_ASSET_TYPES = BOARD_OBSTACLE_TYPES;
+
 export const BOARD_UNIT_TYPES = [
   'police',
   'nationalGuard',
@@ -168,6 +173,9 @@ export const BOARD_ASSET_REGISTRY = {
     temporaryHousing: 'facilities/facility_temporary_housing.png',
     armyBase: 'facilities/facility_army_base.png',
     checkpoint: 'facilities/facility_checkpoint.png',
+  },
+  obstacles: {
+    barbedWire: 'obstacles/obstacle_barbed_wire.png',
   },
   units: {
     police: 'units/unit_police.png',
@@ -239,6 +247,15 @@ export function getFacilityAssetPath(type: FacilityType | 'checkpoint' | string)
 
 export const facilityAssetPath = getFacilityAssetPath;
 
+/** Return an independent obstacle path, or null for an unknown obstacle. */
+export function getObstacleAssetPath(type: BoardObstacleAssetType | string): string | null {
+  return (BOARD_OBSTACLE_TYPES as readonly string[]).includes(type)
+    ? BOARD_ASSET_REGISTRY.obstacles[type as BoardObstacleAssetType]
+    : null;
+}
+
+export const obstacleAssetPath = getObstacleAssetPath;
+
 /** Return a unit path, or null for a missing mapping. */
 export function getUnitAssetPath(type: UnitType | string): string | null {
   return isBoardUnitType(type) ? BOARD_ASSET_REGISTRY.units[type] : null;
@@ -276,6 +293,7 @@ export function getAllBoardAssetPaths(): readonly string[] {
     BOARD_ASSET_REGISTRY.overlays.horde,
     BOARD_ASSET_REGISTRY.overlays.final,
     ...Object.values(BOARD_ASSET_REGISTRY.facilities),
+    ...Object.values(BOARD_ASSET_REGISTRY.obstacles),
     ...Object.values(BOARD_ASSET_REGISTRY.units),
   ];
 }

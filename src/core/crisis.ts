@@ -19,6 +19,7 @@ export const CRISIS_WORSENING_FACTS = {
   guaranteed_resource_defeat: { foodShortage: 'up', civilianGoodsShortage: 'up', healthyCivilians: 'down' },
   new_state_loss: { eventId: 'changed' },
   production_outage: { stoppedWorkers: 'up' },
+  resource_runway_risk: { netBurn: 'up', estimatedShortageTurn: 'down', nextEndTurnShortage: 'true' },
 } satisfies Record<CrisisAlert['reasonCode'], Record<string, string>>;
 
 type ComparableCrisis = Pick<CrisisAlert, 'id' | 'reasonCode' | 'entityIds' | 'severity' | 'publicFacts'>;
@@ -175,11 +176,62 @@ export function deriveCrisisSummary(state: Readonly<GameState>): CrisisAlert[] {
   }
   const strategic = deriveStrategicForecast(state);
   const guaranteed = strategic.guaranteedDefeat.guaranteed;
+  const populationIncreasedThisTurn = state.events.some((event) =>
+    event.turn === state.turn
+    && event.type === 'population_transferred'
+    && event.payload.reason === 'unmanaged_pass_through'
+    && typeof event.payload.people === 'number'
+    && event.payload.people > 0);
   if (guaranteed) alerts.push(alert('critical', 'resource', 'guaranteed_resource_defeat', [], {
     foodShortage: forecast.food.shortage,
     civilianGoodsShortage: forecast.civilianGoods.maintenanceShortage,
     healthyCivilians: state.population.healthyCivilians,
   }));
+
+  for (const resource of ['food', 'civilianGoods', 'militaryGoods', 'fuel'] as const) {
+    if (guaranteed && strategic.guaranteedDefeat.causeResource === resource) continue;
+    const runway = strategic.resources[resource].runway;
+    const shortageTurn = runway.current.estimatedShortageTurn;
+    const severity = runway.current.nextEndTurnShortage || shortageTurn === 1
+      ? 'critical' as const
+      : shortageTurn != null && shortageTurn <= 3
+        ? 'warning' as const
+        : null;
+    if (!severity) continue;
+    const causeCodes: string[] = [];
+    if (runway.current.nextEndTurnShortage) causeCodes.push('next_end_turn_shortage');
+    if ((runway.current.netBurn ?? 0) > 0) causeCodes.push('demand_exceeds_current_production');
+    if (runway.projectedCurrentProduction === 0 && runway.currentDemandBasis > 0) causeCodes.push('no_projected_production');
+    if (resource === 'food' || resource === 'civilianGoods') {
+      const maintenance = forecast.maintenanceBreakdown[resource];
+      if (populationIncreasedThisTurn) causeCodes.push('population_increase');
+      if (maintenance.overcrowding > 0) causeCodes.push('overcrowding');
+      if (maintenance.housingOutage > 0) causeCodes.push('temporary_housing_outage');
+    }
+    if (resource === 'civilianGoods' && forecast.civilianGoods.productionInputShortage > 0) {
+      causeCodes.push('production_input_shortage');
+    }
+    if (resource === 'militaryGoods' && runway.current.unavailableReason === 'input_dependency_unstable') {
+      causeCodes.push('production_input_shortage');
+    }
+    if (resource === 'fuel') {
+      if (forecast.fuel.powerFuelShortage > 0) causeCodes.push('power_generation_demand');
+      if (forecast.fuel.unitRefillFuelShortage > 0) causeCodes.push('unit_refill_demand');
+    }
+    alerts.push(alert(severity, 'resource', 'resource_runway_risk', [resource], {
+      resource,
+      estimatedShortageTurn: shortageTurn,
+      nextEndTurnShortage: runway.current.nextEndTurnShortage,
+      netBurn: runway.current.netBurn,
+      unavailableReason: runway.current.unavailableReason,
+      causeCodes,
+      assumption: runway.assumption,
+      currentStock: runway.currentStock,
+      projectedProduction: runway.projectedCurrentProduction,
+      demand: runway.currentDemandBasis,
+      demandBreakdown: runway.demandBreakdown,
+    }));
+  }
 
   for (const event of currentTurnLossEvents(state)) {
     const entityId = String(event.payload.facilityId ?? event.payload.checkpointId ?? event.payload.unitId ?? event.id);

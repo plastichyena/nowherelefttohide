@@ -41,6 +41,7 @@ describe('Phaser board asset boundary helpers', () => {
       'facility-base',
       'facility-state',
       'fog',
+      'obstacle',
       'unit',
       'dynamic',
     ]);

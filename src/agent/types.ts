@@ -35,16 +35,16 @@ import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
 /** v1.5.4 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.5.6';
-export const GAME_RULES_VERSION = '8.0.0';
-export const SAVE_FORMAT_VERSION = '15';
-export const AGENT_API_VERSION = '13.0.0';
-export const OBSERVATION_API_VERSION = '13.0.0';
-export const BRIDGE_API_VERSION = '13.0.0';
+export const APP_VERSION = '1.5.7';
+export const GAME_RULES_VERSION = '9.0.0';
+export const SAVE_FORMAT_VERSION = '16';
+export const AGENT_API_VERSION = '14.0.0';
+export const OBSERVATION_API_VERSION = '14.0.0';
+export const BRIDGE_API_VERSION = '14.0.0';
 export const BALANCED_AGENT_VERSION = '8.0.0';
 export const RANDOM_AGENT_VERSION = '6.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '12.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '9.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '13.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '10.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -62,6 +62,7 @@ export const CRISIS_REASON_CODES = [
   'guaranteed_resource_defeat',
   'new_state_loss',
   'production_outage',
+  'resource_runway_risk',
 ] as const;
 
 export type CrisisReasonCode = typeof CRISIS_REASON_CODES[number];
@@ -402,6 +403,7 @@ export interface AgentCheckpointObservation {
 }
 
 export interface AgentApiInfo {
+  queryContract: ReturnType<typeof import('./query-contract').publicQueryContract>;
   actionContracts: Record<string, { required: string[]; example: import('../core/types').GameAction; conditions: string[] }>;
   parameterQueries: { transferPopulation: string; legalActionsExhaustive: false; revisionRequiredForSession: true };
   appVersion: string;
@@ -666,7 +668,13 @@ export interface AgentGameResult {
   reason: GameOverReason;
   turn: number;
   statistics: {
-    maxPopulation: number;
+    barbedWireBuilt: number;
+  barbedWireDestroyed: number;
+  barbedWireDamageTaken: number;
+  barbedWireAbsorbedDamage: number;
+  barbedWireEmptyAttackCharges: number;
+  barbedWireOccupiedAttackCharges: number;
+  maxPopulation: number;
     maxSecuredFacilities: number;
     civilianLosses: number;
     unitLosses: number;

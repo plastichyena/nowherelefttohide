@@ -327,8 +327,8 @@ describe('v1.5.1 Hunter and shared-charge rule coverage', () => {
     horde.movement = 0;
     horde.canMove = true;
     horde.canAttack = true;
-    horde.attackChargesRemaining = 2;
-    horde.maxAttackCharges = 2;
+    horde.attackChargesRemaining = 4;
+    horde.maxAttackCharges = 4;
     horde.spawnGroupId = 'periodic-interception-charge';
     horde.hordeKind = 'periodic';
     state.units.push(horde);
@@ -339,20 +339,20 @@ describe('v1.5.1 Hunter and shared-charge rule coverage', () => {
     expect(moved.events.some((event) => event.type === 'interception'
       && event.payload.attackerId === horde.id
       && event.payload.defenderId === police.id)).toBe(true);
-    expect(moved.state.units.find((unit) => unit.id === horde.id)?.attackChargesRemaining).toBe(1);
+    expect(moved.state.units.find((unit) => unit.id === horde.id)?.attackChargesRemaining).toBe(3);
 
     const ended = engine.step({ type: 'EndTurn' });
 
     expect(ended.error?.message ?? null).toBeNull();
     expect(ended.events.filter((event) => event.type === 'attack'
       && event.payload.attackerId === horde.id
-      && !event.payload.counterattack)).toHaveLength(1);
+      && !event.payload.counterattack)).toHaveLength(3);
     const hordeAttacks = ended.state.events.filter((event) =>
       (event.type === 'interception' || event.type === 'attack')
       && event.payload.attackerId === horde.id
       && !event.payload.counterattack,
     );
-    expect(hordeAttacks).toHaveLength(2);
+    expect(hordeAttacks).toHaveLength(4);
   });
 
   it.each([

@@ -14,6 +14,7 @@ import {
   deriveRoadConnectionDirections,
   getFacilityAssetPath,
   getFacilityUnitOffset,
+  getObstacleAssetPath,
   getTerrainAssetPath,
   getUnitAssetPath,
   isBoardZombieUnitType,
@@ -44,6 +45,7 @@ describe('board asset registry', () => {
       'armyBase',
       'checkpoint',
     ]);
+    expect(Object.keys(BOARD_ASSET_REGISTRY.obstacles)).toEqual(['barbedWire']);
     expect(Object.keys(BOARD_ASSET_REGISTRY.units)).toEqual([
       'police',
       'nationalGuard',
@@ -60,6 +62,8 @@ describe('board asset registry', () => {
     expect(getTerrainAssetPath('water')).toBeNull();
     expect(mapTerrainAsset('water')).toEqual({ key: 'water', path: null, fallback: true });
     expect(getFacilityAssetPath('not-a-facility')).toBeNull();
+    expect(getObstacleAssetPath('not-an-obstacle')).toBeNull();
+    expect(getObstacleAssetPath('barbedWire')).toBe(BOARD_ASSET_REGISTRY.obstacles.barbedWire);
     expect(getUnitAssetPath('not-a-unit')).toBeNull();
     expect(getFacilityAssetPath('armyBase')).toBe(BOARD_ASSET_REGISTRY.facilities.armyBase);
     expect(getFacilityAssetPath('temporaryHousing')).toBe(BOARD_ASSET_REGISTRY.facilities.temporaryHousing);

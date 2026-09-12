@@ -101,7 +101,6 @@ export interface MetricFailureInfo {
 }
 
 export interface GameMetrics {
-  barbedWireBuilt: number;
   barbedWireVisibleDestroyed: number;
   barbedWireVisibleDamage: number;
   barbedWireAbsorbedHumanDamage: number;
@@ -139,6 +138,12 @@ export interface GameMetrics {
   unmanagedPassThrough: number;
   refugeesScreenedByPolicy: Record<CheckpointPolicy, number>;
   refugeesDeparted: number;
+  barbedWireBuilt: number;
+  barbedWireDestroyed: number;
+  barbedWireDamageTaken: number;
+  barbedWireAbsorbedDamage: number;
+  barbedWireEmptyAttackCharges: number;
+  barbedWireOccupiedAttackCharges: number;
   checkpointsBuilt: number;
   checkpointsRelocated: number;
   checkpointRetreats: number;
@@ -1486,7 +1491,6 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
 
   return {
     appVersion: input.appVersion ?? APP_VERSION,
-    barbedWireBuilt: input.actions.filter(a => a.type === 'BuildBarbedWire').length,
     barbedWireVisibleDestroyed: events.filter(e => e.type === 'barbed_wire_damaged' && e.payload.destroyed === true).length,
     barbedWireVisibleDamage: events.filter(e => e.type === 'barbed_wire_damaged').reduce((sum, e) => sum + Number(e.payload.damage ?? 0), 0),
     barbedWireAbsorbedHumanDamage: events.filter(e => e.type === 'barbed_wire_damaged' && e.payload.protectingHuman === true).reduce((sum, e) => sum + Number(e.payload.damage ?? 0), 0),
@@ -1524,6 +1528,12 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       .reduce((total, event) => total + eventPayloadNumber(event, 'people'), 0),
     refugeesScreenedByPolicy,
     refugeesDeparted,
+    barbedWireBuilt: statisticNumber(statistics, 'barbedWireBuilt') ?? eventCount('barbed_wire_built'),
+    barbedWireDestroyed: statisticNumber(statistics, 'barbedWireDestroyed') ?? events.filter(e => e.type === 'barbed_wire_damaged' && e.payload.destroyed === true).length,
+    barbedWireDamageTaken: statisticNumber(statistics, 'barbedWireDamageTaken') ?? events.filter(e => e.type === 'barbed_wire_damaged').reduce((n,e) => n + Number(e.payload.damage ?? 0), 0),
+    barbedWireAbsorbedDamage: statisticNumber(statistics, 'barbedWireAbsorbedDamage') ?? events.filter(e => e.type === 'barbed_wire_damaged' && e.payload.protectingHuman === true).reduce((n,e) => n + Number(e.payload.damage ?? 0), 0),
+    barbedWireEmptyAttackCharges: statisticNumber(statistics, 'barbedWireEmptyAttackCharges') ?? events.filter(e => e.type === 'barbed_wire_attack_charge' && e.payload.targetKind === 'empty').length,
+    barbedWireOccupiedAttackCharges: statisticNumber(statistics, 'barbedWireOccupiedAttackCharges') ?? events.filter(e => e.type === 'barbed_wire_attack_charge' && e.payload.targetKind === 'occupied').length,
     checkpointsBuilt,
     checkpointsRelocated,
     checkpointRetreats,
@@ -1878,6 +1888,12 @@ const SUMMARY_NUMERIC_KEYS: readonly (keyof GameMetrics)[] = [
   'totalRefugeeArrivals',
   'unmanagedPassThrough',
   'refugeesDeparted',
+  'barbedWireBuilt',
+  'barbedWireDestroyed',
+  'barbedWireDamageTaken',
+  'barbedWireAbsorbedDamage',
+  'barbedWireEmptyAttackCharges',
+  'barbedWireOccupiedAttackCharges',
   'checkpointsBuilt',
   'checkpointsRelocated',
   'checkpointRetreats',

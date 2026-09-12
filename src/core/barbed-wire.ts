@@ -8,8 +8,9 @@ import { createMapReference } from './map-reference';
 import { getSuppliedTileKeys } from './supply';
 
 export const BARBED_WIRE_RULES = {
-  maxHp: 10, civilianGoods: 5, militaryGoods: 5, humanEntryMP: 5,
+  maxHp: 20, civilianGoods: 5, militaryGoods: 5, humanEntryMP: 5,
   minimumRadialDistance: 3, repair: false, gasAbsorption: false,
+  statisticsScope: 'successful construction and publicly visible combat only; hidden damage and charges are excluded',
   reanimation: 'same-hex spawn exception; cannot re-enter after exit',
   routeEvaluation: 'terrain MP + attack count + future-charge turns * movement; stable coordinate ties',
 } as const;
@@ -62,6 +63,9 @@ export function damageWire(state: GameState, position: HexCoord, damage: number,
   const absorbed = Math.min(wire.hp, Math.max(0, Math.floor(damage)));
   wire.hp -= absorbed;
   if (getPlayerVisibleTileKeys(state).has(hexKey(position))) {
+    state.statistics.barbedWireDamageTaken += absorbed;
+    if (protectingHuman) state.statistics.barbedWireAbsorbedDamage += absorbed;
+    if (wire.hp === 0) state.statistics.barbedWireDestroyed += 1;
     state.events.push({ id: `event-${state.nextEventNumber++}`, turn: state.turn, phase: state.phase, type: 'barbed_wire_damaged', payload: { wireId: wire.id, q: position.q, r: position.r, damage: absorbed, protectingHuman, hp: wire.hp, destroyed: wire.hp === 0 } });
   }
   if (wire.hp === 0) {
@@ -87,4 +91,13 @@ export function wireCombatProjection(state: Readonly<GameState>, human: UnitStat
   const wallDamage = Math.min(wire?.hp ?? 0, attack);
   const humanDamage = Math.min(human.hp, terrainAdjustedDamage(state, human, Math.max(0, attack - wallDamage)).finalDamage);
   return { attack, wireId: wire?.id ?? null, wallDamage, remainingWallHp: Math.max(0, (wire?.hp ?? 0) - wallDamage), humanDamage, remainingHumanHp: human.hp - humanDamage };
+}
+
+/** Public combat statistics never reveal an attack outside Player Vision. */
+export function recordWireAttackCharge(state: GameState, attacker: UnitState, defender: UnitState): void {
+  if (attacker.attackChargesRemaining > 0 && defender.isPlayerUnit && wireAt(state, defender.position)
+    && getPlayerVisibleTileKeys(state).has(hexKey(defender.position))) {
+    state.statistics.barbedWireOccupiedAttackCharges += 1;
+    state.events.push({ id: `event-${state.nextEventNumber++}`, turn: state.turn, phase: state.phase, type: 'barbed_wire_attack_charge', payload: { wireId: wireAt(state, defender.position)!.id, targetKind: 'occupied', charges: 1 } });
+  }
 }

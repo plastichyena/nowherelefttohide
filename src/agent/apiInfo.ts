@@ -1,3 +1,4 @@
+import { publicQueryContract } from './query-contract';
 import { BARBED_WIRE_RULES } from '../core/barbed-wire';
 import type { GameConfig } from '../core/types';
 import { FIXED_MAP } from '../core/map';
@@ -85,8 +86,10 @@ export function createAgentApiInfo(
     guaranteed_resource_defeat: { severity: 'critical', category: 'resources' },
     new_state_loss: { severity: 'advisory', category: 'loss' },
     production_outage: { severity: 'warning', category: 'resource' },
+    resource_runway_risk: { severity: 'warning', category: 'resource' },
   };
   return cloneJson({
+    queryContract: publicQueryContract(),
     appVersion: APP_VERSION,
     gameRulesVersion: GAME_RULES_VERSION,
     saveFormatVersion: SAVE_FORMAT_VERSION,
@@ -98,6 +101,7 @@ export function createAgentApiInfo(
     methods: [...PUBLIC_METHODS],
     parameterQueries: { construction: 'query construction; filters facilityType, legalOnly, inSupply, reasonCode, q/r or qMin/qMax/rMin/rMax; paginated and revision-bound', transferPopulation: 'query population-transfers; filters fromFacilityId/toFacilityId; min/max inclusive, positive integers, expectedRevision', legalActionsExhaustive: false, revisionRequiredForSession: true },
     actionContracts: {
+      RelocateCheckpoint: { required: ['checkpointId', 'position'], example: { type: 'RelocateCheckpoint', checkpointId: 'checkpoint-1', position: { q: 25, r: 21 } }, conditions: ['known operational checkpoint', 'same branch', 'visible capital-side road route', 'query construction for current legal destinations'] },
       BuildBarbedWire: { required: ['position'], example: { type: 'BuildBarbedWire', position: { q: 21, r: 26 } }, conditions: ['query construction facilityType=barbedWire', 'visible supplied empty passable hex', 'visible adjacent and radial inspection area', 'no adjacent enemy', 'radial separation at least 3', 'Civilian Goods 5 + Military Goods 5; one action'] },
       Move: { required: ['unitId', 'destination'], example: { type: 'Move', unitId: 'police-1', destination: { q: 24, r: 25 } }, conditions: ['legal destination', 'move budget', 'supply/fuel projection'] },
       Attack: { required: ['attackerId', 'targetId'], example: { type: 'Attack', attackerId: 'police-1', targetId: 'zombie-1' }, conditions: ['visible enemy', 'range', 'charge', 'military goods'] },

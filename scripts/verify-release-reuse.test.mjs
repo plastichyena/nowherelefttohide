@@ -10,9 +10,9 @@ const sha = 'a'.repeat(40);
 function source() {
   const run = { id: 123, repository: { full_name: repository }, head_repository: { full_name: repository },
     path: '.github/workflows/v140-release-validation.yml', event: 'workflow_dispatch', status: 'completed', head_sha: sha };
-  const jobs = [{ name: 'Session v1.5.6 physical 512 MiB Package validation', conclusion: 'success' }];
+  const jobs = [{ name: 'Session v1.5.7 physical 512 MiB Package validation', conclusion: 'success' }];
   for (const agent of ['random', 'balanced']) for (let start = 1; start <= 91; start += 10) {
-    jobs.push({ name: `v1.5.6 ${agent} seeds ${start} + 9`, conclusion: 'success' });
+    jobs.push({ name: `v1.5.7 ${agent} seeds ${start} + 9`, conclusion: 'success' });
   }
   return { run, jobs };
 }

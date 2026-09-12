@@ -11,6 +11,13 @@ import failure from '../testing/fixtures/v156-random69-construction-failure.json
 it('rejects the actual Random 69 unseen-wall build without leaking wall existence or changing state', () => {
   const initial = createInitialState(failure.seed, createDefaultConfig());
   const state = { ...initial, ...structuredClone(failure.state) } as unknown as GameState;
+  // Recreate this regression under new rules; this is not Save migration.
+  state.gameVersion = initial.gameVersion;
+  state.config.version = initial.config.version;
+  state.config.units.hordeZombie.maxAttackCharges = 4;
+  state.statistics = { ...initial.statistics, ...state.statistics };
+  state.barbedWire.forEach(w => { w.maxHp = 20; });
+  state.units.filter(u => u.type === 'hordeZombie').forEach(u => { u.maxAttackCharges = 4; });
   const action = failure.action as GameAction & { position: { q: number; r: number } };
   expect(validateInvariants(state)).toEqual({ valid: true, errors: [] });
   expect(getPlayerVisibleTileKeys(state).has(hexKey(action.position))).toBe(false);

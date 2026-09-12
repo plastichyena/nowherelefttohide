@@ -38,7 +38,7 @@ import { findNearestOpenTiles, findReachablePaths, findShortestPath, pathMovemen
 import { SeededRng } from './rng';
 import { deriveUnitRecovery } from './recovery';
 import { facilityRecaptureConditions } from './facility-recovery';
-import { wireAt, wireBuildReason, wireCandidates, wireRoutePenalty } from './barbed-wire';
+import { BARBED_WIRE_RULES, recordWireAttackCharge, wireAt, wireBuildReason, wireCandidates, wireRoutePenalty } from './barbed-wire';
 import { createMovementCostResolver, effectiveMovementCost, terrainAdjustedDamage } from './terrain';
 import {
   canUnitSee,
@@ -194,6 +194,7 @@ function resolveCombat(
   if (!attackProjection.canAttack) return;
   const human = attacker.isPlayerUnit ? attacker : defender.isPlayerUnit ? defender : null;
   const noise = human ? emitCombatNoise(state, human, { ...human.position }) : null;
+  recordWireAttackCharge(state, attacker, defender);
   markAttacked(state, attacker, kind === 'interception');
   if (attacker.isPlayerUnit) attacker.currentMilitaryGoods = attackProjection.projectedMilitaryGoodsAfterAttack;
   emit(state, kind === 'interception' ? 'interception' : 'attack', {
@@ -215,6 +216,7 @@ function resolveCombat(
   const counterDistance = hexDistance(defender.position, attacker.position);
   const counterProjection = forecastUnitCombatAtDistance(state, defender, counterDistance);
   if (defender.canAttack && counterProjection.canAttack) {
+    recordWireAttackCharge(state, defender, attacker);
     markAttacked(state, defender);
     if (defender.isPlayerUnit) defender.currentMilitaryGoods = counterProjection.projectedMilitaryGoodsAfterAttack;
     emit(state, 'attack', {
@@ -4329,10 +4331,11 @@ export class GameEngine implements HeadlessGame {
       if (reason) actionError = error(action, reason, reason);
       else {
         const id = `barbed-wire-${candidate.nextBarbedWireNumber++}`;
-        candidate.barbedWire.push({ id, position: { ...action.position }, hp: 10, maxHp: 10, builtTurn: candidate.turn });
+        candidate.barbedWire.push({ id, position: { ...action.position }, hp: BARBED_WIRE_RULES.maxHp, maxHp: BARBED_WIRE_RULES.maxHp, builtTurn: candidate.turn });
         candidate.resources.civilianGoods -= 5;
         candidate.resources.militaryGoods -= 5;
         candidate.actionsTakenThisTurn++;
+        candidate.statistics.barbedWireBuilt += 1;
         emit(candidate, 'barbed_wire_built', { wireId: id, q: action.position.q, r: action.position.r });
       }
     }

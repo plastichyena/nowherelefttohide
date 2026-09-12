@@ -1,5 +1,6 @@
 import type { GameState, UnitState, HexCoord, HumanUnitType } from './types';
-import { hexDistance } from './hex';
+import { getPlayerVisibleTileKeys } from './visibility';
+import { hexDistance, hexKey } from './hex';
 import { SeededRng } from './rng';
 import { isHumanUnit, getUnitAt } from './state';
 import { canPlayerOccupyHex, getTile } from './map';
@@ -36,6 +37,10 @@ function applyMovement(
     if (occupant && occupant.id !== mover.id) break;
     if (!mover.isPlayerUnit) {
       while (wireAt(state, position) && mover.canAttack && mover.attackChargesRemaining > 0) {
+        if (getPlayerVisibleTileKeys(state).has(hexKey(position))) {
+          state.statistics.barbedWireEmptyAttackCharges += 1;
+          emit(state, 'barbed_wire_attack_charge', { wireId: wireAt(state, position)!.id, targetKind: 'empty', charges: 1 });
+        }
         mover.attackChargesRemaining--;
         mover.canAttack = mover.attackChargesRemaining > 0;
         damageWire(state, position, mover.attack);

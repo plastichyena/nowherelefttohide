@@ -11,6 +11,9 @@ describe('v1.5.5 deterministic full initial-state fixture', () => {
       expect(state.barbedWire).toEqual([]);
       expect(state.nextBarbedWireNumber).toBe(1);
       const { barbedWire, nextBarbedWireNumber, ...previousShape } = state;
+      // Normalize only approved v1.5.7 additions; retain deployment and RNG regression.
+      previousShape.config.units.hordeZombie.maxAttackCharges = 2;
+      for (const key of ['barbedWireBuilt', 'barbedWireDestroyed', 'barbedWireDamageTaken', 'barbedWireAbsorbedDamage', 'barbedWireEmptyAttackCharges', 'barbedWireOccupiedAttackCharges']) delete (previousShape.statistics as unknown as Record<string, unknown>)[key];
       previousShape.gameVersion = '7.0.0';
       previousShape.config.version = '7.0.0';
       expect(createHash('sha256').update(JSON.stringify(previousShape)).digest('hex')).toBe(entry.sha256);

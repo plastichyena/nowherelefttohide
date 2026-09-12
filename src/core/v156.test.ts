@@ -19,7 +19,7 @@ describe('v1.5.6 Barbed Wire', () => {
   it.each([5,10,15])('absorbs damage %i before human terrain defense', damage => {
     const s=state();const human=s.units.find(u=>u.isPlayerUnit)!;
     human.position={q:25,r:25};human.hp=human.maxHp;
-    s.barbedWire=[{id:'shield',position:{...human.position},hp:10,maxHp:10,builtTurn:1}];
+    s.barbedWire=[{id:'shield',position:{...human.position},hp:10,maxHp:20,builtTurn:1}];
     const {dealDamage}=createUnitLifecycle({applyGeneratedZombieOccupancy:()=>{},processSpawnOccupancyQueue:()=>{},applyGasExplosionSiteInfection:()=>0,resolveGasExplosionSiteFalls:()=>{}});
     dealDamage(s,human,damage,'enemy','attack',SeededRng.fromState(s.rngState));
     expect(human.hp).toBe(human.maxHp-Math.ceil(Math.max(0,damage-10)*s.config.terrain.damageMultiplier.urban));
@@ -27,7 +27,7 @@ describe('v1.5.6 Barbed Wire', () => {
   });
   it('Gas damage bypasses intact wire', () => {
     const s=state();const human=s.units.find(u=>u.isPlayerUnit)!;
-    s.barbedWire=[{id:'shield',position:{...human.position},hp:10,maxHp:10,builtTurn:1}];
+    s.barbedWire=[{id:'shield',position:{...human.position},hp:10,maxHp:20,builtTurn:1}];
     const {dealDamage}=createUnitLifecycle({applyGeneratedZombieOccupancy:()=>{},processSpawnOccupancyQueue:()=>{},applyGasExplosionSiteInfection:()=>0,resolveGasExplosionSiteFalls:()=>{}});
     const hp=human.hp;dealDamage(s,human,5,'gas','gas_explosion',SeededRng.fromState(s.rngState));
     expect(human.hp).toBeLessThan(hp);expect(s.barbedWire[0].hp).toBe(10);
@@ -65,14 +65,14 @@ describe('v1.5.6 Barbed Wire', () => {
     expect(result.state.resources.militaryGoods).toBe(before.resources.militaryGoods-5);
     expect(result.state.actionsTakenThisTurn).toBe(before.actionsTakenThisTurn+1);
     expect(result.state.rngState).toEqual(before.rngState);
-    expect(result.state.barbedWire[0]).toMatchObject({hp:10,maxHp:10});
+    expect(result.state.barbedWire[0]).toMatchObject({hp:20,maxHp:20});
     expect(engine.step(action).error).not.toBeNull();
     expect(engine.getState()).toEqual(result.state);
   });
   it('uses total human entry MP5 and restores terrain immediately on destruction', () => {
     const s=state(); const p=wireCandidates(s).find(c=>c.legal)!.position;
     const original=effectiveMovementCost(s,p);
-    s.barbedWire.push({id:'wall',position:p,hp:10,maxHp:10,builtTurn:1});
+    s.barbedWire.push({id:'wall',position:p,hp:10,maxHp:20,builtTurn:1});
     expect(effectiveMovementCost(s,p)).toBe(5);
     expect(damageWire(s,p,5)).toBe(5); expect(s.barbedWire[0].hp).toBe(5);
     expect(damageWire(s,p,15)).toBe(5); expect(s.barbedWire).toEqual([]);
@@ -82,7 +82,7 @@ describe('v1.5.6 Barbed Wire', () => {
     const s=state(); const start={q:25,r:24}, end={q:26,r:24};
     s.units=[]; const z=createUnit(s,'z','hordeZombie',start);s.units=[z];
     z.attack=5;z.attackChargesRemaining=2;z.canAttack=true;
-    s.barbedWire=[{id:'wall',position:end,hp:10,maxHp:10,builtTurn:1}];
+    s.barbedWire=[{id:'wall',position:end,hp:10,maxHp:20,builtTurn:1}];
     const movement=createMovement({interceptorsAt:()=>[],interceptArmyBase:()=>false,resolveCombat:()=>{},tryCapture:()=>{}});
     movement.applyMovement(s,z,[start,end],5);
     expect(s.barbedWire).toEqual([]);expect(z.attackChargesRemaining).toBe(0);expect(z.position).toEqual(end);
@@ -90,13 +90,13 @@ describe('v1.5.6 Barbed Wire', () => {
   });
   it('never exposes a hidden wall or its damage through public state', () => {
     const s=state();const p={q:3,r:3};
-    s.barbedWire=[{id:'hidden',position:p,hp:10,maxHp:10,builtTurn:1}];
+    s.barbedWire=[{id:'hidden',position:p,hp:10,maxHp:20,builtTurn:1}];
     const before=createAgentObservation(s);damageWire(s,p,10);
     expect(createAgentObservation(s)).toEqual(before);
     expect(wireBuildReason(s,p)).toBe('visibility_required');
   });
   it('rejects HP0 persistence', () => {
-    const s=state();s.barbedWire=[{id:'wall',position:{q:25,r:24},hp:0,maxHp:10,builtTurn:1}];
+    const s=state();s.barbedWire=[{id:'wall',position:{q:25,r:24},hp:0,maxHp:20,builtTurn:1}];
     expect(validateInvariants(s).valid).toBe(false);
   });
 });

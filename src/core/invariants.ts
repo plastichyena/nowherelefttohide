@@ -3,7 +3,7 @@ import { hexKey, hexWithinBounds } from './hex';
 import { initialArmyBaseMatchesSeed, isHordeSpawnReserve, isRoad, validateFixedMap } from './map';
 import { civilianWorkerCount, effectiveAttackForProficiency, isCityFacility, populationLedgerTotal, resourceConsumerPopulation } from './state';
 import type { GameState } from './types';
-import { radialConflict } from './barbed-wire';
+import { BARBED_WIRE_RULES, radialConflict } from './barbed-wire';
 import { getCapitalPosition } from './supply';
 import { getTile } from './map-reference';
 
@@ -54,7 +54,7 @@ export function validateInvariants(state: GameState): InvariantResult {
   if (!Number.isSafeInteger(state.nextBarbedWireNumber) || state.nextBarbedWireNumber < 1) errors.push('Invalid next Barbed Wire number');
   const wirePositions = new Set<string>();
   for (const wire of state.barbedWire) {
-    if (!wire || typeof wire.id !== 'string' || !wire.position || !hexWithinBounds(wire.position, state.map.width, state.map.height) || !Number.isInteger(wire.hp) || wire.hp <= 0 || wire.hp > 10 || wire.maxHp !== 10 || !Number.isInteger(wire.builtTurn) || wire.builtTurn < 1 || wire.builtTurn > state.turn) {
+    if (!wire || typeof wire.id !== 'string' || !wire.position || !hexWithinBounds(wire.position, state.map.width, state.map.height) || !Number.isInteger(wire.hp) || wire.hp <= 0 || wire.hp > BARBED_WIRE_RULES.maxHp || wire.maxHp !== BARBED_WIRE_RULES.maxHp || !Number.isInteger(wire.builtTurn) || wire.builtTurn < 1 || wire.builtTurn > state.turn) {
       errors.push('Invalid Barbed Wire state');
       continue;
     }
@@ -263,7 +263,13 @@ export function validateInvariants(state: GameState): InvariantResult {
     'unmanagedPassThrough',
     'refugeesAccepted',
     'refugeesDeparted',
-    'checkpointsBuilt',
+    'barbedWireBuilt',
+  'barbedWireDestroyed',
+  'barbedWireDamageTaken',
+  'barbedWireAbsorbedDamage',
+  'barbedWireEmptyAttackCharges',
+  'barbedWireOccupiedAttackCharges',
+  'checkpointsBuilt',
     'checkpointsRelocated',
     'checkpointRetreats',
     'checkpointsRuined',

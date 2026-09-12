@@ -89,7 +89,8 @@ describe('board runtime PNG files', () => {
       'facilities/facility_army_base.png',
       'facilities/facility_temporary_housing.png',
     ]));
-    for (const path of paths.filter((entry) => entry.startsWith('units/') || entry.startsWith('facilities/') || entry.startsWith('overlays/'))) {
+    expect(paths.filter((path) => path.startsWith('obstacles/'))).toEqual(['obstacles/obstacle_barbed_wire.png']);
+    for (const path of paths.filter((entry) => entry.startsWith('units/') || entry.startsWith('facilities/') || entry.startsWith('obstacles/') || entry.startsWith('overlays/'))) {
       const rgba = decodeRgba(readPng(path));
       const alpha = Array.from({ length: 256 * 256 }, (_, index) => rgba[index * 4 + 3]!);
       expect(Math.min(...alpha), path).toBeLessThan(255);

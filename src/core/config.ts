@@ -15,7 +15,7 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '8.0.0';
+export const CONFIG_VERSION = '9.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v4';
 
 const facilityIds: FacilityId[] = [
@@ -102,7 +102,7 @@ const defaultUnitConfig: UnitConfigMap = {
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   hordeZombie: {
-    maxAttackCharges: 2,
+    maxAttackCharges: 4,
     hp: 40, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,

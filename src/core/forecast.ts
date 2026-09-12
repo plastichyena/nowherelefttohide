@@ -1,4 +1,5 @@
 import { forecastEndTurn, forecastFacilityProduction, forecastNextTurnPenalties, forecastProductionCapacity } from './economy-query';
+import { deriveResourceRunwayForecast } from './resource-runway';
 import type {
   CriticalResourceDependencyForecast,
   GameState,
@@ -7,12 +8,12 @@ import type {
   StrategicForecast,
   StrategicResourceType,
 } from './types';
+import type { FacilityProductionProjection } from './economy-types';
 
 function contributorsFor(
-  state: Readonly<GameState>,
+  projections: readonly FacilityProductionProjection[],
   resource: StrategicResourceType,
 ): ResourceContributorForecast[] {
-  const projections = forecastFacilityProduction(state);
   const raw = projections
     .map((projection) => ({
       facilityId: projection.facilityId,
@@ -36,6 +37,13 @@ export function getQueuePressureClass(queuePeople: number, capacity: number): Qu
 /** Pure strategic projection shared by Human UI, Observation, and agents. */
 export function deriveStrategicForecast(state: Readonly<GameState>): StrategicForecast {
   const economy = forecastEndTurn(state);
+  const facilityProduction = forecastFacilityProduction(state);
+  const militaryGoodsArmyBaseRefillDemand = facilityProduction.reduce((total, projection) => {
+    const armyBase = projection.armyBaseMilitaryGoods;
+    return total + (armyBase?.refillEligible
+      ? Math.max(0, armyBase.capacity - armyBase.current)
+      : 0);
+  }, 0);
   const supplyAndDemand: Record<StrategicResourceType, { supply: number; demand: number; short: boolean }> = {
     food: {
       supply: economy.food.startingStock + economy.food.projectedProduction,
@@ -65,8 +73,11 @@ export function deriveStrategicForecast(state: Readonly<GameState>): StrategicFo
   };
   const resources = Object.fromEntries(
     (['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricity'] as const).map((resource) => {
-      const contributors = contributorsFor(state, resource);
+      const contributors = contributorsFor(facilityProduction, resource);
       const largest = contributors[0] ?? null;
+      const largestFacility = largest
+        ? state.facilities.find((facility) => facility.id === largest.facilityId) ?? null
+        : null;
       const current = supplyAndDemand[resource];
       const projectedSupplyWithoutLargestContributor = Math.max(0, current.supply - (largest?.amount ?? 0));
       const shortageWithoutLargestContributor = Math.max(0, current.demand - projectedSupplyWithoutLargestContributor);
@@ -80,6 +91,19 @@ export function deriveStrategicForecast(state: Readonly<GameState>): StrategicFo
         shortageWithoutLargestContributor,
         singlePointOfFailure: !current.short && largest !== null && shortageWithoutLargestContributor > 0,
         currentlyShort: current.short,
+        runway: deriveResourceRunwayForecast(
+          resource,
+          economy,
+          largest?.amount ?? 0,
+          {
+            electricityContributorKind: largestFacility?.type === 'windPowerPlant'
+              ? 'wind'
+              : largestFacility?.type === 'powerPlant'
+                ? 'fuel_power'
+                : null,
+            militaryGoodsArmyBaseRefillDemand,
+          },
+        ),
       };
       return [resource, value];
     }),

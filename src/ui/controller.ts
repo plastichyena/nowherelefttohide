@@ -1521,6 +1521,7 @@ const LEGEND_TERRAINS = ['plain', 'forest', 'mountain'] as const;
 const LEGEND_OVERLAYS = ['road', 'urban'] as const;
 const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const;
 const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'checkpoint'] as const;
+const LEGEND_OBSTACLES = ['barbedWire'] as const;
 
 function legendAssetFromRegistry(
   registry: BoardLegendRegistry | undefined,
@@ -1535,7 +1536,9 @@ function legendAssetFromRegistry(
       ? 'facilities'
       : category === 'unit'
         ? 'units'
-        : category;
+        : category === 'obstacle'
+          ? 'obstacles'
+          : category;
   const categoryValue = root[categoryName];
   const categoryEntries = categoryValue && typeof categoryValue === 'object'
     ? categoryValue as Record<string, unknown>
@@ -1721,6 +1724,7 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
     riotZombie: ['再活性化したriotpolice由来の通常ゾンビ。生前の防具がそのまま高いHPとして機能しています。', 'A normal Zombie reanimated from a Riot Police unit. The armor it wore in life gives it high HP.'],
     hunterZombie: ['筋骨隆々で長い爪を持つ高速のNormal AI系Zombie。性能値は表示中のConfigを使用し、専用TargetやCapital常時知識は持ちません。', 'A fast Normal AI Zombie with a powerful build and long claws. Its performance comes from the current Config; it has no special target or permanent Capital knowledge.'],
     gasZombie: ['死亡時に隣接6 HexへTerrain適用damageと拠点感染を与え、Gas同士でFIFO連鎖するNormal AI系Zombieです。', 'A Normal AI Zombie whose death damages units with Terrain defense and infects sites in the six adjacent Hexes; Gas deaths chain in FIFO order.'],
+    barbedWire: ['有刺鉄線。HP20で、同居するHumanとZombieの識別を保ちます。通常Zoomでは実Asset、低ZoomとAsset失敗時は同じ意味のFence fallbackを表示します。', 'Barbed Wire with HP20. Co-located Humans and Zombies remain identifiable. Normal Zoom uses the runtime asset; low Zoom and load failures use a semantic fence fallback.'],
     periodic: ['Horde ZombieとNormal Zombieが混在できる周期集団。MarkerはUnit Typeではなく所属を示します。', 'A periodic group that may mix Horde and Normal Zombies. Its marker shows membership, not Unit Type.'],
     final: ['Final Spawn Group所属を示すMarker。Normal Zombieも含め、Group全滅がVictory条件の一つです。', 'Marks Final Spawn Group membership. Every member, including Normal Zombies, must be defeated for Victory.'],
     capital: ['州都。人口の基点、編成、初期Supply、Capital Ground Visionを担います。', 'The capital anchors population, recruitment, initial Supply, and Capital Ground Vision.'],
@@ -1756,6 +1760,7 @@ function legendSections(
   const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'riotPolice' ? 'RP' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : key === 'soldierZombie' ? 'SZ' : key === 'riotZombie' ? 'RZ' : key === 'gasZombie' ? 'GZ' : 'HZ'));
   const horde = (['periodic', 'final'] as const).map((key) => legendAssetEntry(registry, 'horde', key, key === 'periodic' ? t('periodicHorde') : t('finalHorde'), legendDescription(key, locale, t), key === 'periodic' ? '↝' : '✹'));
   const facilities = LEGEND_FACILITIES.map((key) => legendAssetEntry(registry, 'facility', key, key === 'checkpoint' ? t('checkpoint') : facilityLabel(key, locale), legendDescription(key, locale, t), key === 'capital' ? '★' : key === 'city' ? '⌂' : key === 'checkpoint' ? '⊞' : '▣'));
+  const obstacles = LEGEND_OBSTACLES.map((key) => legendAssetEntry(registry, 'obstacle', key, t(key), legendDescription(key, locale, t), 'W'));
   const facilityStates = ['unowned', 'owned', 'stopped', 'infected', 'ruined'].map((key) => legendAssetEntry(registry, 'facilityState', key, t(key), legendDescription(key, locale, t), key === 'owned' ? '✓' : key === 'infected' ? '☣' : key === 'ruined' ? '×' : '•'));
   facilityStates.push(
     legendCompositeEntry(registry, 'securedStopped', locale === 'ja' ? '確保済み + 停止中' : 'Secured + stopped', locale === 'ja' ? '確保済みのBaseに停止中Overlayを重ねます。' : 'Composes the secured Base with the stopped overlay.', [['facilityState', 'owned'], ['facilityState', 'stopped']], '✓·'),
@@ -1771,6 +1776,7 @@ function legendSections(
     { key: 'units', title: t('legendUnits'), entries: units },
     { key: 'horde', title: t('legendHorde'), entries: horde },
     { key: 'facilities', title: t('legendFacilities'), entries: facilities },
+    { key: 'obstacles', title: t('legendObstacles'), entries: obstacles },
     { key: 'facilityStates', title: t('legendFacilityStates'), entries: facilityStates },
     { key: 'checkpointStates', title: t('legendCheckpointStates'), entries: checkpointStates },
     { key: 'zoom', title: t('legendZoom'), entries: [
@@ -5187,7 +5193,7 @@ export class GameUiController {
 
   private showHelp(): void {
     const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipRiotPolice', 'tipZombieEngagement', 'tipGasZombie', 'tipHunterZombie', 'tipArmyBase', 'tipArmyBaseRecruitment', 'tipArmyBaseInterception', 'tipArmyBaseRecovery', 'tipProficiency', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipWaveRoster', 'tipHousing', 'tipNextTurnPenaltyForecast', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipDecommission', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipCrisis', 'tipSave']
+    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipRiotPolice', 'tipZombieEngagement', 'tipGasZombie', 'tipHunterZombie', 'tipArmyBase', 'tipArmyBaseRecruitment', 'tipArmyBaseInterception', 'tipArmyBaseRecovery', 'tipProficiency', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipWaveRoster', 'tipHousing', 'tipNextTurnPenaltyForecast', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipBarbedWire', 'tipDecommission', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipCrisis', 'tipSave']
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
@@ -5249,7 +5255,7 @@ export class GameUiController {
     const terrainEntries = Object.entries(stats.terrainEntriesByType)
       .map(([terrain, count]) => `${escapeHtml(terrainLabel(terrain as AgentMapTileObservation['terrain'], this.locale))} ${count}`)
       .join(' · ');
-    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="statistics"><section class="modal-card floating-card" aria-labelledby="statistics-heading"><p class="eyebrow">${escapeHtml(t('gameOver'))}</p><h2 id="statistics-heading">${escapeHtml(result.outcome === 'won' ? t('victory') : t('defeat'))}</h2><div class="stats-grid"><span>${escapeHtml(t('survivedTurns'))}<b>${result.turn}</b></span><span>${escapeHtml(t('finalPopulation'))}<b>${finalPopulation}</b></span><span>${escapeHtml(t('maxPopulation'))}<b>${stats.maxPopulation}</b></span><span>${escapeHtml(t('finalFacilities'))}<b>${finalFacilities}</b></span><span>${escapeHtml(t('maxFacilities'))}<b>${stats.maxSecuredFacilities}</b></span><span>${escapeHtml(t('civilianLosses'))}<b>${stats.civilianLosses}</b></span><span>${escapeHtml(t('unitLosses'))}<b>${stats.unitLosses}</b></span><span>${escapeHtml(t('infectionLosses'))}<b>${stats.infectionLosses}</b></span><span>${escapeHtml(t('shortageLosses'))}<b>${stats.resourceShortageLosses}</b></span><span>${escapeHtml(t('hordeInterceptions'))}<b>${stats.hordeInterceptions}</b></span><span>${escapeHtml(t('finalHordeSpawned'))}<b>${stats.finalHordeSpawned}</b></span><span>${escapeHtml(t('finalHordeKilled'))}<b>${stats.finalHordeKilled}</b></span><span>${escapeHtml(t('normalZombiesKilled'))}<b>${stats.normalZombiesKilled}</b></span><span>${escapeHtml(t('hordeZombiesKilled'))}<b>${stats.hordeZombiesKilled}</b></span><span>${escapeHtml(t('victoryTurn'))}<b>${stats.victoryTurn ?? '—'}</b></span><span>${escapeHtml(t('defeatReason'))}<b>${escapeHtml(gameOverReasonLabel(result.reason, this.locale))}</b></span></div><section class="victory-progress stats-victory"><h3>${escapeHtml(t('victoryProgress'))}</h3><div>${progressHtml || `<span class="muted">${escapeHtml(t('unavailable'))}</span>`}</div></section><p class="muted stats-terrain-summary">${escapeHtml(t('terrain'))}: ${terrainEntries}</p><div class="modal-actions"><button class="primary-button" data-action="title">${escapeHtml(t('reset'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="statistics"><section class="modal-card floating-card" aria-labelledby="statistics-heading"><p class="eyebrow">${escapeHtml(t('gameOver'))}</p><h2 id="statistics-heading">${escapeHtml(result.outcome === 'won' ? t('victory') : t('defeat'))}</h2><div class="stats-grid"><span>${escapeHtml(t('survivedTurns'))}<b>${result.turn}</b></span><span>${escapeHtml(t('finalPopulation'))}<b>${finalPopulation}</b></span><span>${escapeHtml(t('maxPopulation'))}<b>${stats.maxPopulation}</b></span><span>${escapeHtml(t('finalFacilities'))}<b>${finalFacilities}</b></span><span>${escapeHtml(t('maxFacilities'))}<b>${stats.maxSecuredFacilities}</b></span><span>${escapeHtml(t('civilianLosses'))}<b>${stats.civilianLosses}</b></span><span>${escapeHtml(t('unitLosses'))}<b>${stats.unitLosses}</b></span><span>${escapeHtml(t('infectionLosses'))}<b>${stats.infectionLosses}</b></span><span>${escapeHtml(t('shortageLosses'))}<b>${stats.resourceShortageLosses}</b></span><span>${escapeHtml(t('hordeInterceptions'))}<b>${stats.hordeInterceptions}</b></span><span>${escapeHtml(t('finalHordeSpawned'))}<b>${stats.finalHordeSpawned}</b></span><span>${escapeHtml(t('finalHordeKilled'))}<b>${stats.finalHordeKilled}</b></span><span>${escapeHtml(t('normalZombiesKilled'))}<b>${stats.normalZombiesKilled}</b></span><span>${escapeHtml(t('hordeZombiesKilled'))}<b>${stats.hordeZombiesKilled}</b></span><span>${escapeHtml(t('barbedWireBuilt'))}<b>${stats.barbedWireBuilt}</b></span><span>${escapeHtml(t('barbedWireDestroyed'))}<b>${stats.barbedWireDestroyed}</b></span><span>${escapeHtml(t('barbedWireDamageTaken'))}<b>${stats.barbedWireDamageTaken}</b></span><span>${escapeHtml(t('barbedWireAbsorbedDamage'))}<b>${stats.barbedWireAbsorbedDamage}</b></span><span>${escapeHtml(t('barbedWireEmptyAttackCharges'))}<b>${stats.barbedWireEmptyAttackCharges}</b></span><span>${escapeHtml(t('barbedWireOccupiedAttackCharges'))}<b>${stats.barbedWireOccupiedAttackCharges}</b></span><span>${escapeHtml(t('victoryTurn'))}<b>${stats.victoryTurn ?? '—'}</b></span><span>${escapeHtml(t('defeatReason'))}<b>${escapeHtml(gameOverReasonLabel(result.reason, this.locale))}</b></span></div><p class="muted stats-barbed-wire-scope">${escapeHtml(t('barbedWireStatisticsScope'))}</p><section class="victory-progress stats-victory"><h3>${escapeHtml(t('victoryProgress'))}</h3><div>${progressHtml || `<span class="muted">${escapeHtml(t('unavailable'))}</span>`}</div></section><p class="muted stats-terrain-summary">${escapeHtml(t('terrain'))}: ${terrainEntries}</p><div class="modal-actions"><button class="primary-button" data-action="title">${escapeHtml(t('reset'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
   }
 
   private renderBranchFlow(): string {
@@ -5433,7 +5439,7 @@ export class GameUiController {
     const reasonCode = candidates.find((candidate) => candidate && !candidate.legal)?.reasonCode;
     const selectedReason = this.constructiblePlacementMessage ?? (reasonCode ? localizeActionError(reasonCode, this.locale) : null);
     const wire = publicTile?.visibleToPlayer ? this.state?.barbedWire.find(w => samePosition(w.position, position)) : undefined;
-    title.textContent = wire ? `${this.locale === 'ja' ? '有刺鉄線' : 'Barbed Wire'} · HP ${wire.hp}/${wire.maxHp}` : t('hex');
+    title.textContent = wire ? `${t('barbedWire')} · HP ${wire.hp}/${wire.maxHp}` : t('hex');
     summary.textContent = `${t('location')} ${position.q},${position.r} · ${publicTile?.road ? t('roadOverlay') : ''}${publicTile?.urban ? ` · ${t('urbanOverlay')}` : ''}`;
     const buildBody = this.navMode === 'domestic'
       ? `<section class="constructible-placement constructible-local" data-constructible-local="true"><h3>${escapeHtml(t('buildFacility'))}</h3><p class="muted">${escapeHtml(t('localBuildOnly'))}</p>${buttons || `<p class="warning-text constructible-inline-message" data-constructible-inline-message role="status">${escapeHtml(selectedReason ?? t('noConstructibleHere'))}</p>`}</section>`
@@ -5444,10 +5450,12 @@ export class GameUiController {
   private renderWirePanel(position: HexCoord, publicTile?: AgentMapTileObservation): string {
     const wireCandidate = this.query()?.getBarbedWireCandidates?.().find(c => samePosition(c.position, position));
     const wire = this.state?.barbedWire.find(w => samePosition(w.position, position) && publicTile?.visibleToPlayer);
-    const wireName = this.locale === 'ja' ? '有刺鉄線' : 'Barbed Wire';
-    const wireHelp = this.locale === 'ja' ? 'HP10・民需品5＋軍需品5。Human進入MP5、Zombieは攻撃して突破。通常戦闘を肩代わりし超過分は貫通。Gas対象外・修理不可・索敵なし。同じ州都距離で横につなげられます。州都へ向かう前後の壁は間に2Hex必要です。' : 'HP10; Civilian Goods 5 + Military Goods 5. Human entry MP5. Zombies attack to breach. Absorbs normal combat; excess penetrates. No Gas protection, repair or vision. Side-by-side at equal capital distance is allowed; radial layers need two intervening hexes.';
-    const wireControl = this.navMode === 'domestic' ? `<button class="secondary-button" data-action="build-barbed-wire" data-q="${position.q}" data-r="${position.r}" ${wireCandidate?.legal ? '' : 'disabled'}>${wireName} · 5/5</button><p>${escapeHtml(wireBuildReasonLabel(wireCandidate?.reason ?? (publicTile?.visibleToPlayer ? null : 'visibility_required'), this.locale))}</p>` : '';
-    return `<section data-wire-panel><h3>${wireName}${wire ? ` HP ${wire.hp}/${wire.maxHp}` : ''}</h3>${wireControl}<details><summary>${this.locale === 'ja' ? '性能・配置例（C＝州都）' : 'Rules and spacing (C = capital)'}</summary><p>${wireHelp}</p><img style="width:100%" alt="Barbed Wire spacing" src="${new URL('../testing/fixtures/v156-spacing.svg', import.meta.url).href}" /></details></section>`;
+    const t = this.translator();
+    const wireName = t('barbedWire');
+    const wireControl = this.navMode === 'domestic' ? `<button class="secondary-button" data-action="build-barbed-wire" data-q="${position.q}" data-r="${position.r}" ${wireCandidate?.legal ? '' : 'disabled'}>${escapeHtml(wireName)} · 5/5</button><p>${escapeHtml(wireBuildReasonLabel(wireCandidate?.reason ?? (publicTile?.visibleToPlayer ? null : 'visibility_required'), this.locale))}</p>` : '';
+    const runtimeAsset = escapeHtml(resolveBoardAssetUrl(BOARD_ASSET_REGISTRY.obstacles.barbedWire));
+    const spacingAsset = escapeHtml(new URL('../testing/fixtures/v156-spacing.svg', import.meta.url).href);
+    return `<section data-wire-panel><h3>${escapeHtml(wireName)}${wire ? ` HP ${wire.hp}/${wire.maxHp}` : ''}</h3><img class="wire-panel-icon" src="${runtimeAsset}" alt="${escapeHtml(wireName)}" loading="lazy" />${wireControl}<details><summary>${escapeHtml(t('barbedWireRule'))}</summary><p>${escapeHtml(t('barbedWireRule'))}</p><img style="width:100%" alt="${escapeHtml(wireName)} spacing" src="${spacingAsset}" /></details></section>`;
   }
 
   /** Same-Hex tabs expose alternate public targets without changing Core. */
@@ -5469,7 +5477,7 @@ export class GameUiController {
     } else if (!targets.some((target) => target.kind === 'hex')) {
       // Keep the full public terrain view reachable from every occupied
       // target. Target tabs remain ordered Unit → Facility/Checkpoint → Hex.
-      targets.push({ kind: 'hex', label: this.state.barbedWire.some(w => samePosition(w.position, position) && this.queryVisibleTileKeys().has(hexKey(position))) ? (this.locale === 'ja' ? '有刺鉄線 / Hex' : 'Barbed Wire / Hex') : this.translator()('hex') });
+      targets.push({ kind: 'hex', label: this.state.barbedWire.some(w => samePosition(w.position, position) && this.queryVisibleTileKeys().has(hexKey(position))) ? `${this.translator()('barbedWire')} / ${this.translator()('hex')}` : this.translator()('hex') });
     }
     if (targets.length < 2) return '';
     return `<nav class="same-hex-tabs" data-same-hex-tabs="true" role="tablist" aria-label="${escapeHtml(this.translator()('sameHexActions'))}">${targets.map((target) => {
@@ -5524,14 +5532,14 @@ export class GameUiController {
         : '';
       title.textContent = `${unitLabel(unit.type, this.locale)} · ${unit.id}`;
       const protectingWire = this.state.barbedWire.find(w => samePosition(w.position, unit.position));
-      if (protectingWire) title.textContent += ` · ${this.locale === 'ja' ? '壁' : 'Wire'} HP ${protectingWire.hp}/${protectingWire.maxHp}`;
+      if (protectingWire) title.textContent += ` · ${t('barbedWire')} HP ${protectingWire.hp}/${protectingWire.maxHp}`;
       summary.textContent = `HP ${unit.hp}/${unit.maxHp}${proficiencySummary} · ${t('unitFuel')} ${publicUnit?.currentFuel ?? unit.currentFuel}/${publicUnit?.maxFuel ?? unit.maxFuel} · ${t('carriedMilitaryGoods')} ${publicUnit?.currentMilitaryGoods ?? unit.currentMilitaryGoods}/${publicUnit?.maxMilitaryGoods ?? unit.maxMilitaryGoods} · ${t('move')} ${unit.movement} · ${t('attack')} ${publicUnit?.attack ?? unit.attack} · ${t('effectiveRange')} ${publicUnit?.effectiveRange ?? unit.range} · ${t('vision')} ${publicUnit?.vision ?? unit.vision}`;
       const risk = this.pendingMove?.interceptionRisk;
       const riskText = typeof risk === 'number' ? risk <= 0.2 ? t('low') : risk <= 0.5 ? t('medium') : t('high') : String(risk ?? t('none'));
       const canWait = actions.some((action) => action.type === 'Wait');
       const supplied = isHexSupplied(this.state, unit.position);
       const supplyReason = supplied ? '' : localizeActionError('recovery_out_of_supply', this.locale);
-      const incoming = publicUnit?.conditionalIncomingCombat?.map(p => `<li>${escapeHtml(p.enemyId)}: ${this.locale === 'ja' ? '攻撃された場合' : 'if attacked'} D${p.attack} → ${this.locale === 'ja' ? '壁' : 'Wire'} -${p.wallDamage} / HP${p.remainingWallHp}; Human -${p.humanDamage} / HP${p.remainingHumanHp}</li>`).join('');
+      const incoming = publicUnit?.conditionalIncomingCombat?.map(p => `<li>${escapeHtml(p.enemyId)}: ${this.locale === 'ja' ? '攻撃された場合' : 'if attacked'} D${p.attack} → ${t('barbedWire')} -${p.wallDamage} / HP${p.remainingWallHp}; Human -${p.humanDamage} / HP${p.remainingHumanHp}</li>`).join('');
       body.innerHTML = this.renderSameHexTabs(unit.position, selected) + (incoming ? `<details><summary>${this.locale === 'ja' ? '条件付き被攻撃予測（移動予測を含まない）' : 'Conditional attacks (no movement prediction)'}</summary><ul>${incoming}</ul></details>` : '') + this.renderUnitSheet(unit, publicUnit, publicTile, actions, riskText, supplied, supplyReason);
       return;
     }
@@ -5683,9 +5691,11 @@ export class GameUiController {
     const publicAttack = publicZombie?.attack ?? zombie.attack;
     const publicMovement = publicZombie?.movement ?? zombie.movement;
     const publicRange = publicZombie?.effectiveRange ?? publicZombie?.range ?? zombie.range;
+    const publicAttackCharges = publicZombie?.attackChargesRemaining ?? zombie.attackChargesRemaining;
+    const publicMaxAttackCharges = publicZombie?.maxAttackCharges ?? zombie.maxAttackCharges;
     const badge = waveBadge ? `<span class="status-chip zombie-wave-badge">${escapeHtml(waveBadge)}</span>` : '';
     const finalBadge = zombie.hordeKind === 'final' ? `<p class="warning-text">${escapeHtml(t('finalWaveMembership'))}</p>` : '';
-    return `<section class="zombie-detail-panel" data-zombie-panel="true"><div class="section-heading"><h3>${escapeHtml(unitLabel(zombie.type, this.locale))}</h3>${badge}</div><dl class="location-grid"><div><dt>${escapeHtml(t('hp'))}</dt><dd>${zombie.hp}/${zombie.maxHp}</dd></div><div><dt>${escapeHtml(t('attack'))}</dt><dd>${publicAttack}</dd></div><div><dt>${escapeHtml(t('movement'))}</dt><dd>${publicMovement}</dd></div><div><dt>${escapeHtml(t('range'))}</dt><dd>${publicRange}</dd></div></dl>${finalBadge}<p class="muted">${escapeHtml(t('visibleEnemyOnly'))}</p></section>`;
+    return `<section class="zombie-detail-panel" data-zombie-panel="true"><div class="section-heading"><h3>${escapeHtml(unitLabel(zombie.type, this.locale))}</h3>${badge}</div><dl class="location-grid"><div><dt>${escapeHtml(t('hp'))}</dt><dd>${zombie.hp}/${zombie.maxHp}</dd></div><div><dt>${escapeHtml(t('attack'))}</dt><dd>${publicAttack}</dd></div><div><dt>${escapeHtml(t('attackCharge'))}</dt><dd>${publicAttackCharges}/${publicMaxAttackCharges}</dd></div><div><dt>${escapeHtml(t('movement'))}</dt><dd>${publicMovement}</dd></div><div><dt>${escapeHtml(t('range'))}</dt><dd>${publicRange}</dd></div></dl>${finalBadge}<p class="muted">${escapeHtml(t('visibleEnemyOnly'))}</p></section>`;
   }
 
   private renderUnitSheet(

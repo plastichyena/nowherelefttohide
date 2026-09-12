@@ -8,9 +8,9 @@ export function validateSourceRun(run, jobs, repository) {
     || run.path !== '.github/workflows/v140-release-validation.yml'
     || run.event !== 'workflow_dispatch' || run.status !== 'completed'
     || !/^[a-f0-9]{40}$/.test(run.head_sha ?? '')) throw new Error('Source must be a completed release run from this repository');
-  const expected = ['Session v1.5.6 physical 512 MiB Package validation'];
+  const expected = ['Session v1.5.7 physical 512 MiB Package validation'];
   for (const agent of ['random', 'balanced']) {
-    for (let start = 1; start <= 91; start += 10) expected.push(`v1.5.6 ${agent} seeds ${start} + 9`);
+    for (let start = 1; start <= 91; start += 10) expected.push(`v1.5.7 ${agent} seeds ${start} + 9`);
   }
   for (const name of expected) {
     const matching = jobs.filter(job => job.name === name);

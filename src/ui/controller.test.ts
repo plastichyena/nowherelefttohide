@@ -61,8 +61,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.5.6');
-    expect(titleVersionLabel('en')).toContain('1.5.6');
+    expect(titleVersionLabel('ja')).toContain('1.5.7');
+    expect(titleVersionLabel('en')).toContain('1.5.7');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -306,26 +306,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.5.5-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.5.6-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.5以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.6');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.6以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.7');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.5 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.6');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.6 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.7');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 8.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 15');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 8.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 15');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 9.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 16');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 9.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 16');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.5以前' : 'v1.5.5-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.6以前' : 'v1.5.6 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.6以前' : 'v1.5.6 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.6以前' : 'v1.5.6-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.6以前' : 'v1.5.6-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.6以前' : 'v1.5.6-or-earlier');
     }
   });
 
@@ -719,17 +719,22 @@ describe('controller view models', () => {
       'tipRiotPolice', 'tipZombieEngagement', 'tipGasZombie', 'tipHunterZombie',
       'tipArmyBase', 'tipArmyBaseRecruitment', 'tipArmyBaseInterception', 'tipArmyBaseRecovery',
       'tipProficiency', 'tipCrisis', 'unitRecruitment', 'completionProficiency',
+      'tipBarbedWire', 'barbedWire', 'barbedWireRule', 'barbedWireStatisticsScope', 'legendObstacles', 'legendDescription.barbedWire',
+      'barbedWireBuilt', 'barbedWireDestroyed', 'barbedWireDamageTaken', 'barbedWireAbsorbedDamage', 'barbedWireEmptyAttackCharges', 'barbedWireOccupiedAttackCharges',
       'dedicatedMilitaryGoods', 'interceptionsRemaining', 'interceptionCost', 'noiseRadius',
       'projectedRefill', 'earlyCaptureReward', 'recruitmentPower', 'armyBaseFunctions',
       'armyBaseInterceptionRefresh', 'armyBasePendingRecruitment', 'armyBaseNoPendingRecruitment',
       'armyBaseRecruitmentRule', 'armyBaseForfeitRule', 'armyBaseReward.claimed',
       'armyBaseRecruitment.waiting_power', 'legendInitialGasCount', 'legendInitialGasDistance',
-      'legendGasExplosion', 'legendDescription.gasZombie', 'legendDescription.armyBase', 'legendDescription.riotPolice', 'legendDescription.riotZombie',
+      'legendGasExplosion', 'legendDescription.gasZombie', 'legendDescription.barbedWire', 'legendDescription.armyBase', 'legendDescription.riotPolice', 'legendDescription.riotZombie',
+      'crisisReason.resource_runway_risk',
     ];
     for (const key of keys) {
       expect(createTranslator('ja')(key)).not.toBe(key);
       expect(createTranslator('en')(key)).not.toBe(key);
     }
+    expect(createTranslator('ja')('barbedWireStatisticsScope')).toContain('視界外の被害は含めない');
+    expect(createTranslator('en')('barbedWireStatisticsScope')).toContain('publicly observed combat only');
   });
 
   it('has bilingual terrain, visibility, Horde, and victory labels', () => {
@@ -879,6 +884,9 @@ describe('controller view models', () => {
     expect(english).toContain('A decisive unit for infection suppression. It has high HP and causes no civilian casualties during infection suppression.');
     expect(english).toContain('A normal Zombie reanimated from a Riot Police unit. The armor it wore in life gives it high HP.');
     expect(english).toContain('Periodic Horde');
+    expect(english).toContain('Barbed Wire');
+    expect(english).toContain('data-legend-section="obstacles"');
+    expect(english).toContain('/assets/board/obstacles/obstacle_barbed_wire.png');
     expect(english).toContain('data-legend-section="dynamic"');
     expect(english).toContain('Secured + stopped');
     expect(english).toContain('Forest Movement Cost');
@@ -898,6 +906,8 @@ describe('controller view models', () => {
     expect(english).toContain('Attack 15');
     expect(english).toContain('Movement 15');
     expect(english).toContain('Max Attack Charges 1');
+    expect(english).toContain('Attack 5');
+    expect(english).toContain('Max Attack Charges 4');
     expect(english).toContain('Police Zombie');
     expect(english).toContain('Soldier Zombie');
     expect(english).toContain('Special Slot weights');

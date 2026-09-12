@@ -16,8 +16,8 @@ describe('shared public entity projections', () => {
     const hordeProjection = createPublicUnitProjection(horde, state);
     const recruitProjection = createPublicUnitProjection(recruit, state);
 
-    expect(hordeProjection.maxAttackCharges).toBe(2);
-    expect(hordeProjection.attackChargesRemaining).toBe(2);
+    expect(hordeProjection.maxAttackCharges).toBe(4);
+    expect(hordeProjection.attackChargesRemaining).toBe(4);
     expect(recruitProjection.turnsUntilRegular).toBe(7);
     expect(JSON.stringify(state)).toBe(before);
   });

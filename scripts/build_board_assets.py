@@ -66,6 +66,10 @@ V153_SOURCE_FILES = {
     "facilities/facility_army_base.png": "exec-efb7de25-827a-4ab9-a01d-51e9927cd022.png",
 }
 
+V157_SOURCE_FILES = {
+    "obstacles/obstacle_barbed_wire.png": "barbed-wire-candidate-v1.png",
+}
+
 
 def contain(source: Image.Image, bounds: tuple[int, int], y_offset: int = 0) -> Image.Image:
     image = source.convert("RGBA")
@@ -238,6 +242,19 @@ def build_v153(source_root: Path, output_root: Path) -> None:
         )
 
 
+def build_v157(source_root: Path, output_root: Path) -> None:
+    """Post-process the approved v1.5.7 Barbed Wire concept."""
+    for relative, source_name in V157_SOURCE_FILES.items():
+        destination = output_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source = Image.open(source_root / source_name)
+        contain(source, (218, 218), y_offset=3).save(
+            destination,
+            optimize=True,
+            compress_level=9,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source_root", type=Path)
@@ -247,6 +264,7 @@ def main() -> None:
     mode.add_argument("--v144-only", action="store_true")
     mode.add_argument("--v150-only", action="store_true")
     mode.add_argument("--v153-only", action="store_true")
+    mode.add_argument("--v157-only", action="store_true")
     args = parser.parse_args()
     if args.v140_only:
         build_v140(args.source_root, args.output_root)
@@ -256,6 +274,8 @@ def main() -> None:
         build_v150(args.source_root, args.output_root)
     elif args.v153_only:
         build_v153(args.source_root, args.output_root)
+    elif args.v157_only:
+        build_v157(args.source_root, args.output_root)
     else:
         build(args.source_root, args.output_root)
 

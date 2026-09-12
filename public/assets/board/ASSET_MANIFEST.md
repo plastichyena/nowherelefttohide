@@ -1,15 +1,15 @@
-# Nowhere Left to Hide v1.5.4 Board Asset Manifest
+# Nowhere Left to Hide v1.5.7 Board Asset Manifest
 
-- Generated: 2026-09-07
+- Generated: 2026-09-12
 - Runtime format: 256×256 PNG
 - Generated source resolutions: 1254×1254 for most sources, 1362×1155 for the
   twelve-Zombie Horde swarm, and 1536×1024 for Capital and Refinery; every
   checked-in runtime image is normalized to 256×256.
-- Runtime total: 38 PNG files, 1,813,763 bytes (approximately 1.73 MiB)
+- Runtime total: 39 PNG files, 1,857,241 bytes (approximately 1.77 MiB)
 - Source: original assets created for this project; no third-party images, real
   logos, seals, flags, or trademarks are included.
 - Provenance / licensing: generated specifically for this repository during
-  the v1.3.1, v1.4.4, v1.5.0, and v1.5.3 implementations. No third-party asset or external
+  the v1.3.1, v1.4.4, v1.5.0, v1.5.3, and v1.5.7 implementations. No third-party asset or external
   asset-license obligation is incorporated into these PNGs.
 - Generation: OpenAI built-in image generation. The built-in tool did not
   expose a more specific model identifier for recording.
@@ -77,6 +77,14 @@ with a barracks, hangar, and watchtower. Prompt and post-processing records are
 kept in `Art/reference/v1.5.3-asset-concepts/`; only the 256px derivatives are
 preloaded.
 
+The v1.5.7 Barbed Wire candidate is retained at
+`Art/reference/v1.5.7-barbed-wire-concept/barbed-wire-candidate-v1.png` as the
+approved 1254×1254 RGBA source. It is deterministically normalized to the
+runtime 256×256 RGBA contract and registered under `obstacles.barbedWire`; no
+new image generation is used for this derivative.
+Source SHA256: `2D19ED834416A27C439223A1BAE2D92C660E74D3B1A09F5156D0277BF1005EAB`;
+runtime SHA256: `57314046022ccf8dc3538d4be524cd1ed2e85ff3d684117320c08f91bb2d0254`.
+
 ## Runtime files
 
 | File | Core type / UI state | Purpose |
@@ -99,6 +107,7 @@ preloaded.
 | `facilities/facility_civilian_drone_base.png` | `civilianDroneBase` | Forward civilian drone pad and communications mast |
 | `facilities/facility_temporary_housing.png` | `temporaryHousing` | Compact emergency container and prefab housing settlement |
 | `facilities/facility_checkpoint.png` | Checkpoint base | Barrier and guard booth |
+| `obstacles/obstacle_barbed_wire.png` | `barbedWire` | Approved v1.5.7 Barbed Wire obstacle; dynamic HP and selection overlays remain separate |
 | `units/unit_police.png` | `police` | Approved v1.4.4 five-person Police Group in US-style uniforms |
 | `units/unit_national_guard.png` | `nationalGuard` | Approved v1.4.4 five-person armed National Guard Group |
 | `units/unit_zombie.png` | `zombie` | Approved three-Zombie civilian/worker group |
@@ -141,7 +150,8 @@ warnings, and Horde entrance directions remain dynamic UI overlays.
    replacement human sprites and two reanimated Zombie sprites; v1.5.0 Riot
    candidates are documented under `Art/reference/v1.5.0-unit-concepts/`.
    v1.5.3 Gas and Army Base source output identifiers and prompts are recorded
-   under `Art/reference/v1.5.3-asset-concepts/`.
+   under `Art/reference/v1.5.3-asset-concepts/`. The v1.5.7 Barbed Wire source
+   and provenance are retained under `Art/reference/v1.5.7-barbed-wire-concept/`.
 
 The original single-Zombie concept, approved three-Zombie normal-unit source,
 approved twelve-Zombie Horde source, and v1.4 facility references live in
