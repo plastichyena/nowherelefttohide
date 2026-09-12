@@ -1,7 +1,7 @@
 import { deriveStrategicMap, strategicMapItems } from '../agent/strategic-map';
 import { queryRoute, RouteQueryInputError, type RouteQueryInput } from '../agent/route-query';
 import { QUERY_FILTER_SCHEMAS, validateQuerySchema, publicQueryContract } from '../agent/query-contract';
-import { deriveImportantChanges, summarizeImportantChanges, deriveCombatHazards, type ChangeDecision } from '../agent/decision-summary';
+import { checkpointSupplyExplanation, deriveImportantChanges, summarizeImportantChanges, deriveCombatHazards, type ChangeDecision } from '../agent/decision-summary';
 import { facilityChanges, branchFlowChanges } from '../agent/facility-changes';
 import { writeArtifactZip } from './artifact-zip';
 import { createHash, randomUUID } from 'node:crypto';
@@ -219,7 +219,7 @@ function compactSnapshot(loaded: LoadedSession, changes = summarizeImportantChan
     facilities: observation.facilities.map(({ id, type, position, status, owner, healthyPopulation, infectedPopulation, inSupply, operationalStatus, populationCapacity, populationOperational, populationUnavailableReason, populationIncreaseAvailable, populationDecreaseAvailable, production, recovery }) => ({ id, type, position, status, owner, healthyPopulation, infectedPopulation, inSupply, operationalStatus, populationCapacity, populationOperational, populationUnavailableReason, populationIncreaseAvailable, populationDecreaseAvailable, production: { stoppedReason: production.stoppedReason, projectedPowerReason: production.projectedPowerReason }, recovery: { status: recovery.status, missingConditions: recovery.missingConditions } })),
     units: observation.units.map(({ id, type, unitType, position, hp, maxHp, proficiency, attackChargesRemaining, maxAttackCharges, canMove, canAttack, inSupply, currentFuel, maxFuel, currentMilitaryGoods, maxMilitaryGoods, fixedMilitaryGoodsUpkeepPerTurn, attack, baseRecruitAttack, effectiveAttack, movement, effectiveMovementCostAtPosition, baseRange, effectiveRange, rangeModifierReason, emergencyMovementPoints, emergencyMovementAvailable }) => ({ id, type, unitType, position, hp, maxHp, proficiency, attackChargesRemaining, maxAttackCharges, canMove, canAttack, inSupply, currentFuel, maxFuel, currentMilitaryGoods, maxMilitaryGoods, fixedMilitaryGoodsUpkeepPerTurn, attack, baseRecruitAttack, effectiveAttack, movement, effectiveMovementCostAtPosition, baseRange, effectiveRange, rangeModifierReason, emergencyMovementPoints, emergencyMovementAvailable })),
     visibleEnemies: clone(observation.zombies),
-    checkpoints: observation.checkpoints.map(({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply }) => ({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply })),
+    checkpoints: observation.checkpoints.map(({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply }) => ({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply, supplyExplanation: checkpointSupplyExplanation(observation, branchId, loaded.active.revision) })),
     horde: clone(observation.horde),
     victory: clone(observation.victory),
     crisisSummary: clone(observation.crisisSummary),
@@ -819,7 +819,7 @@ export class SessionService {
           }
           case 'units': items = observation.units as unknown as JsonValue[]; break;
           case 'facilities': items = observation.facilities as unknown as JsonValue[]; break;
-          case 'checkpoints': items = observation.checkpoints as unknown as JsonValue[]; break;
+          case 'checkpoints': items = observation.checkpoints.map(c => ({ ...c, supplyExplanation: checkpointSupplyExplanation(observation, c.branchId, revision) })) as unknown as JsonValue[]; break;
           case 'branches': items = observation.roadBranches as unknown as JsonValue[]; break;
           case 'worker-assignments': items = observation.workerAssignmentCandidates.map(item => ({ ...item, revision })) as unknown as JsonValue[]; break;
           case 'population-transfers': items = observation.populationTransferCandidates.map(item => ({ ...item, revision })) as unknown as JsonValue[]; break;

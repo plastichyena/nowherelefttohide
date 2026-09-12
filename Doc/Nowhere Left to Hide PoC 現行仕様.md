@@ -2132,3 +2132,11 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - 最終[AI Portable Run 34681924510](https://github.com/plastichyena/nowherelefttohide/actions/runs/34681924510)はCommit `1613bc56c01141358ce76e447ea12afcb78826bd`で両OSとも成功。同梱Node 22.23.2で全9コマンド、Seed1/7の正常終局（10/8判断・通常敗北）、Artifact取得、Replay一致を確認した。最終13ファイルのZIP／展開実容量はLinux 44,209,080／125,978,819 bytes、Windows 34,634,141／88,140,342 bytes。Windows最終ZIPは旧版107,137,535 bytesから72,503,394 bytes減少した。
 - [最終Release Validation Run 34682006736](https://github.com/plastichyena/nowherelefttohide/actions/runs/34682006736)の200ゲーム・全Replay・物理512 MiB、および[通常CI Run 34681173166](https://github.com/plastichyena/nowherelefttohide/actions/runs/34681173166)の長時間Jobは起動を確認し、完了結果は未確認。配布修正前のPortable失敗Run 34681186690と、差し替え取消Run（Portable 34681562051、Validation 34681188070／34681646071）は履歴として残す。ローカル常駐サーバーは停止済みで、残りはGitHub上で実行される。
 - 検証証跡は `src/testing/fixtures/v157-release-validation.json`。遅れて完了する旧CIが新しい配布工程で古いcheckoutを組み立てないよう、自動Portableを最新mainと同じSHAに限定した。明示dispatchの全検証は維持する。最終記録の変更はゲーム実行コードを変更しない。
+
+## 18.8 v1.5.7 補給説明の追補修正（2026-09-12）
+
+- App／Rules／API／Save／Artifact／Session等のVersionは据え置く。補給計算、合法性、Coreのゲーム状態、公開Observationの保存形式は変更しない。
+- Session Compactの各検問所と `query --target=checkpoints` に、既存公開Supplyから導出する `supplyExplanation` を追加する。州都中心・支線Sector・初期半径・現在の支線半径・計算式と、revision付きconstruction Queryへの案内を含む。`providesSupply` はActive Roleを示し、追加補給域の有無を示さない。
+- 受理された検問所建設・移設・Role変更は既存importantChangesのconsequencesに、支線半径の前後値と当該Decision全体の補給増減Hex／施設数を記録する。増減0も明示し、複数Postの通知に同じDecision全体の増減が出ても加算しない。履歴、Resume、再試行は既存の記録を使う。
+- PLAY_WITH_AIに距離5の東検問所と距離6の陸軍基地の具体例、前進Relocateと後方Standbyの違い、construction Queryの取得手順を追加した。不合法候補の半径据え置き・増分0は、妨害条件解消後も拡張不能という意味ではないと明記した。残存していた旧Version、壁HP10、Horde Charge2表記を現行値へ修正した。
+- Claude記録と同じSeed1・東(30,25)建設で説明不足をテスト失敗として再現後、修正して成功。距離6で陸軍基地が補給内、後方Standbyは増分0、合法移設で半径6→7を実Core Actionで確認。関連5ファイル38テスト（Supply、重要変化、Session、Query契約、play-turn）が成功し、型検査と本番Buildも成功。既存Build warningは継続。サブエージェント未使用、Doc/archiveは参照・変更していない。

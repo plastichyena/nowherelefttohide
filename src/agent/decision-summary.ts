@@ -14,6 +14,19 @@ export interface ImportantChange {
 export interface ChangeDecision { decision: number; changes: readonly ImportantChange[] }
 const severity = { critical: 0, warning: 1, advisory: 2 };
 
+/** Session guidance derived only from the existing public supply projection. */
+export function checkpointSupplyExplanation(observation: Pick<AgentObservation, 'supply'>, branchId: string, revision: number) {
+  return {
+    center: 'capital' as const,
+    scope: 'branch_sector' as const,
+    radiusRule: 'max(initialRadius, capitalToActiveCheckpointHexDistance)',
+    initialRadius: observation.supply.initialRadius,
+    currentBranchRadius: observation.supply.branchRadii.find(b => b.branchId === branchId)?.radius ?? observation.supply.initialRadius,
+    providesSupplyMeaning: 'active_role_not_incremental_coverage',
+    candidateQuery: { target: 'construction' as const, expectedRevision: revision, filters: { branchId } },
+  };
+}
+
 /** Interpretation of committed public facts only; no Store or transport dependency. */
 export function deriveImportantChanges(before: AgentObservation, after: AgentObservation, events: readonly AgentPublicEvent[]): ImportantChange[] {
   const changes: ImportantChange[] = [];
@@ -46,8 +59,21 @@ export function deriveImportantChanges(before: AgentObservation, after: AgentObs
   }
   for (const current of after.checkpoints) {
     const old = before.checkpoints.find(c => c.id === current.id);
-    const reasons = [...(old?.role !== current.role ? ['checkpoint_role_changed'] : []), ...(current.infected > (old?.infected ?? 0) ? ['checkpoint_infected'] : [])];
-    if (reasons.length) add(`checkpoint:${current.id}`, 'checkpoint', current.status === 'ruined' ? 'critical' : 'warning', [current.id], reasons);
+    const moved = old && (old.position.q !== current.position.q || old.position.r !== current.position.r);
+    const reasons = [...(old?.role !== current.role ? ['checkpoint_role_changed'] : []), ...(moved ? ['checkpoint_relocated'] : []), ...(current.infected > (old?.infected ?? 0) ? ['checkpoint_infected'] : [])];
+    const consequences: string[] = [];
+    if (!old || moved || old.role !== current.role) {
+      const radius = (o: AgentObservation) => o.supply.branchRadii.find(b => b.branchId === current.branchId)?.radius ?? o.supply.initialRadius;
+      const oldTiles = new Set(before.supply.suppliedTileKeys);
+      const newTiles = new Set(after.supply.suppliedTileKeys);
+      const added = [...newTiles].filter(k => !oldTiles.has(k)).length;
+      const removed = [...oldTiles].filter(k => !newTiles.has(k)).length;
+      const gained = after.facilities.filter(f => newTiles.has(`${f.position.q},${f.position.r}`) && !oldTiles.has(`${f.position.q},${f.position.r}`)).length;
+      const lost = before.facilities.filter(f => oldTiles.has(`${f.position.q},${f.position.r}`) && !newTiles.has(`${f.position.q},${f.position.r}`)).length;
+      consequences.push(`branch_supply_radius:${radius(before)}->${radius(after)}`, `newly_supplied_hexes:${added}`, `newly_unsupplied_hexes:${removed}`, `newly_supplied_facilities:${gained}`, `newly_unsupplied_facilities:${lost}`);
+      if (!added && !removed) consequences.push('supply_coverage_unchanged');
+    }
+    if (reasons.length) add(`checkpoint:${current.id}`, 'checkpoint', current.status === 'ruined' ? 'critical' : 'warning', [current.id], reasons, consequences);
   }
   for (const enemy of after.zombies) if (!before.zombies.some(z => z.id === enemy.id)) add(`enemy:${enemy.id}`, 'enemy', 'warning', [enemy.id], ['enemy_spotted']);
   return changes.sort((a, b) => a.id.localeCompare(b.id));
@@ -66,7 +92,7 @@ export function summarizeImportantChanges(records: Iterable<ChangeDecision>, fro
   return { items: items.map(item => {
     const { entityIds, reasonCodes, relatedEventIds, relatedEventTypes, consequences, ...rest } = item;
     const arrays = { entityIds, reasonCodes, relatedEventIds, relatedEventTypes, consequences };
-    return { ...rest, ...Object.fromEntries(Object.entries(arrays).map(([key, value]) => [key, value.slice(0, 10)])),
+    return { ...rest, ...Object.fromEntries(Object.entries(arrays).map(([key, value]) => [key, value.slice(0, 10)])) as typeof arrays,
       totals: Object.fromEntries(Object.entries(arrays).map(([key, value]) => [key, { totalCount: value.length, omittedCount: Math.max(0, value.length - 10) }])), detailQuery };
   }), totalCount, omittedCount: Math.max(0, totalCount - 10), range: { fromDecision, toDecision, fromRevision: fromDecision, toRevision: toDecision }, detailQuery };
 }

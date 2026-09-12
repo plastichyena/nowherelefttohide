@@ -4,6 +4,36 @@ import { createDefaultConfig } from '../core/config';
 import { createAgentObservation } from './observation';
 import { deriveCombatHazards, deriveImportantChanges, summarizeImportantChanges } from './decision-summary';
 import { QUERY_FILTER_SCHEMAS, publicQueryContract, validateQuerySchema } from './query-contract';
+import { GameEngine } from '../core/engine';
+
+it('reports actual forward expansion and rear standby coverage from accepted Core actions', () => {
+  const engine = new GameEngine(1, createDefaultConfig({ vision: { capital: 50 } }));
+  const initial = engine.getState();
+  const state = { ...initial, units: initial.units.filter(u => u.isPlayerUnit) };
+  expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
+  const before = createAgentObservation(engine.getState());
+  const built = engine.step({ type: 'BuildCheckpoint', branchId: 'east', position: { q: 31, r: 25 } });
+  expect(built.error).toBeNull();
+  const after = createAgentObservation(engine.getState());
+  expect(after.facilities.find(f => f.id === 'army-base-1')?.inSupply).toBe(true);
+  expect(deriveImportantChanges(before, after, []).find(c => c.category === 'checkpoint')?.consequences).toEqual(expect.arrayContaining(['branch_supply_radius:5->6', 'newly_supplied_facilities:1']));
+  expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+  const beforeRear = createAgentObservation(engine.getState());
+  expect(engine.step({ type: 'BuildCheckpoint', branchId: 'east', position: { q: 30, r: 25 } }).error).toBeNull();
+  const rear = createAgentObservation(engine.getState());
+  expect(rear.checkpoints.find(c => c.role === 'standby')?.providesSupply).toBe(false);
+  expect(deriveImportantChanges(beforeRear, rear, []).find(c => c.category === 'checkpoint')?.consequences).toEqual(expect.arrayContaining(['branch_supply_radius:6->6', 'newly_supplied_facilities:0', 'supply_coverage_unchanged']));
+  expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
+  const beforeMove = createAgentObservation(engine.getState());
+  const candidate = beforeMove.checkpointPositionCandidates.find(c => c.actionType === 'RelocateCheckpoint' && c.branchId === 'east' && c.legal && c.projectedBranchRadius === 7)!;
+  expect(candidate).toBeDefined();
+  expect(engine.step({ type: 'RelocateCheckpoint', branchId: 'east', checkpointId: candidate.checkpointId!, position: candidate.position }).error).toBeNull();
+  const afterMove = createAgentObservation(engine.getState());
+  expect(deriveImportantChanges(beforeMove, afterMove, [])).toEqual(expect.arrayContaining([
+    expect.objectContaining({ category: 'checkpoint', consequences: expect.arrayContaining(['branch_supply_radius:6->7']) }),
+  ]));
+  expect(afterMove.supply.branchRadii.find(b => b.branchId === 'east')?.radius).toBe(7);
+});
 
 it('links public factory and power losses to production and keeps losses separate from recovery decisions', () => {
   const state = createInitialState(1, createDefaultConfig());
