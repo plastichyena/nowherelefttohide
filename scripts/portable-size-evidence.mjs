@@ -107,8 +107,23 @@ function sessionIds(root) {
   return readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory() && existsSync(join(root, entry.name, 'session.json'))).map((entry) => entry.name).sort();
 }
 
+function identityEnvironment(root) {
+  const environment = { ...process.env };
+  const windowsIdentity = join(root, 'runtime', 'identity.cmd');
+  const unixIdentity = join(root, 'runtime', 'identity.env');
+  if (existsSync(windowsIdentity)) {
+    const text = readFileSync(windowsIdentity, 'utf8');
+    for (const match of text.matchAll(/^set\s+"(NLTH_[A-Z_]+)=([^"\r\n]*)"/gim)) environment[match[1]] = match[2];
+  } else if (existsSync(unixIdentity)) {
+    const text = readFileSync(unixIdentity, 'utf8');
+    for (const match of text.matchAll(/^export\s+(NLTH_[A-Z_]+)='([^']*)'/gim)) environment[match[1]] = match[2];
+  }
+  return environment;
+}
+
 function launcherCommand(launcher, args) {
   const root = dirname(launcher);
+  const environment = identityEnvironment(root);
   // Windows cmd wrappers can buffer or keep an inherited console handle open
   // during a large query. The package's bundled runtime and CLI are the same
   // entry point, so invoke them directly for deterministic evidence capture.
@@ -116,13 +131,13 @@ function launcherCommand(launcher, args) {
     return {
       command: join(root, 'runtime', 'node', 'node.exe'),
       args: [join(root, 'session-cli.mjs'), ...args],
-      options: { encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
+      options: { encoding: 'utf8', env: environment, windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
     };
   }
   return {
     command: launcher,
     args,
-    options: { encoding: 'utf8', shell: false, windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
+    options: { encoding: 'utf8', env: environment, shell: false, windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
   };
 }
 

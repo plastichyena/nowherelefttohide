@@ -111,7 +111,7 @@ function writeLauncher(root, platform) {
   const launcher = [
     '#!/usr/bin/env bash',
     'set -euo pipefail',
-    'ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)',
+    'ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"',
     'source "${ROOT}/runtime/identity.env"',
     'exec "${ROOT}/runtime/node/node" "${ROOT}/session-cli.mjs" "$@"',
     '',
