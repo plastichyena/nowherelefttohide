@@ -1,6 +1,6 @@
 # Nowhere Left to Hide PoC v1.5.7 アップデート要件 確定版
 
-- ステータス: 要件確定・実装反映済み。ローカル回帰と実ブラウザを検証し、公開Pages／両OS Portableの最終確認中。
+- ステータス: 要件確定・実装／現行仕様への反映済み。通常回帰、公開Pagesの実ブラウザ動作、両OS Portableの完遂を確認。長時間Workflowは依頼に従い起動確認まで（結果未確認）。
 - 確定日: 2026-09-12
 - アセット承認日: 2026-09-12。採用source: `Art/reference/v1.5.7-barbed-wire-concept/barbed-wire-candidate-v1.png`（生成記録は同フォルダのREADME.md）。後続実装ではこの承認素材を使用する。
 - 作成日: 2026-09-11

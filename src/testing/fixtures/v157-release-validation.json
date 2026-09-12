@@ -1,0 +1,3248 @@
+{
+  "release": "1.5.7",
+  "date": "2026-09-12",
+  "gameCommit": "53dda314328faeeda3ea44516176dbc94abd99cb",
+  "distributionCommit": "1613bc56c01141358ce76e447ea12afcb78826bd",
+  "runtimeUnchangedByDistributionFix": true,
+  "localValidation": {
+    "normalSuite": {
+      "files": 85,
+      "passedBeforeFollowup": 762,
+      "failedBeforeFollowup": 5,
+      "skipped": 11,
+      "skipReason": "existing NLTH_SESSION_DAILY gated 1000-decision tests; long batch/seed198 excluded from normal gate"
+    },
+    "followup": {
+      "files": 3,
+      "passed": 31,
+      "reason": "wall-event Save allowlist correction, misplaced new test scenario assertion, transient PNG test timeout"
+    },
+    "explicitPreviousSaveBoundary": {
+      "file": "src/persistence/save.test.ts",
+      "passed": 22
+    },
+    "boardContrastFollowup": {
+      "passed": 18
+    },
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "browserBridgeSmoke": "passed",
+    "reportToolTests": 8,
+    "buildWarnings": [
+      "existing large JavaScript chunk",
+      "existing mixed static/dynamic engine import"
+    ],
+    "browserBridge": {
+      "ok": true,
+      "appVersion": "1.5.7",
+      "buildId": "local-unknown",
+      "gameRulesVersion": "9.0.0",
+      "policy": "public-observation-legal-actions-end-turn-only",
+      "policyGuarantee": "game-completion-only; victory is not guaranteed",
+      "hiddenForbiddenKeyCount": 14,
+      "publicFieldsChecked": 15956272,
+      "runs": [
+        {
+          "seed": 1,
+          "decisions": 10,
+          "gameOver": true,
+          "result": {
+            "outcome": "lost",
+            "reason": "capitalLost",
+            "turn": 10
+          },
+          "replayMatched": true,
+          "artifactPagesChecked": 1028,
+          "artifactItemCounts": {
+            "manifest": 1,
+            "observations": 11,
+            "actions": 10,
+            "events": 491,
+            "invalid-attempts": 0
+          }
+        },
+        {
+          "seed": 7,
+          "decisions": 8,
+          "gameOver": true,
+          "result": {
+            "outcome": "lost",
+            "reason": "capitalLost",
+            "turn": 8
+          },
+          "replayMatched": true,
+          "artifactPagesChecked": 770,
+          "artifactItemCounts": {
+            "manifest": 1,
+            "observations": 9,
+            "actions": 8,
+            "events": 366,
+            "invalid-attempts": 0
+          }
+        }
+      ]
+    }
+  },
+  "pages": {
+    "url": "https://plastichyena.github.io/nowherelefttohide/",
+    "workflowRun": 34681173166,
+    "verifyJob": "success",
+    "deployJob": "success",
+    "browserBridge": {
+      "ok": true,
+      "appVersion": "1.5.7",
+      "buildId": "53dda314328faeeda3ea44516176dbc94abd99cb",
+      "gameRulesVersion": "9.0.0",
+      "policy": "public-observation-legal-actions-end-turn-only",
+      "policyGuarantee": "game-completion-only; victory is not guaranteed",
+      "hiddenForbiddenKeyCount": 14,
+      "publicFieldsChecked": 15956272,
+      "runs": [
+        {
+          "seed": 1,
+          "decisions": 10,
+          "gameOver": true,
+          "result": {
+            "outcome": "lost",
+            "reason": "capitalLost",
+            "turn": 10
+          },
+          "replayMatched": true,
+          "artifactPagesChecked": 1028,
+          "artifactItemCounts": {
+            "manifest": 1,
+            "observations": 11,
+            "actions": 10,
+            "events": 491,
+            "invalid-attempts": 0
+          }
+        },
+        {
+          "seed": 7,
+          "decisions": 8,
+          "gameOver": true,
+          "result": {
+            "outcome": "lost",
+            "reason": "capitalLost",
+            "turn": 8
+          },
+          "replayMatched": true,
+          "artifactPagesChecked": 770,
+          "artifactItemCounts": {
+            "manifest": 1,
+            "observations": 9,
+            "actions": 8,
+            "events": 366,
+            "invalid-attempts": 0
+          }
+        }
+      ]
+    },
+    "ui": {
+      "viewports": [
+        {
+          "width": 1280,
+          "height": 900
+        },
+        {
+          "width": 390,
+          "height": 844
+        }
+      ],
+      "newGame": true,
+      "endTurnTo": 2,
+      "autosaveKey": "nowhere-left-to-hide:auto-save:v16",
+      "reloadContinueTo": 2,
+      "horizontalOverflow": false,
+      "consoleErrors": 0,
+      "physicalMobileDevice": false
+    },
+    "ciTests": {
+      "files": 85,
+      "passed": 768,
+      "skipped": 11
+    }
+  },
+  "wallVisual": {
+    "fixture": "src/testing/v157-browser-fixture.ts",
+    "terrain": [
+      "road",
+      "plain",
+      "forest",
+      "mountain"
+    ],
+    "normalAndLowZoom": true,
+    "humanCooccupancy": true,
+    "languages": [
+      "ja",
+      "en"
+    ],
+    "hp": 20,
+    "cost": {
+      "civilianGoods": 5,
+      "militaryGoods": 5
+    },
+    "humanEntryMp": 5,
+    "screenshots": [
+      "output/playwright/v157-wall-selected-pc.png",
+      "output/playwright/v157-forest-mountain-final.png",
+      "output/playwright/v157-wall-lod.png",
+      "output/playwright/v157-wall-mobile-en-final.png"
+    ],
+    "fixtureIsCustomConfig": true
+  },
+  "replayUi": {
+    "source": "local v1.5.7 Player seed 1 artifact",
+    "loaded": true,
+    "seekToTurn": 5,
+    "mobileViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "horizontalOverflow": false
+  },
+  "localPortable": {
+    "platform": "win-x64",
+    "node": {
+      "version": "v22.14.0",
+      "platform": "win32",
+      "arch": "x64"
+    },
+    "commands": [
+      "new",
+      "status",
+      "step",
+      "play-turn",
+      "save-checkpoint",
+      "list-checkpoints",
+      "load-checkpoint",
+      "query",
+      "artifact"
+    ],
+    "replayMatched": true,
+    "seeds": [
+      {
+        "seed": 1,
+        "decisions": 10,
+        "result": {
+          "outcome": "lost",
+          "reason": "capitalLost",
+          "statistics": {
+            "activeCheckpointLosses": 0,
+            "barbedWireAbsorbedDamage": 0,
+            "barbedWireBuilt": 0,
+            "barbedWireDamageTaken": 0,
+            "barbedWireDestroyed": 0,
+            "barbedWireEmptyAttackCharges": 0,
+            "barbedWireOccupiedAttackCharges": 0,
+            "chainOverruns": 0,
+            "checkpointActivations": 0,
+            "checkpointFallbacks": 0,
+            "checkpointFallbacksByBranch": {
+              "east": 0,
+              "north": 0,
+              "south": 0,
+              "west": 0
+            },
+            "checkpointFallbacksFromDormant": 0,
+            "checkpointFallbacksFromStandby": 0,
+            "checkpointFallbacksPreventingUnmanagedArrival": 0,
+            "checkpointQueueCivilianGoodsConsumed": 0,
+            "checkpointQueueCivilianGoodsDemand": 0,
+            "checkpointQueueFoodConsumed": 0,
+            "checkpointQueueFoodDemand": 0,
+            "checkpointRetreats": 0,
+            "checkpointsAbandoned": 0,
+            "checkpointsBuilt": 0,
+            "checkpointsRecovered": 0,
+            "checkpointsRelocated": 0,
+            "checkpointsRemoved": 0,
+            "checkpointsRuined": 0,
+            "civilianDroneBasesBuilt": 0,
+            "civilianDroneBasesDecommissioned": 0,
+            "civilianGoodsRefundedFromDecommission": 0,
+            "civilianLosses": 147,
+            "constructibleInfectedDeaths": 0,
+            "cumulativeGroundVisionBlockedHexes": 0,
+            "dormantCheckpointsCreated": 0,
+            "fallenSitesTriggeredByNoise": 0,
+            "finalHordeDefeated": false,
+            "finalHordeKilled": 0,
+            "finalHordeSpawned": 0,
+            "finalSpecialZombiesSpawnedByType": {
+              "gasZombie": 0,
+              "hunterZombie": 0,
+              "policeZombie": 0,
+              "riotZombie": 0,
+              "soldierZombie": 0
+            },
+            "forestDefenseApplications": 0,
+            "forestDefenseDamagePrevented": 0,
+            "gasExplosions": 0,
+            "gasExplosionUnitDamage": 0,
+            "gasZombiesKilled": 0,
+            "groundVisionBlockedHexes": 0,
+            "groundVisionPotentialHexes": 113,
+            "groundVisionSamples": 10,
+            "groundVisionVisibleHexes": 113,
+            "hordeInterceptions": 2,
+            "hordeMovementNoisePulses": 11,
+            "hordeTargetClearedCount": 0,
+            "hordeTargetInheritedCount": 0,
+            "hordeZombiesKilled": 0,
+            "housingBuilt": 0,
+            "housingCivilianGoodsProduced": 0,
+            "housingOutageFacilityTurns": 0,
+            "housingResidentTurns": 0,
+            "hunterZombiesKilled": 0,
+            "immediateInfectionsFromSpawn": 0,
+            "infectedPopulationConvertedToZombies": 45,
+            "infectionLosses": 147,
+            "initialNormalZombies": 25,
+            "maxCheckpointPostsPerBranch": 0,
+            "maxCivilianDroneVisionRadius": 0,
+            "maxGroundVisionBlockedHexes": 0,
+            "maximumOverrunChainLength": 0,
+            "maxPopulation": 176,
+            "maxPreparedCheckpointPostsPerBranch": 0,
+            "maxSecuredFacilities": 6,
+            "maxSuppliedFacilities": 8,
+            "maxSupplyRadius": 5,
+            "maxVisibleZombies": 6,
+            "nationalGuardNoisePulses": 9,
+            "nationalGuardReanimations": 0,
+            "noisePulsesBySourceType": {
+              "armyBase": 0,
+              "hordeZombie": 11,
+              "nationalGuard": 9,
+              "police": 2,
+              "riotPolice": 0,
+              "windPowerPlant": 9
+            },
+            "noisePulsesEmitted": 31,
+            "noiseRespawnAttempts": 0,
+            "noiseRespawnZombiesSpawned": 0,
+            "normalZombieIdleCount": 252,
+            "normalZombiesKilled": 3,
+            "policeLongRangeMoves": 0,
+            "policeNoisePulses": 2,
+            "policeReanimations": 0,
+            "policeZombiesKilled": 0,
+            "preventedRefugeeArrivalsAfterFinal": 0,
+            "reanimationChainOverruns": 0,
+            "reanimationCheckpointInfections": 0,
+            "reanimationFacilityInfections": 0,
+            "reanimationImmediateInfections": 0,
+            "reanimationSiteFalls": 0,
+            "recruitsCommissionedByType": {
+              "nationalGuard": 0,
+              "police": 0,
+              "riotPolice": 0
+            },
+            "refugeeArrivalsByBranch": {
+              "east": 47,
+              "north": 33,
+              "south": 50,
+              "west": 32
+            },
+            "refugeesAccepted": 99,
+            "refugeesDeparted": 63,
+            "refugeesScreenedByPolicy": {
+              "normal": 0,
+              "passThrough": 162,
+              "strict": 0
+            },
+            "regularPromotionsByType": {
+              "nationalGuard": 0,
+              "police": 0,
+              "riotPolice": 0
+            },
+            "resourceShortageLosses": 0,
+            "riotPoliceLost": 0,
+            "riotPoliceProduced": 0,
+            "riotPoliceReanimations": 0,
+            "riotZombiesFinal": 0,
+            "riotZombiesKilled": 0,
+            "soldierZombiesKilled": 0,
+            "standbyCheckpointsCreated": 0,
+            "suppliedAreaInfectionClearTurn": 1,
+            "suppliedAreaZombieClearTurn": 1,
+            "supplyLosses": 0,
+            "supplyRejections": 0,
+            "terrainEntriesByType": {
+              "forest": 0,
+              "mountain": 0,
+              "plain": 74,
+              "water": 0
+            },
+            "turnsAfterFinalHorde": 0,
+            "unitLosses": 0,
+            "unmanagedBranchTurns": 40,
+            "unmanagedPassThrough": 162,
+            "unspawnedInfectedPopulation": 15,
+            "urbanDefenseApplications": 2,
+            "urbanDefenseDamagePrevented": 14,
+            "veteranPromotionsByType": {
+              "nationalGuard": 0,
+              "police": 0,
+              "riotPolice": 0
+            },
+            "veteranZombieKillsByType": {
+              "nationalGuard": 0,
+              "police": 0,
+              "riotPolice": 0
+            },
+            "victoryTurn": null
+          },
+          "turn": 10
+        }
+      },
+      {
+        "seed": 7,
+        "decisions": 8,
+        "result": {
+          "outcome": "lost",
+          "reason": "capitalLost",
+          "statistics": {
+            "activeCheckpointLosses": 0,
+            "barbedWireAbsorbedDamage": 0,
+            "barbedWireBuilt": 0,
+            "barbedWireDamageTaken": 0,
+            "barbedWireDestroyed": 0,
+            "barbedWireEmptyAttackCharges": 0,
+            "barbedWireOccupiedAttackCharges": 0,
+            "chainOverruns": 0,
+            "checkpointActivations": 0,
+            "checkpointFallbacks": 0,
+            "checkpointFallbacksByBranch": {
+              "east": 0,
+              "north": 0,
+              "south": 0,
+              "west": 0
+            },
+            "checkpointFallbacksFromDormant": 0,
+            "checkpointFallbacksFromStandby": 0,
+            "checkpointFallbacksPreventingUnmanagedArrival": 0,
+            "checkpointQueueCivilianGoodsConsumed": 0,
+            "checkpointQueueCivilianGoodsDemand": 0,
+            "checkpointQueueFoodConsumed": 0,
+            "checkpointQueueFoodDemand": 0,
+            "checkpointRetreats": 0,
+            "checkpointsAbandoned": 0,
+            "checkpointsBuilt": 0,
+            "checkpointsRecovered": 0,
+            "checkpointsRelocated": 0,
+            "checkpointsRemoved": 0,
+            "checkpointsRuined": 0,
+            "civilianDroneBasesBuilt": 0,
+            "civilianDroneBasesDecommissioned": 0,
+            "civilianGoodsRefundedFromDecommission": 0,
+            "civilianLosses": 117,
+            "constructibleInfectedDeaths": 0,
+            "cumulativeGroundVisionBlockedHexes": 0,
+            "dormantCheckpointsCreated": 0,
+            "fallenSitesTriggeredByNoise": 0,
+            "finalHordeDefeated": false,
+            "finalHordeKilled": 0,
+            "finalHordeSpawned": 0,
+            "finalSpecialZombiesSpawnedByType": {
+              "gasZombie": 0,
+              "hunterZombie": 0,
+              "policeZombie": 0,
+              "riotZombie": 0,
+              "soldierZombie": 0
+            },
+            "forestDefenseApplications": 0,
+            "forestDefenseDamagePrevented": 0,
+            "gasExplosions": 0,
+            "gasExplosionUnitDamage": 0,
+            "gasZombiesKilled": 0,
+            "groundVisionBlockedHexes": 0,
+            "groundVisionPotentialHexes": 113,
+            "groundVisionSamples": 8,
+            "groundVisionVisibleHexes": 113,
+            "hordeInterceptions": 0,
+            "hordeMovementNoisePulses": 5,
+            "hordeTargetClearedCount": 0,
+            "hordeTargetInheritedCount": 0,
+            "hordeZombiesKilled": 0,
+            "housingBuilt": 0,
+            "housingCivilianGoodsProduced": 0,
+            "housingOutageFacilityTurns": 0,
+            "housingResidentTurns": 0,
+            "hunterZombiesKilled": 0,
+            "immediateInfectionsFromSpawn": 0,
+            "infectedPopulationConvertedToZombies": 40,
+            "infectionLosses": 117,
+            "initialNormalZombies": 25,
+            "maxCheckpointPostsPerBranch": 0,
+            "maxCivilianDroneVisionRadius": 0,
+            "maxGroundVisionBlockedHexes": 0,
+            "maximumOverrunChainLength": 0,
+            "maxPopulation": 160,
+            "maxPreparedCheckpointPostsPerBranch": 0,
+            "maxSecuredFacilities": 6,
+            "maxSuppliedFacilities": 8,
+            "maxSupplyRadius": 5,
+            "maxVisibleZombies": 7,
+            "nationalGuardNoisePulses": 7,
+            "nationalGuardReanimations": 0,
+            "noisePulsesBySourceType": {
+              "armyBase": 0,
+              "hordeZombie": 5,
+              "nationalGuard": 7,
+              "police": 0,
+              "riotPolice": 0,
+              "windPowerPlant": 7
+            },
+            "noisePulsesEmitted": 19,
+            "noiseRespawnAttempts": 0,
+            "noiseRespawnZombiesSpawned": 0,
+            "normalZombieIdleCount": 188,
+            "normalZombiesKilled": 1,
+            "policeLongRangeMoves": 0,
+            "policeNoisePulses": 0,
+            "policeReanimations": 0,
+            "policeZombiesKilled": 0,
+            "preventedRefugeeArrivalsAfterFinal": 0,
+            "reanimationChainOverruns": 0,
+            "reanimationCheckpointInfections": 0,
+            "reanimationFacilityInfections": 0,
+            "reanimationImmediateInfections": 0,
+            "reanimationSiteFalls": 0,
+            "recruitsCommissionedByType": {
+              "nationalGuard": 0,
+              "police": 0,
+              "riotPolice": 0
+            },
+            "refugeeArrivalsByBranch": {
+              "east": 31,
+              "north": 32,
+              "south": 34,
+              "west": 17
+            },
+            "refugeesAccepted": 72,
+            "refugeesDeparted": 42,
+            "refugeesScreenedByPolicy": {
+              "normal": 0,
+              "passThrough": 114,
+              "strict": 0
+            },
+            "regularPromotionsByType": {
+              "nationalGuard": 0,
+              "police": 0,
+              "riotPolice": 0
+            },
+            "resourceShortageLosses": 0,
+            "riotPoliceLost": 0,
+            "riotPoliceProduced": 0,
+            "riotPoliceReanimations": 0,
+            "riotZombiesFinal": 0,
+            "riotZombiesKilled": 0,
+            "soldierZombiesKilled": 0,
+            "standbyCheckpointsCreated": 0,
+            "suppliedAreaInfectionClearTurn": 1,
+            "suppliedAreaZombieClearTurn": 1,
+            "supplyLosses": 0,
+            "supplyRejections": 0,
+            "terrainEntriesByType": {
+              "forest": 0,
+              "mountain": 0,
+              "plain": 38,
+              "water": 0
+            },
+            "turnsAfterFinalHorde": 0,
+            "unitLosses": 0,
+            "unmanagedBranchTurns": 32,
+            "unmanagedPassThrough": 114,
+            "unspawnedInfectedPopulation": 10,
+            "urbanDefenseApplications": 1,
+            "urbanDefenseDamagePrevented": 7,
+            "veteranPromotionsByType": {
+              "nationalGuard": 0,
+              "police": 0,
+              "riotPolice": 0
+            },
+            "veteranZombieKillsByType": {
+              "nationalGuard": 0,
+              "police": 0,
+              "riotPolice": 0
+            },
+            "victoryTurn": null
+          },
+          "turn": 8
+        }
+      }
+    ],
+    "before": {
+      "release": "1.5.6",
+      "workflowRun": 34602437771,
+      "zipBytes": 107137535,
+      "expandedBytes": 302766249,
+      "fileCount": 7044
+    },
+    "after": {
+      "release": "local v1.5.7 candidate with Save allowlist fix",
+      "zipBytes": 33335530,
+      "expandedBytes": 84332647,
+      "fileCount": 10
+    },
+    "delta": {
+      "zipBytes": -73802005,
+      "expandedBytes": -218433602,
+      "fileCount": -7034
+    },
+    "session": {
+      "bytes": 2232173,
+      "fileCount": 746,
+      "artifactBytes": 2509384,
+      "categories": {
+        "otherSessionFile": {
+          "bytes": 592250,
+          "fileCount": 304
+        },
+        "privatePayloadPool": {
+          "bytes": 213945,
+          "fileCount": 88
+        },
+        "publicPayloadPool": {
+          "bytes": 542470,
+          "fileCount": 167
+        },
+        "lockDiagnosticHistory": {
+          "bytes": 26887,
+          "fileCount": 92
+        },
+        "decisionRecord": {
+          "bytes": 827084,
+          "fileCount": 47
+        },
+        "checkpointMetadata": {
+          "bytes": 15793,
+          "fileCount": 10
+        },
+        "requestIndex": {
+          "bytes": 13744,
+          "fileCount": 38
+        },
+        "artifactPackage": {
+          "bytes": 2509384,
+          "fileCount": 108
+        },
+        "legalActionPayload": {
+          "bytes": 0,
+          "fileCount": 0,
+          "storage": "embedded in publicPayloadPool snapshots/diffs"
+        }
+      }
+    },
+    "compact": {
+      "revision": 1,
+      "bytes": 47234
+    },
+    "fullSnapshot": {
+      "revision": 1,
+      "bytes": 2522173
+    },
+    "limitation": "Small representative command/seed/replay Sessions; this is not a 1000-action or 512 MiB memory measurement. Local Node differs from hosted runner Node.",
+    "responseComparison": {
+      "ok": true,
+      "comparisonBasis": "Same Windows x64 host, seed 1, default Config, one legal EndTurn from revision 0 to revision 1. Raw stdout bytes include the CLI JSON response exactly as emitted.",
+      "measurements": {
+        "v156": {
+          "label": "v1.5.6",
+          "package": {
+            "root": "D:\\private\\nowherelefttohide\\output\\v156-response-baseline-package\\nowhere-left-to-hide-ai-1.5.6-52f4127b0fbc-win-x64",
+            "appVersion": "1.5.6",
+            "platform": "win-x64",
+            "commit": "52f4127b0fbc326371f3ba5232395731cafb0a71",
+            "buildId": "52f4127b0fbc326371f3ba5232395731cafb0a71",
+            "buildInfoNodeVersion": "v22.23.2",
+            "bundledNodeVersion": "v22.23.2",
+            "cliPath": "D:\\private\\nowherelefttohide\\output\\v156-response-baseline-package\\nowhere-left-to-hide-ai-1.5.6-52f4127b0fbc-win-x64\\game\\dist\\portable\\session-cli.mjs",
+            "cliBytes": 863639,
+            "cliSha256": "759d983d23b4081090af278de3d425c32ac004eb48ab6b94833b246df9295f1a"
+          },
+          "operation": {
+            "sessionRoot": "D:\\private\\nowherelefttohide\\output\\v156-response-session-20260912",
+            "sessionId": "response-compare-v156",
+            "seed": 1,
+            "config": "default (no --config, --checkpoint-interval, or other tuning flags)",
+            "commandSequence": [
+              "new",
+              "query full-snapshot@0",
+              "step EndTurn@0",
+              "status@1",
+              "query full-snapshot@1"
+            ],
+            "acceptedAction": {
+              "type": "EndTurn"
+            },
+            "acceptedActionType": "EndTurn",
+            "revisionAfterEndTurn": 1,
+            "initialFullSnapshot": {
+              "bytes": 2519696,
+              "sha256": "2206715073ccfc4e86380d370acbde76217f61d45a9232e7997774a40d7d152b",
+              "revision": 0,
+              "summary": {
+                "legalActionCount": 1475,
+                "legalActionTypes": [
+                  "AssignWorkers",
+                  "BuildBarbedWire",
+                  "BuildCheckpoint",
+                  "BuildConstructibleFacility",
+                  "EndTurn",
+                  "Move",
+                  "ProduceUnit",
+                  "SetPowerSupply",
+                  "Wait"
+                ],
+                "resources": null,
+                "population": null,
+                "turn": null,
+                "gameOver": null,
+                "result": null
+              }
+            },
+            "compactStatusRevision1": {
+              "bytes": 32542,
+              "sha256": "f8bf5759f7abe41ddca0126e01ebdf023b2cf14ecae48d96d2154a9aa6a378c5",
+              "revision": 1,
+              "resources": {
+                "civilianGoods": 411,
+                "electricityCapacity": 60,
+                "electricityRequired": 40,
+                "food": 345,
+                "fuel": 132,
+                "militaryGoods": 74
+              },
+              "population": {
+                "approvedRefugees": 0,
+                "cityResidents": 41,
+                "healthyCivilians": 100,
+                "infected": 0,
+                "productionWorkers": 59,
+                "screeningRefugees": 0,
+                "unitPopulation": 15,
+                "waitingRefugees": 0
+              },
+              "gameOver": false,
+              "result": null
+            },
+            "fullSnapshotRevision1": {
+              "bytes": 2519729,
+              "sha256": "1ba74ee276412898aa269c3639d27e881652503ce5f2c1bef2bb4552adb174c7",
+              "revision": 1,
+              "summary": {
+                "legalActionCount": 1475,
+                "legalActionTypes": [
+                  "AssignWorkers",
+                  "BuildBarbedWire",
+                  "BuildCheckpoint",
+                  "BuildConstructibleFacility",
+                  "EndTurn",
+                  "Move",
+                  "ProduceUnit",
+                  "SetPowerSupply",
+                  "Wait"
+                ],
+                "resources": null,
+                "population": null,
+                "turn": null,
+                "gameOver": null,
+                "result": null
+              }
+            }
+          }
+        },
+        "v157": {
+          "label": "v1.5.7",
+          "package": {
+            "root": "D:\\private\\nowherelefttohide\\output\\portable-player-license-check-win-20260912",
+            "appVersion": "1.5.7",
+            "platform": "win-x64",
+            "commit": "portable-license-check",
+            "buildId": "portable-license-check",
+            "buildInfoNodeVersion": "v22.14.0",
+            "bundledNodeVersion": "v22.14.0",
+            "cliPath": "D:\\private\\nowherelefttohide\\output\\portable-player-license-check-win-20260912\\session-cli.mjs",
+            "cliBytes": 935505,
+            "cliSha256": "16bfdf03803a4cc1a0d21feaff0652c0986ee7ca64a7dcebdbfb765f2a9139a1"
+          },
+          "operation": {
+            "sessionRoot": "D:\\private\\nowherelefttohide\\output\\v157-response-session-20260912",
+            "sessionId": "response-compare-v157",
+            "seed": 1,
+            "config": "default (no --config, --checkpoint-interval, or other tuning flags)",
+            "commandSequence": [
+              "new",
+              "query full-snapshot@0",
+              "step EndTurn@0",
+              "status@1",
+              "query full-snapshot@1"
+            ],
+            "acceptedAction": {
+              "type": "EndTurn"
+            },
+            "acceptedActionType": "EndTurn",
+            "revisionAfterEndTurn": 1,
+            "initialFullSnapshot": {
+              "bytes": 2522138,
+              "sha256": "243812eb8ab2da817388a297d9c2aec0307bf0fc28b0668a83e94d33164805bd",
+              "revision": 0,
+              "summary": {
+                "legalActionCount": 1475,
+                "legalActionTypes": [
+                  "AssignWorkers",
+                  "BuildBarbedWire",
+                  "BuildCheckpoint",
+                  "BuildConstructibleFacility",
+                  "EndTurn",
+                  "Move",
+                  "ProduceUnit",
+                  "SetPowerSupply",
+                  "Wait"
+                ],
+                "resources": null,
+                "population": null,
+                "turn": null,
+                "gameOver": null,
+                "result": null
+              }
+            },
+            "compactStatusRevision1": {
+              "bytes": 47234,
+              "sha256": "0974ce49de1dfca8404c920b8dcd4d8311d9f92f06570fc2da1f87d29283d0fe",
+              "revision": 1,
+              "resources": {
+                "civilianGoods": 411,
+                "electricityCapacity": 60,
+                "electricityRequired": 40,
+                "food": 345,
+                "fuel": 132,
+                "militaryGoods": 74
+              },
+              "population": {
+                "approvedRefugees": 0,
+                "cityResidents": 41,
+                "healthyCivilians": 100,
+                "infected": 0,
+                "productionWorkers": 59,
+                "screeningRefugees": 0,
+                "unitPopulation": 15,
+                "waitingRefugees": 0
+              },
+              "gameOver": false,
+              "result": null
+            },
+            "fullSnapshotRevision1": {
+              "bytes": 2522172,
+              "sha256": "18fa89aed12fccc266dd58afb4c075a28fcd5a4532c0cfb4954ee1dc3b2093d8",
+              "revision": 1,
+              "summary": {
+                "legalActionCount": 1475,
+                "legalActionTypes": [
+                  "AssignWorkers",
+                  "BuildBarbedWire",
+                  "BuildCheckpoint",
+                  "BuildConstructibleFacility",
+                  "EndTurn",
+                  "Move",
+                  "ProduceUnit",
+                  "SetPowerSupply",
+                  "Wait"
+                ],
+                "resources": null,
+                "population": null,
+                "turn": null,
+                "gameOver": null,
+                "result": null
+              }
+            }
+          }
+        }
+      },
+      "responseComparison": {
+        "compactStatusRevision1": {
+          "v156": {
+            "bytes": 32542,
+            "sha256": "f8bf5759f7abe41ddca0126e01ebdf023b2cf14ecae48d96d2154a9aa6a378c5",
+            "revision": 1,
+            "resources": {
+              "civilianGoods": 411,
+              "electricityCapacity": 60,
+              "electricityRequired": 40,
+              "food": 345,
+              "fuel": 132,
+              "militaryGoods": 74
+            },
+            "population": {
+              "approvedRefugees": 0,
+              "cityResidents": 41,
+              "healthyCivilians": 100,
+              "infected": 0,
+              "productionWorkers": 59,
+              "screeningRefugees": 0,
+              "unitPopulation": 15,
+              "waitingRefugees": 0
+            },
+            "gameOver": false,
+            "result": null
+          },
+          "v157": {
+            "bytes": 47234,
+            "sha256": "0974ce49de1dfca8404c920b8dcd4d8311d9f92f06570fc2da1f87d29283d0fe",
+            "revision": 1,
+            "resources": {
+              "civilianGoods": 411,
+              "electricityCapacity": 60,
+              "electricityRequired": 40,
+              "food": 345,
+              "fuel": 132,
+              "militaryGoods": 74
+            },
+            "population": {
+              "approvedRefugees": 0,
+              "cityResidents": 41,
+              "healthyCivilians": 100,
+              "infected": 0,
+              "productionWorkers": 59,
+              "screeningRefugees": 0,
+              "unitPopulation": 15,
+              "waitingRefugees": 0
+            },
+            "gameOver": false,
+            "result": null
+          },
+          "deltaBytes": 14692
+        },
+        "fullSnapshotRevision1": {
+          "v156": {
+            "bytes": 2519729,
+            "sha256": "1ba74ee276412898aa269c3639d27e881652503ce5f2c1bef2bb4552adb174c7",
+            "revision": 1,
+            "summary": {
+              "legalActionCount": 1475,
+              "legalActionTypes": [
+                "AssignWorkers",
+                "BuildBarbedWire",
+                "BuildCheckpoint",
+                "BuildConstructibleFacility",
+                "EndTurn",
+                "Move",
+                "ProduceUnit",
+                "SetPowerSupply",
+                "Wait"
+              ],
+              "resources": null,
+              "population": null,
+              "turn": null,
+              "gameOver": null,
+              "result": null
+            }
+          },
+          "v157": {
+            "bytes": 2522172,
+            "sha256": "18fa89aed12fccc266dd58afb4c075a28fcd5a4532c0cfb4954ee1dc3b2093d8",
+            "revision": 1,
+            "summary": {
+              "legalActionCount": 1475,
+              "legalActionTypes": [
+                "AssignWorkers",
+                "BuildBarbedWire",
+                "BuildCheckpoint",
+                "BuildConstructibleFacility",
+                "EndTurn",
+                "Move",
+                "ProduceUnit",
+                "SetPowerSupply",
+                "Wait"
+              ],
+              "resources": null,
+              "population": null,
+              "turn": null,
+              "gameOver": null,
+              "result": null
+            }
+          },
+          "deltaBytes": 2443
+        }
+      }
+    }
+  },
+  "portableCi": {
+    "run": 34681924510,
+    "status": "completed",
+    "previousFailedRun": 34681186690,
+    "fixes": [
+      "Linux launcher closing quote",
+      "canonical Windows test temporary directory",
+      "preserve package identity during evidence queries"
+    ],
+    "supersededCancelledRuns": [
+      34681562051
+    ],
+    "conclusion": "success",
+    "runResult": {
+      "conclusion": "success",
+      "headSha": "1613bc56c01141358ce76e447ea12afcb78826bd",
+      "jobs": [
+        {
+          "completedAt": "2026-09-12T08:07:46Z",
+          "conclusion": "success",
+          "databaseId": 103522003626,
+          "name": "Build Linux x64 AI package",
+          "startedAt": "2026-09-12T07:56:01Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-09-12T07:56:02Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-09-12T07:56:01Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T07:56:03Z",
+              "conclusion": "success",
+              "name": "Check out verified source revision",
+              "number": 2,
+              "startedAt": "2026-09-12T07:56:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T07:56:05Z",
+              "conclusion": "success",
+              "name": "Set up Node.js 22",
+              "number": 3,
+              "startedAt": "2026-09-12T07:56:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T07:56:09Z",
+              "conclusion": "success",
+              "name": "Install locked dependencies for checkout validation",
+              "number": 4,
+              "startedAt": "2026-09-12T07:56:05Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:01:20Z",
+              "conclusion": "success",
+              "name": "Validate checkout before assembling Player package",
+              "number": 5,
+              "startedAt": "2026-09-12T07:56:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:01:20Z",
+              "conclusion": "success",
+              "name": "Assemble minimal Linux Player package",
+              "number": 6,
+              "startedAt": "2026-09-12T08:01:20Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:01:21Z",
+              "conclusion": "success",
+              "name": "Verify minimal Linux Player package contents",
+              "number": 7,
+              "startedAt": "2026-09-12T08:01:20Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:03:01Z",
+              "conclusion": "success",
+              "name": "Smoke test checkout built-in Agent",
+              "number": 8,
+              "startedAt": "2026-09-12T08:01:21Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:07:34Z",
+              "conclusion": "success",
+              "name": "Smoke test Linux Player package from checkout driver",
+              "number": 9,
+              "startedAt": "2026-09-12T08:03:01Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:07:39Z",
+              "conclusion": "success",
+              "name": "Create distributable ZIP",
+              "number": 10,
+              "startedAt": "2026-09-12T08:07:34Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:07:43Z",
+              "conclusion": "success",
+              "name": "Record Linux package and Session evidence",
+              "number": 11,
+              "startedAt": "2026-09-12T08:07:39Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:07:44Z",
+              "conclusion": "success",
+              "name": "Upload portable AI Player package",
+              "number": 12,
+              "startedAt": "2026-09-12T08:07:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:07:44Z",
+              "conclusion": "success",
+              "name": "Upload Linux package evidence",
+              "number": 13,
+              "startedAt": "2026-09-12T08:07:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:07:45Z",
+              "conclusion": "success",
+              "name": "Post Set up Node.js 22",
+              "number": 25,
+              "startedAt": "2026-09-12T08:07:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:07:45Z",
+              "conclusion": "success",
+              "name": "Post Check out verified source revision",
+              "number": 26,
+              "startedAt": "2026-09-12T08:07:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:07:45Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 27,
+              "startedAt": "2026-09-12T08:07:45Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34681924510/job/103522003626"
+        },
+        {
+          "completedAt": "2026-09-12T08:11:23Z",
+          "conclusion": "success",
+          "databaseId": 103522003750,
+          "name": "Build Windows x64 AI package",
+          "startedAt": "2026-09-12T07:55:42Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-09-12T07:55:44Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-09-12T07:55:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T07:55:50Z",
+              "conclusion": "success",
+              "name": "Check out verified source revision",
+              "number": 2,
+              "startedAt": "2026-09-12T07:55:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T07:55:56Z",
+              "conclusion": "success",
+              "name": "Set up Node.js 22",
+              "number": 3,
+              "startedAt": "2026-09-12T07:55:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T07:56:09Z",
+              "conclusion": "success",
+              "name": "Install locked dependencies for checkout validation",
+              "number": 4,
+              "startedAt": "2026-09-12T07:55:56Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:03:01Z",
+              "conclusion": "success",
+              "name": "Validate checkout before assembling Windows Player package",
+              "number": 5,
+              "startedAt": "2026-09-12T07:56:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:03:02Z",
+              "conclusion": "success",
+              "name": "Assemble minimal Windows Player package",
+              "number": 6,
+              "startedAt": "2026-09-12T08:03:01Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:03:03Z",
+              "conclusion": "success",
+              "name": "Verify minimal Windows Player package contents",
+              "number": 7,
+              "startedAt": "2026-09-12T08:03:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:05:16Z",
+              "conclusion": "success",
+              "name": "Smoke test checkout built-in Agent on Windows",
+              "number": 8,
+              "startedAt": "2026-09-12T08:03:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:11:04Z",
+              "conclusion": "success",
+              "name": "Smoke test Windows Player package from checkout driver",
+              "number": 9,
+              "startedAt": "2026-09-12T08:05:16Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:11:07Z",
+              "conclusion": "success",
+              "name": "Create Windows distributable ZIP",
+              "number": 10,
+              "startedAt": "2026-09-12T08:11:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:11:12Z",
+              "conclusion": "success",
+              "name": "Record Windows package and Session evidence",
+              "number": 11,
+              "startedAt": "2026-09-12T08:11:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:11:15Z",
+              "conclusion": "success",
+              "name": "Upload Windows portable AI Player package",
+              "number": 12,
+              "startedAt": "2026-09-12T08:11:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:11:16Z",
+              "conclusion": "success",
+              "name": "Upload Windows package evidence",
+              "number": 13,
+              "startedAt": "2026-09-12T08:11:15Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:11:19Z",
+              "conclusion": "success",
+              "name": "Post Set up Node.js 22",
+              "number": 25,
+              "startedAt": "2026-09-12T08:11:16Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:11:21Z",
+              "conclusion": "success",
+              "name": "Post Check out verified source revision",
+              "number": 26,
+              "startedAt": "2026-09-12T08:11:19Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-12T08:11:21Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 27,
+              "startedAt": "2026-09-12T08:11:21Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34681924510/job/103522003750"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/plastichyena/nowherelefttohide/actions/runs/34681924510"
+    },
+    "platforms": {
+      "linux": {
+        "measurements": {
+          "ok": true,
+          "measuredAtUtc": "2026-09-12T08:07:41.190Z",
+          "package": {
+            "path": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64",
+            "expandedBytes": 125978819,
+            "fileCount": 13,
+            "sha256": "f10c66e1ea06ff5cc6bcfadfb771d6663f5e728110aa9dec693ab1dc1e230dcb",
+            "zipBytes": 44209080,
+            "zipPath": "/home/runner/work/nowherelefttohide/nowherelefttohide/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64.zip"
+          },
+          "before": null,
+          "comparison": null,
+          "session": {
+            "root": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64-sessions",
+            "sessionBytes": 2232177,
+            "sessionFileCount": 744,
+            "artifactBytes": 2510272,
+            "artifactFileCount": 108,
+            "categories": {
+              "otherSessionFile": {
+                "bytes": 592237,
+                "fileCount": 303
+              },
+              "privatePayloadPool": {
+                "bytes": 213917,
+                "fileCount": 88
+              },
+              "publicPayloadPool": {
+                "bytes": 542462,
+                "fileCount": 167
+              },
+              "lockDiagnosticHistory": {
+                "bytes": 26600,
+                "fileCount": 91
+              },
+              "decisionRecord": {
+                "bytes": 827084,
+                "fileCount": 47
+              },
+              "checkpointMetadata": {
+                "bytes": 16133,
+                "fileCount": 10
+              },
+              "requestIndex": {
+                "bytes": 13744,
+                "fileCount": 38
+              },
+              "artifactPackage": {
+                "bytes": 2510272,
+                "fileCount": 108
+              },
+              "legalActionPayload": {
+                "bytes": 0,
+                "fileCount": 0,
+                "storage": "embedded in publicPayloadPool snapshots/diffs"
+              }
+            }
+          },
+          "compact": {
+            "available": true,
+            "launcher": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64/run-session.sh",
+            "session": "portable-command-smoke",
+            "revision": 1,
+            "bytes": 47268,
+            "sha256": "31745ffde5f559c5ae18cc98959c72ec40e2c08593030d8e73167b3f1f9a4d25"
+          },
+          "fullJson": {
+            "available": true,
+            "launcher": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64/run-session.sh",
+            "session": "portable-command-smoke",
+            "revision": 1,
+            "bytes": 2522173,
+            "sha256": "eaa0846f92cc9059e856d9b7e6b4a0a31e8050fd67da6a5e07e76e015cc6e0bd",
+            "kind": null,
+            "target": "full-snapshot"
+          }
+        },
+        "smoke": {
+          "ok": true,
+          "launcher": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64/run-session.sh",
+          "root": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64-sessions",
+          "node": {
+            "version": "v22.23.2",
+            "platform": "linux",
+            "arch": "x64"
+          },
+          "commands": [
+            "new",
+            "status",
+            "step",
+            "play-turn",
+            "save-checkpoint",
+            "list-checkpoints",
+            "load-checkpoint",
+            "query",
+            "artifact"
+          ],
+          "commandSmoke": {
+            "commandCount": 9,
+            "commands": [
+              "new",
+              "status",
+              "step",
+              "play-turn",
+              "save-checkpoint",
+              "list-checkpoints",
+              "load-checkpoint",
+              "query",
+              "artifact"
+            ],
+            "checkpointId": "manual-turn-001-d000001-001",
+            "branchArtifact": {
+              "path": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64-sessions/command-branch-artifact",
+              "manifestHash": "ba01f85d4c29b03516dff0dd4330db386faa0072b9ac2afa5984818e93e5072d",
+              "decisionCount": 1,
+              "acceptedActionCount": 1
+            },
+            "finitePlan": {
+              "sessionId": "portable-finite-plan",
+              "revision": 1
+            },
+            "interactive": {
+              "sessionId": "portable-interactive-plan",
+              "revision": 1
+            }
+          },
+          "seeds": [
+            {
+              "seed": 1,
+              "session": "portable-seed-1-0",
+              "decisions": 10,
+              "revision": 10,
+              "result": {
+                "outcome": "lost",
+                "reason": "capitalLost",
+                "statistics": {
+                  "activeCheckpointLosses": 0,
+                  "barbedWireAbsorbedDamage": 0,
+                  "barbedWireBuilt": 0,
+                  "barbedWireDamageTaken": 0,
+                  "barbedWireDestroyed": 0,
+                  "barbedWireEmptyAttackCharges": 0,
+                  "barbedWireOccupiedAttackCharges": 0,
+                  "chainOverruns": 0,
+                  "checkpointActivations": 0,
+                  "checkpointFallbacks": 0,
+                  "checkpointFallbacksByBranch": {
+                    "east": 0,
+                    "north": 0,
+                    "south": 0,
+                    "west": 0
+                  },
+                  "checkpointFallbacksFromDormant": 0,
+                  "checkpointFallbacksFromStandby": 0,
+                  "checkpointFallbacksPreventingUnmanagedArrival": 0,
+                  "checkpointQueueCivilianGoodsConsumed": 0,
+                  "checkpointQueueCivilianGoodsDemand": 0,
+                  "checkpointQueueFoodConsumed": 0,
+                  "checkpointQueueFoodDemand": 0,
+                  "checkpointRetreats": 0,
+                  "checkpointsAbandoned": 0,
+                  "checkpointsBuilt": 0,
+                  "checkpointsRecovered": 0,
+                  "checkpointsRelocated": 0,
+                  "checkpointsRemoved": 0,
+                  "checkpointsRuined": 0,
+                  "civilianDroneBasesBuilt": 0,
+                  "civilianDroneBasesDecommissioned": 0,
+                  "civilianGoodsRefundedFromDecommission": 0,
+                  "civilianLosses": 147,
+                  "constructibleInfectedDeaths": 0,
+                  "cumulativeGroundVisionBlockedHexes": 0,
+                  "dormantCheckpointsCreated": 0,
+                  "fallenSitesTriggeredByNoise": 0,
+                  "finalHordeDefeated": false,
+                  "finalHordeKilled": 0,
+                  "finalHordeSpawned": 0,
+                  "finalSpecialZombiesSpawnedByType": {
+                    "gasZombie": 0,
+                    "hunterZombie": 0,
+                    "policeZombie": 0,
+                    "riotZombie": 0,
+                    "soldierZombie": 0
+                  },
+                  "forestDefenseApplications": 0,
+                  "forestDefenseDamagePrevented": 0,
+                  "gasExplosions": 0,
+                  "gasExplosionUnitDamage": 0,
+                  "gasZombiesKilled": 0,
+                  "groundVisionBlockedHexes": 0,
+                  "groundVisionPotentialHexes": 113,
+                  "groundVisionSamples": 10,
+                  "groundVisionVisibleHexes": 113,
+                  "hordeInterceptions": 2,
+                  "hordeMovementNoisePulses": 11,
+                  "hordeTargetClearedCount": 0,
+                  "hordeTargetInheritedCount": 0,
+                  "hordeZombiesKilled": 0,
+                  "housingBuilt": 0,
+                  "housingCivilianGoodsProduced": 0,
+                  "housingOutageFacilityTurns": 0,
+                  "housingResidentTurns": 0,
+                  "hunterZombiesKilled": 0,
+                  "immediateInfectionsFromSpawn": 0,
+                  "infectedPopulationConvertedToZombies": 45,
+                  "infectionLosses": 147,
+                  "initialNormalZombies": 25,
+                  "maxCheckpointPostsPerBranch": 0,
+                  "maxCivilianDroneVisionRadius": 0,
+                  "maxGroundVisionBlockedHexes": 0,
+                  "maximumOverrunChainLength": 0,
+                  "maxPopulation": 176,
+                  "maxPreparedCheckpointPostsPerBranch": 0,
+                  "maxSecuredFacilities": 6,
+                  "maxSuppliedFacilities": 8,
+                  "maxSupplyRadius": 5,
+                  "maxVisibleZombies": 6,
+                  "nationalGuardNoisePulses": 9,
+                  "nationalGuardReanimations": 0,
+                  "noisePulsesBySourceType": {
+                    "armyBase": 0,
+                    "hordeZombie": 11,
+                    "nationalGuard": 9,
+                    "police": 2,
+                    "riotPolice": 0,
+                    "windPowerPlant": 9
+                  },
+                  "noisePulsesEmitted": 31,
+                  "noiseRespawnAttempts": 0,
+                  "noiseRespawnZombiesSpawned": 0,
+                  "normalZombieIdleCount": 252,
+                  "normalZombiesKilled": 3,
+                  "policeLongRangeMoves": 0,
+                  "policeNoisePulses": 2,
+                  "policeReanimations": 0,
+                  "policeZombiesKilled": 0,
+                  "preventedRefugeeArrivalsAfterFinal": 0,
+                  "reanimationChainOverruns": 0,
+                  "reanimationCheckpointInfections": 0,
+                  "reanimationFacilityInfections": 0,
+                  "reanimationImmediateInfections": 0,
+                  "reanimationSiteFalls": 0,
+                  "recruitsCommissionedByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "refugeeArrivalsByBranch": {
+                    "east": 47,
+                    "north": 33,
+                    "south": 50,
+                    "west": 32
+                  },
+                  "refugeesAccepted": 99,
+                  "refugeesDeparted": 63,
+                  "refugeesScreenedByPolicy": {
+                    "normal": 0,
+                    "passThrough": 162,
+                    "strict": 0
+                  },
+                  "regularPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "resourceShortageLosses": 0,
+                  "riotPoliceLost": 0,
+                  "riotPoliceProduced": 0,
+                  "riotPoliceReanimations": 0,
+                  "riotZombiesFinal": 0,
+                  "riotZombiesKilled": 0,
+                  "soldierZombiesKilled": 0,
+                  "standbyCheckpointsCreated": 0,
+                  "suppliedAreaInfectionClearTurn": 1,
+                  "suppliedAreaZombieClearTurn": 1,
+                  "supplyLosses": 0,
+                  "supplyRejections": 0,
+                  "terrainEntriesByType": {
+                    "forest": 0,
+                    "mountain": 0,
+                    "plain": 74,
+                    "water": 0
+                  },
+                  "turnsAfterFinalHorde": 0,
+                  "unitLosses": 0,
+                  "unmanagedBranchTurns": 40,
+                  "unmanagedPassThrough": 162,
+                  "unspawnedInfectedPopulation": 15,
+                  "urbanDefenseApplications": 2,
+                  "urbanDefenseDamagePrevented": 14,
+                  "veteranPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "veteranZombieKillsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "victoryTurn": null
+                },
+                "turn": 10
+              },
+              "artifact": {
+                "path": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64-sessions/seed-1-0.nlth-artifact",
+                "manifestHash": "a0f47e5a6321cfbe49aebd6616986a23c7f0d6b96b2f1a3356b729a68318de54",
+                "decisionCount": 10,
+                "acceptedActionCount": 10
+              },
+              "compactHashes": [
+                "78491fd525d66fba550fa27269cfd66bd3a59bf8e233aab3695a8e60943b9d4f",
+                "f08ba7f9ef994014aa22b9907cb8f9bdf32589d8ced969ee25888103f2181966",
+                "7dea3a6549932fe0d8d32b93cd1af3f25c2bb4524d39d696e835fb1fab558cfa",
+                "ff23ffd85796fe9c795abdedd376831c695215ea75584483b11f33d505a22be5",
+                "26153244b91818fc0dfcd35a62e1545a30bbcfa6ba800277db34c747dfcd15d5",
+                "88eb2023de262be710fc578cb6ff258d3a8f10af177a5baf4c2ba6945638e82c",
+                "4d1dec3185ae32942ba610b24197a2d2be6a9eeb6d1f6aec4da3205a2eff6cc2",
+                "2dbc0d09e339c1ca9c83db90541b83975176baf853e633d5279b12d8345898ea",
+                "127e00c7ccf36e42ba0b841a50d7f0d0cdca9deccc94da3f99efb4cca0e12acb",
+                "abce3f3e4a8de81de0edd1083cf9548f1aa1b931eee2dcbb613f4e68b53d05b0",
+                "d4e22618abf013a04538f660371f072bb0c1f53782fe82d4d1790a3dc073c48f"
+              ]
+            },
+            {
+              "seed": 7,
+              "session": "portable-seed-7-1",
+              "decisions": 8,
+              "revision": 8,
+              "result": {
+                "outcome": "lost",
+                "reason": "capitalLost",
+                "statistics": {
+                  "activeCheckpointLosses": 0,
+                  "barbedWireAbsorbedDamage": 0,
+                  "barbedWireBuilt": 0,
+                  "barbedWireDamageTaken": 0,
+                  "barbedWireDestroyed": 0,
+                  "barbedWireEmptyAttackCharges": 0,
+                  "barbedWireOccupiedAttackCharges": 0,
+                  "chainOverruns": 0,
+                  "checkpointActivations": 0,
+                  "checkpointFallbacks": 0,
+                  "checkpointFallbacksByBranch": {
+                    "east": 0,
+                    "north": 0,
+                    "south": 0,
+                    "west": 0
+                  },
+                  "checkpointFallbacksFromDormant": 0,
+                  "checkpointFallbacksFromStandby": 0,
+                  "checkpointFallbacksPreventingUnmanagedArrival": 0,
+                  "checkpointQueueCivilianGoodsConsumed": 0,
+                  "checkpointQueueCivilianGoodsDemand": 0,
+                  "checkpointQueueFoodConsumed": 0,
+                  "checkpointQueueFoodDemand": 0,
+                  "checkpointRetreats": 0,
+                  "checkpointsAbandoned": 0,
+                  "checkpointsBuilt": 0,
+                  "checkpointsRecovered": 0,
+                  "checkpointsRelocated": 0,
+                  "checkpointsRemoved": 0,
+                  "checkpointsRuined": 0,
+                  "civilianDroneBasesBuilt": 0,
+                  "civilianDroneBasesDecommissioned": 0,
+                  "civilianGoodsRefundedFromDecommission": 0,
+                  "civilianLosses": 117,
+                  "constructibleInfectedDeaths": 0,
+                  "cumulativeGroundVisionBlockedHexes": 0,
+                  "dormantCheckpointsCreated": 0,
+                  "fallenSitesTriggeredByNoise": 0,
+                  "finalHordeDefeated": false,
+                  "finalHordeKilled": 0,
+                  "finalHordeSpawned": 0,
+                  "finalSpecialZombiesSpawnedByType": {
+                    "gasZombie": 0,
+                    "hunterZombie": 0,
+                    "policeZombie": 0,
+                    "riotZombie": 0,
+                    "soldierZombie": 0
+                  },
+                  "forestDefenseApplications": 0,
+                  "forestDefenseDamagePrevented": 0,
+                  "gasExplosions": 0,
+                  "gasExplosionUnitDamage": 0,
+                  "gasZombiesKilled": 0,
+                  "groundVisionBlockedHexes": 0,
+                  "groundVisionPotentialHexes": 113,
+                  "groundVisionSamples": 8,
+                  "groundVisionVisibleHexes": 113,
+                  "hordeInterceptions": 0,
+                  "hordeMovementNoisePulses": 5,
+                  "hordeTargetClearedCount": 0,
+                  "hordeTargetInheritedCount": 0,
+                  "hordeZombiesKilled": 0,
+                  "housingBuilt": 0,
+                  "housingCivilianGoodsProduced": 0,
+                  "housingOutageFacilityTurns": 0,
+                  "housingResidentTurns": 0,
+                  "hunterZombiesKilled": 0,
+                  "immediateInfectionsFromSpawn": 0,
+                  "infectedPopulationConvertedToZombies": 40,
+                  "infectionLosses": 117,
+                  "initialNormalZombies": 25,
+                  "maxCheckpointPostsPerBranch": 0,
+                  "maxCivilianDroneVisionRadius": 0,
+                  "maxGroundVisionBlockedHexes": 0,
+                  "maximumOverrunChainLength": 0,
+                  "maxPopulation": 160,
+                  "maxPreparedCheckpointPostsPerBranch": 0,
+                  "maxSecuredFacilities": 6,
+                  "maxSuppliedFacilities": 8,
+                  "maxSupplyRadius": 5,
+                  "maxVisibleZombies": 7,
+                  "nationalGuardNoisePulses": 7,
+                  "nationalGuardReanimations": 0,
+                  "noisePulsesBySourceType": {
+                    "armyBase": 0,
+                    "hordeZombie": 5,
+                    "nationalGuard": 7,
+                    "police": 0,
+                    "riotPolice": 0,
+                    "windPowerPlant": 7
+                  },
+                  "noisePulsesEmitted": 19,
+                  "noiseRespawnAttempts": 0,
+                  "noiseRespawnZombiesSpawned": 0,
+                  "normalZombieIdleCount": 188,
+                  "normalZombiesKilled": 1,
+                  "policeLongRangeMoves": 0,
+                  "policeNoisePulses": 0,
+                  "policeReanimations": 0,
+                  "policeZombiesKilled": 0,
+                  "preventedRefugeeArrivalsAfterFinal": 0,
+                  "reanimationChainOverruns": 0,
+                  "reanimationCheckpointInfections": 0,
+                  "reanimationFacilityInfections": 0,
+                  "reanimationImmediateInfections": 0,
+                  "reanimationSiteFalls": 0,
+                  "recruitsCommissionedByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "refugeeArrivalsByBranch": {
+                    "east": 31,
+                    "north": 32,
+                    "south": 34,
+                    "west": 17
+                  },
+                  "refugeesAccepted": 72,
+                  "refugeesDeparted": 42,
+                  "refugeesScreenedByPolicy": {
+                    "normal": 0,
+                    "passThrough": 114,
+                    "strict": 0
+                  },
+                  "regularPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "resourceShortageLosses": 0,
+                  "riotPoliceLost": 0,
+                  "riotPoliceProduced": 0,
+                  "riotPoliceReanimations": 0,
+                  "riotZombiesFinal": 0,
+                  "riotZombiesKilled": 0,
+                  "soldierZombiesKilled": 0,
+                  "standbyCheckpointsCreated": 0,
+                  "suppliedAreaInfectionClearTurn": 1,
+                  "suppliedAreaZombieClearTurn": 1,
+                  "supplyLosses": 0,
+                  "supplyRejections": 0,
+                  "terrainEntriesByType": {
+                    "forest": 0,
+                    "mountain": 0,
+                    "plain": 38,
+                    "water": 0
+                  },
+                  "turnsAfterFinalHorde": 0,
+                  "unitLosses": 0,
+                  "unmanagedBranchTurns": 32,
+                  "unmanagedPassThrough": 114,
+                  "unspawnedInfectedPopulation": 10,
+                  "urbanDefenseApplications": 1,
+                  "urbanDefenseDamagePrevented": 7,
+                  "veteranPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "veteranZombieKillsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "victoryTurn": null
+                },
+                "turn": 8
+              },
+              "artifact": {
+                "path": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64-sessions/seed-7-1.nlth-artifact",
+                "manifestHash": "079b096b321505af3042215dd6bb403efc8db4079c06c8dea2fb9e316c7841e7",
+                "decisionCount": 8,
+                "acceptedActionCount": 8
+              },
+              "compactHashes": [
+                "00f1031d706fb6e8afdf729468d7ca8d8c9f11402f5bac2d3b5176b2101a471b",
+                "ace0e2de3b44ec5de7608d38d4e4ef2a5362df1c384ea1bc57159d5bd83b5ef2",
+                "52483bdb708fa224120ab58d7d322bb50402685994eee7a9a8045d99c6b7b498",
+                "ef1cb2704a711da8dd97c1a7737437aa7e850453fc3481fe745a1814c1d5137d",
+                "1ca7d0ea8e5d0496f417617151fed5dbfc05e2bf667ff8c339fc67a13345b4e8",
+                "6fcda7178098dae24d6d4ab882ca3b02b03e8c031395dd7f056d2b7ca224eff0",
+                "447d9a5b3e142242532e5d2b6d076e01371a4a6e891d9400bfe0f1709f0fc4c1",
+                "ef5af4b5d1b356fb49025654d9b2ba4972a2bd9c425107098c2ddb51659445a7",
+                "bed9b72f791f22ff522f8e1b7aa0ad58b888c225990d211cd55e30947cc31b94"
+              ]
+            }
+          ],
+          "replays": [
+            {
+              "session": "portable-replay-1-0",
+              "decisions": 10,
+              "result": {
+                "outcome": "lost",
+                "reason": "capitalLost",
+                "statistics": {
+                  "activeCheckpointLosses": 0,
+                  "barbedWireAbsorbedDamage": 0,
+                  "barbedWireBuilt": 0,
+                  "barbedWireDamageTaken": 0,
+                  "barbedWireDestroyed": 0,
+                  "barbedWireEmptyAttackCharges": 0,
+                  "barbedWireOccupiedAttackCharges": 0,
+                  "chainOverruns": 0,
+                  "checkpointActivations": 0,
+                  "checkpointFallbacks": 0,
+                  "checkpointFallbacksByBranch": {
+                    "east": 0,
+                    "north": 0,
+                    "south": 0,
+                    "west": 0
+                  },
+                  "checkpointFallbacksFromDormant": 0,
+                  "checkpointFallbacksFromStandby": 0,
+                  "checkpointFallbacksPreventingUnmanagedArrival": 0,
+                  "checkpointQueueCivilianGoodsConsumed": 0,
+                  "checkpointQueueCivilianGoodsDemand": 0,
+                  "checkpointQueueFoodConsumed": 0,
+                  "checkpointQueueFoodDemand": 0,
+                  "checkpointRetreats": 0,
+                  "checkpointsAbandoned": 0,
+                  "checkpointsBuilt": 0,
+                  "checkpointsRecovered": 0,
+                  "checkpointsRelocated": 0,
+                  "checkpointsRemoved": 0,
+                  "checkpointsRuined": 0,
+                  "civilianDroneBasesBuilt": 0,
+                  "civilianDroneBasesDecommissioned": 0,
+                  "civilianGoodsRefundedFromDecommission": 0,
+                  "civilianLosses": 147,
+                  "constructibleInfectedDeaths": 0,
+                  "cumulativeGroundVisionBlockedHexes": 0,
+                  "dormantCheckpointsCreated": 0,
+                  "fallenSitesTriggeredByNoise": 0,
+                  "finalHordeDefeated": false,
+                  "finalHordeKilled": 0,
+                  "finalHordeSpawned": 0,
+                  "finalSpecialZombiesSpawnedByType": {
+                    "gasZombie": 0,
+                    "hunterZombie": 0,
+                    "policeZombie": 0,
+                    "riotZombie": 0,
+                    "soldierZombie": 0
+                  },
+                  "forestDefenseApplications": 0,
+                  "forestDefenseDamagePrevented": 0,
+                  "gasExplosions": 0,
+                  "gasExplosionUnitDamage": 0,
+                  "gasZombiesKilled": 0,
+                  "groundVisionBlockedHexes": 0,
+                  "groundVisionPotentialHexes": 113,
+                  "groundVisionSamples": 10,
+                  "groundVisionVisibleHexes": 113,
+                  "hordeInterceptions": 2,
+                  "hordeMovementNoisePulses": 11,
+                  "hordeTargetClearedCount": 0,
+                  "hordeTargetInheritedCount": 0,
+                  "hordeZombiesKilled": 0,
+                  "housingBuilt": 0,
+                  "housingCivilianGoodsProduced": 0,
+                  "housingOutageFacilityTurns": 0,
+                  "housingResidentTurns": 0,
+                  "hunterZombiesKilled": 0,
+                  "immediateInfectionsFromSpawn": 0,
+                  "infectedPopulationConvertedToZombies": 45,
+                  "infectionLosses": 147,
+                  "initialNormalZombies": 25,
+                  "maxCheckpointPostsPerBranch": 0,
+                  "maxCivilianDroneVisionRadius": 0,
+                  "maxGroundVisionBlockedHexes": 0,
+                  "maximumOverrunChainLength": 0,
+                  "maxPopulation": 176,
+                  "maxPreparedCheckpointPostsPerBranch": 0,
+                  "maxSecuredFacilities": 6,
+                  "maxSuppliedFacilities": 8,
+                  "maxSupplyRadius": 5,
+                  "maxVisibleZombies": 6,
+                  "nationalGuardNoisePulses": 9,
+                  "nationalGuardReanimations": 0,
+                  "noisePulsesBySourceType": {
+                    "armyBase": 0,
+                    "hordeZombie": 11,
+                    "nationalGuard": 9,
+                    "police": 2,
+                    "riotPolice": 0,
+                    "windPowerPlant": 9
+                  },
+                  "noisePulsesEmitted": 31,
+                  "noiseRespawnAttempts": 0,
+                  "noiseRespawnZombiesSpawned": 0,
+                  "normalZombieIdleCount": 252,
+                  "normalZombiesKilled": 3,
+                  "policeLongRangeMoves": 0,
+                  "policeNoisePulses": 2,
+                  "policeReanimations": 0,
+                  "policeZombiesKilled": 0,
+                  "preventedRefugeeArrivalsAfterFinal": 0,
+                  "reanimationChainOverruns": 0,
+                  "reanimationCheckpointInfections": 0,
+                  "reanimationFacilityInfections": 0,
+                  "reanimationImmediateInfections": 0,
+                  "reanimationSiteFalls": 0,
+                  "recruitsCommissionedByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "refugeeArrivalsByBranch": {
+                    "east": 47,
+                    "north": 33,
+                    "south": 50,
+                    "west": 32
+                  },
+                  "refugeesAccepted": 99,
+                  "refugeesDeparted": 63,
+                  "refugeesScreenedByPolicy": {
+                    "normal": 0,
+                    "passThrough": 162,
+                    "strict": 0
+                  },
+                  "regularPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "resourceShortageLosses": 0,
+                  "riotPoliceLost": 0,
+                  "riotPoliceProduced": 0,
+                  "riotPoliceReanimations": 0,
+                  "riotZombiesFinal": 0,
+                  "riotZombiesKilled": 0,
+                  "soldierZombiesKilled": 0,
+                  "standbyCheckpointsCreated": 0,
+                  "suppliedAreaInfectionClearTurn": 1,
+                  "suppliedAreaZombieClearTurn": 1,
+                  "supplyLosses": 0,
+                  "supplyRejections": 0,
+                  "terrainEntriesByType": {
+                    "forest": 0,
+                    "mountain": 0,
+                    "plain": 74,
+                    "water": 0
+                  },
+                  "turnsAfterFinalHorde": 0,
+                  "unitLosses": 0,
+                  "unmanagedBranchTurns": 40,
+                  "unmanagedPassThrough": 162,
+                  "unspawnedInfectedPopulation": 15,
+                  "urbanDefenseApplications": 2,
+                  "urbanDefenseDamagePrevented": 14,
+                  "veteranPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "veteranZombieKillsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "victoryTurn": null
+                },
+                "turn": 10
+              },
+              "artifact": {
+                "path": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64-sessions/replay-seed-1-0.nlth-artifact",
+                "manifestHash": "8e61efb66aa37bb01e878c260ca1ec7ae3050e6f20560ad0b534e2c0531d1ee8",
+                "decisionCount": 10,
+                "acceptedActionCount": 10
+              },
+              "compactHashes": [
+                "78491fd525d66fba550fa27269cfd66bd3a59bf8e233aab3695a8e60943b9d4f",
+                "f08ba7f9ef994014aa22b9907cb8f9bdf32589d8ced969ee25888103f2181966",
+                "7dea3a6549932fe0d8d32b93cd1af3f25c2bb4524d39d696e835fb1fab558cfa",
+                "ff23ffd85796fe9c795abdedd376831c695215ea75584483b11f33d505a22be5",
+                "26153244b91818fc0dfcd35a62e1545a30bbcfa6ba800277db34c747dfcd15d5",
+                "88eb2023de262be710fc578cb6ff258d3a8f10af177a5baf4c2ba6945638e82c",
+                "4d1dec3185ae32942ba610b24197a2d2be6a9eeb6d1f6aec4da3205a2eff6cc2",
+                "2dbc0d09e339c1ca9c83db90541b83975176baf853e633d5279b12d8345898ea",
+                "127e00c7ccf36e42ba0b841a50d7f0d0cdca9deccc94da3f99efb4cca0e12acb",
+                "abce3f3e4a8de81de0edd1083cf9548f1aa1b931eee2dcbb613f4e68b53d05b0",
+                "d4e22618abf013a04538f660371f072bb0c1f53782fe82d4d1790a3dc073c48f"
+              ],
+              "replayMatched": true
+            },
+            {
+              "session": "portable-replay-7-1",
+              "decisions": 8,
+              "result": {
+                "outcome": "lost",
+                "reason": "capitalLost",
+                "statistics": {
+                  "activeCheckpointLosses": 0,
+                  "barbedWireAbsorbedDamage": 0,
+                  "barbedWireBuilt": 0,
+                  "barbedWireDamageTaken": 0,
+                  "barbedWireDestroyed": 0,
+                  "barbedWireEmptyAttackCharges": 0,
+                  "barbedWireOccupiedAttackCharges": 0,
+                  "chainOverruns": 0,
+                  "checkpointActivations": 0,
+                  "checkpointFallbacks": 0,
+                  "checkpointFallbacksByBranch": {
+                    "east": 0,
+                    "north": 0,
+                    "south": 0,
+                    "west": 0
+                  },
+                  "checkpointFallbacksFromDormant": 0,
+                  "checkpointFallbacksFromStandby": 0,
+                  "checkpointFallbacksPreventingUnmanagedArrival": 0,
+                  "checkpointQueueCivilianGoodsConsumed": 0,
+                  "checkpointQueueCivilianGoodsDemand": 0,
+                  "checkpointQueueFoodConsumed": 0,
+                  "checkpointQueueFoodDemand": 0,
+                  "checkpointRetreats": 0,
+                  "checkpointsAbandoned": 0,
+                  "checkpointsBuilt": 0,
+                  "checkpointsRecovered": 0,
+                  "checkpointsRelocated": 0,
+                  "checkpointsRemoved": 0,
+                  "checkpointsRuined": 0,
+                  "civilianDroneBasesBuilt": 0,
+                  "civilianDroneBasesDecommissioned": 0,
+                  "civilianGoodsRefundedFromDecommission": 0,
+                  "civilianLosses": 117,
+                  "constructibleInfectedDeaths": 0,
+                  "cumulativeGroundVisionBlockedHexes": 0,
+                  "dormantCheckpointsCreated": 0,
+                  "fallenSitesTriggeredByNoise": 0,
+                  "finalHordeDefeated": false,
+                  "finalHordeKilled": 0,
+                  "finalHordeSpawned": 0,
+                  "finalSpecialZombiesSpawnedByType": {
+                    "gasZombie": 0,
+                    "hunterZombie": 0,
+                    "policeZombie": 0,
+                    "riotZombie": 0,
+                    "soldierZombie": 0
+                  },
+                  "forestDefenseApplications": 0,
+                  "forestDefenseDamagePrevented": 0,
+                  "gasExplosions": 0,
+                  "gasExplosionUnitDamage": 0,
+                  "gasZombiesKilled": 0,
+                  "groundVisionBlockedHexes": 0,
+                  "groundVisionPotentialHexes": 113,
+                  "groundVisionSamples": 8,
+                  "groundVisionVisibleHexes": 113,
+                  "hordeInterceptions": 0,
+                  "hordeMovementNoisePulses": 5,
+                  "hordeTargetClearedCount": 0,
+                  "hordeTargetInheritedCount": 0,
+                  "hordeZombiesKilled": 0,
+                  "housingBuilt": 0,
+                  "housingCivilianGoodsProduced": 0,
+                  "housingOutageFacilityTurns": 0,
+                  "housingResidentTurns": 0,
+                  "hunterZombiesKilled": 0,
+                  "immediateInfectionsFromSpawn": 0,
+                  "infectedPopulationConvertedToZombies": 40,
+                  "infectionLosses": 117,
+                  "initialNormalZombies": 25,
+                  "maxCheckpointPostsPerBranch": 0,
+                  "maxCivilianDroneVisionRadius": 0,
+                  "maxGroundVisionBlockedHexes": 0,
+                  "maximumOverrunChainLength": 0,
+                  "maxPopulation": 160,
+                  "maxPreparedCheckpointPostsPerBranch": 0,
+                  "maxSecuredFacilities": 6,
+                  "maxSuppliedFacilities": 8,
+                  "maxSupplyRadius": 5,
+                  "maxVisibleZombies": 7,
+                  "nationalGuardNoisePulses": 7,
+                  "nationalGuardReanimations": 0,
+                  "noisePulsesBySourceType": {
+                    "armyBase": 0,
+                    "hordeZombie": 5,
+                    "nationalGuard": 7,
+                    "police": 0,
+                    "riotPolice": 0,
+                    "windPowerPlant": 7
+                  },
+                  "noisePulsesEmitted": 19,
+                  "noiseRespawnAttempts": 0,
+                  "noiseRespawnZombiesSpawned": 0,
+                  "normalZombieIdleCount": 188,
+                  "normalZombiesKilled": 1,
+                  "policeLongRangeMoves": 0,
+                  "policeNoisePulses": 0,
+                  "policeReanimations": 0,
+                  "policeZombiesKilled": 0,
+                  "preventedRefugeeArrivalsAfterFinal": 0,
+                  "reanimationChainOverruns": 0,
+                  "reanimationCheckpointInfections": 0,
+                  "reanimationFacilityInfections": 0,
+                  "reanimationImmediateInfections": 0,
+                  "reanimationSiteFalls": 0,
+                  "recruitsCommissionedByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "refugeeArrivalsByBranch": {
+                    "east": 31,
+                    "north": 32,
+                    "south": 34,
+                    "west": 17
+                  },
+                  "refugeesAccepted": 72,
+                  "refugeesDeparted": 42,
+                  "refugeesScreenedByPolicy": {
+                    "normal": 0,
+                    "passThrough": 114,
+                    "strict": 0
+                  },
+                  "regularPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "resourceShortageLosses": 0,
+                  "riotPoliceLost": 0,
+                  "riotPoliceProduced": 0,
+                  "riotPoliceReanimations": 0,
+                  "riotZombiesFinal": 0,
+                  "riotZombiesKilled": 0,
+                  "soldierZombiesKilled": 0,
+                  "standbyCheckpointsCreated": 0,
+                  "suppliedAreaInfectionClearTurn": 1,
+                  "suppliedAreaZombieClearTurn": 1,
+                  "supplyLosses": 0,
+                  "supplyRejections": 0,
+                  "terrainEntriesByType": {
+                    "forest": 0,
+                    "mountain": 0,
+                    "plain": 38,
+                    "water": 0
+                  },
+                  "turnsAfterFinalHorde": 0,
+                  "unitLosses": 0,
+                  "unmanagedBranchTurns": 32,
+                  "unmanagedPassThrough": 114,
+                  "unspawnedInfectedPopulation": 10,
+                  "urbanDefenseApplications": 1,
+                  "urbanDefenseDamagePrevented": 7,
+                  "veteranPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "veteranZombieKillsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "victoryTurn": null
+                },
+                "turn": 8
+              },
+              "artifact": {
+                "path": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-1613bc56c011-linux-x64-sessions/replay-seed-7-1.nlth-artifact",
+                "manifestHash": "6dc3310f1ad36eedfd6090cc46e5bd8afca4dabdc06910a5c93515b5ccccb0f4",
+                "decisionCount": 8,
+                "acceptedActionCount": 8
+              },
+              "compactHashes": [
+                "00f1031d706fb6e8afdf729468d7ca8d8c9f11402f5bac2d3b5176b2101a471b",
+                "ace0e2de3b44ec5de7608d38d4e4ef2a5362df1c384ea1bc57159d5bd83b5ef2",
+                "52483bdb708fa224120ab58d7d322bb50402685994eee7a9a8045d99c6b7b498",
+                "ef1cb2704a711da8dd97c1a7737437aa7e850453fc3481fe745a1814c1d5137d",
+                "1ca7d0ea8e5d0496f417617151fed5dbfc05e2bf667ff8c339fc67a13345b4e8",
+                "6fcda7178098dae24d6d4ab882ca3b02b03e8c031395dd7f056d2b7ca224eff0",
+                "447d9a5b3e142242532e5d2b6d076e01371a4a6e891d9400bfe0f1709f0fc4c1",
+                "ef5af4b5d1b356fb49025654d9b2ba4972a2bd9c425107098c2ddb51659445a7",
+                "bed9b72f791f22ff522f8e1b7aa0ad58b888c225990d211cd55e30947cc31b94"
+              ],
+              "replayMatched": true
+            }
+          ],
+          "replayMatched": true
+        }
+      },
+      "windows": {
+        "measurements": {
+          "ok": true,
+          "measuredAtUtc": "2026-09-12T08:11:10.255Z",
+          "package": {
+            "path": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64",
+            "expandedBytes": 88140342,
+            "fileCount": 13,
+            "sha256": "b32b20a12b6ed019fdbae61445096b1017bff4625f6063d1cbb11ef95359adf0",
+            "zipBytes": 34634141,
+            "zipPath": "D:\\a\\nowherelefttohide\\nowherelefttohide\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64.zip"
+          },
+          "before": null,
+          "comparison": null,
+          "session": {
+            "root": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64-sessions",
+            "sessionBytes": 2232187,
+            "sessionFileCount": 744,
+            "artifactBytes": 2510184,
+            "artifactFileCount": 108,
+            "categories": {
+              "otherSessionFile": {
+                "bytes": 592211,
+                "fileCount": 303
+              },
+              "privatePayloadPool": {
+                "bytes": 213945,
+                "fileCount": 88
+              },
+              "publicPayloadPool": {
+                "bytes": 542470,
+                "fileCount": 167
+              },
+              "lockDiagnosticHistory": {
+                "bytes": 26600,
+                "fileCount": 91
+              },
+              "decisionRecord": {
+                "bytes": 827084,
+                "fileCount": 47
+              },
+              "checkpointMetadata": {
+                "bytes": 16133,
+                "fileCount": 10
+              },
+              "requestIndex": {
+                "bytes": 13744,
+                "fileCount": 38
+              },
+              "artifactPackage": {
+                "bytes": 2510184,
+                "fileCount": 108
+              },
+              "legalActionPayload": {
+                "bytes": 0,
+                "fileCount": 0,
+                "storage": "embedded in publicPayloadPool snapshots/diffs"
+              }
+            }
+          },
+          "compact": {
+            "available": true,
+            "launcher": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64\\run-session.cmd",
+            "session": "portable-command-smoke",
+            "revision": 1,
+            "bytes": 47268,
+            "sha256": "3fdf68cf3936489bee6f8bc4f0462b3bbf85cc9e10816b70828437cc90f1a42e"
+          },
+          "fullJson": {
+            "available": true,
+            "launcher": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64\\run-session.cmd",
+            "session": "portable-command-smoke",
+            "revision": 1,
+            "bytes": 2522173,
+            "sha256": "eaa0846f92cc9059e856d9b7e6b4a0a31e8050fd67da6a5e07e76e015cc6e0bd",
+            "kind": null,
+            "target": "full-snapshot"
+          }
+        },
+        "smoke": {
+          "ok": true,
+          "launcher": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64\\run-session.cmd",
+          "root": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64-sessions",
+          "node": {
+            "version": "v22.23.2",
+            "platform": "win32",
+            "arch": "x64"
+          },
+          "commands": [
+            "new",
+            "status",
+            "step",
+            "play-turn",
+            "save-checkpoint",
+            "list-checkpoints",
+            "load-checkpoint",
+            "query",
+            "artifact"
+          ],
+          "commandSmoke": {
+            "commandCount": 9,
+            "commands": [
+              "new",
+              "status",
+              "step",
+              "play-turn",
+              "save-checkpoint",
+              "list-checkpoints",
+              "load-checkpoint",
+              "query",
+              "artifact"
+            ],
+            "checkpointId": "manual-turn-001-d000001-001",
+            "branchArtifact": {
+              "path": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64-sessions\\command-branch-artifact",
+              "manifestHash": "39581beef508d4702fa19cb40bb951749d129698fd5b0b439de552515f4462d3",
+              "decisionCount": 1,
+              "acceptedActionCount": 1
+            },
+            "finitePlan": {
+              "sessionId": "portable-finite-plan",
+              "revision": 1
+            },
+            "interactive": {
+              "sessionId": "portable-interactive-plan",
+              "revision": 1
+            }
+          },
+          "seeds": [
+            {
+              "seed": 1,
+              "session": "portable-seed-1-0",
+              "decisions": 10,
+              "revision": 10,
+              "result": {
+                "outcome": "lost",
+                "reason": "capitalLost",
+                "statistics": {
+                  "activeCheckpointLosses": 0,
+                  "barbedWireAbsorbedDamage": 0,
+                  "barbedWireBuilt": 0,
+                  "barbedWireDamageTaken": 0,
+                  "barbedWireDestroyed": 0,
+                  "barbedWireEmptyAttackCharges": 0,
+                  "barbedWireOccupiedAttackCharges": 0,
+                  "chainOverruns": 0,
+                  "checkpointActivations": 0,
+                  "checkpointFallbacks": 0,
+                  "checkpointFallbacksByBranch": {
+                    "east": 0,
+                    "north": 0,
+                    "south": 0,
+                    "west": 0
+                  },
+                  "checkpointFallbacksFromDormant": 0,
+                  "checkpointFallbacksFromStandby": 0,
+                  "checkpointFallbacksPreventingUnmanagedArrival": 0,
+                  "checkpointQueueCivilianGoodsConsumed": 0,
+                  "checkpointQueueCivilianGoodsDemand": 0,
+                  "checkpointQueueFoodConsumed": 0,
+                  "checkpointQueueFoodDemand": 0,
+                  "checkpointRetreats": 0,
+                  "checkpointsAbandoned": 0,
+                  "checkpointsBuilt": 0,
+                  "checkpointsRecovered": 0,
+                  "checkpointsRelocated": 0,
+                  "checkpointsRemoved": 0,
+                  "checkpointsRuined": 0,
+                  "civilianDroneBasesBuilt": 0,
+                  "civilianDroneBasesDecommissioned": 0,
+                  "civilianGoodsRefundedFromDecommission": 0,
+                  "civilianLosses": 147,
+                  "constructibleInfectedDeaths": 0,
+                  "cumulativeGroundVisionBlockedHexes": 0,
+                  "dormantCheckpointsCreated": 0,
+                  "fallenSitesTriggeredByNoise": 0,
+                  "finalHordeDefeated": false,
+                  "finalHordeKilled": 0,
+                  "finalHordeSpawned": 0,
+                  "finalSpecialZombiesSpawnedByType": {
+                    "gasZombie": 0,
+                    "hunterZombie": 0,
+                    "policeZombie": 0,
+                    "riotZombie": 0,
+                    "soldierZombie": 0
+                  },
+                  "forestDefenseApplications": 0,
+                  "forestDefenseDamagePrevented": 0,
+                  "gasExplosions": 0,
+                  "gasExplosionUnitDamage": 0,
+                  "gasZombiesKilled": 0,
+                  "groundVisionBlockedHexes": 0,
+                  "groundVisionPotentialHexes": 113,
+                  "groundVisionSamples": 10,
+                  "groundVisionVisibleHexes": 113,
+                  "hordeInterceptions": 2,
+                  "hordeMovementNoisePulses": 11,
+                  "hordeTargetClearedCount": 0,
+                  "hordeTargetInheritedCount": 0,
+                  "hordeZombiesKilled": 0,
+                  "housingBuilt": 0,
+                  "housingCivilianGoodsProduced": 0,
+                  "housingOutageFacilityTurns": 0,
+                  "housingResidentTurns": 0,
+                  "hunterZombiesKilled": 0,
+                  "immediateInfectionsFromSpawn": 0,
+                  "infectedPopulationConvertedToZombies": 45,
+                  "infectionLosses": 147,
+                  "initialNormalZombies": 25,
+                  "maxCheckpointPostsPerBranch": 0,
+                  "maxCivilianDroneVisionRadius": 0,
+                  "maxGroundVisionBlockedHexes": 0,
+                  "maximumOverrunChainLength": 0,
+                  "maxPopulation": 176,
+                  "maxPreparedCheckpointPostsPerBranch": 0,
+                  "maxSecuredFacilities": 6,
+                  "maxSuppliedFacilities": 8,
+                  "maxSupplyRadius": 5,
+                  "maxVisibleZombies": 6,
+                  "nationalGuardNoisePulses": 9,
+                  "nationalGuardReanimations": 0,
+                  "noisePulsesBySourceType": {
+                    "armyBase": 0,
+                    "hordeZombie": 11,
+                    "nationalGuard": 9,
+                    "police": 2,
+                    "riotPolice": 0,
+                    "windPowerPlant": 9
+                  },
+                  "noisePulsesEmitted": 31,
+                  "noiseRespawnAttempts": 0,
+                  "noiseRespawnZombiesSpawned": 0,
+                  "normalZombieIdleCount": 252,
+                  "normalZombiesKilled": 3,
+                  "policeLongRangeMoves": 0,
+                  "policeNoisePulses": 2,
+                  "policeReanimations": 0,
+                  "policeZombiesKilled": 0,
+                  "preventedRefugeeArrivalsAfterFinal": 0,
+                  "reanimationChainOverruns": 0,
+                  "reanimationCheckpointInfections": 0,
+                  "reanimationFacilityInfections": 0,
+                  "reanimationImmediateInfections": 0,
+                  "reanimationSiteFalls": 0,
+                  "recruitsCommissionedByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "refugeeArrivalsByBranch": {
+                    "east": 47,
+                    "north": 33,
+                    "south": 50,
+                    "west": 32
+                  },
+                  "refugeesAccepted": 99,
+                  "refugeesDeparted": 63,
+                  "refugeesScreenedByPolicy": {
+                    "normal": 0,
+                    "passThrough": 162,
+                    "strict": 0
+                  },
+                  "regularPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "resourceShortageLosses": 0,
+                  "riotPoliceLost": 0,
+                  "riotPoliceProduced": 0,
+                  "riotPoliceReanimations": 0,
+                  "riotZombiesFinal": 0,
+                  "riotZombiesKilled": 0,
+                  "soldierZombiesKilled": 0,
+                  "standbyCheckpointsCreated": 0,
+                  "suppliedAreaInfectionClearTurn": 1,
+                  "suppliedAreaZombieClearTurn": 1,
+                  "supplyLosses": 0,
+                  "supplyRejections": 0,
+                  "terrainEntriesByType": {
+                    "forest": 0,
+                    "mountain": 0,
+                    "plain": 74,
+                    "water": 0
+                  },
+                  "turnsAfterFinalHorde": 0,
+                  "unitLosses": 0,
+                  "unmanagedBranchTurns": 40,
+                  "unmanagedPassThrough": 162,
+                  "unspawnedInfectedPopulation": 15,
+                  "urbanDefenseApplications": 2,
+                  "urbanDefenseDamagePrevented": 14,
+                  "veteranPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "veteranZombieKillsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "victoryTurn": null
+                },
+                "turn": 10
+              },
+              "artifact": {
+                "path": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64-sessions\\seed-1-0.nlth-artifact",
+                "manifestHash": "705ca56dbbe79f8b01c1a754c1c80fb5b9a2f775735e43ab6a2a74ac75d5a546",
+                "decisionCount": 10,
+                "acceptedActionCount": 10
+              },
+              "compactHashes": [
+                "78491fd525d66fba550fa27269cfd66bd3a59bf8e233aab3695a8e60943b9d4f",
+                "f08ba7f9ef994014aa22b9907cb8f9bdf32589d8ced969ee25888103f2181966",
+                "7dea3a6549932fe0d8d32b93cd1af3f25c2bb4524d39d696e835fb1fab558cfa",
+                "ff23ffd85796fe9c795abdedd376831c695215ea75584483b11f33d505a22be5",
+                "26153244b91818fc0dfcd35a62e1545a30bbcfa6ba800277db34c747dfcd15d5",
+                "88eb2023de262be710fc578cb6ff258d3a8f10af177a5baf4c2ba6945638e82c",
+                "4d1dec3185ae32942ba610b24197a2d2be6a9eeb6d1f6aec4da3205a2eff6cc2",
+                "2dbc0d09e339c1ca9c83db90541b83975176baf853e633d5279b12d8345898ea",
+                "127e00c7ccf36e42ba0b841a50d7f0d0cdca9deccc94da3f99efb4cca0e12acb",
+                "abce3f3e4a8de81de0edd1083cf9548f1aa1b931eee2dcbb613f4e68b53d05b0",
+                "d4e22618abf013a04538f660371f072bb0c1f53782fe82d4d1790a3dc073c48f"
+              ]
+            },
+            {
+              "seed": 7,
+              "session": "portable-seed-7-1",
+              "decisions": 8,
+              "revision": 8,
+              "result": {
+                "outcome": "lost",
+                "reason": "capitalLost",
+                "statistics": {
+                  "activeCheckpointLosses": 0,
+                  "barbedWireAbsorbedDamage": 0,
+                  "barbedWireBuilt": 0,
+                  "barbedWireDamageTaken": 0,
+                  "barbedWireDestroyed": 0,
+                  "barbedWireEmptyAttackCharges": 0,
+                  "barbedWireOccupiedAttackCharges": 0,
+                  "chainOverruns": 0,
+                  "checkpointActivations": 0,
+                  "checkpointFallbacks": 0,
+                  "checkpointFallbacksByBranch": {
+                    "east": 0,
+                    "north": 0,
+                    "south": 0,
+                    "west": 0
+                  },
+                  "checkpointFallbacksFromDormant": 0,
+                  "checkpointFallbacksFromStandby": 0,
+                  "checkpointFallbacksPreventingUnmanagedArrival": 0,
+                  "checkpointQueueCivilianGoodsConsumed": 0,
+                  "checkpointQueueCivilianGoodsDemand": 0,
+                  "checkpointQueueFoodConsumed": 0,
+                  "checkpointQueueFoodDemand": 0,
+                  "checkpointRetreats": 0,
+                  "checkpointsAbandoned": 0,
+                  "checkpointsBuilt": 0,
+                  "checkpointsRecovered": 0,
+                  "checkpointsRelocated": 0,
+                  "checkpointsRemoved": 0,
+                  "checkpointsRuined": 0,
+                  "civilianDroneBasesBuilt": 0,
+                  "civilianDroneBasesDecommissioned": 0,
+                  "civilianGoodsRefundedFromDecommission": 0,
+                  "civilianLosses": 117,
+                  "constructibleInfectedDeaths": 0,
+                  "cumulativeGroundVisionBlockedHexes": 0,
+                  "dormantCheckpointsCreated": 0,
+                  "fallenSitesTriggeredByNoise": 0,
+                  "finalHordeDefeated": false,
+                  "finalHordeKilled": 0,
+                  "finalHordeSpawned": 0,
+                  "finalSpecialZombiesSpawnedByType": {
+                    "gasZombie": 0,
+                    "hunterZombie": 0,
+                    "policeZombie": 0,
+                    "riotZombie": 0,
+                    "soldierZombie": 0
+                  },
+                  "forestDefenseApplications": 0,
+                  "forestDefenseDamagePrevented": 0,
+                  "gasExplosions": 0,
+                  "gasExplosionUnitDamage": 0,
+                  "gasZombiesKilled": 0,
+                  "groundVisionBlockedHexes": 0,
+                  "groundVisionPotentialHexes": 113,
+                  "groundVisionSamples": 8,
+                  "groundVisionVisibleHexes": 113,
+                  "hordeInterceptions": 0,
+                  "hordeMovementNoisePulses": 5,
+                  "hordeTargetClearedCount": 0,
+                  "hordeTargetInheritedCount": 0,
+                  "hordeZombiesKilled": 0,
+                  "housingBuilt": 0,
+                  "housingCivilianGoodsProduced": 0,
+                  "housingOutageFacilityTurns": 0,
+                  "housingResidentTurns": 0,
+                  "hunterZombiesKilled": 0,
+                  "immediateInfectionsFromSpawn": 0,
+                  "infectedPopulationConvertedToZombies": 40,
+                  "infectionLosses": 117,
+                  "initialNormalZombies": 25,
+                  "maxCheckpointPostsPerBranch": 0,
+                  "maxCivilianDroneVisionRadius": 0,
+                  "maxGroundVisionBlockedHexes": 0,
+                  "maximumOverrunChainLength": 0,
+                  "maxPopulation": 160,
+                  "maxPreparedCheckpointPostsPerBranch": 0,
+                  "maxSecuredFacilities": 6,
+                  "maxSuppliedFacilities": 8,
+                  "maxSupplyRadius": 5,
+                  "maxVisibleZombies": 7,
+                  "nationalGuardNoisePulses": 7,
+                  "nationalGuardReanimations": 0,
+                  "noisePulsesBySourceType": {
+                    "armyBase": 0,
+                    "hordeZombie": 5,
+                    "nationalGuard": 7,
+                    "police": 0,
+                    "riotPolice": 0,
+                    "windPowerPlant": 7
+                  },
+                  "noisePulsesEmitted": 19,
+                  "noiseRespawnAttempts": 0,
+                  "noiseRespawnZombiesSpawned": 0,
+                  "normalZombieIdleCount": 188,
+                  "normalZombiesKilled": 1,
+                  "policeLongRangeMoves": 0,
+                  "policeNoisePulses": 0,
+                  "policeReanimations": 0,
+                  "policeZombiesKilled": 0,
+                  "preventedRefugeeArrivalsAfterFinal": 0,
+                  "reanimationChainOverruns": 0,
+                  "reanimationCheckpointInfections": 0,
+                  "reanimationFacilityInfections": 0,
+                  "reanimationImmediateInfections": 0,
+                  "reanimationSiteFalls": 0,
+                  "recruitsCommissionedByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "refugeeArrivalsByBranch": {
+                    "east": 31,
+                    "north": 32,
+                    "south": 34,
+                    "west": 17
+                  },
+                  "refugeesAccepted": 72,
+                  "refugeesDeparted": 42,
+                  "refugeesScreenedByPolicy": {
+                    "normal": 0,
+                    "passThrough": 114,
+                    "strict": 0
+                  },
+                  "regularPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "resourceShortageLosses": 0,
+                  "riotPoliceLost": 0,
+                  "riotPoliceProduced": 0,
+                  "riotPoliceReanimations": 0,
+                  "riotZombiesFinal": 0,
+                  "riotZombiesKilled": 0,
+                  "soldierZombiesKilled": 0,
+                  "standbyCheckpointsCreated": 0,
+                  "suppliedAreaInfectionClearTurn": 1,
+                  "suppliedAreaZombieClearTurn": 1,
+                  "supplyLosses": 0,
+                  "supplyRejections": 0,
+                  "terrainEntriesByType": {
+                    "forest": 0,
+                    "mountain": 0,
+                    "plain": 38,
+                    "water": 0
+                  },
+                  "turnsAfterFinalHorde": 0,
+                  "unitLosses": 0,
+                  "unmanagedBranchTurns": 32,
+                  "unmanagedPassThrough": 114,
+                  "unspawnedInfectedPopulation": 10,
+                  "urbanDefenseApplications": 1,
+                  "urbanDefenseDamagePrevented": 7,
+                  "veteranPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "veteranZombieKillsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "victoryTurn": null
+                },
+                "turn": 8
+              },
+              "artifact": {
+                "path": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64-sessions\\seed-7-1.nlth-artifact",
+                "manifestHash": "2b2dfdc272fd3575e3347e03f3d5cc436035b3dfb4f8902e93239b585825271e",
+                "decisionCount": 8,
+                "acceptedActionCount": 8
+              },
+              "compactHashes": [
+                "00f1031d706fb6e8afdf729468d7ca8d8c9f11402f5bac2d3b5176b2101a471b",
+                "ace0e2de3b44ec5de7608d38d4e4ef2a5362df1c384ea1bc57159d5bd83b5ef2",
+                "52483bdb708fa224120ab58d7d322bb50402685994eee7a9a8045d99c6b7b498",
+                "ef1cb2704a711da8dd97c1a7737437aa7e850453fc3481fe745a1814c1d5137d",
+                "1ca7d0ea8e5d0496f417617151fed5dbfc05e2bf667ff8c339fc67a13345b4e8",
+                "6fcda7178098dae24d6d4ab882ca3b02b03e8c031395dd7f056d2b7ca224eff0",
+                "447d9a5b3e142242532e5d2b6d076e01371a4a6e891d9400bfe0f1709f0fc4c1",
+                "ef5af4b5d1b356fb49025654d9b2ba4972a2bd9c425107098c2ddb51659445a7",
+                "bed9b72f791f22ff522f8e1b7aa0ad58b888c225990d211cd55e30947cc31b94"
+              ]
+            }
+          ],
+          "replays": [
+            {
+              "session": "portable-replay-1-0",
+              "decisions": 10,
+              "result": {
+                "outcome": "lost",
+                "reason": "capitalLost",
+                "statistics": {
+                  "activeCheckpointLosses": 0,
+                  "barbedWireAbsorbedDamage": 0,
+                  "barbedWireBuilt": 0,
+                  "barbedWireDamageTaken": 0,
+                  "barbedWireDestroyed": 0,
+                  "barbedWireEmptyAttackCharges": 0,
+                  "barbedWireOccupiedAttackCharges": 0,
+                  "chainOverruns": 0,
+                  "checkpointActivations": 0,
+                  "checkpointFallbacks": 0,
+                  "checkpointFallbacksByBranch": {
+                    "east": 0,
+                    "north": 0,
+                    "south": 0,
+                    "west": 0
+                  },
+                  "checkpointFallbacksFromDormant": 0,
+                  "checkpointFallbacksFromStandby": 0,
+                  "checkpointFallbacksPreventingUnmanagedArrival": 0,
+                  "checkpointQueueCivilianGoodsConsumed": 0,
+                  "checkpointQueueCivilianGoodsDemand": 0,
+                  "checkpointQueueFoodConsumed": 0,
+                  "checkpointQueueFoodDemand": 0,
+                  "checkpointRetreats": 0,
+                  "checkpointsAbandoned": 0,
+                  "checkpointsBuilt": 0,
+                  "checkpointsRecovered": 0,
+                  "checkpointsRelocated": 0,
+                  "checkpointsRemoved": 0,
+                  "checkpointsRuined": 0,
+                  "civilianDroneBasesBuilt": 0,
+                  "civilianDroneBasesDecommissioned": 0,
+                  "civilianGoodsRefundedFromDecommission": 0,
+                  "civilianLosses": 147,
+                  "constructibleInfectedDeaths": 0,
+                  "cumulativeGroundVisionBlockedHexes": 0,
+                  "dormantCheckpointsCreated": 0,
+                  "fallenSitesTriggeredByNoise": 0,
+                  "finalHordeDefeated": false,
+                  "finalHordeKilled": 0,
+                  "finalHordeSpawned": 0,
+                  "finalSpecialZombiesSpawnedByType": {
+                    "gasZombie": 0,
+                    "hunterZombie": 0,
+                    "policeZombie": 0,
+                    "riotZombie": 0,
+                    "soldierZombie": 0
+                  },
+                  "forestDefenseApplications": 0,
+                  "forestDefenseDamagePrevented": 0,
+                  "gasExplosions": 0,
+                  "gasExplosionUnitDamage": 0,
+                  "gasZombiesKilled": 0,
+                  "groundVisionBlockedHexes": 0,
+                  "groundVisionPotentialHexes": 113,
+                  "groundVisionSamples": 10,
+                  "groundVisionVisibleHexes": 113,
+                  "hordeInterceptions": 2,
+                  "hordeMovementNoisePulses": 11,
+                  "hordeTargetClearedCount": 0,
+                  "hordeTargetInheritedCount": 0,
+                  "hordeZombiesKilled": 0,
+                  "housingBuilt": 0,
+                  "housingCivilianGoodsProduced": 0,
+                  "housingOutageFacilityTurns": 0,
+                  "housingResidentTurns": 0,
+                  "hunterZombiesKilled": 0,
+                  "immediateInfectionsFromSpawn": 0,
+                  "infectedPopulationConvertedToZombies": 45,
+                  "infectionLosses": 147,
+                  "initialNormalZombies": 25,
+                  "maxCheckpointPostsPerBranch": 0,
+                  "maxCivilianDroneVisionRadius": 0,
+                  "maxGroundVisionBlockedHexes": 0,
+                  "maximumOverrunChainLength": 0,
+                  "maxPopulation": 176,
+                  "maxPreparedCheckpointPostsPerBranch": 0,
+                  "maxSecuredFacilities": 6,
+                  "maxSuppliedFacilities": 8,
+                  "maxSupplyRadius": 5,
+                  "maxVisibleZombies": 6,
+                  "nationalGuardNoisePulses": 9,
+                  "nationalGuardReanimations": 0,
+                  "noisePulsesBySourceType": {
+                    "armyBase": 0,
+                    "hordeZombie": 11,
+                    "nationalGuard": 9,
+                    "police": 2,
+                    "riotPolice": 0,
+                    "windPowerPlant": 9
+                  },
+                  "noisePulsesEmitted": 31,
+                  "noiseRespawnAttempts": 0,
+                  "noiseRespawnZombiesSpawned": 0,
+                  "normalZombieIdleCount": 252,
+                  "normalZombiesKilled": 3,
+                  "policeLongRangeMoves": 0,
+                  "policeNoisePulses": 2,
+                  "policeReanimations": 0,
+                  "policeZombiesKilled": 0,
+                  "preventedRefugeeArrivalsAfterFinal": 0,
+                  "reanimationChainOverruns": 0,
+                  "reanimationCheckpointInfections": 0,
+                  "reanimationFacilityInfections": 0,
+                  "reanimationImmediateInfections": 0,
+                  "reanimationSiteFalls": 0,
+                  "recruitsCommissionedByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "refugeeArrivalsByBranch": {
+                    "east": 47,
+                    "north": 33,
+                    "south": 50,
+                    "west": 32
+                  },
+                  "refugeesAccepted": 99,
+                  "refugeesDeparted": 63,
+                  "refugeesScreenedByPolicy": {
+                    "normal": 0,
+                    "passThrough": 162,
+                    "strict": 0
+                  },
+                  "regularPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "resourceShortageLosses": 0,
+                  "riotPoliceLost": 0,
+                  "riotPoliceProduced": 0,
+                  "riotPoliceReanimations": 0,
+                  "riotZombiesFinal": 0,
+                  "riotZombiesKilled": 0,
+                  "soldierZombiesKilled": 0,
+                  "standbyCheckpointsCreated": 0,
+                  "suppliedAreaInfectionClearTurn": 1,
+                  "suppliedAreaZombieClearTurn": 1,
+                  "supplyLosses": 0,
+                  "supplyRejections": 0,
+                  "terrainEntriesByType": {
+                    "forest": 0,
+                    "mountain": 0,
+                    "plain": 74,
+                    "water": 0
+                  },
+                  "turnsAfterFinalHorde": 0,
+                  "unitLosses": 0,
+                  "unmanagedBranchTurns": 40,
+                  "unmanagedPassThrough": 162,
+                  "unspawnedInfectedPopulation": 15,
+                  "urbanDefenseApplications": 2,
+                  "urbanDefenseDamagePrevented": 14,
+                  "veteranPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "veteranZombieKillsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "victoryTurn": null
+                },
+                "turn": 10
+              },
+              "artifact": {
+                "path": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64-sessions\\replay-seed-1-0.nlth-artifact",
+                "manifestHash": "1d914ebdc6220f842920a968f399aabd0cd121da97bd0fbe25227f44cd05b6fc",
+                "decisionCount": 10,
+                "acceptedActionCount": 10
+              },
+              "compactHashes": [
+                "78491fd525d66fba550fa27269cfd66bd3a59bf8e233aab3695a8e60943b9d4f",
+                "f08ba7f9ef994014aa22b9907cb8f9bdf32589d8ced969ee25888103f2181966",
+                "7dea3a6549932fe0d8d32b93cd1af3f25c2bb4524d39d696e835fb1fab558cfa",
+                "ff23ffd85796fe9c795abdedd376831c695215ea75584483b11f33d505a22be5",
+                "26153244b91818fc0dfcd35a62e1545a30bbcfa6ba800277db34c747dfcd15d5",
+                "88eb2023de262be710fc578cb6ff258d3a8f10af177a5baf4c2ba6945638e82c",
+                "4d1dec3185ae32942ba610b24197a2d2be6a9eeb6d1f6aec4da3205a2eff6cc2",
+                "2dbc0d09e339c1ca9c83db90541b83975176baf853e633d5279b12d8345898ea",
+                "127e00c7ccf36e42ba0b841a50d7f0d0cdca9deccc94da3f99efb4cca0e12acb",
+                "abce3f3e4a8de81de0edd1083cf9548f1aa1b931eee2dcbb613f4e68b53d05b0",
+                "d4e22618abf013a04538f660371f072bb0c1f53782fe82d4d1790a3dc073c48f"
+              ],
+              "replayMatched": true
+            },
+            {
+              "session": "portable-replay-7-1",
+              "decisions": 8,
+              "result": {
+                "outcome": "lost",
+                "reason": "capitalLost",
+                "statistics": {
+                  "activeCheckpointLosses": 0,
+                  "barbedWireAbsorbedDamage": 0,
+                  "barbedWireBuilt": 0,
+                  "barbedWireDamageTaken": 0,
+                  "barbedWireDestroyed": 0,
+                  "barbedWireEmptyAttackCharges": 0,
+                  "barbedWireOccupiedAttackCharges": 0,
+                  "chainOverruns": 0,
+                  "checkpointActivations": 0,
+                  "checkpointFallbacks": 0,
+                  "checkpointFallbacksByBranch": {
+                    "east": 0,
+                    "north": 0,
+                    "south": 0,
+                    "west": 0
+                  },
+                  "checkpointFallbacksFromDormant": 0,
+                  "checkpointFallbacksFromStandby": 0,
+                  "checkpointFallbacksPreventingUnmanagedArrival": 0,
+                  "checkpointQueueCivilianGoodsConsumed": 0,
+                  "checkpointQueueCivilianGoodsDemand": 0,
+                  "checkpointQueueFoodConsumed": 0,
+                  "checkpointQueueFoodDemand": 0,
+                  "checkpointRetreats": 0,
+                  "checkpointsAbandoned": 0,
+                  "checkpointsBuilt": 0,
+                  "checkpointsRecovered": 0,
+                  "checkpointsRelocated": 0,
+                  "checkpointsRemoved": 0,
+                  "checkpointsRuined": 0,
+                  "civilianDroneBasesBuilt": 0,
+                  "civilianDroneBasesDecommissioned": 0,
+                  "civilianGoodsRefundedFromDecommission": 0,
+                  "civilianLosses": 117,
+                  "constructibleInfectedDeaths": 0,
+                  "cumulativeGroundVisionBlockedHexes": 0,
+                  "dormantCheckpointsCreated": 0,
+                  "fallenSitesTriggeredByNoise": 0,
+                  "finalHordeDefeated": false,
+                  "finalHordeKilled": 0,
+                  "finalHordeSpawned": 0,
+                  "finalSpecialZombiesSpawnedByType": {
+                    "gasZombie": 0,
+                    "hunterZombie": 0,
+                    "policeZombie": 0,
+                    "riotZombie": 0,
+                    "soldierZombie": 0
+                  },
+                  "forestDefenseApplications": 0,
+                  "forestDefenseDamagePrevented": 0,
+                  "gasExplosions": 0,
+                  "gasExplosionUnitDamage": 0,
+                  "gasZombiesKilled": 0,
+                  "groundVisionBlockedHexes": 0,
+                  "groundVisionPotentialHexes": 113,
+                  "groundVisionSamples": 8,
+                  "groundVisionVisibleHexes": 113,
+                  "hordeInterceptions": 0,
+                  "hordeMovementNoisePulses": 5,
+                  "hordeTargetClearedCount": 0,
+                  "hordeTargetInheritedCount": 0,
+                  "hordeZombiesKilled": 0,
+                  "housingBuilt": 0,
+                  "housingCivilianGoodsProduced": 0,
+                  "housingOutageFacilityTurns": 0,
+                  "housingResidentTurns": 0,
+                  "hunterZombiesKilled": 0,
+                  "immediateInfectionsFromSpawn": 0,
+                  "infectedPopulationConvertedToZombies": 40,
+                  "infectionLosses": 117,
+                  "initialNormalZombies": 25,
+                  "maxCheckpointPostsPerBranch": 0,
+                  "maxCivilianDroneVisionRadius": 0,
+                  "maxGroundVisionBlockedHexes": 0,
+                  "maximumOverrunChainLength": 0,
+                  "maxPopulation": 160,
+                  "maxPreparedCheckpointPostsPerBranch": 0,
+                  "maxSecuredFacilities": 6,
+                  "maxSuppliedFacilities": 8,
+                  "maxSupplyRadius": 5,
+                  "maxVisibleZombies": 7,
+                  "nationalGuardNoisePulses": 7,
+                  "nationalGuardReanimations": 0,
+                  "noisePulsesBySourceType": {
+                    "armyBase": 0,
+                    "hordeZombie": 5,
+                    "nationalGuard": 7,
+                    "police": 0,
+                    "riotPolice": 0,
+                    "windPowerPlant": 7
+                  },
+                  "noisePulsesEmitted": 19,
+                  "noiseRespawnAttempts": 0,
+                  "noiseRespawnZombiesSpawned": 0,
+                  "normalZombieIdleCount": 188,
+                  "normalZombiesKilled": 1,
+                  "policeLongRangeMoves": 0,
+                  "policeNoisePulses": 0,
+                  "policeReanimations": 0,
+                  "policeZombiesKilled": 0,
+                  "preventedRefugeeArrivalsAfterFinal": 0,
+                  "reanimationChainOverruns": 0,
+                  "reanimationCheckpointInfections": 0,
+                  "reanimationFacilityInfections": 0,
+                  "reanimationImmediateInfections": 0,
+                  "reanimationSiteFalls": 0,
+                  "recruitsCommissionedByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "refugeeArrivalsByBranch": {
+                    "east": 31,
+                    "north": 32,
+                    "south": 34,
+                    "west": 17
+                  },
+                  "refugeesAccepted": 72,
+                  "refugeesDeparted": 42,
+                  "refugeesScreenedByPolicy": {
+                    "normal": 0,
+                    "passThrough": 114,
+                    "strict": 0
+                  },
+                  "regularPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "resourceShortageLosses": 0,
+                  "riotPoliceLost": 0,
+                  "riotPoliceProduced": 0,
+                  "riotPoliceReanimations": 0,
+                  "riotZombiesFinal": 0,
+                  "riotZombiesKilled": 0,
+                  "soldierZombiesKilled": 0,
+                  "standbyCheckpointsCreated": 0,
+                  "suppliedAreaInfectionClearTurn": 1,
+                  "suppliedAreaZombieClearTurn": 1,
+                  "supplyLosses": 0,
+                  "supplyRejections": 0,
+                  "terrainEntriesByType": {
+                    "forest": 0,
+                    "mountain": 0,
+                    "plain": 38,
+                    "water": 0
+                  },
+                  "turnsAfterFinalHorde": 0,
+                  "unitLosses": 0,
+                  "unmanagedBranchTurns": 32,
+                  "unmanagedPassThrough": 114,
+                  "unspawnedInfectedPopulation": 10,
+                  "urbanDefenseApplications": 1,
+                  "urbanDefenseDamagePrevented": 7,
+                  "veteranPromotionsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "veteranZombieKillsByType": {
+                    "nationalGuard": 0,
+                    "police": 0,
+                    "riotPolice": 0
+                  },
+                  "victoryTurn": null
+                },
+                "turn": 8
+              },
+              "artifact": {
+                "path": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-1613bc56c011-win-x64-sessions\\replay-seed-7-1.nlth-artifact",
+                "manifestHash": "bf77d2edba3dc9c0078bd3554cca984d64f716c09827aed48df53d4127906273",
+                "decisionCount": 8,
+                "acceptedActionCount": 8
+              },
+              "compactHashes": [
+                "00f1031d706fb6e8afdf729468d7ca8d8c9f11402f5bac2d3b5176b2101a471b",
+                "ace0e2de3b44ec5de7608d38d4e4ef2a5362df1c384ea1bc57159d5bd83b5ef2",
+                "52483bdb708fa224120ab58d7d322bb50402685994eee7a9a8045d99c6b7b498",
+                "ef1cb2704a711da8dd97c1a7737437aa7e850453fc3481fe745a1814c1d5137d",
+                "1ca7d0ea8e5d0496f417617151fed5dbfc05e2bf667ff8c339fc67a13345b4e8",
+                "6fcda7178098dae24d6d4ab882ca3b02b03e8c031395dd7f056d2b7ca224eff0",
+                "447d9a5b3e142242532e5d2b6d076e01371a4a6e891d9400bfe0f1709f0fc4c1",
+                "ef5af4b5d1b356fb49025654d9b2ba4972a2bd9c425107098c2ddb51659445a7",
+                "bed9b72f791f22ff522f8e1b7aa0ad58b888c225990d211cd55e30947cc31b94"
+              ],
+              "replayMatched": true
+            }
+          ],
+          "replayMatched": true
+        }
+      }
+    }
+  },
+  "longValidation": {
+    "run": 34682006736,
+    "status": "dispatched; completion intentionally not awaited",
+    "replacesCancelledRun": 34681188070,
+    "reasonForRestart": "free hosted runner slots for required Portable verification",
+    "ciLongRun": 34681173166,
+    "scope": [
+      "Random/Balanced 100 seeds each and replays",
+      "physical 512 MiB package",
+      "normal 1000 actions",
+      "Balanced 1..30 and seed198"
+    ],
+    "replacesCancelledRuns": [
+      34681188070,
+      34681646071
+    ],
+    "startedSnapshot": {
+      "headSha": "1613bc56c01141358ce76e447ea12afcb78826bd",
+      "jobs": [
+        {
+          "name": "Session v1.5.7 physical 512 MiB Package validation",
+          "startedAt": "2026-09-12T07:56:47Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 91 + 9",
+          "startedAt": "2026-09-12T07:56:47Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 81 + 9",
+          "startedAt": "2026-09-12T07:56:46Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 random seeds 61 + 9",
+          "startedAt": "2026-09-12T07:56:46Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 random seeds 81 + 9",
+          "startedAt": "2026-09-12T07:56:46Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 random seeds 71 + 9",
+          "startedAt": "2026-09-12T07:56:47Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 11 + 9",
+          "startedAt": "2026-09-12T07:56:46Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 71 + 9",
+          "startedAt": "2026-09-12T07:56:43Z",
+          "status": "queued"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 41 + 9",
+          "startedAt": "2026-09-12T07:56:46Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 51 + 9",
+          "startedAt": "2026-09-12T07:56:46Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 random seeds 31 + 9",
+          "startedAt": "2026-09-12T07:56:47Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 random seeds 1 + 9",
+          "startedAt": "2026-09-12T07:56:52Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 61 + 9",
+          "startedAt": "2026-09-12T07:56:46Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 random seeds 21 + 9",
+          "startedAt": "2026-09-12T07:56:47Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 31 + 9",
+          "startedAt": "2026-09-12T07:56:43Z",
+          "status": "queued"
+        },
+        {
+          "name": "v1.5.7 random seeds 51 + 9",
+          "startedAt": "2026-09-12T07:56:47Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 21 + 9",
+          "startedAt": "2026-09-12T07:56:46Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 random seeds 41 + 9",
+          "startedAt": "2026-09-12T07:56:47Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 balanced seeds 1 + 9",
+          "startedAt": "2026-09-12T07:56:46Z",
+          "status": "in_progress"
+        },
+        {
+          "name": "v1.5.7 random seeds 91 + 9",
+          "startedAt": "2026-09-12T07:56:43Z",
+          "status": "queued"
+        },
+        {
+          "name": "v1.5.7 random seeds 11 + 9",
+          "startedAt": "2026-09-12T07:56:43Z",
+          "status": "queued"
+        },
+        {
+          "name": "Verify unchanged runtime against successful recorded executions",
+          "startedAt": "2026-09-12T07:56:44Z",
+          "status": "completed"
+        }
+      ],
+      "status": "queued"
+    }
+  },
+  "documentation": {
+    "userMovesIncludedUnchanged": true,
+    "archiveUsedAsSpecification": false,
+    "archiveBodiesEdited": false,
+    "confirmedRequirementsKeptInDoc": true
+  }
+}

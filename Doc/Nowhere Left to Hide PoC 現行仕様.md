@@ -1572,7 +1572,7 @@ Zombie陣営は`zombie`、`hordeZombie`、`policeZombie`、`soldierZombie`、`ri
 ## 13.3 Horde
 
 - 標準Wave ScheduleはTurn5 H3/S3×1方向、Turn10 H2/S5×2、Turn20 H5/S7×1、Turn35 H3/S7×3、Turn50 H5/S8×4（Final）。Warning Lead2、North/East/South/West安定順、4方向以外のWarning方向のみSeed付き抽選。
-- Baseの非Horde抽選と既存RNG semanticsは維持し、その後Bonus抽選を同じ表と共有Capで行う。Horde以外は最大Charge1、Hordeは2。各Spawn Turnは行動せず次Zombie Phaseから行動する。
+- Baseの非Horde抽選と既存RNG semanticsは維持し、その後Bonus抽選を同じ表と共有Capで行う。Horde以外は最大Charge1、Hordeは4。各Spawn Turnは行動せず次Zombie Phaseから行動する。
 
 ### 13.3.1 Horde Spawn Reserve
 
@@ -2017,7 +2017,7 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - Random／Balancedの同一Seed比較、決定性、JSON／CSV／通常モードのゲーム単位Artifact、`--summary-only`のコンパクト出力、失敗継続、fail-fast、Replay一致を試験する。
 - Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
 - 公開Pagesでは公開Observation／Legal Actionsだけを読むブラウザ操作可能な外部Agentを使い、API発見、不正Action訂正、Seed 1と7のGame Over、Result／Artifact取得とReplayを手動E2E確認する。PagesのWorkflow成功を必須とし、個別ゲームの勝利は合格条件にしない。
-- v1.5.4 Release ValidationはVersion Metadata、Rules／Map／Save拒否、Reserve／Direction Zone、Frozen Roster／Pending Spawn、Rejected Bonus、Final Victory、Zombie fallback、Temporary Housing、Wind、電力／予測の固定fixture、同Version Replay／Session決定性を確認する。Pages deploy成功後、独立したAI Portable Package Workflowを確認する。Linux／Windows x64 ZIPはCommit SHA・App・Node Versionを記録し、Bundled Nodeで既存8コマンド、JSONL play-turn、外部AI Seed 1／7のGame Over・Artifact・Replay一致を検証する。公開Pages／Portable結果は確認前に成功済みと扱わない。既存v1.5.6以前の性能証跡は履歴の測定記録として保持し、v1.5.4の結果一致ゲートにはしない。SOG05は実測がないため、PC・モバイルviewportの確認結果と混同しない。
+- v1.5.7 Release ValidationはVersion Metadata、Rules／Map／Save拒否、Reserve／Direction Zone、Frozen Roster／Pending Spawn、Rejected Bonus、Final Victory、Zombie fallback、Temporary Housing、Wind、電力／予測の固定fixture、同Version Replay／Session決定性を確認する。Pages deploy成功後、独立したAI Portable Package Workflowを確認する。Linux／Windows x64 ZIPはCommit SHA・App・Node Versionを記録し、Bundled Nodeで既存8コマンド、JSONL play-turn、外部AI Seed 1／7のGame Over・Artifact・Replay一致を検証する。公開Pages／Portable結果は確認前に成功済みと扱わない。既存v1.5.6以前の性能証跡は履歴の測定記録として保持し、v1.5.7の結果一致ゲートにはしない。SOG05は実測がないため、PC・モバイルviewportの確認結果と混同しない。
 
 ---
 
@@ -2122,5 +2122,13 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - 通常回帰85ファイルを実行し、83ファイル762件が成功、5件が失敗、専用の日次1,000判断11件は環境変数未指定でskipした。新設壁テストのケース配置誤りを修正し、戦闘後Saveで新Event許可漏れによる失敗を再現して修正した。負荷時にtimeoutしたPNG試験と合わせて関連3ファイル31件を再実行し全成功。成功済みの無関係な回帰は反復していない。長時間Balanced Batch／Seed198はクラウド側へ分離する。
 - 型検査、本番Build、Browser Bridge smoke、release report tool 8件が成功。既存のbundle sizeとdynamic importのBuild warningは残る。壁の背景識別の追補ではboard18件・型検査が成功した。
 - 実ブラウザの表示fixtureは `src/testing/v157-browser-fixture.ts`。公開GameAction経由で建設し、道路・Plain・Forest・Mountain、Human同居、PC1280×900／mobile390×844、壁HP20・費用5/5・進入MP5の表示を確認する。画面測定はviewportの確認であり実機スマートフォン測定ではない。
-- 公開Pages、Linux／Windows Portableの必須完遂結果とPackage／Session実測は公開確認後に追記する。長時間Workflowは今回の依頼に従い開始だけを確認し、結果未確認と区別する。
+- 公開PagesとLinux／Windows Portableの必須確認は完了。長時間Workflowは今回の依頼に従い開始だけを確認し、結果未確認と区別する。
 - ユーザーが先に行ったv1.5.6要件／v1.5.7ドラフトの移動をコミットに含める。Doc/archiveの本文は参照・変更していない。今回の明示指示に従い、確定v1.5.7要件はDoc直下に残す。
+- 公開ゲームCommit `53dda314328faeeda3ea44516176dbc94abd99cb` のGitHub通常ゲートは85ファイル・768テスト成功、日次専用11件skip。Pages deploy成功後、公開Build ID一致、Seed 1/7の終局（限定EndTurn policyでTurn10/8に通常敗北）、全公開Artifactページと同Action列再生一致、Hidden禁止field非公開を実ブラウザで確認した。通常UIの新規ゲーム、Turn2への進行、autosave v16、reload後の再開、PC1280×900/mobile390×844の横はみ出しなし、console error 0件も確認した。
+- 配布工程のみの追補は `46140fc`（Linux launcher引用符・Windows正規化TEMP・計測時Build identity）と `1613bc5`（追加許可文書と同梱Node/fflate LICENSE本文）。ゲームsrc、Version、盤面AssetはPages Commitと同一。既存長時間CIを取消さないためpush時CIを省略し、Portableは各候補の明示dispatchで検証する。
+- Windowsローカル候補のv1.5.6実Artifactとの直接比較では、ZIP107,137,535→33,335,530 bytes、展開302,766,249→84,332,647 bytes、7,044→10 files。これはライセンス本文追加前の測定候補で、最終Packageは必要な文書を含む13 filesとなる。代表Session群2,232,173 bytes、Artifact2,509,384 bytes、revision1のCompact47,234 bytes/Full Snapshot2,522,173 bytes。小規模Sessionでの計測であり、1,000判断・512 MiB・実機RAM改善の結果として扱わない。
+- 同一Windowsホスト・Seed1・既定Config・合法EndTurn1回・revision1での代表応答前後比較: Compact32,542→47,234 bytes（+14,692）、Full Snapshot2,519,729→2,522,172 bytes（+2,443）。Nodeはv1.5.6同梱22.23.2／ローカル候補22.14.0で、Turn2の資源・人口は同一。新しい判断情報の追加でCompactは増加しており、応答bytes削減を達成したとは扱わない。Sessionのlossless payload、Checkpoint lineage、hash検証は維持し、本版では配布ファイルの除外を主な容量改善として採用する。
+
+- 最終[AI Portable Run 34681924510](https://github.com/plastichyena/nowherelefttohide/actions/runs/34681924510)はCommit `1613bc56c01141358ce76e447ea12afcb78826bd`で両OSとも成功。同梱Node 22.23.2で全9コマンド、Seed1/7の正常終局（10/8判断・通常敗北）、Artifact取得、Replay一致を確認した。最終13ファイルのZIP／展開実容量はLinux 44,209,080／125,978,819 bytes、Windows 34,634,141／88,140,342 bytes。Windows最終ZIPは旧版107,137,535 bytesから72,503,394 bytes減少した。
+- [最終Release Validation Run 34682006736](https://github.com/plastichyena/nowherelefttohide/actions/runs/34682006736)の200ゲーム・全Replay・物理512 MiB、および[通常CI Run 34681173166](https://github.com/plastichyena/nowherelefttohide/actions/runs/34681173166)の長時間Jobは起動を確認し、完了結果は未確認。配布修正前のPortable失敗Run 34681186690と、差し替え取消Run（Portable 34681562051、Validation 34681188070／34681646071）は履歴として残す。ローカル常駐サーバーは停止済みで、残りはGitHub上で実行される。
+- 検証証跡は `src/testing/fixtures/v157-release-validation.json`。遅れて完了する旧CIが新しい配布工程で古いcheckoutを組み立てないよう、自動Portableを最新mainと同じSHAに限定した。明示dispatchの全検証は維持する。最終記録の変更はゲーム実行コードを変更しない。
