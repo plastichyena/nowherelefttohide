@@ -57,11 +57,15 @@ jobs:
           FULL_SHA="$(git rev-parse HEAD)"
           PACKAGE_NAME="nowhere-left-to-hide-ai-${VERSION}-${SHORT_SHA}-linux-x64"
           PACKAGE_ROOT="${RUNNER_TEMP}/${PACKAGE_NAME}"
+          NODE_VERSION="$(node --version)"
+          NODE_LICENSE="${RUNNER_TEMP}/node-${NODE_VERSION}-LICENSE.txt"
+          curl --fail --location --retry 3 "https://raw.githubusercontent.com/nodejs/node/${NODE_VERSION}/LICENSE" --output "${NODE_LICENSE}"
           node scripts/assemble-portable.mjs \
             --source="${GITHUB_WORKSPACE}" \
             --out="${PACKAGE_ROOT}" \
             --platform=linux-x64 \
             --node="$(command -v node)" \
+            --node-license="${NODE_LICENSE}" \
             --commit="${FULL_SHA}" \
             --build-id="${FULL_SHA}"
           echo "package_name=${PACKAGE_NAME}" >> "${GITHUB_OUTPUT}"
@@ -74,7 +78,8 @@ jobs:
           set -euo pipefail
           ROOT="${{ steps.package.outputs.package_root }}"
           for FILE in \
-            PLAY_WITH_AI.md LICENSE THIRD_PARTY_NOTICES ASSETS_LICENSE.md \
+            PLAY_WITH_AI.md LICENSE ADDITIONAL_PERMISSIONS.md THIRD_PARTY_NOTICES ASSETS_LICENSE.md \
+            licenses/node-LICENSE.txt licenses/fflate-LICENSE.txt \
             BUILD_INFO.txt PORTABLE_PACKAGE.json runtime/identity.env \
             runtime/node/node run-session.sh session-cli.mjs; do
             test -f "${ROOT}/${FILE}"
@@ -218,11 +223,15 @@ jobs:
           $packageName = "nowhere-left-to-hide-ai-$version-$shortSha-win-x64"
           $packageRoot = Join-Path $env:RUNNER_TEMP $packageName
           $nodePath = (Get-Command node).Source
+          $nodeVersion = node --version
+          $nodeLicense = Join-Path $env:RUNNER_TEMP "node-$nodeVersion-LICENSE.txt"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/nodejs/node/$nodeVersion/LICENSE" -OutFile $nodeLicense
           node scripts/assemble-portable.mjs `
             --source="$env:GITHUB_WORKSPACE" `
             --out="$packageRoot" `
             --platform=win-x64 `
             --node="$nodePath" `
+            --node-license="$nodeLicense" `
             --commit="$fullSha" `
             --build-id="$fullSha"
           if ($LASTEXITCODE -ne 0) { throw "Portable package assembly failed with exit code $LASTEXITCODE" }
@@ -234,7 +243,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $root = '${{ steps.package_windows.outputs.package_root }}'
-          @('PLAY_WITH_AI.md', 'LICENSE', 'THIRD_PARTY_NOTICES', 'ASSETS_LICENSE.md', 'BUILD_INFO.txt', 'PORTABLE_PACKAGE.json', 'runtime/identity.cmd', 'runtime/node/node.exe', 'run-session.cmd', 'session-cli.mjs') |
+          @('PLAY_WITH_AI.md', 'LICENSE', 'ADDITIONAL_PERMISSIONS.md', 'THIRD_PARTY_NOTICES', 'ASSETS_LICENSE.md', 'licenses/node-LICENSE.txt', 'licenses/fflate-LICENSE.txt', 'BUILD_INFO.txt', 'PORTABLE_PACKAGE.json', 'runtime/identity.cmd', 'runtime/node/node.exe', 'run-session.cmd', 'session-cli.mjs') |
             ForEach-Object { if (-not (Test-Path (Join-Path $root $_))) { throw "Missing portable package entry: $_" } }
           if (Test-Path (Join-Path $root 'node_modules')) { throw 'Player package unexpectedly contains node_modules' }
           if (Test-Path (Join-Path $root 'package.json')) { throw 'Player package unexpectedly contains package.json' }

@@ -23,7 +23,7 @@ import { basename, join, relative, resolve } from 'node:path';
  */
 
 const PLATFORMS = new Set(['linux-x64', 'win-x64']);
-const REQUIRED_FILES = ['PLAY_WITH_AI.md', 'LICENSE', 'THIRD_PARTY_NOTICES'];
+const REQUIRED_FILES = ['PLAY_WITH_AI.md', 'LICENSE', 'THIRD_PARTY_NOTICES', 'ADDITIONAL_PERMISSIONS.md'];
 
 function fail(message) {
   throw new Error(message);
@@ -67,6 +67,41 @@ function findNodeExecutable(nodeArgument, platform) {
   const executable = candidates.find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
   if (!executable) fail(`Could not find a Node executable under ${supplied}`);
   return executable;
+}
+
+function requiredFile(path, label) {
+  if (!existsSync(path) || !statSync(path).isFile()) fail(`${label} is missing or is not a regular file: ${path}`);
+  return path;
+}
+
+function findNodeLicense(nodeSource, nodeLicenseArgument) {
+  if (nodeLicenseArgument) return requiredFile(resolve(nodeLicenseArgument), 'Node LICENSE supplied by --node-license');
+  const executableDirectory = join(nodeSource, '..');
+  const candidates = [
+    join(executableDirectory, 'LICENSE'),
+    join(executableDirectory, 'LICENSE.txt'),
+    join(executableDirectory, 'LICENSE.md'),
+    join(executableDirectory, '..', 'LICENSE'),
+    join(executableDirectory, '..', 'LICENSE.txt'),
+    join(executableDirectory, '..', 'LICENSE.md'),
+    join(executableDirectory, '..', '..', 'LICENSE'),
+    join(executableDirectory, '..', '..', 'LICENSE.txt'),
+    join(executableDirectory, '..', '..', 'LICENSE.md'),
+  ].map((candidate) => resolve(candidate));
+  const candidate = candidates.find((path) => existsSync(path) && statSync(path).isFile());
+  if (candidate) return candidate;
+  fail(`Bundled Node LICENSE was not found near ${nodeSource}; pass --node-license=PATH or provide LICENSE beside the Node executable/tarball root. Candidates checked: ${candidates.join(', ')}`);
+}
+
+function bundledNodeVersion(nodeSource) {
+  let value;
+  try {
+    value = execFileSync(nodeSource, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch (error) {
+    fail(`Could not read the bundled Node version from ${nodeSource}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!/^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/u.test(value)) fail(`Bundled Node --version returned an invalid value: ${value}`);
+  return value;
 }
 
 function ensureEmptyDirectory(path) {
@@ -154,24 +189,30 @@ function main(argv = process.argv.slice(2)) {
   if (!existsSync(cliSource) || !statSync(cliSource).isFile()) fail(`Bundled Session CLI does not exist: ${cliSource}`);
   for (const file of REQUIRED_FILES) {
     const path = join(sourceRoot, file);
-    if (!existsSync(path) || !statSync(path).isFile()) fail(`Required Player package notice is missing: ${path}`);
+    requiredFile(path, `Required Player package notice ${file}`);
   }
+  const fflateLicenseSource = requiredFile(join(sourceRoot, 'node_modules', 'fflate', 'LICENSE'), 'fflate LICENSE');
 
   ensureEmptyDirectory(outputRoot);
   const runtimeRoot = join(outputRoot, 'runtime', 'node');
   mkdirSync(runtimeRoot, { recursive: true });
   const nodeSource = findNodeExecutable(nodeArgument, platform);
+  const nodeLicenseSource = findNodeLicense(nodeSource, optionValue(argv, '--node-license'));
+  const nodeVersion = bundledNodeVersion(nodeSource);
   const nodeTarget = join(runtimeRoot, platform === 'win-x64' ? 'node.exe' : 'node');
   cpSync(nodeSource, nodeTarget);
   if (platform === 'linux-x64') chmodSync(nodeTarget, 0o755);
   cpSync(cliSource, join(outputRoot, 'session-cli.mjs'));
   for (const file of REQUIRED_FILES) cpSync(join(sourceRoot, file), join(outputRoot, basename(file)));
   if (existsSync(join(sourceRoot, 'ASSETS_LICENSE.md'))) cpSync(join(sourceRoot, 'ASSETS_LICENSE.md'), join(outputRoot, 'ASSETS_LICENSE.md'));
+  const licensesRoot = join(outputRoot, 'licenses');
+  mkdirSync(licensesRoot, { recursive: true });
+  cpSync(fflateLicenseSource, join(licensesRoot, 'fflate-LICENSE.txt'));
+  cpSync(nodeLicenseSource, join(licensesRoot, 'node-LICENSE.txt'));
   mkdirSync(join(outputRoot, 'runtime'), { recursive: true });
   writeIdentity(outputRoot, platform, commit, buildId);
   writeLauncher(outputRoot, platform);
 
-  const nodeVersion = process.version;
   writeFileSync(join(outputRoot, 'BUILD_INFO.txt'), [
     'Nowhere Left to Hide portable AI Player package',
     `App version: ${appVersion}`,
@@ -192,6 +233,7 @@ function main(argv = process.argv.slice(2)) {
     buildId,
     nodeVersion,
     entrypoint: platform === 'win-x64' ? '.\\run-session.cmd' : './run-session.sh',
+    licenses: ['LICENSE', 'ADDITIONAL_PERMISSIONS.md', 'licenses/fflate-LICENSE.txt', 'licenses/node-LICENSE.txt', 'THIRD_PARTY_NOTICES'],
     developmentFilesIncluded: false,
     developmentPath: 'Use the repository checkout for TypeScript drivers, UI development, and tests.',
   };
