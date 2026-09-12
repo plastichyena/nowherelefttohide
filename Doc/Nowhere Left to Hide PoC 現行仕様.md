@@ -2140,3 +2140,5 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - 受理された検問所建設・移設・Role変更は既存importantChangesのconsequencesに、支線半径の前後値と当該Decision全体の補給増減Hex／施設数を記録する。増減0も明示し、複数Postの通知に同じDecision全体の増減が出ても加算しない。履歴、Resume、再試行は既存の記録を使う。
 - PLAY_WITH_AIに距離5の東検問所と距離6の陸軍基地の具体例、前進Relocateと後方Standbyの違い、construction Queryの取得手順を追加した。不合法候補の半径据え置き・増分0は、妨害条件解消後も拡張不能という意味ではないと明記した。残存していた旧Version、壁HP10、Horde Charge2表記を現行値へ修正した。
 - Claude記録と同じSeed1・東(30,25)建設で説明不足をテスト失敗として再現後、修正して成功。距離6で陸軍基地が補給内、後方Standbyは増分0、合法移設で半径6→7を実Core Actionで確認。関連5ファイル38テスト（Supply、重要変化、Session、Query契約、play-turn）が成功し、型検査と本番Buildも成功。既存Build warningは継続。サブエージェント未使用、Doc/archiveは参照・変更していない。
+- Commit `857a92596c662a3b9589796d543231d93fe0ee51`の[通常CI／Pages](https://github.com/plastichyena/nowherelefttohide/actions/runs/34691169010)は通常85ファイル770テストとdeployが成功（日次専用11件skip）。公開配信JSのBuild ID一致を確認した。UI変更はなく、この追補での対話的ブラウザ操作の再検証は行っていない。
+- 同Commitの[AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34691178518)はLinux／Windowsとも成功。同梱Nodeで全9コマンド、Seed1/7の通常終局、Artifact取得、Replay一致を確認。長時間Jobは開始確認までとし、前回Release Validationを取消していない。証跡は `src/testing/fixtures/v157-supply-followup.json`。

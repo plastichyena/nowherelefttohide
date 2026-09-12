@@ -1,0 +1,141 @@
+{
+  "date": "2026-09-12",
+  "commit": "857a92596c662a3b9589796d543231d93fe0ee51",
+  "versionsChanged": false,
+  "coreSupplyRulesChanged": false,
+  "subagentsUsed": false,
+  "local": {
+    "targetedTests": 38,
+    "typecheck": "success",
+    "build": "success",
+    "beforeFixFailure": "Seed1 east distance5 BuildCheckpoint response missing supplyExplanation"
+  },
+  "ci": {
+    "run": 34691169010,
+    "normalFiles": 85,
+    "normalTests": 770,
+    "longOnlySkipped": 11,
+    "pagesDeploy": "success",
+    "publishedBuildMatched": true,
+    "interactiveBrowserRetested": false,
+    "longJobs": "started; completion not checked"
+  },
+  "portable": {
+    "run": 34691178518,
+    "conclusion": "success",
+    "platforms": {
+      "linux": {
+        "ok": true,
+        "node": {
+          "version": "v22.23.2",
+          "platform": "linux",
+          "arch": "x64"
+        },
+        "commands": [
+          "new",
+          "status",
+          "step",
+          "play-turn",
+          "save-checkpoint",
+          "list-checkpoints",
+          "load-checkpoint",
+          "query",
+          "artifact"
+        ],
+        "replayMatched": true,
+        "seeds": [
+          {
+            "seed": 1,
+            "decisions": 10,
+            "result": "lost",
+            "reason": "capitalLost",
+            "artifact": {
+              "path": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-857a92596c66-linux-x64-sessions/seed-1-0.nlth-artifact",
+              "manifestHash": "04d12123a3a23e13e05e09d1918d8a0c18d63c4e3b7cea50e218050c6eea223c",
+              "decisionCount": 10,
+              "acceptedActionCount": 10
+            }
+          },
+          {
+            "seed": 7,
+            "decisions": 8,
+            "result": "lost",
+            "reason": "capitalLost",
+            "artifact": {
+              "path": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-857a92596c66-linux-x64-sessions/seed-7-1.nlth-artifact",
+              "manifestHash": "21823bcb9e168f16547d7bd0b26a6152838ba471661dd3c57a81c7df5358eef6",
+              "decisionCount": 8,
+              "acceptedActionCount": 8
+            }
+          }
+        ],
+        "package": {
+          "path": "/home/runner/work/_temp/nowhere-left-to-hide-ai-1.5.7-857a92596c66-linux-x64",
+          "expandedBytes": 125984231,
+          "fileCount": 13,
+          "sha256": "94c7c5459487bf5fc440a1f32780ca602a7346be177ff2701157d9c24d65a064",
+          "zipBytes": 44210741,
+          "zipPath": "/home/runner/work/nowherelefttohide/nowherelefttohide/nowhere-left-to-hide-ai-1.5.7-857a92596c66-linux-x64.zip"
+        }
+      },
+      "windows": {
+        "ok": true,
+        "node": {
+          "version": "v22.23.2",
+          "platform": "win32",
+          "arch": "x64"
+        },
+        "commands": [
+          "new",
+          "status",
+          "step",
+          "play-turn",
+          "save-checkpoint",
+          "list-checkpoints",
+          "load-checkpoint",
+          "query",
+          "artifact"
+        ],
+        "replayMatched": true,
+        "seeds": [
+          {
+            "seed": 1,
+            "decisions": 10,
+            "result": "lost",
+            "reason": "capitalLost",
+            "artifact": {
+              "path": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-857a92596c66-win-x64-sessions\\seed-1-0.nlth-artifact",
+              "manifestHash": "47e523d81a279c97956f48d73aa6b49027837c3fc203fe376069888a32a73288",
+              "decisionCount": 10,
+              "acceptedActionCount": 10
+            }
+          },
+          {
+            "seed": 7,
+            "decisions": 8,
+            "result": "lost",
+            "reason": "capitalLost",
+            "artifact": {
+              "path": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-857a92596c66-win-x64-sessions\\seed-7-1.nlth-artifact",
+              "manifestHash": "2496966ded4bf33227253a467de0cc34d1e8f4de3e06150eaeac08c1fe102e9a",
+              "decisionCount": 8,
+              "acceptedActionCount": 8
+            }
+          }
+        ],
+        "package": {
+          "path": "D:\\a\\_temp\\nowhere-left-to-hide-ai-1.5.7-857a92596c66-win-x64",
+          "expandedBytes": 88145770,
+          "fileCount": 13,
+          "sha256": "6fc14df015fa7d18df782f1c4881e7f0f71e79faf1363584efb136d70f9553b1",
+          "zipBytes": 34635843,
+          "zipPath": "D:\\a\\nowherelefttohide\\nowherelefttohide\\nowhere-left-to-hide-ai-1.5.7-857a92596c66-win-x64.zip"
+        }
+      }
+    }
+  },
+  "supersededDispatch": {
+    "run": 34691169096,
+    "reason": "Cancelled before validation: immediate dispatch resolved previous main SHA during push propagation"
+  }
+}
