@@ -1,0 +1,357 @@
+{
+  "source": {
+    "archive": "claude-playtest-20260912-r2.zip",
+    "sha256": "f68d7ecbeb996b21825e046a3751601b3103e9c3dd187673b45f46ef240f771d",
+    "build": "f82110c70b388da6b6b5af17c6fd086d93bf282c",
+    "sessionId": "claude-0912-r2",
+    "appVersion": "1.5.7"
+  },
+  "decisions": 225,
+  "terminalEconomy": [
+    {
+      "decision": 219,
+      "turn": 62,
+      "action": {
+        "type": "EndTurn"
+      },
+      "civilianGoods": {
+        "available": 273,
+        "endingStock": 13,
+        "maintenanceRequired": 297,
+        "maintenanceShortage": 0,
+        "productionInputAllocated": 0,
+        "productionInputDemand": 0,
+        "productionInputRequired": 0,
+        "productionInputShortage": 0,
+        "projectedProduction": 37,
+        "required": 297,
+        "shortage": 0,
+        "startingStock": 273
+      },
+      "guaranteedDefeat": {
+        "causeResource": null,
+        "civilianGoodsShortage": 0,
+        "defeatReason": null,
+        "foodShortage": 0,
+        "guaranteed": false,
+        "projectedHealthyCivilians": 137
+      },
+      "criticalCodes": [
+        "resource_runway_risk"
+      ]
+    },
+    {
+      "decision": 220,
+      "turn": 62,
+      "action": {
+        "facilityType": "windPowerPlant",
+        "position": {
+          "q": 24,
+          "r": 26
+        },
+        "type": "BuildConstructibleFacility"
+      },
+      "civilianGoods": {
+        "available": 173,
+        "endingStock": 0,
+        "maintenanceRequired": 297,
+        "maintenanceShortage": 87,
+        "productionInputAllocated": 0,
+        "productionInputDemand": 0,
+        "productionInputRequired": 0,
+        "productionInputShortage": 0,
+        "projectedProduction": 37,
+        "required": 297,
+        "shortage": 87,
+        "startingStock": 173
+      },
+      "guaranteedDefeat": {
+        "causeResource": null,
+        "civilianGoodsShortage": 87,
+        "defeatReason": null,
+        "foodShortage": 0,
+        "guaranteed": false,
+        "projectedHealthyCivilians": 50
+      },
+      "criticalCodes": [
+        "resource_runway_risk",
+        "resource_runway_risk"
+      ]
+    },
+    {
+      "decision": 221,
+      "turn": 62,
+      "action": {
+        "facilityType": "windPowerPlant",
+        "position": {
+          "q": 27,
+          "r": 23
+        },
+        "type": "BuildConstructibleFacility"
+      },
+      "civilianGoods": {
+        "available": 73,
+        "endingStock": 0,
+        "maintenanceRequired": 297,
+        "maintenanceShortage": 187,
+        "productionInputAllocated": 0,
+        "productionInputDemand": 0,
+        "productionInputRequired": 0,
+        "productionInputShortage": 0,
+        "projectedProduction": 37,
+        "required": 297,
+        "shortage": 187,
+        "startingStock": 73
+      },
+      "guaranteedDefeat": {
+        "causeResource": "civilianGoods",
+        "civilianGoodsShortage": 187,
+        "defeatReason": "healthyCiviliansLost",
+        "foodShortage": 0,
+        "guaranteed": true,
+        "projectedHealthyCivilians": 0
+      },
+      "criticalCodes": [
+        "guaranteed_resource_defeat",
+        "resource_runway_risk"
+      ]
+    }
+  ],
+  "killCounts": {
+    "normalZombiesKilled": 96,
+    "hordeZombiesKilled": 34,
+    "policeZombiesKilled": 12,
+    "soldierZombiesKilled": 16,
+    "riotZombiesKilled": 7,
+    "hunterZombiesKilled": 4,
+    "gasZombiesKilled": 6
+  },
+  "killCountSum": 175,
+  "agentMetricsZombiesKilled": 169,
+  "cumulativeResourceShortageLosses": 352,
+  "unitLosses": 8,
+  "refugeesDeparted": 340,
+  "finalHordeSpawned": 78,
+  "sessionMetrics": {
+    "activeSessionResumes": 166,
+    "branchedSessionsCreated": 0,
+    "buildRejections": 0,
+    "corruptionRejections": 0,
+    "diagnosticIntegrityErrors": 0,
+    "finalCheckpointsCreated": 1,
+    "hashRejections": 0,
+    "inputFormatRejections": 0,
+    "invalidDecisions": 37,
+    "manualCheckpointsCreated": 0,
+    "periodicCheckpointsCreated": 12,
+    "staleRevisionRejections": 1,
+    "versionRejections": 0
+  },
+  "militaryRunwayExample": {
+    "decision": 9,
+    "turn": 2,
+    "alert": {
+      "category": "resource",
+      "entityIds": [
+        "militaryGoods"
+      ],
+      "id": "resource_runway_risk:militaryGoods",
+      "publicFacts": {
+        "assumption": "static_current_conditions",
+        "causeCodes": [
+          "next_end_turn_shortage"
+        ],
+        "currentStock": 74,
+        "demand": 3,
+        "demandBreakdown": {
+          "armyBaseRefill": 0,
+          "unitRefill": 3
+        },
+        "estimatedShortageTurn": 1,
+        "netBurn": -77,
+        "nextEndTurnShortage": true,
+        "projectedProduction": 80,
+        "resource": "militaryGoods",
+        "unavailableReason": null
+      },
+      "reasonCode": "resource_runway_risk",
+      "severity": "critical"
+    },
+    "plan": {
+      "projectedEndingStock": 153,
+      "projectedProduction": 80,
+      "projectedTotalRefilled": 1,
+      "startingStock": 74,
+      "totalRefillDemand": 3,
+      "totalUnfilledRefillDemand": 2,
+      "units": [
+        {
+          "afterFixed": 18,
+          "afterRefill": 18,
+          "afterSuppression": 18,
+          "beforeFixed": 19,
+          "fixedConsumption": 1,
+          "inSupply": false,
+          "projectedRefillAmount": 0,
+          "refillDemand": 2,
+          "suppressionCost": 0,
+          "suppressionStatus": "none",
+          "unfilledRefillDemand": 2,
+          "unitId": "national-guard-1",
+          "unitType": "nationalGuard"
+        },
+        {
+          "afterFixed": 19,
+          "afterRefill": 20,
+          "afterSuppression": 20,
+          "beforeFixed": 20,
+          "fixedConsumption": 1,
+          "inSupply": true,
+          "projectedRefillAmount": 1,
+          "refillDemand": 1,
+          "suppressionCost": 0,
+          "suppressionStatus": "none",
+          "unfilledRefillDemand": 0,
+          "unitId": "national-guard-2",
+          "unitType": "nationalGuard"
+        },
+        {
+          "afterFixed": 5,
+          "afterRefill": 5,
+          "afterSuppression": 5,
+          "beforeFixed": 5,
+          "fixedConsumption": 0,
+          "inSupply": true,
+          "projectedRefillAmount": 0,
+          "refillDemand": 0,
+          "suppressionCost": 0,
+          "suppressionStatus": "none",
+          "unfilledRefillDemand": 0,
+          "unitId": "police-1",
+          "unitType": "police"
+        }
+      ]
+    }
+  },
+  "powerPlantFall": [
+    {
+      "id": "event-10892",
+      "payload": {
+        "actualSpawnCount": 0,
+        "cause": "gas_explosion",
+        "chainDepth": 0,
+        "chainOriginEventId": null,
+        "constructibleInfectedDeaths": 0,
+        "infectedAtFall": 4,
+        "q": 25,
+        "r": 27,
+        "remainingInfected": 4,
+        "requestedSpawnCount": 0,
+        "siteId": "power-plant-1",
+        "siteKind": "facility",
+        "siteType": "powerPlant",
+        "sourceUnitType": null
+      },
+      "phase": "zombie",
+      "turn": 61,
+      "type": "site_fallen"
+    }
+  ],
+  "lastTurnShortageEvents": [
+    {
+      "id": "event-11178",
+      "payload": {
+        "amount": 77,
+        "reason": "unit_refill",
+        "resource": "militaryGoods"
+      },
+      "phase": "economy",
+      "turn": 62,
+      "type": "resource_shortage"
+    },
+    {
+      "id": "event-11179",
+      "payload": {
+        "civilianGoods": 187,
+        "food": 0
+      },
+      "phase": "economy",
+      "turn": 62,
+      "type": "resource_shortage"
+    },
+    {
+      "id": "event-11180",
+      "payload": {
+        "facilityId": "capital",
+        "populationLost": 37,
+        "resource": "civilianGoods"
+      },
+      "phase": "economy",
+      "turn": 62,
+      "type": "resource_shortage"
+    },
+    {
+      "id": "event-11181",
+      "payload": {
+        "facilityId": "city-1",
+        "populationLost": 20,
+        "resource": "civilianGoods"
+      },
+      "phase": "economy",
+      "turn": 62,
+      "type": "resource_shortage"
+    },
+    {
+      "id": "event-11182",
+      "payload": {
+        "facilityId": "simple-farm-2",
+        "populationLost": 10,
+        "resource": "civilianGoods"
+      },
+      "phase": "economy",
+      "turn": 62,
+      "type": "resource_shortage"
+    },
+    {
+      "id": "event-11183",
+      "payload": {
+        "facilityId": "simple-farm-1",
+        "populationLost": 10,
+        "resource": "civilianGoods"
+      },
+      "phase": "economy",
+      "turn": 62,
+      "type": "resource_shortage"
+    },
+    {
+      "id": "event-11184",
+      "payload": {
+        "facilityId": "civilian-factory-1",
+        "populationLost": 30,
+        "resource": "civilianGoods"
+      },
+      "phase": "economy",
+      "turn": 62,
+      "type": "resource_shortage"
+    },
+    {
+      "id": "event-11185",
+      "payload": {
+        "facilityId": "farm-1",
+        "populationLost": 30,
+        "resource": "civilianGoods"
+      },
+      "phase": "economy",
+      "turn": 62,
+      "type": "resource_shortage"
+    }
+  ],
+  "lockProbe": {
+    "method": "two play-turn processes on a new isolated scratch session using the supplied CLI bundle",
+    "result": "session_locked",
+    "exitCode": 1,
+    "outputStream": "stderr",
+    "elapsedSeconds": 0.573,
+    "limitations": "One local reproduction; does not rule out shell/pipe/platform-specific hangs."
+  }
+}
