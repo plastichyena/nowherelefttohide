@@ -1,6 +1,6 @@
 import 'phaser';
 import './styles.css';
-import { installBrowserBridge } from './browser/bridge';
+import { installBrowserBridge, resolveBuildId } from './browser/bridge';
 import { LiveAiViewer } from './browser/live-ai';
 import { registerWebMcpTools } from './browser/webmcp';
 import { GameUiController, type UiGameEngine } from './ui/controller';
@@ -49,8 +49,9 @@ async function boot(): Promise<void> {
 // Keep the Developer / Browser Bridge available from the first page script
 // evaluation.  It owns a separate in-memory AgentGame and never reuses the
 // UI controller's engine or persistence store.
-installBrowserBridge();
-const liveAiViewer = new LiveAiViewer();
+const buildId = resolveBuildId(undefined);
+installBrowserBridge({ buildId });
+const liveAiViewer = new LiveAiViewer({ buildId });
 try {
   registerWebMcpTools({ getSession: liveAiViewer.getSession, act: liveAiViewer.act });
 } catch {

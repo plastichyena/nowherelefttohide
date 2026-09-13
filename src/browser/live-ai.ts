@@ -7,6 +7,20 @@ const LOG_DECISION_LIMIT = 100;
 const LOG_BYTE_LIMIT = 2 * 1024 * 1024;
 const MAX_CANVAS_PIXELS = 2048 * 2048;
 
+export interface LiveAiViewerOptions {
+  buildId?: string;
+}
+
+export function liveAiSessionOptions(
+  options: LiveAiViewerOptions,
+  preferredCommentLocale: 'ja' | 'en',
+): { buildId?: string; preferredCommentLocale: 'ja' | 'en' } {
+  return {
+    ...(options.buildId === undefined ? {} : { buildId: options.buildId }),
+    preferredCommentLocale,
+  };
+}
+
 export function boundedCanvasBackingSize(cssWidth: number, cssHeight: number, devicePixelRatio: number): { width: number; height: number; scale: number } {
   const safeWidth = Math.max(1, Math.floor(cssWidth));
   const safeHeight = Math.max(1, Math.floor(cssHeight));
@@ -41,8 +55,10 @@ export class LiveAiViewer {
   private readonly log: HTMLElement;
   private readonly omitted: HTMLElement;
   private readonly state: HTMLElement;
+  private readonly options: LiveAiViewerOptions;
 
-  public constructor() {
+  public constructor(options: LiveAiViewerOptions = {}) {
+    this.options = options;
     this.host = document.createElement('aside');
     this.host.className = 'live-ai-host';
     this.host.innerHTML = `
@@ -105,7 +121,7 @@ export class LiveAiViewer {
   };
 
   private async start(): Promise<void> {
-    this.session = createAiSession({ preferredCommentLocale: locale() });
+    this.session = createAiSession(liveAiSessionOptions(this.options, locale()));
     const artifact = this.session.buildPublicArtifact();
     if (artifact.ok) {
       this.latestObservation = artifact.artifact.finalObservation;

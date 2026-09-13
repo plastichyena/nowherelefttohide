@@ -225,7 +225,7 @@ function isBridgeAction(value: unknown): value is GameAction {
   }
 }
 
-function resolveBuildId(explicit: string | undefined): string {
+export function resolveBuildId(explicit: string | undefined): string {
   if (typeof explicit === 'string' && explicit.length > 0 && explicit.length <= MAX_INPUT_STRING_LENGTH) return explicit;
   // Vite replaces import.meta.env.VITE_BUILD_ID in CI builds.  Avoid reading
   // any browser storage or network metadata for this value.
