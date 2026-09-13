@@ -9,9 +9,9 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** v1.5.4 deliberately rejects Session/Checkpoint v6 instead of migrating it. */
-export const CHECKPOINT_SCHEMA_VERSION = '10.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '10.0.0' as const;
+/** v1.6 deliberately rejects every earlier Session/Checkpoint schema. */
+export const CHECKPOINT_SCHEMA_VERSION = '11.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '11.0.0' as const;
 export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
 export const SESSION_ARTIFACT_PACKAGE_VERSION = '1.0.0' as const;
 export const PLAY_TURN_PROTOCOL_VERSION = '1.0.0' as const;
@@ -27,6 +27,8 @@ export const MAX_PLAY_TURN_PLAN_ACTIONS = 64;
 export const MAX_PLAY_TURN_REQUESTS = 256;
 export const DEFAULT_PLAY_TURN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 export const ZERO_HASH = '0'.repeat(64);
+
+export type SessionCommentLocale = 'ja' | 'en';
 
 export type SessionCommand = 'new' | 'status' | 'step' | 'play-turn' | 'save-checkpoint' | 'list-checkpoints' | 'load-checkpoint' | 'query' | 'artifact';
 
@@ -64,6 +66,7 @@ export interface SessionDescriptor extends SessionVersionIdentity, SessionLineag
   seed: number;
   agentId: string;
   checkpointInterval: number;
+  preferredCommentLocale: SessionCommentLocale;
   publicConfig: JsonValue;
   createdAt: string;
   descriptorIntegrityHash: string;
@@ -113,14 +116,14 @@ export interface SessionPublicHead {
 }
 export interface SessionPrivateEnvelope { body: JsonValue; map: SessionPayloadReference | null; events: SessionPayloadReference[] }
 
-export interface SessionStepInput { action: GameAction; decisionSummary: string; expectedRevision?: number }
+export interface SessionStepInput { action: GameAction; decisionSummary?: string | null; expectedRevision?: number }
 
 export interface SessionPlayTurnHpExpectation { unitId: string; minHp: number; maxHp: number }
 export interface SessionPlayTurnExpectations { playerUnitHp: SessionPlayTurnHpExpectation[] }
 export interface SessionPlayTurnActionInput {
   type: 'action';
   action: GameAction;
-  decisionSummary: string;
+  decisionSummary?: string | null;
   expectedRevision: number;
   requestId: string;
   expectations?: SessionPlayTurnExpectations;
@@ -168,7 +171,8 @@ export interface PublicDecisionRecord {
   turn: number;
   phase: AgentObservation['phase'];
   inputAction: GameAction;
-  decisionSummary: string;
+  decisionSummary: string | null;
+  requestedCommentLocale: SessionCommentLocale;
   /** Present only for play-turn writes; hashed into the immutable Decision record. */
   requestId: string | null;
   requestHash: string | null;
@@ -364,7 +368,7 @@ export interface SessionPlayTurnPlanResult {
   result: AgentGameResult | null;
 }
 
-export interface NewSessionOptions { sessionId?: string; seed?: number; agentId?: string; checkpointInterval?: number }
+export interface NewSessionOptions { sessionId?: string; seed?: number; agentId?: string; checkpointInterval?: number; preferredCommentLocale?: SessionCommentLocale }
 export interface SessionGameRuntime {
   getApiInfo?(): AgentApiInfo;
   getObservation(): AgentObservation;

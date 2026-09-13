@@ -19,6 +19,7 @@ import {
 import { effectiveMovementCost, isUrbanHex } from '../core/terrain';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
 import { deriveCrisisSummary as deriveCoreCrisisSummary, deriveEndTurnRisk as deriveCoreEndTurnRisk } from '../core/crisis';
+import { deriveSupportHeadroom } from '../core/action-preview';
 import { withReadOnlyQueryScope } from '../core/query-cache';
 import {
   createPublicCheckpointProjection,
@@ -384,6 +385,13 @@ function createAgentObservationInScope(
        hordeSpawnReserve: state.map.hordeSpawnReserve.map((position) => ({ ...position })),
     },
     resources: cloneJson(state.resources),
+    refineryAllowance: cloneJson(state.refineryAllowance),
+    supportHeadroom: deriveSupportHeadroom(state, endTurnForecast),
+    windPowerConstruction: {
+      playerBuiltCount: state.facilities.filter((facility) => facility.type === 'windPowerPlant' && facility.constructible).length,
+      playerBuildLimit: state.roadBranches.length * 2,
+      remaining: Math.max(0, state.roadBranches.length * 2 - state.facilities.filter((facility) => facility.type === 'windPowerPlant' && facility.constructible).length),
+    },
     population: {
       healthyCivilians: state.population.healthyCivilians,
       cityResidents: state.population.cityResidents,
@@ -447,7 +455,7 @@ function createAgentObservationInScope(
   } satisfies AgentObservation as unknown as JsonValue) as unknown as AgentObservation;
 }
 
-/** Remove fixed topology from one Artifact Schema 10.0.0 trace entry. */
+/** Remove fixed topology from one Artifact Schema 14.0.0 trace entry. */
 export function compactArtifactObservation(observation: AgentObservation): AgentArtifactObservation {
   const copy = cloneJson(observation);
   const { map, ...dynamic } = copy;

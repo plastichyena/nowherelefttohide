@@ -27,9 +27,9 @@ const key = ({ q, r }: { q: number; r: number }) => `${q},${r}`;
 const at = (q: number, r: number) => FIXED_MAP.tiles.find((tile) => tile.q === q && tile.r === r);
 const rotate = ({ q, r }: { q: number; r: number }) => ({ q: 50 - q, r: 50 - r });
 
-describe('v1.5.5 fixed map', () => {
+describe('v1.6 fixed map', () => {
   it('uses the 51x51 fixed map contract and covers every hex exactly once', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v4');
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v5');
     expect(FIXED_MAP.width).toBe(FIXED_MAP_WIDTH);
     expect(FIXED_MAP.height).toBe(FIXED_MAP_HEIGHT);
     expect(FIXED_MAP.tiles).toHaveLength(51 * 51);
@@ -129,7 +129,7 @@ describe('v1.5.5 fixed map', () => {
     expect(canPlayerOccupyHex(replaced, { q: 15, r: 0 })).toBe(true);
   });
 
-  it('contains the 29 permanent facilities at the specified coordinates', () => {
+  it('contains the 28 permanent v5 facilities at the specified coordinates', () => {
     expect(FIXED_MAP.facilities).toHaveLength(FIXED_FACILITY_COUNT);
     expect(FIXED_MAP.facilities.map((facility) => facility.id)).toEqual(FIXED_FACILITY_IDS);
     const expected = {
@@ -154,13 +154,12 @@ describe('v1.5.5 fixed map', () => {
       'military-factory-1': ['militaryFactory', 21, 25, false],
       'military-factory-2': ['militaryFactory', 22, 10, false],
       'military-factory-3': ['militaryFactory', 28, 40, false],
+      'oilfield-north': ['oilField', 26, 13, false],
+      'oilfield-east': ['oilField', 37, 24, false],
+      'oilfield-south': ['oilField', 24, 37, false],
+      'oilfield-west': ['oilField', 13, 26, false],
       'refinery-1': ['refinery', 25, 23, true],
-      'refinery-2': ['refinery', 38, 21, false],
-      'refinery-3': ['refinery', 25, 39, false],
-      'refinery-4': ['refinery', 11, 30, false],
       'power-plant-1': ['powerPlant', 25, 27, true],
-      'power-plant-2': ['powerPlant', 40, 22, false],
-      'power-plant-3': ['powerPlant', 10, 28, false],
       'wind-power-plant-1': ['windPowerPlant', 26, 24, true],
     } as Record<string, [string, number, number, boolean]>;
     for (const facility of FIXED_MAP.facilities) {
@@ -181,6 +180,9 @@ describe('v1.5.5 fixed map', () => {
       startingWorkers: 0,
       workerCapacity: 0,
     });
+    for (const id of ['refinery-2', 'refinery-3', 'refinery-4', 'power-plant-2', 'power-plant-3']) {
+      expect(FIXED_MAP.facilities.some((facility) => facility.id === id)).toBe(false);
+    }
   });
 
   it('publishes canonical initial Unit positions and seed-selected safe Normal Zombies', () => {

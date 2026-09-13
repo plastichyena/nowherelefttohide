@@ -169,15 +169,57 @@ describe('Session hash and input boundaries', () => {
   it('uses canonical SHA-256 and validates safe identifiers and Unicode summaries', () => {
     expect(sha256Text('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
     expect(canonicalJson({ z: 1, a: { d: 2, b: 1 } })).toBe('{"a":{"b":1,"d":2},"z":1}');
-    expect(normalizeDecisionSummary('  🧟 defend  ')).toBe('🧟 defend');
-    expect(() => normalizeDecisionSummary('')).toThrow(SessionError);
+    expect(normalizeDecisionSummary('  🧟 defend  ')).toBe('  🧟 defend  ');
+    expect(normalizeDecisionSummary('')).toBeNull();
+    expect(normalizeDecisionSummary(undefined)).toBeNull();
+    expect(normalizeDecisionSummary(null)).toBeNull();
     expect(() => normalizeDecisionSummary('🧟'.repeat(501))).toThrow(SessionError);
     expect(() => assertSafeIdentifier('../escape', 'sessionId')).toThrow(SessionError);
+  });
+
+  it('accepts optional Session comments, stores the fixed preferred locale, and includes normalized comment/locale in play-turn idempotency', () => {
+    const japaneseRoot = tempRoot('comment-ja');
+    const japanese = service(japaneseRoot);
+    const created = japanese.newSession({ sessionId: 'comment-ja', preferredCommentLocale: 'ja' });
+    expect(created.session.preferredCommentLocale).toBe('ja');
+
+    const exactLimit = japanese.step('comment-ja', { action: { type: 'EndTurn' }, decisionSummary: '😀'.repeat(500) });
+    expect(exactLimit.decisionRecord.decisionSummary).toBe('😀'.repeat(500));
+    expect(exactLimit.decisionRecord.requestedCommentLocale).toBe('ja');
+
+    const defaultRoot = tempRoot('comment-default');
+    const defaultLocale = service(defaultRoot);
+    const defaultCreated = defaultLocale.newSession({ sessionId: 'comment-default' });
+    expect(defaultCreated.session.preferredCommentLocale).toBe('en');
+    const omitted = defaultLocale.playTurnAction('comment-default', {
+      type: 'action', requestId: 'comment-idempotency', action: { type: 'EndTurn' }, expectedRevision: 0,
+    });
+    const retriedAsEmpty = defaultLocale.playTurnAction('comment-default', {
+      type: 'action', requestId: 'comment-idempotency', action: { type: 'EndTurn' }, expectedRevision: 0, decisionSummary: '',
+    });
+    expect(omitted.replayed).toBe(false);
+    expect(retriedAsEmpty.replayed).toBe(true);
+    const record = defaultLocale.artifact('comment-default').decisionTrace[0]!;
+    expect(record.decisionSummary).toBeNull();
+    expect(record.requestedCommentLocale).toBe('en');
+
+    const localeHashRootJa = tempRoot('comment-hash-ja');
+    const localeHashJa = service(localeHashRootJa);
+    localeHashJa.newSession({ sessionId: 'comment-hash', preferredCommentLocale: 'ja' });
+    localeHashJa.playTurnAction('comment-hash', { type: 'action', requestId: 'same-payload', action: { type: 'EndTurn' }, expectedRevision: 0, decisionSummary: 'same comment' });
+    const localeHashRootEn = tempRoot('comment-hash-en');
+    const localeHashEn = service(localeHashRootEn);
+    localeHashEn.newSession({ sessionId: 'comment-hash', preferredCommentLocale: 'en' });
+    localeHashEn.playTurnAction('comment-hash', { type: 'action', requestId: 'same-payload', action: { type: 'EndTurn' }, expectedRevision: 0, decisionSummary: 'same comment' });
+    expect(localeHashJa.artifact('comment-hash').decisionTrace[0]!.requestHash).not.toBe(localeHashEn.artifact('comment-hash').decisionTrace[0]!.requestHash);
+
+    expect(() => japanese.step('comment-ja', { action: { type: 'EndTurn' }, decisionSummary: '😀'.repeat(501) })).toThrow(/code points/u);
+    expect(japanese.status('comment-ja').revision).toBe(1);
   });
 });
 
 describe('AI Portable Session lifecycle', () => {
-  it('restores v1.5.6 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
+  it('restores v1.6.0 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
     const root = tempRoot('real-wave-resume');
     const api = agentService(root);
     api.newSession({ sessionId: 'real-wave-resume', seed: 71, checkpointInterval: 99 });
@@ -224,11 +266,11 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '9.0.0',
-      mapId: 'fixed-51x51-v4',
+      gameVersion: '10.0.0',
+      mapId: 'fixed-51x51-v5',
       config: {
-        version: '9.0.0',
-        mapId: 'fixed-51x51-v4',
+        version: '10.0.0',
+        mapId: 'fixed-51x51-v5',
         infection: {
           zombieSpawnPopulationPerUnit: 5,
           maxZombieSpawnPerResolution: 6,
@@ -265,7 +307,7 @@ describe('AI Portable Session lifecycle', () => {
   // obsolete 31×31 wall-clock budget are the portable Session contract.
   }, 60_000);
 
-  it('round-trips Active state, records rejected Decisions, and leaves malformed input unnumbered', () => {
+  it('round-trips Active state, records rejected Decisions, and normalizes missing comments', () => {
     const root = tempRoot('roundtrip');
     const api = service(root);
     const created = api.newSession({ sessionId: 'roundtrip', seed: 7 });
@@ -290,11 +332,14 @@ describe('AI Portable Session lifecycle', () => {
     expect(rejected.accepted).toBe(false);
     expect(rejected.active.decision).toBe(2);
     const beforeMalformed = api.status('roundtrip');
-    expect(() => api.step('roundtrip', { action: { type: 'EndTurn' }, decisionSummary: '   ' })).toThrow(/decisionSummary/u);
-    expect(api.status('roundtrip').active).toEqual(beforeMalformed.active);
+    const noComment = api.step('roundtrip', { action: { type: 'EndTurn' } });
+    expect(noComment.accepted).toBe(true);
+    expect(noComment.decisionRecord.decisionSummary).toBeNull();
+    expect(noComment.decisionRecord.requestedCommentLocale).toBe('en');
+    expect(noComment.active.decision).toBe(beforeMalformed.active.decision + 1);
 
     const artifact = api.artifact('roundtrip');
-    expect(artifact.decisionTrace).toHaveLength(2);
+    expect(artifact.decisionTrace).toHaveLength(3);
     expect(artifact.decisionTrace[0]!.previousDecisionHash).toBe('0'.repeat(64));
     expect(artifact.decisionTrace[1]!.previousDecisionHash).toBe(artifact.decisionTrace[0]!.decisionHash);
     expect(JSON.stringify(artifact)).not.toContain('secretRngState');
@@ -483,7 +528,7 @@ describe('AI Portable Session lifecycle', () => {
     expect(resumed.sessionMetrics.activeSessionResumes).toBe(1);
 
     try {
-      api.step('metrics', { action: { type: 'EndTurn' }, decisionSummary: '' });
+      api.step('metrics', { action: { type: 'EndTurn' }, decisionSummary: 42 as unknown as string });
     } catch (error) {
       expect((error as SessionError).details).toMatchObject({ sessionMetrics: { inputFormatRejections: 1 } });
     }

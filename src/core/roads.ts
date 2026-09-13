@@ -138,7 +138,20 @@ export function generateRoadNetwork(input: RoadInput, optional = true): RoadNetw
     if (next.route.path.length > 1) network.segments.push({ id: `collector-${next.d.id}`, role: 'collector', path: next.route.path });
     pending.splice(pending.indexOf(next.d), 1);
   }
-  for (const f of normalized.facilities) connectRoadAccess(input, network, f.position, `access-${f.id}`);
+  const fixedOilFieldSpurs: Record<string, HexCoord> = {
+    'oilfield-north': { q: 25, r: 13 },
+    'oilfield-east': { q: 37, r: 25 },
+    'oilfield-south': { q: 25, r: 37 },
+    'oilfield-west': { q: 13, r: 25 },
+  };
+  for (const f of normalized.facilities) {
+    const fixedSpurEnd = fixedOilFieldSpurs[f.id];
+    if (fixedSpurEnd) {
+      network.segments.push({ id: `access-${f.id}`, role: 'access', path: [f.position, fixedSpurEnd] });
+    } else {
+      connectRoadAccess(input, network, f.position, `access-${f.id}`);
+    }
+  }
   const trunkEdges = roadEdges({ ...network, segments: [...input.trunks] }).length;
   let budget = Math.floor((roadEdges(network).length - trunkEdges) * input.style.optionalRatio);
   if (optional) while (budget > 0) {

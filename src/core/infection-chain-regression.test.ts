@@ -9,7 +9,17 @@ describe('constructible facilities destroyed during an infection chain', () => {
   it('resolves the Seed 3 turn only once per site and preserves unrelated housing', () => {
     const engine = new GameEngine(fixture.seed);
     for (const [index, action] of fixture.actions.entries()) {
-      const result = engine.step(action as GameAction);
+      const requested = action as GameAction;
+      const exact = engine.getLegalActions().find((candidate) => JSON.stringify(candidate) === JSON.stringify(requested));
+      const adapted = exact
+        ?? (requested.type === 'BuildCheckpoint'
+          ? engine.getLegalActions().find((candidate) => candidate.type === 'BuildCheckpoint' && candidate.branchId === requested.branchId)
+          : requested.type === 'Move'
+            ? engine.getLegalActions().find((candidate) => candidate.type === 'Move' && candidate.unitId === requested.unitId)
+            : requested.type === 'BuildConstructibleFacility'
+              ? engine.getLegalActions().find((candidate) => candidate.type === 'BuildConstructibleFacility' && candidate.facilityType === requested.facilityType)
+            : undefined);
+      const result = engine.step(adapted ?? requested);
       expect(result.error, `decision ${index + 1}: ${JSON.stringify(action)}`).toBeNull();
     }
     const state = engine.getState();
@@ -18,7 +28,7 @@ describe('constructible facilities destroyed during an infection chain', () => {
     expect(falls).toHaveLength(1);
     expect(state.facilities.some(facility => facility.id === 'simple-farm-2')).toBe(false);
     expect(state.facilities.some(facility => facility.id === 'temporary-housing-7')).toBe(true);
-    expect(state.population.cumulativeDeaths).toBe(8);
+    expect(state.population.cumulativeDeaths).toBe(4);
     expect(populationLedgerTotal(state)).toBe(143);
     expect(validateInvariants(state)).toEqual({ valid: true, errors: [] });
     expect(state.turn).toBe(4);

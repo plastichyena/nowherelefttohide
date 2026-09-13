@@ -265,6 +265,24 @@ function interceptArmyBase(state: GameState, mover: UnitState, rng: SeededRng): 
   }
   return fired;
 }
+const FIRST_CAPTURE_REWARDS: Partial<Record<FacilityState['type'], Partial<Record<ResourceType, number>>>> = {
+  city: { food: 100, civilianGoods: 100, fuel: 100 },
+  civilianFactory: { civilianGoods: 100 },
+  militaryFactory: { militaryGoods: 100 },
+  armyBase: { food: 100, militaryGoods: 100 },
+  farm: { food: 100, fuel: 100 },
+};
+
+function claimFirstCaptureReward(state: GameState, facility: FacilityState): Partial<Record<ResourceType, number>> {
+  if (facility.firstCaptureRewardClaimed) return {};
+  facility.firstCaptureRewardClaimed = true;
+  const reward = FIRST_CAPTURE_REWARDS[facility.type] ?? {};
+  for (const [resource, amount] of Object.entries(reward) as Array<[ResourceType, number]>) {
+    state.resources[resource] += amount;
+  }
+  return reward;
+}
+
 function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRng.fromState(state.rngState)): void {
   if (!unit.isPlayerUnit) {
     return;
@@ -280,7 +298,8 @@ function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRn
       facility.status = 'owned';
       facility.securedOrder = state.facilities.reduce((max, item) => Math.max(max, item.securedOrder ?? -1), -1) + 1;
       facility.lastAssignedOrder = state.nextAssignmentOrder++;
-      emit(state, 'facility_captured', { facilityId: facility.id, unitId: unit.id });
+      const captureReward = claimFirstCaptureReward(state, facility);
+      emit(state, 'facility_captured', { facilityId: facility.id, unitId: unit.id, captureReward });
       if (facility.armyBase?.reward === 'unclaimed') {
         facility.armyBase.reward = state.turn <= state.config.armyBase.rewardLastTurn ? 'pending' : 'expired';
         settleArmyReward(state, facility, rng);
@@ -317,7 +336,8 @@ function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRn
   facility.securedOrder = previousOrder + 1;
   facility.lastAssignedOrder = state.nextAssignmentOrder++;
   facility.populationOperationalTurn = state.turn + 1;
-  emit(state, 'facility_captured', { facilityId: facility.id, unitId: unit.id });
+  const captureReward = claimFirstCaptureReward(state, facility);
+  emit(state, 'facility_captured', { facilityId: facility.id, unitId: unit.id, captureReward });
   if (facility.armyBase?.reward === 'unclaimed') { facility.armyBase.reward=state.turn<=state.config.armyBase.rewardLastTurn ? 'pending' : 'expired'; settleArmyReward(state,facility,rng); }
 }
 
@@ -720,12 +740,15 @@ function removeWorkersForShortage(state: GameState, amount: number, resource: 'f
   }
   state.statistics.civilianLosses += removed;
   state.statistics.resourceShortageLosses += removed;
+  state.statistics.resourceShortageLossesTotal += removed;
+  state.statistics.finalEconomyResourceShortageLosses += removed;
   state.population.cumulativeDeaths += removed;
   return removed;
 }
 
 function processEconomy(state: GameState): FacilityProductionProjection[] {
   synchronizePopulation(state);
+  state.statistics.finalEconomyResourceShortageLosses = 0;
   const plan = calculateEconomyPlan(state);
   const forecast = plan.forecast;
   const housing = state.facilities.filter(f => f.type === 'temporaryHousing' && f.owner === 'player');
@@ -751,6 +774,9 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
   state.resources.civilianGoods = forecast.civilianGoods.endingStock;
   state.resources.militaryGoods = forecast.militaryGoods.projectedEndingStock;
   state.resources.fuel = forecast.fuel.endingStock;
+  state.refineryAllowance.oilCreditsEarned += forecast.refineryAllowance.oilCreditsEarned;
+  state.refineryAllowance.fuelRefined += forecast.refineryAllowance.fuelRefined;
+  state.refineryAllowance.remainingAllowance = forecast.refineryAllowance.remaining;
   state.resources.electricityCapacity = forecast.electricity.physicalGenerationCapacity;
   state.resources.electricityRequired = forecast.electricity.required;
 
@@ -3577,7 +3603,8 @@ function wait(state: GameState, action: Extract<GameAction, { type: 'Wait' }>): 
 
 function constructibleLimit(state: Readonly<GameState>, facilityType: ConstructibleFacilityType): number {
   if (facilityType === 'temporaryHousing') return Number.MAX_SAFE_INTEGER;
-  return facilityType === 'simpleFarm' || facilityType === 'windPowerPlant'
+  if (facilityType === 'windPowerPlant') return state.map.roadBranches.length * 2;
+  return facilityType === 'simpleFarm'
     ? state.map.roadBranches.length
     : Math.ceil(state.map.roadBranches.length / state.config.constructibleFacility.limitPerTypeDivisor);
 }
@@ -3721,6 +3748,7 @@ function buildConstructibleFacility(
     constructible: true,
     builtTurn: state.turn,
     recoveryOperationalTurn: null,
+    firstCaptureRewardClaimed: true,
   };
   state.facilities.push(facility);
   if (action.facilityType === 'temporaryHousing') state.statistics.housingBuilt += 1;

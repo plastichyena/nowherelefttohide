@@ -94,7 +94,7 @@ function stateWithArmyBaseReservation(seed = 42): GameState {
   return state;
 }
 
-describe('v1.5.7 Save Format 16', () => {
+describe('v1.6.0 Save Format 17', () => {
   it('rejects the v1.5.6 Save 15 boundary with a valid checksum without changing its input', () => {
     const legacy = exportedEnvelope();
     legacy.formatVersion = 15;
@@ -109,7 +109,7 @@ describe('v1.5.7 Save Format 16', () => {
     expect(result.errors.join(' ')).toMatch(/version|format|新規/i);
     expect(JSON.stringify(resign(legacy))).toBe(text);
   });
-  it('exposes stable per-stage timings without changing Save Format 15 bytes', () => {
+  it('exposes stable per-stage timings without changing Save Format 17 bytes', () => {
     const state = initialState(15152);
     const measured = measureSaveEncoding(state);
     expect(measured.code).toBe(encodeSaveCode(state));
@@ -121,7 +121,7 @@ describe('v1.5.7 Save Format 16', () => {
     }
   });
 
-  it('round-trips a detached complete Save Format 15 GameState through code and JSON', () => {
+  it('round-trips a detached complete Save Format 17 GameState through code and JSON', () => {
     const state = initialState(77);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);
@@ -129,9 +129,9 @@ describe('v1.5.7 Save Format 16', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 16,
+      formatVersion: 17,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-51x51-v4',
+      mapId: 'fixed-51x51-v5',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -142,7 +142,7 @@ describe('v1.5.7 Save Format 16', () => {
     expect(decodeSaveCode(code).state!.horde.finalHordeStatus).toBe('notStarted');
   });
 
-  it('preserves v1.5.6 Army Base, Gas, Wind Noise, and pending Noise state without conversion', () => {
+  it('preserves v1.6.0 Army Base, Gas, Wind Noise, and pending Noise state without conversion', () => {
     const state = initialState(78);
     const riot = state.units.find((unit) => unit.type === 'police')!;
     const capital = state.facilities.find((facility) => facility.id === 'capital')!;
@@ -236,16 +236,16 @@ describe('v1.5.7 Save Format 16', () => {
     expect(loaded.state?.initialGasPositions).toEqual(state.initialGasPositions);
   });
 
-  it('writes the v1.5.6 version boundaries and complete v1.5.6 Config / Statistics / Event state', () => {
+  it('writes the v1.6.0 version boundaries and complete v1.6.0 Config / Statistics / Event state', () => {
     const envelope = exportedEnvelope(initialState(6));
     const state = envelope.state as Record<string, unknown>;
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(16);
-    expect(envelope.gameVersion).toBe('9.0.0');
-    expect(config.version).toBe('9.0.0');
-    expect(config.mapId).toBe('fixed-51x51-v4');
+    expect(envelope.formatVersion).toBe(17);
+    expect(envelope.gameVersion).toBe('10.0.0');
+    expect(config.version).toBe('10.0.0');
+    expect(config.mapId).toBe('fixed-51x51-v5');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
@@ -354,7 +354,7 @@ describe('v1.5.7 Save Format 16', () => {
     expect(result.errors.join(' ')).toMatch(/warningLeadTurns|fallBackCapacityRate|warningDirections|spawnGroupIdsByWave|pendingWaves|horde\.waves|hordeSpawnReserve|playerOccupancyAllowed|initialHunterPositions|noiseRespawnAttempts|unitExperience|windPower|specialZombieWeights|pendingNoisePulses|proficiency|previousFallbackPosition|fallbackTarget|waveCapitalAnchor|riotPoliceProduced|windPowerPlant/i);
   });
 
-  it('rejects missing or invalid v1.5.6 Army Base, Gas, Wind Noise, Event, and statistics data', () => {
+  it('rejects missing or invalid v1.6.0 Army Base, Gas, Wind Noise, Event, and statistics data', () => {
     const valid = exportedEnvelope(stateWithArmyBaseReservation(117));
 
     const missingBaseState = clone(valid);
@@ -601,7 +601,7 @@ describe('v1.5.7 Save Format 16', () => {
     expect(current).toEqual(before);
   });
 
-  it('rejects a stale state/config version even when the envelope has Save Format 15', () => {
+  it('rejects a stale state/config version even when the envelope has Save Format 17', () => {
     const envelope = exportedEnvelope();
     const state = envelope.state as Record<string, unknown>;
     state.gameVersion = '2.4.0';
@@ -639,7 +639,7 @@ describe('v1.5.7 Save Format 16', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v15 autosave key and never rewrites or removes the v14 legacy key', () => {
+  it('uses the v17 autosave key and never rewrites or removes the v16 legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
     legacy.formatVersion = 10;

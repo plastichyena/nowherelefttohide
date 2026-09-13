@@ -28,7 +28,7 @@ describe('GameEngine', () => {
     const first = createInitialState(42, config);
     const second = createInitialState(42, config);
     expect(first).toEqual(second);
-    expect(first.facilities).toHaveLength(30);
+    expect(first.facilities).toHaveLength(29);
     expect(first.facilities.filter((facility) => facility.status === 'owned')).toHaveLength(6);
     expect(first.population.healthyCivilians).toBe(100);
     expect(first.facilities.find((facility) => facility.id === 'capital')?.workers).toBe(41);

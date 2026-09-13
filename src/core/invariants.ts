@@ -33,6 +33,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     !state.config ||
     !state.population ||
     !state.resources ||
+    !state.refineryAllowance ||
     !state.statistics ||
     !state.horde ||
     !Array.isArray(state.barbedWire) ||
@@ -77,6 +78,13 @@ export function validateInvariants(state: GameState): InvariantResult {
   }
   if (state.map.id !== state.mapId || state.map.id !== state.config.mapId) {
     errors.push('State map id must match config and map');
+  }
+  const allowance = state.refineryAllowance;
+  for (const field of ['initialAllowance', 'oilCreditsEarned', 'fuelRefined', 'remainingAllowance'] as const) {
+    if (!isNonNegativeInteger(allowance[field])) errors.push(`Refinery allowance ${field} must be a non-negative integer`);
+  }
+  if (allowance.remainingAllowance !== allowance.initialAllowance + allowance.oilCreditsEarned - allowance.fuelRefined) {
+    errors.push('Refinery allowance ledger must balance');
   }
   try {
     const map = validateFixedMap(state.map);
@@ -259,6 +267,9 @@ export function validateInvariants(state: GameState): InvariantResult {
     'unitLosses',
     'infectionLosses',
     'resourceShortageLosses',
+    'resourceShortageLossesTotal',
+    'finalEconomyResourceShortageLosses',
+    'enemyKillsTotal',
     'hordeInterceptions',
     'unmanagedPassThrough',
     'refugeesAccepted',
@@ -437,6 +448,20 @@ export function validateInvariants(state: GameState): InvariantResult {
   if (state.statistics.finalHordeKilled > state.statistics.finalHordeSpawned) {
     errors.push('Final Horde killed count cannot exceed its spawned count');
   }
+  if (state.statistics.resourceShortageLossesTotal !== state.statistics.resourceShortageLosses) {
+    errors.push('Cumulative resource shortage loss counters must match');
+  }
+  if (state.statistics.finalEconomyResourceShortageLosses > state.statistics.resourceShortageLossesTotal) {
+    errors.push('Final economy shortage losses cannot exceed cumulative shortage losses');
+  }
+  const enemyKillsTotal = state.statistics.normalZombiesKilled
+    + state.statistics.hordeZombiesKilled
+    + state.statistics.policeZombiesKilled
+    + state.statistics.soldierZombiesKilled
+    + state.statistics.riotZombiesKilled
+    + state.statistics.hunterZombiesKilled
+    + state.statistics.gasZombiesKilled;
+  if (state.statistics.enemyKillsTotal !== enemyKillsTotal) errors.push('Enemy kill total must equal all enemy type counters');
   const finalSpecialSpawned = Object.values(state.statistics.finalSpecialZombiesSpawnedByType ?? {})
     .reduce((sum, value) => sum + Number(value), 0);
   if (state.statistics.finalHordeSpawned !== state.statistics.finalHordeZombiesSpawned + state.statistics.finalNormalZombiesSpawned + finalSpecialSpawned) {
@@ -476,6 +501,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (facility.constructible && !['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'].includes(facility.type)) {
       errors.push(`Facility ${facility.id} has an invalid constructible type`);
     }
+    if (typeof facility.firstCaptureRewardClaimed !== 'boolean') errors.push(`Facility ${facility.id} has an invalid first-capture reward ledger`);
     if (facility.type === 'armyBase') {
       if (facility.constructible) errors.push(`Army Base ${facility.id} cannot be constructible`);
       if (!facility.armyBase) {
@@ -533,7 +559,7 @@ export function validateInvariants(state: GameState): InvariantResult {
   const playerBuiltWindCount = state.facilities.filter(
     (facility) => facility.constructible && facility.type === 'windPowerPlant',
   ).length;
-  if (playerBuiltWindCount > state.map.roadBranches.length) {
+  if (playerBuiltWindCount > state.map.roadBranches.length * 2) {
     errors.push('Player-built Wind Power exceeds the road-branch build limit');
   }
 

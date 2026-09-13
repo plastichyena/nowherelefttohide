@@ -14,6 +14,7 @@ import {
   createPublicCheckpointProjection,
   createPublicFacilityProjection,
   createPublicUnitProjection,
+  checkpointBonusValue,
   type PublicEntityProjectionContext,
 } from '../core/public-entities';
 import type {
@@ -1520,7 +1521,7 @@ export interface BoardLegendViewModel {
 const LEGEND_TERRAINS = ['plain', 'forest', 'mountain'] as const;
 const LEGEND_OVERLAYS = ['road', 'urban'] as const;
 const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const;
-const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'checkpoint'] as const;
+const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'checkpoint'] as const;
 const LEGEND_OBSTACLES = ['barbedWire'] as const;
 
 function legendAssetFromRegistry(
@@ -2005,6 +2006,7 @@ function facilityLabel(type: string, locale: Locale): string {
     farm: ['農場', 'Farm'],
     civilianFactory: ['民需工場', 'Civilian Factory'],
     militaryFactory: ['軍需工場', 'Military Factory'],
+    oilField: ['油田', 'Oil Field'],
     refinery: ['製油所', 'Refinery'],
     powerPlant: ['発電所', 'Power Plant'],
     windPowerPlant: ['風力発電所', 'Wind Power Plant'],
@@ -5256,6 +5258,8 @@ export class GameUiController {
       .map(([terrain, count]) => `${escapeHtml(terrainLabel(terrain as AgentMapTileObservation['terrain'], this.locale))} ${count}`)
       .join(' · ');
     this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="statistics"><section class="modal-card floating-card" aria-labelledby="statistics-heading"><p class="eyebrow">${escapeHtml(t('gameOver'))}</p><h2 id="statistics-heading">${escapeHtml(result.outcome === 'won' ? t('victory') : t('defeat'))}</h2><div class="stats-grid"><span>${escapeHtml(t('survivedTurns'))}<b>${result.turn}</b></span><span>${escapeHtml(t('finalPopulation'))}<b>${finalPopulation}</b></span><span>${escapeHtml(t('maxPopulation'))}<b>${stats.maxPopulation}</b></span><span>${escapeHtml(t('finalFacilities'))}<b>${finalFacilities}</b></span><span>${escapeHtml(t('maxFacilities'))}<b>${stats.maxSecuredFacilities}</b></span><span>${escapeHtml(t('civilianLosses'))}<b>${stats.civilianLosses}</b></span><span>${escapeHtml(t('unitLosses'))}<b>${stats.unitLosses}</b></span><span>${escapeHtml(t('infectionLosses'))}<b>${stats.infectionLosses}</b></span><span>${escapeHtml(t('shortageLosses'))}<b>${stats.resourceShortageLosses}</b></span><span>${escapeHtml(t('hordeInterceptions'))}<b>${stats.hordeInterceptions}</b></span><span>${escapeHtml(t('finalHordeSpawned'))}<b>${stats.finalHordeSpawned}</b></span><span>${escapeHtml(t('finalHordeKilled'))}<b>${stats.finalHordeKilled}</b></span><span>${escapeHtml(t('normalZombiesKilled'))}<b>${stats.normalZombiesKilled}</b></span><span>${escapeHtml(t('hordeZombiesKilled'))}<b>${stats.hordeZombiesKilled}</b></span><span>${escapeHtml(t('barbedWireBuilt'))}<b>${stats.barbedWireBuilt}</b></span><span>${escapeHtml(t('barbedWireDestroyed'))}<b>${stats.barbedWireDestroyed}</b></span><span>${escapeHtml(t('barbedWireDamageTaken'))}<b>${stats.barbedWireDamageTaken}</b></span><span>${escapeHtml(t('barbedWireAbsorbedDamage'))}<b>${stats.barbedWireAbsorbedDamage}</b></span><span>${escapeHtml(t('barbedWireEmptyAttackCharges'))}<b>${stats.barbedWireEmptyAttackCharges}</b></span><span>${escapeHtml(t('barbedWireOccupiedAttackCharges'))}<b>${stats.barbedWireOccupiedAttackCharges}</b></span><span>${escapeHtml(t('victoryTurn'))}<b>${stats.victoryTurn ?? '—'}</b></span><span>${escapeHtml(t('defeatReason'))}<b>${escapeHtml(gameOverReasonLabel(result.reason, this.locale))}</b></span></div><p class="muted stats-barbed-wire-scope">${escapeHtml(t('barbedWireStatisticsScope'))}</p><section class="victory-progress stats-victory"><h3>${escapeHtml(t('victoryProgress'))}</h3><div>${progressHtml || `<span class="muted">${escapeHtml(t('unavailable'))}</span>`}</div></section><p class="muted stats-terrain-summary">${escapeHtml(t('terrain'))}: ${terrainEntries}</p><div class="modal-actions"><button class="primary-button" data-action="title">${escapeHtml(t('reset'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
+    const statisticsGrid = this.root.querySelector<HTMLElement>('[data-modal="statistics"] .stats-grid');
+    statisticsGrid?.insertAdjacentHTML('beforeend', `<span>${escapeHtml(t('finalEconomyShortageLosses'))}<b>${stats.finalEconomyResourceShortageLosses}</b></span><span>${escapeHtml(t('enemyKillsTotal'))}<b>${stats.enemyKillsTotal}</b></span>`);
   }
 
   private renderBranchFlow(): string {
@@ -5937,6 +5941,7 @@ export class GameUiController {
     const screeningThroughput = publicCheckpoint?.estimatedScreeningThroughput ?? screeningCapacity / Math.max(1, this.state?.config.refugees.policies[branchPolicy].turns ?? 1);
     const screeningTurns = publicCheckpoint?.currentPolicyTurns ?? this.state?.config.refugees.policies[branchPolicy].turns ?? 0;
     const checkpointQueuePressure = publicCheckpoint ? queuePressureLabel(publicCheckpoint.queuePressureClass, this.locale) : t('none');
+    const checkpointBonus = checkpointBonusValue(publicCheckpoint?.checkpointBonus ?? this.state?.config.checkpoint.checkpointBonus);
     const newRelocationAvailable = checkpoint.status === 'operational' && this.checkpointCandidates({
       mode: 'relocate',
       checkpointId: checkpoint.id,
@@ -5988,7 +5993,7 @@ export class GameUiController {
       '</dt><dd>' + escapeHtml(arrivalText) + '</dd></div><div><dt>' + escapeHtml(t('waiting')) + '</dt><dd>' + String(checkpoint.waiting) +
       '</dd></div><div><dt>' + escapeHtml(t('screening')) + '</dt><dd>' + String(checkpoint.screening) + '</dd></div><div><dt>' +
       escapeHtml(t('approved')) + '</dt><dd>' + String(checkpoint.approved) + '</dd></div><div><dt>' + escapeHtml(t('infected')) +
-      '</dt><dd>' + String(checkpoint.infected) + '</dd></div><div><dt>' + escapeHtml(t('screeningCapacity')) + '</dt><dd>' + String(screeningCapacity) + '</dd></div><div><dt>' + escapeHtml(t('screeningThroughput')) + '</dt><dd>' + String(screeningThroughput) + ' / ' + escapeHtml(t('turn')) + '</dd></div><div><dt>' + escapeHtml(t('policyTurns')) + '</dt><dd>' + String(screeningTurns) + '</dd></div><div><dt>' + escapeHtml(t('queuePressure')) + '</dt><dd>' + escapeHtml(checkpointQueuePressure) + '</dd></div><div><dt>' + escapeHtml(t('remainingScreeningTurns')) +
+      '</dt><dd>' + String(checkpoint.infected) + '</dd></div><div><dt>' + escapeHtml(t('checkpointBonus')) + '</dt><dd>' + String(checkpointBonus) + '</dd></div><div><dt>' + escapeHtml(t('screeningCapacity')) + '</dt><dd>' + String(screeningCapacity) + '</dd></div><div><dt>' + escapeHtml(t('screeningThroughput')) + '</dt><dd>' + String(screeningThroughput) + ' / ' + escapeHtml(t('turn')) + '</dd></div><div><dt>' + escapeHtml(t('policyTurns')) + '</dt><dd>' + String(screeningTurns) + '</dd></div><div><dt>' + escapeHtml(t('queuePressure')) + '</dt><dd>' + escapeHtml(checkpointQueuePressure) + '</dd></div><div><dt>' + escapeHtml(t('remainingScreeningTurns')) +
       '</dt><dd>' + String(checkpoint.remainingTurns) + '</dd></div></dl><p class="muted">' + escapeHtml(t('tipCheckpoint')) +
       '</p>' + arrivalStopNotice + queueMaintenance + turnAwayControl + '<p class="checkpoint-role-help"><strong>' + escapeHtml(t('checkpointRole')) + '</strong>: ' + escapeHtml(roleLabel) + '</p><label>' + escapeHtml(t('branchPolicy')) + '<select data-policy="' + escapeHtml(branchId) + '" ' +
        (policyEditable ? '' : 'disabled') + '>' + newPolicyOptions + '</select></label><p class="muted">' + escapeHtml(t('checkpointPolicy')) + ': ' + escapeHtml(t(branchPolicy)) + ' · ' + escapeHtml(t('nextPolicy')) + ': ' + escapeHtml(t(checkpoint.screeningPolicy)) + '</p>' + infectionSection + '<section class="policy-details"><h3>' + escapeHtml(t('policyDetails')) + '</h3><p class="muted">' + escapeHtml(t('policyTradeoff')) + '</p><ul class="policy-list">' + policyDetails + '</ul></section>' +

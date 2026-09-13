@@ -15,8 +15,8 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '9.0.0';
-export const DEFAULT_MAP_ID = 'fixed-51x51-v4';
+export const CONFIG_VERSION = '10.0.0';
+export const DEFAULT_MAP_ID = 'fixed-51x51-v5';
 
 const facilityIds: FacilityId[] = [
   'army-base-1',
@@ -41,13 +41,12 @@ const facilityIds: FacilityId[] = [
   'military-factory-1',
   'military-factory-2',
   'military-factory-3',
+  'oilfield-north',
+  'oilfield-east',
+  'oilfield-south',
+  'oilfield-west',
   'refinery-1',
-  'refinery-2',
-  'refinery-3',
-  'refinery-4',
   'power-plant-1',
-  'power-plant-2',
-  'power-plant-3',
   'wind-power-plant-1',
 ];
 
@@ -139,7 +138,7 @@ const defaultUnitConfig: UnitConfigMap = {
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
-  temporaryHousing: { workerCapacity: 10, production: production({}, { civilianGoods: 0.5 }, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 25, visionRadius: 1, zombieTargetValue: 0 },
+  temporaryHousing: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 25, visionRadius: 1, zombieTargetValue: 0 },
   armyBase: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
   capital: {
     workerCapacity: 100,
@@ -168,6 +167,12 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
   militaryFactory: {
     workerCapacity: 30,
     production: production({ civilianGoods: 1 }, { militaryGoods: 4 }, 'required', 20),
+    overrunSpawnCount: 2,
+    buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
+  },
+  oilField: {
+    workerCapacity: 5,
+    production: production(emptyInputs(), emptyOutputs(), 'none'),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
@@ -233,19 +238,20 @@ const initialWorkersByFacility: Record<FacilityId, number> = {
   'military-factory-1': 0,
   'military-factory-2': 0,
   'military-factory-3': 0,
+  'oilfield-north': 0,
+  'oilfield-east': 0,
+  'oilfield-south': 0,
+  'oilfield-west': 0,
   'refinery-1': 10,
-  'refinery-2': 0,
-  'refinery-3': 0,
-  'refinery-4': 0,
   'power-plant-1': 3,
-  'power-plant-2': 0,
-  'power-plant-3': 0,
   'wind-power-plant-1': 0,
 };
 
 const defaultEconomy: EconomyConfig = {
   populationConsumption: { food: 1, civilianGoods: 1 },
   initialResources,
+  initialRefineryAllowance: 5_000,
+  oilFieldAllowancePerWorker: 100,
   initialWorkersByFacility,
   initialZombieCount: 25,
   initialHunterCount: { min: 1, max: 4 },
@@ -353,6 +359,7 @@ export const DEFAULT_CONFIG: GameConfig = {
     noiseRespawnEnabled: true,
   },
   checkpoint: {
+    checkpointBonus: 25,
     constructionCivilianGoods: 5,
     subsequentConstructionCivilianGoods: 25,
     relocationCivilianGoods: 25,
@@ -706,6 +713,8 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
         requireInteger(errors, amount, `economy.initialResources.${resource}`, 0);
       }
     }
+    requireInteger(errors, economy.initialRefineryAllowance, 'economy.initialRefineryAllowance', 0);
+    requireInteger(errors, economy.oilFieldAllowancePerWorker, 'economy.oilFieldAllowancePerWorker', 0);
     for (const facilityId of facilityIds) {
       requireInteger(errors, economy.initialWorkersByFacility?.[facilityId], `economy.initialWorkersByFacility.${facilityId}`, 0);
     }
@@ -794,6 +803,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (!checkpoint || typeof checkpoint !== 'object') {
     errors.push('checkpoint is required');
   } else {
+    requireInteger(errors, checkpoint.checkpointBonus, 'checkpoint.checkpointBonus', 0);
     requireInteger(errors, checkpoint.constructionCivilianGoods, 'checkpoint.constructionCivilianGoods', 0);
     requireInteger(errors, checkpoint.subsequentConstructionCivilianGoods, 'checkpoint.subsequentConstructionCivilianGoods', 0);
     requireInteger(errors, checkpoint.relocationCivilianGoods, 'checkpoint.relocationCivilianGoods', 0);

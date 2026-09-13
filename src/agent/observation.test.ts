@@ -323,7 +323,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
       healthyPopulation: 0,
       zombieTargetValue: 0,
       constructible: false,
-      windPower: { operational: true, generation: 15, emitsNoise: true, playerBuildLimit: 4, playerBuiltCount: 0 },
+      windPower: { operational: true, generation: 15, emitsNoise: true, playerBuildLimit: 8, playerBuiltCount: 0 },
     });
     const nearbyMilitaryFactory = observation.facilities.find(
       (facility) => facility.id === 'military-factory-2',

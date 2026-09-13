@@ -22,10 +22,10 @@ export { getTile, getFacility, getHordeEntrance, isRoad, isHordeSpawnReserve, ca
  * identifier here rather than deriving it from caller config: map validation
  * and save loading must reject a different fixed-map contract.
  */
-export const FIXED_MAP_ID = 'fixed-51x51-v4' as const;
+export const FIXED_MAP_ID = 'fixed-51x51-v5' as const;
 export const FIXED_MAP_WIDTH = 51 as const;
 export const FIXED_MAP_HEIGHT = 51 as const;
-export const FIXED_FACILITY_COUNT = 29 as const;
+export const FIXED_FACILITY_COUNT = 28 as const;
 export const FIXED_INITIAL_ZOMBIE_COUNT = 25 as const;
 
 /**
@@ -75,13 +75,12 @@ const facilitySpecs: Array<{
   { id: 'military-factory-1', type: 'militaryFactory', position: { q: 21, r: 25 }, startingOwned: false, startingWorkers: 0 },
   { id: 'military-factory-2', type: 'militaryFactory', position: { q: 22, r: 10 }, startingOwned: false, startingWorkers: 0 },
   { id: 'military-factory-3', type: 'militaryFactory', position: { q: 28, r: 40 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'oilfield-north', type: 'oilField', position: { q: 26, r: 13 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'oilfield-east', type: 'oilField', position: { q: 37, r: 24 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'oilfield-south', type: 'oilField', position: { q: 24, r: 37 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'oilfield-west', type: 'oilField', position: { q: 13, r: 26 }, startingOwned: false, startingWorkers: 0 },
   { id: 'refinery-1', type: 'refinery', position: { q: 25, r: 23 }, startingOwned: true, startingWorkers: 10 },
-  { id: 'refinery-2', type: 'refinery', position: { q: 38, r: 21 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'refinery-3', type: 'refinery', position: { q: 25, r: 39 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'refinery-4', type: 'refinery', position: { q: 11, r: 30 }, startingOwned: false, startingWorkers: 0 },
   { id: 'power-plant-1', type: 'powerPlant', position: { q: 25, r: 27 }, startingOwned: true, startingWorkers: 3 },
-  { id: 'power-plant-2', type: 'powerPlant', position: { q: 40, r: 22 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'power-plant-3', type: 'powerPlant', position: { q: 10, r: 28 }, startingOwned: false, startingWorkers: 0 },
   { id: 'wind-power-plant-1', type: 'windPowerPlant', position: { q: 26, r: 24 }, startingOwned: true, startingWorkers: 0 },
 ];
 
@@ -94,6 +93,7 @@ const capacityByType: Record<string, number> = {
   farm: 30,
   civilianFactory: 30,
   militaryFactory: 30,
+  oilField: 5,
   refinery: 30,
   powerPlant: 30,
   windPowerPlant: 0,

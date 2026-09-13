@@ -3,7 +3,7 @@ import { forecastUnitSuppression, getUnitLegalAttackProjections } from './combat
 import { deriveStrategicForecast } from './forecast';
 import { deriveCheckpointRole, isHexSupplied } from './supply';
 import { isHumanUnit } from './state';
-import type { CrisisAlert, CrisisSeverity, EndTurnRisk, EndTurnRiskUnit, GameState, JsonObject } from './types';
+import type { CrisisAlert, CrisisSeverity, EndTurnRisk, EndTurnRiskUnit, GameAction, GameState, JsonObject } from './types';
 
 const severityOrder: Record<CrisisSeverity, number> = { critical: 0, warning: 1, advisory: 2 };
 
@@ -20,6 +20,11 @@ export const CRISIS_WORSENING_FACTS = {
   new_state_loss: { eventId: 'changed' },
   production_outage: { stoppedWorkers: 'up' },
   resource_runway_risk: { netBurn: 'up', estimatedShortageTurn: 'down', nextEndTurnShortage: 'true' },
+  military_goods_national_shortage: { unfilledSuppliedDemand: 'up', nationalEndingStock: 'down' },
+  military_goods_supply_disconnected: { disconnectedDemand: 'up', disconnectedUnitCount: 'up' },
+  facility_workers_zero: { stoppedWorkers: 'up' },
+  refinery_allowance_exhausted: { availableAllowance: 'down' },
+  oil_field_allowance_blocked: { blockedWorkers: 'up' },
 } satisfies Record<CrisisAlert['reasonCode'], Record<string, string>>;
 
 type ComparableCrisis = Pick<CrisisAlert, 'id' | 'reasonCode' | 'entityIds' | 'severity' | 'publicFacts'>;
@@ -49,6 +54,7 @@ function alert(
   reasonCode: CrisisAlert['reasonCode'],
   entityIds: string[],
   publicFacts: JsonObject,
+  suggestedActionKinds: GameAction['type'][] = [],
 ): CrisisAlert {
   return {
     id: `${reasonCode}:${[...entityIds].sort().join(',') || 'state'}`,
@@ -57,6 +63,12 @@ function alert(
     reasonCode,
     entityIds: [...entityIds].sort(),
     publicFacts,
+    titleKey: `alert.${reasonCode}.title`,
+    bodyKey: `alert.${reasonCode}.body`,
+    params: structuredClone(publicFacts),
+    evidence: [structuredClone(publicFacts)],
+    suggestedActionKinds: [...suggestedActionKinds],
+    sourceRevision: 0,
   };
 }
 
@@ -145,14 +157,54 @@ export function deriveCrisisSummary(state: Readonly<GameState>): CrisisAlert[] {
   }
 
   const forecast = forecastEndTurn(state);
+  const suppliedMilitaryShortages = forecast.militaryGoods.units.filter((unit) => unit.inSupply && unit.unfilledRefillDemand > 0);
+  const unfilledSuppliedDemand = suppliedMilitaryShortages.reduce((sum, unit) => sum + unit.unfilledRefillDemand, 0);
+  if (unfilledSuppliedDemand > 0) {
+    alerts.push(alert('warning', 'resource', 'military_goods_national_shortage', suppliedMilitaryShortages.map((unit) => unit.unitId), {
+      nationalStartingStock: forecast.militaryGoods.startingStock,
+      nationalProduction: forecast.militaryGoods.projectedProduction,
+      nationalEndingStock: forecast.militaryGoods.projectedEndingStock,
+      suppliedDemand: suppliedMilitaryShortages.reduce((sum, unit) => sum + unit.refillDemand, 0),
+      unfilledSuppliedDemand,
+    }, ['AssignWorkers', 'SetPowerSupply']));
+  }
+  const disconnectedMilitaryDemand = forecast.militaryGoods.units.filter((unit) => !unit.inSupply && unit.refillDemand > 0);
+  if (disconnectedMilitaryDemand.length > 0) {
+    alerts.push(alert('warning', 'unit', 'military_goods_supply_disconnected', disconnectedMilitaryDemand.map((unit) => unit.unitId), {
+      disconnectedDemand: disconnectedMilitaryDemand.reduce((sum, unit) => sum + unit.refillDemand, 0),
+      disconnectedUnitCount: disconnectedMilitaryDemand.length,
+      nationalStockExcluded: true,
+    }, ['Move', 'BuildCheckpoint', 'RelocateCheckpoint', 'ActivateCheckpoint']));
+  }
   for (const source of state.facilities.filter(f => ['powerPlant', 'windPowerPlant'].includes(f.type) && (f.status === 'ruined' || f.operationalStatus === 'disabled'))) {
     alerts.push(alert('warning', 'resource', 'production_outage', [source.id], { stoppedWorkers: source.workers, reason: 'power_source_lost', currentStatus: source.status, forecastOnly: false }));
   }
   for (const production of forecastFacilityProduction(state)) {
     const facility = state.facilities.find(f => f.id === production.facilityId)!;
-    if (facility.owner === 'player' && facility.workers >= 5 && production.stoppedReason && !['capital', 'city', 'temporaryHousing'].includes(facility.type)) {
+    if (facility.owner === 'player' && facility.workers === 0 && production.stoppedReason === 'no_workers'
+      && !['capital', 'city', 'temporaryHousing', 'windPowerPlant'].includes(facility.type)) {
+      alerts.push(alert('advisory', 'facility', 'facility_workers_zero', [facility.id], {
+        facilityType: facility.type,
+        stoppedWorkers: state.map.facilities.find((definition) => definition.id === facility.id)?.workerCapacity ?? 1,
+        reason: 'no_workers',
+      }, ['AssignWorkers']));
+    }
+    if (facility.owner === 'player' && facility.workers > 0 && production.stoppedReason && !['capital', 'city', 'temporaryHousing'].includes(facility.type)) {
       alerts.push(alert('warning', 'resource', 'production_outage', [facility.id], { stoppedWorkers: facility.workers, reason: production.stoppedReason, powerReason: production.projectedPowerReason, forecastOnly: true }));
     }
+    if (facility.owner === 'player' && facility.type === 'oilField' && facility.workers > 0 && production.allowanceCredits === 0) {
+      alerts.push(alert('warning', 'facility', 'oil_field_allowance_blocked', [facility.id], {
+        blockedWorkers: facility.workers, reason: production.stoppedReason ?? production.projectedPowerReason,
+      }, ['Move', 'AssignWorkers']));
+    }
+  }
+  const activeRefineries = state.facilities.filter((facility) => facility.owner === 'player' && facility.type === 'refinery' && facility.workers > 0);
+  if (activeRefineries.length > 0 && forecast.refineryAllowance.availableForRefining <= 0) {
+    alerts.push(alert('warning', 'resource', 'refinery_allowance_exhausted', activeRefineries.map((facility) => facility.id), {
+      availableAllowance: forecast.refineryAllowance.availableForRefining,
+      oilCreditsEarned: forecast.refineryAllowance.oilCreditsEarned,
+      refineryCount: activeRefineries.length,
+    }, ['AssignWorkers']));
   }
   const nextTurnPenalties = forecastNextTurnPenalties(state);
   if (nextTurnPenalties.overcrowding.active) {
@@ -238,7 +290,8 @@ export function deriveCrisisSummary(state: Readonly<GameState>): CrisisAlert[] {
     alerts.push(alert('advisory', 'loss', 'new_state_loss', [entityId], { eventType: event.type, eventId: event.id }));
   }
 
-  return alerts.sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity]
+  const sourceRevision = state.events.length + state.actionsTakenThisTurn;
+  return alerts.map((entry) => ({ ...entry, sourceRevision })).sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity]
     || left.category.localeCompare(right.category)
     || left.entityIds.join(',').localeCompare(right.entityIds.join(','))
     || left.id.localeCompare(right.id));

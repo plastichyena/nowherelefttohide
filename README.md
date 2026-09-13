@@ -165,7 +165,7 @@ Turn 50のFinal Waveは4方向・基本52体です。参加方向の拒絶Bonus�
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Build・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.5.5`、Game Rules / GameState / Configは `7.0.0`、Fixed Mapは `fixed-51x51-v4`、Agent / Observation / Browser Bridge APIは `12.0.0`、Artifact Schemaは `11.0.0`、Checkpoint／Session Schemaは`8.0.0`、Balanced Agentは`7.0.0`、Random Agentは`5.0.0`です。v1.5.4以前の通常Save、AI Session、Checkpoint、Artifact、Replayは変換せず拒否し、旧データを削除・上書きしません。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Build・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.6.0`、Game Rules / GameState / Configは `10.0.0`、Fixed Mapは `fixed-51x51-v5`、Agent / Observation / Browser Bridge APIは `15.0.0`、Artifact Schemaは `14.0.0`、Checkpoint／Session Schemaは`11.0.0`、Balanced Agentは`9.0.0`、Random Agentは`6.0.0`です。v1.5.7以前の通常Save、AI Session、Checkpoint、Artifact、Replayは変換せず拒否し、旧データを削除・上書きしません。
 
 ## CoreとHeadless API
 

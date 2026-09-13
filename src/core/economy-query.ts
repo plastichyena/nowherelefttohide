@@ -57,6 +57,7 @@ function emptyFacilityProjection(
     lastPowerSupplied: facility.lastPowerSupplied,
     productionMultiplier: 1,
     baseOutputs: {},
+    allowanceCredits: 0,
     stoppedReason,
     armyBaseMilitaryGoods: null,
   };
@@ -364,9 +365,31 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   );
   requiredPowerAllocated += allocate(militaryTargets);
 
-  const refineryTargets = facilities.filter(
-    (facility) => canProduce(facility) && facility.type === 'refinery' && facility.powerSupplyEnabled,
-  );
+  const oilCreditsByFacility = new Map<string, number>();
+  for (const facility of [...facilities].sort((left, right) => left.id.localeCompare(right.id))) {
+    if (
+      facility.type === 'oilField' && canProduce(facility) && isHexSupplied(state, facility.position)
+    ) {
+      oilCreditsByFacility.set(
+        facility.id,
+        Math.min(facility.workers, state.config.facilities.oilField.workerCapacity)
+          * state.config.economy.oilFieldAllowancePerWorker,
+      );
+    }
+  }
+  const projectedOilCredits = [...oilCreditsByFacility.values()].reduce((total, amount) => total + amount, 0);
+  let unreservedRefineryAllowance = state.refineryAllowance.remainingAllowance + projectedOilCredits;
+  const refineryAllowanceByFacility = new Map<string, number>();
+  for (const facility of [...facilities].sort((left, right) => left.id.localeCompare(right.id))) {
+    if (facility.type !== 'refinery' || !canProduce(facility) || !facility.powerSupplyEnabled) continue;
+    const ratedOutput = staffed(facility) * (state.config.facilities.refinery.production.outputs.fuel ?? 0);
+    const allowedOutput = Math.min(ratedOutput, unreservedRefineryAllowance);
+    refineryAllowanceByFacility.set(facility.id, allowedOutput);
+    unreservedRefineryAllowance -= allowedOutput;
+  }
+  const refineryTargets = facilities
+    .filter((facility) => (refineryAllowanceByFacility.get(facility.id) ?? 0) > 0)
+    .sort((left, right) => left.id.localeCompare(right.id));
   requiredPowerDemand += refineryTargets.reduce(
     (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
     0,
@@ -449,6 +472,9 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     const baseOutputs = Object.fromEntries(
       Object.entries(rule.outputs).map(([resource, amount]) => [resource, Math.floor(amount * potentialOperatingWorkers)]),
     ) as Partial<Record<ResourceType, number>>;
+    if (facility.type === 'refinery') {
+      baseOutputs.fuel = Math.min(baseOutputs.fuel ?? 0, refineryAllowanceByFacility.get(facility.id) ?? 0);
+    }
     const outputs = powerMode === 'required' && !projectedPowerSupplied
       ? {}
       : Object.fromEntries(
@@ -483,6 +509,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       lastPowerSupplied: facility.lastPowerSupplied,
       productionMultiplier,
       baseOutputs,
+      allowanceCredits: oilCreditsByFacility.get(facility.id) ?? 0,
       stoppedReason,
       armyBaseMilitaryGoods: null,
     };
@@ -660,6 +687,13 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
         productionInputRequired: generationFuelDemand,
         required: generationFuelDemand,
         shortage: Math.max(0, generationFuelDemand + projectedUnitRefillDemand - state.resources.fuel),
+      },
+      refineryAllowance: {
+        before: state.refineryAllowance.remainingAllowance,
+        oilCreditsEarned: projectedOilCredits,
+        availableForRefining: state.refineryAllowance.remainingAllowance + projectedOilCredits,
+        fuelRefined: fuelProduction,
+        remaining: Math.max(0, state.refineryAllowance.remainingAllowance + projectedOilCredits - fuelProduction),
       },
       electricity: {
         physicalGenerationCapacity,

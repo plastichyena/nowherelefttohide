@@ -46,6 +46,7 @@ import {
   type SessionBranchBase,
   type SessionCheckpointKind,
   type SessionCheckpointMetadata,
+  type SessionCommentLocale,
   type SessionCompactSnapshot,
   type SessionDescriptor,
   type SessionDiagnosticEventKind,
@@ -98,11 +99,11 @@ export const SESSION_PLAY_TURN_CAPABILITIES: SessionPlayTurnCapabilities = {
   },
   inputSchema: {
     interactiveRequests: {
-      action: { type: 'action', action: 'GameAction', decisionSummary: '1-500 public code points', expectedRevision: 'non-negative integer', requestId: '1-128 code points', expectations: { playerUnitHp: [{ unitId: 'string', minHp: 'non-negative integer', maxHp: 'integer >= minHp' }] } },
+      action: { type: 'action', action: 'GameAction', decisionSummary: 'optional; null/empty means no comment; non-empty 1-500 Unicode code points', expectedRevision: 'non-negative integer', requestId: '1-128 code points', expectations: { playerUnitHp: [{ unitId: 'string', minHp: 'non-negative integer', maxHp: 'integer >= minHp' }] } },
       query: { type: 'query', target: 'SessionQueryTarget', expectedRevision: 'optional non-negative integer', cursor: 'optional string', pageSize: 'optional 1-500 integer', filters: 'optional object' },
       close: { type: 'close' },
     },
-    finitePlan: { expectedRevision: 'non-negative integer', actions: [{ action: 'GameAction', decisionSummary: '1-500 public code points', requestId: 'unique 1-128 code points', expectations: 'optional action-specific public bounds' }] },
+    finitePlan: { expectedRevision: 'non-negative integer', actions: [{ action: 'GameAction', decisionSummary: 'optional; null/empty means no comment; non-empty 1-500 Unicode code points', requestId: 'unique 1-128 code points', expectations: 'optional action-specific public bounds' }] },
   },
   finitePlanStopsOn: ['rejected', 'move_interrupted', 'unexpected_unit_damage', 'player_unit_lost', 'new_enemy_spotted', 'new_crisis', 'crisis_worsened', 'stale_revision', 'game_over', 'end_turn_completed'],
   exitsOn: ['successful_end_turn', 'game_over', 'explicit_close', 'eof', 'idle_timeout', 'request_limit'],
@@ -116,8 +117,8 @@ function requireSafeInteger(value: unknown, name: string, minimum: number): numb
 }
 function newSessionId(): string { return `session-${randomUUID()}`; }
 
-function descriptorWithHash(identity: SessionVersionIdentity, storeId: string, input: { sessionId: string; seed: number; agentId: string; checkpointInterval: number; publicConfig: JsonValue; lineage: SessionLineage; branchBase: SessionBranchBase | null }): SessionDescriptor {
-  const withoutHash = { sessionSchemaVersion: SESSION_SCHEMA_VERSION, checkpointSchemaVersion: CHECKPOINT_SCHEMA_VERSION, ...identity, ...input.lineage, sessionId: input.sessionId, storeId, branchBase: input.branchBase, seed: input.seed, agentId: input.agentId, checkpointInterval: input.checkpointInterval, publicConfig: clone(input.publicConfig), createdAt: new Date().toISOString() } satisfies Omit<SessionDescriptor, 'descriptorIntegrityHash'>;
+function descriptorWithHash(identity: SessionVersionIdentity, storeId: string, input: { sessionId: string; seed: number; agentId: string; checkpointInterval: number; preferredCommentLocale: SessionCommentLocale; publicConfig: JsonValue; lineage: SessionLineage; branchBase: SessionBranchBase | null }): SessionDescriptor {
+  const withoutHash = { sessionSchemaVersion: SESSION_SCHEMA_VERSION, checkpointSchemaVersion: CHECKPOINT_SCHEMA_VERSION, ...identity, ...input.lineage, sessionId: input.sessionId, storeId, branchBase: input.branchBase, seed: input.seed, agentId: input.agentId, checkpointInterval: input.checkpointInterval, preferredCommentLocale: input.preferredCommentLocale, publicConfig: clone(input.publicConfig), createdAt: new Date().toISOString() } satisfies Omit<SessionDescriptor, 'descriptorIntegrityHash'>;
   return { ...withoutHash, descriptorIntegrityHash: sha256Json(withoutHash) };
 }
 
@@ -304,6 +305,15 @@ function normalizeRequestId(value: unknown): string {
   return requestId;
 }
 
+function normalizeCommentLocale(value: unknown, name: string): SessionCommentLocale {
+  if (value === 'ja' || value === 'en') return value;
+  throw new SessionError('invalid_session_option', `${name} must be ja or en`);
+}
+
+function defaultCommentLocale(value: unknown): SessionCommentLocale {
+  return value === undefined ? 'en' : normalizeCommentLocale(value, 'preferredCommentLocale');
+}
+
 function validatePlayTurnExpectations(raw: unknown): SessionPlayTurnExpectations | undefined {
   if (raw === undefined) return undefined;
   if (!isObject(raw) || Object.keys(raw).some((key) => key !== 'playerUnitHp') || !Array.isArray(raw.playerUnitHp)) throw new SessionError('invalid_play_turn_input', 'expectations may contain only a playerUnitHp array');
@@ -485,6 +495,7 @@ export class SessionService {
     const seed = requireSafeInteger(options.seed ?? 1, 'seed', Number.MIN_SAFE_INTEGER);
     const checkpointInterval = requireSafeInteger(options.checkpointInterval ?? DEFAULT_CHECKPOINT_INTERVAL, 'checkpointInterval', 1);
     const agentId = options.agentId ?? 'external-agent';
+    const preferredCommentLocale = defaultCommentLocale(options.preferredCommentLocale);
     assertSafeIdentifier(sessionId, 'sessionId'); assertSafeIdentifier(agentId, 'agentId');
     const lock = this.store.acquireLock(sessionId);
     try {
@@ -493,7 +504,7 @@ export class SessionService {
       if (observation.map.id !== this.identity.mapId) throw new SessionError('session_version_mismatch', `Runtime map ${observation.map.id} does not match ${this.identity.mapId}`);
       const publicConfig = clone(runtime.getRunArtifact().config) as unknown as JsonValue;
       const lineage = { parentSessionId: null, parentCheckpointId: null } satisfies SessionLineage;
-      const descriptor = descriptorWithHash(this.identity, this.store.manifest.storeId, { sessionId, seed, agentId, checkpointInterval, publicConfig, lineage, branchBase: null });
+      const descriptor = descriptorWithHash(this.identity, this.store.manifest.storeId, { sessionId, seed, agentId, checkpointInterval, preferredCommentLocale, publicConfig, lineage, branchBase: null });
       const initialState = publicState(runtime, 0, ZERO_HASH);
       const initialSnapshot = this.store.writePayload('public', { kind: 'snapshot', document: { observation: initialState.observation, legalActions: initialState.legalActions, gameOver: initialState.gameOver, result: initialState.result }, documentHash: initialState.documentHash } satisfies SessionPublicSnapshotPayload);
       const runBase = runBaseWithHash({ sessionSchemaVersion: SESSION_SCHEMA_VERSION, artifactSchemaVersion: this.identity.artifactSchemaVersion, sessionId, seed, agentId, buildId: this.identity.buildId, publicConfig, fixedMap: this.store.writePayload('public', observation.map), initialPublicState: initialSnapshot, initialPublicHash: initialState.documentHash, ...lineage });
@@ -526,7 +537,7 @@ export class SessionService {
     } catch (error) { this.closeContinuation(sessionId); return this.rejectWithDiagnostics(sessionId, 'step', error); }
   }
 
-  private commitStep(sessionId: string, input: SessionStepInput, request: { requestId: string; requestHash: string; expectations?: SessionPlayTurnExpectations } | null): SessionStepResult {
+  private commitStep(sessionId: string, input: SessionStepInput, request: { requestId: string; requestHash: string; requestedCommentLocale: SessionCommentLocale; expectations?: SessionPlayTurnExpectations } | null): SessionStepResult {
     const lock = this.store.acquireExistingLock(sessionId);
     try {
       const loaded = this.loadCompatible(sessionId, true);
@@ -558,7 +569,7 @@ export class SessionService {
         : this.store.writePayload('public', { kind: 'diff', beforeDocumentHash: beforeHash, afterDocumentHash: afterHash, operations } satisfies SessionPublicDiffPayload);
       const stateDelta = deriveSessionStateDelta(beforeObservation, afterObservation, result.events);
       const stop = request ? playTurnStop(input.action, accepted, beforeObservation, afterObservation, request.expectations) : { reason: null, details: {} as JsonValue };
-      const withoutHash = { decision: nextDecision, turn: beforeObservation.turn, phase: beforeObservation.phase, inputAction: cloneAction(input.action), decisionSummary: input.decisionSummary, requestId: request?.requestId ?? null, requestHash: request?.requestHash ?? null, playTurnStopReason: stop.reason, playTurnStopDetails: clone(stop.details), accepted, error: clone(result.error), events: clone(result.events), stateDelta, importantChanges: accepted ? deriveImportantChanges(beforeObservation, afterObservation, result.events) : [], beforePublicHash: beforeHash, afterPublicHash: afterHash, publicPayload: payload, publicPayloadKind: payloadKind, previousDecisionHash: loaded.active.traceHeadHash } satisfies Omit<PublicDecisionRecord, 'decisionHash'>;
+      const withoutHash = { decision: nextDecision, turn: beforeObservation.turn, phase: beforeObservation.phase, inputAction: cloneAction(input.action), decisionSummary: input.decisionSummary ?? null, requestedCommentLocale: request?.requestedCommentLocale ?? loaded.descriptor.preferredCommentLocale, requestId: request?.requestId ?? null, requestHash: request?.requestHash ?? null, playTurnStopReason: stop.reason, playTurnStopDetails: clone(stop.details), accepted, error: clone(result.error), events: clone(result.events), stateDelta, importantChanges: accepted ? deriveImportantChanges(beforeObservation, afterObservation, result.events) : [], beforePublicHash: beforeHash, afterPublicHash: afterHash, publicPayload: payload, publicPayloadKind: payloadKind, previousDecisionHash: loaded.active.traceHeadHash } satisfies Omit<PublicDecisionRecord, 'decisionHash'>;
       const record: PublicDecisionRecord = { ...withoutHash, decisionHash: decisionHash(withoutHash) };
       const nextPublic: SessionPublicState = { ...afterDocument, decision: nextDecision, traceHeadHash: record.decisionHash, documentHash: afterHash };
       const nextActive = this.store.commit({ descriptor: loaded.descriptor, previous: loaded.active, privateState: afterPrivate, publicState: nextPublic, decisionRecord: record, acceptedActionCount: loaded.active.acceptedActionCount + (accepted ? 1 : 0), invalidActionCount: loaded.active.invalidActionCount + (accepted ? 0 : 1) });
@@ -612,7 +623,10 @@ export class SessionService {
       this.store.recordDiagnostic(sessionId, 'inputFormatRejected', 'play-turn');
       throw this.withMetricsDetails(sessionId, error);
     }
-    const requestContent = { action: input.action, decisionSummary: input.decisionSummary, expectedRevision: input.expectedRevision, expectations: input.expectations ?? null };
+    const descriptor = this.store.getDescriptor(sessionId);
+    this.assertDescriptorCompatible(descriptor);
+    const requestedCommentLocale = descriptor.preferredCommentLocale;
+    const requestContent = { action: input.action, decisionSummary: input.decisionSummary ?? null, requestedCommentLocale, expectedRevision: input.expectedRevision, expectations: input.expectations ?? null };
     const requestHash = sha256Json(requestContent);
     const indexed = this.store.lookupRequest(sessionId, input.requestId);
     if (indexed.status !== 'missing' && indexed.requestHash !== requestHash) {
@@ -633,7 +647,7 @@ export class SessionService {
       this.restoreAndVerify(loaded, true);
       return this.playTurnActionResult(statusResult(loaded, this.store.readSessionMetrics(sessionId), this.store), indexed.record, true);
     }
-    const stepped = this.commitStep(sessionId, { action: input.action, decisionSummary: input.decisionSummary, expectedRevision: input.expectedRevision }, { requestId: input.requestId, requestHash, ...(input.expectations ? { expectations: input.expectations } : {}) });
+    const stepped = this.commitStep(sessionId, { action: input.action, decisionSummary: input.decisionSummary ?? null, expectedRevision: input.expectedRevision }, { requestId: input.requestId, requestHash, requestedCommentLocale, ...(input.expectations ? { expectations: input.expectations } : {}) });
     return this.playTurnActionResult(stepped, stepped.decisionRecord, false);
   }
 
@@ -720,7 +734,7 @@ export class SessionService {
   }
 
   private validatePlayTurnAction(raw: unknown): SessionPlayTurnActionInput {
-    if (!isObject(raw) || Object.keys(raw).some((key) => !['type', 'action', 'decisionSummary', 'expectedRevision', 'requestId', 'expectations'].includes(key)) || raw.type !== 'action' || !isObject(raw.action)) throw new SessionError('invalid_play_turn_input', 'play-turn action requires only type, action, decisionSummary, expectedRevision, requestId, and optional expectations');
+    if (!isObject(raw) || Object.keys(raw).some((key) => !['type', 'action', 'decisionSummary', 'expectedRevision', 'requestId', 'expectations'].includes(key)) || raw.type !== 'action' || !isObject(raw.action)) throw new SessionError('invalid_play_turn_input', 'play-turn action requires only type, action, optional decisionSummary, expectedRevision, requestId, and optional expectations');
     const expectedRevision = requireSafeInteger(raw.expectedRevision, 'expectedRevision', 0);
     const expectations = validatePlayTurnExpectations(raw.expectations);
     return { type: 'action', action: JSON.parse(canonicalJson(raw.action)) as GameAction, decisionSummary: normalizeDecisionSummary(raw.decisionSummary), expectedRevision, requestId: normalizeRequestId(raw.requestId), ...(expectations ? { expectations } : {}) };
@@ -731,7 +745,7 @@ export class SessionService {
     if (raw.actions.length < 1 || raw.actions.length > MAX_PLAY_TURN_PLAN_ACTIONS) throw new SessionError('invalid_play_turn_input', `play-turn plan actions must contain 1-${MAX_PLAY_TURN_PLAN_ACTIONS} entries`);
     const expectedRevision = requireSafeInteger(raw.expectedRevision, 'expectedRevision', 0);
     const actions = raw.actions.map((action) => {
-      if (!isObject(action) || Object.keys(action).some((key) => !['action', 'decisionSummary', 'requestId', 'expectations'].includes(key))) throw new SessionError('invalid_play_turn_input', 'each plan action requires action, decisionSummary, requestId, and optional expectations');
+      if (!isObject(action) || Object.keys(action).some((key) => !['action', 'decisionSummary', 'requestId', 'expectations'].includes(key))) throw new SessionError('invalid_play_turn_input', 'each plan action requires action, optional decisionSummary, requestId, and optional expectations');
       const validated = this.validatePlayTurnAction({ type: 'action', ...action, expectedRevision });
       const { type: _type, expectedRevision: _revision, ...planAction } = validated;
       return planAction;
@@ -759,7 +773,7 @@ export class SessionService {
       const lock = this.store.acquireLock(newSessionId);
       try {
         const lineage = { parentSessionId: sourceSessionId, parentCheckpointId: checkpointId } satisfies SessionLineage;
-        const descriptor = descriptorWithHash(this.identity, this.store.manifest.storeId, { sessionId: newSessionId, seed: checkpoint.source.descriptor.seed, agentId: checkpoint.source.descriptor.agentId, checkpointInterval: checkpoint.source.descriptor.checkpointInterval, publicConfig: checkpoint.source.descriptor.publicConfig, lineage, branchBase });
+        const descriptor = descriptorWithHash(this.identity, this.store.manifest.storeId, { sessionId: newSessionId, seed: checkpoint.source.descriptor.seed, agentId: checkpoint.source.descriptor.agentId, checkpointInterval: checkpoint.source.descriptor.checkpointInterval, preferredCommentLocale: checkpoint.source.descriptor.preferredCommentLocale, publicConfig: checkpoint.source.descriptor.publicConfig, lineage, branchBase });
         const runBase = runBaseWithHash({ sessionSchemaVersion: SESSION_SCHEMA_VERSION, artifactSchemaVersion: checkpoint.source.runBase.artifactSchemaVersion, sessionId: newSessionId, seed: checkpoint.source.runBase.seed, agentId: checkpoint.source.runBase.agentId, buildId: checkpoint.source.runBase.buildId, publicConfig: checkpoint.source.runBase.publicConfig, fixedMap: checkpoint.source.runBase.fixedMap, initialPublicState: checkpoint.source.runBase.initialPublicState, initialPublicHash: checkpoint.source.runBase.initialPublicHash, ...lineage });
         const active = this.store.create(descriptor, runBase, checkpoint.privateState, checkpoint.publicState, ancestor);
         const loaded = this.loadCompatible(active.sessionId);
@@ -1145,7 +1159,7 @@ export class SessionService {
 
   private validateStepInput(raw: unknown): SessionStepInput {
     if (!isObject(raw) || Object.keys(raw).some((key) => !['action', 'decisionSummary', 'expectedRevision'].includes(key))) throw new SessionError('invalid_step_input', 'step input may contain only action, decisionSummary, and expectedRevision');
-    if (!Object.prototype.hasOwnProperty.call(raw, 'action') || !Object.prototype.hasOwnProperty.call(raw, 'decisionSummary') || !isObject(raw.action)) throw new SessionError('invalid_step_input', 'step input requires an action object and decisionSummary');
+    if (!Object.prototype.hasOwnProperty.call(raw, 'action') || !isObject(raw.action)) throw new SessionError('invalid_step_input', 'step input requires an action object');
     const expectedRevision = raw.expectedRevision === undefined ? undefined : requireSafeInteger(raw.expectedRevision, 'expectedRevision', 0);
     return { action: JSON.parse(canonicalJson(raw.action)) as GameAction, decisionSummary: normalizeDecisionSummary(raw.decisionSummary), ...(expectedRevision === undefined ? {} : { expectedRevision }) };
   }
@@ -1170,6 +1184,7 @@ export class SessionService {
   }
   private assertDescriptorCompatible(descriptor: SessionDescriptor): void {
     for (const field of ['appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit', 'mapId'] as const) if (descriptor[field] !== this.identity[field]) throw new SessionError('session_version_mismatch', `Session ${field} ${String(descriptor[field])} does not match ${String(this.identity[field])}`);
+    if (descriptor.preferredCommentLocale !== 'ja' && descriptor.preferredCommentLocale !== 'en') throw new SessionError('session_version_mismatch', 'Session preferredCommentLocale is unsupported; start a new Session');
   }
 
   private restoreAndVerify(loaded: LoadedSession, reuse = false): SessionGameRuntime {

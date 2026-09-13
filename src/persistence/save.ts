@@ -14,16 +14,17 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.5.4 saves. */
+/** The sole game-rules version accepted by v1.6 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 16;
-/** v1.5.4 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v16';
+export const SAVE_FORMAT_VERSION = 17;
+/** v1.6 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v17';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v15';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v16';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v15',
   'nowhere-left-to-hide:auto-save:v14',
   'nowhere-left-to-hide:auto-save:v13',
   'nowhere-left-to-hide:auto-save:v12',
@@ -106,6 +107,7 @@ const FACILITY_TYPES = [
   'farm',
   'civilianFactory',
   'militaryFactory',
+  'oilField',
   'refinery',
   'powerPlant',
   'windPowerPlant',
@@ -216,6 +218,9 @@ const STATISTIC_INTEGER_FIELDS = [
   'unitLosses',
   'infectionLosses',
   'resourceShortageLosses',
+  'resourceShortageLossesTotal',
+  'finalEconomyResourceShortageLosses',
+  'enemyKillsTotal',
   'hordeInterceptions',
   'unmanagedPassThrough',
   'refugeesAccepted',
@@ -371,6 +376,7 @@ const REQUIRED_STATE_FIELDS = [
   'initialGasPositions',
   'cityPopulationSnapshot',
   'resources',
+  'refineryAllowance',
   'units',
   'checkpoints',
   'roadBranches',
@@ -510,7 +516,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.5.6 or earlier; start a new v1.5.7 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.5.7 or earlier; start a new v1.6.0 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -811,6 +817,22 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     requireFields(errors, resources, 'state.resources', ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricityCapacity', 'electricityRequired']);
     for (const resource of ['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricityCapacity', 'electricityRequired'] as const) if (!isInteger(resources[resource])) errors.push(`state.resources.${resource} is invalid`);
   }
+  const refineryAllowance = state.refineryAllowance;
+  if (!isRecord(refineryAllowance)) {
+    errors.push('state.refineryAllowance must be an object');
+  } else {
+    requireFields(errors, refineryAllowance, 'state.refineryAllowance', ['initialAllowance', 'oilCreditsEarned', 'fuelRefined', 'remainingAllowance']);
+    for (const field of ['initialAllowance', 'oilCreditsEarned', 'fuelRefined', 'remainingAllowance'] as const) {
+      if (!isInteger(refineryAllowance[field])) errors.push(`state.refineryAllowance.${field} is invalid`);
+    }
+    if (
+      isInteger(refineryAllowance.initialAllowance)
+      && isInteger(refineryAllowance.oilCreditsEarned)
+      && isInteger(refineryAllowance.fuelRefined)
+      && isInteger(refineryAllowance.remainingAllowance)
+      && refineryAllowance.remainingAllowance !== refineryAllowance.initialAllowance + refineryAllowance.oilCreditsEarned - refineryAllowance.fuelRefined
+    ) errors.push('state.refineryAllowance ledger does not balance');
+  }
 
   const facilities = state.facilities;
   if (!Array.isArray(facilities)) {
@@ -844,6 +866,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
         'constructible',
         'builtTurn',
         'recoveryOperationalTurn',
+        'firstCaptureRewardClaimed',
       ]);
       if (typeof facility.id !== 'string' || facility.id.length === 0) errors.push(`${path}.id is invalid`);
       if (!FACILITY_TYPES.includes(facility.type as typeof FACILITY_TYPES[number])) errors.push(`${path}.type is invalid`);
@@ -861,6 +884,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       if (typeof facility.constructible !== 'boolean') errors.push(`${path}.constructible is invalid`);
       if (facility.builtTurn !== null && !isInteger(facility.builtTurn, 1)) errors.push(`${path}.builtTurn is invalid`);
       if (facility.recoveryOperationalTurn !== null && !isInteger(facility.recoveryOperationalTurn, 1)) errors.push(`${path}.recoveryOperationalTurn is invalid`);
+      if (typeof facility.firstCaptureRewardClaimed !== 'boolean') errors.push(`${path}.firstCaptureRewardClaimed is invalid`);
       if (facility.constructible && !CONSTRUCTIBLE_FACILITY_TYPES.includes(facility.type as typeof CONSTRUCTIBLE_FACILITY_TYPES[number])) errors.push(`${path}.constructible does not match its facility type`);
       if (facility.constructible && facility.builtTurn === null) errors.push(`${path}.constructible facilities require builtTurn`);
       if (!facility.constructible && facility.builtTurn !== null) errors.push(`${path}.fixed facilities cannot have builtTurn`);

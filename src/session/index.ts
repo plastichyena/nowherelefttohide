@@ -4,3 +4,6 @@ export * from './public-diff';
 export * from './store';
 export * from './service';
 export * from './agent-adapter';
+export * from './ai-session-contract';
+export * from './ai-session';
+export * from './artifact-builder';

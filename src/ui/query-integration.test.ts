@@ -24,7 +24,7 @@ it('keeps Core risk IDs, charge details and independent confirmation triggers', 
   const risk: EndTurnRisk = {
     readyUnits: [unit], unitsWithMoveRemaining: [unit], unitsWithAttackChargesRemaining: [unit],
     uncontainedInfectedSites: [{ id: 'capital', kind: 'facility', infected: 1 }],
-    criticalAlerts: [{ id: 'infection:capital', severity: 'critical', category: 'infection', reasonCode: 'capital_infection_uncontained', entityIds: ['capital'], publicFacts: { infected: 1 } }],
+    criticalAlerts: [{ id: 'infection:capital', severity: 'critical', category: 'infection', reasonCode: 'capital_infection_uncontained', entityIds: ['capital'], publicFacts: { infected: 1 }, titleKey: 'alert.capital_infection_uncontained.title', bodyKey: 'alert.capital_infection_uncontained.body', params: { infected: 1 }, evidence: [{ infected: 1 }], suggestedActionKinds: [], sourceRevision: 0 }],
     forecastGuaranteedDefeat: false,
   };
   const model = endTurnRiskViewModel({ endTurnRisk: risk });

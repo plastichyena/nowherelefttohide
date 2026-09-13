@@ -177,7 +177,7 @@ describe('road branches and supply network', () => {
     const config = createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } }, horde: singleFinalWave(3) });
     const engine = new GameEngine(4, config);
     const snapshot = engine.getState();
-    const power = snapshot.facilities.find((facility) => facility.id === 'power-plant-2')!;
+    const power = snapshot.facilities.find((facility) => facility.id === 'farm-2')!;
     power.owner = 'player';
     power.status = 'owned';
     power.operationalStatus = 'stopped';

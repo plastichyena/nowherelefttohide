@@ -1,6 +1,6 @@
 {
   "name": "nowhere-left-to-hide",
-  "version": "1.5.7",
+  "version": "1.6.0",
   "private": true,
   "description": "Nowhere Left to Hide - a mobile-first hex strategy game PoC",
   "type": "module",

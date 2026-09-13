@@ -1,15 +1,15 @@
-# Nowhere Left to Hide v1.5.7 Board Asset Manifest
+# Nowhere Left to Hide v1.6.0 Board Asset Manifest
 
-- Generated: 2026-09-12
+- Generated: 2026-09-13
 - Runtime format: 256×256 PNG
 - Generated source resolutions: 1254×1254 for most sources, 1362×1155 for the
   twelve-Zombie Horde swarm, and 1536×1024 for Capital and Refinery; every
   checked-in runtime image is normalized to 256×256.
-- Runtime total: 39 PNG files, 1,857,241 bytes (approximately 1.77 MiB)
+- Runtime total: 40 PNG files, 1,933,090 bytes (approximately 1.84 MiB)
 - Source: original assets created for this project; no third-party images, real
   logos, seals, flags, or trademarks are included.
 - Provenance / licensing: generated specifically for this repository during
-  the v1.3.1, v1.4.4, v1.5.0, v1.5.3, and v1.5.7 implementations. No third-party asset or external
+  the v1.3.1, v1.4.4, v1.5.0, v1.5.3, v1.5.7, and v1.6.0 updates. No third-party asset or external
   asset-license obligation is incorporated into these PNGs.
 - Generation: OpenAI built-in image generation. The built-in tool did not
   expose a more specific model identifier for recording.
@@ -85,6 +85,15 @@ new image generation is used for this derivative.
 Source SHA256: `2D19ED834416A27C439223A1BAE2D92C660E74D3B1A09F5156D0277BF1005EAB`;
 runtime SHA256: `57314046022ccf8dc3538d4be524cd1ed2e85ff3d684117320c08f91bb2d0254`.
 
+The v1.6.0 Oil Field is a single large beam pumpjack with one small low tank
+and short ground-level pipes. The built-in generator's first output contained
+a baked checkerboard, so a second background-extraction pass produced the
+approved genuine-alpha source. Both generation outputs, prompts, hashes, and
+normalization details are retained under
+`Art/reference/v1.6.0-oilfield-concept/`. Only
+`facilities/facility_oilfield.png` is intended for runtime use; Registry
+integration occurs with the v1.6.0 Oil Field implementation.
+
 ## Runtime files
 
 | File | Core type / UI state | Purpose |
@@ -101,6 +110,7 @@ runtime SHA256: `57314046022ccf8dc3538d4be524cd1ed2e85ff3d684117320c08f91bb2d025
 | `facilities/facility_military_factory.png` | `militaryFactory` | Factory and generic supply motif |
 | `facilities/facility_army_base.png` | `armyBase` | Fenced barracks, hangar, and watchtower compound |
 | `facilities/facility_refinery.png` | `refinery` | Storage tanks and pipes |
+| `facilities/facility_oilfield.png` | `oilField` | v1.6.0 large pumpjack, small low tank, and short pipes |
 | `facilities/facility_power_plant.png` | `powerPlant` | Turbine hall and transmission tower |
 | `facilities/facility_wind_power_plant.png` | `windPowerPlant` | Wind turbine array and compact control hut; fixed 15 Electricity source |
 | `facilities/facility_simple_farm.png` | `simpleFarm` | Small forward farm, field rows, and utility shed |
@@ -152,6 +162,8 @@ warnings, and Horde entrance directions remain dynamic UI overlays.
    v1.5.3 Gas and Army Base source output identifiers and prompts are recorded
    under `Art/reference/v1.5.3-asset-concepts/`. The v1.5.7 Barbed Wire source
    and provenance are retained under `Art/reference/v1.5.7-barbed-wire-concept/`.
+   The v1.6.0 Oil Field source and prompts are retained under
+   `Art/reference/v1.6.0-oilfield-concept/` and rebuild with `--v160-only`.
 
 The original single-Zombie concept, approved three-Zombie normal-unit source,
 approved twelve-Zombie Horde source, and v1.4 facility references live in

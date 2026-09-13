@@ -76,6 +76,7 @@ function destroyUnit(
   if (unit.type === 'riotZombie') state.statistics.riotZombiesKilled += 1;
   if (unit.type === 'hunterZombie') state.statistics.hunterZombiesKilled += 1;
   if (unit.type === 'gasZombie') state.statistics.gasZombiesKilled += 1;
+  if (!unit.isPlayerUnit) state.statistics.enemyKillsTotal += 1;
   if (!unit.isPlayerUnit && unit.hordeKind === 'final') state.statistics.finalHordeKilled += 1;
   emit(state, 'unit_destroyed', {
     unitId: unit.id,

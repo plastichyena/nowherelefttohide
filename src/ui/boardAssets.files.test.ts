@@ -84,10 +84,11 @@ describe('board runtime PNG files', () => {
       'units/unit_hunter_zombie.png',
       'units/unit_gas_zombie.png',
     ]));
-    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(13);
+    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(14);
     expect(paths).toEqual(expect.arrayContaining([
       'facilities/facility_army_base.png',
       'facilities/facility_temporary_housing.png',
+      'facilities/facility_oilfield.png',
     ]));
     expect(paths.filter((path) => path.startsWith('obstacles/'))).toEqual(['obstacles/obstacle_barbed_wire.png']);
     for (const path of paths.filter((entry) => entry.startsWith('units/') || entry.startsWith('facilities/') || entry.startsWith('obstacles/') || entry.startsWith('overlays/'))) {
@@ -101,5 +102,14 @@ describe('board runtime PNG files', () => {
     }
     const totalBytes = paths.reduce((total, path) => total + statSync(join(BOARD_ROOT, path)).size, 0);
     expect(totalBytes).toBeLessThanOrEqual(3 * 1024 * 1024);
+  });
+
+  it('keeps Oil Field transparent and visually distinct from Refinery', () => {
+    const oilField = decodeRgba(readPng('facilities/facility_oilfield.png'));
+    const refinery = decodeRgba(readPng('facilities/facility_refinery.png'));
+    const oilFieldAlpha = Array.from({ length: 256 * 256 }, (_, index) => oilField[index * 4 + 3]!);
+    expect(Math.min(...oilFieldAlpha)).toBeLessThan(255);
+    expect(Math.max(...oilFieldAlpha)).toBe(255);
+    expect(oilField).not.toEqual(refinery);
   });
 });

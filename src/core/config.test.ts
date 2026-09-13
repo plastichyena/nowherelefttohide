@@ -5,11 +5,13 @@ import {
   validateGameConfig,
 } from './config';
 
-describe('v1.5.5 GameConfig', () => {
+describe('v1.6 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('9.0.0');
-    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v4');
+    expect(DEFAULT_CONFIG.version).toBe('10.0.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v5');
+    expect(DEFAULT_CONFIG.economy.initialRefineryAllowance).toBe(5_000);
+    expect(DEFAULT_CONFIG.economy.oilFieldAllowancePerWorker).toBe(100);
     expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(25);
     expect(DEFAULT_CONFIG.economy.initialResources).toMatchObject({
       food: 230,
@@ -20,6 +22,7 @@ describe('v1.5.5 GameConfig', () => {
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(15);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, outputs: { food: 10 }, powerMode: 'required' });
     expect(DEFAULT_CONFIG.facilities.refinery.production).toMatchObject({ outputs: { fuel: 5 }, powerMode: 'required', powerCapacity: 10 });
+    expect(DEFAULT_CONFIG.facilities.oilField).toMatchObject({ workerCapacity: 5, production: { inputs: {}, outputs: {}, powerMode: 'none' } });
     expect(DEFAULT_CONFIG.facilities.simpleFarm.production).toMatchObject({ outputs: { food: 5 }, powerMode: 'none', powerCapacity: 0 });
     expect(DEFAULT_CONFIG.horde.warningLeadTurns).toBe(2);
     expect(DEFAULT_CONFIG.horde.waves).toEqual([

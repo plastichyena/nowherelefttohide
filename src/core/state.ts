@@ -26,7 +26,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '9.0.0';
+export const GAME_VERSION = '10.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -51,7 +51,7 @@ export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
 }
 
 export function isProductionFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'simpleFarm', 'civilianDroneBase', 'armyBase']
+  return ['farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'simpleFarm', 'civilianDroneBase', 'armyBase']
     .includes(facility.type);
 }
 
@@ -352,6 +352,7 @@ function facilityStateFromDefinition(
     constructible: false,
     builtTurn: null,
     recoveryOperationalTurn: null,
+    firstCaptureRewardClaimed: owned,
   };
 }
 
@@ -500,6 +501,12 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       electricityCapacity: 0,
       electricityRequired: 0,
     },
+    refineryAllowance: {
+      initialAllowance: stateConfig.economy.initialRefineryAllowance,
+      oilCreditsEarned: 0,
+      fuelRefined: 0,
+      remainingAllowance: stateConfig.economy.initialRefineryAllowance,
+    },
     units: initialUnitDeployment(map, initialHunterPositions, stateConfig.economy.initialZombieCount).map(
       (unit) => createUnit({ config: stateConfig }, unit.id, unit.type, unit.position, 'ready', unit.proficiency),
     ),
@@ -550,6 +557,9 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       unitLosses: 0,
       infectionLosses: 0,
       resourceShortageLosses: 0,
+      resourceShortageLossesTotal: 0,
+      finalEconomyResourceShortageLosses: 0,
+      enemyKillsTotal: 0,
       hordeInterceptions: 0,
       refugeeArrivalsByBranch: Object.fromEntries(roadBranches.map((branch) => [branch.branchId, 0])),
       unmanagedPassThrough: 0,

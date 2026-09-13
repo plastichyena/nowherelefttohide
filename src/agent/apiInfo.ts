@@ -87,6 +87,11 @@ export function createAgentApiInfo(
     new_state_loss: { severity: 'advisory', category: 'loss' },
     production_outage: { severity: 'warning', category: 'resource' },
     resource_runway_risk: { severity: 'warning', category: 'resource' },
+    military_goods_national_shortage: { severity: 'warning', category: 'resource' },
+    military_goods_supply_disconnected: { severity: 'warning', category: 'unit_supply' },
+    facility_workers_zero: { severity: 'advisory', category: 'facility' },
+    refinery_allowance_exhausted: { severity: 'warning', category: 'resource' },
+    oil_field_allowance_blocked: { severity: 'warning', category: 'facility' },
   };
   return cloneJson({
     queryContract: publicQueryContract(),

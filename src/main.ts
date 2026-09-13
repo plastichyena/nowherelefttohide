@@ -1,6 +1,8 @@
 import 'phaser';
 import './styles.css';
 import { installBrowserBridge } from './browser/bridge';
+import { LiveAiViewer } from './browser/live-ai';
+import { registerWebMcpTools } from './browser/webmcp';
 import { GameUiController, type UiGameEngine } from './ui/controller';
 
 const root = document.querySelector<HTMLElement>('#app');
@@ -48,4 +50,10 @@ async function boot(): Promise<void> {
 // evaluation.  It owns a separate in-memory AgentGame and never reuses the
 // UI controller's engine or persistence store.
 installBrowserBridge();
+const liveAiViewer = new LiveAiViewer();
+try {
+  registerWebMcpTools({ getSession: liveAiViewer.getSession, act: liveAiViewer.act });
+} catch {
+  // A partial or incompatible client implementation must not prevent normal play.
+}
 void boot();

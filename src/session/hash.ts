@@ -61,17 +61,17 @@ export function assertSafeIdentifier(value: unknown, name: string): asserts valu
   }
 }
 
-export function normalizeDecisionSummary(value: unknown): string {
-  if (typeof value !== 'string') throw new SessionError('invalid_step_input', 'decisionSummary must be a Unicode string');
-  const normalized = value.trim();
-  const length = Array.from(normalized).length;
+export function normalizeDecisionSummary(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') throw new SessionError('invalid_step_input', 'decisionSummary must be a Unicode string when supplied');
+  const length = Array.from(value).length;
   if (length < 1 || length > MAX_DECISION_SUMMARY_CODE_POINTS) {
     throw new SessionError(
       'invalid_step_input',
-      `decisionSummary must contain 1-${MAX_DECISION_SUMMARY_CODE_POINTS} Unicode characters after trimming`,
+      `decisionSummary must contain 1-${MAX_DECISION_SUMMARY_CODE_POINTS} Unicode code points`,
     );
   }
-  return normalized;
+  return value;
 }
 
 export function decisionHash(record: Omit<PublicDecisionRecord, 'decisionHash'>): string {

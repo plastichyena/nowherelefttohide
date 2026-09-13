@@ -45,6 +45,7 @@ export type FacilityType =
   | 'farm'
   | 'civilianFactory'
   | 'militaryFactory'
+  | 'oilField'
   | 'refinery'
   | 'powerPlant'
   | 'windPowerPlant'
@@ -225,6 +226,15 @@ export interface FacilityState extends FacilityDefinition {
   builtTurn: number | null;
   /** First Player Turn on which a recovering special facility becomes operational. */
   recoveryOperationalTurn: number | null;
+  /** One-way ledger: starting-owned facilities and rewarded captures are claimed. */
+  firstCaptureRewardClaimed: boolean;
+}
+
+export interface RefineryAllowanceState {
+  initialAllowance: number;
+  oilCreditsEarned: number;
+  fuelRefined: number;
+  remainingAllowance: number;
 }
 
 export interface PopulationState {
@@ -542,6 +552,12 @@ export interface GameStatistics {
   unitLosses: number;
   infectionLosses: number;
   resourceShortageLosses: number;
+  /** Canonical cumulative shortage deaths; the legacy field above is kept in sync. */
+  resourceShortageLossesTotal: number;
+  /** Deaths caused by Food/Civilian Goods shortage in the latest economy phase. */
+  finalEconomyResourceShortageLosses: number;
+  /** Sum of every concrete enemy-type kill counter. */
+  enemyKillsTotal: number;
   hordeInterceptions: number;
   refugeeArrivalsByBranch: Record<RoadBranchId, number>;
   unmanagedPassThrough: number;
@@ -875,6 +891,13 @@ export interface EndTurnForecast {
   civilianGoods: CivilianGoodsForecast;
   militaryGoods: MilitaryGoodsForecast;
   fuel: FuelForecast;
+  refineryAllowance: {
+    before: number;
+    oilCreditsEarned: number;
+    availableForRefining: number;
+    fuelRefined: number;
+    remaining: number;
+  };
   electricity: {
     physicalGenerationCapacity: number;
     fuelLimitedGenerationCapacity: number;
@@ -902,15 +925,26 @@ export type CrisisReasonCode =
   | 'guaranteed_resource_defeat'
   | 'new_state_loss'
   | 'production_outage'
-  | 'resource_runway_risk';
+  | 'resource_runway_risk'
+  | 'military_goods_national_shortage'
+  | 'military_goods_supply_disconnected'
+  | 'facility_workers_zero'
+  | 'refinery_allowance_exhausted'
+  | 'oil_field_allowance_blocked';
 
 export interface CrisisAlert {
   id: string;
   severity: CrisisSeverity;
-  category: 'infection' | 'checkpoint' | 'unit' | 'horde' | 'resource' | 'loss';
+  category: 'infection' | 'checkpoint' | 'unit' | 'horde' | 'resource' | 'facility' | 'loss';
   reasonCode: CrisisReasonCode;
   entityIds: string[];
   publicFacts: JsonObject;
+  titleKey: string;
+  bodyKey: string;
+  params: JsonObject;
+  evidence: JsonObject[];
+  suggestedActionKinds: GameAction['type'][];
+  sourceRevision: number;
 }
 
 export interface EndTurnRiskUnit {
@@ -959,6 +993,7 @@ export interface GameState {
   population: PopulationState;
   cityPopulationSnapshot: CityPopulationSnapshot;
   resources: ResourceState;
+  refineryAllowance: RefineryAllowanceState;
   units: UnitState[];
   checkpoints: CheckpointState[];
   roadBranches: RoadBranchState[];
@@ -1276,6 +1311,8 @@ export interface InfectionConfig {
 }
 
 export interface CheckpointConfig {
+  /** Public checkpoint modifier shown by every UI/projection path. */
+  checkpointBonus: number;
   /** Cost of the first checkpoint ever built on a branch. */
   constructionCivilianGoods: number;
   subsequentConstructionCivilianGoods: number;
@@ -1296,6 +1333,8 @@ export interface EconomyConfig {
     civilianGoods: number;
   };
   initialResources: ResourceStock;
+  initialRefineryAllowance: number;
+  oilFieldAllowancePerWorker: number;
   initialWorkersByFacility: Record<FacilityId, number>;
   initialZombieCount: number;
 }

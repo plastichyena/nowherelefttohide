@@ -396,11 +396,16 @@ export function createPublicFacilityProjection(
           ? state.config.facilities.windPowerPlant.production.fixedPowerGeneration
           : 0,
         emitsNoise: facility.owner === 'player' && facility.status === 'owned' && facility.operationalStatus === 'operational',
-        playerBuildLimit: state.map.roadBranches.length,
+        playerBuildLimit: state.map.roadBranches.length * 2,
         playerBuiltCount: state.facilities.filter((candidate) => candidate.type === 'windPowerPlant' && candidate.constructible).length,
       }
       : null,
   };
+}
+
+/** v1.6 legacy display fallback; missing old projections must never render as zero. */
+export function checkpointBonusValue(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 25;
 }
 
 /** Project one public checkpoint, including its branch and containment facts. */
@@ -415,6 +420,7 @@ export function createPublicCheckpointProjection(
   const queuePeople = checkpoint.waiting + checkpoint.screening + checkpoint.approved;
   const policy = branch?.currentPolicy ?? 'normal';
   return {
+    checkpointBonus: checkpointBonusValue(state.config.checkpoint.checkpointBonus),
     id: checkpoint.id,
     branchId: checkpoint.branchId ?? checkpoint.direction,
     position: { ...checkpoint.position },

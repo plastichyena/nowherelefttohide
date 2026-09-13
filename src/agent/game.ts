@@ -2,6 +2,7 @@ import { facilityChanges, branchFlowChanges } from './facility-changes';
 import { ObservationHistory, metricObservation } from './history';
 import { assertValidGameConfig, cloneConfig, createDefaultConfig, DEFAULT_MAP_ID } from '../core/config';
 import { GameEngine, getCheckpointPositionCandidates, validateAction } from '../core/engine';
+import { coreActionPreviewJson } from '../core/action-preview';
 import { hexKey } from '../core/hex';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
 import type { DeepPartial, GameAction, GameConfig, GameEvent, GameState, JsonObject, JsonValue } from '../core/types';
@@ -432,6 +433,10 @@ export class AgentGameAdapter implements AgentGame {
 
   public getLegalActions(): GameAction[] {
     return this.currentLegalActions().map(cloneAction);
+  }
+
+  public previewAction(action: GameAction, baseRevision: number): JsonValue {
+    return cloneJson(coreActionPreviewJson(this.engine.getState(), action, baseRevision));
   }
 
   private currentLegalActions(): GameAction[] {

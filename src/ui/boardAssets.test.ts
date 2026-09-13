@@ -36,6 +36,7 @@ describe('board asset registry', () => {
       'farm',
       'civilianFactory',
       'militaryFactory',
+      'oilField',
       'refinery',
       'powerPlant',
       'windPowerPlant',
@@ -67,6 +68,9 @@ describe('board asset registry', () => {
     expect(getUnitAssetPath('not-a-unit')).toBeNull();
     expect(getFacilityAssetPath('armyBase')).toBe(BOARD_ASSET_REGISTRY.facilities.armyBase);
     expect(getFacilityAssetPath('temporaryHousing')).toBe(BOARD_ASSET_REGISTRY.facilities.temporaryHousing);
+    expect(getFacilityAssetPath('oilField')).toBe(BOARD_ASSET_REGISTRY.facilities.oilField);
+    expect(BOARD_ASSET_REGISTRY.facilities.oilField).toBe('facilities/facility_oilfield.png');
+    expect(getFacilityAssetPath('oilField')).not.toBe(getFacilityAssetPath('refinery'));
     expect(getUnitAssetPath('policeZombie')).toBe(BOARD_ASSET_REGISTRY.units.policeZombie);
     expect(getUnitAssetPath('soldierZombie')).toBe(BOARD_ASSET_REGISTRY.units.soldierZombie);
     expect(getUnitAssetPath('riotPolice')).toBe(BOARD_ASSET_REGISTRY.units.riotPolice);

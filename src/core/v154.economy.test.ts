@@ -57,6 +57,7 @@ function addHousing(
     constructible: true,
     builtTurn: operationalStatus === 'building' ? state.turn : state.turn - 1,
     recoveryOperationalTurn: null,
+    firstCaptureRewardClaimed: true,
   };
   state.facilities.push(housing);
   return housing;

@@ -35,9 +35,20 @@ const worseningCases: FactCase[] = [
   ['resource_runway_risk', 'estimatedShortageTurn', 3, 2],
   ['resource_runway_risk', 'nextEndTurnShortage', false, true],
   ['new_state_loss', 'eventId', 'event-1', 'event-2'],
+  ['military_goods_national_shortage', 'unfilledSuppliedDemand', 1, 2],
+  ['military_goods_national_shortage', 'nationalEndingStock', 2, 1],
+  ['military_goods_supply_disconnected', 'disconnectedDemand', 1, 2],
+  ['military_goods_supply_disconnected', 'disconnectedUnitCount', 1, 2],
+  ['facility_workers_zero', 'stoppedWorkers', 1, 2],
+  ['refinery_allowance_exhausted', 'availableAllowance', 1, 0],
+  ['oil_field_allowance_blocked', 'blockedWorkers', 1, 2],
 ];
 function alert(reasonCode: CrisisAlert['reasonCode'], publicFacts: JsonObject = {}): CrisisAlert {
-  return { id: reasonCode + ':x', category: 'unit', severity: 'warning', reasonCode, entityIds: ['x'], publicFacts };
+  return {
+    id: reasonCode + ':x', category: 'unit', severity: 'warning', reasonCode, entityIds: ['x'], publicFacts,
+    titleKey: `alert.${reasonCode}.title`, bodyKey: `alert.${reasonCode}.body`, params: publicFacts,
+    evidence: [publicFacts], suggestedActionKinds: [], sourceRevision: 0,
+  };
 }
 
 describe('v1.5.4 public crisis worsening contract', () => {
@@ -46,6 +57,8 @@ describe('v1.5.4 public crisis worsening contract', () => {
       'capital_infection_uncontained', 'critical_site_infection_uncontained', 'checkpoint_defense_degraded',
       'unit_out_of_supply_risk', 'horde_warning_active', 'guaranteed_resource_defeat', 'new_state_loss',
       'production_outage', 'resource_runway_risk', 'overcrowding_forecast', 'temporary_housing_outage_forecast',
+      'military_goods_national_shortage', 'military_goods_supply_disconnected', 'facility_workers_zero',
+      'refinery_allowance_exhausted', 'oil_field_allowance_blocked',
     ].sort());
     expect(worseningCases.map(([reason, key]) => `${reason}:${key}`).sort()).toEqual(
       Object.entries(CRISIS_WORSENING_FACTS).flatMap(([reason, facts]) => Object.keys(facts).map(key => `${reason}:${key}`)).sort());

@@ -20,6 +20,7 @@ import type {
   HordeComposition,
   HumanUnitType,
   JsonObject,
+  JsonValue,
   NoiseClass,
   PowerMode,
   PowerSupplyReason,
@@ -34,17 +35,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.5.4 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.5.7';
-export const GAME_RULES_VERSION = '9.0.0';
-export const SAVE_FORMAT_VERSION = '16';
-export const AGENT_API_VERSION = '14.0.0';
-export const OBSERVATION_API_VERSION = '14.0.0';
-export const BRIDGE_API_VERSION = '14.0.0';
-export const BALANCED_AGENT_VERSION = '8.0.0';
+/** v1.6 rejects all earlier state and public API schemas without migration. */
+export const APP_VERSION = '1.6.0';
+export const GAME_RULES_VERSION = '10.0.0';
+export const SAVE_FORMAT_VERSION = '17';
+export const AGENT_API_VERSION = '15.0.0';
+export const OBSERVATION_API_VERSION = '15.0.0';
+export const BRIDGE_API_VERSION = '15.0.0';
+export const BALANCED_AGENT_VERSION = '9.0.0';
 export const RANDOM_AGENT_VERSION = '6.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '13.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '10.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '14.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '11.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -63,6 +64,11 @@ export const CRISIS_REASON_CODES = [
   'new_state_loss',
   'production_outage',
   'resource_runway_risk',
+  'military_goods_national_shortage',
+  'military_goods_supply_disconnected',
+  'facility_workers_zero',
+  'refinery_allowance_exhausted',
+  'oil_field_allowance_blocked',
 ] as const;
 
 export type CrisisReasonCode = typeof CRISIS_REASON_CODES[number];
@@ -75,6 +81,12 @@ export interface CrisisAlert {
   reasonCode: CrisisReasonCode;
   entityIds: string[];
   publicFacts: JsonObject;
+  titleKey?: string;
+  bodyKey?: string;
+  params?: JsonObject;
+  evidence?: JsonObject[];
+  suggestedActionKinds?: GameAction['type'][];
+  sourceRevision?: number;
 }
 
 export interface CrisisSummary {
@@ -364,6 +376,7 @@ export interface AgentUnitObservation {
 }
 
 export interface AgentCheckpointObservation {
+  checkpointBonus?: number;
   turnAwayPreview?: { waitingOnly: boolean; maxPeople: number; foodMaintenanceReduction: number; civilianGoodsMaintenanceReduction: number; additionalPenalties: string; futureWaveRisk: boolean };
   id: string;
   branchId: string;
@@ -680,6 +693,9 @@ export interface AgentGameResult {
     unitLosses: number;
     infectionLosses: number;
     resourceShortageLosses: number;
+    resourceShortageLossesTotal: number;
+    finalEconomyResourceShortageLosses: number;
+    enemyKillsTotal: number;
     hordeInterceptions: number;
     refugeeArrivalsByBranch: Record<string, number>;
     unmanagedPassThrough: number;
@@ -767,6 +783,9 @@ export interface AgentObservation {
   phase: GamePhase;
   map: AgentMapObservation;
   resources: ResourceState;
+  refineryAllowance?: import('../core/types').RefineryAllowanceState;
+  supportHeadroom?: import('../core/action-preview').SupportHeadroomProjection;
+  windPowerConstruction?: { playerBuiltCount: number; playerBuildLimit: number; remaining: number };
   population: {
     healthyCivilians: number;
     cityResidents: number;
@@ -951,7 +970,7 @@ export interface AgentRunArtifact {
   /** Present for a Session artifact; absent for a standalone run. */
   sessionLineage?: { parentSessionId: string | null; parentCheckpointId: string | null };
   result: AgentGameResult | null;
-  /** Static map projection stored once per game by Artifact Schema 10.0.0. */
+  /** Static map projection stored once per game by Artifact Schema 14.0.0. */
   fixedMap?: AgentMapObservation;
   /** Dynamic public observations at reset and after each accepted action. */
   observationTrace?: AgentArtifactObservation[];
@@ -963,7 +982,7 @@ export interface AgentRunArtifact {
 }
 
 /**
- * Artifact Schema 10.0.0 stores topology once and keeps only dynamic map
+ * Artifact Schema 14.0.0 stores topology once and keeps only dynamic map
  * visibility in each trace entry.  Live observations remain complete.
  */
 export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {
@@ -1043,6 +1062,7 @@ export interface AgentGame {
   reset(options?: AgentResetOptions): AgentObservation;
   getObservation(): AgentObservation;
   getLegalActions(): GameAction[];
+  previewAction?(action: GameAction, baseRevision: number): JsonValue;
   step(action: GameAction): AgentStepResult;
   isGameOver(): boolean;
   getResult(): AgentGameResult | null;

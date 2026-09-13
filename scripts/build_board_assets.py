@@ -70,6 +70,10 @@ V157_SOURCE_FILES = {
     "obstacles/obstacle_barbed_wire.png": "barbed-wire-candidate-v1.png",
 }
 
+V160_SOURCE_FILES = {
+    "facilities/facility_oilfield.png": "oilfield_concept_transparent.png",
+}
+
 
 def contain(source: Image.Image, bounds: tuple[int, int], y_offset: int = 0) -> Image.Image:
     image = source.convert("RGBA")
@@ -79,6 +83,15 @@ def contain(source: Image.Image, bounds: tuple[int, int], y_offset: int = 0) -> 
     y = (SIZE - image.height) // 2 + y_offset
     result.alpha_composite(image, (x, y))
     return result
+
+
+def contain_visible(source: Image.Image, bounds: tuple[int, int]) -> Image.Image:
+    """Crop transparent padding before fitting a generated facility source."""
+    image = source.convert("RGBA")
+    alpha_bounds = image.getchannel("A").getbbox()
+    if alpha_bounds is None:
+        raise ValueError("source has no visible pixels")
+    return contain(image.crop(alpha_bounds), bounds)
 
 
 def terrain(source: Image.Image) -> Image.Image:
@@ -255,6 +268,19 @@ def build_v157(source_root: Path, output_root: Path) -> None:
         )
 
 
+def build_v160(source_root: Path, output_root: Path) -> None:
+    """Post-process the approved v1.6.0 Oil Field concept."""
+    for relative, source_name in V160_SOURCE_FILES.items():
+        destination = output_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source = Image.open(source_root / source_name)
+        contain_visible(source, (217, 217)).save(
+            destination,
+            optimize=True,
+            compress_level=9,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source_root", type=Path)
@@ -265,6 +291,7 @@ def main() -> None:
     mode.add_argument("--v150-only", action="store_true")
     mode.add_argument("--v153-only", action="store_true")
     mode.add_argument("--v157-only", action="store_true")
+    mode.add_argument("--v160-only", action="store_true")
     args = parser.parse_args()
     if args.v140_only:
         build_v140(args.source_root, args.output_root)
@@ -276,6 +303,8 @@ def main() -> None:
         build_v153(args.source_root, args.output_root)
     elif args.v157_only:
         build_v157(args.source_root, args.output_root)
+    elif args.v160_only:
+        build_v160(args.source_root, args.output_root)
     else:
         build(args.source_root, args.output_root)
 
