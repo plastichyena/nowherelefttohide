@@ -69,7 +69,15 @@ export const QUERY_FILTER_SCHEMAS = {
   construction: object({ ...bounds, facilityType: { enum: [...CONSTRUCTIBLE_TYPES, 'barbedWire'] }, actionType: { enum: ['BuildCheckpoint', 'RelocateCheckpoint', 'ActivateCheckpoint', 'BuildBarbedWire'] }, branchId: string, checkpointId: string, legalOnly: bool, legal: bool, inSupply: bool, reasonCode: nullableString }),
   'legal-actions': object({ type: { enum: QUERYABLE_ACTION_TYPES }, actionType: { enum: QUERYABLE_ACTION_TYPES }, unitId: string, attackerId: string, targetId: string, facilityId: string, checkpointId: string, branchId: string, fromFacilityId: string, toFacilityId: string, unitType: { enum: HUMAN_UNIT_TYPES }, facilityType: { enum: CONSTRUCTIBLE_TYPES }, policy: { enum: CHECKPOINT_POLICIES }, enabled: bool }),
   forecast: object({}),
-  history: object({ fromDecision: { type: 'integer', minimum: 0 }, toDecision: { type: 'integer', minimum: 0 } }),
+  history: object({
+    fromDecision: { type: 'integer', minimum: 0 },
+    toDecision: { type: 'integer', minimum: 0 },
+    includeSnapshots: {
+      ...bool,
+      default: false,
+      description: 'When true, include reconstructed before/after Observations and legal actions. The default summary contains the complete Decision record, events, stateDelta, and importantChanges without duplicating large snapshots.',
+    },
+  }),
   'full-snapshot': object({}),
   'population-transfers': object({ fromFacilityId: string, toFacilityId: string, legal: bool, legalOnly: bool, min: { type: ['integer', 'null'] }, max: { type: ['integer', 'null'] }, fromReason: nullableString, toReason: nullableString, actionBudgetReason: nullableString, reason: nullableString }),
   'worker-assignments': object({ facilityId: string, legal: bool, legalOnly: bool, availablePopulation: { type: 'integer', minimum: 0 }, targetReason: nullableString, populationReason: nullableString, actionBudgetReason: nullableString, reason: nullableString }),

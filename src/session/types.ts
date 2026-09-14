@@ -30,7 +30,7 @@ export const ZERO_HASH = '0'.repeat(64);
 
 export type SessionCommentLocale = 'ja' | 'en';
 
-export type SessionCommand = 'new' | 'status' | 'step' | 'play-turn' | 'save-checkpoint' | 'list-checkpoints' | 'load-checkpoint' | 'query' | 'artifact';
+export type SessionCommand = 'new' | 'status' | 'step' | 'preview' | 'play-turn' | 'save-checkpoint' | 'list-checkpoints' | 'load-checkpoint' | 'query' | 'artifact';
 
 export interface SessionVersionIdentity {
   appVersion: string;
@@ -136,8 +136,13 @@ export interface SessionPlayTurnQueryInput {
   pageSize?: number;
   filters?: Record<string, JsonValue>;
 }
+export interface SessionPlayTurnPreviewInput {
+  type: 'preview';
+  action: GameAction;
+  expectedRevision: number;
+}
 export interface SessionPlayTurnCloseInput { type: 'close' }
-export type SessionPlayTurnRequest = SessionPlayTurnActionInput | SessionPlayTurnQueryInput | SessionPlayTurnCloseInput;
+export type SessionPlayTurnRequest = SessionPlayTurnActionInput | SessionPlayTurnQueryInput | SessionPlayTurnPreviewInput | SessionPlayTurnCloseInput;
 export interface SessionPlayTurnPlanAction extends Omit<SessionPlayTurnActionInput, 'type' | 'expectedRevision'> {}
 export interface SessionPlayTurnPlanInput { expectedRevision: number; actions: SessionPlayTurnPlanAction[] }
 
@@ -293,6 +298,7 @@ export interface SessionCompactSnapshot {
   endTurnRisk: AgentObservation['endTurnRisk'];
   forecastSummary: Record<string, JsonValue>;
   productionCapacity: JsonValue;
+  supportHeadroom: NonNullable<AgentObservation['supportHeadroom']>;
   gameOver: boolean;
   result: AgentGameResult | null;
   availableActionTypes: Array<{ type: string; count: number; targetIds: string[]; modes: string[] }>;
@@ -373,6 +379,7 @@ export interface SessionGameRuntime {
   getApiInfo?(): AgentApiInfo;
   getObservation(): AgentObservation;
   getLegalActions(): GameAction[];
+  previewAction?(action: GameAction, baseRevision: number): JsonValue;
   step(input: SessionStepInput): AgentStepResult;
   isGameOver(): boolean;
   getResult(): AgentGameResult | null;
@@ -386,6 +393,13 @@ export interface SessionGameFactory {
 
 export type SessionQueryTarget = import('../agent/query-contract').PublicQueryTarget;
 export interface SessionQueryInput { target: SessionQueryTarget; expectedRevision?: number; cursor?: string; pageSize?: number; filters?: Record<string, JsonValue> }
+export interface SessionPreviewInput { action: GameAction; expectedRevision: number }
+export interface SessionPreviewResult {
+  sessionId: string;
+  revision: number;
+  action: GameAction;
+  preview: JsonValue;
+}
 export interface SessionQueryResult {
   sessionId: string;
   revision: number;

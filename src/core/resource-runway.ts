@@ -153,20 +153,28 @@ export function deriveResourceRunwayForecast(
         productionInput: economy.civilianGoods.productionInputDemand,
       };
       order = 'civilian_goods_reservation';
-      nextEndTurnShortage = economy.civilianGoods.maintenanceShortage > 0
-        || economy.civilianGoods.productionInputShortage > 0;
+      // Military Factory input that cannot be reserved is a production-input
+      // outage, not a Civilian Goods maintenance shortage. In particular it
+      // must not turn a growing national stock into a critical runway alert.
+      nextEndTurnShortage = economy.civilianGoods.maintenanceShortage > 0;
       break;
     case 'militaryGoods':
       currentStock = economy.militaryGoods.startingStock;
       production = economy.militaryGoods.projectedProduction;
-      demand = economy.militaryGoods.totalRefillDemand
+      // Out-of-supply Units cannot draw from national stock. Their refill
+      // deficit has its own supply-disconnected alert and is deliberately
+      // excluded from the national runway calculation.
+      const suppliedUnits = economy.militaryGoods.units.filter((unit) => unit.inSupply);
+      const suppliedUnitRefillDemand = suppliedUnits.reduce((sum, unit) => sum + unit.refillDemand, 0);
+      const unfilledSuppliedUnitRefillDemand = suppliedUnits.reduce((sum, unit) => sum + unit.unfilledRefillDemand, 0);
+      demand = suppliedUnitRefillDemand
         + Math.max(0, context.militaryGoodsArmyBaseRefillDemand ?? 0);
       demandBreakdown = {
-        unitRefill: economy.militaryGoods.totalRefillDemand,
+        unitRefill: suppliedUnitRefillDemand,
         armyBaseRefill: Math.max(0, context.militaryGoodsArmyBaseRefillDemand ?? 0),
       };
       order = 'production_before_demand';
-      nextEndTurnShortage = economy.militaryGoods.totalUnfilledRefillDemand > 0
+      nextEndTurnShortage = unfilledSuppliedUnitRefillDemand > 0
         || economy.militaryGoods.startingStock + economy.militaryGoods.projectedProduction < demand;
       unavailableReason = economy.civilianGoods.productionInputShortage > 0
         ? 'input_dependency_unstable'

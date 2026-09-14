@@ -44,6 +44,18 @@ export function deriveStrategicForecast(state: Readonly<GameState>): StrategicFo
       ? Math.max(0, armyBase.capacity - armyBase.current)
       : 0);
   }, 0);
+  const militaryGoodsArmyBaseUnfilledDemand = facilityProduction.reduce((total, projection) => {
+    const armyBase = projection.armyBaseMilitaryGoods;
+    return total + (armyBase?.refillEligible
+      ? Math.max(0, armyBase.capacity - armyBase.current - armyBase.projectedRefillAmount)
+      : 0);
+  }, 0);
+  const suppliedMilitaryUnits = economy.militaryGoods.units.filter((unit) => unit.inSupply);
+  const suppliedMilitaryGoodsDemand = suppliedMilitaryUnits.reduce((total, unit) => total + unit.refillDemand, 0);
+  const suppliedMilitaryGoodsUnfilledDemand = suppliedMilitaryUnits.reduce(
+    (total, unit) => total + unit.unfilledRefillDemand,
+    0,
+  );
   const supplyAndDemand: Record<StrategicResourceType, { supply: number; demand: number; short: boolean }> = {
     food: {
       supply: economy.food.startingStock + economy.food.projectedProduction,
@@ -57,8 +69,8 @@ export function deriveStrategicForecast(state: Readonly<GameState>): StrategicFo
     },
     militaryGoods: {
       supply: economy.militaryGoods.startingStock + economy.militaryGoods.projectedProduction,
-      demand: economy.militaryGoods.totalRefillDemand,
-      short: economy.militaryGoods.totalUnfilledRefillDemand > 0,
+      demand: suppliedMilitaryGoodsDemand + militaryGoodsArmyBaseRefillDemand,
+      short: suppliedMilitaryGoodsUnfilledDemand > 0 || militaryGoodsArmyBaseUnfilledDemand > 0,
     },
     fuel: {
       supply: economy.fuel.turnStartFuel + economy.fuel.projectedRefineryProduction,

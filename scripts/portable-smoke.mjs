@@ -11,7 +11,7 @@ import { dirname, join, resolve } from 'node:path';
  * tested without putting development dependencies back into that package.
  */
 
-const COMMANDS = ['new', 'status', 'step', 'play-turn', 'save-checkpoint', 'list-checkpoints', 'load-checkpoint', 'query', 'artifact'];
+const COMMANDS = ['new', 'status', 'step', 'preview', 'play-turn', 'save-checkpoint', 'list-checkpoints', 'load-checkpoint', 'query', 'artifact'];
 const MAX_DECISIONS = 200;
 
 function fail(message) {
@@ -183,12 +183,17 @@ function commandSmoke(launcher, root) {
   for (const command of COMMANDS) assert(help.commands.includes(command), `Session CLI help omitted ${command}`);
 
   const session = 'portable-command-smoke';
-  const created = statusView(invokeJson(launcher, ['new', '--root', root, '--session-id', session, '--seed', '1', '--checkpoint-interval', '1', '--agent-id', 'portable-command-driver'], { label: 'new command smoke' }), 'new command smoke');
+  const created = statusView(invokeJson(launcher, ['new', '--root', root, '--session-id', session, '--seed', '1', '--checkpoint-interval', '1', '--agent-id', 'portable-command-driver', '--preferred-comment-locale', 'ja'], { label: 'new command smoke' }), 'new command smoke');
   assert(created.revision === 0, 'new command did not start at revision 0');
+  assert(created.session?.preferredCommentLocale === 'ja', 'new command did not preserve preferredCommentLocale');
   statusView(invokeJson(launcher, ['status', ...sessionArgs(root, session)], { label: 'status command smoke' }), 'status command smoke');
 
   const snapshot = fullSnapshot(launcher, root, session, created.revision);
   const endTurn = endTurnAction(snapshot, 'command smoke');
+  const previewInputPath = join(root, 'command-preview-action.json');
+  writeUniqueJson(previewInputPath, endTurn);
+  const previewed = invokeJson(launcher, ['preview', ...sessionArgs(root, session), '--revision', String(created.revision), '--input', previewInputPath], { label: 'preview command smoke' });
+  assert(previewed.ok === true && previewed.preview?.baseRevision === created.revision && previewed.preview?.legal === true, 'preview command did not return a legal revision-pinned projection');
   const queryFilterPath = join(root, 'command-query-filter.json');
   writeUniqueJson(queryFilterPath, { actionType: 'EndTurn' });
   const filtered = invokeJson(launcher, ['query', ...sessionArgs(root, session), '--target', 'legal-actions', '--revision', String(created.revision), '--input', queryFilterPath, '--page-size', '500'], { label: 'query filter command smoke' });
@@ -231,10 +236,12 @@ function commandSmoke(launcher, root) {
   const interactiveCreated = statusView(invokeJson(launcher, ['new', '--root', root, '--session', interactiveSession, '--seed', '1', '--agent-id', 'portable-interactive-driver'], { label: 'interactive new smoke' }), 'interactive new smoke');
   const interactiveAction = endTurnAction(fullSnapshot(launcher, root, interactiveSession, interactiveCreated.revision), 'interactive play-turn smoke');
   const interactiveResponses = invokeInteractive(launcher, ['play-turn', ...sessionArgs(root, interactiveSession)], [
+    { type: 'preview', action: interactiveAction, expectedRevision: interactiveCreated.revision },
     { type: 'query', target: 'legal-actions', expectedRevision: interactiveCreated.revision, pageSize: 500, filters: { actionType: 'EndTurn' } },
     { type: 'action', action: interactiveAction, decisionSummary: 'Portable interactive EndTurn.', expectedRevision: interactiveCreated.revision, requestId: 'portable-interactive-end-turn' },
   ], 'interactive play-turn smoke');
   assert(interactiveResponses.some((item) => item.kind === 'start'), 'interactive play-turn omitted start');
+  assert(interactiveResponses.some((item) => item.kind === 'preview-result' && item.preview?.legal === true), 'interactive play-turn omitted preview result');
   assert(interactiveResponses.some((item) => item.kind === 'query-result' && item.target === 'legal-actions'), 'interactive play-turn omitted query result');
   const actionResult = interactiveResponses.find((item) => item.kind === 'action-result');
   assert(actionResult?.accepted === true, 'interactive play-turn did not accept EndTurn');

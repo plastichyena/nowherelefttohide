@@ -434,6 +434,8 @@ describe('v1.6 Core acceptance', () => {
     expect(national?.publicFacts.unfilledSuppliedDemand).toBeGreaterThan(0);
     expect(supply?.entityIds).toEqual([disconnected.id]);
     expect(supply?.publicFacts.nationalStockExcluded).toBe(true);
+    expect(alerts.some((entry) => entry.reasonCode === 'resource_runway_risk'
+      && entry.entityIds.includes('militaryGoods'))).toBe(true);
   });
 
   it('alerts on zero workers only for secured worker-based production facilities', () => {
@@ -442,9 +444,19 @@ describe('v1.6 Core acceptance', () => {
     setFacilityOperating(farm, 0);
     const wind = facility(state, 'wind-power-plant-1');
     setFacilityOperating(wind, 0);
+    const simpleFarm: FacilityState = {
+      ...structuredClone(farm),
+      id: 'simple-farm-worker-alert',
+      type: 'simpleFarm',
+      workerCapacity: 10,
+      position: { q: 12, r: 12 },
+    };
+    setFacilityOperating(simpleFarm, 0);
+    state.facilities.push(simpleFarm);
     const alerts = deriveCrisisSummary(state).filter((entry) => entry.reasonCode === 'facility_workers_zero');
     expect(alerts.some((entry) => entry.entityIds.includes(farm.id))).toBe(true);
     expect(alerts.some((entry) => entry.entityIds.includes(wind.id))).toBe(false);
+    expect(alerts.find((entry) => entry.entityIds.includes(simpleFarm.id))?.publicFacts.stoppedWorkers).toBe(10);
     expect(alerts.every((entry) => state.facilities.find((candidate) => candidate.id === entry.entityIds[0])?.owner === 'player')).toBe(true);
   });
 

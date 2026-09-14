@@ -448,6 +448,7 @@ interface AgentGame {
 - 確定結果、条件付き結果、未計算の結果を区別する。公開情報だけでは確定しない将来の敵行動を保証として出さない。
 - UIとAIで共通のCore Queryを利用し、予測用のルールを別実装しない。維持費内訳、Gas撃破時の被害予測、施設復旧・生産停止理由は人間向けUIでも提供する。通常画面は要約、詳細パネルは内訳と条件を表示し、日英UI・ヘルプを整合させる。
 - フィールドは `maintenancePopulation`、`maintenanceBreakdown`、`gasExplosion`、`recovery`、`populationTransferCandidates`、`turnAwayPreview` を使用する。
+- SessionのCrisis／EndTurn Riskに含む各Alertの`sourceRevision`は、その応答を生成したSession Revisionと一致させる。status、query、historyの復元Snapshot、play-turnで同じ意味を使い、Core内部Event件数等をSession Revisionとして公開しない。
 
 ### 6.9.2 維持人口と資源収支
 
@@ -469,6 +470,7 @@ CompactのEndTurn予測に以下を追加する。
 - 爆発による敵への利益と、自軍への損失を同じプレビューで示す。
 - 公開情報で求められる連鎖と、隠蔽情報のため確定できない範囲を区別する。隠蔽個体の存在を示すフラグは出さない。
 - 非致死攻撃では即時爆発が発生しないことを区別する。
+- 非致死攻撃でGas Zombieを弱らせた後は、確定結果の新Revisionで再度Previewし、致死時に初めて現れる`gasExplosion`を確認できる。確定Actionをまたいで旧Previewを再利用しない。
 - 敵フェーズの追跡・迎撃・反撃による将来爆発を、この即時プレビューの確定結果に含めない。
 
 ### 6.9.4 施設復旧・防御の説明
@@ -483,6 +485,7 @@ CompactのEndTurn予測に以下を追加する。
 
 - `PLAY_WITH_AI.md`と機械可読API情報に、主要Actionの必須フィールド・例・対象条件を示す。
 - Move / Attack / AssignWorkers / TransferPopulation / SetCheckpointPolicy / TurnAwayCheckpointRefugees等を対象にする。
+- Unit IDは連番を仮定できないopaqueな安定IDとし、Observation、Legal Action、実行結果が返した値をそのまま使う。新規編成UnitのIDを既存IDから予測しない。
 - TransferPopulationはCoreで許可される任意整数人数をAgent APIからも指定可能にする。
 - 移送元・移送先ごとに、指定可能な整数人数の最小値・最大値・制約・RevisionをQueryで取得する。TransferPopulationのfromFacilityId / toFacilityId / peopleを指定して実行する。0人は実行候補にせず、合法範囲が空なら理由を返す。
 - 列挙型Legal Actionsは有限の具体例として維持し、人口移送の全合法人数を網羅する契約にはしない。例に存在しない人数もCoreが合法と判定すれば受理する。機械可読APIでパラメータ候補の取得先と列挙の非網羅性を明示し、既存Agentの具体例利用経路も維持する。
@@ -503,7 +506,8 @@ CompactのEndTurn予測に以下を追加する。
 - 維持人口・維持費内訳・資源終値予測を保ち、利用可能都市人口を`availableCityPopulation`として総人口と分ける。
 - Compactは全4支線のID・managed・Active Checkpoint IDまたはnull・方針・次回到着Turnまたはnull・到着終了・現在Queueを返す。支線別`latestPublicFlow`は直近4件の公開到着／審査を処理Turn付きで返す。未管理素通りと検問所受入は公開payloadで区別する。
 - 確定Revision間の`facilityChanges`と`branchFlowChanges`をAction/EndTurnへ返す。状態から確認した変化と関連公開Eventを分ける。status/newは現在状態のみ。支線Queueの前後差を到着人数や累積値と混同しない。
-- `productionStops`はPlayer施設の停止ID・理由・給電理由・予測出力を最大8件、総数と省略数、同Revisionのfacilities Query導線付きで返す。電源喪失、Fuel不足、容量／割当不足、感染、復旧待ち、人口不足を区別する。大きな停止と失われた電源はwarningの`production_outage`。未計算の将来枯渇・不可避敗北を保証しない。
+- `productionStops`はPlayer所有施設の停止ID・理由・給電理由・予測出力を最大8件、総数と省略数、同Revisionのfacilities Query導線付きで返す。Worker不要のWindは0 Workerでも停止ではないため除外する。電源喪失、Fuel不足、容量／割当不足、感染、復旧待ち、人口不足を区別する。`facility_workers_zero`の`stoppedWorkers`は停止したWorker型施設のWorker Capacity（Simple Farmは10）を返す。大きな停止と失われた電源はwarningの`production_outage`。未計算の将来枯渇・不可避敗北を保証しない。
+- Compactは公開Forecastから導出したFood／Civilian Goods別の人口維持余力と制約資源を`supportHeadroom`として返す。人口受入、Worker配置、編成前にFull Snapshotなしで確認できる。
 - `population-transfers`はfromReason/toReason/actionBudgetReason、任意正整数のmin/maxを返す。`worker-assignments`はtargetReason/populationReason/actionBudgetReasonと都市別の健常人口・供給可能人口・不適格理由を返す。Turn開始Snapshotを途中で作り直さない。
 - 現在可視の`barbedWire`と建設候補・不許可理由、静的`barbedWire`規則、HumanのMP5と実移動Hex由来Fuelを提供する。Mapの基礎移動値と動的壁による実効値を分け、Artifact復元時にも壁を反映する。
 - 壁上Humanの`conditionalIncomingCombat`は視認済み敵ごとに攻撃値・壁Damage・残壁HP・Human貫通Damage・残HPを返す。敵が実際に移動／選択／攻撃するという予告ではない。攻撃時の条件付き反撃予測と既存Gas撃破プレビューも維持する。
@@ -1019,6 +1023,7 @@ Human Unitは次のプレイヤーターン開始時、判定時に補給圏内�
 - Windで足りない実割当5 ElectricityごとにTurn-start State Fuel 2を消費する。利用可能電力は`operationalWindCapacity + min(powerPlantPhysicalCapacity, floor(turnStartFuel / 2) × 5)`で、余剰CapacityへFuelを消費しない。Fuel 1で部分発電はしない。
 - 電力はCapital／City、occupied Housing、Farm／Civilian Factory、入力確保済みMilitary Factory、Refinery、Drone、Army Base予約、empty Housingの順で割り当てる。occupiedはworkers > 0であり、infectedだけのHousingはemptyとする。
 - 各段階内は確保時期が古い施設、同順位は`facilityId`昇順とする。未給電理由は物理Capacity不足、Turn-start Fuel不足、同段階の順位負け、Power Supply OFF、人口／労働者0または非対象、Military Factory入力なしを区別する。
+- Player Phase途中のSupply拡張では当該Turnの既存電力割当を再実行しない。新規Supply内になったRequired施設は次の経済処理まで`power_unavailable`／`not_applicable`を表示し得るため、次Player Turn開始後のForecastで再評価する。
 - 複数発電所のCapacityと電力は州全体で共有し、送電線、地域別停電、蓄電、発電所ごとのFuel在庫は扱わない。
 - 発電Fuel消費後、施設生産前に残るState Fuelから、判定時点で生存かつSupply内のHuman Unitを補給する。`maxFuel - currentFuel`を需要とし、Unit ID昇順の1 Fuel単位Round Robinで満タンUnitを飛ばして配分する。Supply外Unitは補給しない。
 - 当TurnのRefinery生産Fuelは発電にもUnit補給にも使わず、Ending Stockへ加えて次Turnから利用する。ForecastとEndTurnは同じ純粋計算経路を使う。
@@ -1082,7 +1087,7 @@ productionInputAvailable
 - Worker: 0
 - 建設条件は Temporary Housing と同じく Plain + Supply + 既存 Constructible 禁止条件。
 - 建設 Turn は building で発電・Noiseなし。次 Player Turn Start から Operational。
-- Player-built Wind の Build Limit は `roadBranches.length`。現Mapでは4。
+- Player-built Wind の Build Limit は `2 * roadBranches.length`。現Mapでは8。
 - 初期配置 Wind はこの上限 Count に含めない。
 - Player-built Wind は `building / operational / disabled / recovering` の間すべて slot を消費する。
 - Wind は decommission 不可。
@@ -1138,7 +1143,7 @@ EndTurn の順序を次のようにする。
 
 ### v1.6.0 資源持続見込み
 
-Strategic Forecastの各資源runwayは現在備蓄、現在生産、最大寄与施設の生産、同施設喪失時生産、需要内訳、netBurn、最初に不足する相対Turnを公開する。現状継続と単一最大寄与施設喪失の仮定を分け、static_current_conditionsを明示する。Food等の生産/維持順序、民需品の生産入力予約、Fuelの当Turn生産先取り禁止、Army Base軍需補充要求を既存EndTurn処理と揃える。使い切って不足しなかったTurnを不足Turnと数えない。Electricityは非貯蔵、減耗なし、入力依存で推定不能の場合はnullと理由を返す。これは将来の敵行動や複数施設連鎖の保証ではない。resource_runway_riskは次EndTurn不足をcritical、2～3Turnをwarningにし、同じ資源のGuaranteed Defeatと重複させない。
+Strategic Forecastの各資源runwayは現在備蓄、現在生産、最大寄与施設の生産、同施設喪失時生産、需要内訳、netBurn、最初に不足する相対Turnを公開する。現状継続と単一最大寄与施設喪失の仮定を分け、static_current_conditionsを明示する。Food等の生産/維持順序、民需品の生産入力予約、Fuelの当Turn生産先取り禁止、Army Base軍需補充要求を既存EndTurn処理と揃える。Military Goodsの国家runwayはSupply内Unitと補充対象Army Baseだけを需要へ含め、Supply外Unitの不足は`military_goods_supply_disconnected`で分離する。Civilian GoodsのMilitary Factory入力不足だけを市民維持不足としてcriticalにしない。使い切って不足しなかったTurnを不足Turnと数えない。Electricityは非貯蔵、減耗なし、入力依存で推定不能の場合はnullと理由を返す。これは将来の敵行動や複数施設連鎖の保証ではない。resource_runway_riskは次EndTurn不足をcritical、2～3Turnをwarningにし、同じ資源のGuaranteed Defeatと重複させない。
 
 ## 10.12 AI向けProduction Capacity
 
@@ -1807,24 +1812,26 @@ ZOMBIE TURN / INFECTION
 
 ## 14.1 AI Portable Session
 
-- AI Portableは長時間の外部AIプレイをプロセス境界で継続するSession層を提供し、`new`、`status`、`step`、`save-checkpoint`、`list-checkpoints`、`load-checkpoint`、`artifact`、`query`の既存8コマンドに`play-turn`を加えたJSON CLIを公開する。既存8コマンドは単発実行と復旧用に維持し、通常の外部AIプレイは配布版Bundled Nodeの`play-turn`を推奨する。`query`は読み取り専用の詳細取得とする。
-- `play-turn`は1ターン1プロセスのJSON Lines対話を正式経路とし、読み取りQuery、1 Action、明示的closeを受ける。各Actionに現在Revision、Session内で一意なrequestId、1～500 Unicode code pointの短い公開理由を必須とする。自動戦略を実行せず、明示的EndTurn成功／Game Overで終了する。EOF、idle timeout、closeは暗黙のEndTurnを行わない。
+- AI Portableは長時間の外部AIプレイをプロセス境界で継続するSession層を提供し、`new`、`status`、`step`、`preview`、`save-checkpoint`、`list-checkpoints`、`load-checkpoint`、`artifact`、`query`、`play-turn`の10コマンドをJSON CLIとして公開する。単発コマンドは復旧・非対話環境用に維持し、通常の外部AIプレイは配布版Bundled Nodeの`play-turn`を推奨する。`query`と`preview`は読み取り専用とする。
+- `play-turn`は1ターン1プロセスのJSON Lines対話を正式経路とし、読み取りQuery、純粋な1 Action Preview、1 Action、明示的closeを受ける。各Actionに現在RevisionとSession内で一意なrequestIdを必須とし、1～500 Unicode code pointの短い公開理由は任意とする。自動戦略を実行せず、明示的EndTurn成功／Game Overで終了する。EOF、idle timeout、closeは暗黙のEndTurnを行わない。
 - 有限計画は開始Revisionと最大64件のAction列を受け、各手を検証・保存して公開結果を返す。不合法、新しい可視敵、移動中断、想定外の損害、危機の発生・悪化等で残りを止める。Crisis比較は公開reason・対象ID・Severity・型付き事実の悪化方向で行い、文言変更だけでは停止しない。EndTurn成功とGame Overは状況変化より優先して終了する。
 - requestId再送は永続化済み記録から元のDecision／Revision／応答を返し、Actionを二重適用しない。同じIDで異なる内容は拒否する。照合は排他内で行い、commit後・応答前の中断も再送で回復する。
 - 対話中は検証済みRuntime・現在State・公開Projectionを再利用する。Queryでも毎回復元せず、次の操作前に現在commitを確認する。別プロセスの旧`step`がcommitした場合は古いRevisionの後続操作を拒否し、再読込を要求する。複数の書き込み`play-turn`はSession単位で排他する。全履歴Observationや二重の初期ObservationをRuntimeに保持しない。
 - 入力1行1 MiB、有限計画8 MiB／64 Actions、対話256要求、idle timeoutを上限とし、stdoutはJSONL応答のみ、診断はstderrとする。stdout backpressureを待ち、入力と応答を無制限に蓄積しない。上限、停止条件、Input Schema、Linux／Windows launcher、開発用経路は`query api`の`sessionPlayTurn`と各応答capabilityで公開する。
 - `new`、`status`、`step`、`load-checkpoint`の標準応答はCompactな構造化公開Snapshot要約とし、Version、Session ID、現在`revision`、Turn／Phase、勝敗、公開資源・人口、所有施設／Checkpoint、全部隊、現在可視の敵、Crisis Summary、EndTurn Risk、Forecast要約、公開Horde予告、Actionの受理／拒否、理由、公開Event、`stateDelta`、作成Checkpoint、利用可能Action種別を含める。固定Map全文、全候補、詳細コスト、前後Observation全文、過去Decision全文を重複させない。
-- `step`は既存`GameAction`と1～500 Unicode code pointの`decisionSummary`だけを受け取り、1回につき1 ActionをGameEngineへ渡す。任意の`expectedRevision`を受け付け、不一致はDecision採番・Action適用前に`stale_revision`として状態不変で拒否する。入力形式不正はDecision番号を付けず、合法性拒否は番号、Error、Action、公開前後状態への参照、公開Eventを持つDecisionとして記録する。
+- `step`は既存`GameAction`と任意の1～500 Unicode code pointの`decisionSummary`を受け取り、1回につき1 ActionをGameEngineへ渡す。`new`は`preferred-comment-locale=ja|en`を受け、省略時は`en`とする。任意の`expectedRevision`を受け付け、不一致はDecision採番・Action適用前に`stale_revision`として状態不変で拒否する。入力形式不正はDecision番号を付けず、合法性拒否は番号、Error、Action、公開前後状態への参照、公開Eventを持つDecisionとして記録する。
+- `preview`はraw `GameAction`と必須の`expectedRevision`を受け、Coreのaction previewを返す。単発CLIと`play-turn`の双方でState、RNG、Revision、Decision番号、Event、requestId台帳を変更しない。Action後は旧Previewを再利用せず、返却Revisionで再取得する。
 - `query`はAPI情報／Map、Unit、Facility／Checkpoint／Branch、建設候補、全Legal Actions、Forecast、Decision履歴、完全な公開Snapshotを対象指定とPaginationで返す。標準Pageは100件、最大500件とし、応答には対象、`revision`、返却件数、続きの有無、次Cursorを含める。CursorはSession IDとRevisionへ結び付け、状態変更後は`stale_revision`で拒否する。`query`はGameState、RNG、Decision番号、正規Action列を変更しない。
-- `query`で固定Map、全候補、詳細コスト、前後Observation全文、過去Decision全文へ明示的にアクセスできる。全Pageの結合は安定順の完全な公開一覧と一致し、Compact化によって従来の公開情報、合法手、不合法理由、Projected Supply、移動コストを失わない。大きなFull SnapshotはPageまたはファイル出力とし、省略は明示する。
+- `query`で固定Map、全候補、詳細コスト、過去Decisionへ明示的にアクセスできる。`history`の既定応答はAction、Event、stateDelta、importantChanges、公開Hashを含むCompact Decision記録とし、重複する前後Observation全文は`includeSnapshots: true`でだけ復元する。全Pageの結合は安定順の完全な公開一覧と一致し、Compact化によって従来の公開情報、合法手、不合法理由、Projected Supply、移動コストを失わない。大きなFull SnapshotはPageまたはファイル出力とし、省略は明示する。
 - 受理Decision応答の`stateDelta`は前後の公開Observationから導出した変化の要約とする。保存用には追加・変更・削除、配列順、Visibility、候補、合法手を完全復元できるlossless diffを別に保持する。新規感染／荒廃Site、新規発見／公開Eventで喪失確認できたEnemy、Human Unit HP／補給、Checkpoint Role、公開施設の所有・状態・人口・停止理由、支線Queueの変化を公開Deltaへ含め、視界外へ移動したEnemyを喪失と断定しない。
 - Active SessionはPrivate State、Public State、Public Decision Logを分離する。Private Stateだけが完全GameStateとRNGを保持し、公開CLI出力、Trace、Checkpoint metadata、ArtifactへHidden Enemy、内部Target、RNG state、完全な非公開Configを含めない。
 - 初期および直前の完全Snapshotから50 Decision経過ごとに完全公開Snapshotを置き、その間は保存用の完全lossless diffと小さなDecision記録を積む。固定Map参照、圧縮、Content-Addressed Store（CAS）による内容Hash重複排除、chunk分割を併用し、Traceの1行にObservation／合法手全文を戻さない。履歴全体の復元済みObservation配列を通常経路で保持しない。
 - 各Decisionは前Decision hashを含むcanonical JSONのSHA-256でchain化する。参照先Payload、Snapshot、commit、Version、Build ID、Map、公開Configの不一致・破損を状態不変で拒否し、Active破損時に暗黙の巻き戻しをしない。大きなTrace、Snapshot、Artifactはstreamと上限付き作業バッファで処理し、全履歴を単一文字列化または一括JSON化しない。
+- `corruptionRejections`は保存済みSession／Payload／Artifactの構造・整合性破損だけを数える。通常の`invalid_query`、`invalid_cursor`、`invalid_page_size`、不正Action入力等は破損として加算しない。
 - 更新は新しいimmutable generationへPrivate／Public StateとDecisionを書き、最後にActive commitを確定する。Session単位の排他lockを使い、同時更新は状態不変で拒否し、同一hostで終了済みPIDのlockだけをstaleとして回収する。
 - 既定で5完了Turnごと、手動要求時、Game Over時にCheckpointを作る。Checkpoint／Session Schemaは`11.0.0`で、immutableな`branchBase`を必須とする。Rootはnull、子は`rootSessionId`、`parentSessionId`、`parentCheckpointId`、`baseDecision`、`baseTraceHeadHash`、`basePublicSnapshotHash`、`ancestorManifestHash`を持つ。`load-checkpoint`は新Session IDへ分岐し、親Sessionと親Checkpointを変更しない。
 - RootのDecision chainはDecision 0／ZERO_HASHから始め、子のlocal chainは`baseDecision + 1`と`baseTraceHeadHash`から始める。RootのStore Manifestは共有Payload Poolと祖先履歴範囲を定義し、子へ祖先の展開済みObservation／Decision全文を複製しない。完全Artifactは分岐点までの祖先履歴と子の履歴を必要なPayload各1回で梱包する。
-- `.git`を含まないPortable PackageでもWorkflowから注入したfull commit SHAをBuild IDとGit Commitとして固定し、別Buildまたはv1.5.7以前のSession／Checkpointを拒否する。Portable PackageはLinux／Windows x64のBundled Nodeだけで既存8コマンドとJSONL `play-turn`のSmokeを行い、公開Observation／Legal Actionsだけを使う外部AI Seed 1／7 Game Over・Artifact・Replay一致を確認する。
+- `.git`を含まないPortable PackageでもWorkflowから注入したfull commit SHAをBuild IDとGit Commitとして固定し、別Buildまたはv1.5.7以前のSession／Checkpointを拒否する。Portable PackageはLinux／Windows x64のBundled Nodeだけで全10コマンドとJSONL `play-turn`内PreviewのSmokeを行い、公開Observation／Legal Actionsだけを使う外部AI Seed 1／7 Game Over・Artifact・Replay一致を確認する。
 
 ---
 
@@ -2037,7 +2044,7 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - Random／Balancedの同一Seed比較、決定性、JSON／CSV／通常モードのゲーム単位Artifact、`--summary-only`のコンパクト出力、失敗継続、fail-fast、Replay一致を試験する。
 - Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
 - 公開Pagesでは公開Observation／Legal Actionsだけを読むブラウザ操作可能な外部Agentを使い、API発見、不正Action訂正、Seed 1と7のGame Over、Result／Artifact取得とReplayを手動E2E確認する。PagesのWorkflow成功を必須とし、個別ゲームの勝利は合格条件にしない。
-- v1.6.0 Release ValidationはVersion Metadata、Rules／Map／Save拒否、初回確保報酬、Oil Field／Allowance、住宅維持費、Wind上限、Crisis reason、action preview、Browser-native Session／Live Viewer、同Version Replay／Session決定性を確認する。Pages deploy成功後、独立したAI Portable Package Workflowを確認する。Linux／Windows x64 ZIPはCommit SHA・App・Node Versionを記録し、Bundled Nodeで既存8コマンド、JSONL play-turn、外部AI Seed 1／7のGame Over・Artifact・Replay一致を検証する。公開Pages／Portable結果は確認前に成功済みと扱わない。既存v1.5.7以前の性能証跡は履歴の測定記録として保持し、v1.6.0の結果一致ゲートにはしない。SOG05は実測がないため、PC・モバイルviewportの確認結果と混同しない。
+- v1.6.0 Release ValidationはVersion Metadata、Rules／Map／Save拒否、初回確保報酬、Oil Field／Allowance、住宅維持費、Wind上限、Crisis reason、action preview、Browser-native Session／Live Viewer、同Version Replay／Session決定性を確認する。Pages deploy成功後、独立したAI Portable Package Workflowを確認する。Linux／Windows x64 ZIPはCommit SHA・App・Node Versionを記録し、Bundled Nodeで全10コマンド、JSONL play-turn内Preview、外部AI Seed 1／7のGame Over・Artifact・Replay一致を検証する。公開Pages／Portable結果は確認前に成功済みと扱わない。既存v1.5.7以前の性能証跡は履歴の測定記録として保持し、v1.6.0の結果一致ゲートにはしない。SOG05は実測がないため、PC・モバイルviewportの結果と混同しない。
 
 ---
 
@@ -2174,3 +2181,12 @@ MaxAttackCharges == 2 iff Human Unit is veteran or Zombie Type is hordeZombie; o
 - 最終公開対象はCommit `8bb7d0ffea163c048d8b367c8c221c2af2217094`。主要実装Commit `c80af5c6ed0d273bc06e08fa43e7f5ffbc211223`に、公開実機で検出したLive AI SessionのBuild ID配線修正を追加した。ローカル通常ゲートは91ファイル・818テスト成功、日次専用11件skip、型検査、本番Build、検証Script 8件、Browser Bridge production smoke、外部AI Seed 1／7の正常終局とReplay一致が成功した。Build ID修正後はBrowser／WebMCP関連23テストと本番Buildを再実行して成功した。
 - 最終Commitの[通常CI／Pages](https://github.com/plastichyena/nowherelefttohide/actions/runs/34750192127)は通常検証とdeployが成功した。公開URLでApp `1.6.0`、Build ID `8bb7d0ffea163c048d8b367c8c221c2af2217094`、通常Turn 1、autosave、コンソールエラー0件を確認した。Codex built-in browserでは固定8 WebMCP Toolをdiscoveryし、開始前拒否、明示開始、context、observe、legal actions、preview、act、request result、game resultを実行した。previewはState不変の合法結果、actはrequestId付きでrevision 0→1、requested locale `ja`、Decision comment、公開State Delta、同一Build IDを返した。
 - 最終Commitの[AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34750201373)はLinux x64・Windows x64とも成功した。同梱Nodeで全コマンド、Seed 1／7の正常終局、Artifact取得、Replay一致を含む。長時間[Release Validation](https://github.com/plastichyena/nowherelefttohide/actions/runs/34749686774)は主要実装Commitでdispatchと各shard開始までを確認した。本項では最終結果を確認しておらず、成功済みとは扱わない。最終追補はBrowser Live SessionへのBuild identity引き渡しだけで、Core、Agent runner、Session CLI、長時間検証ロジックは変更していない。
+
+## 18.10 v1.6.0 外部AIプレイ追補修正（2026-09-14）
+
+- Claude Opus 5によるSeed 1・Turn 66・485 Decisionの公開Sessionプレイ報告を確認し、指摘された9項目を現行v1.6.0のまま修正した。`PLAY_WITH_AI.md`をv1.6.0へ更新し、Session作成時の`preferredCommentLocale`、単発／JSONL `play-turn`の純粋`preview`、全10コマンド、Compactの`supportHeadroom`を追加した。攻撃後移動、迎撃反撃のCharge、Gas致死Previewの再取得、Supply拡張直後の電力表示、Simple Farm上限・容量、人口供給順、opaque Unit ID、National Guard鎮圧損失も説明した。
+- 国家Military Goods runwayはSupply内Unitと補充対象Army Baseだけを需要へ含め、Supply外Unitの不足を専用警告へ分離した。Civilian GoodsはMilitary Factory入力不足だけで維持不足のcriticalを出さない。Session Alertの`sourceRevision`は全応答でSession Revisionに統一し、Worker不要のWindを`productionStops`から除外、Simple Farmの`stoppedWorkers`を10、Wind上限を`2 * roadBranchCount`として機械可読APIと一致させた。
+- `history` Queryは既定でCompact Decision記録を返し、重複する前後Observation／Legal Actionsの再構築を`includeSnapshots: true`へ分離した。報告SessionのDecision 150～195を既定条件で再計測し、従来164秒超から約10.6秒へ短縮した。完全Snapshotが必要な明示Queryでは従来どおりlossless復元とhash検証を維持する。
+- 報告時の`corruptionRejections: 1`は、保存データ破損ではなくdestinationの形が不正なroute Queryを汎用`invalid`判定で破損へ誤分類した記録だった。入力・合法性エラーを除外し、保存構造・payload・hash・再構築の破損だけを同Metricsへ数える。不正route Queryで0を維持し、実際の破損では1になる回帰を確認した。
+- ローカル通常回帰は91ファイル・825テスト成功、日次専用11件skip。型検査、本番Build、Browser Bridge production smoke、release report tool 8件、Balanced Seed 198が成功した。外部公開APIのSeed 1／7は10／8判断で通常敗北まで完走し、ArtifactとReplayが一致した。Windows最小Portableは13ファイルで、同梱Nodeから全10コマンド、単発／対話Preview、locale保持、Seed 1／7終局、Artifact、Replay一致まで成功した。
+- 公開Pages、Linux／Windows AI Portable、および長時間Release Validationの実行状況は対象CommitのGitHub Actionsで確認する。PagesとPortableは完了結果を確認し、Release Validationはユーザー指定によりdispatchとJob開始までを確認対象とする。サブエージェントは使用せず、`Doc/archive/`は現行判断に使用せず変更していない。

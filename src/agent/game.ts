@@ -411,7 +411,16 @@ export class AgentGameAdapter implements AgentGame {
   }
 
   public getObservation(): AgentObservation {
-    return cloneJson(this.currentObservation());
+    const observation = cloneJson(this.currentObservation());
+    observation.crisisSummary.alerts = observation.crisisSummary.alerts.map((entry) => ({
+      ...entry,
+      sourceRevision: this.decisionCount,
+    }));
+    observation.endTurnRisk.criticalAlerts = observation.endTurnRisk.criticalAlerts.map((entry) => ({
+      ...entry,
+      sourceRevision: this.decisionCount,
+    }));
+    return observation;
   }
 
   private currentObservation(): AgentObservation {
@@ -505,7 +514,7 @@ export class AgentGameAdapter implements AgentGame {
     if (this.recordHistory) this.acceptedActions.push(cloneAction(matched));
     this.cachedLegalActions = null;
     this.cachedObservation = null;
-    const observation = this.currentObservation();
+    const observation = this.getObservation();
     const events = publicEvents(before, result.state, result.events);
     if (this.recordHistory) this.events.push(...events);
     if (this.recordHistory) this.observations.push(observation);
@@ -625,7 +634,7 @@ export class AgentGameAdapter implements AgentGame {
    */
   public restorePrivateSessionState(
     snapshot: GameState,
-    options: { agentId?: string } = {},
+    options: { agentId?: string; decisionCount?: number } = {},
   ): AgentObservation {
     const snapshotCopy = cloneJson(snapshot);
     const config = cloneConfig(snapshotCopy.config);
@@ -637,7 +646,7 @@ export class AgentGameAdapter implements AgentGame {
     this.seed = snapshotCopy.seed;
     this.config = config;
     if (options.agentId !== undefined) this.agentId = options.agentId;
-    this.decisionCount = 0;
+    this.decisionCount = options.decisionCount ?? 0;
     this.acceptedActions = [];
     this.invalidAttempts = [];
     this.events = [];

@@ -55,6 +55,8 @@ import {
   type SessionLineage,
   type SessionMetrics,
   type SessionPayloadReference,
+  type SessionPreviewInput,
+  type SessionPreviewResult,
   type SessionPlayTurnActionInput,
   type SessionPlayTurnActionResult,
   type SessionPlayTurnCapabilities,
@@ -100,6 +102,7 @@ export const SESSION_PLAY_TURN_CAPABILITIES: SessionPlayTurnCapabilities = {
   inputSchema: {
     interactiveRequests: {
       action: { type: 'action', action: 'GameAction', decisionSummary: 'optional; null/empty means no comment; non-empty 1-500 Unicode code points', expectedRevision: 'non-negative integer', requestId: '1-128 code points', expectations: { playerUnitHp: [{ unitId: 'string', minHp: 'non-negative integer', maxHp: 'integer >= minHp' }] } },
+      preview: { type: 'preview', action: 'GameAction', expectedRevision: 'non-negative integer' },
       query: { type: 'query', target: 'SessionQueryTarget', expectedRevision: 'optional non-negative integer', cursor: 'optional string', pageSize: 'optional 1-500 integer', filters: 'optional object' },
       close: { type: 'close' },
     },
@@ -111,6 +114,38 @@ export const SESSION_PLAY_TURN_CAPABILITIES: SessionPlayTurnCapabilities = {
 
 function clone<T>(value: T): T { return cloneJson(value as never) as T; }
 function isObject(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value); }
+
+function crisisSummaryAtRevision(
+  value: AgentObservation['crisisSummary'],
+  revision: number,
+): AgentObservation['crisisSummary'] {
+  const summary = clone(value);
+  if (Array.isArray(summary.alerts)) {
+    summary.alerts = summary.alerts.map((entry) => ({ ...entry, sourceRevision: revision }));
+  }
+  return summary;
+}
+
+function endTurnRiskAtRevision(
+  value: AgentObservation['endTurnRisk'],
+  revision: number,
+): AgentObservation['endTurnRisk'] {
+  const risk = clone(value);
+  if (Array.isArray(risk.criticalAlerts)) {
+    risk.criticalAlerts = risk.criticalAlerts.map((entry) => ({ ...entry, sourceRevision: revision }));
+  }
+  return risk;
+}
+
+function observationAtRevision<T extends AgentObservation | SessionPublicDocument['observation']>(
+  value: T,
+  revision: number,
+): T {
+  const observation = clone(value);
+  observation.crisisSummary = crisisSummaryAtRevision(observation.crisisSummary, revision);
+  observation.endTurnRisk = endTurnRiskAtRevision(observation.endTurnRisk, revision);
+  return observation;
+}
 function requireSafeInteger(value: unknown, name: string, minimum: number): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum) throw new SessionError('invalid_session_option', `${name} must be a safe integer >= ${minimum}`);
   return value;
@@ -206,6 +241,11 @@ function compactSnapshot(loaded: LoadedSession, changes = summarizeImportantChan
     if (typeof mode === 'string') group.modes.add(mode);
     actionGroups.set(action.type, group);
   }
+  const productionStops = observation.facilities.filter((facility) =>
+    facility.owner === 'player'
+    && facility.type !== 'windPowerPlant'
+    && facility.production.stoppedReason !== null
+  );
   return {
     importantChanges: changes,
     combatHazards: deriveCombatHazards(observation, loaded.active.revision),
@@ -223,15 +263,23 @@ function compactSnapshot(loaded: LoadedSession, changes = summarizeImportantChan
     checkpoints: observation.checkpoints.map(({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply }) => ({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply, supplyExplanation: checkpointSupplyExplanation(observation, branchId, loaded.active.revision) })),
     horde: clone(observation.horde),
     victory: clone(observation.victory),
-    crisisSummary: clone(observation.crisisSummary),
-    endTurnRisk: clone(observation.endTurnRisk),
+    crisisSummary: crisisSummaryAtRevision(observation.crisisSummary, loaded.active.revision),
+    endTurnRisk: endTurnRiskAtRevision(observation.endTurnRisk, loaded.active.revision),
     forecastSummary: forecastSummary(observation),
     productionCapacity: productionCapacitySummary(observation),
+    supportHeadroom: clone(observation.supportHeadroom ?? {
+      peopleEquivalent: 0,
+      limitingResources: ['food', 'civilianGoods'],
+      resources: {
+        food: { available: 0, committedDemand: 0, perPersonCost: 0, peopleEquivalent: 0 },
+        civilianGoods: { available: 0, committedDemand: 0, perPersonCost: 0, peopleEquivalent: 0 },
+      },
+    }),
     availableCityPopulation: observation.workerAssignmentCandidates[0]?.availablePopulation ?? 0,
     productionStops: {
-      items: observation.facilities.filter(f => f.owner === 'player' && f.production.stoppedReason).slice(0, 8).map(f => ({ facilityId: f.id, reason: f.production.stoppedReason, powerReason: f.production.projectedPowerReason, output: f.production.projectedProduction })),
-      total: observation.facilities.filter(f => f.owner === 'player' && f.production.stoppedReason).length,
-      detailQuery: 'facilities', omitted: Math.max(0, observation.facilities.filter(f => f.owner === 'player' && f.production.stoppedReason).length - 8),
+      items: productionStops.slice(0, 8).map(f => ({ facilityId: f.id, reason: f.production.stoppedReason, powerReason: f.production.projectedPowerReason, output: f.production.projectedProduction })),
+      total: productionStops.length,
+      detailQuery: 'facilities', omitted: Math.max(0, productionStops.length - 8),
     },
     gameOver: observation.gameOver,
     result: clone(observation.result),
@@ -810,7 +858,10 @@ export class SessionService {
         const runtime = this.restoreAndVerify(loaded, true);
         let value: JsonValue | undefined;
         let items: JsonValue[] = [];
-        const observation = runtime ? clone(runtime.getObservation()) : restoreArtifactObservation(loaded.publicState.observation, this.store.readPayload<AgentMapObservation>(loaded.runBase.fixedMap, 'Fixed Map'));
+        const observation = observationAtRevision(
+          runtime ? runtime.getObservation() : restoreArtifactObservation(loaded.publicState.observation, this.store.readPayload<AgentMapObservation>(loaded.runBase.fixedMap, 'Fixed Map')),
+          revision,
+        );
         switch (rawInput.target) {
           case 'api': value = { ...(clone(runtime.getApiInfo?.() ?? { unavailable: true }) as unknown as Record<string, JsonValue>), queryContract: publicQueryContract() as unknown as JsonValue, sessionPlayTurn: clone(SESSION_PLAY_TURN_CAPABILITIES) as unknown as JsonValue } as unknown as JsonValue; break;
           case 'map': {
@@ -867,6 +918,13 @@ export class SessionService {
     if (offset === total) return { items: [], total };
     const firstDecision = from + offset;
     const lastDecision = Math.min(to, firstDecision + size - 1);
+    if (filters.includeSnapshots !== true) {
+      const items: Array<Record<string, unknown>> = [];
+      for (const record of this.store.iterateAllDecisionRecords(loaded.descriptor.sessionId, lastDecision)) {
+        if (record.decision >= firstDecision) items.push(clone(record) as unknown as Record<string, unknown>);
+      }
+      return { items, total };
+    }
     let baseSnapshot: PublicDecisionRecord | null = null;
     for (const record of this.store.iterateAllDecisionRecords(loaded.descriptor.sessionId, firstDecision - 1)) {
       if (record.publicPayloadKind === 'snapshot') baseSnapshot = record;
@@ -878,7 +936,13 @@ export class SessionService {
       if (record.decision <= baseDecision) continue;
       const before = document;
       document = this.applyDecisionPayload(document, record);
-      if (record.decision >= firstDecision) compressedItems.push(gzipSync(Buffer.from(canonicalJson({ ...record, observationBefore: before.observation, legalActionsBefore: before.legalActions, observationAfter: document.observation, legalActionsAfter: document.legalActions }), 'utf8'), { level: 9 }));
+      if (record.decision >= firstDecision) compressedItems.push(gzipSync(Buffer.from(JSON.stringify({
+        ...record,
+        observationBefore: observationAtRevision(before.observation, record.decision - 1),
+        legalActionsBefore: before.legalActions,
+        observationAfter: observationAtRevision(document.observation, record.decision),
+        legalActionsAfter: document.legalActions,
+      }), 'utf8'), { level: 1 }));
     }
     const map = this.store.readPayload<AgentMapObservation>(loaded.runBase.fixedMap, 'Fixed Map');
     const items = lazyArray(compressedItems.length, (index) => {
@@ -1187,6 +1251,39 @@ export class SessionService {
     if (descriptor.preferredCommentLocale !== 'ja' && descriptor.preferredCommentLocale !== 'en') throw new SessionError('session_version_mismatch', 'Session preferredCommentLocale is unsupported; start a new Session');
   }
 
+  /** Pure Action Preview for Portable/CLI callers; no Decision is recorded. */
+  public preview(sessionId: string, rawInput: unknown): SessionPreviewResult {
+    try {
+      if (!isObject(rawInput)
+        || Object.keys(rawInput).some((key) => !['action', 'expectedRevision'].includes(key))
+        || !isObject(rawInput.action)) {
+        throw new SessionError('invalid_preview_input', 'preview input requires only action and expectedRevision');
+      }
+      const input: SessionPreviewInput = {
+        action: JSON.parse(canonicalJson(rawInput.action)) as GameAction,
+        expectedRevision: requireSafeInteger(rawInput.expectedRevision, 'expectedRevision', 0),
+      };
+      const lock = this.store.acquireExistingLock(sessionId);
+      try {
+        const loaded = this.loadCompatible(sessionId, true);
+        if (input.expectedRevision !== loaded.active.revision) {
+          throw new SessionError('stale_revision', `Expected revision ${input.expectedRevision}, current revision is ${loaded.active.revision}`);
+        }
+        if (loaded.publicState.gameOver) throw new SessionError('game_over', 'The Session is already over');
+        const runtime = this.restoreAndVerify(loaded, true);
+        if (!runtime.previewAction) throw new SessionError('preview_unavailable', 'This Session runtime does not provide Action Preview');
+        return {
+          sessionId,
+          revision: loaded.active.revision,
+          action: cloneAction(input.action),
+          preview: clone(runtime.previewAction(input.action, loaded.active.revision)),
+        };
+      } finally { lock.release(); }
+    } catch (error) {
+      return this.rejectWithDiagnostics(sessionId, 'preview', error);
+    }
+  }
+
   private restoreAndVerify(loaded: LoadedSession, reuse = false): SessionGameRuntime {
     if (reuse) {
       const cached = this.runtimes.get(loaded.descriptor.sessionId);
@@ -1256,7 +1353,22 @@ export class SessionService {
     if (message.includes('buildid') || message.includes('build id')) kind = 'buildRejected';
     else if (error.code.includes('version_mismatch') || error.code.includes('version_unsupported')) kind = 'versionRejected';
     else if (message.includes('sha-256') || message.includes('hash') || error.code.includes('trace_chain') || error.code.includes('payload_hash')) kind = 'hashRejected';
-    else if (error.code.includes('corrupt') || error.code.includes('reconstruction_mismatch') || error.code.includes('invalid')) kind = 'corruptionRejected';
+    else if (
+      error.code.includes('corrupt')
+      || error.code.includes('reconstruction_mismatch')
+      || [
+        'ancestor_manifest_invalid',
+        'artifact_replay_mismatch',
+        'store_manifest_invalid',
+        'request_index_invalid',
+        'payload_missing',
+        'payload_reference_invalid',
+        'public_diff_invalid',
+        'public_snapshot_invalid',
+        'runtime_inconsistent',
+        'rejected_action_mutated_state',
+      ].includes(error.code)
+    ) kind = 'corruptionRejected';
     if (kind) this.store.recordDiagnostic(sessionId, kind, operation);
     throw this.withMetricsDetails(sessionId, error);
   }

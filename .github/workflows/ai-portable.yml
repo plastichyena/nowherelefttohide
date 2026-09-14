@@ -119,7 +119,7 @@ jobs:
           node --input-type=module -e '
             import { readFileSync } from "node:fs";
             const report = JSON.parse(readFileSync(process.argv[1], "utf8"));
-            if (report.ok !== true || report.commands.length !== 9 || report.seeds.length !== 2 || report.replayMatched !== true) process.exit(1);
+            if (report.ok !== true || report.commands.length !== 10 || report.seeds.length !== 2 || report.replayMatched !== true) process.exit(1);
           ' "${REPORT}"
           echo "session_root=${SESSION_ROOT}" >> "${GITHUB_OUTPUT}"
           echo "smoke_report=${REPORT}" >> "${GITHUB_OUTPUT}"
@@ -280,7 +280,7 @@ jobs:
           node scripts/portable-smoke.mjs --launcher="$root/run-session.cmd" --root="$sessionRoot" --out="$report" --seeds=1,7
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $smoke = Get-Content -Raw $report | ConvertFrom-Json
-          if (-not $smoke.ok -or $smoke.commands.Count -ne 9 -or $smoke.seeds.Count -ne 2 -or -not $smoke.replayMatched) { throw 'Windows Player smoke report is incomplete' }
+          if (-not $smoke.ok -or $smoke.commands.Count -ne 10 -or $smoke.seeds.Count -ne 2 -or -not $smoke.replayMatched) { throw 'Windows Player smoke report is incomplete' }
           "session_root=$sessionRoot" | Add-Content $env:GITHUB_OUTPUT
           "smoke_report=$report" | Add-Content $env:GITHUB_OUTPUT
 

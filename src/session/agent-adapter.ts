@@ -22,7 +22,7 @@ import { SessionError } from './types';
 
 type SessionCapableAgentGame = AgentGame & {
   exportPrivateSessionState(): GameState;
-  restorePrivateSessionState(snapshot: GameState, options?: { agentId?: string }): unknown;
+  restorePrivateSessionState(snapshot: GameState, options?: { agentId?: string; decisionCount?: number }): unknown;
 };
 
 function adapt(game: SessionCapableAgentGame): SessionGameRuntime {
@@ -30,6 +30,7 @@ function adapt(game: SessionCapableAgentGame): SessionGameRuntime {
     getApiInfo: () => game.getApiInfo(),
     getObservation: () => game.getObservation(),
     getLegalActions: () => game.getLegalActions(),
+    previewAction: (action, baseRevision) => game.previewAction!(action, baseRevision),
     // Session owns decisionSummary validation and persistence. GameEngine still
     // receives exactly one existing GameAction through AgentGame.
     step: (input: SessionStepInput) => game.step(input.action),
@@ -47,12 +48,12 @@ export function createAgentSessionGameFactory(buildId: string): SessionGameFacto
       game.reset({ seed, agent: { id: agentId } });
       return adapt(game);
     },
-    restore: ({ privateState, agentId }) => {
+    restore: ({ privateState, agentId, decision }) => {
       const game = createAgentGame({ buildId, recordHistory: false }) as SessionCapableAgentGame;
       if (typeof game.restorePrivateSessionState !== 'function' || typeof game.exportPrivateSessionState !== 'function') {
         throw new SessionError('session_integration_unavailable', 'AgentGameAdapter does not provide Private Session persistence hooks');
       }
-      game.restorePrivateSessionState(privateState as unknown as GameState, { agentId });
+      game.restorePrivateSessionState(privateState as unknown as GameState, { agentId, decisionCount: decision });
       return adapt(game);
     },
   };

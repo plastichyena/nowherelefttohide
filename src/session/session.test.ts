@@ -93,21 +93,41 @@ class FakeRuntime implements SessionGameRuntime {
   public constructor(
     private state: FakePrivateState,
     private readonly gameOverAt: number,
+    private readonly publishAlert = false,
   ) {}
 
   public getObservation(): AgentObservation {
     const result = this.getResult();
-    return cloneJson({
+    const observation: AgentObservation = cloneJson({
       ...observationTemplate,
       turn: this.state.turn,
       phase: this.state.gameOver ? 'gameOver' : 'player',
       gameOver: this.state.gameOver,
       result,
     });
+    if (this.publishAlert) {
+      const alert = {
+        id: 'resource:food', severity: 'warning', category: 'resource', reasonCode: 'resource_runway_risk',
+        entityIds: ['food'], publicFacts: {}, titleKey: 'alert.resource.title', bodyKey: 'alert.resource.body',
+        params: {}, evidence: [], suggestedActionKinds: [], sourceRevision: 777,
+      };
+      observation.crisisSummary = { ...observation.crisisSummary, alerts: [alert] } as never;
+      observation.endTurnRisk = { ...observation.endTurnRisk, criticalAlerts: [alert] } as never;
+    }
+    return observation;
   }
 
   public getLegalActions(): GameAction[] {
     return this.state.gameOver ? [] : [{ type: 'EndTurn' }];
+  }
+
+  public previewAction(action: GameAction, baseRevision: number): JsonValue {
+    return {
+      action: cloneJson(action as never),
+      baseRevision,
+      legal: !this.state.gameOver && action.type === 'EndTurn',
+      reasonCode: this.state.gameOver || action.type !== 'EndTurn' ? 'action_not_legal' : null,
+    } as JsonValue;
   }
 
   public step(input: SessionStepInput): AgentStepResult {
@@ -150,10 +170,10 @@ class FakeRuntime implements SessionGameRuntime {
   }
 }
 
-function fakeFactory(gameOverAt = 999): SessionGameFactory {
+function fakeFactory(gameOverAt = 999, publishAlert = false): SessionGameFactory {
   return {
-    createNew: () => new FakeRuntime({ turn: 1, gameOver: false, secretRngState: 'private-seed' }, gameOverAt),
-    restore: ({ privateState }) => new FakeRuntime(cloneJson(privateState) as FakePrivateState, gameOverAt),
+    createNew: () => new FakeRuntime({ turn: 1, gameOver: false, secretRngState: 'private-seed' }, gameOverAt, publishAlert),
+    restore: ({ privateState }) => new FakeRuntime(cloneJson(privateState) as FakePrivateState, gameOverAt, publishAlert),
   };
 }
 
@@ -222,7 +242,10 @@ describe('AI Portable Session lifecycle', () => {
   it('restores v1.6.0 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
     const root = tempRoot('real-wave-resume');
     const api = agentService(root);
-    api.newSession({ sessionId: 'real-wave-resume', seed: 71, checkpointInterval: 99 });
+    const initial = api.newSession({ sessionId: 'real-wave-resume', seed: 71, checkpointInterval: 99 });
+    expect(initial.observation.supportHeadroom.peopleEquivalent).toBeGreaterThanOrEqual(0);
+    expect((initial.observation.productionStops as { items: Array<{ facilityId: string }> }).items
+      .some((entry) => entry.facilityId.includes('wind-power-plant'))).toBe(false);
 
     api.step('real-wave-resume', { action: { type: 'EndTurn' }, decisionSummary: 'advance to turn two' });
     api.step('real-wave-resume', { action: { type: 'EndTurn' }, decisionSummary: 'start first warning' });
@@ -609,6 +632,37 @@ describe('AI Portable Session lifecycle', () => {
       expect((error as SessionError).details).toMatchObject({ sessionMetrics: { corruptionRejections: 1 } });
     }
   });
+
+  it('does not classify an ordinary invalid query as stored-data corruption', () => {
+    const queryRoot = tempRoot('metric-invalid-query');
+    const api = service(queryRoot);
+    api.newSession({ sessionId: 'metric-invalid-query' });
+    expect(() => api.query('metric-invalid-query', {
+      target: 'route',
+      expectedRevision: 0,
+      filters: { unitId: 'police-1', destination: { kind: 'hex', q: 27, r: 27 } },
+    })).toThrow(/documented shape/u);
+    expect(api.store.readSessionMetrics('metric-invalid-query').corruptionRejections).toBe(0);
+  });
+
+  it('stamps every Session alert snapshot with its public Session revision', () => {
+    const alertRoot = tempRoot('alert-revision');
+    const api = new SessionService(new SessionStore(alertRoot), fakeFactory(999, true), identity());
+    const created = api.newSession({ sessionId: 'alert-revision' });
+    expect(created.observation.crisisSummary.alerts[0]?.sourceRevision).toBe(0);
+    expect(created.observation.endTurnRisk.criticalAlerts[0]?.sourceRevision).toBe(0);
+    const stepped = api.step('alert-revision', { action: { type: 'EndTurn' }, expectedRevision: 0 });
+    expect(stepped.observation.crisisSummary.alerts[0]?.sourceRevision).toBe(1);
+    const current = api.query('alert-revision', { target: 'full-snapshot', expectedRevision: 1 });
+    const currentObservation = (current.value as unknown as { observation: AgentObservation }).observation;
+    expect(currentObservation.crisisSummary.alerts[0]?.sourceRevision).toBe(1);
+    const history = api.query('alert-revision', {
+      target: 'history', expectedRevision: 1, filters: { fromDecision: 1, toDecision: 1, includeSnapshots: true },
+    });
+    const item = history.items?.[0] as unknown as { observationBefore: AgentObservation; observationAfter: AgentObservation };
+    expect(item.observationBefore.crisisSummary.alerts[0]?.sourceRevision).toBe(0);
+    expect(item.observationAfter.crisisSummary.alerts[0]?.sourceRevision).toBe(1);
+  });
 });
 
 describe('Session JSON CLI', () => {
@@ -620,8 +674,9 @@ describe('Session JSON CLI', () => {
       readStdin: () => stdin,
     };
     const common = `--root=${root}`;
-    const created = executeSessionCommand(['new', common, '--session-id=cli-session'], dependencies);
+    const created = executeSessionCommand(['new', common, '--session-id=cli-session', '--preferred-comment-locale=ja'], dependencies);
     expect(created.ok).toBe(true);
+    expect((created.session as { preferredCommentLocale: string }).preferredCommentLocale).toBe('ja');
     expect(executeSessionCommand(['status', common, '--session=cli-session'], dependencies).command).toBe('status');
     stdin = '{broken json';
     try {
@@ -631,6 +686,9 @@ describe('Session JSON CLI', () => {
     }
     stdin = JSON.stringify({ action: { type: 'EndTurn' }, decisionSummary: 'CLI step' });
     expect(executeSessionCommand(['step', common, '--session=cli-session'], dependencies).command).toBe('step');
+    stdin = JSON.stringify({ type: 'EndTurn' });
+    const preview = executeSessionCommand(['preview', common, '--session=cli-session', '--revision=1'], dependencies);
+    expect(preview).toMatchObject({ command: 'preview', preview: { baseRevision: 1, legal: true } });
     const saved = executeSessionCommand(['save-checkpoint', common, '--session=cli-session'], dependencies);
     const checkpointId = (saved.checkpoint as { checkpointId: string }).checkpointId;
     expect(executeSessionCommand(['list-checkpoints', common, '--session=cli-session'], dependencies).command).toBe('list-checkpoints');

@@ -455,7 +455,7 @@ export function createAgentApiInfo(
       },
       constructibleFacilities: {
         types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
-        limitFormula: 'Simple Farm / Drone: ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor); Temporary Housing: unlimited; Wind: roadBranchCount',
+        limitFormula: 'Simple Farm: roadBranchCount; Drone: ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor); Temporary Housing: unlimited; Wind: 2 * roadBranchCount',
         buildConditions: [
           'inside_player_supply',
           'currently_visible_hex',
@@ -482,6 +482,7 @@ export function createAgentApiInfo(
           workerCapacity: config.facilities.simpleFarm.workerCapacity,
           requiredPower: 0,
           foodPerWorker: config.facilities.simpleFarm.production.outputs.food ?? 0,
+          playerBuildLimit: 'roadBranchCount',
         },
         civilianDroneBase: {
           workerCapacity: config.facilities.civilianDroneBase.workerCapacity,
@@ -503,7 +504,7 @@ export function createAgentApiInfo(
           noiseRadius: config.windPower.noiseRadius,
           zombieTargetValue: 0,
           emitsNoise: true,
-          playerBuildLimit: 'roadBranchCount',
+          playerBuildLimit: '2 * roadBranchCount',
           supplySource: false,
         },
       },

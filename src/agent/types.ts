@@ -630,7 +630,7 @@ export interface AgentApiInfo {
       buildConditions: string[];
       costs: Record<'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant', number>;
       stateTransitions: string[];
-      simpleFarm: { workerCapacity: number; requiredPower: number; foodPerWorker: number };
+      simpleFarm: { workerCapacity: number; requiredPower: number; foodPerWorker: number; playerBuildLimit: string };
       civilianDroneBase: { workerCapacity: number; requiredPower: number; visionPerWorker: number };
       temporaryHousing: { civilianGoodsProduction: string; productionConditions: string[]; softCapacity: number; requiredPower: number; vision: number; populationLimitKind: 'soft'; recruitmentHub: false };
       windPowerPlant: { fixedPower: number; vision: number; noiseRadius: number; zombieTargetValue: 0; emitsNoise: true; playerBuildLimit: string; supplySource: false };

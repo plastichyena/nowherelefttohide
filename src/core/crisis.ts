@@ -185,7 +185,7 @@ export function deriveCrisisSummary(state: Readonly<GameState>): CrisisAlert[] {
       && !['capital', 'city', 'temporaryHousing', 'windPowerPlant'].includes(facility.type)) {
       alerts.push(alert('advisory', 'facility', 'facility_workers_zero', [facility.id], {
         facilityType: facility.type,
-        stoppedWorkers: state.map.facilities.find((definition) => definition.id === facility.id)?.workerCapacity ?? 1,
+        stoppedWorkers: facility.workerCapacity,
         reason: 'no_workers',
       }, ['AssignWorkers']));
     }

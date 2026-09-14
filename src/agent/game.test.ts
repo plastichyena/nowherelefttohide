@@ -218,8 +218,9 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.rules.constructibleFacilities).toMatchObject({
       types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
       costs: { simpleFarm: 25, civilianDroneBase: 50, temporaryHousing: 25, windPowerPlant: 100 },
+      simpleFarm: { playerBuildLimit: 'roadBranchCount' },
       temporaryHousing: { softCapacity: 10, requiredPower: 5, recruitmentHub: false },
-      windPowerPlant: { fixedPower: 15, noiseRadius: 8, zombieTargetValue: 0, emitsNoise: true },
+      windPowerPlant: { fixedPower: 15, noiseRadius: 8, zombieTargetValue: 0, emitsNoise: true, playerBuildLimit: '2 * roadBranchCount' },
     });
     expect(info.rules.production.powerAllocationOrder).toEqual([
       'capital_and_cities',

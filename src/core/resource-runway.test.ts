@@ -8,6 +8,7 @@ import {
   estimateResourceRunway,
 } from './resource-runway';
 import { createCityPopulationSnapshot, createInitialState, synchronizePopulation } from './state';
+import { isHexSupplied } from './supply';
 import type { GameState } from './types';
 
 function tenPersonNoProductionState(food: number): GameState {
@@ -95,6 +96,23 @@ describe('v1.5.7 resource runway', () => {
       .toBe('input_dependency_unstable');
   });
 
+  it('does not report a Civilian Goods runway shortage for an input-only factory outage', () => {
+    const state = tenPersonNoProductionState(100);
+    const exact = structuredClone(forecastEndTurn(state));
+    exact.civilianGoods.startingStock = 249;
+    exact.civilianGoods.projectedProduction = 40;
+    exact.civilianGoods.maintenanceRequired = 10;
+    exact.civilianGoods.maintenanceShortage = 0;
+    exact.civilianGoods.productionInputDemand = 0;
+    exact.civilianGoods.productionInputShortage = 1;
+    const runway = deriveResourceRunwayForecast('civilianGoods', exact, 0);
+    expect(runway.current).toMatchObject({
+      nextEndTurnShortage: false,
+      estimatedShortageTurn: null,
+      unavailableReason: 'not_depleting',
+    });
+  });
+
   it('reapplies fuel-limited generation after virtual loss instead of subtracting physical output', () => {
     const state = tenPersonNoProductionState(100);
     const fuelLimited = structuredClone(forecastEndTurn(state));
@@ -118,12 +136,60 @@ describe('v1.5.7 resource runway', () => {
     exact.militaryGoods.projectedProduction = 0;
     exact.militaryGoods.totalRefillDemand = 0;
     exact.militaryGoods.totalUnfilledRefillDemand = 0;
+    exact.militaryGoods.units = [];
     const runway = deriveResourceRunwayForecast('militaryGoods', exact, 0, {
       militaryGoodsArmyBaseRefillDemand: 20,
     });
     expect(runway.currentDemandBasis).toBe(20);
     expect(runway.demandBreakdown).toEqual({ unitRefill: 0, armyBaseRefill: 20 });
     expect(runway.current).toMatchObject({ estimatedShortageTurn: 1, nextEndTurnShortage: true });
+  });
+
+  it('excludes out-of-supply Unit refills from the national Military Goods runway', () => {
+    const state = tenPersonNoProductionState(100);
+    const exact = structuredClone(forecastEndTurn(state));
+    const template = exact.militaryGoods.units[0] ?? {
+      unitId: 'template', unitType: 'police', inSupply: true, beforeFixed: 0, fixedConsumption: 0,
+      afterFixed: 0, refillDemand: 0, projectedRefillAmount: 0, unfilledRefillDemand: 0,
+      afterRefill: 0, suppressionCost: 0, suppressionStatus: 'none' as const, afterSuppression: 0,
+    };
+    exact.militaryGoods.startingStock = 249;
+    exact.militaryGoods.projectedProduction = 40;
+    exact.militaryGoods.totalRefillDemand = 267;
+    exact.militaryGoods.totalUnfilledRefillDemand = 18;
+    exact.militaryGoods.units = [
+      { ...template, unitId: 'supplied', inSupply: true, refillDemand: 17, unfilledRefillDemand: 0 },
+      { ...template, unitId: 'remote', inSupply: false, refillDemand: 250, unfilledRefillDemand: 18 },
+    ];
+    const runway = deriveResourceRunwayForecast('militaryGoods', exact, 0);
+    expect(runway.currentDemandBasis).toBe(17);
+    expect(runway.demandBreakdown).toEqual({ unitRefill: 17, armyBaseRefill: 0 });
+    expect(runway.current).toMatchObject({
+      nextEndTurnShortage: false,
+      estimatedShortageTurn: null,
+      unavailableReason: 'not_depleting',
+    });
+  });
+
+  it('does not mark the national Military Goods forecast short for only an out-of-supply Unit', () => {
+    const state = createInitialState(15752, createDefaultConfig());
+    state.resources.militaryGoods = 1_000;
+    for (const unit of state.units.filter((candidate) => candidate.isPlayerUnit)) {
+      unit.currentMilitaryGoods = unit.maxMilitaryGoods;
+    }
+    const disconnected = state.units.find((unit) => unit.isPlayerUnit)!;
+    disconnected.currentMilitaryGoods = 0;
+    const remote = state.map.tiles.find((tile) => tile.playerOccupancyAllowed
+      && tile.movementCost !== null
+      && !isHexSupplied(state, tile)
+      && !state.facilities.some((facility) => facility.position.q === tile.q && facility.position.r === tile.r));
+    expect(remote).toBeDefined();
+    disconnected.position = { q: remote!.q, r: remote!.r };
+    const forecast = deriveStrategicForecast(state).resources.militaryGoods;
+    expect(forecast.currentlyShort).toBe(false);
+    expect(forecast.currentDemand).toBe(1);
+    expect(forecast.runway.current.nextEndTurnShortage).toBe(false);
+    expect(forecast.runway.current.estimatedShortageTurn).toBeGreaterThan(1);
   });
 
   it('separates current runway from virtual largest-contributor loss', () => {

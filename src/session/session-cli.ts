@@ -14,6 +14,7 @@ import {
   PLAY_TURN_PROTOCOL_VERSION,
   SessionError,
   type SessionCommand,
+  type SessionCommentLocale,
   type SessionPlayTurnRequest,
 } from './types';
 import { SESSION_PLAY_TURN_CAPABILITIES } from './service';
@@ -29,6 +30,7 @@ interface ParsedCli {
   seed?: number;
   checkpointInterval?: number;
   agentId?: string;
+  preferredCommentLocale?: SessionCommentLocale;
   inputPath?: string;
   outputPath?: string;
   queryTarget?: string;
@@ -44,7 +46,7 @@ export interface SessionCliDependencies {
 }
 
 const COMMANDS = new Set<SessionCommand>([
-  'new', 'status', 'step', 'play-turn', 'save-checkpoint', 'list-checkpoints', 'load-checkpoint', 'query', 'artifact',
+  'new', 'status', 'step', 'preview', 'play-turn', 'save-checkpoint', 'list-checkpoints', 'load-checkpoint', 'query', 'artifact',
 ]);
 
 function integer(value: string, name: string, minimum: number): number {
@@ -81,6 +83,10 @@ export function parseSessionCliArgs(argv: readonly string[]): ParsedCli {
     else if ((value = readOption(argument, '--seed', remaining)) !== null) parsed.seed = integer(value, '--seed', Number.MIN_SAFE_INTEGER);
     else if ((value = readOption(argument, '--checkpoint-interval', remaining)) !== null) parsed.checkpointInterval = integer(value, '--checkpoint-interval', 1);
     else if ((value = readOption(argument, '--agent-id', remaining)) !== null) parsed.agentId = value;
+    else if ((value = readOption(argument, '--preferred-comment-locale', remaining)) !== null) {
+      if (value !== 'ja' && value !== 'en') throw new SessionError('invalid_cli_argument', '--preferred-comment-locale must be ja or en');
+      parsed.preferredCommentLocale = value;
+    }
     else if ((value = readOption(argument, '--input', remaining)) !== null) parsed.inputPath = value;
     else if ((value = readOption(argument, '--out', remaining)) !== null) parsed.outputPath = value;
     else if ((value = readOption(argument, '--target', remaining)) !== null) parsed.queryTarget = value;
@@ -95,6 +101,7 @@ export function parseSessionCliArgs(argv: readonly string[]): ParsedCli {
     throw new SessionError('invalid_cli_argument', 'load-checkpoint requires --checkpoint and --new-session-id');
   }
   if (command === 'query' && !parsed.queryTarget) throw new SessionError('invalid_cli_argument', 'query requires --target');
+  if (command === 'preview' && parsed.revision === undefined) throw new SessionError('invalid_cli_argument', 'preview requires --revision');
   if (command !== 'play-turn' && parsed.idleTimeoutMs !== undefined) throw new SessionError('invalid_cli_argument', '--idle-timeout-ms is only valid for play-turn');
   if (parsed.idleTimeoutMs !== undefined && parsed.idleTimeoutMs > 60 * 60 * 1000) throw new SessionError('invalid_cli_argument', '--idle-timeout-ms must be <= 3600000');
   return parsed;
@@ -110,13 +117,14 @@ function defaultDependencies(): SessionCliDependencies {
   };
 }
 
-function readStepInput(parsed: ParsedCli, dependencies: SessionCliDependencies): unknown {
+function readActionInput(parsed: ParsedCli, dependencies: SessionCliDependencies, command: 'step' | 'preview'): unknown {
   const text = parsed.inputPath ? readFileSync(resolve(parsed.inputPath), 'utf8') : dependencies.readStdin();
-  if (text.trim().length === 0) throw new SessionError('invalid_step_input', 'step requires JSON from --input or standard input');
+  const code = command === 'step' ? 'invalid_step_input' : 'invalid_preview_input';
+  if (text.trim().length === 0) throw new SessionError(code, `${command} requires JSON from --input or standard input`);
   try {
     return JSON.parse(text) as unknown;
   } catch (error) {
-    throw new SessionError('invalid_step_input', `step input is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    throw new SessionError(code, `${command} input is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -159,6 +167,14 @@ export function sessionCliHelp(): Record<string, unknown> {
         finitePlan: './run-session.sh play-turn --session=my-game --input=turn-plan.json',
       },
     },
+    newSession: {
+      preferredCommentLocale: 'Use --preferred-comment-locale=ja or en; default en and fixed for the Session.',
+    },
+    preview: {
+      example: './run-session.sh preview --session=my-game --revision=0 --input=action.json',
+      input: 'GameAction JSON from --input or standard input; --revision pins the preview.',
+      mutatesState: false,
+    },
   };
 }
 
@@ -177,6 +193,7 @@ export function executeSessionCommand(
         seed: parsed.seed,
         checkpointInterval: parsed.checkpointInterval,
         agentId: parsed.agentId,
+        preferredCommentLocale: parsed.preferredCommentLocale,
       });
       return { ok: true, command: parsed.command, ...status };
     }
@@ -185,7 +202,7 @@ export function executeSessionCommand(
     case 'step': {
       let input: unknown;
       try {
-        input = readStepInput(parsed, dependencies);
+        input = readActionInput(parsed, dependencies, 'step');
       } catch (error) {
         const sessionMetrics = service.recordInputFormatRejection(parsed.sessionId!, 'step-json');
         if (error instanceof SessionError) {
@@ -195,6 +212,10 @@ export function executeSessionCommand(
       }
       const result = service.step(parsed.sessionId!, input);
       return { ok: true, command: parsed.command, ...result };
+    }
+    case 'preview': {
+      const action = readActionInput(parsed, dependencies, 'preview');
+      return { ok: true, command: parsed.command, ...service.preview(parsed.sessionId!, { action, expectedRevision: parsed.revision }) };
     }
     case 'play-turn': {
       if (!parsed.inputPath) throw new SessionError('interactive_play_turn_required', 'play-turn without --input uses the interactive JSONL runner');
@@ -299,6 +320,11 @@ export async function runInteractivePlayTurn(
         await writeJsonToWritable(output, { ok: true, command: 'play-turn', protocolVersion: PLAY_TURN_PROTOCOL_VERSION, ...result });
         if (result.stopReason === 'end_turn_completed') exitReason = 'successful_end_turn';
         else if (result.stopReason === 'game_over') exitReason = 'game_over';
+      } else if (typed.type === 'preview') {
+        const previewObject = typed as unknown as Record<string, unknown>;
+        if (Object.keys(previewObject).some((key) => !['type', 'action', 'expectedRevision'].includes(key))) throw new SessionError('invalid_play_turn_input', 'preview request contains an unknown field');
+        const result = service.preview(sessionId, { action: typed.action, expectedRevision: typed.expectedRevision });
+        await writeJsonToWritable(output, { ok: true, command: 'play-turn', kind: 'preview-result', protocolVersion: PLAY_TURN_PROTOCOL_VERSION, ...result });
       } else if (typed.type === 'query') {
         const queryObject = typed as unknown as Record<string, unknown>;
         if (Object.keys(queryObject).some((key) => !['type', 'target', 'expectedRevision', 'cursor', 'pageSize', 'filters'].includes(key))) throw new SessionError('invalid_play_turn_input', 'query request contains an unknown field');
@@ -310,7 +336,7 @@ export async function runInteractivePlayTurn(
       } else if (typed.type === 'close') {
         if (Object.keys(typed as unknown as Record<string, unknown>).length !== 1) throw new SessionError('invalid_play_turn_input', 'close request may contain only type');
         exitReason = 'explicit_close';
-      } else throw new SessionError('invalid_play_turn_input', 'play-turn request type must be action, query, or close');
+      } else throw new SessionError('invalid_play_turn_input', 'play-turn request type must be action, preview, query, or close');
     } catch (error) {
       await writeJsonToWritable(output, publicError(error));
     }
