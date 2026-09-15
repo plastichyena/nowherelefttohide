@@ -19,7 +19,7 @@ import {
   OBSERVATION_API_VERSION,
 } from '../agent/types';
 import { DEFAULT_MAP_ID } from '../core/config';
-import type { GameAction, JsonValue } from '../core/types';
+import type { DeepPartial, GameAction, GameConfig, JsonValue } from '../core/types';
 import { SAVE_FORMAT_VERSION } from '../persistence/save';
 import { createAgentSessionGameFactory } from './agent-adapter';
 import { executeSessionCommand } from './session-cli';
@@ -181,8 +181,8 @@ function service(root: string, gameOverAt = 999, store?: SessionStore): SessionS
   return new SessionService(store ?? new SessionStore(root), fakeFactory(gameOverAt), identity());
 }
 
-function agentService(root: string): SessionService {
-  return new SessionService(new SessionStore(root), createAgentSessionGameFactory('test-build'), identity());
+function agentService(root: string, configOverrides?: DeepPartial<GameConfig>): SessionService {
+  return new SessionService(new SessionStore(root), createAgentSessionGameFactory('test-build', configOverrides), identity());
 }
 
 describe('Session hash and input boundaries', () => {
@@ -239,26 +239,36 @@ describe('Session hash and input boundaries', () => {
 });
 
 describe('AI Portable Session lifecycle', () => {
-  it('restores v1.6.0 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
+  it('restores v1.6.1 Map, Config, Wave, LOS Statistics, Events, and RNG exactly through real Agent Session Resume and Checkpoint replay branching', () => {
     const root = tempRoot('real-wave-resume');
-    const api = agentService(root);
-    const initial = api.newSession({ sessionId: 'real-wave-resume', seed: 71, checkpointInterval: 99 });
+    const api = agentService(root, {
+      economy: {
+        initialZombieCount: 0,
+        initialHunterCount: { min: 0, max: 0 },
+        initialGasCount: { min: 0, max: 0 },
+        initialResources: { food: 100_000, civilianGoods: 100_000, militaryGoods: 100_000, fuel: 100_000 },
+      },
+      refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 },
+    });
+    const initial = api.newSession({ sessionId: 'real-wave-resume', seed: 2, checkpointInterval: 99 });
     expect(initial.observation.supportHeadroom.peopleEquivalent).toBeGreaterThanOrEqual(0);
     expect((initial.observation.productionStops as { items: Array<{ facilityId: string }> }).items
       .some((entry) => entry.facilityId.includes('wind-power-plant'))).toBe(false);
 
-    api.step('real-wave-resume', { action: { type: 'EndTurn' }, decisionSummary: 'advance to turn two' });
-    api.step('real-wave-resume', { action: { type: 'EndTurn' }, decisionSummary: 'start first warning' });
-    const warned = api.status('real-wave-resume');
+    let warned = api.status('real-wave-resume');
+    for (let index = 0; index < 10 && warned.observation.horde.warningType === 'none'; index += 1) {
+      api.step('real-wave-resume', { action: { type: 'EndTurn' }, decisionSummary: `advance to first warning ${index}` });
+      warned = api.status('real-wave-resume');
+    }
     expect(warned.observation.horde).toMatchObject({
       warningType: 'periodic',
       warningDirections: expect.any(Array),
       nextWaveIndex: 1,
-      nextSpawnTurn: 5,
+      nextSpawnTurn: 10,
     });
     expect(warned.observation.horde.warningDirections).toHaveLength(1);
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 10; index += 1) {
       const privateState = api.store.load('real-wave-resume').privateState as unknown as {
         horde: { spawnGroupIdsByWave: Record<string, string[]> };
       };
@@ -289,11 +299,11 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '10.0.0',
-      mapId: 'fixed-51x51-v5',
+      gameVersion: '11.0.0',
+      mapId: 'fixed-51x51-v6',
       config: {
-        version: '10.0.0',
-        mapId: 'fixed-51x51-v5',
+        version: '11.0.0',
+        mapId: 'fixed-51x51-v6',
         infection: {
           zombieSpawnPopulationPerUnit: 5,
           maxZombieSpawnPerResolution: 6,
@@ -301,9 +311,9 @@ describe('AI Portable Session lifecycle', () => {
           noiseRespawnEnabled: true,
         },
       },
-      statistics: { initialNormalZombies: 25 },
+      statistics: { initialNormalZombies: 0 },
     });
-    expect(beforeCheckpoint.map.initialZombiePositions).toHaveLength(25);
+    expect(beforeCheckpoint.map.initialZombiePositions).toHaveLength(50);
     expect(beforeCheckpoint.horde.spawnGroupIdsByWave['1']).toHaveLength(1);
     const checkpoint = api.saveCheckpoint('real-wave-resume');
 

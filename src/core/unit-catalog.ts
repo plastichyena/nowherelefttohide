@@ -5,6 +5,7 @@ export const UNIT_CATALOG = {
   police: { faction: 'human', ai: null, waveSlot: null, reanimation: 'policeZombie' },
   nationalGuard: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
   riotPolice: { faction: 'human', ai: null, waveSlot: null, reanimation: 'riotZombie' },
+  reconTeam: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
   zombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
   hordeZombie: { faction: 'zombie', ai: 'horde', waveSlot: 'horde', reanimation: null },
   policeZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
@@ -12,6 +13,7 @@ export const UNIT_CATALOG = {
   riotZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
   hunterZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
   gasZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
+  screamerZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
 } as const satisfies Record<UnitType, {
   faction: 'human' | 'zombie'; ai: 'normal' | 'horde' | null;
   waveSlot: 'horde' | 'nonHorde' | null; reanimation: ZombieUnitType | null;

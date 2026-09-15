@@ -9,9 +9,9 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** v1.6 deliberately rejects every earlier Session/Checkpoint schema. */
-export const CHECKPOINT_SCHEMA_VERSION = '11.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '11.0.0' as const;
+/** v1.6.1 deliberately rejects every earlier Session/Checkpoint schema. */
+export const CHECKPOINT_SCHEMA_VERSION = '12.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '12.0.0' as const;
 export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
 export const SESSION_ARTIFACT_PACKAGE_VERSION = '1.0.0' as const;
 export const PLAY_TURN_PROTOCOL_VERSION = '1.0.0' as const;

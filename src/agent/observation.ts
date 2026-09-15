@@ -332,7 +332,7 @@ function createAgentObservationInScope(
   )));
   const possibleNonHordeTypes = Array.isArray(nextWaveRecord?.possibleNonHordeTypes)
     ? nextWaveRecord!.possibleNonHordeTypes.filter((value): value is UnitType => typeof value === 'string')
-    : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', ...(state.horde.nextWaveIndex !== null && state.horde.nextWaveIndex >= Math.max(1,state.config.horde.waves.length-1) ? ['gasZombie'] : [])].filter((value) => value in state.config.units) as UnitType[];
+    : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', ...(state.horde.nextWaveIndex !== null && state.horde.nextWaveIndex >= Math.max(1,state.config.horde.waves.length-1) ? ['gasZombie'] : [])].filter((value) => value in state.config.units) as UnitType[];
   // The schedule turn is public even before a warning starts. The selected
   // directions remain private until the warning event/observation is active.
   const publicSpawnTurn = nextWave?.turn ?? state.horde.lastSpawnTurn;
@@ -400,7 +400,10 @@ function createAgentObservationInScope(
       waitingRefugees: state.population.waitingRefugees,
       screeningRefugees: state.population.screeningRefugees,
       approvedRefugees: state.population.approvedRefugees,
-      infected: state.population.facilityInfected + state.population.checkpointInfected,
+      infected: state.facilities
+        .filter((facility) => facility.owner === 'player')
+        .reduce((total, facility) => total + facility.infected, 0)
+        + state.population.checkpointInfected,
     },
     facilities,
     units,
@@ -455,7 +458,7 @@ function createAgentObservationInScope(
   } satisfies AgentObservation as unknown as JsonValue) as unknown as AgentObservation;
 }
 
-/** Remove fixed topology from one Artifact Schema 14.0.0 trace entry. */
+/** Remove fixed topology from one Artifact Schema 15.0.0 trace entry. */
 export function compactArtifactObservation(observation: AgentObservation): AgentArtifactObservation {
   const copy = cloneJson(observation);
   const { map, ...dynamic } = copy;

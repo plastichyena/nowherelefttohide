@@ -61,8 +61,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.6.0');
-    expect(titleVersionLabel('en')).toContain('1.6.0');
+    expect(titleVersionLabel('ja')).toContain('1.6.1');
+    expect(titleVersionLabel('en')).toContain('1.6.1');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -76,10 +76,10 @@ describe('controller view models', () => {
       peopleMax: 20,
     });
     expect(hordeCompositionLabel(config.horde.waves[0], 'en', config)).toContain(
-      'Zombie 70 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Gas Zombie 0',
+      'Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 0',
     );
     expect(hordeCompositionLabel(config.horde.waves.at(-2), 'en', config)).toContain(
-      'Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Gas Zombie 5',
+      'Zombie 60 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 5',
     );
   });
 
@@ -88,13 +88,16 @@ describe('controller view models', () => {
     const capital = { id: 'capital', type: 'capital', position: { q: 25, r: 25 } } as FacilityState;
     const armyBase = { id: 'army-base-1', type: 'armyBase', position: { q: 25, r: 19 } } as FacilityState;
     const state = { config } as GameState;
-    const capitalActions = (['police', 'nationalGuard', 'riotPolice'] as const).map((unitType) => ({
+    const capitalActions = (['police', 'nationalGuard', 'riotPolice', 'reconTeam'] as const).map((unitType) => ({
       type: 'ProduceUnit' as const, unitType, destination: { ...capital.position },
     }));
-    const baseActions: GameAction[] = [{ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { ...armyBase.position } }];
+    const baseActions: GameAction[] = [
+      { type: 'ProduceUnit', unitType: 'nationalGuard', destination: { ...armyBase.position } },
+      { type: 'ProduceUnit', unitType: 'reconTeam', destination: { ...armyBase.position } },
+    ];
 
     const capitalOptions = recruitmentOptionsForFacility(state, capital, capitalActions, 'en');
-    expect(capitalOptions.map((option) => option.unitType)).toEqual(['police', 'nationalGuard', 'riotPolice']);
+    expect(capitalOptions.map((option) => option.unitType)).toEqual(['police', 'nationalGuard', 'riotPolice', 'reconTeam']);
     expect(capitalOptions.find((option) => option.unitType === 'riotPolice')).toMatchObject({
       completionProficiency: config.unitExperience.productionProficiencyByType.riotPolice,
       populationCost: 10,
@@ -107,7 +110,7 @@ describe('controller view models', () => {
       legal: true,
     });
     expect(recruitmentOptionsForFacility(state, armyBase, baseActions, 'en').map((option) => option.unitType))
-      .toEqual(['nationalGuard']);
+      .toEqual(['nationalGuard', 'reconTeam']);
     const markup = renderRecruitmentAccordion(state, armyBase, baseActions, 'en');
     expect(markup).toContain('<details class="recruitment-accordion"');
     expect(markup).not.toMatch(/<details[^>]*\sopen(?:\s|>)/);
@@ -306,26 +309,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.5.7-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.6.0-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.5.7以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.0');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.0以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.1');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.5.7 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.0');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.0 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.1');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 10.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 17');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 10.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 17');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 11.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 18');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 11.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 18');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.5.7以前' : 'v1.5.7 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.5.7以前' : 'v1.5.7 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.5.7以前' : 'v1.5.7-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.5.7以前' : 'v1.5.7-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.5.7以前' : 'v1.5.7-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.0以前' : 'v1.6.0 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.0以前' : 'v1.6.0 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.0以前' : 'v1.6.0-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.0以前' : 'v1.6.0-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.0以前' : 'v1.6.0-or-earlier');
     }
   });
 
@@ -911,8 +914,8 @@ describe('controller view models', () => {
     expect(english).toContain('Police Zombie');
     expect(english).toContain('Soldier Zombie');
     expect(english).toContain('Special Slot weights');
-    expect(english).toContain('Before the last two Waves: Zombie 70 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Gas Zombie 0');
-    expect(english).toContain('Last two Waves: Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Gas Zombie 5');
+    expect(english).toContain('Before the last two Waves: Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 0');
+    expect(english).toContain('Last two Waves: Zombie 60 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 5');
     expect(english).toContain('Special Slot caps');
     expect(english).toContain('Riot Zombie 1 · Hunter Zombie 1');
     expect(english).toContain('Initial Hunter count');

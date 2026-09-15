@@ -63,7 +63,7 @@ function unitString(value: unknown): string {
 }
 
 function isHumanUnitType(type: string): boolean {
-  return type === 'police' || type === 'nationalGuard' || type === 'riotPolice';
+  return type === 'police' || type === 'nationalGuard' || type === 'riotPolice' || type === 'reconTeam';
 }
 
 function multiplyResources(
@@ -314,7 +314,18 @@ export function createPublicFacilityProjection(
   const estimatedInputs = productionProjection?.inputs ?? multiplyResources(rule.inputs, currentWorkers);
   const estimatedOutputs = productionProjection?.outputs ?? multiplyResources(rule.outputs, currentWorkers);
   const stoppedReason = productionProjection ? productionProjection.stoppedReason : 'stopped';
+  const visible = (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(facility.position));
+  const publicEarlyCaptureReward = facility.earlyCaptureSurvivorStatus === 'rescued'
+    ? 'rescued' as const
+    : facility.earlyCaptureSurvivorStatus === 'notApplicable'
+      ? 'not_applicable' as const
+      : visible && facility.earlyCaptureSurvivorStatus === 'available'
+        ? 'possible' as const
+        : visible && facility.earlyCaptureSurvivorStatus === 'lost'
+          ? 'lost' as const
+          : undefined;
   return {
+    ...(publicEarlyCaptureReward === undefined ? {} : { earlyCaptureSurvivorReward: publicEarlyCaptureReward }),
     recovery: facilityRecoveryProjection(state, facility),
     armyBase: armyBaseProjection(state, facility, productionProjection),
     id: facility.id,
@@ -335,9 +346,9 @@ export function createPublicFacilityProjection(
       : 0,
     visionMode: facility.type === 'civilianDroneBase' ? 'aerial' : 'ground',
     terrainLosBlocking: facility.type !== 'civilianDroneBase',
-    healthyPopulation: facility.workers,
-    zombieTargetValue: facilityZombieTargetValue(state, facility),
-    infectedPopulation: facility.infected,
+    healthyPopulation: facility.owner === 'player' ? facility.workers : 0,
+    zombieTargetValue: facility.owner === 'player' ? facilityZombieTargetValue(state, facility) : 0,
+    infectedPopulation: facility.owner === 'player' ? facility.infected : 0,
     populationCapacity: facility.workerCapacity,
     populationLimitKind: isCityFacility(facility) ? 'soft' : 'hard',
     populationOperational,
@@ -432,6 +443,9 @@ export function createPublicCheckpointProjection(
     role,
     turnAwayPreview: { waitingOnly: true, maxPeople: checkpoint.waiting, foodMaintenanceReduction: checkpoint.waiting * state.config.economy.populationConsumption.food, civilianGoodsMaintenanceReduction: checkpoint.waiting * state.config.economy.populationConsumption.civilianGoods, additionalPenalties: 'recalculated_after_action', futureWaveRisk: state.horde.finalHordeStatus === 'notStarted' },
     waiting: checkpoint.waiting,
+    grandfatheredWaiting: checkpoint.grandfatheredWaiting ?? 0,
+    grandfatheredPolicy: checkpoint.grandfatheredPolicy ?? null,
+    waitingRiskPercent: checkpoint.waitingRiskPercent ?? 0,
     screening: checkpoint.screening,
     approved: checkpoint.approved,
     queuePeople,
@@ -481,7 +495,7 @@ export function createPublicEntityProjectionContext(state: Readonly<GameState>):
 }
 
 function armyBaseProjection(state: Readonly<GameState>, facility: FacilityState, projection: ReturnType<typeof forecastFacilityProduction>[number] | undefined): AgentFacilityObservation['armyBase'] {
-  if (!facility.armyBase) return null;
+  if (!facility.armyBase || facility.owner !== 'player') return null;
   const settings=state.config.armyBase;
   const normal=facility.owner==='player' && facility.status==='owned' && facility.infected===0 && facility.operationalStatus==='operational';
   const operationReason=facility.owner!=='player'?'not_owned':facility.status!=='owned'?'facility_ruined':facility.infected>0?'facility_infected':facility.operationalStatus!=='operational'?facility.operationalStatus:null;

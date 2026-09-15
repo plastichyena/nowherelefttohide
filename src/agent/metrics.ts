@@ -86,8 +86,8 @@ export interface HordeWaveMetric {
   /** Publicly declared slot count; the per-slot draw remains hidden until Spawn. */
   nonHordeSlotCountPerDirection?: number;
   possibleNonHordeTypes?: string[];
-  specialZombieSpawnedByType?: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
-  specialZombieKilledByType?: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number>;
+  specialZombieSpawnedByType?: Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
+  specialZombieKilledByType?: Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
   final: boolean;
   hordeZombieSpawned: number;
   normalZombieSpawned: number;
@@ -511,11 +511,11 @@ const BASE_TERRAINS: readonly BaseTerrain[] = ['plain', 'forest', 'mountain', 'w
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 const RESOURCE_TYPES: readonly ResourceType[] = ['food', 'civilianGoods', 'militaryGoods', 'fuel'];
 const FACILITY_TYPES: readonly string[] = [
-  'capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery',
-  'powerPlant', 'windPowerPlant', 'civilianDroneBase', 'simpleFarm',
+  'capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery',
+  'powerPlant', 'windPowerPlant', 'civilianDroneBase', 'simpleFarm', 'temporaryHousing', 'armyBase',
 ];
-const HUMAN_UNIT_TYPES: readonly HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice'];
-const SPECIAL_ZOMBIE_TYPES = ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'] as const;
+const HUMAN_UNIT_TYPES: readonly HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice', 'reconTeam'];
+const SPECIAL_ZOMBIE_TYPES = ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as const;
 const ZOMBIE_TYPES = ['zombie', 'hordeZombie', ...SPECIAL_ZOMBIE_TYPES] as const;
 
 function isHumanUnitType(value: unknown): value is HumanUnitType {
@@ -805,6 +805,9 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     police: policeNoisePulses,
     nationalGuard: nationalGuardNoisePulses,
     riotPolice: riotPoliceNoisePulses,
+    reconTeam: events.filter(
+      (event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'reconTeam',
+    ).length,
     hordeZombie: statisticNumber(statistics, 'hordeMovementNoisePulses') ?? events.filter(
       (event) => event.type === 'noise_emitted' && event.payload.sourceKind === 'hordeZombie',
     ).length,
@@ -971,7 +974,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const outOfSupplyUnitLosses = events.filter((event) =>
     event.type === 'unit_destroyed' && event.payload.isPlayerUnit === true && event.payload.inSupply === false,
   ).length;
-  const branchTurns: Record<CheckpointPolicy, number> = { passThrough: 0, normal: 0, strict: 0 };
+  const branchTurns: Record<CheckpointPolicy, number> = { passThrough: 0, normal: 0, strict: 0, deny: 0 };
   for (const observation of turnObservations) {
     for (const checkpoint of observation.checkpoints.filter(
       (candidate) => candidate.status === 'operational' && candidate.role === 'active',
@@ -985,7 +988,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const finalSecuredFacilities = finalObservation.facilities.filter(
     (facility) => facility.owner === 'player' && facility.status === 'owned',
   ).length;
-  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0, riotPolice: 0 });
+  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 });
   const statisticHumanRecord = (key: string): Record<HumanUnitType, number> => {
     const source = numericRecord(isRecord(statistics) ? statistics[key] : undefined);
     return Object.fromEntries(HUMAN_UNIT_TYPES.map((type) => [type, source[type] ?? 0])) as Record<HumanUnitType, number>;
@@ -1221,10 +1224,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const refineryOutageTurns = new Set<number>();
   let simpleFarmFoodShortageAvoidanceTurns = 0;
   const checkpointBatchStartsByPolicy: Record<CheckpointPolicy, number> = {
-    passThrough: 0, normal: 0, strict: 0,
+    passThrough: 0, normal: 0, strict: 0, deny: 0,
   };
   const checkpointBatchCompletionsByPolicy: Record<CheckpointPolicy, number> = {
-    passThrough: 0, normal: 0, strict: 0,
+    passThrough: 0, normal: 0, strict: 0, deny: 0,
   };
   let checkpointQueueSamples = 0;
   let checkpointQueueTotal = 0;
@@ -1309,13 +1312,13 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   );
   const specialRecordFromStatistics = (
     key: string,
-  ): Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number> => {
+  ): Record<typeof SPECIAL_ZOMBIE_TYPES[number], number> => {
     const source = numericRecord(isRecord(statistics) ? statistics[key] : undefined);
     return Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [type, source[type] ?? 0])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
   };
   const specialRecordFromEvents = (
     predicate: (event: AgentPublicEvent) => boolean,
-  ): Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie', number> => {
+  ): Record<typeof SPECIAL_ZOMBIE_TYPES[number], number> => {
     const result = Object.fromEntries(SPECIAL_ZOMBIE_TYPES.map((type) => [type, 0])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
     for (const event of events) {
       if (!predicate(event)) continue;

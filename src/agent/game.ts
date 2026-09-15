@@ -134,7 +134,7 @@ export function createAgentPublicConfig(config: GameConfig): AgentPublicConfig {
   if (isPlainObject(value.units)) {
     for (const unit of Object.values(value.units)) {
       if (!isPlainObject(unit)) continue;
-      for (const key of ['noiseRadius', 'combatNoiseRadius', 'noiseRadiusByType', 'exactNoiseRadius']) delete unit[key];
+      for (const key of ['noiseRadius', 'screamRadius', 'combatNoiseRadius', 'noiseRadiusByType', 'exactNoiseRadius']) delete unit[key];
     }
   }
   if (isPlainObject(value.armyBase)) { value.armyBase.interceptionNoiseRadius=value.armyBase.noiseRadius; delete value.armyBase.noiseRadius; }
@@ -202,7 +202,22 @@ function publicEvents(
   return events
     .filter((event) => !INTERNAL_EVENT_TYPES.has(event.type))
     .map((event) => {
+      if (event.type === 'survivors_expired') {
+        if (event.payload.publicVisible !== true) return null;
+      }
       let payload = cloneJson(event.payload) as JsonObject;
+      if (event.type === 'screamer_scream') payload = {
+        noiseClass: 'extraLarge',
+        message: { ja: '悍ましい叫び声(特大ノイズ)', en: 'Horrifying scream (extra-large noise)' },
+      };
+      if (event.type === 'survivors_expired') payload = {
+        facilityId: payload.facilityId,
+        earlyCaptureSurvivorReward: 'lost',
+      };
+      if (event.type === 'unsecured_army_base_interception') payload = {
+        facilityId: payload.facilityId,
+        survivorRewardPossible: true,
+      };
       if (SITE_PUBLIC_EVENT_TYPES.has(event.type)) {
         payload = Object.fromEntries(
           Object.entries(payload).filter(([field]) => SITE_PUBLIC_EVENT_FIELDS.has(field)),
@@ -241,7 +256,7 @@ function publicEvents(
           : [];
         const possibleNonHordeTypes = Array.isArray(waveRecord?.possibleNonHordeTypes)
           ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
-          : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', ...(waveIndex !== null && waveIndex >= Math.max(1,after.config.horde.waves.length-1) ? ['gasZombie'] : [])];
+          : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', ...(waveIndex !== null && waveIndex >= Math.max(1,after.config.horde.waves.length-1) ? ['gasZombie'] : [])];
         if (wave && directions.length > 0) {
           const slotValue = waveRecord?.nonHordeSlotCountPerDirection ?? waveRecord?.nonHordeSlotsPerDirection ?? composition.zombie;
           const nonHordeSlotCountPerDirection = typeof slotValue === 'number' && Number.isSafeInteger(slotValue)

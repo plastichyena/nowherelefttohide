@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
 import { forecastEndTurn, forecastFacilityProduction, GameEngine } from './engine';
-import { synchronizePopulation } from './state';
+import { prepareTestSnapshot } from './testConfig';
 import type { GameState } from './types';
 
 function editableState(engine: GameEngine): GameState {
@@ -69,7 +69,7 @@ describe('v1.4.2 economy and required power grid', () => {
       .filter((facility) => facility.id !== military.id && facility.powerSupplyEnabled)
       .forEach((facility) => { facility.powerSupplyEnabled = false; });
     state.resources.fuel = 1_000;
-    synchronizePopulation(state);
+    prepareTestSnapshot(state);
     state.resources.civilianGoods = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const none = forecastEndTurn(engine.getState());
@@ -93,7 +93,7 @@ describe('v1.4.2 economy and required power grid', () => {
     disableWind(state);
     state.facilities.find((facility) => facility.id === 'power-plant-1')!.workers = 1;
     state.facilities.find((facility) => facility.id === 'capital')!.workers += 2;
-    synchronizePopulation(state);
+    prepareTestSnapshot(state);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const projections = forecastFacilityProduction(engine.getState());
     expect(projections.find((facility) => facility.facilityId === 'capital')?.projectedPowerSupplied).toBe(true);
@@ -145,7 +145,7 @@ describe('v1.4.2 economy and required power grid', () => {
     simple.position = { q: 12, r: 14 };
     state.facilities.push(simple);
     state.facilities.find((facility) => facility.id === 'capital')!.workers -= 4;
-    synchronizePopulation(state);
+    prepareTestSnapshot(state);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const projection = forecastFacilityProduction(engine.getState()).find((item) => item.facilityId === simple.id)!;
     expect(projection).toMatchObject({ powerMode: 'none', requiredPowerCapacity: 0, projectedPowerRequested: false, outputs: { food: 20 } });
@@ -166,7 +166,7 @@ describe('v1.4.2 economy and required power grid', () => {
     }));
     expect(result.events).toContainEqual(expect.objectContaining({
       type: 'power_allocated',
-      payload: expect.objectContaining({ facilityId: 'military-factory-1', supplied: false, reason: 'no_population', amount: 0 }),
+      payload: expect.objectContaining({ facilityId: 'military-factory-1', supplied: false, reason: 'not_eligible', amount: 0 }),
     }));
   });
 
@@ -184,7 +184,7 @@ describe('v1.4.2 economy and required power grid', () => {
     city.populationOperationalTurn = 1;
     capital.workers -= 5;
     state.resources.fuel = 0;
-    synchronizePopulation(state);
+    prepareTestSnapshot(state);
     state.cityPopulationSnapshot.supply.push({ facilityId: city.id, population: 5, eligible: true });
     state.cityPopulationSnapshot.reception.unshift({ facilityId: city.id, population: 5, eligible: true });
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
@@ -208,7 +208,7 @@ describe('v1.4.2 economy and required power grid', () => {
     const capital = state.facilities.find((facility) => facility.id === 'capital')!;
     capital.workers += plant.workers - 1;
     plant.workers = 1;
-    synchronizePopulation(state);
+    prepareTestSnapshot(state);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const forecast = forecastEndTurn(engine.getState());
     expect(forecast.electricity.physicalGenerationCapacity).toBe(3);

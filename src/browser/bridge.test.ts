@@ -53,7 +53,7 @@ describe('Developer / Browser Bridge', () => {
     expect(info.methodSchemas.step.returns).toBe('AgentStepResult');
     expect(info.prohibited.join(' ')).toContain('localStorage');
     expect(info.minimalExample).toContain('window.NLTH');
-    expect(info.rules.recovery).toMatchObject({ combatRate: 0.1, restRate: 0.2 });
+    expect(info.rules.recovery).toMatchObject({ combatRate: 0.05, restRate: 0.1 });
     expect(info.rules.infection.stationedUnitsContainSpread).toBe(true);
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',

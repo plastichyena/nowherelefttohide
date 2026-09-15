@@ -1,4 +1,4 @@
-name: AI Portable Player Package v1.6.0
+name: AI Portable Player Package v1.6.1
 
 on:
   workflow_run:

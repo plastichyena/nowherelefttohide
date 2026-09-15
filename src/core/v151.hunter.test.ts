@@ -7,6 +7,7 @@ import { findReachablePaths, findShortestPath } from './path';
 import { effectiveMovementCost } from './terrain';
 import { createInitialState, createUnit, synchronizePopulation } from './state';
 import type { GameState, HexCoord, NoisePulse, UnitState } from './types';
+import { prepareTestSnapshot } from './testConfig';
 
 function quietConfig() {
   return createDefaultConfig({
@@ -35,6 +36,7 @@ function quietConfig() {
 }
 
 function load(engine: GameEngine, state: GameState): void {
+  prepareTestSnapshot(state);
   const result = engine.step({ type: 'LoadSnapshot', snapshot: state });
   expect(result.error?.message ?? null).toBeNull();
 }

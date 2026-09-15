@@ -73,7 +73,7 @@ describe('board runtime PNG files', () => {
     const paths = [...BOARD_ASSET_PATHS];
     expect(paths).toHaveLength(new Set(paths).size);
     expect(paths.some((path) => /water/iu.test(path))).toBe(false);
-    expect(paths.filter((path) => path.startsWith('units/'))).toHaveLength(10);
+    expect(paths.filter((path) => path.startsWith('units/'))).toHaveLength(12);
     expect(paths).toEqual(expect.arrayContaining([
       'units/unit_police.png',
       'units/unit_national_guard.png',
@@ -83,6 +83,8 @@ describe('board runtime PNG files', () => {
       'units/unit_riot_zombie.png',
       'units/unit_hunter_zombie.png',
       'units/unit_gas_zombie.png',
+      'units/unit_recon_team.png',
+      'units/unit_screamer_zombie.png',
     ]));
     expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(14);
     expect(paths).toEqual(expect.arrayContaining([

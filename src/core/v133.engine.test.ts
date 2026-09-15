@@ -4,7 +4,7 @@ import { hexKey } from './hex';
 import { deriveCheckpointRole, isHexSupplied, isHexSuppliedByBranch } from './supply';
 import { createUnit, synchronizePopulation } from './state';
 import { GameEngine } from './engine';
-import { singleFinalWave } from './testConfig';
+import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 import { getPlayerVisibleTileKeys } from './visibility';
 import type {
   BuildCheckpointAction,
@@ -54,6 +54,7 @@ function action(value: GameAction): GameAction {
 }
 
 function stepOk(engine: GameEngine, gameAction: GameAction): ReturnType<GameEngine['step']> {
+  if (gameAction.type === 'LoadSnapshot') prepareTestSnapshot(gameAction.snapshot);
   const result = engine.step(action(gameAction));
   expect(
     result.error,

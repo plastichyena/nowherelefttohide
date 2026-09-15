@@ -109,13 +109,13 @@ describe('v1.4 Horde composition and combat', () => {
 
   it('spawns the standard five deterministic multi-direction Waves', () => {
     const defaultSchedule = createDefaultConfig().horde.waves;
-    expect(defaultSchedule.map((wave) => wave.turn)).toEqual([5, 10, 20, 35, 50]);
+    expect(defaultSchedule.map((wave) => wave.turn)).toEqual([10, 20, 35, 50, 70]);
     // Preserve the standard wave sizes/directions while moving their turns
     // forward.  The full 50-turn map simulation is intentionally covered by
     // integration tests; this unit test isolates spawn composition.
     const acceleratedSchedule = defaultSchedule.map((wave, index) => ({ ...wave, turn: index + 3 }));
     const engine = new GameEngine(302, safeScenarioConfig({
-      horde: { waves: acceleratedSchedule, specialZombieWeights: { hunterZombie: 0, gasZombie: 0 } },
+      horde: { waves: acceleratedSchedule, specialZombieWeights: { hunterZombie: 0, gasZombie: 0, screamerZombie: 0 } },
       units: {
         zombie: { movement: 0 }, hordeZombie: { movement: 0 }, policeZombie: { movement: 0 },
         soldierZombie: { movement: 0 }, riotZombie: { movement: 0 },

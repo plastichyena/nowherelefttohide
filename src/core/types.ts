@@ -73,18 +73,20 @@ export type UnitType =
   | 'police'
   | 'nationalGuard'
   | 'riotPolice'
+  | 'reconTeam'
   | 'zombie'
   | 'hordeZombie'
   | 'policeZombie'
   | 'soldierZombie'
   | 'riotZombie'
   | 'hunterZombie'
-  | 'gasZombie';
+  | 'gasZombie'
+  | 'screamerZombie';
 
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
 
-export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice'>;
+export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam'>;
 
 export type ZombieUnitType = Exclude<UnitType, HumanUnitType>;
 
@@ -92,7 +94,7 @@ export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
 export type UnitActionState = 'ready' | 'moved' | 'acted' | 'destroyed';
 
-export type CheckpointPolicy = 'passThrough' | 'normal' | 'strict';
+export type CheckpointPolicy = 'passThrough' | 'normal' | 'strict' | 'deny';
 
 export type CheckpointStatus = 'operational' | 'remnant' | 'ruined' | 'abandoned';
 
@@ -228,6 +230,7 @@ export interface FacilityState extends FacilityDefinition {
   recoveryOperationalTurn: number | null;
   /** One-way ledger: starting-owned facilities and rewarded captures are claimed. */
   firstCaptureRewardClaimed: boolean;
+  earlyCaptureSurvivorStatus?: 'available' | 'rescued' | 'lost' | 'notApplicable';
 }
 
 export interface RefineryAllowanceState {
@@ -250,6 +253,7 @@ export interface PopulationState {
   police: number;
   nationalGuard: number;
   riotPolice: number;
+  reconTeam: number;
   /** Population in units is tracked separately from civilian workers. */
   unitPopulation: number;
   /** Facility assignment is kept as an array so it remains JSON-only. */
@@ -322,6 +326,7 @@ export interface UnitState {
   /** Identifies periodic/final Horde membership without exposing it through public APIs. */
   spawnGroupId: string | null;
   hordeKind: 'periodic' | 'final' | null;
+  hasScreamed: boolean;
   /** Activity since the previous Player Turn Start, used for natural healing. */
   activity: {
     moved: boolean;
@@ -347,6 +352,9 @@ export interface CheckpointState {
   infected: number;
   /** Prevents repeated overrun effects while a non-operational site remains infected. */
   overrunProcessed?: boolean;
+  grandfatheredWaiting?: number;
+  grandfatheredPolicy?: Exclude<CheckpointPolicy, 'deny'> | null;
+  waitingRiskPercent?: number;
 }
 
 export interface CheckpointPositionCandidate {
@@ -441,7 +449,7 @@ export interface HordeState {
   finalSpawnedCount: number;
 }
 
-export type NoisePulseSourceKind = 'humanCombat' | 'hordeMovement' | 'armyBase' | 'windPower';
+export type NoisePulseSourceKind = 'humanCombat' | 'hordeMovement' | 'armyBase' | 'windPower' | 'scream';
 
 /** Internal deterministic work item. Public projections never expose center or source id. */
 export interface NoisePulse {
@@ -449,7 +457,7 @@ export interface NoisePulse {
   center: HexCoord;
   radius: number;
   sourceKind: NoisePulseSourceKind;
-  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant';
+  sourceUnitType: HumanUnitType | 'hordeZombie' | 'screamerZombie' | 'armyBase' | 'windPowerPlant';
   emittedTurn: number;
 }
 
@@ -528,6 +536,13 @@ export type GameEventType =
   | 'refugee_arrivals_ended'
   | 'constructible_decommissioned'
   | 'human_unit_reanimated'
+  | 'survivors_rescued'
+  | 'survivors_expired'
+  | 'checkpoint_waiting_risk_reserved'
+  | 'checkpoint_waiting_risk_infection'
+  | 'checkpoint_policy_changed'
+  | 'screamer_scream'
+  | 'unsecured_army_base_interception'
   | 'game_over';
 
 export interface GameEvent {
@@ -674,6 +689,9 @@ export interface GameStatistics {
   hunterZombiesKilled: number;
   gasZombiesKilled: number;
   gasZombiesSpawned: number;
+  screamerZombiesKilled: number;
+  screamerZombiesSpawned: number;
+  screamerScreams: number;
   housingBuilt: number;
   housingResidentTurns: number;
   housingCivilianGoodsProduced: number;
@@ -681,9 +699,9 @@ export interface GameStatistics {
   gasExplosions: number;
   gasExplosionUnitDamage: number;
   riotPoliceReanimations: number;
-  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number>;
-  finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number>;
-  noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant', number>;
+  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie' | 'screamerZombie', number>;
+  finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie' | 'screamerZombie', number>;
+  noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie' | 'screamerZombie' | 'armyBase' | 'windPowerPlant', number>;
   hordeMovementNoisePulses: number;
   hordeNoiseRespawnedByType: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
 }
@@ -1204,6 +1222,7 @@ export interface UnitConfigMap {
   police: HumanUnitConfig;
   nationalGuard: HumanUnitConfig;
   riotPolice: HumanUnitConfig;
+  reconTeam: HumanUnitConfig;
   zombie: ZombieUnitConfig;
   hordeZombie: ZombieUnitConfig;
   policeZombie: ZombieUnitConfig;
@@ -1211,6 +1230,7 @@ export interface UnitConfigMap {
   riotZombie: ZombieUnitConfig;
   hunterZombie: ZombieUnitConfig;
   gasZombie: ZombieUnitConfig & { explosionDamage: number; explosionInfection: number };
+  screamerZombie: ZombieUnitConfig & { screamRadius: number };
 }
 
 export interface ProductionRule {
@@ -1255,7 +1275,7 @@ export interface HordeWaveConfig {
 export interface HordeConfig {
   warningLeadTurns: number;
   waves: HordeWaveConfig[];
-  specialZombieWeights: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number>;
+  specialZombieWeights: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number> & { screamerZombie?: number };
   riotZombieCapPerDirection: number;
   hunterZombieCapPerDirection: number;
   gasZombieCapPerDirection: number;
@@ -1299,6 +1319,10 @@ export interface RefugeeConfig {
   arrivalPeopleMax: number;
   screeningCapacity: number;
   policies: Record<CheckpointPolicy, RefugeePolicyConfig>;
+  waitingRiskThreshold: number;
+  waitingRiskMaxPercent: number;
+  waitingRiskInfectionMin: number;
+  waitingRiskInfectionMax: number;
 }
 
 export interface InfectionConfig {
@@ -1337,6 +1361,7 @@ export interface EconomyConfig {
   oilFieldAllowancePerWorker: number;
   initialWorkersByFacility: Record<FacilityId, number>;
   initialZombieCount: number;
+  neutralSurvivorRewardLastTurn: number;
 }
 
 /** Inclusive range resolved with the game's seeded RNG during new-game setup. */

@@ -14,8 +14,12 @@ import type { HumanUnitType } from './types';
 export function unitMoveFuelCost(unitType: HumanUnitType, distance: number): number {
   const entered = Math.max(0, Math.floor(distance));
   if (entered === 0) return 0;
-  if (entered <= 5) return 1;
-  return unitType === 'nationalGuard' ? 1 + 2 * (entered - 5) : 1 + (entered - 5);
+  const base = entered <= 5
+    ? 1
+    : unitType === 'nationalGuard' || unitType === 'reconTeam'
+      ? 1 + 2 * (entered - 5)
+      : 1 + (entered - 5);
+  return base * 2;
 }
 
 

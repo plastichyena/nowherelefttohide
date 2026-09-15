@@ -74,6 +74,11 @@ V160_SOURCE_FILES = {
     "facilities/facility_oilfield.png": "oilfield_concept_transparent.png",
 }
 
+V161_SOURCE_FILES = {
+    "units/unit_recon_team.png": "exec-8c3b740f-097a-4028-9841-840f81b3c871.png",
+    "units/unit_screamer_zombie.png": "exec-ea420d5e-a9dc-4fa5-81e3-c5ea63245c2a.png",
+}
+
 
 def contain(source: Image.Image, bounds: tuple[int, int], y_offset: int = 0) -> Image.Image:
     image = source.convert("RGBA")
@@ -281,6 +286,19 @@ def build_v160(source_root: Path, output_root: Path) -> None:
         )
 
 
+def build_v161(source_root: Path, output_root: Path) -> None:
+    """Post-process the approved v1.6.1 Recon Team and Screamer concepts."""
+    for relative, source_name in V161_SOURCE_FILES.items():
+        destination = output_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source = Image.open(source_root / source_name)
+        contain(source, (202, 202)).save(
+            destination,
+            optimize=True,
+            compress_level=9,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source_root", type=Path)
@@ -292,6 +310,7 @@ def main() -> None:
     mode.add_argument("--v153-only", action="store_true")
     mode.add_argument("--v157-only", action="store_true")
     mode.add_argument("--v160-only", action="store_true")
+    mode.add_argument("--v161-only", action="store_true")
     args = parser.parse_args()
     if args.v140_only:
         build_v140(args.source_root, args.output_root)
@@ -305,6 +324,8 @@ def main() -> None:
         build_v157(args.source_root, args.output_root)
     elif args.v160_only:
         build_v160(args.source_root, args.output_root)
+    elif args.v161_only:
+        build_v161(args.source_root, args.output_root)
     else:
         build(args.source_root, args.output_root)
 

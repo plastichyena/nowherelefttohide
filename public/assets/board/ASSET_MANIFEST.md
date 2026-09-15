@@ -1,15 +1,15 @@
-# Nowhere Left to Hide v1.6.0 Board Asset Manifest
+# Nowhere Left to Hide v1.6.1 Board Asset Manifest
 
-- Generated: 2026-09-13
+- Generated: 2026-09-15
 - Runtime format: 256×256 PNG
 - Generated source resolutions: 1254×1254 for most sources, 1362×1155 for the
   twelve-Zombie Horde swarm, and 1536×1024 for Capital and Refinery; every
   checked-in runtime image is normalized to 256×256.
-- Runtime total: 40 PNG files, 1,933,090 bytes (approximately 1.84 MiB)
+- Runtime total: 42 PNG files, 2,013,814 bytes (approximately 1.92 MiB)
 - Source: original assets created for this project; no third-party images, real
   logos, seals, flags, or trademarks are included.
 - Provenance / licensing: generated specifically for this repository during
-  the v1.3.1, v1.4.4, v1.5.0, v1.5.3, v1.5.7, and v1.6.0 updates. No third-party asset or external
+  the v1.3.1, v1.4.4, v1.5.0, v1.5.3, v1.5.7, v1.6.0, and v1.6.1 updates. No third-party asset or external
   asset-license obligation is incorporated into these PNGs.
 - Generation: OpenAI built-in image generation. The built-in tool did not
   expose a more specific model identifier for recording.
@@ -94,6 +94,22 @@ normalization details are retained under
 `facilities/facility_oilfield.png` is intended for runtime use; Registry
 integration occurs with the v1.6.0 Oil Field implementation.
 
+The v1.6.1 Recon Team is an exactly five-person olive-drab team: two scoped
+precision-rifle scouts plus a binocular spotter, radio operator, and light
+infantry escort. The v1.6.1 Screamer Zombie is a single emaciated figure with
+an unmistakable upward scream and both hands raised beside its head. Both use
+genuine alpha, contain no real insignia or text, and were generated as original
+project artwork rather than reproductions of an existing composition. Their
+1254×1254 generated sources were normalized with the same 202×202 unit bounds
+used by the existing unit family. Only the two 256×256 derivatives are checked
+in. Source filenames and deterministic rebuild mapping are recorded in
+`scripts/build_board_assets.py` under `V161_SOURCE_FILES`.
+
+Runtime SHA256:
+
+- `units/unit_recon_team.png`: `2CC6C1567F3566B09C16419CFE428C3FA39645344EA2771E375B8B672C189BA9`
+- `units/unit_screamer_zombie.png`: `B45A61FE32DA8D30201815686AFCF90BD22710FE137E2F9C0E765EEDEF8FB10F`
+
 ## Runtime files
 
 | File | Core type / UI state | Purpose |
@@ -128,6 +144,8 @@ integration occurs with the v1.6.0 Oil Field implementation.
 | `units/unit_riot_zombie.png` | `riotZombie` | Approved three-person reanimated Riot group; normal Zombie AI |
 | `units/unit_hunter_zombie.png` | `hunterZombie` | v1.5.3 single Hunter Zombie; athletic runner clothing and long claws; normal Zombie AI |
 | `units/unit_gas_zombie.png` | `gasZombie` | Single Gas Zombie with swollen back gas sac and visible vapor |
+| `units/unit_recon_team.png` | planned `reconTeam` | v1.6.1 five-person Recon Team with two scoped precision rifles and three spotter/escort members |
+| `units/unit_screamer_zombie.png` | planned `screamerZombie` | v1.6.1 single emaciated Screamer Zombie in an original anguished screaming pose |
 | `overlays/state_unsecured.png` | Unowned facility | Gray dashed perimeter |
 | `overlays/state_secured.png` | Player-owned facility | Teal perimeter |
 | `overlays/state_stopped.png` | Current `operationalStatus === stopped` | Pause bars; not used for forecast warnings |
@@ -164,6 +182,9 @@ warnings, and Horde entrance directions remain dynamic UI overlays.
    and provenance are retained under `Art/reference/v1.5.7-barbed-wire-concept/`.
    The v1.6.0 Oil Field source and prompts are retained under
    `Art/reference/v1.6.0-oilfield-concept/` and rebuild with `--v160-only`.
+   The v1.6.1 Recon Team and Screamer source identifiers rebuild with
+   `--v161-only`; their source root is the generated-image directory recorded
+   by the built-in generation run.
 
 The original single-Zombie concept, approved three-Zombie normal-unit source,
 approved twelve-Zombie Horde source, and v1.4 facility references live in

@@ -64,11 +64,11 @@ export function forecastUnitCombatAtDistance(
       reason: null,
     };
   }
-  if (normalizedDistance === 1 && unit.currentMilitaryGoods === 0) {
+  if (normalizedDistance === 1 && unit.type !== 'reconTeam' && unit.currentMilitaryGoods < militaryGoodsCost) {
     return {
       distance: normalizedDistance,
       canAttack: true,
-      militaryGoodsCost: 0,
+      militaryGoodsCost: unit.currentMilitaryGoods,
       projectedMilitaryGoodsAfterAttack: 0,
       effectiveAttack: Math.max(1, Math.ceil(unit.attack * config.militaryGoodsShortageAttackMultiplier)),
       reason: null,

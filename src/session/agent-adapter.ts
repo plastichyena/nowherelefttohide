@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import type { GameState, JsonValue } from '../core/types';
+import type { DeepPartial, GameConfig, GameState, JsonValue } from '../core/types';
 import { DEFAULT_MAP_ID } from '../core/config';
 import { SAVE_FORMAT_VERSION as NUMERIC_SAVE_FORMAT_VERSION } from '../persistence/save';
 import { createAgentGame } from '../agent/game';
@@ -41,11 +41,11 @@ function adapt(game: SessionCapableAgentGame): SessionGameRuntime {
   };
 }
 
-export function createAgentSessionGameFactory(buildId: string): SessionGameFactory {
+export function createAgentSessionGameFactory(buildId: string, configOverrides?: DeepPartial<GameConfig>): SessionGameFactory {
   return {
     createNew: ({ seed, agentId }) => {
       const game = createAgentGame({ buildId, recordHistory: false }) as SessionCapableAgentGame;
-      game.reset({ seed, agent: { id: agentId } });
+      game.reset({ seed, agent: { id: agentId }, configOverrides });
       return adapt(game);
     },
     restore: ({ privateState, agentId, decision }) => {

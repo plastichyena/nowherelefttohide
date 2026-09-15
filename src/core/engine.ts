@@ -248,7 +248,11 @@ function interceptArmyBase(state: GameState, mover: UnitState, rng: SeededRng): 
   for (const base of state.facilities.filter(f=>f.type==='armyBase').sort((a,b)=>a.id.localeCompare(b.id))) {
     const distance=hexDistance(base.position,mover.position);
     if(distance>state.config.armyBase.range) continue;
-    while(state.units.some(u=>u.id===mover.id) && base.armyBase && base.owner==='player' && base.status==='owned' && base.operationalStatus==='operational' && base.infected===0 && base.workers>0) {
+    const canDefend = base.owner === 'player'
+      ? base.status === 'owned' && base.operationalStatus === 'operational'
+      : base.status === 'unowned' && base.earlyCaptureSurvivorStatus === 'available'
+        && !['disabled', 'ruined'].includes(base.operationalStatus);
+    while(state.units.some(u=>u.id===mover.id) && base.armyBase && canDefend && base.infected===0 && base.workers>0) {
       base.armyBase.interceptionsRemaining=Math.min(base.armyBase.interceptionsRemaining,base.workers);
       if(base.armyBase.interceptionsRemaining<=0 || base.armyBase.militaryGoods<state.config.armyBase.interceptionCost) break;
       base.armyBase.interceptionsRemaining--; base.armyBase.militaryGoods-=state.config.armyBase.interceptionCost;
@@ -256,8 +260,14 @@ function interceptArmyBase(state: GameState, mover: UnitState, rng: SeededRng): 
       state.pendingNoisePulses.push({id:`noise-${state.nextEventNumber}`,center:{...base.position},radius:state.config.armyBase.noiseRadius,sourceKind:'armyBase',sourceUnitType:'armyBase',emittedTurn:state.turn});
       state.statistics.noisePulsesEmitted++;
       state.statistics.noisePulsesBySourceType.armyBase++;
-      emit(state,'noise_emitted',{sourceUnitType:'armyBase',sourceKind:'armyBase',noiseClass:'large'});
-      emit(state,'interception',{facilityId:base.id,defenderId:mover.id,effectiveAttack:state.config.armyBase.attack,militaryGoodsCost:state.config.armyBase.interceptionCost});
+      if (base.owner === 'player' || isVisibleToPlayer(state, base.position)) {
+        emit(state,'noise_emitted',{sourceUnitType:'armyBase',sourceKind:'armyBase',noiseClass:'large'});
+      }
+      if (base.owner === 'player') {
+        emit(state,'interception',{facilityId:base.id,defenderId:mover.id,effectiveAttack:state.config.armyBase.attack,militaryGoodsCost:state.config.armyBase.interceptionCost});
+      } else if (isVisibleToPlayer(state, base.position)) {
+        emit(state, 'unsecured_army_base_interception', { facilityId: base.id, survivorRewardPossible: true });
+      }
       dealDamage(state,mover,state.config.armyBase.attack,base.id,'army_base_interception',rng);
       resolveFallenSiteNoiseRespawns(state,'armyBase',base.position,state.config.armyBase.noiseRadius,rng);
       if(distance>0) break;
@@ -338,7 +348,16 @@ function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRn
   facility.populationOperationalTurn = state.turn + 1;
   const captureReward = claimFirstCaptureReward(state, facility);
   emit(state, 'facility_captured', { facilityId: facility.id, unitId: unit.id, captureReward });
-  if (facility.armyBase?.reward === 'unclaimed') { facility.armyBase.reward=state.turn<=state.config.armyBase.rewardLastTurn ? 'pending' : 'expired'; settleArmyReward(state,facility,rng); }
+  if (facility.earlyCaptureSurvivorStatus === 'available') {
+    facility.earlyCaptureSurvivorStatus = 'rescued';
+    emit(state, 'survivors_rescued', { facilityId: facility.id, rescued: facility.workers });
+  }
+  if (facility.armyBase?.reward === 'unclaimed') {
+    facility.armyBase.reward = state.turn <= state.config.armyBase.rewardLastTurn && facility.workers > 0
+      ? 'pending'
+      : 'expired';
+    settleArmyReward(state,facility,rng);
+  }
 }
 
 function totalCheckpointPeople(checkpoint: CheckpointState): number {
@@ -353,12 +372,29 @@ function removeCheckpointPeople(
   let remaining = Math.max(0, Math.floor(amount));
   let removed = 0;
   for (const pool of order) {
+    if (pool === 'waiting') {
+      const fromWaiting = removeWaitingPeople(checkpoint, remaining);
+      remaining -= fromWaiting;
+      removed += fromWaiting;
+      if (remaining === 0) break;
+      continue;
+    }
     const fromPool = Math.min(remaining, checkpoint[pool]);
     checkpoint[pool] -= fromPool;
     remaining -= fromPool;
     removed += fromPool;
     if (remaining === 0) break;
   }
+  return removed;
+}
+
+function removeWaitingPeople(checkpoint: CheckpointState, amount: number): number {
+  const removed = Math.min(checkpoint.waiting, Math.max(0, Math.floor(amount)));
+  const grandfathered = checkpoint.grandfatheredWaiting ?? 0;
+  const regular = Math.max(0, checkpoint.waiting - grandfathered);
+  checkpoint.waiting -= removed;
+  checkpoint.grandfatheredWaiting = Math.max(0, grandfathered - Math.max(0, removed - regular));
+  if (checkpoint.grandfatheredWaiting === 0) checkpoint.grandfatheredPolicy = null;
   return removed;
 }
 
@@ -624,6 +660,48 @@ function processUnmanagedArrival(
 }
 
 function processRefugees(state: GameState, rng: SeededRng): void {
+  for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
+    const risk = checkpoint.waitingRiskPercent ?? 0;
+    checkpoint.waitingRiskPercent = 0;
+    if (risk > 0 && checkpoint.waiting > 0 && rng.nextInt(1, 100) <= risk) {
+      const infected = removeWaitingPeople(
+        checkpoint,
+        rng.nextInt(state.config.refugees.waitingRiskInfectionMin, state.config.refugees.waitingRiskInfectionMax),
+      );
+      checkpoint.infected += infected;
+      if (infected > 0) emit(state, 'checkpoint_waiting_risk_infection', { checkpointId: checkpoint.id, infected });
+    }
+  }
+
+  for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (!['operational', 'remnant'].includes(checkpoint.status)) continue;
+    if (checkpoint.screening > 0 && checkpoint.remainingTurns > 0) {
+      checkpoint.remainingTurns -= 1;
+      if (checkpoint.remainingTurns === 0) resolveScreeningBatch(state, checkpoint, rng);
+    }
+  }
+
+  for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (!['operational', 'remnant'].includes(checkpoint.status) || checkpoint.screening > 0) continue;
+    const role = deriveCheckpointRole(state, checkpoint);
+    if (role !== 'active' && role !== 'remnant') continue;
+    const branch = getRoadBranchState(state, checkpoint.branchId ?? checkpoint.direction);
+    const grandfathered = Math.min(checkpoint.waiting, checkpoint.grandfatheredWaiting ?? 0);
+    const policy = grandfathered > 0 ? checkpoint.grandfatheredPolicy : branch?.currentPolicy;
+    if (!policy || policy === 'deny') continue;
+    const batch = Math.min(grandfathered > 0 ? grandfathered : checkpoint.waiting, state.config.refugees.screeningCapacity);
+    if (batch <= 0) continue;
+    checkpoint.waiting -= batch;
+    if (grandfathered > 0) {
+      checkpoint.grandfatheredWaiting = grandfathered - batch;
+      if (checkpoint.grandfatheredWaiting === 0) checkpoint.grandfatheredPolicy = null;
+    }
+    checkpoint.screening = batch;
+    checkpoint.screeningPolicy = policy;
+    checkpoint.remainingTurns = state.config.refugees.policies[policy].turns;
+    if (checkpoint.remainingTurns === 0) resolveScreeningBatch(state, checkpoint, rng);
+  }
+
   for (const branch of [...state.roadBranches].sort((a, b) => a.branchId.localeCompare(b.branchId))) {
     const checkpoint = activeCheckpointForBranch(state, branch.branchId);
     const arrivalsEnded = state.horde.finalHordeStatus !== 'notStarted';
@@ -644,7 +722,8 @@ function processRefugees(state: GameState, rng: SeededRng): void {
         state.config.refugees.arrivalIntervalMin,
         state.config.refugees.arrivalIntervalMax,
       );
-      if (checkpoint) checkpoint.waiting += people;
+      const denied = checkpoint !== undefined && branch.currentPolicy === 'deny';
+      if (checkpoint && !denied) checkpoint.waiting += people;
       emit(state, 'refugees_arrived', {
         branchId: branch.branchId,
         checkpointId: checkpoint?.id ?? null,
@@ -652,31 +731,50 @@ function processRefugees(state: GameState, rng: SeededRng): void {
         unmanaged: !checkpoint,
       });
       if (!checkpoint) processUnmanagedArrival(state, branch.branchId, people, rng);
+      if (checkpoint && denied) {
+        state.population.cumulativeDepartures += people;
+        state.statistics.refugeesDeparted += people;
+        state.statistics.refugeesTurnedAwayByDirection[checkpoint.direction] += people;
+        const contributesToFutureHorde = state.horde.finalHordeStatus === 'notStarted';
+        if (contributesToFutureHorde) state.rejectedRefugeesByDirection[checkpoint.direction].turnedAway += people;
+        emit(state, 'checkpoint_refugees_turned_away', {
+          checkpointId: checkpoint.id, direction: checkpoint.direction, count: people,
+          contributesToFutureHorde, automatic: true,
+        });
+      }
     }
   }
   for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!['operational', 'remnant'].includes(checkpoint.status)) continue;
-    if (checkpoint.screening > 0 && checkpoint.remainingTurns > 0) {
-      checkpoint.remainingTurns -= 1;
-      if (checkpoint.remainingTurns === 0) {
-        resolveScreeningBatch(state, checkpoint, rng);
-      }
-    }
-    const role = deriveCheckpointRole(state, checkpoint);
-    if (checkpoint.screening === 0 && checkpoint.waiting > 0 && (role === 'active' || role === 'remnant')) {
-      const branch = getRoadBranchState(state, checkpoint.branchId ?? checkpoint.direction);
-      const policy = branch?.currentPolicy ?? 'normal';
-      const batch = Math.min(checkpoint.waiting, state.config.refugees.screeningCapacity);
-      checkpoint.waiting -= batch;
-      checkpoint.screening = batch;
-      checkpoint.screeningPolicy = policy;
-      checkpoint.remainingTurns = state.config.refugees.policies[policy].turns;
-      if (checkpoint.remainingTurns === 0) {
-        resolveScreeningBatch(state, checkpoint, rng);
-      }
-    }
+    checkpoint.waitingRiskPercent = Math.min(
+      state.config.refugees.waitingRiskMaxPercent,
+      Math.max(0, checkpoint.waiting - state.config.refugees.waitingRiskThreshold),
+    );
+    if (checkpoint.waitingRiskPercent > 0) emit(state, 'checkpoint_waiting_risk_reserved', {
+      checkpointId: checkpoint.id, riskPercent: checkpoint.waitingRiskPercent,
+    });
   }
   resolveCheckpointRemnants(state);
+}
+
+function expireNeutralFacilitySurvivors(state: GameState): void {
+  if (state.turn !== state.config.economy.neutralSurvivorRewardLastTurn) return;
+  for (const facility of [...state.facilities].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (facility.owner !== 'none' || facility.earlyCaptureSurvivorStatus !== 'available') continue;
+    const expired = facility.workers;
+    facility.workers = 0;
+    facility.infected += expired;
+    facility.earlyCaptureSurvivorStatus = 'lost';
+    if (facility.armyBase) facility.armyBase.reward = 'expired';
+    if (expired > 0) {
+      facility.operationalStatus = 'infected';
+      emit(state, 'survivors_expired', {
+        facilityId: facility.id,
+        expired,
+        publicVisible: isVisibleToPlayer(state, facility.position),
+      });
+    }
+  }
 }
 
 function removeWorkersForShortage(state: GameState, amount: number, resource: 'food' | 'civilianGoods'): number {
@@ -967,7 +1065,7 @@ function chooseHordeSlotType(
     .filter(type => type !== 'gasZombie' || (gasEligible && gasCount < state.config.horde.gasZombieCapPerDirection))
     .filter((type) => type !== 'riotZombie' || riotCount < state.config.horde.riotZombieCapPerDirection)
     .filter((type) => type !== 'hunterZombie' || hunterCount < state.config.horde.hunterZombieCapPerDirection)
-    .map((type) => ({ type, weight: type === 'zombie' && gasEligible ? Math.max(state.config.horde.specialZombieWeights.zombie > 0 ? 1 : 0, state.config.horde.specialZombieWeights.zombie - state.config.horde.specialZombieWeights.gasZombie) : state.config.horde.specialZombieWeights[type] }))
+    .map((type) => ({ type, weight: type === 'zombie' && gasEligible ? Math.max(state.config.horde.specialZombieWeights.zombie > 0 ? 1 : 0, state.config.horde.specialZombieWeights.zombie - state.config.horde.specialZombieWeights.gasZombie) : (state.config.horde.specialZombieWeights[type] ?? 0) }))
     .filter((entry) => entry.weight > 0);
   const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
   let roll = rng.nextInt(1, total);
@@ -976,6 +1074,14 @@ function chooseHordeSlotType(
     if (roll <= 0) return entry.type;
   }
   return entries.at(-1)!.type;
+}
+
+function possibleNonHordeTypesForWave(
+  state: Readonly<GameState>,
+  waveIndex: number,
+): Exclude<ZombieUnitType, 'hordeZombie'>[] {
+  const gasEligible = waveIndex - 1 >= Math.max(0, state.config.horde.waves.length - 2);
+  return WAVE_NON_HORDE_TYPES.filter((type) => type !== 'gasZombie' || gasEligible);
 }
 
 function freezeWaveRoster(
@@ -1044,14 +1150,15 @@ function eligibleAdjacentZombieSpawnPositions(state: Readonly<GameState>, origin
     .sort((left, right) => left.q - right.q || left.r - right.r);
 }
 
-function createSiteSpawnedZombie(state: GameState, position: HexCoord): UnitState {
-  let id = `zombie-${state.nextUnitNumber}`;
+function createSiteSpawnedZombie(state: GameState, position: HexCoord, type: ZombieUnitType = 'zombie'): UnitState {
+  const prefix = type.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+  let id = `${prefix}-${state.nextUnitNumber}`;
   while (state.units.some((unit) => unit.id === id)) {
     state.nextUnitNumber += 1;
-    id = `zombie-${state.nextUnitNumber}`;
+    id = `${prefix}-${state.nextUnitNumber}`;
   }
   state.nextUnitNumber += 1;
-  const unit = createUnit(state, id, 'zombie', position);
+  const unit = createUnit(state, id, type, position);
   unit.canMove = false;
   unit.canAttack = false;
   state.units.push(unit);
@@ -1067,7 +1174,7 @@ function resolveSiteZombieSpawn(
   queue: SpawnOccupancyEntry[],
   chainRootEventId: string | null,
   chainDepth: number,
-  originUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant' | null = null,
+  originUnitType: HumanUnitType | 'hordeZombie' | 'screamerZombie' | 'armyBase' | 'windPowerPlant' | null = null,
 ): { remainingInfected: number; actualSpawnCount: number; eventId: string } {
   const perUnit = state.config.infection.zombieSpawnPopulationPerUnit;
   const requestedSpawnCount = Math.min(
@@ -1097,9 +1204,17 @@ function resolveSiteZombieSpawn(
   const rootEventId = chainRootEventId ?? primaryEvent.id;
   const spawned: UnitState[] = [];
   for (let index = 0; index < actualSpawnCount; index += 1) {
+    let spawnedType: ZombieUnitType = 'zombie';
+    if (eventType === 'site_noise_respawn' && site.siteKind === 'facility') {
+      const roll = rng.nextInt(1, 100);
+      spawnedType = roll <= 70 ? 'zombie' : roll <= 80 ? 'gasZombie' : roll <= 90 ? 'hunterZombie' : 'screamerZombie';
+    }
     const position = available.length > 1 ? rng.pick(available) : available[0]!;
     available = available.filter((candidate) => hexKey(candidate) !== hexKey(position));
-    const unit = createSiteSpawnedZombie(state, position);
+    const unit = createSiteSpawnedZombie(state, position, spawnedType);
+    if (spawnedType === 'hunterZombie') state.statistics.hunterZombiesSpawned += 1;
+    if (spawnedType === 'gasZombie') state.statistics.gasZombiesSpawned += 1;
+    if (spawnedType === 'screamerZombie') state.statistics.screamerZombiesSpawned += 1;
     spawned.push(unit);
     queue.push({ unitId: unit.id, chainRootEventId: rootEventId, chainDepth });
   }
@@ -1158,6 +1273,7 @@ function fallFacility(
     return;
   }
   if (facility.status === 'ruined') return;
+  if (facility.armyBase?.reward === 'unclaimed') facility.armyBase.reward = 'expired';
   const infectedAtFall = facility.infected;
   if (facility.constructible) {
     const result = resolveSiteZombieSpawn(
@@ -1842,7 +1958,7 @@ function hasVisiblePopulationTarget(state: GameState, zombie: UnitState): boolea
 }
 
 interface CombatNoiseResolution {
-  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant';
+  sourceUnitType: HumanUnitType | 'hordeZombie' | 'screamerZombie' | 'armyBase' | 'windPowerPlant';
   center: HexCoord;
   radius: number;
 }
@@ -1900,9 +2016,28 @@ function emitHordeMovementNoise(
   return { sourceUnitType: 'hordeZombie', center: { ...center }, radius };
 }
 
+function emitScreamerScream(state: GameState, source: UnitState, rng: SeededRng): void {
+  if (source.type !== 'screamerZombie' || source.hasScreamed) return;
+  source.hasScreamed = true;
+  const radius = state.config.units.screamerZombie.screamRadius;
+  state.pendingNoisePulses.push({
+    id: `noise-${state.nextEventNumber}`,
+    center: { ...source.position },
+    radius,
+    sourceKind: 'scream',
+    sourceUnitType: 'screamerZombie',
+    emittedTurn: state.turn,
+  });
+  state.statistics.noisePulsesEmitted += 1;
+  state.statistics.screamerScreams += 1;
+  state.statistics.noisePulsesBySourceType.screamerZombie += 1;
+  emit(state, 'screamer_scream', { noiseClass: 'extraLarge' });
+  resolveFallenSiteNoiseRespawns(state, 'screamerZombie', source.position, radius, rng);
+}
+
 function resolveFallenSiteNoiseRespawns(
   state: GameState,
-  sourceUnitType: HumanUnitType | 'hordeZombie' | 'armyBase' | 'windPowerPlant',
+  sourceUnitType: HumanUnitType | 'hordeZombie' | 'screamerZombie' | 'armyBase' | 'windPowerPlant',
   center: HexCoord,
   radius: number,
   rng: SeededRng,
@@ -2133,6 +2268,10 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
       noiseTarget: null,
       noiseChanged: null,
     };
+    if (
+      zombie.type === 'screamerZombie' &&
+      (decision.reason === 'visible_population' || decision.reason === 'inherited_horde' || decision.reason === 'wave_capital')
+    ) emitScreamerScream(state, zombie, rng);
     if (isNormalAiZombie(zombie)) {
       const noiseAcquiredAfterSnapshot =
         zombie.noiseTarget !== null && decision.noiseTarget === null && decision.noiseChanged === null
@@ -2267,6 +2406,7 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
         (facility.type === 'windPowerPlant' || ((facility.constructible || facility.type === 'armyBase') && facility.workers === 0 && facility.infected === 0))
       ) {
         facility.operationalStatus = 'disabled';
+        if (facility.armyBase?.reward === 'unclaimed') facility.armyBase.reward = 'expired';
         facility.infected = 0;
         emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type, source: zombie.id });
       } else if (facility.status !== 'ruined') {
@@ -2338,7 +2478,7 @@ function beginHordeWarningIfDue(state: GameState, rng: SeededRng): void {
     directions: [...state.horde.warningDirections],
     hordeZombieCountPerDirection: wave.compositionPerDirection.hordeZombie,
     nonHordeSlotCountPerDirection: wave.compositionPerDirection.zombie,
-    possibleNonHordeTypes: [...WAVE_NON_HORDE_TYPES],
+    possibleNonHordeTypes: possibleNonHordeTypesForWave(state, state.horde.nextWaveIndex),
   });
 }
 
@@ -2426,6 +2566,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
       ...remainingNonHordes.slice(0, nonHordeThisBatch),
     ];
     const spawned = types.map((type, index) => createWaveZombie(state, pending, type, available[index]!));
+    for (const screamer of spawned.filter((unit) => unit.type === 'screamerZombie')) emitScreamerScream(state, screamer, rng);
     pending.roster = [
       ...Array.from({ length: remainingHordes - hordeThisBatch }, () => 'hordeZombie' as const),
       ...remainingNonHordes.slice(nonHordeThisBatch),
@@ -2446,7 +2587,8 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
     state.statistics.riotZombiesSpawned += count('riotZombie');
     state.statistics.hunterZombiesSpawned += count('hunterZombie');
     state.statistics.gasZombiesSpawned += count('gasZombie');
-    for (const type of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const) {
+    state.statistics.screamerZombiesSpawned += count('screamerZombie');
+    for (const type of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as const) {
       state.statistics.hordeSpecialSpawnedByType[type] += count(type);
       if (pending.kind === 'final') state.statistics.finalSpecialZombiesSpawnedByType[type] += count(type);
     }
@@ -2765,6 +2907,7 @@ function endTurn(state: GameState, rng: SeededRng): ActionError | null {
   if (checkImmediateGameEnd(state)) return null;
   state.phase = 'refugees';
   processRefugees(state, rng);
+  expireNeutralFacilitySurvivors(state);
   synchronizePopulation(state);
   if (checkImmediateGameEnd(state)) return null;
   state.phase = 'infection';
@@ -3154,6 +3297,9 @@ function createOperationalCheckpoint(
     nextArrivalTurn: branch?.nextArrivalTurn ?? null,
     infected: 0,
     overrunProcessed: false,
+    grandfatheredWaiting: 0,
+    grandfatheredPolicy: null,
+    waitingRiskPercent: 0,
   };
   state.checkpoints.push(checkpoint);
   if (branch && role === 'active') branch.activeCheckpointId = checkpoint.id;
@@ -3380,7 +3526,7 @@ function validateSetCheckpointPolicy(state: Readonly<GameState>, action: Extract
   if (budget) return budget;
   const branch = getRoadBranchState(state, action.branchId);
   if (!branch || !activeCheckpointForBranch(state, action.branchId)) return error(action, 'unknown_operational_checkpoint', 'This branch has no active checkpoint');
-  if (!['passThrough', 'normal', 'strict'].includes(action.policy)) return error(action, 'invalid_policy', 'Unknown checkpoint policy');
+  if (!['passThrough', 'normal', 'strict', 'deny'].includes(action.policy)) return error(action, 'invalid_policy', 'Unknown checkpoint policy');
   return { branch };
 }
 
@@ -3388,8 +3534,26 @@ function setCheckpointPolicy(state: GameState, action: Extract<GameAction, { typ
   const validation = validateSetCheckpointPolicy(state, action);
   if ('code' in validation) return validation;
   const { branch } = validation;
+  const previousPolicy = branch.currentPolicy;
+  let grandfatheredWaiting = 0;
+  if (action.policy === 'deny' && branch.currentPolicy !== 'deny') {
+    const previous = branch.currentPolicy;
+    for (const checkpoint of state.checkpoints.filter((candidate) =>
+      (candidate.branchId ?? candidate.direction) === branch.branchId && candidate.waiting > 0
+    )) {
+      checkpoint.grandfatheredWaiting = checkpoint.waiting;
+      checkpoint.grandfatheredPolicy = previous;
+      grandfatheredWaiting += checkpoint.waiting;
+    }
+  }
   branch.currentPolicy = action.policy;
   state.actionsTakenThisTurn += 1;
+  emit(state, 'checkpoint_policy_changed', {
+    branchId: branch.branchId,
+    previousPolicy,
+    policy: action.policy,
+    grandfatheredWaiting,
+  });
   return null;
 }
 
@@ -3416,7 +3580,7 @@ function turnAwayCheckpointRefugees(
   const validation = validateTurnAwayCheckpointRefugees(state, action);
   if ('code' in validation) return validation;
   const { checkpoint } = validation;
-  checkpoint.waiting -= action.count;
+  removeWaitingPeople(checkpoint, action.count);
   state.population.cumulativeDepartures += action.count;
   state.statistics.refugeesDeparted += action.count;
   state.statistics.refugeesTurnedAwayByDirection[checkpoint.direction] += action.count;
@@ -3749,6 +3913,7 @@ function buildConstructibleFacility(
     builtTurn: state.turn,
     recoveryOperationalTurn: null,
     firstCaptureRewardClaimed: true,
+    earlyCaptureSurvivorStatus: 'notApplicable',
   };
   state.facilities.push(facility);
   if (action.facilityType === 'temporaryHousing') state.statistics.housingBuilt += 1;
@@ -3831,7 +3996,7 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   }
   if (action.type === 'LoadSnapshot') {
     const valid = validateInvariants(action.snapshot);
-    const seededInitialZombiesValid = initialZombiePositionsMatchSeed(action.snapshot.map, action.snapshot.seed) && initialHunterPositionsMatchSeed(action.snapshot);
+    const seededInitialZombiesValid = initialZombiePositionsMatchSeed(action.snapshot.map, action.snapshot.seed, action.snapshot.config.units.zombie.vision) && initialHunterPositionsMatchSeed(action.snapshot);
     if (action.snapshot.gameVersion !== state.gameVersion || !valid.valid || !seededInitialZombiesValid) {
       if (!seededInitialZombiesValid) valid.errors.push('Map initial Zombie positions and order must match the deterministic state seed');
       return error(action, 'invalid_snapshot', valid.errors.join('; ') || 'Unsupported game version');
@@ -4241,7 +4406,7 @@ export class GameEngine implements HeadlessGame {
     }
     for (const branch of [...this.state.roadBranches].sort((a, b) => a.branchId.localeCompare(b.branchId))) {
       if (!activeCheckpointForBranch(this.state, branch.branchId)) continue;
-      for (const policy of ['passThrough', 'normal', 'strict'] as const) {
+      for (const policy of ['passThrough', 'normal', 'strict', 'deny'] as const) {
         if (policy !== branch.currentPolicy) actions.push({ type: 'SetCheckpointPolicy', branchId: branch.branchId, policy });
       }
     }
@@ -4275,7 +4440,12 @@ export class GameEngine implements HeadlessGame {
       };
       if (validationError(validateDecommissionConstructibleFacility(this.state, action)) === null) actions.push(action);
     }
-    for (const base of this.state.facilities.filter(f=>f.type==='armyBase')) { const action: GameAction={type:'ProduceUnit',unitType:'nationalGuard',destination:{...base.position}}; if (!('code' in validateProduceUnit(this.state,action))) actions.push(action); }
+    for (const base of this.state.facilities.filter(f => f.type === 'armyBase')) {
+      for (const unitType of HUMAN_UNIT_TYPES.filter((type) => this.state.config.units[type].recruitmentFacilityTypes.includes('armyBase'))) {
+        const action: GameAction = { type: 'ProduceUnit', unitType, destination: { ...base.position } };
+        if (!('code' in validateProduceUnit(this.state, action))) actions.push(action);
+      }
+    }
     const currentCivilianWorkers = civilianWorkerCount(this.state);
     for (const city of cities.filter((candidate) => suppliedKeys.has(hexKey(candidate.position)))) {
       if (!this.state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) {
@@ -4325,7 +4495,7 @@ export class GameEngine implements HeadlessGame {
       try {
         const candidate = cloneState(action.snapshot);
         const valid = validateInvariants(candidate);
-        const seededInitialZombiesValid = initialZombiePositionsMatchSeed(candidate.map, candidate.seed) && initialHunterPositionsMatchSeed(candidate);
+        const seededInitialZombiesValid = initialZombiePositionsMatchSeed(candidate.map, candidate.seed, candidate.config.units.zombie.vision) && initialHunterPositionsMatchSeed(candidate);
         if (candidate.gameVersion !== original.gameVersion || !valid.valid || !seededInitialZombiesValid) {
           if (!seededInitialZombiesValid) valid.errors.push('Map initial Zombie positions and order must match the deterministic state seed');
           return { state: this.getState(), events: [], error: error(action, 'invalid_snapshot', valid.errors.join('; ') || 'Unsupported game version'), gameOver: false, result: null };

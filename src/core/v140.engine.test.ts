@@ -15,7 +15,7 @@ import { hexDistance, hexKey } from './hex';
 import { createCityPopulationSnapshot, createInitialState, createUnit, facilityZombieTargetValue, synchronizePopulation } from './state';
 import { getPlayerVisibleTileKeys } from './visibility';
 import { isHexSupplied } from './supply';
-import { singleFinalWave } from './testConfig';
+import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 import type { GameConfig, GameState, HexCoord } from './types';
 
 const CENTER: HexCoord = { q: 25, r: 25 };
@@ -42,8 +42,7 @@ function cloneState(state: Readonly<GameState>): GameState {
 }
 
 function syncScenario(state: GameState): void {
-  synchronizePopulation(state);
-  createCityPopulationSnapshot(state);
+  prepareTestSnapshot(state);
 }
 
 function loadScenario(engine: GameEngine, state: GameState): void {
@@ -66,12 +65,12 @@ function facilityAt(state: Readonly<GameState>, id: string) {
 describe('v1.4 Unit Fuel and deterministic refuel', () => {
   it('uses the Hex-count Fuel table independently from weighted Terrain Cost', () => {
     expect([0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((distance) => unitMoveFuelCost('police', distance)))
-      .toEqual([0, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+      .toEqual([0, 2, 2, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]);
     expect([0, 1, 2, 5, 6, 7, 8, 9, 10].map((distance) => unitMoveFuelCost('nationalGuard', distance)))
-      .toEqual([0, 1, 1, 1, 3, 5, 7, 9, 11]);
+      .toEqual([0, 2, 2, 2, 6, 10, 14, 18, 22]);
     const state = createInitialState(1401, safeConfig());
-    expect(state.units.find((unit) => unit.type === 'police')).toMatchObject({ currentFuel: 12, maxFuel: 12, movement: 15 });
-    expect(state.units.find((unit) => unit.type === 'nationalGuard')).toMatchObject({ currentFuel: 22, maxFuel: 22, movement: 10 });
+    expect(state.units.find((unit) => unit.type === 'police')).toMatchObject({ currentFuel: 24, maxFuel: 24, movement: 15 });
+    expect(state.units.find((unit) => unit.type === 'nationalGuard')).toMatchObject({ currentFuel: 44, maxFuel: 44, movement: 10 });
   });
 
   it('rejects a Move whose planned Fuel exceeds the Unit pool without changing State or PRNG', () => {
@@ -149,13 +148,13 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
       projectedPowerFuelDemand: 12,
       projectedPowerFuelUsed: 4,
       fuelAfterPower: 1,
-      projectedUnitRefillDemand: 2,
+      projectedUnitRefillDemand: 14,
       projectedUnitFuelRefilled: 1,
       projectedEndingFuel: 0,
     });
     expect(forecastUnitRefills(before)).toEqual(expect.arrayContaining([
-      { unitId: 'police-1', demand: 2, amount: 1 },
-      { unitId: 'national-guard-1', demand: 2, amount: 0 },
+      { unitId: 'police-1', demand: 14, amount: 1 },
+      { unitId: 'national-guard-1', demand: 24, amount: 0 },
     ]));
     const beforeJson = JSON.stringify(before);
     expect(JSON.stringify(forecastEndTurn(before))).not.toBe(beforeJson);

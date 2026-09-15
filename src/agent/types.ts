@@ -35,17 +35,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.6.0';
-export const GAME_RULES_VERSION = '10.0.0';
-export const SAVE_FORMAT_VERSION = '17';
-export const AGENT_API_VERSION = '15.0.0';
-export const OBSERVATION_API_VERSION = '15.0.0';
-export const BRIDGE_API_VERSION = '15.0.0';
-export const BALANCED_AGENT_VERSION = '9.0.0';
+/** v1.6.1 rejects all earlier state and public API schemas without migration. */
+export const APP_VERSION = '1.6.1';
+export const GAME_RULES_VERSION = '11.0.0';
+export const SAVE_FORMAT_VERSION = '18';
+export const AGENT_API_VERSION = '16.0.0';
+export const OBSERVATION_API_VERSION = '16.0.0';
+export const BRIDGE_API_VERSION = '16.0.0';
+export const BALANCED_AGENT_VERSION = '10.0.0';
 export const RANDOM_AGENT_VERSION = '6.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '14.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '11.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '15.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '12.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -188,6 +188,7 @@ export interface AgentSupplyObservation {
 }
 
 export interface AgentFacilityObservation {
+  earlyCaptureSurvivorReward?: 'possible' | 'lost' | 'rescued' | 'not_applicable';
   recovery: ReturnType<typeof import('../core/public-entities').facilityRecoveryProjection>;
   armyBase?: null | {
     militaryGoods:number; maxMilitaryGoods:number; interceptionsRemaining:number; interceptionsRefresh:'zombie_phase_start';
@@ -389,6 +390,9 @@ export interface AgentCheckpointObservation {
   status: 'operational' | 'remnant' | 'ruined' | 'abandoned';
   role: CheckpointRole;
   waiting: number;
+  grandfatheredWaiting?: number;
+  grandfatheredPolicy?: Exclude<CheckpointPolicy, 'deny'> | null;
+  waitingRiskPercent?: number;
   screening: number;
   approved: number;
   queuePeople: number;
@@ -477,6 +481,19 @@ export interface AgentApiInfo {
       };
       productionFacilities: FacilityType[];
       productionCost: { population: number; civilianGoods: number; militaryGoods: number };
+    };
+    recon?: {
+      recruitAttack: number;
+      hp: number;
+      movement: number;
+      range: number;
+      vision: number;
+      population: number;
+      maxFuel: number;
+      maxMilitaryGoods: number;
+      attackMilitaryGoodsCost: number;
+      noiseClass: 'medium';
+      productionFacilities: FacilityType[];
     };
     recovery: {
       combatRate: number;
@@ -970,7 +987,7 @@ export interface AgentRunArtifact {
   /** Present for a Session artifact; absent for a standalone run. */
   sessionLineage?: { parentSessionId: string | null; parentCheckpointId: string | null };
   result: AgentGameResult | null;
-  /** Static map projection stored once per game by Artifact Schema 14.0.0. */
+  /** Static map projection stored once per game by Artifact Schema 15.0.0. */
   fixedMap?: AgentMapObservation;
   /** Dynamic public observations at reset and after each accepted action. */
   observationTrace?: AgentArtifactObservation[];
@@ -982,7 +999,7 @@ export interface AgentRunArtifact {
 }
 
 /**
- * Artifact Schema 14.0.0 stores topology once and keeps only dynamic map
+ * Artifact Schema 15.0.0 stores topology once and keeps only dynamic map
  * visibility in each trace entry.  Live observations remain complete.
  */
 export type AgentArtifactObservation = Omit<AgentObservation, 'map'> & {

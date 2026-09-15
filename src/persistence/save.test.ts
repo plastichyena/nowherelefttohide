@@ -129,9 +129,9 @@ describe('v1.6.0 Save Format 17', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 17,
+      formatVersion: 18,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-51x51-v5',
+      mapId: 'fixed-51x51-v6',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -160,10 +160,10 @@ describe('v1.6.0 Save Format 17', () => {
       recruitSurvivalTurns: 5,
       regularZombieKills: 5,
       veteranPromotionPending: false,
-      maxFuel: 12,
-      currentFuel: 12,
-      maxMilitaryGoods: 5,
-      currentMilitaryGoods: 5,
+      maxFuel: 24,
+      currentFuel: 24,
+      maxMilitaryGoods: 10,
+      currentMilitaryGoods: 10,
       maxAttackCharges: 2,
       attackChargesRemaining: 1,
     });
@@ -242,20 +242,20 @@ describe('v1.6.0 Save Format 17', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(17);
-    expect(envelope.gameVersion).toBe('10.0.0');
-    expect(config.version).toBe('10.0.0');
-    expect(config.mapId).toBe('fixed-51x51-v5');
+    expect(envelope.formatVersion).toBe(18);
+    expect(envelope.gameVersion).toBe('11.0.0');
+    expect(config.version).toBe('11.0.0');
+    expect(config.mapId).toBe('fixed-51x51-v6');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
-    expect(state).toHaveProperty('finalHordeTurn', 50);
+    expect(state).toHaveProperty('finalHordeTurn', 70);
     expect(state).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('finalHordeTurn');
     expect(config).toMatchObject({
       economy: {
-        initialZombieCount: 25,
+        initialZombieCount: 50,
         initialHunterCount: { min: 1, max: 4 },
         initialHunterMinDistance: 20,
         initialGasCount: { min: 1, max: 2 },
@@ -268,7 +268,7 @@ describe('v1.6.0 Save Format 17', () => {
         noiseRespawnEnabled: true,
       },
       unitExperience: {
-        productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit' },
+        productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit', reconTeam: 'recruit' },
         recruitSurvivalTurnsRequired: 5,
         regularAttackMultiplier: 1.25,
         regularAttackRounding: 'ceil',
@@ -276,24 +276,26 @@ describe('v1.6.0 Save Format 17', () => {
         veteranAttackCharges: 2,
       },
       horde: {
-        specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5 },
+        specialZombieWeights: { zombie: 65, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5, screamerZombie: 5 },
         riotZombieCapPerDirection: 1,
         hunterZombieCapPerDirection: 1,
         gasZombieCapPerDirection: 1,
         movementNoiseRadius: 8,
       },
       windPower: { noiseRadius: 8 },
-      armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 20 },
+      armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 10 },
       units: {
         police: { recruitAttack: 6, noiseClass: 'medium', noiseRadius: 4 },
         riotPolice: { hp: 75, recruitAttack: 9, reanimationUnitType: 'riotZombie', noiseRadius: 5 },
         riotZombie: { hp: 60, attack: 5 },
         hunterZombie: { hp: 20, attack: 15, movement: 15, range: 1, vision: 5 },
         gasZombie: { hp: 35, attack: 5, explosionDamage: 30, explosionInfection: 30 },
+        screamerZombie: { hp: 15, attack: 10, movement: 3, range: 1, vision: 2, screamRadius: 30 },
+        reconTeam: { hp: 25, recruitAttack: 9, movement: 10, range: 6, vision: 10, noiseRadius: 6 },
       },
     });
     expect(state).toHaveProperty('pendingNoisePulses', []);
-    expect((state.map as Record<string, unknown>).initialZombiePositions).toHaveLength(25);
+    expect((state.map as Record<string, unknown>).initialZombiePositions).toHaveLength(50);
     expect(state).toHaveProperty('initialHunterPositions');
     expect((state.initialHunterPositions as unknown[]).length).toBeGreaterThanOrEqual(1);
     expect((state.initialHunterPositions as unknown[]).length).toBeLessThanOrEqual(4);
@@ -304,7 +306,7 @@ describe('v1.6.0 Save Format 17', () => {
       expect.objectContaining({ id: 'army-base-1', type: 'armyBase' }),
     ]));
     expect(state.statistics).toMatchObject({
-      initialNormalZombies: 25,
+      initialNormalZombies: 50,
       noiseRespawnAttempts: 0,
       infectedPopulationConvertedToZombies: 0,
       groundVisionBlockedHexes: 0,
@@ -639,7 +641,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v17 autosave key and never rewrites or removes the v16 legacy key', () => {
+  it('uses the v18 autosave key and never rewrites or removes the v17 legacy key', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
     legacy.formatVersion = 10;

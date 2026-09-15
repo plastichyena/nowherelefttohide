@@ -110,6 +110,7 @@ export const BOARD_UNIT_TYPES = [
   'police',
   'nationalGuard',
   'riotPolice',
+  'reconTeam',
   'zombie',
   'hordeZombie',
   'policeZombie',
@@ -117,11 +118,12 @@ export const BOARD_UNIT_TYPES = [
   'riotZombie',
   'hunterZombie',
   'gasZombie',
+  'screamerZombie',
 ] as const satisfies readonly UnitType[];
 export type BoardUnitAssetType = (typeof BOARD_UNIT_TYPES)[number];
 
 /** Zombie-side unit types rendered by the Board (including reanimated units). */
-export const BOARD_ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const;
+export const BOARD_ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as const;
 export type BoardZombieUnitAssetType = (typeof BOARD_ZOMBIE_UNIT_TYPES)[number];
 
 export const BOARD_COMMON_STATE_LAYERS = ['infected', 'ruined'] as const;
@@ -187,9 +189,11 @@ export const BOARD_ASSET_REGISTRY = {
     policeZombie: 'units/unit_police_zombie.png',
     soldierZombie: 'units/unit_soldier_zombie.png',
     riotPolice: 'units/unit_riot_police.png',
+    reconTeam: 'units/unit_recon_team.png',
     riotZombie: 'units/unit_riot_zombie.png',
     hunterZombie: 'units/unit_hunter_zombie.png',
     gasZombie: 'units/unit_gas_zombie.png',
+    screamerZombie: 'units/unit_screamer_zombie.png',
   },
 } as const;
 

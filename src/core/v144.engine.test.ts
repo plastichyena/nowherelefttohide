@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
 import { forecastEndTurn, GameEngine, getCheckpointBuildCost } from './engine';
-import { singleFinalWave } from './testConfig';
+import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 import {
   createInitialState,
   createUnit,
@@ -12,14 +12,11 @@ import {
 type Snapshot = ReturnType<typeof createInitialState>;
 
 function rebalance(state: Snapshot): void {
-  synchronizePopulation(state);
-  state.population.initialPopulation = populationLedgerTotal(state)
-    - state.population.cumulativeArrivals
-    - state.population.cumulativeDiscoveredInfected
-    + state.population.cumulativeDepartures;
+  prepareTestSnapshot(state);
 }
 
 function load(engine: GameEngine, snapshot: Snapshot): void {
+  prepareTestSnapshot(snapshot);
   const result = engine.step({ type: 'LoadSnapshot', snapshot });
   expect(result.error).toBeNull();
 }
@@ -109,7 +106,13 @@ describe('v1.4.5 checkpoint and rejection rules', () => {
   it('adds ceil(rejected/5) normal Zombies on the participating front, resets it, and ends arrivals', () => {
     const config = createDefaultConfig({
       economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
-      horde: singleFinalWave(1, { hordeZombie: 1, zombie: 0 }, 1),
+      horde: {
+        ...singleFinalWave(1, { hordeZombie: 1, zombie: 0 }, 1),
+        specialZombieWeights: {
+          zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0,
+          hunterZombie: 0, gasZombie: 0, screamerZombie: 0,
+        },
+      },
     });
     const engine = new GameEngine(14403, config);
     const snapshot = engine.getState() as Snapshot;

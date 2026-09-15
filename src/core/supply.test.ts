@@ -4,7 +4,7 @@ import { GameEngine, validateAction } from './engine';
 import { hexDistance } from './hex';
 import { createFixedMap } from './map';
 import { createUnit } from './state';
-import { singleFinalWave } from './testConfig';
+import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 import type { GameState } from './types';
 import {
   getBlockingZombiesForCheckpoint,
@@ -183,11 +183,13 @@ describe('road branches and supply network', () => {
     power.operationalStatus = 'stopped';
     power.populationOperationalTurn = 1;
     power.securedOrder = 6;
+    power.workers = 0;
     snapshot.population.facilityWorkers.push({ facilityId: power.id, workers: 0 });
     snapshot.population.facilityWorkers.sort((a, b) => a.facilityId.localeCompare(b.facilityId));
     const police = snapshot.units.find((unit) => unit.type === 'police')!;
     police.position = { q: 2, r: 2 };
     police.hp = 10;
+    prepareTestSnapshot(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'AssignWorkers', facilityId: power.id, workers: 1 }).error?.code)
       .toBe('facility_out_of_supply');

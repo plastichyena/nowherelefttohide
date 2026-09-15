@@ -91,7 +91,7 @@ function captureFacility(engine: GameEngine, facilityId: string) {
   return engine.step({ type: 'Move', unitId: 'police-1', destination: target.position });
 }
 
-function oilFixture(workers: number, remainingAllowance = 5_000): GameState {
+function oilFixture(workers: number, remainingAllowance = 2_000): GameState {
   const state = testState();
   for (const candidate of state.facilities) setFacilityStopped(candidate);
   const powerPlant = facility(state, 'power-plant-1');
@@ -101,11 +101,12 @@ function oilFixture(workers: number, remainingAllowance = 5_000): GameState {
   const refinery = facility(state, 'refinery-1');
   setFacilityOperating(refinery, 10);
   refinery.powerSupplyEnabled = true;
-  const oil = facility(state, 'oilfield-north');
+  const oil = state.facilities.find((candidate) => candidate.type === 'oilField');
+  if (!oil) throw new Error('Missing seed-selected Oil Field');
   setFacilityOperating(oil, workers);
   state.refineryAllowance = {
-    initialAllowance: 5_000,
-    oilCreditsEarned: 5_000 - remainingAllowance,
+    initialAllowance: 2_000,
+    oilCreditsEarned: 2_000 - remainingAllowance,
     fuelRefined: 0,
     remainingAllowance,
   };
@@ -114,31 +115,26 @@ function oilFixture(workers: number, remainingAllowance = 5_000): GameState {
 }
 
 describe('v1.6 Core acceptance', () => {
-  it('uses the v5 facility set, exact Oil coordinates, four branches, and one-hex Oil access spurs', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v5');
+  it('uses the v6 facility set with one Oil Field, four branches, and its one-hex access spur', () => {
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v6');
     expect(FIXED_MAP.facilities).toHaveLength(FIXED_FACILITY_COUNT);
     expect(FIXED_MAP.roadBranches).toHaveLength(4);
     const removed = ['refinery-2', 'refinery-3', 'refinery-4', 'power-plant-2', 'power-plant-3'];
     expect(FIXED_MAP.facilities.some((candidate) => removed.includes(candidate.id))).toBe(false);
 
-    const oilSpurs = [
-      ['oilfield-north', { q: 26, r: 13 }, { q: 25, r: 13 }],
-      ['oilfield-east', { q: 37, r: 24 }, { q: 37, r: 25 }],
-      ['oilfield-south', { q: 24, r: 37 }, { q: 25, r: 37 }],
-      ['oilfield-west', { q: 13, r: 26 }, { q: 13, r: 25 }],
-    ] as const;
-    for (const [id, oilPosition, connector] of oilSpurs) {
-      const oil = FIXED_MAP.facilities.find((candidate) => candidate.id === id);
-      expect(oil).toMatchObject({ type: 'oilField', position: oilPosition, startingOwned: false, startingWorkers: 0 });
-      expect(FIXED_MAP.tiles.find((tile) => tile.key === hexKey(oilPosition))).toMatchObject({
-        terrain: 'plain',
-        facilityId: id,
-      });
-      const segment = FIXED_MAP.roads?.segments.find((candidate) => candidate.id === `access-${id}`);
-      expect(segment).toMatchObject({ role: 'access', path: [oilPosition, connector] });
-      expect(segment?.path).toHaveLength(2);
-      expect(FIXED_MAP.roadBranches.flatMap((branch) => branch.roadTiles).some((position) => hexKey(position) === hexKey(oilPosition))).toBe(false);
-    }
+    const oils = FIXED_MAP.facilities.filter((candidate) => candidate.type === 'oilField');
+    expect(oils).toHaveLength(1);
+    const oil = oils[0]!;
+    expect(oil).toMatchObject({ startingOwned: false, startingWorkers: 0 });
+    expect(FIXED_MAP.tiles.find((tile) => tile.key === hexKey(oil.position))).toMatchObject({
+      terrain: 'plain',
+      facilityId: oil.id,
+    });
+    const segment = FIXED_MAP.roads?.segments.find((candidate) => candidate.id === `access-${oil.id}`);
+    expect(segment).toMatchObject({ role: 'access' });
+    expect(segment?.path).toHaveLength(2);
+    expect(segment?.path[0]).toEqual(oil.position);
+    expect(FIXED_MAP.roadBranches.flatMap((branch) => branch.roadTiles).some((position) => hexKey(position) === hexKey(oil.position))).toBe(false);
   });
 
   it('charges Temporary Housing population at one Food and one Civilian Good per person', () => {
@@ -230,8 +226,8 @@ describe('v1.6 Core acceptance', () => {
     expect(second.state.facilities.find((candidate) => candidate.id === 'farm-2')?.firstCaptureRewardClaimed).toBe(true);
   });
 
-  it('stacks the Army Base unit and resource rewards through turn 20, then keeps only resources', () => {
-    for (const turn of [20, 21]) {
+  it('stacks the Army Base unit and resource rewards through turn 10, then keeps only resources', () => {
+    for (const turn of [10, 11]) {
       const engine = new GameEngine(16030 + turn, testConfig());
       const snapshot = engine.getState() as GameState;
       snapshot.turn = turn;
@@ -244,7 +240,7 @@ describe('v1.6 Core acceptance', () => {
       expect(result.state.resources.food - before.resources.food).toBe(100);
       expect(result.state.resources.militaryGoods - before.resources.militaryGoods).toBe(100);
       const guardCountAfter = result.state.units.filter((unit) => unit.type === 'nationalGuard').length;
-      expect(guardCountAfter - guardCountBefore).toBe(turn <= 20 ? 1 : 0);
+      expect(guardCountAfter - guardCountBefore).toBe(turn <= 10 ? 1 : 0);
     }
   });
 
@@ -252,7 +248,8 @@ describe('v1.6 Core acceptance', () => {
     for (const workers of [1, 5]) {
       const state = oilFixture(workers);
       const plan = calculateEconomyPlan(state);
-      const oil = plan.facilities.find((projection) => projection.facilityId === 'oilfield-north');
+      const oilId = state.facilities.find((candidate) => candidate.type === 'oilField')!.id;
+      const oil = plan.facilities.find((projection) => projection.facilityId === oilId);
       expect(oil?.allowanceCredits, `${workers} workers`).toBe(workers * 100);
       expect(oil?.outputs, `${workers} workers`).toEqual({});
       expect(oil?.powerMode, `${workers} workers`).toBe('none');
@@ -274,7 +271,7 @@ describe('v1.6 Core acceptance', () => {
 
   it('does not reserve Refinery electricity when the shared allowance is exhausted', () => {
     const state = oilFixture(0, 0);
-    state.refineryAllowance = { initialAllowance: 5_000, oilCreditsEarned: 0, fuelRefined: 5_000, remainingAllowance: 0 };
+    state.refineryAllowance = { initialAllowance: 2_000, oilCreditsEarned: 0, fuelRefined: 2_000, remainingAllowance: 0 };
     const plan = calculateEconomyPlan(state);
     const refinery = plan.facilities.find((projection) => projection.facilityId === 'refinery-1')!;
     expect(refinery.projectedPowerRequested).toBe(false);
@@ -304,7 +301,7 @@ describe('v1.6 Core acceptance', () => {
     expect(rejected.error?.code).toBe('constructible_facility_limit_reached');
   });
 
-  it('previews the fixed decision 219 economy before either Wind construction is committed', () => {
+  it('previews the 150-goods Wind decision and rejects an unaffordable second build', () => {
     const state = testState();
     state.checkpoints = [];
     state.config.units.nationalGuard.population = 160;
@@ -334,15 +331,17 @@ describe('v1.6 Core acceptance', () => {
     const firstAction = { type: 'BuildConstructibleFacility', facilityType: 'windPowerPlant', position: firstCandidate.position } as const;
     const firstPreview = previewCoreAction(engine.getState(), firstAction, 219);
     expect(firstPreview.nextEndTurn.before).toMatchObject({ civilianGoods: 13, populationLoss: 0, projectedHealthyCivilians: 137 });
-    expect(firstPreview.nextEndTurn.after).toMatchObject({ civilianGoods: 0, populationLoss: 87, projectedHealthyCivilians: 50, guaranteedDefeat: false });
+    expect(firstPreview.nextEndTurn.after).toMatchObject({ civilianGoods: 0, populationLoss: 137, projectedHealthyCivilians: 0, guaranteedDefeat: true });
     expect(engine.getState().resources.civilianGoods).toBe(273);
 
     expect(engine.step(firstAction).error).toBeNull();
-    const secondCandidate = engine.getConstructibleFacilityPositionCandidates('windPowerPlant').find((candidate) => candidate.legal)!;
+    const secondCandidate = engine.getConstructibleFacilityPositionCandidates('windPowerPlant')
+      .find((candidate) => candidate.reasonCode === 'insufficient_civilian_goods')!;
     const secondAction = { type: 'BuildConstructibleFacility', facilityType: 'windPowerPlant', position: secondCandidate.position } as const;
     const secondPreview = previewCoreAction(engine.getState(), secondAction, 220);
-    expect(secondPreview.nextEndTurn.after).toMatchObject({ civilianGoods: 0, populationLoss: 137, projectedHealthyCivilians: 0, guaranteedDefeat: true });
-    expect(forecastEndTurn(engine.getState()).civilianGoods.maintenanceShortage).toBe(87);
+    expect(secondPreview.legal).toBe(false);
+    expect(secondPreview.reasonCode).toBe('insufficient_civilian_goods');
+    expect(forecastEndTurn(engine.getState()).civilianGoods.maintenanceShortage).toBe(137);
     expect(forecastEndTurn({ ...engine.getState(), resources: { ...engine.getState().resources, civilianGoods: 73 } }).civilianGoods.maintenanceShortage).toBe(187);
   });
 

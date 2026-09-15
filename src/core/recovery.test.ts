@@ -22,11 +22,11 @@ function recoveryEngine(seed = 301): GameEngine {
 
 describe('v1.2.6 unit recovery and automatic suppression', () => {
   it.each([
-    [{ moved: false, attacked: true, intercepted: false, suppressed: false }, 'combat', 3],
-    [{ moved: false, attacked: false, intercepted: true, suppressed: false }, 'combat', 3],
-    [{ moved: false, attacked: false, intercepted: false, suppressed: true }, 'combat', 3],
-    [{ moved: true, attacked: false, intercepted: false, suppressed: false }, 'rest', 5],
-    [{ moved: false, attacked: false, intercepted: false, suppressed: false }, 'rest', 5],
+    [{ moved: false, attacked: true, intercepted: false, suppressed: false }, 'combat', 2],
+    [{ moved: false, attacked: false, intercepted: true, suppressed: false }, 'combat', 2],
+    [{ moved: false, attacked: false, intercepted: false, suppressed: true }, 'combat', 2],
+    [{ moved: true, attacked: false, intercepted: false, suppressed: false }, 'rest', 3],
+    [{ moved: false, attacked: false, intercepted: false, suppressed: false }, 'rest', 3],
   ] as const)('classifies activity %j as %s recovery', (activity, expectedClass, expectedAmount) => {
     const state = createInitialState(300, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const police = state.units.find((unit) => unit.id === 'police-1')!;
@@ -55,12 +55,12 @@ describe('v1.2.6 unit recovery and automatic suppression', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
 
     const result = engine.step({ type: 'EndTurn' });
-    expect(result.state.units.find((unit) => unit.id === police.id)?.hp).toBe(13);
-    expect(result.state.units.find((unit) => unit.id === guard.id)?.hp).toBe(30);
+    expect(result.state.units.find((unit) => unit.id === police.id)?.hp).toBe(12);
+    expect(result.state.units.find((unit) => unit.id === guard.id)?.hp).toBe(25);
     expect(result.events.filter((event) => event.type === 'unit_recovered').map((event) => event.payload)).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ unitId: police.id, recoveryClass: 'combat', baseAmount: 3, actualAmount: 3, rate: 0.1 }),
-        expect.objectContaining({ unitId: guard.id, recoveryClass: 'rest', baseAmount: 10, actualAmount: 10, rate: 0.2 }),
+        expect.objectContaining({ unitId: police.id, recoveryClass: 'combat', baseAmount: 2, actualAmount: 2, rate: 0.05 }),
+        expect.objectContaining({ unitId: guard.id, recoveryClass: 'rest', baseAmount: 5, actualAmount: 5, rate: 0.1 }),
       ]),
     );
   });

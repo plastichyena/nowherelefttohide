@@ -412,7 +412,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       }
     }
   }
-  for (const unitType of ['police', 'nationalGuard', 'riotPolice'] as const) {
+  for (const unitType of ['police', 'nationalGuard', 'riotPolice', 'reconTeam'] as const) {
     for (const field of ['recruitsCommissionedByType', 'regularPromotionsByType', 'veteranPromotionsByType', 'veteranZombieKillsByType'] as const) {
       if (!isNonNegativeInteger(state.statistics[field]?.[unitType])) errors.push(`Statistic ${field}.${unitType} must be a non-negative integer`);
     }
@@ -421,7 +421,8 @@ export function validateInvariants(state: GameState): InvariantResult {
   if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.hordeZombie)) errors.push('Statistic noisePulsesBySourceType.hordeZombie must be a non-negative integer');
   if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.armyBase)) errors.push('Statistic noisePulsesBySourceType.armyBase must be a non-negative integer');
   if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.windPowerPlant)) errors.push('Statistic noisePulsesBySourceType.windPowerPlant must be a non-negative integer');
-  for (const unitType of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as const) {
+  if (!isNonNegativeInteger(state.statistics.noisePulsesBySourceType?.screamerZombie)) errors.push('Statistic noisePulsesBySourceType.screamerZombie must be a non-negative integer');
+  for (const unitType of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as const) {
     if (!isNonNegativeInteger(state.statistics.hordeSpecialSpawnedByType?.[unitType])) errors.push(`Statistic hordeSpecialSpawnedByType.${unitType} must be a non-negative integer`);
     if (!isNonNegativeInteger(state.statistics.finalSpecialZombiesSpawnedByType?.[unitType])) errors.push(`Statistic finalSpecialZombiesSpawnedByType.${unitType} must be a non-negative integer`);
   }
@@ -460,7 +461,8 @@ export function validateInvariants(state: GameState): InvariantResult {
     + state.statistics.soldierZombiesKilled
     + state.statistics.riotZombiesKilled
     + state.statistics.hunterZombiesKilled
-    + state.statistics.gasZombiesKilled;
+    + state.statistics.gasZombiesKilled
+    + state.statistics.screamerZombiesKilled;
   if (state.statistics.enemyKillsTotal !== enemyKillsTotal) errors.push('Enemy kill total must equal all enemy type counters');
   const finalSpecialSpawned = Object.values(state.statistics.finalSpecialZombiesSpawnedByType ?? {})
     .reduce((sum, value) => sum + Number(value), 0);
@@ -502,6 +504,9 @@ export function validateInvariants(state: GameState): InvariantResult {
       errors.push(`Facility ${facility.id} has an invalid constructible type`);
     }
     if (typeof facility.firstCaptureRewardClaimed !== 'boolean') errors.push(`Facility ${facility.id} has an invalid first-capture reward ledger`);
+    if (!['available', 'rescued', 'lost', 'notApplicable'].includes(facility.earlyCaptureSurvivorStatus ?? '')) {
+      errors.push(`Facility ${facility.id} has an invalid early-capture Survivor state`);
+    }
     if (facility.type === 'armyBase') {
       if (facility.constructible) errors.push(`Army Base ${facility.id} cannot be constructible`);
       if (!facility.armyBase) {
@@ -603,11 +608,14 @@ export function validateInvariants(state: GameState): InvariantResult {
       && (unit.currentMilitaryGoods !== 0 || unit.maxMilitaryGoods !== 0)) {
       errors.push(`Zombie unit ${unit.id} cannot store Military Goods`);
     }
-    if (!['police', 'nationalGuard', 'riotPolice', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'].includes(unit.type)) {
+    if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'].includes(unit.type)) {
       errors.push(`Unit ${unit.id} has an invalid type`);
     }
-    const shouldBePlayerUnit = unit.type === 'police' || unit.type === 'nationalGuard' || unit.type === 'riotPolice';
+    const shouldBePlayerUnit = unit.type === 'police' || unit.type === 'nationalGuard' || unit.type === 'riotPolice' || unit.type === 'reconTeam';
     if (unit.isPlayerUnit !== shouldBePlayerUnit) errors.push(`Unit ${unit.id} has an invalid faction`);
+    if (typeof unit.hasScreamed !== 'boolean' || (unit.type !== 'screamerZombie' && unit.hasScreamed)) {
+      errors.push(`Unit ${unit.id} has invalid Screamer state`);
+    }
     if (unit.isPlayerUnit && isHordeSpawnReserve(state.map, unit.position)) {
       errors.push(`Player unit ${unit.id} cannot occupy the Horde Spawn Reserve`);
     }
@@ -646,14 +654,14 @@ export function validateInvariants(state: GameState): InvariantResult {
       if (!['recruit', 'regular', 'veteran'].includes(unit.proficiency ?? '')) errors.push(`Human unit ${unit.id} has invalid proficiency`);
       const expectedCharges = unit.proficiency === 'veteran' ? state.config.unitExperience.veteranAttackCharges : 1;
       if (unit.maxAttackCharges !== expectedCharges) errors.push(`Human unit ${unit.id} max attack charges do not match proficiency`);
-      if (unit.proficiency && unit.attack !== effectiveAttackForProficiency(state, unit.type as 'police' | 'nationalGuard' | 'riotPolice', unit.proficiency)) {
+      if (unit.proficiency && unit.attack !== effectiveAttackForProficiency(state, unit.type as import('./types').HumanUnitType, unit.proficiency)) {
         errors.push(`Human unit ${unit.id} attack does not match proficiency`);
       }
     } else if (unit.proficiency !== null || unit.recruitSurvivalTurns !== 0 || unit.regularZombieKills !== 0 || unit.veteranPromotionPending) {
       errors.push(`Zombie unit ${unit.id} cannot store proficiency`);
     }
     if (!shouldBePlayerUnit && unit.maxAttackCharges !== state.config.units[unit.type as import('./types').ZombieUnitType]?.maxAttackCharges) errors.push(`Zombie unit ${unit.id} max attack charges do not match Config`);
-    if (unit.type === 'zombie' || unit.type === 'policeZombie' || unit.type === 'soldierZombie' || unit.type === 'riotZombie' || unit.type === 'hunterZombie' || unit.type === 'gasZombie') {
+    if (unit.type === 'zombie' || unit.type === 'policeZombie' || unit.type === 'soldierZombie' || unit.type === 'riotZombie' || unit.type === 'hunterZombie' || unit.type === 'gasZombie' || unit.type === 'screamerZombie') {
       const hasKind = ['periodic', 'final'].includes(unit.hordeKind ?? '');
       const hasGroup = typeof unit.spawnGroupId === 'string' && unit.spawnGroupId.length > 0;
       if (hasKind !== hasGroup) errors.push(`Normal-AI Zombie ${unit.id} must have both Horde kind and spawn group, or neither`);
@@ -680,14 +688,15 @@ export function validateInvariants(state: GameState): InvariantResult {
 
   for (const pulse of state.pendingNoisePulses) {
     if (!pulse || typeof pulse.id !== 'string' || !hexWithinBounds(pulse.center, state.map.width, state.map.height)
-      || !isNonNegativeInteger(pulse.radius) || !['humanCombat', 'hordeMovement', 'armyBase', 'windPower'].includes(pulse.sourceKind)
+      || !isNonNegativeInteger(pulse.radius) || !['humanCombat', 'hordeMovement', 'armyBase', 'windPower', 'scream'].includes(pulse.sourceKind)
       || !isNonNegativeInteger(pulse.emittedTurn)) {
       errors.push('Pending Noise Pulse is invalid');
     }
-    const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice'].includes(pulse.sourceUnitType))
+    const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice', 'reconTeam'].includes(pulse.sourceUnitType))
       || (pulse.sourceKind === 'hordeMovement' && pulse.sourceUnitType === 'hordeZombie')
       || (pulse.sourceKind === 'armyBase' && pulse.sourceUnitType === 'armyBase')
-      || (pulse.sourceKind === 'windPower' && pulse.sourceUnitType === 'windPowerPlant');
+      || (pulse.sourceKind === 'windPower' && pulse.sourceUnitType === 'windPowerPlant')
+      || (pulse.sourceKind === 'scream' && pulse.sourceUnitType === 'screamerZombie');
     if (!matchingSource) errors.push('Pending Noise Pulse source kind and type must match');
   }
 
@@ -728,6 +737,20 @@ export function validateInvariants(state: GameState): InvariantResult {
       if (!isNonNegativeInteger(checkpoint[field])) {
         errors.push(`Checkpoint ${checkpoint.id}.${field} must be non-negative`);
       }
+    }
+    if (!isNonNegativeInteger(checkpoint.grandfatheredWaiting ?? -1)
+      || (checkpoint.grandfatheredWaiting ?? 0) > checkpoint.waiting) {
+      errors.push(`Checkpoint ${checkpoint.id} has invalid grandfathered waiting population`);
+    }
+    if (checkpoint.grandfatheredPolicy !== null
+      && !['passThrough', 'normal', 'strict', 'deny'].includes(checkpoint.grandfatheredPolicy ?? '')) {
+      errors.push(`Checkpoint ${checkpoint.id} has invalid grandfathered policy`);
+    }
+    if ((checkpoint.grandfatheredWaiting ?? 0) === 0 && checkpoint.grandfatheredPolicy !== null) {
+      errors.push(`Checkpoint ${checkpoint.id} cannot retain a grandfathered policy without population`);
+    }
+    if (!isNonNegativeInteger(checkpoint.waitingRiskPercent ?? -1) || (checkpoint.waitingRiskPercent ?? 0) > 100) {
+      errors.push(`Checkpoint ${checkpoint.id} has invalid waiting infection risk`);
     }
     const branchId = checkpoint.branchId ?? checkpoint.direction;
     const branch = state.map.roadBranches.find((candidate) => candidate.id === branchId);
@@ -790,7 +813,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (preparedCount > state.config.checkpoint.maxPreparedPostsPerDirection) {
       errors.push(`Road branch ${branch.branchId} exceeds the prepared checkpoint limit`);
     }
-    if (!['passThrough', 'normal', 'strict'].includes(branch.currentPolicy)) {
+    if (!['passThrough', 'normal', 'strict', 'deny'].includes(branch.currentPolicy)) {
       errors.push(`Road branch ${branch.branchId} has invalid policy`);
     }
     if (!isNonNegativeInteger(state.statistics.refugeeArrivalsByBranch?.[branch.branchId])) {
@@ -804,7 +827,7 @@ export function validateInvariants(state: GameState): InvariantResult {
   const pendingProductionIds = new Set<string>();
   const pendingProductionFacilities = new Set<string>();
   for (const order of state.pendingUnitProductions ?? []) {
-    if (!['police', 'nationalGuard', 'riotPolice'].includes(order.unitType)
+    if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam'].includes(order.unitType)
       || !mapFacilityById.has(order.cityFacilityId) || !isNonNegativeInteger(order.population) || !isNonNegativeInteger(order.readyTurn)) {
       errors.push(`Pending unit production ${order.id} is invalid`);
     }
@@ -814,8 +837,8 @@ export function validateInvariants(state: GameState): InvariantResult {
     pendingProductionFacilities.add(order.cityFacilityId);
     const facility = state.facilities.find((candidate) => candidate.id === order.cityFacilityId);
     if (facility?.type === 'armyBase') {
-      if (order.unitType !== 'nationalGuard' || typeof order.powerReady !== 'boolean') {
-        errors.push(`Army Base reservation ${order.id} requires National Guard power state`);
+      if (!state.config.units[order.unitType].recruitmentFacilityTypes.includes('armyBase') || typeof order.powerReady !== 'boolean') {
+        errors.push(`Army Base reservation ${order.id} requires an eligible Human Unit and power state`);
       }
     } else if (order.powerReady !== undefined) {
       errors.push(`Non-Army Base reservation ${order.id} cannot contain power state`);
@@ -854,8 +877,12 @@ export function validateInvariants(state: GameState): InvariantResult {
   const riotPolice =
     state.units.filter((unit) => unit.type === 'riotPolice').reduce((sum, unit) => sum + unit.population, 0) +
     state.pendingUnitProductions.filter((order) => order.unitType === 'riotPolice').reduce((sum, order) => sum + order.population, 0);
+  const reconTeam =
+    state.units.filter((unit) => unit.type === 'reconTeam').reduce((sum, unit) => sum + unit.population, 0) +
+    state.pendingUnitProductions.filter((order) => order.unitType === 'reconTeam').reduce((sum, order) => sum + order.population, 0);
   if (state.population.police !== police || state.population.nationalGuard !== nationalGuard
-    || state.population.riotPolice !== riotPolice || state.population.unitPopulation !== police + nationalGuard + riotPolice) {
+    || state.population.riotPolice !== riotPolice || state.population.reconTeam !== reconTeam
+    || state.population.unitPopulation !== police + nationalGuard + riotPolice + reconTeam) {
     errors.push('Unit population totals are out of sync');
   }
   const waiting = state.checkpoints.reduce((sum, checkpoint) => sum + checkpoint.waiting, 0);

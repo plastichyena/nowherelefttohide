@@ -101,7 +101,7 @@ function run(): void {
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
   for (const marker of [
-    '1.6.0', '10.0.0', '11.0.0', '14.0.0', '15.0.0', 'fixed-51x51-v5', 'gasZombie', 'armyBase', 'oilField', 'SetPowerSupply',
+    '1.6.1', '11.0.0', '12.0.0', '15.0.0', '16.0.0', 'fixed-51x51-v6', 'gasZombie', 'screamerZombie', 'reconTeam', 'armyBase', 'oilField', 'SetPowerSupply',
     'temporaryHousing', 'committedWaveUnitCount', 'pendingCount', 'horde_wave_started', 'horde_spawn_batch', 'nextTurnPenalties', 'housingOutage',
     'BuildConstructibleFacility', 'DecommissionConstructibleFacility', 'TurnAwayCheckpointRefugees',
     'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',
@@ -126,9 +126,10 @@ function run(): void {
     'projectedPowerSupplied', 'recoveryClassIfTurnEndsNow', 'effectiveRange', 'projectedSuppression',
     'visibleToPlayer', 'finalHordeStatus', 'powerResourceLossByResource', 'checkpointCapacityUtilization',
     'hordeWaves', 'visionMode', 'terrainLosBlocking', 'site_zombies_spawned',
-    'groundVisionBlockedHexes', 'infectedPopulationConvertedToZombies',
+    'groundVisionBlockedHexes', 'infectedPopulationConvertedToZombies', 'earlyCaptureSurvivorReward',
+    'grandfatheredWaiting', 'waitingRiskPercent', 'checkpoint_policy_changed', 'screamer_scream',
   ]) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.6.0 schema marker: ${marker}`);
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.6.1 schema marker: ${marker}`);
   }
   // Compatibility validation may legitimately retain the names of removed
   // fields so an old Config can be rejected with a useful reason. Only flag

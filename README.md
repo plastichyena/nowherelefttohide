@@ -1,6 +1,6 @@
 # Nowhere Left to Hide
 
-v1.5.5は、Zombieの混雑回避、方向別22 HexでのHorde分割Spawnと未出現名簿、Wave人数の公開、Final所属個体だけを対象とする勝利条件、仮設住宅、建設可能な風力発電、電力バランス、次ターン過密・停電予測を追加します。旧Save／AIデータは移行せず拒否します。
+v1.6.1は、長射程の偵察隊、発見時に特大Noiseを生むScreamer Zombie、Turn 10まで救助できる中立施設の生存者、Checkpointの拒否方針と待機感染リスク、初期Normal Zombie 50体、再調整したWave／Fuel／Military Goods／回復、Seedごとに選ばれるOil Field 1基を追加します。v1.6.0以前のSave／AIデータは移行せず拒否します。
 
 v1.5.2で行ったPC Chromeの比較証跡は[`v152-performance-evidence.json`](src/testing/fixtures/v152-performance-evidence.json)、AI CLIは[`play-turn-performance-evidence.json`](src/session/play-turn-performance-evidence.json)に記録しています。390×844の同一Saveで、序盤の選択中央値は849→98ms、Turn 51の移動先確認は4,146→108ms、ターン終了操作全体は6,881→987msでした。Core単体のTurn 51は683→372msで、旧新版144回のStepResult hashが一致しています。ブラウザ値には自動操作と描画待ちが含まれ、SOG05の実測値ではありません。パン・ピンチ・人口スライダーは概ね横ばいで、選択・プレビュー・確定・資源／シート表示が主に改善しました。
 
@@ -31,7 +31,7 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 州都と稼働中検問所を起点にした供給範囲、セクター境界、供給外Actionの理由表示
 - Seed付き乱数によるゾンビAI、避難民、感染、Hordeの再現
 - 戦闘地点・Horde移動地点から通常系Zombieを誘引する共通Noise Pulseと、Horde／人口Targetとの優先順位
-- Recruit／Regular／Veteran熟練度、Attack Charge、Riot Police／Riot Zombie／Hunter Zombie／Gas Zombie、Army Base迎撃、特殊Zombie混成を含む固定Multi-direction Wave（Turn 5 / 10 / 20 / 35 / 50）
+- Recruit／Regular／Veteran熟練度、Attack Charge、Recon Team、Riot Police／Riot Zombie／Hunter Zombie／Gas Zombie／Screamer Zombie、Army Base迎撃、特殊Zombie混成を含む固定Multi-direction Wave（Turn 10 / 20 / 35 / 50 / 70）
 - 公開ObservationのCrisis Summary／EndTurn Risk、AI Portable Session応答のState Delta
 - Core生成の全道路Checkpoint候補と、Human／Agent共通の利用不能理由
 - 自動保存、セーブコード、JSON保存・復元
@@ -40,7 +40,7 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 - 1 Turnを同じNodeプロセスで対話できる`play-turn`、互換用の既存8コマンド、Active Session、Public Decision Log、履歴Checkpoint、分岐Session、Compact応答と詳細query
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.5.5の変更目標は [`Doc/Nowhere Left to Hide PoC v1.5.5 アップデート要件 確定版.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.5.5%20アップデート要件%20確定版.md) です。v1.5.5の実装・テスト・ローカル動作確認を現行仕様へ反映済みです。2026-09-09に長時間検証の完了結果と修正内容も現行仕様18.4へ追記しました。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.6.1の確定要件と実装・検証結果は現行仕様18.11へ反映します。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## v1.5.5 公開検証
 
@@ -78,7 +78,7 @@ Open https://plastichyena.github.io/nowherelefttohide/ and use the documented wi
 
 公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact`、`getArtifactPage` です。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・Checkpoint候補Schema／Reason Code・生産/電力の静的ルールを返します。`getRunArtifact()` は既存の完全互換の公開Artifactを返します。大きな履歴は読み取り専用の `getArtifactPage({ target, offset?, pageSize?, expectedRevision? })` で、`manifest`、`observations`、`actions`、`events`、`invalid-attempts`を既定100件・最大500件ずつ取得できます。応答はRevision、件数、総数、続き、次Offset、item列を含み、State変更後の古いRevisionは状態不変で拒否します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
 
-v1.5.5ではHuman UIとAgentが同じCore Visibility／Crisis Summary／EndTurn Riskを使い、Checkpointの新設・移設には対象地点と州都側からの幹線道路全区間の現在視界が必要です。Hidden Zombieは候補や実行を妨害せず、可視Zombieだけが妨害理由になります。Ground VisionはForest／Mountainで遮蔽され、Civilian Drone BaseのAerial Visionは遮蔽を無視します。ObservationはGround／Aerial種別と最新50件の重要Site Eventを返します。初期Normal Zombie 25体に加え、Seedで決まるHunter Zombie 1～4体とGas Zombie 1～2体が追加されます。Gasは州都から9 Hex以上、Hunterは20 Hex以上離れて出現します。Police Zombie／Soldier Zombie／Riot Zombie／Hunter Zombie／Gas Zombieを含む敵は可視時だけ公開します。拒絶Counterと未確定の増援数は非公開です。Wave開始後は基礎人数・Bonus込み確定人数・出現済み人数・Pending人数を公開します。Police／Riot Policeは`medium`、National Guardは`large`、Horde movementとArmy Base迎撃は公開ルールとしてRadius 8を使用します。Human Unitの熟練度、Attack Charge、Hordeの非Horde slot数と抽選候補も公開Observationへ含まれますが、未確定の抽選結果、Hidden Enemyの反応数・ID・Target・非可視Spawn位置は公開しません。
+Human UIとAgentは同じCore Visibility／Crisis Summary／EndTurn Riskを使い、Checkpointの新設・移設には対象地点と州都側からの幹線道路全区間の現在視界が必要です。Hidden Zombieは候補や実行を妨害せず、可視Zombieだけが妨害理由になります。Ground VisionはForest／Mountainで遮蔽され、Civilian Drone BaseのAerial Visionは遮蔽を無視します。ObservationはGround／Aerial種別と最新50件の重要Site Eventを返します。初期Normal Zombie 50体に加え、Seedで決まるHunter Zombie 1～4体とGas Zombie 1～2体が追加されます。全初期Zombieは選択されたArmy BaseのZombie視界外です。Police Zombie／Soldier Zombie／Riot Zombie／Hunter Zombie／Gas Zombie／Screamer Zombieを含む敵は可視時だけ公開します。拒絶Counter、Screamerの内部Radius、未確定の増援数は非公開です。Wave開始後は基礎人数・Bonus込み確定人数・出現済み人数・Pending人数を公開します。Human Unitの熟練度、Attack Charge、Hordeの非Horde slot数と抽選候補も公開Observationへ含まれますが、未確定の抽選結果、Hidden Enemyの反応数・ID・Target・非可視Spawn位置は公開しません。
 
 ## Agent Simulation CLI
 
@@ -149,7 +149,7 @@ Turn 50のFinal Waveは4方向・基本52体です。参加方向の拒絶Bonus�
 1. 州都が陥落する
 2. 所有中の州都・地方都市・仮設住宅・生産施設にいる健全民間人口の合計が0になる
 
-検問所の3健常者プール、施設内感染者、ユニット人口は健全民間人口0の判定には数えません。都市はソフトキャップを超えて受け入れられますが、民需品生産はソフトキャップで止まり、食料・民需品の追加消費が発生します。Warning Leadは2 Turnです。標準WaveはTurn 5（1方向・3 Horde＋3 slot）、Turn 10（2方向・2＋5）、Turn 20（1方向・5＋7）、Turn 35（3方向・3＋7）、Turn 50（4方向・5＋8 Final）で出現します（各CompositionはHorde／非Horde slot）。標準Scheduleの合計はHorde 41、非Horde slot 73、Total 114です。各slotの実TypeはSpawn時に決まり、Horde ZombieはHP 40かつ2 Attack Charge、Normal ZombieはHP 15です。Riot／Hunter／Gasは各方向・Waveでそれぞれ最大1体です。ゲームルール上のTurn上限はありません。
+検問所の3健常者プール、施設内感染者、ユニット人口は健全民間人口0の判定には数えません。都市はソフトキャップを超えて受け入れられますが、民需品生産はソフトキャップで止まり、食料・民需品の追加消費が発生します。Warning Leadは2 Turnです。標準WaveはTurn 10（1方向・5 Horde＋3 slot）、Turn 20（2方向・3＋5）、Turn 35（1方向・8＋7）、Turn 50（3方向・5＋7）、Turn 70（4方向・8＋8 Final）で出現します（各CompositionはHorde／非Horde slot）。標準Scheduleの合計はHorde 66、非Horde slot 73、Total 139です。各slotの実TypeはSpawn時に決まり、Screamerを含みます。Riot／Hunter／Gasは各方向・Waveでそれぞれ最大1体です。ゲームルール上のTurn上限はありません。
 
 ## ConfigとSeed
 
@@ -165,7 +165,7 @@ Turn 50のFinal Waveは4方向・基本52体です。参加方向の拒絶Bonus�
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Build・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.6.0`、Game Rules / GameState / Configは `10.0.0`、Fixed Mapは `fixed-51x51-v5`、Agent / Observation / Browser Bridge APIは `15.0.0`、Artifact Schemaは `14.0.0`、Checkpoint／Session Schemaは`11.0.0`、Balanced Agentは`9.0.0`、Random Agentは`6.0.0`です。v1.5.7以前の通常Save、AI Session、Checkpoint、Artifact、Replayは変換せず拒否し、旧データを削除・上書きしません。
+ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Build・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.6.1`、Game Rules / GameState / Configは `11.0.0`、Fixed Mapは `fixed-51x51-v6`、Save Formatは`18`、Agent / Observation / Browser Bridge APIは `16.0.0`、Artifact Schemaは `15.0.0`、Checkpoint／Session Schemaは`12.0.0`、Balanced Agentは`10.0.0`、Random Agentは`6.0.0`です。v1.6.0以前の通常Save、AI Session、Checkpoint、Artifact、Replayは変換せず拒否し、旧データを削除・上書きしません。
 
 ## CoreとHeadless API
 

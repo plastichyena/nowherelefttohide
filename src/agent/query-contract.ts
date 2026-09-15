@@ -31,14 +31,14 @@ export interface QuerySchema {
   description?: string;
 }
 
-const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice'] as const satisfies readonly HumanUnitType[];
-const FACILITY_TYPES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase'] as const satisfies readonly FacilityType[];
+const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam'] as const satisfies readonly HumanUnitType[];
+const FACILITY_TYPES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase'] as const satisfies readonly FacilityType[];
 const CONSTRUCTIBLE_TYPES = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const satisfies readonly ConstructibleFacilityType[];
 const FACILITY_STATUSES = ['unowned', 'owned', 'ruined'] as const satisfies readonly FacilityStatus[];
 const FACILITY_OPERATIONAL_STATUSES = ['building', 'operational', 'stopped', 'infected', 'disabled', 'recovering', 'ruined'] as const satisfies readonly FacilityOperationalStatus[];
 const CHECKPOINT_STATUSES = ['operational', 'remnant', 'ruined', 'abandoned'] as const satisfies readonly CheckpointStatus[];
 const CHECKPOINT_ROLES = ['active', 'standby', 'dormant', 'remnant', 'ruined', 'abandoned'] as const satisfies readonly CheckpointRole[];
-const CHECKPOINT_POLICIES = ['passThrough', 'normal', 'strict'] as const satisfies readonly CheckpointPolicy[];
+const CHECKPOINT_POLICIES = ['passThrough', 'normal', 'strict', 'deny'] as const satisfies readonly CheckpointPolicy[];
 const UNIT_ACTION_STATES = ['ready', 'moved', 'acted', 'destroyed'] as const satisfies readonly UnitActionState[];
 const UNIT_PROFICIENCIES = ['recruit', 'regular', 'veteran'] as const satisfies readonly UnitProficiency[];
 const TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const satisfies readonly BaseTerrain[];

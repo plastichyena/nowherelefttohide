@@ -55,9 +55,11 @@ describe('board asset registry', () => {
       'policeZombie',
       'soldierZombie',
       'riotPolice',
+      'reconTeam',
       'riotZombie',
       'hunterZombie',
       'gasZombie',
+      'screamerZombie',
     ]);
     expect('water' in BOARD_ASSET_REGISTRY.terrain).toBe(false);
     expect(getTerrainAssetPath('water')).toBeNull();
@@ -77,6 +79,8 @@ describe('board asset registry', () => {
     expect(getUnitAssetPath('riotZombie')).toBe(BOARD_ASSET_REGISTRY.units.riotZombie);
     expect(getUnitAssetPath('hunterZombie')).toBe(BOARD_ASSET_REGISTRY.units.hunterZombie);
     expect(getUnitAssetPath('gasZombie')).toBe(BOARD_ASSET_REGISTRY.units.gasZombie);
+    expect(getUnitAssetPath('reconTeam')).toBe(BOARD_ASSET_REGISTRY.units.reconTeam);
+    expect(getUnitAssetPath('screamerZombie')).toBe(BOARD_ASSET_REGISTRY.units.screamerZombie);
     expect(isBoardZombieUnitType('zombie')).toBe(true);
     expect(isBoardZombieUnitType('hordeZombie')).toBe(true);
     expect(isBoardZombieUnitType('policeZombie')).toBe(true);
@@ -84,6 +88,7 @@ describe('board asset registry', () => {
     expect(isBoardZombieUnitType('riotZombie')).toBe(true);
     expect(isBoardZombieUnitType('hunterZombie')).toBe(true);
     expect(isBoardZombieUnitType('gasZombie')).toBe(true);
+    expect(isBoardZombieUnitType('screamerZombie')).toBe(true);
     expect(isBoardZombieUnitType('police')).toBe(false);
     expect(BOARD_ASSET_PATHS.some((path) => /water/iu.test(path))).toBe(false);
   });

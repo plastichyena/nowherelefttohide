@@ -73,11 +73,11 @@ describe('v1.5.0 public progression, Horde, and Crisis projections', () => {
     const observation = createAgentObservation(state);
 
     expect(observation.horde.nextWave).toMatchObject({
-      spawnTurn: 5,
+      spawnTurn: 10,
       directionCount: 1,
-      compositionPerDirection: { hordeZombie: 3, zombie: 3 },
+      compositionPerDirection: { hordeZombie: 5, zombie: 3 },
       nonHordeSlotCountPerDirection: 3,
-      possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie'],
+      possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie'],
       final: false,
     });
     expect(JSON.stringify(observation.horde)).not.toContain('spawnGroupId');

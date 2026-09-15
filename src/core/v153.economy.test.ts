@@ -111,11 +111,11 @@ describe('v1.5.3 economy query', () => {
 
     let plan = calculateEconomyPlan(state);
     let projection = plan.facilities.find((candidate) => candidate.facilityId === base.id)!;
-    expect(plan.forecast.militaryGoods.units).toEqual([expect.objectContaining({ unitId: 'police-1', projectedRefillAmount: 5 })]);
-    expect(plan.armyBaseMilitaryGoodsRefills).toEqual([{ facilityId: base.id, amount: 3 }]);
+    expect(plan.forecast.militaryGoods.units).toEqual([expect.objectContaining({ unitId: 'police-1', projectedRefillAmount: 8 })]);
+    expect(plan.armyBaseMilitaryGoodsRefills).toEqual([]);
     expect(plan.forecast.militaryGoods.projectedEndingStock).toBe(0);
     expect(projection.armyBaseMilitaryGoods).toMatchObject({
-      current: 35, capacity: 40, projectedRefillAmount: 3, projectedAfterRefill: 38, refillEligible: true, refillReason: 'national_stock_shortage',
+      current: 35, capacity: 40, projectedRefillAmount: 0, projectedAfterRefill: 35, refillEligible: true, refillReason: 'national_stock_shortage',
     });
 
     base.position = { q: 0, r: 0 };

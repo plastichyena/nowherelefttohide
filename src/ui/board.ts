@@ -305,11 +305,14 @@ const FALLBACK_UNIT_SYMBOL: Record<string, string> = {
   police: 'P',
   nationalGuard: 'G',
   riotPolice: 'RP',
+  reconTeam: 'RC',
   zombie: 'Z',
   hordeZombie: 'H',
   policeZombie: 'PZ',
   soldierZombie: 'SZ',
   hunterZombie: 'HZ',
+  gasZombie: 'GZ',
+  screamerZombie: 'SC',
 };
 
 function sameHex(a: HexCoord, b: HexCoord): boolean {
@@ -435,7 +438,10 @@ function unitColor(unit: UnitState): number {
   if (unit.type === 'soldierZombie') return 0x806b49;
   if ((unit.type as string) === 'riotZombie') return 0x8f5367;
   if ((unit.type as string) === 'hunterZombie') return 0xd86c56;
+  if ((unit.type as string) === 'gasZombie') return 0xa4c976;
+  if ((unit.type as string) === 'screamerZombie') return 0xf09ab5;
   if ((unit.type as string) === 'riotPolice') return 0xc6a7d9;
+  if ((unit.type as string) === 'reconTeam') return 0x82d5cf;
   return unit.type === 'nationalGuard' ? 0xb6d8ff : 0x7fc7a0;
 }
 
@@ -1764,12 +1770,12 @@ export class HexBoardScene extends Phaser.Scene {
       const proficiencyLabel = proficiency ? t(`proficiency.${proficiency}`) : null;
       const maxCharges = typeof unitRecord.maxAttackCharges === 'number' ? Math.max(1, Math.trunc(unitRecord.maxAttackCharges)) : 1;
       const charges = typeof unitRecord.attackChargesRemaining === 'number' ? Math.max(0, Math.min(maxCharges, Math.trunc(unitRecord.attackChargesRemaining))) : maxCharges;
-      const typeLabel = unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : t('police');
+      const typeLabel = unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
       const supplyLabel = suppliedTiles.has(tileKey) ? t('supplied') : t('outOfSupply');
       const details = `${typeLabel}${proficiencyLabel ? ` (${proficiencyLabel})` : ''} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
       this.addLabel(`unit:${unit.id}:detail`, details, position.x, position.y + 23, '#f3f7f9', 8, true);
     } else if (isZombie && render.selectedZombieId === unit.id) {
-      const typeLabel = unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : (unit.type as string) === 'hunterZombie' ? t('hunterZombie') : t('zombie');
+      const typeLabel = unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : (unit.type as string) === 'hunterZombie' ? t('hunterZombie') : (unit.type as string) === 'gasZombie' ? t('gasZombie') : (unit.type as string) === 'screamerZombie' ? t('screamerZombie') : t('zombie');
       this.addLabel(`unit:${unit.id}:detail`, `${typeLabel} HP ${unit.hp}/${unit.maxHp}`, position.x, position.y + 23, '#f3f7f9', 8, true);
     }
     void t;

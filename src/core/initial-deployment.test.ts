@@ -3,7 +3,7 @@ import fixture from '../testing/fixtures/v155-initial-state.json';
 import { createDefaultConfig } from './config';
 import { createInitialState } from './state';
 
-describe('v1.6.0 deterministic full initial state', () => {
+describe('v1.6.1 deterministic full initial state', () => {
   for (const entry of fixture.fixtures) {
     it(`preserves every initial field, unit order and RNG draw for seed ${entry.seed}`, () => {
       const state = createInitialState(entry.seed, createDefaultConfig());
@@ -11,9 +11,9 @@ describe('v1.6.0 deterministic full initial state', () => {
       expect(state.barbedWire).toEqual([]);
       expect(state.nextBarbedWireNumber).toBe(1);
       expect(state).toEqual(repeated);
-      expect(state.gameVersion).toBe('10.0.0');
-      expect(state.mapId).toBe('fixed-51x51-v5');
-      expect(state.facilities.filter((facility) => facility.type === 'oilField')).toHaveLength(4);
+      expect(state.gameVersion).toBe('11.0.0');
+      expect(state.mapId).toBe('fixed-51x51-v6');
+      expect(state.facilities.filter((facility) => facility.type === 'oilField')).toHaveLength(1);
       expect(state.rngState).toEqual(repeated.rngState);
     });
   }

@@ -22,11 +22,11 @@ export { getTile, getFacility, getHordeEntrance, isRoad, isHordeSpawnReserve, ca
  * identifier here rather than deriving it from caller config: map validation
  * and save loading must reject a different fixed-map contract.
  */
-export const FIXED_MAP_ID = 'fixed-51x51-v5' as const;
+export const FIXED_MAP_ID = 'fixed-51x51-v6' as const;
 export const FIXED_MAP_WIDTH = 51 as const;
 export const FIXED_MAP_HEIGHT = 51 as const;
-export const FIXED_FACILITY_COUNT = 28 as const;
-export const FIXED_INITIAL_ZOMBIE_COUNT = 25 as const;
+export const FIXED_FACILITY_COUNT = 25 as const;
+export const FIXED_INITIAL_ZOMBIE_COUNT = 50 as const;
 
 /**
  * Initial Zombies are seed-selected at new-game creation. This exported
@@ -83,6 +83,19 @@ const facilitySpecs: Array<{
   { id: 'power-plant-1', type: 'powerPlant', position: { q: 25, r: 27 }, startingOwned: true, startingWorkers: 3 },
   { id: 'wind-power-plant-1', type: 'windPowerPlant', position: { q: 26, r: 24 }, startingOwned: true, startingWorkers: 0 },
 ];
+
+export const OIL_FIELD_CANDIDATES = facilitySpecs
+  .filter((facility) => facility.type === 'oilField')
+  .map((facility) => ({ id: facility.id, position: { ...facility.position } }));
+
+export function oilFieldCandidateForSeed(seed: number): (typeof OIL_FIELD_CANDIDATES)[number] {
+  let hash = 2166136261;
+  for (const character of `${seed}:${FIXED_MAP_ID}:oil-field`) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return OIL_FIELD_CANDIDATES[new SeededRng(hash | 0).nextInt(0, OIL_FIELD_CANDIDATES.length - 1)]!;
+}
 
 export const FIXED_FACILITY_IDS = facilitySpecs.map((facility) => facility.id) as readonly string[];
 
@@ -241,8 +254,9 @@ function createTiles(roads: Set<string>): HexTile[] {
 
 function createFacilities(
   capacities: Readonly<Record<string, number>> = capacityByType,
+  selectedOilFieldId = OIL_FIELD_CANDIDATES[0]!.id,
 ): FacilityDefinition[] {
-  return facilitySpecs.map((spec) => ({
+  return facilitySpecs.filter((spec) => spec.type !== 'oilField' || spec.id === selectedOilFieldId).map((spec) => ({
     id: spec.id,
     type: spec.type,
     nameKey: `facility.${spec.type}`,
@@ -342,10 +356,11 @@ export function getHordeSpawnZone(map: FixedMap, direction: CardinalDirection): 
 let baseRoadCache: { key: string; roads: import('./roads').RoadNetwork } | null = null;
 function buildFixedMap(
   capacities: Readonly<Record<string, number>> = capacityByType,
+  selectedOilFieldId = OIL_FIELD_CANDIDATES[0]!.id,
 ): FixedMap {
   const roads = roadKeySet();
   const tiles = createTiles(roads);
-  const facilities = createFacilities(capacities);
+  const facilities = createFacilities(capacities, selectedOilFieldId);
   const hordeEntrances = createEntrances();
   const roadBranches = createRoadBranches();
   const hordeSpawnReserve = tiles
@@ -393,18 +408,29 @@ function buildFixedMap(
  * applied. Coordinates are sorted q/r so PRNG selection is auditable and
  * independent of array construction order.
  */
-export function getInitialZombieCandidates(map: FixedMap): HexCoord[] {
+export function getInitialZombieCandidates(map: FixedMap, armyBaseVision = 3): HexCoord[] {
   const capital = map.facilities.find((facility) => facility.type === 'capital');
   if (!capital) throw new Error('Fixed map requires a Capital for initial Zombie placement');
   const facilityKeys = new Set(map.facilities.map((facility) => hexKey(facility.position)));
   const humanKeys = new Set(Object.values(FIXED_INITIAL_UNIT_POSITIONS).map(hexKey));
-  return map.tiles
+  const armyBase = map.facilities.find((facility) => facility.type === 'armyBase');
+  const trunkKeys = new Set(map.roadBranches.flatMap((branch) => branch.roadTiles.map(hexKey)));
+  const hardCandidates = map.tiles
     .filter((tile) => {
       if (tile.movementCost === null) return false;
       if (facilityKeys.has(tile.key) || humanKeys.has(tile.key)) return false;
-      return hexDistance(capital.position, tile) >= 9;
+      if (hexDistance(capital.position, tile) < 8) return false;
+      return !armyBase || hexDistance(armyBase.position, tile) > armyBaseVision;
     })
-    .map((tile) => ({ q: tile.q, r: tile.r }))
+    .map((tile) => ({ q: tile.q, r: tile.r }));
+  const offTrunk = hardCandidates.filter((position) => !trunkKeys.has(hexKey(position)));
+  const offAndNotAdjacent = offTrunk.filter((position) =>
+    !map.roadBranches.some((branch) => branch.roadTiles.some((road) => hexDistance(road, position) <= 1)),
+  );
+  const preferred = offAndNotAdjacent.length >= FIXED_INITIAL_ZOMBIE_COUNT
+    ? offAndNotAdjacent
+    : offTrunk.length >= FIXED_INITIAL_ZOMBIE_COUNT ? offTrunk : hardCandidates;
+  return preferred
     .sort((left, right) => left.q - right.q || left.r - right.r);
 }
 
@@ -417,11 +443,12 @@ export function generateInitialZombiePositions(
   map: FixedMap,
   rngOrSeed: SeededRng | number,
   count = FIXED_INITIAL_ZOMBIE_COUNT,
+  armyBaseVision = 3,
 ): HexCoord[] {
   if (!Number.isSafeInteger(count) || count < 0) {
     throw new Error('Initial Zombie count must be a non-negative safe integer');
   }
-  const candidates = getInitialZombieCandidates(map);
+  const candidates = getInitialZombieCandidates(map, armyBaseVision);
   if (count > candidates.length) {
     throw new Error(`Initial Zombie count ${count} exceeds ${candidates.length} valid map candidates`);
   }
@@ -437,11 +464,11 @@ export function generateInitialZombiePositions(
 }
 
 /** Validate the seed-bound initial Zombie list at snapshot trust boundaries. */
-export function initialZombiePositionsMatchSeed(map: FixedMap, seed: number): boolean {
+export function initialZombiePositionsMatchSeed(map: FixedMap, seed: number, armyBaseVision = 3): boolean {
   if (!Number.isSafeInteger(seed)) return false;
   const rng = new SeededRng(seed);
   rng.nextInt(0, ARMY_BASE_CANDIDATES.length - 1);
-  const expected = generateInitialZombiePositions(map, rng);
+  const expected = generateInitialZombiePositions(map, rng, FIXED_INITIAL_ZOMBIE_COUNT, armyBaseVision);
   return map.initialZombiePositions.length === expected.length
     && map.initialZombiePositions.every((position, index) => {
       const expectedPosition = expected[index];
@@ -456,6 +483,7 @@ export function generateInitialHunterPositions(
   map: FixedMap,
   rng: SeededRng,
   options: { initialHunterCount: { min: number; max: number }; initialHunterMinDistance: number },
+  armyBaseVision = 5,
 ): HexCoord[] {
   const capital = map.facilities.find((facility) => facility.type === 'capital');
   if (!capital) throw new Error('Initial Hunter placement requires a Capital');
@@ -464,9 +492,11 @@ export function generateInitialHunterPositions(
     ...Object.values(FIXED_INITIAL_UNIT_POSITIONS).map(hexKey),
     ...map.initialZombiePositions.map(hexKey),
   ]);
+  const armyBase = map.facilities.find((facility) => facility.type === 'armyBase');
   const candidates = map.tiles.filter((tile) => tile.movementCost !== null
     && !occupied.has(tile.key)
     && hexDistance(capital.position, tile) >= options.initialHunterMinDistance)
+    .filter((tile) => !armyBase || hexDistance(armyBase.position, tile) > armyBaseVision)
     .map(({ q, r }) => ({ q, r })).sort((a, b) => a.q - b.q || a.r - b.r);
   const count = rng.nextInt(options.initialHunterCount.min, options.initialHunterCount.max);
   if (candidates.length < count) throw new Error(`Initial Hunter count ${count} exceeds ${candidates.length} valid candidates`);
@@ -485,8 +515,8 @@ export function initialHunterPositionsMatchSeed(
   try {
     const rng = new SeededRng(state.seed);
     rng.nextInt(0, ARMY_BASE_CANDIDATES.length - 1);
-    const normal = generateInitialZombiePositions(state.map, rng);
-    const expected = generateInitialHunterPositions({ ...state.map, initialZombiePositions: normal }, rng, state.config.economy);
+    const normal = generateInitialZombiePositions(state.map, rng, undefined, state.config.units.zombie.vision);
+    const expected = generateInitialHunterPositions({ ...state.map, initialZombiePositions: normal }, rng, state.config.economy, state.config.units.hunterZombie.vision);
     return Array.isArray(state.initialHunterPositions) && expected.length === state.initialHunterPositions.length
       && expected.every((position, index) => position.q === state.initialHunterPositions[index]?.q
         && position.r === state.initialHunterPositions[index]?.r);
@@ -545,9 +575,11 @@ const FIXED_MAP_CANONICAL_JSON = canonicalStaticMapJson(baseFixedMap);
 /** Return a fresh JSON-compatible copy for a new GameState. */
 export function createFixedMap(
   capacities: Readonly<Record<string, number>> = capacityByType,
+  seed = 0,
 ): FixedMap {
-  const map = buildFixedMap(capacities);
-  map.initialZombiePositions = FIXED_INITIAL_ZOMBIE_POSITIONS.map((position) => ({ ...position }));
+  const selected = oilFieldCandidateForSeed(seed);
+  const map = buildFixedMap(capacities, selected.id);
+  map.initialZombiePositions = generateInitialZombiePositions(map, seed);
   return cloneMap(map);
 }
 
@@ -594,8 +626,9 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     errors.push('map must contain 2601 tiles');
   }
   if (!Array.isArray(map?.facilities) || map.facilities.filter(f=>f.type!=='armyBase').length !== FIXED_FACILITY_COUNT) {
-    errors.push('map must contain exactly 29 facilities');
+    errors.push(`map must contain exactly ${FIXED_FACILITY_COUNT + 1} facilities including Army Base`);
   }
+  if ((map?.facilities ?? []).filter((facility) => facility.type === 'oilField').length !== 1) errors.push('map must contain exactly one Oil Field');
 
   const seenTiles = new Set<string>();
   for (const tile of map?.tiles ?? []) {
@@ -762,17 +795,18 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     }
     if (initialHumanKeys.has(key)) errors.push(`initial zombie overlaps initial Human Unit: ${key}`);
     const capital = map?.facilities.find((facility) => facility.type === 'capital');
-    if (capital && hexDistance(position, capital.position) < 9) {
+    if (capital && hexDistance(position, capital.position) < 8) {
       errors.push(`initial zombie is within Capital safety distance: ${key}`);
     }
     const tile = map?.tiles.find((candidate) => candidate.key === key);
     if (tile?.movementCost === null) errors.push(`initial zombie is on impassable terrain: ${key}`);
   }
 
-  const expectedFacilityIds = new Set(FIXED_FACILITY_IDS);
+  const selectedOilId = (map?.facilities ?? []).find((facility) => facility.type === 'oilField')?.id;
+  const expectedFacilityIds = new Set(FIXED_FACILITY_IDS.filter((id) => !id.startsWith('oilfield-') || id === selectedOilId));
   const actualFacilityIds = new Set((map?.facilities ?? []).filter(f=>f.type!=='armyBase').map((facility) => facility.id));
   if (expectedFacilityIds.size !== actualFacilityIds.size || [...expectedFacilityIds].some((id) => !actualFacilityIds.has(id))) {
-    errors.push('map facilities must match the fixed 29-facility template');
+    errors.push('map facilities must match the selected fixed v1.6.1 facility template');
   }
 
   if (map && countStaticBuildablePlainHexes(map, 5) < 12) {
@@ -785,11 +819,12 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
   if (canonicalCandidate) {
     if (!canonicalCandidate.roads) errors.push('Missing connector road network');
     else {
-      const expected = structuredClone(baseFixedMap.roads!);
+      const selectedMap = buildFixedMap(capacityByType, selectedOilId);
+      const expected = structuredClone(selectedMap.roads!);
       const base = canonicalCandidate.facilities.find(f => f.type === 'armyBase');
       if (base) connectRoadAccess(fixedRoadInput(canonicalCandidate), expected, base.position, 'access-army-base-1');
       if (canonicalMapJson(canonicalCandidate.roads) !== canonicalMapJson(expected)) errors.push('Invalid saved road network');
-      canonicalCandidate.roads = structuredClone(baseFixedMap.roads!);
+      canonicalCandidate.roads = structuredClone(selectedMap.roads!);
     }
     canonicalCandidate.facilities=canonicalCandidate.facilities.filter(f=>f.type!=='armyBase');
     for(const tile of canonicalCandidate.tiles) if(tile.facilityId==='army-base-1') tile.facilityId=null;
@@ -797,7 +832,8 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
       facility.workerCapacity = capacityByType[facility.type] ?? facility.workerCapacity;
     }
   }
-  if (canonicalCandidate && canonicalStaticMapJson(canonicalCandidate) !== FIXED_MAP_CANONICAL_JSON) {
+  const expectedCanonicalMap = selectedOilId ? buildFixedMap(capacityByType, selectedOilId) : baseFixedMap;
+  if (canonicalCandidate && canonicalStaticMapJson(canonicalCandidate) !== canonicalStaticMapJson(expectedCanonicalMap)) {
     errors.push('map must match the fixed 51x51 map template');
   }
   return { valid: errors.length === 0, errors };
@@ -818,19 +854,31 @@ export function placeArmyBase(map: FixedMap, rng: SeededRng, capacity = 10): voi
   if (map.roads) connectRoadAccess(fixedRoadInput(map), map.roads, position, 'access-army-base-1');
   map.facilities.push({id:'army-base-1', type:'armyBase', nameKey:'facility.armyBase', position, workerCapacity:capacity, startingOwned:false, startingWorkers:0, startingInfected:0});
 }
-export function generateInitialGasPositions(map: FixedMap, rng: SeededRng, hunters: HexCoord[], options: import('./types').EconomyConfig): HexCoord[] {
-  const occupied = new Set([...map.initialZombiePositions, ...hunters].map(hexKey));
+export function generateInitialGasPositions(map: FixedMap, rng: SeededRng, hunters: HexCoord[], options: import('./types').EconomyConfig, armyBaseVision = 3): HexCoord[] {
+  const occupied = new Set([
+    ...map.facilities.map((facility) => hexKey(facility.position)),
+    ...Object.values(FIXED_INITIAL_UNIT_POSITIONS).map(hexKey),
+    ...map.initialZombiePositions.map(hexKey),
+    ...hunters.map(hexKey),
+  ]);
   const capital = map.facilities.find(f => f.type === 'capital')!;
-  const candidates = getInitialZombieCandidates(map).filter(p => !occupied.has(hexKey(p)) && hexDistance(p, capital.position) >= options.initialGasMinDistance);
+  const armyBase = map.facilities.find((facility) => facility.type === 'armyBase');
+  const candidates = map.tiles
+    .filter((tile) => tile.movementCost !== null
+      && !occupied.has(tile.key)
+      && hexDistance(tile, capital.position) >= options.initialGasMinDistance
+      && (!armyBase || hexDistance(tile, armyBase.position) > armyBaseVision))
+    .map(({ q, r }) => ({ q, r }))
+    .sort((left, right) => left.q - right.q || left.r - right.r);
   const count = rng.nextInt(options.initialGasCount.min, options.initialGasCount.max);
   if (candidates.length < count) throw new Error('Insufficient initial Gas candidates');
   for(let i=0;i<count;i++) { const j=rng.nextInt(i,candidates.length-1); [candidates[i],candidates[j]]=[candidates[j]!,candidates[i]!]; }
   return candidates.slice(0,count);
 }
 export function initialGasPositionsMatchSeed(state: Pick<import('./types').GameState,'map'|'seed'|'config'|'initialGasPositions'>): boolean {
-  try { const rng=new SeededRng(state.seed); rng.nextInt(0,ARMY_BASE_CANDIDATES.length-1); const map={...state.map,initialZombiePositions:generateInitialZombiePositions(state.map,rng)}; const hunters=generateInitialHunterPositions(map,rng,state.config.economy); return JSON.stringify(generateInitialGasPositions(map,rng,hunters,state.config.economy))===JSON.stringify(state.initialGasPositions); } catch { return false; }
+  try { const rng=new SeededRng(state.seed); rng.nextInt(0,ARMY_BASE_CANDIDATES.length-1); const map={...state.map,initialZombiePositions:generateInitialZombiePositions(state.map,rng,undefined,state.config.units.zombie.vision)}; const hunters=generateInitialHunterPositions(map,rng,state.config.economy,state.config.units.hunterZombie.vision); return JSON.stringify(generateInitialGasPositions(map,rng,hunters,state.config.economy,state.config.units.gasZombie.vision))===JSON.stringify(state.initialGasPositions); } catch { return false; }
 }
 
 export function initialArmyBaseMatchesSeed(state: Pick<import('./types').GameState,'map'|'seed'|'config'>): boolean {
- try { const bases=state.map.facilities.filter(f=>f.type==='armyBase'); const rng=new SeededRng(state.seed); const position=ARMY_BASE_CANDIDATES[rng.nextInt(0,ARMY_BASE_CANDIDATES.length-1)]!; const f=bases[0]; return bases.length===1 && f?.id==='army-base-1' && hexKey(f.position)===hexKey(position) && !f.startingOwned && f.startingWorkers===0 && f.startingInfected===0 && f.workerCapacity===state.config.facilities.armyBase.workerCapacity && state.map.tiles.find(t=>hexKey(t)===hexKey(position))?.facilityId===f.id; } catch { return false; }
+ try { const bases=state.map.facilities.filter(f=>f.type==='armyBase'); const rng=new SeededRng(state.seed); const position=ARMY_BASE_CANDIDATES[rng.nextInt(0,ARMY_BASE_CANDIDATES.length-1)]!; const f=bases[0]; const oils=state.map.facilities.filter(facility=>facility.type==='oilField'); const expectedOil=oilFieldCandidateForSeed(state.seed); return bases.length===1 && f?.id==='army-base-1' && hexKey(f.position)===hexKey(position) && !f.startingOwned && f.startingWorkers===0 && f.startingInfected===0 && f.workerCapacity===state.config.facilities.armyBase.workerCapacity && state.map.tiles.find(t=>hexKey(t)===hexKey(position))?.facilityId===f.id && oils.length===1 && oils[0]?.id===expectedOil.id && hexKey(oils[0].position)===hexKey(expectedOil.position); } catch { return false; }
 }

@@ -15,8 +15,8 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '10.0.0';
-export const DEFAULT_MAP_ID = 'fixed-51x51-v5';
+export const CONFIG_VERSION = '11.0.0';
+export const DEFAULT_MAP_ID = 'fixed-51x51-v6';
 
 const facilityIds: FacilityId[] = [
   'army-base-1',
@@ -66,32 +66,42 @@ function production(
 
 const defaultUnitConfig: UnitConfigMap = {
   gasZombie: { maxAttackCharges: 1, hp: 35, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, explosionDamage: 30, explosionInfection: 30 },
+  screamerZombie: { maxAttackCharges: 1, hp: 15, attack: 10, movement: 3, range: 1, vision: 2, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, screamRadius: 30 },
   police: {
-    hp: 25, recruitAttack: 6, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 12,
-    maxMilitaryGoods: 5, fixedMilitaryGoodsUpkeepPerTurn: 0,
-    attackMilitaryGoodsCostByRange: { 1: 1 }, suppressionMilitaryGoodsCost: 1,
+    hp: 25, recruitAttack: 6, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 24,
+    maxMilitaryGoods: 10, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: { 1: 2 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 3,
     recruitmentFacilityTypes: ['capital', 'city'],
     productionCivilianGoods: 10, productionMilitaryGoods: 10, fuelCostRule: 'policeLike',
     suppressionCivilianDamageRate: 0, reanimationUnitType: UNIT_CATALOG.police.reanimation, noiseClass: 'medium', noiseRadius: 4,
   },
   nationalGuard: {
-    hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 22,
-    maxMilitaryGoods: 20, fixedMilitaryGoodsUpkeepPerTurn: 1,
-    attackMilitaryGoodsCostByRange: { 1: 1, 2: 2 }, suppressionMilitaryGoodsCost: 1,
+    hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 44,
+    maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
+    attackMilitaryGoodsCostByRange: { 1: 2, 2: 4 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
     recruitmentFacilityTypes: ['capital', 'armyBase'],
     productionCivilianGoods: 20, productionMilitaryGoods: 25, fuelCostRule: 'nationalGuardLike',
     suppressionCivilianDamageRate: 0.5, reanimationUnitType: UNIT_CATALOG.nationalGuard.reanimation, noiseClass: 'large', noiseRadius: 8,
   },
   riotPolice: {
-    hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 12,
-    maxMilitaryGoods: 5, fixedMilitaryGoodsUpkeepPerTurn: 0,
-    attackMilitaryGoodsCostByRange: { 1: 1 }, suppressionMilitaryGoodsCost: 1,
+    hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 24,
+    maxMilitaryGoods: 10, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: { 1: 2 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
     recruitmentFacilityTypes: ['capital', 'city'],
     productionCivilianGoods: 25, productionMilitaryGoods: 25, fuelCostRule: 'policeLike',
     suppressionCivilianDamageRate: 0, reanimationUnitType: UNIT_CATALOG.riotPolice.reanimation, noiseClass: 'medium', noiseRadius: 5,
+  },
+  reconTeam: {
+    hp: 25, recruitAttack: 9, movement: 10, range: 6, vision: 10, population: 5, maxFuel: 44,
+    maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
+    attackMilitaryGoodsCostByRange: { 1: 6, 2: 6, 3: 6, 4: 6, 5: 6, 6: 6 }, suppressionMilitaryGoodsCost: 1,
+    militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
+    recruitmentFacilityTypes: ['capital', 'armyBase'],
+    productionCivilianGoods: 20, productionMilitaryGoods: 25, fuelCostRule: 'nationalGuardLike',
+    suppressionCivilianDamageRate: 0.5, reanimationUnitType: UNIT_CATALOG.reconTeam.reanimation, noiseClass: 'medium', noiseRadius: 6,
   },
   zombie: {
     maxAttackCharges: 1,
@@ -192,7 +202,7 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
     workerCapacity: 0,
     production: production(emptyInputs(), emptyOutputs(), 'none', 0, 0, 15),
     overrunSpawnCount: 0,
-    buildCivilianGoods: 100, visionRadius: 1, zombieTargetValue: 0,
+    buildCivilianGoods: 150, visionRadius: 1, zombieTargetValue: 0,
   },
   simpleFarm: {
     workerCapacity: 10,
@@ -250,10 +260,11 @@ const initialWorkersByFacility: Record<FacilityId, number> = {
 const defaultEconomy: EconomyConfig = {
   populationConsumption: { food: 1, civilianGoods: 1 },
   initialResources,
-  initialRefineryAllowance: 5_000,
+  initialRefineryAllowance: 2_000,
   oilFieldAllowancePerWorker: 100,
   initialWorkersByFacility,
-  initialZombieCount: 25,
+  initialZombieCount: 50,
+  neutralSurvivorRewardLastTurn: 10,
   initialHunterCount: { min: 1, max: 4 },
   initialHunterMinDistance: 20,
   initialGasCount: { min: 1, max: 2 },
@@ -283,7 +294,7 @@ const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopula
  */
 export const DEFAULT_CONFIG: GameConfig = {
   windPower: { noiseRadius: 8 },
-  armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 20 },
+  armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 10 },
   version: CONFIG_VERSION,
   mapId: DEFAULT_MAP_ID,
   maxActionsPerTurn: 100,
@@ -293,6 +304,7 @@ export const DEFAULT_CONFIG: GameConfig = {
       police: 'recruit',
       nationalGuard: 'recruit',
       riotPolice: 'recruit',
+      reconTeam: 'recruit',
     },
     recruitSurvivalTurnsRequired: 5,
     regularAttackMultiplier: 1.25,
@@ -304,20 +316,20 @@ export const DEFAULT_CONFIG: GameConfig = {
   economy: defaultEconomy,
   initialFacilityPopulation: defaultInitialFacilityPopulation,
   naturalRecovery: {
-    combatRate: 0.1,
-    restRate: 0.2,
+    combatRate: 0.05,
+    restRate: 0.1,
     rounding: 'ceil',
   },
   horde: {
     warningLeadTurns: 2,
     waves: [
-      { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 3 }, final: false },
-      { turn: 10, directionCount: 2, compositionPerDirection: { hordeZombie: 2, zombie: 5 }, final: false },
-      { turn: 20, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, final: false },
-      { turn: 35, directionCount: 3, compositionPerDirection: { hordeZombie: 3, zombie: 7 }, final: false },
-      { turn: 50, directionCount: 4, compositionPerDirection: { hordeZombie: 5, zombie: 8 }, final: true },
+      { turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 3 }, final: false },
+      { turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 5 }, final: false },
+      { turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 7 }, final: false },
+      { turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, final: false },
+      { turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 8 }, final: true },
     ],
-    specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5 },
+    specialZombieWeights: { zombie: 65, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5, screamerZombie: 5 },
     riotZombieCapPerDirection: 1,
     hunterZombieCapPerDirection: 1,
     gasZombieCapPerDirection: 1,
@@ -348,7 +360,12 @@ export const DEFAULT_CONFIG: GameConfig = {
         infectionRate: 0,
         infectionPopulationRate: 0,
       },
+      deny: { turns: 0, workerRate: 0, infectionRate: 0, infectionPopulationRate: 0 },
     },
+    waitingRiskThreshold: 100,
+    waitingRiskMaxPercent: 100,
+    waitingRiskInfectionMin: 1,
+    waitingRiskInfectionMax: 5,
   },
   infection: {
     facilitySpreadPerTurn: 1,
@@ -734,7 +751,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     requireInteger(errors, horde.riotZombieCapPerDirection, 'horde.riotZombieCapPerDirection', 0);
     requireInteger(errors, horde.movementNoiseRadius, 'horde.movementNoiseRadius', 0);
     for (const type of WAVE_NON_HORDE_TYPES) {
-      requireInteger(errors, horde.specialZombieWeights?.[type], `horde.specialZombieWeights.${type}`, 0);
+      requireInteger(errors, horde.specialZombieWeights?.[type] ?? 0, `horde.specialZombieWeights.${type}`, 0);
     }
     if (horde.specialZombieWeights
       && Object.values(horde.specialZombieWeights).reduce((sum, weight) => sum + weight, 0) <= 0) {
@@ -861,7 +878,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     if (refugees.arrivalPeopleMin > refugees.arrivalPeopleMax) {
       errors.push('refugees arrival people minimum cannot exceed maximum');
     }
-    for (const policy of ['passThrough', 'normal', 'strict'] as const) {
+    for (const policy of ['passThrough', 'normal', 'strict', 'deny'] as const) {
       const policyConfig = refugees.policies?.[policy];
       if (!policyConfig) {
         errors.push(`refugees.policies.${policy} is required`);
@@ -874,6 +891,12 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
         }
       }
     }
+    requireInteger(errors, refugees.waitingRiskThreshold, 'refugees.waitingRiskThreshold', 0);
+    requireInteger(errors, refugees.waitingRiskMaxPercent, 'refugees.waitingRiskMaxPercent', 1);
+    requireInteger(errors, refugees.waitingRiskInfectionMin, 'refugees.waitingRiskInfectionMin', 1);
+    requireInteger(errors, refugees.waitingRiskInfectionMax, 'refugees.waitingRiskInfectionMax', 1);
+    if (refugees.waitingRiskMaxPercent > 100) errors.push('refugees.waitingRiskMaxPercent cannot exceed 100');
+    if (refugees.waitingRiskInfectionMin > refugees.waitingRiskInfectionMax) errors.push('refugees waiting risk infection minimum cannot exceed maximum');
   }
 
   requireInteger(errors, config.windPower?.noiseRadius, 'windPower.noiseRadius', 0);

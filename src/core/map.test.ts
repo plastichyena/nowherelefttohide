@@ -29,7 +29,7 @@ const rotate = ({ q, r }: { q: number; r: number }) => ({ q: 50 - q, r: 50 - r }
 
 describe('v1.6 fixed map', () => {
   it('uses the 51x51 fixed map contract and covers every hex exactly once', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v5');
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v6');
     expect(FIXED_MAP.width).toBe(FIXED_MAP_WIDTH);
     expect(FIXED_MAP.height).toBe(FIXED_MAP_HEIGHT);
     expect(FIXED_MAP.tiles).toHaveLength(51 * 51);
@@ -129,9 +129,11 @@ describe('v1.6 fixed map', () => {
     expect(canPlayerOccupyHex(replaced, { q: 15, r: 0 })).toBe(true);
   });
 
-  it('contains the 28 permanent v5 facilities at the specified coordinates', () => {
+  it('contains the 25 permanent v6 facilities with one selected Oil Field', () => {
     expect(FIXED_MAP.facilities).toHaveLength(FIXED_FACILITY_COUNT);
-    expect(FIXED_MAP.facilities.map((facility) => facility.id)).toEqual(FIXED_FACILITY_IDS);
+    expect(FIXED_MAP.facilities.map((facility) => facility.id)).toEqual(
+      FIXED_FACILITY_IDS.filter((id) => !id.startsWith('oilfield-') || id === 'oilfield-north'),
+    );
     const expected = {
       capital: ['capital', 25, 25, true],
       'city-1': ['city', 25, 20, false],
@@ -199,7 +201,7 @@ describe('v1.6 fixed map', () => {
     const capital = { q: 25, r: 25 };
     for (const position of FIXED_INITIAL_ZOMBIE_POSITIONS) {
       expect(occupiedStaticKeys.has(hexKey(position))).toBe(false);
-      expect(hexDistance(position, capital)).toBeGreaterThanOrEqual(9);
+      expect(hexDistance(position, capital)).toBeGreaterThanOrEqual(8);
       expect(at(position.q, position.r)?.movementCost).not.toBeNull();
     }
     expect(new Set(FIXED_INITIAL_ZOMBIE_POSITIONS.map(hexKey)).size).toBe(FIXED_INITIAL_ZOMBIE_COUNT);

@@ -15,6 +15,7 @@ import { effectiveMovementCost, terrainDefenseAt } from './terrain';
 import { populationTransferCandidates, validateAction } from './engine';
 import { createAgentGame } from '../agent/game';
 import type { GameState } from './types';
+import { prepareTestSnapshot } from './testConfig';
 const setup = () => createInitialState(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: {min:0,max:0}, initialGasCount:{min:0,max:0} } }));
 describe('v1.6.0 housing maintenance balance', () => {
   it.each([0,1,2,9,10,11,25])('does not offset Civilian Goods maintenance with resident output: %s', people => {
@@ -49,7 +50,7 @@ describe('v1.5.5 roads',()=>{
 });
 describe('v1.5.5 population parameter domain',()=>{
   it('accepts a legal unenumerated integer and rejects invalid counts without state mutation',()=>{
-    const s=setup(),city=s.facilities.find(f=>f.type==='city')!;city.owner='player';city.status='owned';city.workers=5;s.facilities.find(f=>f.type==='capital')!.workers-=5;city.securedOrder=100;city.operationalStatus='operational';city.populationOperationalTurn=1;synchronizePopulation(s);createCityPopulationSnapshot(s);
+    const s=setup(),city=s.facilities.find(f=>f.type==='city')!;city.owner='player';city.status='owned';city.workers=5;s.facilities.find(f=>f.type==='capital')!.workers-=5;city.securedOrder=100;city.operationalStatus='operational';city.populationOperationalTurn=1;prepareTestSnapshot(s);
     const range=populationTransferCandidates(s).find(c=>c.fromFacilityId==='capital'&&c.toFacilityId===city.id)!;expect(range.min).toBe(1);expect(range.max).toBeGreaterThan(7);
     const game=createAgentGame() as ReturnType<typeof createAgentGame>&{restorePrivateSessionState(s:GameState):void};game.restorePrivateSessionState(s);
     expect(game.step({type:'TransferPopulation',fromFacilityId:'capital',toFacilityId:city.id,people:7}).error).toBeNull();const before=game.getObservation();expect(game.step({type:'TransferPopulation',fromFacilityId:'capital',toFacilityId:city.id,people:0}).error).not.toBeNull();expect(game.getObservation()).toEqual(before);

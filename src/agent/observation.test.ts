@@ -25,10 +25,10 @@ describe('Agent Observation 8.0.0 rule projections', () => {
       effectiveRange: 1,
       rangeModifierReason: 'carried_military_goods_shortage',
       currentMilitaryGoods: 1,
-      maxMilitaryGoods: 20,
+      maxMilitaryGoods: 40,
       recoveryClassIfTurnEndsNow: 'combat',
-      recoveryRateIfTurnEndsNow: 0.1,
-      recoveryBaseAmountIfTurnEndsNow: 5,
+      recoveryRateIfTurnEndsNow: 0.05,
+      recoveryBaseAmountIfTurnEndsNow: 3,
       suppressionAvailableIfTurnEndsNow: true,
       suppressionStatusIfTurnEndsNow: 'suppression',
       suppressionTargetId: farm.id,
@@ -55,7 +55,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
   it('publishes carried Military Goods and exact legal Attack previews by distance', () => {
     const state = createInitialState(142, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
-    guard.currentMilitaryGoods = 2;
+    guard.currentMilitaryGoods = 4;
     state.units.push(createUnit(state, 'zombie-range-2', 'zombie', {
       q: guard.position.q + 2,
       r: guard.position.r,
@@ -63,17 +63,17 @@ describe('Agent Observation 8.0.0 rule projections', () => {
 
     const publicGuard = createAgentObservation(state).units.find((unit) => unit.id === guard.id)!;
     expect(publicGuard).toMatchObject({
-      currentMilitaryGoods: 2,
-      maxMilitaryGoods: 20,
+      currentMilitaryGoods: 4,
+      maxMilitaryGoods: 40,
       fixedMilitaryGoodsUpkeepPerTurn: 1,
-      attackMilitaryGoodsCostByRange: { 1: 1, 2: 2 },
+      attackMilitaryGoodsCostByRange: { 1: 2, 2: 4 },
       suppressionMilitaryGoodsCost: 1,
     });
     expect(publicGuard.attackPreviews).toEqual([
       expect.objectContaining({
         targetUnitId: 'zombie-range-2',
         distance: 2,
-        militaryGoodsCost: 2,
+        militaryGoodsCost: 4,
         projectedMilitaryGoodsAfterAttack: 0,
         effectiveAttack: 15,
       }),
@@ -81,7 +81,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
     expect(publicGuard.attackPreviews[0]!.projectedDamageBeforeTerrain).toBe(15);
     expect(publicGuard.attackPreviews[0]!.projectedDamageAfterTerrain).toBeGreaterThan(0);
 
-    guard.currentMilitaryGoods = 1;
+    guard.currentMilitaryGoods = 3;
     const shortGuard = createAgentObservation(state).units.find((unit) => unit.id === guard.id)!;
     expect(shortGuard).toMatchObject({
       effectiveRange: 1,
@@ -106,9 +106,9 @@ describe('Agent Observation 8.0.0 rule projections', () => {
     const publicGuard = observation.units.find((unit) => unit.id === guard.id)!;
     const publicPolice = observation.units.find((unit) => unit.id === police.id)!;
     expect(publicGuard).toMatchObject({
-      projectedMilitaryGoodsAfterFixedConsumption: 19,
-      projectedMilitaryGoodsAfterRefill: 19,
-      projectedMilitaryGoodsAfterSuppression: 19,
+      projectedMilitaryGoodsAfterFixedConsumption: 39,
+      projectedMilitaryGoodsAfterRefill: 39,
+      projectedMilitaryGoodsAfterSuppression: 39,
       suppressionStatusIfTurnEndsNow: 'none',
     });
     expect(publicPolice).toMatchObject({
@@ -121,13 +121,13 @@ describe('Agent Observation 8.0.0 rule projections', () => {
     expect(observation.endTurnForecast.militaryGoods).toMatchObject({
       startingStock: 1,
       projectedTotalRefilled: 1,
-      totalUnfilledRefillDemand: 5,
+      totalUnfilledRefillDemand: 10,
       projectedEndingStock: 0,
     });
     expect(observation.endTurnForecast.militaryGoods.units.find((unit) => unit.unitId === police.id)).toMatchObject({
-      refillDemand: 5,
+      refillDemand: 10,
       projectedRefillAmount: 1,
-      unfilledRefillDemand: 4,
+      unfilledRefillDemand: 9,
       afterRefill: 1,
       suppressionStatus: 'suppression',
       afterSuppression: 0,
@@ -247,7 +247,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
       .map((unit) => unit.id)
       .filter((id) => !observation.zombies.some((unit) => unit.id === id));
 
-    expect(observation.finalHordeTurn).toBe(50);
+    expect(observation.finalHordeTurn).toBe(70);
     expect(observation.map.tiles).toHaveLength(2601);
     expect(observation.map.tiles.filter((tile) => tile.terrain === 'forest')).toHaveLength(514);
     expect(observation.map.tiles.filter((tile) => tile.terrain === 'mountain')).toHaveLength(126);
@@ -278,8 +278,8 @@ describe('Agent Observation 8.0.0 rule projections', () => {
       warningType: 'none',
       warningDirections: [],
       nextWaveIndex: 1,
-      nextWave: expect.objectContaining({ index: 1, spawnTurn: 5, directionCount: 1 }),
-      spawnTurn: 5,
+      nextWave: expect.objectContaining({ index: 1, spawnTurn: 10, directionCount: 1 }),
+      spawnTurn: 10,
       finalHordeStatus: 'notStarted',
     });
     expect(observation.victory).toEqual({
@@ -315,7 +315,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
     const game = createAgentGame();
     const observation = game.reset({ seed: 140, configOverrides: { economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const police = observation.units.find((unit) => unit.type === 'police')!;
-    expect(police).toMatchObject({ currentFuel: 12, maxFuel: 12, inSupply: true });
+    expect(police).toMatchObject({ currentFuel: 24, maxFuel: 24, inSupply: true });
     expect(police.fuelCostByLegalMove.length).toBeGreaterThan(0);
     expect(police.fuelCostByLegalMove.every((move) => move.fuelCost >= 1 && move.projectedFuelAfterMove >= 0)).toBe(true);
     const wind = observation.facilities.find((facility) => facility.type === 'windPowerPlant')!;

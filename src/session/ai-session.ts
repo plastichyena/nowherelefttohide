@@ -186,7 +186,7 @@ function isCurrentActionShape(value: unknown): value is GameAction {
           && isNonNegativeSafeInteger(value.count) && value.count >= 1;
       case 'ProduceUnit':
         return hasOnlyKeys(value, ['type', 'unitType'], ['destination'])
-          && (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice')
+          && (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice' || value.unitType === 'reconTeam')
           && (value.destination === undefined || isCoordinate(value.destination));
       case 'EndTurn':
         return hasOnlyKeys(value, ['type']);

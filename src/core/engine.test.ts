@@ -4,7 +4,7 @@ import { forecastEndTurn, GameEngine, previewMove } from './engine';
 import { validateInvariants } from './invariants';
 import { hexDistance } from './hex';
 import { findNearestOpenTiles } from './path';
-import { singleFinalWave } from './testConfig';
+import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 import {
   createCityPopulationSnapshot,
   createInitialState,
@@ -14,12 +14,7 @@ import {
 } from './state';
 
 function synchronizePopulation(state: ReturnType<typeof createInitialState>): void {
-  synchronizeDerivedPopulation(state);
-  state.population.initialPopulation =
-    populationLedgerTotal(state) -
-    state.population.cumulativeArrivals -
-    state.population.cumulativeDiscoveredInfected +
-    state.population.cumulativeDepartures;
+  prepareTestSnapshot(state);
 }
 
 describe('GameEngine', () => {
@@ -28,14 +23,14 @@ describe('GameEngine', () => {
     const first = createInitialState(42, config);
     const second = createInitialState(42, config);
     expect(first).toEqual(second);
-    expect(first.facilities).toHaveLength(29);
+    expect(first.facilities).toHaveLength(26);
     expect(first.facilities.filter((facility) => facility.status === 'owned')).toHaveLength(6);
     expect(first.population.healthyCivilians).toBe(100);
     expect(first.facilities.find((facility) => facility.id === 'capital')?.workers).toBe(41);
-    expect(first.map.initialZombiePositions).toHaveLength(25);
-    expect(new Set(first.map.initialZombiePositions.map(({ q, r }) => `${q},${r}`)).size).toBe(25);
+    expect(first.map.initialZombiePositions).toHaveLength(50);
+    expect(new Set(first.map.initialZombiePositions.map(({ q, r }) => `${q},${r}`)).size).toBe(50);
     expect(first.map.initialZombiePositions.every((position) =>
-      hexDistance(position, { q: 25, r: 25 }) > 8,
+      hexDistance(position, { q: 25, r: 25 }) >= 8,
     )).toBe(true);
     expect(first.units.filter((unit) => unit.isPlayerUnit)).toHaveLength(2);
     expect(validateInvariants(first)).toEqual({ valid: true, errors: [] });
@@ -788,7 +783,7 @@ describe('GameEngine', () => {
     expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(capitalBefore + 3);
   });
 
-  it('converts latent infection at a blocked checkpoint in approved-first order and overruns immediately', () => {
+  it('converts latent infection at a blocked checkpoint in approved-first order and reserves overrun for the next phase', () => {
     const config = createDefaultConfig({
       horde: singleFinalWave(2),
       economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
@@ -796,8 +791,6 @@ describe('GameEngine', () => {
     });
     const engine = new GameEngine(207, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
-    snapshot.cityPopulationSnapshot.supply.forEach((entry) => { entry.eligible = false; });
-    snapshot.cityPopulationSnapshot.reception.forEach((entry) => { entry.eligible = false; });
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1', position: { q: 25, r: 19 }, direction: 'north', status: 'operational',
       waiting: 2, screening: 0, approved: 0, remainingTurns: 0, screeningPolicy: 'passThrough', nextArrivalTurn: null, infected: 0,
@@ -805,6 +798,8 @@ describe('GameEngine', () => {
     snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-north-1';
     snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.currentPolicy = 'passThrough';
     synchronizePopulation(snapshot);
+    snapshot.cityPopulationSnapshot.supply.forEach((entry) => { entry.eligible = false; });
+    snapshot.cityPopulationSnapshot.reception.forEach((entry) => { entry.eligible = false; });
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.getState().checkpoints[0]).toMatchObject({ waiting: 0, screening: 0, approved: 0, status: 'ruined' });

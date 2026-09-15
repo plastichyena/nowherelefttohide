@@ -26,7 +26,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '10.0.0';
+export const GAME_VERSION = '11.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -162,6 +162,7 @@ export function createUnit(
     noiseTarget: null,
     spawnGroupId: null,
     hordeKind: null,
+    hasScreamed: false,
     activity: { moved: false, attacked: false, intercepted: false, suppressed: false },
   };
 }
@@ -194,6 +195,12 @@ export function synchronizePopulation(state: GameState): void {
     state.pendingUnitProductions
       .filter((order) => order.unitType === 'riotPolice')
       .reduce((total, order) => total + order.population, 0);
+  const reconTeam = state.units
+    .filter((unit) => unit.type === 'reconTeam')
+    .reduce((total, unit) => total + unit.population, 0) +
+    state.pendingUnitProductions
+      .filter((order) => order.unitType === 'reconTeam')
+      .reduce((total, order) => total + order.population, 0);
   const waiting = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.waiting, 0);
   const screening = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.screening, 0);
   const approved = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.approved, 0);
@@ -205,7 +212,8 @@ export function synchronizePopulation(state: GameState): void {
   state.population.police = police;
   state.population.nationalGuard = nationalGuard;
   state.population.riotPolice = riotPolice;
-  state.population.unitPopulation = police + nationalGuard + riotPolice;
+  state.population.reconTeam = reconTeam;
+  state.population.unitPopulation = police + nationalGuard + riotPolice + reconTeam;
   state.population.waitingRefugees = waiting;
   state.population.screeningRefugees = screening;
   state.population.approvedRefugees = approved;
@@ -218,7 +226,7 @@ export function synchronizePopulation(state: GameState): void {
 
   state.statistics.maxPopulation = Math.max(
     state.statistics.maxPopulation,
-    cityResidents + productionWorkers + waiting + screening + approved + police + nationalGuard + riotPolice,
+    cityResidents + productionWorkers + waiting + screening + approved + police + nationalGuard + riotPolice + reconTeam,
   );
   state.statistics.maxSecuredFacilities = Math.max(
     state.statistics.maxSecuredFacilities,
@@ -315,16 +323,30 @@ function facilityStateFromDefinition(
   config: GameConfig,
   securedOrder: number | null,
   rng: SeededRng,
+  seed: number,
+  mapId: string,
 ): FacilityState {
   const owned = definition.startingOwned;
   const workerCapacity = config.facilities[definition.type].workerCapacity;
   const populationConfig = config.initialFacilityPopulation[definition.id];
-  const { workers: configuredWorkers, infected } = resolveInitialFacilityPopulation(
+  let { workers: configuredWorkers, infected } = resolveInitialFacilityPopulation(
     definition,
     config,
     populationConfig,
     rng,
   );
+  const usesDefaultNeutralSurvivors = !owned
+    && populationConfig.survivors === null
+    && populationConfig.survivorRange === null;
+  if (usesDefaultNeutralSurvivors) {
+    let hash = 2166136261;
+    for (const character of `${seed}:${mapId}:${definition.id}:survivors`) {
+      hash ^= character.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    const layoutRng = new SeededRng(hash | 0);
+    configuredWorkers = Math.min(workerCapacity, layoutRng.nextInt(1, 10));
+  }
   if (configuredWorkers + infected > workerCapacity) {
     throw new Error(`Initial workers exceed capacity for ${definition.id}`);
   }
@@ -353,6 +375,7 @@ function facilityStateFromDefinition(
     builtTurn: null,
     recoveryOperationalTurn: null,
     firstCaptureRewardClaimed: owned,
+    earlyCaptureSurvivorStatus: owned ? 'notApplicable' : configuredWorkers > 0 ? 'available' : 'lost',
   };
 }
 
@@ -424,6 +447,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     Object.fromEntries(
       Object.entries(config.facilities).map(([type, facility]) => [type, facility.workerCapacity]),
     ) as Record<keyof GameConfig['facilities'], number>,
+    seed,
   );
   const rng = new SeededRng(seed);
   // Initial Zombie placement is part of new-game setup and uses the same
@@ -431,9 +455,9 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   // canonical set even when a test Config requests fewer initial Zombies so
   // the map snapshot and replay contract remain stable.
   placeArmyBase(map, rng, stateConfig.facilities.armyBase.workerCapacity);
-  map.initialZombiePositions = generateInitialZombiePositions(map, rng);
-  const initialHunterPositions = generateInitialHunterPositions(map, rng, stateConfig.economy);
-  const initialGasPositions = generateInitialGasPositions(map, rng, initialHunterPositions, stateConfig.economy);
+  map.initialZombiePositions = generateInitialZombiePositions(map, rng, undefined, stateConfig.units.zombie.vision);
+  const initialHunterPositions = generateInitialHunterPositions(map, rng, stateConfig.economy, stateConfig.units.hunterZombie.vision);
+  const initialGasPositions = generateInitialGasPositions(map, rng, initialHunterPositions, stateConfig.economy, stateConfig.units.gasZombie.vision);
   let securedOrder = 0;
   const facilities = map.facilities.map((definition) =>
     facilityStateFromDefinition(
@@ -441,6 +465,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       stateConfig,
       definition.startingOwned ? securedOrder++ : null,
       rng,
+      seed,
+      map.id,
     ),
   );
 
@@ -481,6 +507,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       police: 0,
       nationalGuard: 0,
       riotPolice: 0,
+      reconTeam: 0,
       unitPopulation: 0,
       facilityWorkers: [],
       waitingRefugees: 0,
@@ -563,7 +590,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       hordeInterceptions: 0,
       refugeeArrivalsByBranch: Object.fromEntries(roadBranches.map((branch) => [branch.branchId, 0])),
       unmanagedPassThrough: 0,
-      refugeesScreenedByPolicy: { passThrough: 0, normal: 0, strict: 0 },
+      refugeesScreenedByPolicy: { passThrough: 0, normal: 0, strict: 0, deny: 0 },
       refugeesAccepted: 0,
       refugeesDeparted: 0,
       checkpointsBuilt: 0,
@@ -664,10 +691,10 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       civilianDroneBasesDecommissioned: 0,
       civilianGoodsRefundedFromDecommission: 0,
       policeLongRangeMoves: 0,
-      recruitsCommissionedByType: { police: 0, nationalGuard: 0, riotPolice: 0 },
-      regularPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0 },
-      veteranPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0 },
-      veteranZombieKillsByType: { police: 0, nationalGuard: 0, riotPolice: 0 },
+      recruitsCommissionedByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 },
+      regularPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 },
+      veteranPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 },
+      veteranZombieKillsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 },
       riotPoliceProduced: 0,
       riotPoliceLost: 0,
       riotZombiesSpawned: 0,
@@ -675,11 +702,13 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       riotZombiesKilled: 0,
       hunterZombiesKilled: 0,
       housingBuilt: 0, housingResidentTurns: 0, housingCivilianGoodsProduced: 0, housingOutageFacilityTurns: 0,
-      gasZombiesKilled: 0, gasZombiesSpawned: initialGasPositions.length, gasExplosions: 0, gasExplosionUnitDamage: 0,
+      gasZombiesKilled: 0, gasZombiesSpawned: initialGasPositions.length,
+      screamerZombiesKilled: 0, screamerZombiesSpawned: 0, screamerScreams: 0,
+      gasExplosions: 0, gasExplosionUnitDamage: 0,
       riotPoliceReanimations: 0,
-      hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0 },
-      finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0 },
-      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, hordeZombie: 0, armyBase: 0, windPowerPlant: 0 },
+      hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0 },
+      finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0 },
+      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, hordeZombie: 0, screamerZombie: 0, armyBase: 0, windPowerPlant: 0 },
       hordeMovementNoisePulses: 0,
       hordeNoiseRespawnedByType: { zombie: 0, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
     },
@@ -704,7 +733,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
 }
 
 export function nextHumanUnitId(state: GameState, type: HumanUnitType): string {
-  const prefix = type === 'police' ? 'police' : type === 'nationalGuard' ? 'national-guard' : 'riot-police';
+  const prefix = type === 'police' ? 'police' : type === 'nationalGuard' ? 'national-guard' : type === 'riotPolice' ? 'riot-police' : 'recon-team';
   const id = `${prefix}-${state.nextUnitNumber}`;
   state.nextUnitNumber += 1;
   return id;

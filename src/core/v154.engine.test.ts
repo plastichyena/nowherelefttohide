@@ -3,6 +3,7 @@ import { createDefaultConfig } from './config';
 import { GameEngine } from './engine';
 import { createCityPopulationSnapshot, createUnit, synchronizePopulation } from './state';
 import type { GameState } from './types';
+import { prepareTestSnapshot } from './testConfig';
 
 const quietConfig = () => createDefaultConfig({
   economy: {
@@ -15,8 +16,7 @@ const quietConfig = () => createDefaultConfig({
 });
 
 function load(engine: GameEngine, state: GameState): void {
-  synchronizePopulation(state);
-  createCityPopulationSnapshot(state);
+  prepareTestSnapshot(state);
   expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error?.message ?? null).toBeNull();
 }
 

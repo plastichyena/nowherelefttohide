@@ -3,6 +3,7 @@ import { createDefaultConfig } from './config';
 import { GameEngine } from './engine';
 import { createInitialState, createUnit, populationLedgerTotal, synchronizePopulation } from './state';
 import type { GameState } from './types';
+import { prepareTestSnapshot } from './testConfig';
 
 type MutableState = GameState;
 
@@ -33,16 +34,13 @@ function quietConfig() {
 }
 
 function load(engine: GameEngine, snapshot: MutableState): void {
+  prepareTestSnapshot(snapshot);
   const result = engine.step({ type: 'LoadSnapshot', snapshot });
   expect(result.error, result.error?.message).toBeNull();
 }
 
 function rebalance(state: MutableState): void {
-  synchronizePopulation(state);
-  state.population.initialPopulation = populationLedgerTotal(state)
-    - state.population.cumulativeArrivals
-    - state.population.cumulativeDiscoveredInfected
-    + state.population.cumulativeDepartures;
+  prepareTestSnapshot(state);
 }
 
 describe('v1.5.1 Human Unit progression and Riot defaults', () => {
@@ -52,8 +50,8 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     const police = state.units.find((unit) => unit.type === 'police')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
 
-    expect(state.gameVersion).toBe('10.0.0');
-    expect(config.version).toBe('10.0.0');
+    expect(state.gameVersion).toBe('11.0.0');
+    expect(config.version).toBe('11.0.0');
     expect(police).toMatchObject({
       proficiency: 'regular', recruitSurvivalTurns: 0, regularZombieKills: 0,
       veteranPromotionPending: false, attack: 8, maxAttackCharges: 1, attackChargesRemaining: 1,
@@ -62,7 +60,7 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
       proficiency: 'regular', attack: 15, maxAttackCharges: 1, attackChargesRemaining: 1,
     });
     expect(config.unitExperience).toMatchObject({
-      productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit' },
+      productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit', reconTeam: 'recruit' },
       recruitSurvivalTurnsRequired: 5,
       regularAttackMultiplier: 1.25,
       regularAttackRounding: 'ceil',
@@ -74,7 +72,7 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
       nationalGuard: { recruitAttack: 12 },
       riotPolice: {
         hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10,
-        maxFuel: 12, emergencyMovementPoints: 2, maxMilitaryGoods: 5,
+        maxFuel: 24, emergencyMovementPoints: 2, maxMilitaryGoods: 10,
         productionCivilianGoods: 25, productionMilitaryGoods: 25,
         recruitmentFacilityTypes: ['capital', 'city'],
         reanimationUnitType: 'riotZombie', noiseClass: 'medium', noiseRadius: 5,
@@ -82,12 +80,12 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
       riotZombie: { hp: 60, attack: 5, movement: 3, range: 1, vision: 5 },
     });
     expect(config.horde).toMatchObject({
-      specialZombieWeights: { zombie: 70, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5 },
+      specialZombieWeights: { zombie: 65, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5, screamerZombie: 5 },
       riotZombieCapPerDirection: 1,
       movementNoiseRadius: 8,
     });
     expect(config.horde.waves.map((wave) => [wave.turn, wave.compositionPerDirection.hordeZombie, wave.compositionPerDirection.zombie]))
-      .toEqual([[5, 3, 3], [10, 2, 5], [20, 5, 7], [35, 3, 7], [50, 5, 8]]);
+      .toEqual([[10, 5, 3], [20, 3, 5], [35, 8, 7], [50, 5, 7], [70, 8, 8]]);
   });
 
   it('promotes a surviving Recruit at Player Turn Start with ceiling-rounded Regular attack', () => {
@@ -284,7 +282,7 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
           compositionPerDirection: { hordeZombie: 1, zombie: 3 },
           final: true,
         }],
-        specialZombieWeights: { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100, hunterZombie: 0, gasZombie: 0 },
+        specialZombieWeights: { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100, hunterZombie: 0, gasZombie: 0, screamerZombie: 0 },
         riotZombieCapPerDirection: 1,
       },
     });

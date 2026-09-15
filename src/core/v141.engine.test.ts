@@ -11,7 +11,7 @@ import {
 import { hexNeighbors, hexWithinBounds } from './hex';
 import { canPlayerOccupyHex } from './map';
 import { createUnit, populationLedgerTotal, synchronizePopulation } from './state';
-import { singleFinalWave } from './testConfig';
+import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 
 type Snapshot = ReturnType<GameEngine['getState']> extends Readonly<infer State> ? State : never;
 
@@ -20,8 +20,7 @@ function mutableState(engine: GameEngine): Snapshot {
 }
 
 function rebalance(state: Snapshot): void {
-  synchronizePopulation(state);
-  state.population.initialPopulation = populationLedgerTotal(state);
+  prepareTestSnapshot(state);
 }
 
 function quietEngine(seed = 1): GameEngine {
@@ -46,7 +45,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
       canAttack: true,
       militaryGoodsCost: 1,
       projectedMilitaryGoodsAfterAttack: 0,
-      effectiveAttack: 8,
+      effectiveAttack: 2,
     });
     police.currentMilitaryGoods = 0;
     expect(forecastUnitCombatAtDistance(state, police, 1)).toMatchObject({
@@ -55,26 +54,27 @@ describe('v1.4.1 carried Military Goods combat', () => {
       effectiveAttack: 2,
     });
 
+    guard.currentMilitaryGoods = 4;
+    expect(forecastUnitCombatAtDistance(state, guard, 2)).toMatchObject({
+      canAttack: true,
+      militaryGoodsCost: 4,
+      effectiveAttack: 15,
+    });
     guard.currentMilitaryGoods = 2;
     expect(forecastUnitCombatAtDistance(state, guard, 2)).toMatchObject({
+      canAttack: false,
+      reason: 'insufficient_military_goods',
+    });
+    guard.currentMilitaryGoods = 4;
+    expect(forecastUnitCombatAtDistance(state, guard, 1)).toMatchObject({
       canAttack: true,
       militaryGoodsCost: 2,
       effectiveAttack: 15,
     });
     guard.currentMilitaryGoods = 1;
-    expect(forecastUnitCombatAtDistance(state, guard, 2)).toMatchObject({
-      canAttack: false,
-      reason: 'insufficient_military_goods',
-    });
     expect(forecastUnitCombatAtDistance(state, guard, 1)).toMatchObject({
       canAttack: true,
       militaryGoodsCost: 1,
-      effectiveAttack: 15,
-    });
-    guard.currentMilitaryGoods = 0;
-    expect(forecastUnitCombatAtDistance(state, guard, 1)).toMatchObject({
-      canAttack: true,
-      militaryGoodsCost: 0,
       effectiveAttack: 3,
     });
   });
@@ -95,14 +95,14 @@ describe('v1.4.1 carried Military Goods combat', () => {
     expect(engine.getState()).toEqual(before);
 
     const ready = mutableState(engine);
-    ready.units.find((unit) => unit.id === guard.id)!.currentMilitaryGoods = 2;
+    ready.units.find((unit) => unit.id === guard.id)!.currentMilitaryGoods = 4;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: ready }).error).toBeNull();
     const preview = getUnitLegalAttackProjections(engine.getState(), guard.id)[0]!;
-    expect(preview).toMatchObject({ targetUnitId: zombie.id, distance: 2, militaryGoodsCost: 2, effectiveAttack: 15 });
+    expect(preview).toMatchObject({ targetUnitId: zombie.id, distance: 2, militaryGoodsCost: 4, effectiveAttack: 15 });
     const result = engine.step({ type: 'Attack', attackerId: guard.id, targetId: zombie.id });
     expect(result.error).toBeNull();
     expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(0);
-    expect(result.events.some((event) => event.type === 'attack' && event.payload.militaryGoodsCost === 2)).toBe(true);
+    expect(result.events.some((event) => event.type === 'attack' && event.payload.militaryGoodsCost === 4)).toBe(true);
   });
 
   it('charges carried Military Goods for Human counterattack and interception only when they occur', () => {
@@ -124,7 +124,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
       attackerId: counterGuard.id,
       distance: 1,
       militaryGoodsCost: 1,
-      effectiveAttack: 15,
+      effectiveAttack: 3,
     });
     expect(counterResult.state.units.find((unit) => unit.id === counterGuard.id)?.currentMilitaryGoods).toBe(0);
 
@@ -133,7 +133,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
     interceptionState.units = interceptionState.units.filter((unit) => unit.isPlayerUnit);
     const interceptingGuard = interceptionState.units.find((unit) => unit.id === 'national-guard-1')!;
     interceptingGuard.position = { q: 15, r: 8 };
-    interceptingGuard.currentMilitaryGoods = 3;
+    interceptingGuard.currentMilitaryGoods = 5;
     interceptionState.resources.militaryGoods = 0;
     interceptionState.units.push(createUnit(interceptionState, 'zombie-intercept', 'zombie', { q: 15, r: 5 }));
     rebalance(interceptionState);
@@ -143,7 +143,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
       && event.payload.attackerId === interceptingGuard.id);
     expect(interceptionEvent?.payload).toMatchObject({
       distance: 2,
-      militaryGoodsCost: 2,
+      militaryGoodsCost: 4,
       effectiveAttack: 15,
     });
     expect(interceptionResult.state.units.find((unit) => unit.id === interceptingGuard.id)?.currentMilitaryGoods).toBe(0);
@@ -203,7 +203,7 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
     });
     expect(forecast.units.find((unit) => unit.unitId === guard.id)).toMatchObject({
       fixedConsumption: 1,
-      afterFixed: 19,
+      afterFixed: 39,
       inSupply: false,
       projectedRefillAmount: 0,
       suppressionStatus: 'none',
@@ -220,7 +220,7 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
     expect(result.state.resources.militaryGoods).toBe(0);
-    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(19);
+    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(39);
     expect(result.state.units.find((unit) => unit.id === police.id)?.currentMilitaryGoods).toBe(0);
     expect(result.state.facilities.find((facility) => facility.id === farm.id)?.infected).toBe(0);
     expect(result.events.some((event) => event.type === 'infection_suppressed' && event.payload.militaryGoodsCost === 1)).toBe(true);

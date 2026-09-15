@@ -13,6 +13,7 @@ import { createUnitLifecycle } from './unit-lifecycle';
 import { SeededRng } from './rng';
 import { compactArtifactObservation, restoreArtifactObservation } from '../agent/observation';
 import { encodeSaveCode, decodeSaveCode } from '../persistence/save';
+import { prepareTestSnapshot } from './testConfig';
 
 const state = () => createInitialState(1, createDefaultConfig());
 describe('v1.5.6 Barbed Wire', () => {
@@ -107,6 +108,7 @@ describe('v1.5.6 permanent facility recovery', () => {
     f.owner='none';f.status='ruined';f.operationalStatus='ruined';f.workers=0;f.infected=0;
     const human=s.units.find(u=>u.isPlayerUnit)!;human.position={...f.position};human.attackChargesRemaining=0;human.canAttack=false;human.currentMilitaryGoods=0;
     expect(facilityRecaptureConditions(s,f).ready).toBe(true);
+    prepareTestSnapshot(s);
     const engine=new GameEngine(1,s.config);expect(engine.step({type:'LoadSnapshot',snapshot:s}).error).toBeNull();
     const result=engine.step({type:'EndTurn'});
     expect(result.error).toBeNull();

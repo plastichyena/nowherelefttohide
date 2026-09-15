@@ -7,8 +7,7 @@ import type { EndTurnRisk } from '../core/types';
 
 it('renders Core Query crisis alerts exactly like the complete Agent Observation', () => {
   const engine = new GameEngine(1);
-  engine.step({ type: 'EndTurn' });
-  engine.step({ type: 'EndTurn' });
+  for (let index = 0; index < 7; index += 1) engine.step({ type: 'EndTurn' });
   const queryAlerts = engine.getQuery().getCrisisSummary();
   expect(queryAlerts.length).toBeGreaterThan(0);
   const fromQuery = crisisSummaryViewModel({ crisisSummary: queryAlerts });

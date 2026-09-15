@@ -62,7 +62,7 @@ describe('v1.5.6 obstacle boundaries', () => {
     movement().applyMovement(s, human, [start, end], 4);
     expect(human.position).toEqual(start); expect(human.currentFuel).toBe(fuel);
     movement().applyMovement(s, human, [start, end], 5);
-    expect(human.position).toEqual(end); expect(human.currentFuel).toBe(fuel - 1);
+    expect(human.position).toEqual(end); expect(human.currentFuel).toBe(fuel - 2);
     const exitCost = effectiveMovementCost(s, start)!;
     movement().applyMovement(s, human, [end, start], exitCost);
     expect(human.position).toEqual(start);

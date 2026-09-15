@@ -88,6 +88,17 @@ export class LiveAiViewer {
     this.log = this.host.querySelector('.live-ai-log')!;
     this.omitted = this.host.querySelector('.live-ai-omitted')!;
     this.state = this.host.querySelector('.live-ai-state')!;
+    const appRoot = document.querySelector<HTMLElement>('#app');
+    const syncTitleVisibility = (): void => {
+      const titleVisible = appRoot?.classList.contains('title-screen') ?? false;
+      this.host.hidden = !titleVisible;
+      if (!titleVisible) {
+        this.panel.hidden = true;
+        this.launcher.hidden = false;
+      }
+    };
+    syncTitleVisibility();
+    if (appRoot) new MutationObserver(syncTitleVisibility).observe(appRoot, { attributes: true, attributeFilter: ['class'] });
     this.launcher.addEventListener('click', () => { this.panel.hidden = false; this.launcher.hidden = true; });
     this.host.addEventListener('click', (event) => this.onClick(event));
     window.addEventListener('resize', () => { if (this.latestObservation) void this.render(this.latestObservation); });

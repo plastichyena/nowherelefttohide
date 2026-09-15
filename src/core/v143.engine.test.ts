@@ -4,7 +4,7 @@ import { GameEngine } from './engine';
 import { hexDistance, hexKey, hexNeighbors, hexWithinBounds } from './hex';
 import { getTile } from './map';
 import { createInitialState, createUnit, populationLedgerTotal, synchronizePopulation } from './state';
-import { singleFinalWave } from './testConfig';
+import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 import type { GameConfig, GameState, HexCoord, UnitState } from './types';
 
 type MutableState = GameState;
@@ -35,6 +35,7 @@ function quietConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}):
 }
 
 function load(engine: GameEngine, state: MutableState): void {
+  prepareTestSnapshot(state);
   const result = engine.step({ type: 'LoadSnapshot', snapshot: state });
   expect(result.error, result.error?.message).toBeNull();
 }
@@ -77,16 +78,16 @@ function movePlayersAway(state: MutableState): void {
 }
 
 describe('v1.5.1 Core version, map, and initial state', () => {
-  it('creates a v7.0.0 state on fixed-51x51-v4 with all 25 initial Normal Zombies', () => {
+  it('creates a v11.0.0 state on fixed-51x51-v6 with all 50 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('10.0.0');
-    expect(state.mapId).toBe('fixed-51x51-v5');
-    expect(state.map.id).toBe('fixed-51x51-v5');
+    expect(state.gameVersion).toBe('11.0.0');
+    expect(state.mapId).toBe('fixed-51x51-v6');
+    expect(state.map.id).toBe('fixed-51x51-v6');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');
-    expect(zombies).toHaveLength(25);
+    expect(zombies).toHaveLength(50);
     expect(zombies.map((unit) => unit.position)).toEqual(state.map.initialZombiePositions);
     expect(zombies.every((unit) => unit.hordeKind === null && unit.spawnGroupId === null)).toBe(true);
-    expect(state.statistics.initialNormalZombies).toBe(25);
+    expect(state.statistics.initialNormalZombies).toBe(50);
     expect(state.horde.totalSpawned).toBe(0);
   });
 });
