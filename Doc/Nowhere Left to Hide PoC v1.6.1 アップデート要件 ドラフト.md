@@ -2,36 +2,42 @@
 
 - ステータス: **ドラフト／要レビュー。ゲーム実装・リリースではない。**
 - 作成日: 2026-09-14
+- 改訂日: 2026-09-15。Oil Field、Wind、Refinery Allowance、Fuel／Military Goods、Survivor、Screamer、Horde倍率、Reconの曖昧さを具体化。
 - 基準: v1.6.0 / commit `6364ea196629bd5aa71d89066c0051d35911a98d`
-- 根拠: 依頼者のv1.6.1要望と現行 `Doc/Nowhere Left to Hide PoC 現行仕様.md`
-- この変更は文書のみ。既存の確定版・現行仕様・アプリのバージョン番号は変更しない。
+- 根拠: 依頼者のv1.6.1要望、2026-09-15追加指定、現行 `Doc/Nowhere Left to Hide PoC 現行仕様.md`
+- この変更は文書のみ。既存の現行仕様、実装、アプリのバージョン番号は変更しない。
 
-本書の「必須」は依頼事項または、それを既存Coreへ矛盾なく接続するために必要な受入要件を示す。「提案」は依頼文に数値・順序が明記されていない箇所について、本ドラフトが実装上の既定案を示すもの。「要調整」は依頼だけでは値を一意に決められない事項であり、確定版にする前に決定する。提案・要調整を承認済み仕様として扱わない。
+本書の「必須」は依頼事項または、それを既存Coreへ矛盾なく接続するために必要な受入要件を示す。今回の追加指定により、前版ドラフトで残していたSurvivor人数、Screamer Wave Weight、Recon弾薬消費、Horde 1.5倍の配分は確定扱いへ移す。Oil Fieldの1基化だけは依頼者が実装上の裁量を明示しているため、許容する2方式と優先順位を本書で限定する。
 
 ---
 
 ## 1. 目的
 
-v1.6.1は、v1.6.0で追加・整理されたAI観戦、Human UI、固定Wave、特殊Zombie、補給・感染・検問所の仕組みを全面的に作り直すものではない。主目的は次の4点とする。
+v1.6.1はv1.6.0の基盤を全面的に作り直さず、Human UIの操作性、避難民・Survivor・感染圧、偵察とNoise、資源制約、Horde圧力を強める調整版とする。
 
-1. スマートフォンHuman UIの操作阻害を解消し、内政UIの情報提示を既存Unit編成UIと揃える。
-2. 中立施設の初期生存者、検問所の拒絶・過密リスクを追加し、避難民・民間人口・Zombie AIの相互作用を増やす。
-3. Screamer ZombieとRecon Teamを追加し、偵察・Noise・Zombie誘引の戦術幅を増やす。
-4. 初期Zombie、Horde Wave、自然回復、感染陥落施設のNoise再Spawnを調整し、序盤から終盤までの圧力を高める。
+主目的:
 
-既存のCoreを唯一のGame Truthとする方針、Seed付き決定性、Fog of War、Replay／Artifactの再現性、Save／Session／Agent／Browser Bridge間の同一ルール共有は維持する。
+1. スマートフォンHuman UIの操作阻害を解消し、内政・施設情報を発見しやすくする。
+2. 中立施設Survivor、Checkpoint deny、waiting過密感染を導入する。
+3. Screamer ZombieとRecon Teamを導入する。
+4. 初期Zombie、Horde、自然回復、Fuel、Military Goodsを再調整する。
+5. Oil Fieldを希少資源化し、Refinery Allowanceを1500へ下げ、Wind建設費を引き上げる。
+6. Human UI、Agent、Save、Replay、Session、Artifactで同じGame Truthを使う。
+
+既存のGameAction → GameEngine境界、Seed付き決定性、Fog of War、公開情報境界、Replay／Artifact再現性を維持する。
 
 ### 1.1 非対象
 
-- Live AI Viewerそのものの再設計、別端末同期、クラウド観戦基盤の追加
-- ランダムマップ本体の実装
+- Live AI Viewerそのものの再設計、別端末同期、クラウド観戦基盤
+- ランダムマップ本体
 - Zombie AI全体の優先順位変更
-- Checkpointの既存pass / normal / strictの確率・審査Turn変更
-- Police / National Guard / Riot Policeの基礎戦闘性能変更
-- Hunter / Gas / Police / Soldier / Riot / Horde Zombieの既存基礎性能変更
-- 初期Hunter / Gas数の変更（別途指定がない限り現行値を維持）
-- Rejected Refugee Bonusそのものの算式変更
+- Checkpointの既存pass / normal / strictの審査Turn・合格率・感染率変更
+- Police / National Guard / Riot PoliceのHP・Attack・MP・Range等の基礎戦闘性能変更
+- Hunter / Gas / Police / Soldier / Riot Zombieの既存基礎性能変更
+- 初期Hunter / Gas数の変更
+- Rejected Refugee Bonusの`ceil(rejected / 5)`算式変更
 - Final Wave後の勝利条件変更
+- Emergency MovementのFuel 0特例の廃止
 
 ---
 
@@ -39,189 +45,205 @@ v1.6.1は、v1.6.0で追加・整理されたAI観戦、Human UI、固定Wave、
 
 | ID | 内容 | 扱い |
 | --- | --- | --- |
-| UI-01 | Human UIの`AI Play Watch`入口をメインメニュー限定にする | 必須 |
-| UI-02 | Constructible Facility候補をUnit編成と同系統のAccordion表示へ変更 | 必須 |
-| SURV-01 | 中立施設へ初期生存者を配置し、早期確保で健康な市民として救出可能にする | 必須。人数・配置量は要調整 |
-| SURV-02 | 未確保生存者をZombie AIのPopulation Target対象にする | 必須 |
-| SURV-03 | 未確保生存者を10 Turn後に感染者へ変換する | 必須 |
-| CP-01 | Checkpoint Policyへ`deny`を追加する | 必須 |
-| CP-02 | deny時にwaitingのみをEndTurnで全員追い返す | 必須 |
-| CP-03 | waiting > 100で翌Turn感染リスクを発生させる | 必須 |
-| Z-01 | Screamer Zombieを追加する | 必須 |
-| Z-02 | ScreamerがPopulation / inherited Horde Target取得時に初回だけRadius 30 Noiseを発生 | 必須 |
-| Z-03 | Horde Wave由来Screamerは配置直後にNoiseを発生 | 必須 |
-| Z-04 | Screamer専用Assetを追加する | 必須 |
-| UNIT-01 | Recon Teamを追加する | 必須 |
-| UNIT-02 | Reconの生産条件・燃料・携行軍需をNational Guard系へ接続する | 必須。Range 3..6の軍需消費は要調整 |
-| UNIT-03 | Recon死亡時にSoldier Zombieを生成する | 必須 |
-| UNIT-04 | Recon専用Assetを追加する | 必須 |
-| INIT-01 | 初期Normal Zombieを25体から50体へ増加 | 必須 |
-| INIT-02 | 初期Normal Zombieを州都から8 Hex以上、幹線道路から外れ気味に配置 | 必須。道路距離の厳密値は提案で固定 |
-| WAVE-01 | Wave Turnを10 / 20 / 35 / 50 / 70へ変更 | 必須 |
-| WAVE-02 | 各方向の基礎Zombie数を現行の1.5倍へ増加 | 必須。整数配分は要調整 |
-| HEAL-01 | Human Unitの自然回復率を半減 | 必須 |
-| FALL-01 | Noiseを受けた感染陥落施設の再SpawnをNormal固定から重み付き抽選へ変更 | 必須 |
-| SAVE-01 | 新Unit / Zombie / Survivor / Queue Risk状態をSave・Replay・Agent等へ一貫して反映 | 必須 |
+| UI-01 | Human UIの`AI Play Watch`入口をタイトル／メインメニュー限定にする | 必須 |
+| UI-02 | Constructible Facility候補をUnit編成と同系統のAccordionへ変更 | 必須 |
+| UI-03 | Refinery選択時に全国共有Refinery Allowanceを表示する | 必須 |
+| SURV-01 | ゲーム開始時に全中立恒久施設へSurvivorを配置 | 必須 |
+| SURV-02 | Survivor人数は1..10のSeed付き乱数、施設収容上限でclamp | 必須 |
+| SURV-03 | 未確保SurvivorをZombieのPopulation Target対象にする | 必須 |
+| SURV-04 | 未確保Survivorを10 Turn後に感染者へ変換 | 必須 |
+| CP-01 | Checkpoint Policyへ`deny`を追加 | 必須 |
+| CP-02 | deny時にwaitingのみEndTurnで全員追い返す | 必須 |
+| CP-03 | waiting > 100で翌Turn感染リスクを予約 | 必須 |
+| Z-01 | Screamer Zombieを追加 | 必須 |
+| Z-02 | Population / inherited Horde Target取得時に初回だけRadius 30 Noise | 必須 |
+| Z-03 | Horde由来Screamerは実配置直後にScream | 必須 |
+| Z-04 | Wave WeightはNormalから5を移してScreamer 5、Capなし | 必須 |
+| UNIT-01 | Recon Teamを追加 | 必須 |
+| UNIT-02 | Recon攻撃時Military Goods Costは距離1..6すべて5 | 必須 |
+| UNIT-03 | Recon死亡時Soldier Zombie 1 Unitを生成 | 必須 |
+| UNIT-04 | Recon専用Assetを追加 | 必須 |
+| INIT-01 | 初期Normal Zombieを25から50へ | 必須 |
+| INIT-02 | Capitalから8 Hex以上、幹線から外れ気味に配置 | 必須 |
+| WAVE-01 | Wave Turnを10 / 20 / 35 / 50 / 70へ | 必須 |
+| WAVE-02 | 固定Horde Zombie数のみ1.5倍、端数切り上げ | 必須 |
+| HEAL-01 | Human Unit自然回復率を半減 | 必須 |
+| FUEL-01 | Human Unitの通常移動Fuel Costを2倍 | 必須 |
+| FUEL-02 | Human UnitのMax Fuelを2倍 | 必須 |
+| AMMO-01 | 既存Human Unitの攻撃時Military Goods Costを2倍 | 必須 |
+| AMMO-02 | Human UnitのMax carried Military Goodsを2倍 | 必須 |
+| FALL-01 | Noiseを受けた感染陥落Facilityの再Spawnを70/10/10/10抽選へ | 必須 |
+| MAP-01 | Oil Fieldを4基から1基へ減らす | 必須 |
+| ECO-01 | Player-built Wind Power Plant建設費を1.5倍、端数切り上げ | 必須 |
+| ECO-02 | 初期Refinery Allowanceを5000から1500へ | 必須 |
+| SAVE-01 | 新Type／State／Map／資源ルールをSave等へ一貫反映 | 必須 |
 
 ---
 
 ## 3. Human UI
 
-## 3.1 `AI Play Watch`入口をメインメニュー限定化 — UI-01
+### 3.1 `AI Play Watch`入口 — UI-01
 
-現状、スマートフォンChromeのHuman UIで`AI Play Watch`への入口が画面遷移後も右下へ固定表示され、右下のゲーム操作と競合し得る。v1.6.1ではこの常時Floating表示を廃止する。
+Human Game中の常時Floating入口を廃止し、通常入口はタイトル／メインメニューだけに置く。
 
-必須要件:
+- 盤面、内政、軍事、Facility / Unit / Checkpoint Bottom Sheet、EndTurn確認へ固定ボタンを重ねない。
+- PCとmobileで入口の意味を分けない。
+- Live AI Viewer、Replay Viewer、Artifact読込自体は削除しない。
+- 390×844相当で右下Action、Bottom Sheet、Safe Areaを妨げない。
 
-- `AI Play Watch` / Live AI Viewerへの通常入口は**メインメニュー／タイトル画面だけ**に置く。
-- Human Game開始後は、盤面、内政、軍事、施設・Unit Bottom Sheet、Checkpoint操作、EndTurn確認などの画面へ`AI Play Watch`固定ボタンを重ねない。
-- PCとmobileで入口の意味を分けない。mobileだけ別の常駐入口を追加しない。
-- Live AI Viewer本体、Replay Viewer、Artifact読込の既存機能は削除しない。
-- 戻る操作でタイトルへ戻った後は通常どおり入口を利用できる。
-- 390×844相当で右下のHuman UI Actionを隠さず、横overflowを新規発生させない。
+### 3.2 Constructible Facility候補Accordion — UI-02
 
-## 3.2 Constructible Facility候補Accordion — UI-02
+内政画面の建設候補をUnit Production Accordionと同系統のUIへ寄せる。
 
-内政画面で建設候補を提示する部分を、現行のUnit編成Accordionと同じ情報設計へ寄せる。
+各候補に最低限表示する:
 
-必須要件:
+- 日英名称
+- Civilian Goods / Military Goods / Population等の建設費
+- 建設所要Turn
+- Worker上限
+- Power Demand / Generation
+- 主要入出力
+- Vision / Housing Capacity等の固有性能
+- 建設上限、現在数、残枠
+- 選択Hexでの合法性とCore Reason Code
 
-- Build可能なConstructible Facilityを1つの折り畳みセクション、または同等のAccordion群として表示する。
-- 初期状態は閉じた状態を許可し、Chevron等で展開状態を示す。
-- 各候補は少なくとも次を表示する。
-  - 日英名称
-  - Civilian Goods / Military Goods / Population等の即時コスト。該当しない値は0または「不要」として曖昧にしない。
-  - 建設所要Turn
-  - Worker上限
-  - Power要求／発電量
-  - 主要な入出力資源
-  - Vision、Housing Capacity等、その施設固有の主要性能
-  - 建設上限と現在数
-- 数値はUIへ複製せず、現在ConfigとCore Queryを参照する。
-- 選択Hexが不合法な場合は、既存方針どおりCore Reason Codeを表示し、UI独自判定で合法化しない。
-- disabled状態でも「なぜ建てられないか」と「建てられた場合のコスト／性能」を確認できる。
-- Touch target 44 CSS px以上、キーボード操作、`aria-expanded`等の既存Accordionアクセシビリティを踏襲する。
+表示値はConfig / Core Queryを正本とし、UIへルール値を独自複製しない。Accordionは44 CSS px以上、Chevron、`aria-expanded`を持つ。
 
----
+### 3.3 Refinery Allowance表示 — UI-03
 
-## 4. 中立施設の初期生存者 — SURV-01..03
+v1.6.0実装を確認した限り、Refinery AllowanceはCoreのCrisis reasonとしては存在するが、HumanのRefinery Facility詳細に現在値を直接表示していない。したがってv1.6.1では追加要件とする。
 
-## 4.1 基本モデル
+PlayerがRefineryを選択したFacility情報一覧へ、全国共有値として最低限次を表示する。
 
-中立恒久施設の一部へ、ゲーム開始時に健康なSurvivor Populationを配置する。これはPlayer所有人口ではないが、実在する健康な民間人口としてGame Stateへ保持する。
+- `Initial Refinery Allowance`: 標準1500
+- `Oil Credits Earned`: Oil Fieldから累積加算された量
+- `Fuel Refined`: Refineryが累積消費したAllowance
+- `Remaining Refinery Allowance`
 
-- 生存者配置はGame Seedに対して決定的であること。
-- どの中立施設へ配置するか、各施設の人数はConfigから取得すること。
-- 同Seed、同Configなら配置施設・人数・10 Turn期限が一致すること。
-- Oil Fieldのように現行仕様上Population Target Valueを持たない特殊施設を候補に含めるかはConfigで明示し、暗黙に全施設へ配置しない。
+関係は既存意味論を維持する。
 
-**要調整 SURV-Q1:** 初期生存者を持つ施設数、施設種別ごとの人数または範囲は依頼文だけでは決められない。確定版でConfig値を決定する。本ドラフトでは恣意的な人数を追加しない。
+```text
+remainingAllowance
+= initialAllowance + oilCreditsEarned - fuelRefined
+```
 
-## 4.2 早期確保
-
-- Survivor Populationを持つ中立施設をPlayerが確保した時点で、残っている健康なSurvivorをその施設のPlayer健康人口へ移す。
-- この移行は追加Actionを要求しない。
-- 確保済みSurvivorは「未確保生存者の10 Turn感染タイマー」の対象から外れ、通常のPlayer人口・感染・維持費ルールへ移行する。
-- 既存の初回確保資源報酬とは別であり、両方の条件を満たす施設では累積する。
-- 再確保で同じSurvivorを再生成しない。
-
-## 4.3 10 Turn感染期限
-
-- 各初期Survivor groupはゲーム開始時に10 Turnの期限を持つ。
-- Playerが確保しないまま10回のEndTurnを完了した時点で、そのgroupに残る健康人口を同施設の感染人口へ変換する。
-- 人口を新規生成せず、`healthy -> infected`の移動として扱い総人口を保存する。
-- 期限到達直前のSave / Load / Session Resumeで期限が延長・短縮されない。
-- 期限到達と同じEndTurnに確保処理が存在し得る場合は、既存Phase順をGame Truthとし、Replayで同一順序を再現する。
-
-## 4.4 Zombie AIのPopulation Target
-
-未確保SurvivorもPopulation Target候補へ含める。
-
-- Player所有か否かではなく、可視範囲内に健康Survivor Populationが存在することを候補条件とする。
-- 現行の`Visible Population > wave_capital / inherited Horde > Noise > Idle`というNormal AI優先順位は変更しない。
-- Zombieから不可視のSurvivorはTargetへしない。
-- Zombieが施設Hexへ到達した場合は、既存Facility接触・感染処理へ接続し、専用の別Combat Systemを作らない。
-- 接触・時間経過により健康Survivorが0になった施設は以後Population Target値0として扱う。
-- Agent / Human UIへはFog of Warに従った公開情報だけを出し、未発見施設のSurvivor数を漏らさない。
+Refineryが複数存在するConfigでも全国共有値であることを明示し、施設固有在庫に見せない。0なら既存の`refinery_allowance_exhausted`警告と整合させる。Human UI、Agent、Forecastで別々の算式を作らない。
 
 ---
 
-## 5. Checkpoint `deny` Policy — CP-01, CP-02
+## 4. 中立施設Survivor — SURV-01..04
 
-現行`pass / normal / strict`へ4つ目のPolicyとして`deny`を追加する。
+### 4.1 対象施設
 
-## 5.1 denyの意味
+ゲーム開始時点で**中立である全ての恒久Facility**へ健康なSurvivorを配置する。初期Player所有Facilityには配置しない。Player-built Constructible、Checkpointは開始時対象外である。
 
-`deny`は「これ以上waitingから新規Screeningを開始せず、waitingにいる避難民をそのTurn終了時に全員追い返す」Policyとする。
+Oil Fieldを1基へ減らした後は、そのゲームで実際に配置された1基だけが中立Facilityとして対象になる。存在しない3候補へSurvivorを作らない。
 
-- `waiting`だけが自動拒絶対象。
-- 既に`screening`中の人員はそのBatch開始時のPolicyと残りTurnを維持し、denyへの変更だけで追い返さない。
-- 既に審査済みで`approved`配置待ちの人員も追い返さない。
-- deny中に新たに到着してwaitingへ入った避難民も、そのEndTurnの拒絶処理対象に含む。
-- deny中はwaitingから新しいScreening Batchを作らない。
-- 自動拒絶は1人ごとにPlayer Actionを消費しない。
-- Policy変更Action自体のAction消費・合法性は既存`SetCheckpointPolicy`と同一規則を使う。
-- 自動拒絶人数は、既存の`TurnAwayCheckpointRefugees`と同じRejected Refugee Counter意味論へ加算する。Final roster freeze後は既存どおりBonusを増やさない。
-- 不足死亡・感染死亡を「拒絶」と誤計上しない。
+### 4.2 人数
 
-UI / Agentでは`deny`を4方針目として表示し、少なくとも「waitingはTurn終了時に全員拒絶」「screening / approvedは対象外」「新規Screening停止」を明示する。
+各対象Facilityごとに独立してSeed付きで1..10の整数を等確率抽選し、Facilityが保持可能な健康人口上限でclampする。
+
+```text
+rolled = randomIntInclusive(1, 10)
+survivors = min(rolled, facilityHealthyPopulationCapacity)
+```
+
+例:
+
+- 上限30 → 1..10
+- 上限10 → 1..10
+- 上限5 → 1..5
+
+開始時中立Facilityに人口上限0のTypeが将来追加された場合はConfig validationで明示的に扱い、架空の収容枠を作らない。現行対象Typeは少なくとも1人を収容可能であることをリリース検証する。
+
+乱数はGame Seedから決定的に得る。同Seed / Map / ConfigならFacilityごとの人数が一致する。Save / Loadで再抽選しない。
+
+### 4.3 早期確保
+
+Survivorが残る中立FacilityをPlayerが確保した瞬間、残存健康SurvivorをそのFacilityのPlayer健康人口として引き継ぐ。
+
+- 追加Action不要。
+- 既存の初回確保資源報酬と累積する。
+- 再確保でSurvivorを再生成しない。
+- 確保後は通常の維持費、感染、敗北判定、人口操作ルールへ入る。
+
+### 4.4 10 Turn期限
+
+ゲーム開始から10回のEndTurnを完了するまで未確保だったFacilityでは、残る健康Survivorを同Facilityの感染者へ全員変換する。
+
+- 人口新規生成ではなく`healthy -> infected`。
+- Save / Resumeで期限をリセットしない。
+- Zombie接触で先に感染・死亡した人数は二重変換しない。
+- 10 Turn到達時のPhase順はCoreで固定しReplayと一致させる。
+
+### 4.5 Zombie AI Target
+
+未確保Survivorは実在する健康人口として、ZombieのVisible Population Target対象に含める。
+
+- Normal AI優先度`Visible Population > wave_capital / inherited Horde > Noise > Idle`を維持。
+- Zombieから見えないSurvivorをTargetにしない。
+- Facility到達時は既存のFacility接触・感染処理へ接続する。
+- Hidden Survivor数をHuman / Agentへ漏らさない。
+
+---
+
+## 5. Checkpoint `deny` — CP-01, CP-02
+
+現行`pass / normal / strict`に`deny`を加える。
+
+`deny`の意味:
+
+- 新規ArrivalはActive Checkpointの`waiting`へ入る。
+- deny中はwaitingから新しいScreeningを開始しない。
+- 既存`screening`はBatch開始時Policyと残りTurnを維持する。
+- `approved`は自動配置待ちを継続し、denyで追い返さない。
+- EndTurnのRefugee処理で、その時点の`waiting`を全員Turn Awayする。
+- 自動Turn Away人数は既存Rejected Counterへ加える。Final roster freeze後は既存どおりCounter加算しない。
+- 自動拒絶は追加Player Actionを消費しない。
+
+UI / Agentは「waitingのみ拒絶」「screening / approvedは対象外」「新規Screening停止」を明示する。
 
 ---
 
 ## 6. Checkpoint waiting過密感染Risk — CP-03
 
-## 6.1 算式
-
-Checkpointごとの健康な`waiting`人数を`W`とする。
+Checkpointごとの健康なwaiting人数を`W`とする。
 
 ```text
 excess = max(0, W - 100)
 riskPercent = min(100, excess)
 ```
 
-例:
+- W<=100 → 0%
+- W=101 → 1%
+- W=150 → 50%
+- W>=200 → 100%
 
-- W=100 -> 0%
-- W=101 -> 1%
-- W=125 -> 25%
-- W=150 -> 50%
-- W>=200 -> 100%
+Turn末に求めたRiskを次TurnのRefugee処理で解決する。
 
-`riskPercent > 0`なら、その値を**次Turnに解決する感染発生確率**として保存する。
+推奨固定順序:
 
-## 6.2 発生時
+1. 前Turn末に予約したRiskを解決。
+2. 既存Screening進行・判定。
+3. 新規Arrival。
+4. denyならwaiting全員をTurn Away。
+5. 残ったwaitingから翌Turn用Riskを計算・保存。
 
-- Seed付きGame RNGを1回使って発生有無を判定する。
-- 発生した場合、1..5人をSeed付きで等確率抽選する。
-- 実変換人数は`min(currentWaiting, rolledCount)`とする。
-- 該当人数を健康な`waiting`からCheckpoint感染人口へ移す。人口を追加生成しない。
-- `screening` / `approved`からは変換しない。
-- waitingが0なら実変換0とし、感染者を空から生成しない。
+Risk発生時:
 
-## 6.3 Turn順序の提案
+- Seed付きRNGで発生有無を1回判定。
+- 成立時に1..5人を等確率抽選。
+- 実感染人数=`min(currentWaiting, rolledCount)`。
+- waitingからinfectedへ変換し、screening / approvedは対象外。
+- waiting 0なら0人。
 
-**提案:** 1 Turn遅延を曖昧にしないため、各Refugee処理で次の順を使う。
-
-1. 前Turn末に記録したwaiting Riskを解決する。
-2. 既存Screening進行・判定を処理する。
-3. 当該Turnの新規Arrivalを処理する。
-4. denyならwaitingを全員自動拒絶する。
-5. 残ったwaitingから翌Turn用Riskを計算・保存する。
-
-この順序ではdenyでwaitingを0にしたCheckpointは次Turn Riskを新規予約しない。一方、既に前Turnに予約済みのRiskは、当該TurnにPolicyをdenyへ切り替えるだけでは過去の過密事実を取り消さない。ただし解決時点でwaitingが既に0なら変換0となる。
-
-## 6.4 公開情報
-
-- Human UI / Agentは現在waiting人数と、既に予約された次回Risk %を確認できる。
-- 乱数判定前に「次Turnに何人感染するか」は公開しない。
-- 発生後は感染発生人数を通常Eventへ記録する。
-- Save / Replay / Checkpoint分岐でRisk予約値とRNGが一致する。
+Human / Agentは予約済みRisk %を確認できるが、成立前の感染人数抽選結果は公開しない。
 
 ---
 
 ## 7. Screamer Zombie — Z-01..04
 
-## 7.1 基礎性能
+### 7.1 基礎性能
 
 | 項目 | 値 |
 | --- | ---: |
@@ -233,186 +255,317 @@ riskPercent = min(100, excess)
 | Max Attack Charge | 1 |
 | AI系統 | Normal AI |
 
-RangeとChargeは、別指定がないため既存Normal AI型の共通値1を踏襲する。ScreamerはHorde Zombieそのものではなく、Hunter / Gas等と同じNormal AI系Zombie Typeとして追加する。
+日英名: `スクリーマーゾンビ` / `Screamer Zombie`。
 
-- 日英名: `スクリーマーゾンビ` / `Screamer Zombie`
-- Human Unit死亡Reanimationの生成先にはしない。
-- Initial spawn数は別指定がないため0とし、Horde Waveまたは感染陥落施設のNoise再Spawn等、明示された生成源から出現する。
+初期配置は0。Human Reanimationでは生成しない。Horde Waveとfallen infected FacilityのNoise再Spawnを明示的な生成源とする。
 
-## 7.2 一度だけのScream
+### 7.2 Scream
 
-Screamerごとに`hasScreamed`相当の永続状態を持つ。
+Screamerごとに`hasScreamed`を保持する。通常出現個体は初めて以下のいずれかをTargetとして獲得した時点で、自身のHexを中心にRadius 30 Noise Pulseを1回発生する。
 
-通常出現したScreamerは、初めて次のいずれかのTargetを獲得した時点で、Screamer自身のHexをCenterとする**Radius 30 Noise Pulse**を1回だけ発生する。
+- Visible Population Target
+- inherited Horde Target / wave_capital系のHorde inherited target
 
-- Visible Population Targetを獲得した。
-- Hordeから継承したTarget（inherited Horde Target）を獲得した。
+Noise Target、Idle、単なる移動だけではScreamしない。一度Screamした個体はTargetを失って再取得しても再発生しない。
 
-Noise Target、Idle、単なる移動、通常攻撃だけではScream条件を満たさない。既に`hasScreamed=true`ならTargetを失って再取得しても再発生しない。
+既存Noise Systemへ接続し、Screamer専用の第二Targeting Systemを作らない。
 
-Screamは既存Noise Systemへ接続し、Screamer専用の別Targeting経路を作らない。Noiseを受けたNormal AIの反応、FoW、fallen-site再Spawn、Event公開範囲は既存Noise規則を用いる。
+### 7.3 Horde由来Screamer
 
-## 7.3 Horde Wave由来
+Horde roster由来Screamerは、PendingからMapへ実配置された直後にRadius 30 Noiseを1回発生し、`hasScreamed=true`にする。
 
-Horde Wave rosterの一部として生成されたScreamerは、Mapへ実際に配置された直後にRadius 30 Noiseを発生し、`hasScreamed=true`にする。
+- Pending中はScreamしない。
+- Spawn space不足で未配置ならScreamしない。
+- 配置後のPopulation / inherited Target取得では二重Screamしない。
+- 複数Screamerが同batchに出れば各個体が1 Pulseずつ出す。
 
-- Pending中はまだNoiseを出さない。
-- Spawn先不足でMapへ配置されなかった段階でもNoiseを出さない。
-- Map配置直後のScreamで一度消費するため、その後Population / inherited Horde Targetを得ても2回目は出さない。
-- 同じSpawn batchに複数Screamerが含まれれば各個体が1 Pulseずつ発生し得る。Pulse統合で存在を隠蔽・消失させない。
+### 7.4 Horde特殊Slot Weight
 
-**要調整 Z-Q1:** 現行Horde特殊SlotへScreamerをどのWeight / Direction Capで加えるかは依頼文に値がない。Horde Wave由来Screamerを実際に発生させるため、確定版で既存Hunter / Gas等とのWeight・Capを決める。
+ScreamerはHordeの非Horde特殊Slot抽選へ追加する。**Normal ZombieのWeightを5減らし、その5をScreamerへ移す。ScreamerにDirection Capを設けない。**
 
-## 7.4 Asset
+最後の2 Waveより前:
 
-専用Unit Assetを追加する。
+| Type | Weight |
+| --- | ---: |
+| Normal Zombie | 65 |
+| Police Zombie | 10 |
+| Soldier Zombie | 10 |
+| Riot Zombie | 5 |
+| Hunter Zombie | 5 |
+| Screamer Zombie | 5 |
 
-- 1体の痩せこけたZombie。
-- 顔・口・両手の姿勢等でムンク『叫び』を彷彿させる不安・絶叫のシルエットを持たせる。
-- 既存Zombie Asset群と同じ盤面縮尺で識別可能にする。
-- 絵画そのものの構図・背景を盤面Assetへ複製する必要はなく、「細身の単体Screamer」であることを優先する。
-- Asset Registry、Board Legend、Help、Replay、Live AI Viewerで同一Typeへ解決する。
+最後の2 Wave:
+
+| Type | Weight |
+| --- | ---: |
+| Normal Zombie | 60 |
+| Police Zombie | 10 |
+| Soldier Zombie | 10 |
+| Riot Zombie | 5 |
+| Hunter Zombie | 5 |
+| Gas Zombie | 5 |
+| Screamer Zombie | 5 |
+
+既存Riot / Hunter / GasのDirection Capは維持する。Screamerは0..全Slotまで出現可能である。Rejected BonusのType drawも現行どおりBaseと同じ当該Wave表を使うためScreamerを含み、ScreamerだけCapなしとする。
+
+### 7.5 Asset
+
+専用Assetは1体の痩せこけたZombie。ムンク『叫び』を想起させる絶叫・不安のシルエットを持たせるが、絵画そのものの構図や背景を複製する必要はない。Asset Registry、Legend、Help、Replay、Live Viewerで同じTypeへ解決する。
 
 ---
 
 ## 8. Recon Team — UNIT-01..04
 
-## 8.1 基礎性能
+### 8.1 基礎性能
 
 | 項目 | 値 |
 | --- | ---: |
-| Population / 編成人口 | 5 |
+| Population | 5 |
 | HP | 25 |
 | Recruit Attack | 9 |
 | Move / MP | 10 |
 | Vision | 10 |
 | Range | 6 |
 | Combat Noise Radius | 6 |
-| Max Fuel | 22 |
-| Max carried Military Goods | 20 |
+| Max Fuel | 44 |
+| Max carried Military Goods | 40 |
 
-Regular / Veteran Attackは既存Human Unit共通式`ceil(Recruit Attack × 1.25)`を使うため、別指定がなければAttack表示はRecruit 9 / Regular 12 / Veteran 12となる。熟練度、Attack Charge、Supply、Emergency Movement、Fuel補給、自然回復等は既存Human Unit共通ルールへ従う。
+Regular / Veteran Attackは既存式`ceil(recruitAttack * 1.25)`を用い、標準では12 / 12。熟練度、Attack Charge、Supply等は既存Human Unit共通規則へ接続する。
 
-## 8.2 生産
+### 8.2 生産
 
 Recon TeamはNational Guardと同じ軍系生産ルートを使う。
 
-- 生産可能: Capital、およびPlayer所有で通常編成可能なArmy Baseのみ。
-- City単独では生産不可。
-- Civilian Goodsコスト: 20（現行National Guardと同値）
-- Military Goodsコスト: 25（現行National Guardと同値）
-- Populationコスト: **5**。依頼でReconのPop 5が明示されているため、National GuardのPop 10をコピーしない。
-- 完成熟練度: Recruit。
-- 最大Fuel 22、完成時Fuel／有償補給の扱いはNational Guardと同じ。
-- 携行Military Goods最大20、完成時搭載量・補充順・国家備蓄との関係はNational Guardと同じ。
-- Army Base予約中のPower要求、陥落時予約没収等は既存National Guard予約と同じ共通Production Queueへ乗せる。
+- 生産可能: Capital、Player所有で通常編成可能なArmy Base。
+- City単独では不可。
+- Population 5。
+- Civilian Goods / Military Goodsの**生産コストはNational Guardと同値**: Civilian Goods 20 + Military Goods 25。
+- 完成熟練度Recruit。
+- Army Base予約時のPower、保留、陥落没収等はNational Guardと共通。
 
-## 8.3 Range 6とMilitary Goods
+### 8.3 Fuel
 
-距離1..6のCombatはCoreが同じRange判定、遮蔽／地形、防御、Attack Charge処理を行う。UI / Agentは距離別Military Goods Costを事前表示する。
+ReconのFuel能力はv1.6.1 National Guardと同値にする。
 
-**要調整 UNIT-Q1:** 現行National Guardは距離1でMilitary Goods 1、距離2で2を要求するが、Reconの距離3..6の消費量は依頼文にない。「弾薬は州兵と同じ」だけではRange 3..6の値を一意に決められないため、確定版で距離別Costを決める。実装側で勝手に距離=Cost、全距離2固定等へ決めない。
+- Max Fuel 44。
+- 通常移動Fuel CostはNational Guardの「v1.6.0計算結果×2」。
+- 完成時の有償Fuel補給、Round Robin、Supply内補給もNational Guardと同じ。
+- Fuel 0時Emergency Movementは既存National Guardと同じ2 MP、Fuel消費0のまま維持。
 
-## 8.4 Noise
+### 8.4 Military Goods
 
-Reconが通常攻撃・反撃・迎撃等、既存Human Combat Noise対象行為を行った場合はRadius 6のNoiseを発生する。Counterattack等で既存ルール上二重Pulseを禁止している箇所はその規則を維持する。
+ReconのMax carried Military GoodsはNational Guardと同じ40。ただし**攻撃時Costは距離に関係なく固定5**とし、National Guardの距離1 / 2 Cost式は流用しない。
 
-## 8.5 死亡とReanimation
+Attack / Counterattack / InterceptionのいずれもRange 1..6で5消費する。5未満の場合はそのCombatを不成立とし、距離1だけ最低攻撃へ落とす等のNational Guard不足特例をReconへ暗黙適用しない。
 
-Recon Teamが死亡した場合、既存National Guardと同様にSoldier Zombieを生成する。人数5だからPolice Zombieへ変える、あるいは5体のZombieを生成する、といった別解釈は行わない。既存Human Unit Reanimationと同じ「部隊死亡に対応するZombie Unit生成」とする。
+自動感染鎮圧に参加する場合のCostは「攻撃時Cost」とは別の既存鎮圧規則を用いる。今回の2倍化対象はAttack / Counterattack / InterceptionのCombat Costであり、既存のターン固定Military Goods消費や自動鎮圧Costを暗黙に2倍にしない。
 
-## 8.6 Asset
+### 8.5 Noise / Reanimation / Asset
 
-Recon Team専用Assetは5人組とする。
-
-- scoped sniper rifleを持つ兵士2名。
-- spotter / escort役の随伴歩兵3名。
-- 5人チームとしてまとまりを持たせつつ、盤面縮尺でNational Guard等と識別できる構図にする。
-- Asset Registry、Unit Production Accordion、Board Legend、Help、Replay、Live AI Viewerへ同一Typeを登録する。
+- Human Combat NoiseはRadius 6。
+- 死亡時はSoldier Zombieを1 Unit生成する。Pop5だから5 Zombieを作る等の解釈はしない。
+- Assetはscoped sniper rifleを持つ兵士2人＋spotter / escort歩兵3人の5人組。
 
 ---
 
-## 9. 初期Zombie増加と配置 — INIT-01, INIT-02
+## 9. Human Unit Fuel / Military Goods全体調整 — FUEL-01..02, AMMO-01..02
 
-現行初期Normal Zombie 25体を**50体**へ変更する。
+### 9.1 Max Fuel
 
-- 変更対象は初期Normal Zombie。
-- 初期Hunter 1..4、初期Gas 1..2は別指定がないため現行値を維持する。
-- 初期Screamerは0。
-- 既存の非重複、Zombie進入可能Terrain、Reserve除外、Facility / Human Unitとの競合禁止、Seed付き決定性を維持する。
-- Normal ZombieのCapital最小距離を**8 Hex以上**とする。
-- Hunterの既存20 Hex以上、Gasの既存9 Hex以上のように、より厳しいType固有制約は弱めない。
+v1.6.0標準値を2倍にする。
 
-### 9.1 幹線道路から「やや外れた」配置
-
-**提案:** 数値指定がないため、道路からの厳密な最小距離を新しいHard Error条件にはせず、候補順位へRoad Avoidanceを導入する。
-
-1. 幹線道路Hexそのものではない候補を優先する。
-2. その中で幹線道路に隣接しない候補を優先する。
-3. 50体を満たせない場合だけ、Capital 8以上等のHard Constraintを満たす残り候補へ決定的にフォールバックする。
-
-これにより「幹線道路からやや外れた」を表現しつつ、固定51×51 Mapで候補不足を起こしにくくする。選択はSeed付きであり、同Seedで再現する。
-
----
-
-## 10. Horde Wave調整 — WAVE-01, WAVE-02
-
-## 10.1 Wave Turn
-
-標準固定Wave Scheduleを次へ変更する。
-
-| Wave | Turn |
-| --- | ---: |
-| 1 | 10 |
-| 2 | 20 |
-| 3 | 35 |
-| 4 | 50 |
-| Final | 70 |
-
-- `final: true`はTurn 70のWaveへ移す。
-- Final Horde Turnはハードコードせず、引き続きConfigの最後の`final: true`から導出する。
-- Warning Leadは別指定がないため現行2を維持する。
-- 「最後の2 Wave」で特殊Weightを切り替える処理はTurn番号をハードコードせず、Schedule上の末尾2件としてTurn 50 / 70へ追従する。
-- Final freeze後の自然Arrival停止、Rejected Counter凍結、Victory判定は既存意味論を維持する。
-
-## 10.2 各方向1.5倍
-
-各Waveの**各方向ごとの基礎Zombie総数**を、現行Scheduleの同方向総数に対して1.5倍にする。Rejected Refugee Bonusはこの拡大後Base Rosterへ既存どおり別加算する。
-
-**要調整 WAVE-Q1:** 現行WaveはHorde固定枠と非Horde特殊抽選Slotの2部分からなるため、1.5倍後に端数が出る場合の整数化と、追加分をHorde / Slotへどう配分するかを確定版で固定する必要がある。
-
-確定時の必須条件:
-
-- 各方向の最終Base Totalが「現行の約1.5倍」であること。
-- Direction間で同じ基礎Compositionなら同じ整数化を使うこと。
-- Seedで端数処理をランダム化しないこと。
-- 特殊SlotのWeight / Capは、Screamer追加以外について勝手に変更しないこと。
-- Help、Warning、Frozen Roster、Metrics、Balanced Agentが新Scheduleと新Base Totalを同じConfigから読むこと。
-
----
-
-## 11. Human Unit自然回復半減 — HEAL-01
-
-現行のSupply内自然回復を次へ変更する。
-
-| 前Turnの行動区分 | v1.6.0 | v1.6.1 |
+| Unit | v1.6.0 | v1.6.1 |
 | --- | ---: | ---: |
-| Combat実行あり | max HPの10% | **5%** |
-| 移動のみ／待機／未行動等 | max HPの20% | **10%** |
-| Supply外 | 0% | **0%** |
+| Police | 12 | 24 |
+| National Guard | 22 | 44 |
+| Riot Police | 12 | 24 |
+| Recon Team | — | 44 |
 
-- Unit個別切り上げ、HP上限、回復時点Supply再評価等の既存処理は維持する。
-- Police / National Guard / Riot Police / Recon Teamへ同じ率を適用する。
-- Zombieは引き続き自然回復しない。
-- UI / Help / Agentの10% / 20%表記を5% / 10%へ更新する。
+初期Unitの満載値も新Maxへ合わせる。完成Unitの有償補給は新Maxまで行うため、必要State Fuelも増える。
+
+### 9.2 通常移動Fuel Cost
+
+既存の「実移動Hex数からUnit Type別Fuel Costを求める」式の結果を2倍する。MPやTerrain Costそのものは変更しない。
+
+Police / Riot Police:
+
+```text
+baseCost = distance <= 5 ? 1 : 1 + (distance - 5)
+fuelCost = 2 * baseCost
+```
+
+National Guard / Recon:
+
+```text
+baseCost = distance <= 5 ? 1 : 1 + 2 * (distance - 5)
+fuelCost = 2 * baseCost
+```
+
+距離0は0。Hidden Enemyによる途中停止時も実進入Hex数から新式で再計算する。Fuel 0 Emergency Movementは既存どおりFuelを消費しないため2倍対象外。
+
+### 9.3 Max carried Military Goods
+
+| Unit | v1.6.0 | v1.6.1 |
+| --- | ---: | ---: |
+| Police | 5 | 10 |
+| National Guard | 20 | 40 |
+| Riot Police | 5 | 10 |
+| Recon Team | — | 40 |
+
+初期Unitと完成Unitの満載量も新Maxへ合わせる。
+
+### 9.4 攻撃時Military Goods Cost
+
+既存UnitのAttack / Counterattack / Interception Costを2倍する。
+
+- Police Range1: 1 → 2
+- Riot Police Range1: 1 → 2
+- National Guard Range1: 1 → 2
+- National Guard Range2: 2 → 4
+- Recon Range1..6: 固定5（Recon固有規則を優先）
+
+National Guard Range2は4未満なら不成立。Police / Riot / National Guard Range1の「弾薬0時最低攻撃」等の不足時挙動は既存意味論を保ち、Cost閾値だけ新値に合わせる。具体的には必要量未満だが0より大きいケースをCoreで明示的に検証し、UIとAgentで実行可否・実効Attackを同じQueryから表示する。
+
+通常のEndTurn固定Military Goods消費、自動鎮圧Cost、Army Base専用迎撃Costは、依頼が「攻撃時消費」を対象としているため本項では変更しない。
 
 ---
 
-## 12. 感染陥落施設のNoise再Spawn抽選 — FALL-01
+## 10. 初期Zombie — INIT-01, INIT-02
 
-対象は、**感染して陥落したFacilityがNoise Pulseを受け、既存ルールにより感染人口からZombieを再Spawnする場面**とする。施設が最初に陥落した瞬間の既存Spawn規則やHuman Unit Reanimationを、この要求だけで変更しない。
+初期Normal Zombieを25から50へ変更する。
 
-Noise再SpawnでZombieを1体生成するごとに、Seed付きRNGで次の重み付き抽選を行う。
+- 初期Hunter 1..4、Gas 1..2は維持。
+- 初期Screamer 0。
+- Normal ZombieのCapital最小Hex Distanceは8以上。
+- Hunterの20以上、Gasの9以上というより厳しい固有条件は維持。
+- Reserve、Facility、初期Human Unit、既存Zombieとの非重複を維持。
+
+「幹線道路からやや外れた」はHardな候補不足を避けるため、次の決定的優先順位とする。
+
+1. 幹線Road Hexでない候補を優先。
+2. さらに幹線Roadに隣接しない候補を優先。
+3. 候補不足時だけ次の優先層へ緩和。
+4. 各層内はSeed付きの既存決定配置を用いる。
+
+これにより道路を絶対禁止にはせず、意図として幹線から外す。
+
+---
+
+## 11. Horde Wave — WAVE-01, WAVE-02
+
+### 11.1 Schedule
+
+Wave Turnを次へ変更する。
+
+| Wave | Turn | Directions | 現行non-Horde Slots / direction | v1.6.1 Horde / direction |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 10 | 1 | 3 | 5 |
+| 2 | 20 | 2 | 5 | 3 |
+| 3 | 35 | 1 | 7 | 8 |
+| 4 | 50 | 3 | 7 | 5 |
+| 5 Final | 70 | 4 | 8 | 8 |
+
+Warning Leadは2を維持。FinalはSchedule最後の`final: true`から導出し70となる。「最後の2 Wave」判定はindex基準でWave 4 / 5、すなわちTurn 50 / 70へ追従する。
+
+### 11.2 1.5倍の意味
+
+1.5倍するのは**固定でスポーンするHorde Zombie数だけ**とし、非Horde Slot数は変更しない。
+
+```text
+newHordeCount = ceil(oldHordeCount * 1.5)
+```
+
+したがって:
+
+- 3 → 5
+- 2 → 3
+- 5 → 8
+
+Rejected Refugee Bonusは拡大後Base rosterへ既存どおり別加算する。
+
+標準Schedule全体ではBase Horde数は41 → 66、non-Horde Slotsは73のまま、Base総数は114 → 139となる。Final Waveは4方向合計でHorde 32 + Slot 32 = Base 64となる。
+
+Horde batch分散、Pending、roster freeze、Final affiliation、Victory条件は既存意味論を維持する。
+
+---
+
+## 12. Human Unit自然回復 — HEAL-01
+
+Supply内自然回復を半分にする。
+
+| 前Turn行動 | v1.6.0 | v1.6.1 |
+| --- | ---: | ---: |
+| 通常攻撃・反撃・迎撃・自動鎮圧あり | 最大HP 10% | 最大HP 5% |
+| 移動のみ・Wait・移動後Wait・未行動 | 最大HP 20% | 最大HP 10% |
+| Supply外 | 0% | 0% |
+
+端数は既存どおりUnit個別切り上げ。Reconも同じ規則。Zombieは回復しない。
+
+---
+
+## 13. Oil Field / Refinery / Wind — MAP-01, ECO-01..02
+
+### 13.1 Oil Fieldを1基へ
+
+v1.6.0の4 Oil Field候補:
+
+- North `(26,13)` / trunk `(25,13)`
+- East `(37,24)` / trunk `(37,25)`
+- South `(24,37)` / trunk `(25,37)`
+- West `(13,26)` / trunk `(13,25)`
+
+v1.6.1では、この4候補のうち**実際にMapへ配置するOil Fieldを1基だけ**とする。
+
+採用優先順位:
+
+1. **推奨方式:** 4候補から等確率で1つをSeed付き決定抽選する。
+2. 実装構造上、Map / Save / Road生成への影響が不釣り合いに大きい場合のみ、実装時に4候補のどれか1つへ固定してよい。
+
+推奨方式ではOil Field選択専用の独立したLayout RNG / deterministic hashを使い、Army Base、初期Zombie、Refugee、Wave等の既存Game RNG消費順をずらさない。同Seed / Map / Configで同じ方角を選ぶ。
+
+固定方式を採る場合は選択方角をMap Config / 要件確定記録へ明示し、Buildごと・Reloadごとに変わらないこと。
+
+いずれの方式でも:
+
+- 選ばれた1候補だけFacilityと1-Hex access spurを生成。
+- 未選択3候補はOil Field Facilityとして存在せず、専用access spurも生成しない。
+- 未選択地点にSurvivor、Worker、報酬、Vision、Oil creditを作らない。
+- Map / Save / Artifactは実際に選択されたOil Field位置を保持し、Load時に再抽選しない。
+- Map IDまたはMap schemaは4基版と取り違えないようv1.6.1で更新する。
+
+Oil Field性能自体は既存どおり最大Worker 5、healthy worker 1人につきeconomy phaseでAllowance +100、電力／Fuel不要を維持する。
+
+### 13.2 Refinery Allowance 1500
+
+全国共有の`initialAllowance`を5000から**1500 Fuel**へ下げる。
+
+これは既存Allowanceモデルの初期値変更であり、Oil Field creditによる累積追加は維持する。つまり1500はOil Field確保前の初期Lifetime Refining Capacityであり、Oil Field稼働によって総利用可能Allowanceが1500を超えることは許可する。Hard ceiling 1500へ変更するものではない。
+
+- Refineryが実際に精製したFuel 1につきAllowance 1消費。
+- 初期Stock、確保報酬、他手段Fuel、Fuel消費はAllowanceを減らさない。
+- Oil creditは同economy phaseのRefineryが利用可能。
+- 過去の発電不足へ遡及しない。
+- remainingAllowance 0ならRefineryは精製用電力を要求しない。
+
+### 13.3 Wind建設費1.5倍
+
+Player-built Wind Power Plantの建設費を各コスト成分ごとに次で計算する。
+
+```text
+newCost = ceil(v1.6.0Cost * 1.5)
+```
+
+現行標準はCivilian Goods 100のためv1.6.1では**Civilian Goods 150**。現行0のMilitary Goods等を新たに追加しない。
+
+初期配置Windは建設費を支払わないため影響なし。建設上限`2 * roadBranches.length`、初期Windを上限外とする規則、Generation 15、Noise、Worker 0等は別指定がないため維持する。
+
+---
+
+## 14. 感染陥落FacilityのNoise再Spawn — FALL-01
+
+対象は**感染して陥落したFacilityがNoise Pulseを受け、感染人口からZombieを再Spawnする処理**。初回陥落時Spawn、Human Unit Reanimation、Scheduled Horde rosterはこの表へ置換しない。
+
+1 Unit生成ごとにSeed付きRNGで:
 
 | Type | Weight |
 | --- | ---: |
@@ -421,150 +574,148 @@ Noise再SpawnでZombieを1体生成するごとに、Seed付きRNGで次の重�
 | Hunter Zombie | 10 |
 | Screamer Zombie | 10 |
 
-合計100。
+Police / Riot / Soldier / Horde Zombieは除外する。
 
-明示的に対象外:
-
-- Police Zombie
-- Riot Zombie
-- Soldier Zombie
-- Horde Zombie
-
-必須要件:
-
-- 既存の「感染者5人につき1 Zombie」「1 Pulseあたりの生成上限」「空きHex不足時の未生成感染者保持」等、Spawn数を決める既存規則は維持する。
-- Type抽選は**実際に1体生成できる単位ごと**に行う。配置不能な架空Unitのために余分なRNGを進めない。
-- SpawnしたHunter / Gas / Screamerはそれぞれの通常Type性能を持つ。
-- Noise再Spawnで生まれたScreamerは、Horde Wave由来ではないため**配置されたことだけ**ではScreamしない。後にPopulation / inherited Horde Targetを初取得した場合だけScreamする。
-- 生成Unitは既存どおり同Phaseに追加行動しない。
-- Hidden SpawnのType / 座標はFoWで公開可能になるまでHuman UI / Agentへ漏らさない。
+- 抽選順は既存Facility ID / Pulseの安定順を維持。
+- 同一Noiseで複数体なら1体ずつ抽選。
+- Screamerはこの生成時点では`hasScreamed=false`。後にPopulation / inherited targetを初取得した時にScreamする。
+- Spawn直後の同Phase追加行動禁止、即時占有、FIFO連鎖等は既存規則を維持。
+- Hidden Spawn Type / 位置をFoW外へ漏らさない。
 
 ---
 
-## 13. Core / State / Save / Agent / Replayの共通反映 — SAVE-01
+## 15. Core / Save / Agent / Replay — SAVE-01
 
-今回の変更はUIだけで完結しない。少なくとも次をCoreの明示状態・Config・公開Queryへ反映する。
+最低限追加・変更する正データ:
 
-### 13.1 新しい型・状態候補
+- `reconTeam` Human Unit Type
+- `screamerZombie` Zombie Type
+- Screamer `hasScreamed`
+- Neutral Facility Survivor healthy / infected / expiry
+- Checkpoint waiting risk予約
+- Oil Field selected candidate / Map identity
+- Refinery Allowance initial 1500と既存ledger
+- 新Max Fuel / Military Goodsと新Combat Cost
+- 新Wave Schedule / Horde count / Screamer Weight
 
-- Human Unit Type: `reconTeam`相当
-- Zombie Type: `screamerZombie`相当
-- Screamerの一度限りScream済み状態
-- Neutral Facility survivor healthy / infected / expiry情報
-- Checkpoint Policy: `deny`
-- Checkpoint waiting Risk予約値／対象Turn
-- ReconのFuel / carried Military Goods / proficiency / reanimation provenance
-- ScreamerのWave provenance / Noise provenance
+Save / Session / Artifact:
 
-命名は既存TypeScript schemaの規約に合わせ、UI都合の別名Stateを増やさない。
+- LoadでSurvivor、Risk、hasScreamed、Oil Field方角、Allowanceを再抽選／リセットしない。
+- 同一Seed / Config / Map / Action列でScreamer draw、Survivor人数、Risk、fallen-site drawが一致する。
+- schema変更後、v1.6.0データをv1.6.1として黙って読むことは禁止。Migrationを作らない場合はVersion mismatchで状態不変拒否。
+- v1.6.1のRules / State / Config / Map / Save / Agent / Artifact / Session versionは実装時に一括更新し、旧番号の部分残しをしない。
 
-### 13.2 Save / Replay / Session
+Agent / Browser Bridgeは公開範囲内で:
 
-- 新状態はSave Round Tripで失われない。
-- Screamerの`hasScreamed`、Survivor期限、Checkpoint予約RiskはLoadでリセットしない。
-- 同一SeedのReplayでSurvivor配置、Risk抽選、Noise再Spawn Type抽選、Horde Screamer配置Noiseが一致する。
-- Checkpoint / Session分岐後も分岐時点のRNG Stateと予約状態を正確に継承する。
-- schema変更が必要なため、v1.6.0 Save / Replay / Artifact / Sessionをv1.6.1として黙って読まない。Migrationを作らない場合はVersion mismatchとして状態不変で拒否する。
-- 正確なSave / Agent API / Artifact / Session / Rules version番号は確定版または実装時に一括決定し、部分的に旧version番号を残さない。
+- Recon性能、Fuel / Military Goods、固定攻撃Cost 5
+- Screamer公開性能とWave混成可能性
+- 可視Neutral Survivor
+- Checkpoint deny / waiting risk
+- 新Wave schedule / count
+- Refinery Allowance
+- Oil Field位置
 
-### 13.3 Agent / Browser Bridge
-
-AIがHumanと同じGame Truthで判断できるよう、公開範囲内で次をQuery可能にする。
-
-- Reconの生産可否、性能、距離別弾薬費、Fuel、Noise Class / 公開仕様
-- 可視Screamerの公開基礎性能
-- 可視Neutral FacilityのSurvivor Populationと残り猶予（公開設計でTurn数を見せる場合）
-- Checkpoint deny、waiting、screening、approved、次回Risk %
-- 新Wave Scheduleと公開済みBase / Frozen人数
-
-Screamer内部Target、Hidden Survivor、Hidden ZombieのScream誘因、未解決RNG結果は公開しない。
+を取得できる。内部Target、Hidden Survivor、Hidden Zombie、未解決RNGを漏らさない。
 
 ---
 
-## 14. UI / Help / Asset / Metrics更新
+## 16. UI / Help / Asset / Metrics更新
 
-## 14.1 Human UI
+Human UI:
 
-- Unit Production AccordionへRecon Teamを追加する。
-- Unit Bottom SheetへReconのRange 6、Vision 10、Noise 6、Fuel、Military Goods、距離別Costを表示する。
-- Visible Screamer選択時はType、HP、Attack、Move、Range等の既存公開Zombie情報を表示する。
-- Checkpoint Panelを4方針へ更新し、denyとwaiting Riskを表示する。
-- Neutral FacilityのSurvivorは可視施設のみ表示し、確保可能な健康人口として区別する。
-- Helpの自然回復率、Wave Turn、初期Normal数を更新する。
+- ReconをUnit Production Accordionへ追加。
+- Recon Bottom SheetにRange 6、Vision 10、Noise 6、Fuel 44、Military Goods 40、Attack Cost 5を表示。
+- Visible ScreamerのType / HP / Attack / MP / Vision / Rangeを表示。
+- Checkpointを4Policyへ更新しdenyとwaiting riskを表示。
+- 可視Neutral FacilityのSurvivor人数を表示。
+- Refinery Facility詳細へAllowance ledgerを表示。
+- Wind候補にCivilian Goods 150を表示。
+- Helpの自然回復、Fuel、Military Goods、Wave Turn、Horde数、Screamer Weight、Oil Field 1基、Allowance 1500を更新。
 
-## 14.2 Live AI Viewer / Replay
+Live Viewer / Replay:
 
-Live Viewer自体の操作体系を作り直さず、既存盤面描画が新Type / Eventを読めるようにする。
+- Recon / Screamer Assetを表示。
+- Scream、Survivor救出／感染、Risk感染、deny、fallen-site Type等の公開Eventを既存timelineで扱う。
 
-- Screamer / Recon Assetを表示できる。
-- Scream Noise Event、Checkpoint Risk感染、deny自動拒絶、Survivor救出／感染、Noise再Spawn Typeを既存Event timelineへ表示可能にする。
-- Human Game中へ`AI Play Watch`Floating入口を戻さない。
+Metrics:
 
-## 14.3 Metrics / Validation
-
-少なくとも次を検証・計測可能にする。
-
-- 初期Survivor配置人数、救出人数、時間切れ感染人数、Zombie接触による感染人数
-- denyによるTurn Away人数
-- waiting Risk判定回数、発生回数、感染人数
-- Screamer生成源別数、Scream回数、Wave配置直後Scream、Target取得Scream、二重Scream防止
-- Recon生産数、移動、Attack距離、弾薬消費、Noise、死亡、Soldier Zombie化
-- 初期Normal 50体の配置制約とSeed再現性
-- 各Wave / Directionの新Base数、Rejected Bonus、Pending / spawned / killed
-- Human Unit自然回復量
-- fallen-site Noise respawnのNormal / Gas / Hunter / Screamer内訳
-
----
-
-## 15. 受入試験
-
-以下を最低限のv1.6.1受入条件とする。
-
-1. 390×844相当のChromeでHuman Game中に`AI Play Watch`固定ボタンが盤面・Bottom Sheet・右下Actionへ重ならず、タイトル画面からはViewerへ入れる。
-2. Constructible Facility候補を折り畳み、各候補のコスト・主要性能・上限・合法性理由を確認でき、表示値がConfig / Coreと一致する。
-3. 同SeedでNeutral Survivorの配置が一致し、10 Turn前に確保すれば健康人口として得られ、未確保なら期限どおり感染する。
-4. 可視SurvivorがNormal AI Population Targetになり、不可視SurvivorがTarget情報として漏洩しない。
-5. Checkpointをdenyへ切り替えるとwaitingだけがEndTurnで全員拒絶され、screening / approvedは保持され、新しいScreeningを開始しない。
-6. waiting 100でRisk 0%、101で1%、150で50%、200以上で100%となり、発生時1..5人だけがwaitingから感染へ移る。Save / Replayで同じ結果になる。
-7. ScreamerがHP15 / ATK10 / MP3 / Vision2 / Range1で動作し、Populationまたはinherited Horde Target初取得でRadius 30 Noiseを1回だけ出す。
-8. Horde Wave由来Screamerが実配置直後に1回Screamし、その後Target取得で二重Screamしない。
-9. Recon TeamがPop5 / HP25 / Recruit ATK9 / MP10 / Vision10 / Range6 / Noise6で、Capital / Army Baseだけから生産でき、Civilian Goods20 / Military Goods25、Fuel22、carried Military Goods20を基準に動作する。
-10. Recon死亡時にSoldier Zombieが1 Unit生成される。
-11. 初期Normal Zombieが50体、Capitalから8 Hex以上、既存占有禁止条件を満たし、Road Avoidanceを含め同Seedで同配置になる。Hunter / Gasの既存数と固有最小距離を壊さない。
-12. WaveがTurn 10 / 20 / 35 / 50 / 70に発生し、Finalが70、Warning Lead 2、最後の2 Wave判定が50 / 70へ追従する。
-13. 各DirectionのBase人数が確定した1.5倍規則に一致し、Rejected Bonusは別加算、Frozen Roster / Help / Agent / Metricsが一致する。
-14. Supply内Human Unit自然回復がCombat 5%、Rest 10%、Supply外0%、個別切り上げとなる。Reconにも同じ規則を適用する。
-15. fallen infected FacilityがNoiseを受けた再SpawnでNormal / Gas / Hunter / Screamerだけを70 / 10 / 10 / 10から抽選し、Police / Riot / Soldier / Hordeを生成しない。
-16. 新Type / Stateを含むSave Round Trip、Session Resume、Replay、Artifact検証、Browser Bridge / Agent QueryでGame TruthとRNGが一致する。
-17. Fog of War下でHidden Survivor、Hidden Screamer、内部Target、Noise Target、未来のRisk抽選結果を漏らさない。
-18. 既存のTypeScript型検査、通常Unit/Checkpoint/Noise/Wave/Replay回帰、production build、mobile smokeを壊さない。
+- Survivor初期／救出／時間切れ感染／接触感染
+- deny Turn Away
+- waiting risk予約／成立／感染人数
+- Screamer生成源、Scream数、Noise Pulse数
+- Recon完成／損失／Kill／Fuel／Military Goods
+- Unit Type別Fuel消費、新Maxまでの補給需要
+- Unit Type別Combat Military Goods消費／不足
+- Wave別Horde base count、Slot、Screamer draw
+- Oil Field選択方角、Oil credit
+- Refinery initial / earned / refined / remaining allowance
+- Wind建設費支出
+- fallen-site respawn Type内訳
 
 ---
 
-## 16. 確定版前に決める項目
+## 17. 受入試験
 
-本ドラフトで依頼値を勝手に補わず残している論点は次の4件だけとする。
+最低限:
 
-| ID | 未確定内容 | 確定時に必要な決定 |
-| --- | --- | --- |
-| SURV-Q1 | 中立施設の初期Survivor数 | 対象施設種、配置施設数、各施設人数またはSeed付き範囲 |
-| Z-Q1 | Horde Wave内Screamer出現率 | 特殊Slot Weight、Direction Cap、通常Wave／最後2 Waveで差を付けるか |
-| UNIT-Q1 | Recon Range 3..6の弾薬消費 | 距離別Military Goods Cost |
-| WAVE-Q1 | 各方向1.5倍の整数化 | Totalの丸め方、Horde固定数と非Horde Slotへの配分 |
-
-上記以外は、本ドラフトに記載した値・順序をv1.6.1の既定要求として扱える粒度まで固定する。
+1. 390×844相当ChromeでHuman Game中にAI Play Watch固定入口がなく、タイトルからViewerへ入れる。
+2. Constructible Accordionでコスト・性能・上限・Reasonを確認できる。
+3. Refinery選択時にInitial 1500、Oil Credits、Fuel Refined、Remaining Allowanceを確認できる。
+4. 新規ゲームの全中立恒久Facilityに`1..min(10, capacity)`のSurvivorが同Seedで再現する。初期Player所有Facilityには追加されない。
+5. Survivorを10 Turn前に確保すると健康人口として取得し、未確保なら期限で感染する。
+6. Visible SurvivorがZombie Population Targetになり、Hidden Survivorは公開されない。
+7. denyでwaitingだけがTurn末に全拒絶され、screening / approvedは残る。
+8. waiting 100 / 101 / 150 / 200で0 / 1 / 50 / 100%を予約し、成立時1..5人だけwaitingから感染する。
+9. ScreamerがHP15 / ATK10 / MP3 / Vision2で、Target初取得Screamを一度だけ出す。
+10. Horde由来Screamerは実配置直後にScreamし二重発生しない。
+11. pre-last-two Weightが65/10/10/5/5/5、last-twoが60/10/10/5/5/5/5で、ScreamerにCapがない。
+12. ReconがPop5 / HP25 / Recruit9 / MP10 / Vision10 / Range6 / Noise6 / Fuel44 / MG40で、Capital / Army Baseから生産できる。
+13. ReconのRange1..6 Attack / Counter / Interceptionが常にMG5を要求する。
+14. Recon死亡でSoldier Zombie 1 Unitを生成する。
+15. Police / Riot maxFuel 24、Guard / Recon 44。通常移動Fuel Costが旧計算の2倍で、Emergency MovementはFuel0のまま機能する。
+16. Police / Riot maxMG10、Guard / Recon40。Police/Riot/Guard Range1 cost2、Guard Range2 cost4、Recon全距離5でUI / Agent / Coreが一致する。
+17. 初期Normal Zombie 50、Capital距離8以上、Road Avoidance、Hunter / Gas固有条件が同Seedで再現する。
+18. Waveが10 / 20 / 35 / 50 / 70、Horde/directionが5 / 3 / 8 / 5 / 8、Slot数が3 / 5 / 7 / 7 / 8で一致する。
+19. 全ScheduleのBase Horde 66、Slot 73、Base Total 139、Final Base 64をHelp / Agent / Metricsが同じConfigから表示する。
+20. 自然回復がCombat5% / Rest10% / Supply外0%、個別切り上げ。
+21. Oil Fieldが1基だけ存在し、推奨Seed選択または明示固定方式のどちらか一つに実装が統一され、Loadで位置が変わらない。
+22. 未選択Oil Field 3地点にFacility / spur / Survivor / creditが残らない。
+23. Refinery initialAllowanceが1500、Oil credit追加、実精製消費、remaining式が一致する。
+24. Player-built Windの標準建設費がCivilian Goods150で、初期Wind性能は変わらない。
+25. fallen infected FacilityのNoise再SpawnがNormal/Gas/Hunter/Screamer=70/10/10/10で、除外Typeを生成しない。
+26. Save Round Trip / Session Resume / Replay / Artifactで新StateとRNGが一致する。
+27. Fog of War下でHidden Survivor、Hidden Screamer、内部Target、Noise Target、未解決Risk / drawを漏らさない。
+28. TypeScript型検査、通常Unit / Checkpoint / Noise / Wave / Replay回帰、production build、mobile smokeを通す。
 
 ---
 
-## 17. 実装順序案
+## 18. 実装判断として残す範囲
 
-1. Config / schemaへRecon、Screamer、Wave、回復率を追加し、既存Core testを更新。
-2. Neutral SurvivorとCheckpoint deny / RiskのState遷移を追加。
-3. Screamer Screamとfallen-site weighted respawnを既存Noise pipelineへ接続。
-4. ReconをProduction / Combat / Fuel / Military Goods / Reanimationへ接続。
-5. 初期50体配置とWave 10 / 20 / 35 / 50 / 70を適用。
-6. Human UIのAI Watch入口修正、Constructible Accordion、Checkpoint / Unit UI更新。
-7. Asset / Legend / Help / Live Viewer / Replayを更新。
-8. Save / Agent / Browser Bridge / Artifact version boundaryを更新し、回帰・Seed決定性・mobileを検証。
+前版ドラフトで未確定だった4件は今回すべて確定した。
 
-この順序は実装の依存関係を減らすための提案であり、ゲームルールではない。
+- Survivor人数: 全中立Facility、1..10、capacity clamp
+- Screamer Wave: Normal Weight -5 / Screamer +5、Capなし
+- Recon弾薬: 全射程5
+- Horde倍率: 固定Horde数だけ`ceil(x * 1.5)`、Slot不変
+
+残る実装裁量はOil Field方角の選択方式だけであり、許容範囲を次に限定する。
+
+- 第一選択: 現4候補からSeed付き等確率選択。
+- 実装負担が不釣り合いな場合: 現4候補から1地点を固定。
+- どちらを採ったかは確定版／検証記録へ残す。
+- runtimeで非決定的に選ぶ、Loadで再抽選する、4候補のうち複数を残す実装は禁止。
+
+これ以外の数値・順序は本ドラフトをv1.6.1の既定要求として扱える粒度まで固定する。
+
+---
+
+## 19. 実装順序案
+
+1. Config / schema: Unit fuel/MG、Recon、Screamer、Wave、Allowance、Wind cost、Oil Field count。
+2. Map生成: Oil Field 1基とspur、Map identity、Save validation。
+3. Survivor、Checkpoint deny / riskのState遷移。
+4. Screamer Scream、Wave table、fallen-site weighted respawnを既存Noise pipelineへ接続。
+5. ReconをProduction / Combat / Fuel / MG / Reanimationへ接続。
+6. Human UI: AI入口、Construction Accordion、Refinery Allowance、Recon / Screamer / Survivor / Checkpoint。
+7. Agent / Browser / Session / Replay / Artifact / Help / Metrics更新。
+8. 決定性、FoW、Save、mobile、production buildを受入試験する。
