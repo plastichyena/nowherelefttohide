@@ -12,4 +12,14 @@ describe('Session release fixture', () => {
     expect(move).toBeDefined();
     expect(runtime.step({ action: move!, decisionSummary: 'validate a Core move' }).error).toBeNull();
   });
+
+  it('remains a quiet legal EndTurn fixture after neutral survivor expiry', () => {
+    const runtime = createSessionReleaseFixtureFactory('session-release-fixture-test').createNew({ seed: 1511, agentId: 'fixture-test' });
+    for (let decision = 1; decision <= 25; decision += 1) {
+      const endTurn = runtime.getLegalActions().find((action) => action.type === 'EndTurn');
+      expect(endTurn, `decision ${decision}`).toBeDefined();
+      expect(runtime.step({ action: endTurn!, decisionSummary: `quiet EndTurn ${decision}` }).error).toBeNull();
+      expect(runtime.isGameOver(), `decision ${decision}`).toBe(false);
+    }
+  });
 });

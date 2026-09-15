@@ -54,6 +54,19 @@ function availablePlayerPositions(state: GameState): HexCoord[] {
 /** Adds actual Core human units, then restores through LoadSnapshot validation. */
 function prepareReleaseState(game: SessionCapableAgentGame, agentId: string): void {
   const state = game.exportPrivateSessionState();
+  // v1.6.1 gives every initially neutral permanent facility a deterministic
+  // survivor population.  Those survivors expire after turn 10 and create an
+  // outbreak, which is correct for the real game but defeats this deliberately
+  // quiet, long-running storage fixture.  Remove only that scenario population
+  // before restoring the snapshot; all subsequent transitions still use the
+  // real GameEngine and Config.
+  for (const facility of state.facilities) {
+    if (facility.owner !== 'none') continue;
+    facility.workers = 0;
+    facility.infected = 0;
+    facility.operationalStatus = 'stopped';
+    facility.earlyCaptureSurvivorStatus = 'lost';
+  }
   const positions = availablePlayerPositions(state);
   const requiredAdditionalUnits = 19;
   if (positions.length < requiredAdditionalUnits) throw new Error('Release fixture has insufficient legal positions for 21 human units');
