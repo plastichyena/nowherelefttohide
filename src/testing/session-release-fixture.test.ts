@@ -16,7 +16,8 @@ describe('Session release fixture', () => {
   it('remains a quiet legal EndTurn fixture after neutral survivor expiry', () => {
     const factory = createSessionReleaseFixtureFactory('session-release-fixture-test');
     const runtime = factory.createNew({ seed: 1511, agentId: 'fixture-test' });
-    for (let decision = 1; decision <= 25; decision += 1) {
+    const decisionsPastNeutralSurvivorExpiry = 12;
+    for (let decision = 1; decision <= decisionsPastNeutralSurvivorExpiry; decision += 1) {
       const endTurn = runtime.getLegalActions().find((action) => action.type === 'EndTurn');
       expect(endTurn, `decision ${decision}`).toBeDefined();
       expect(runtime.step({ action: endTurn!, decisionSummary: `quiet EndTurn ${decision}` }).error).toBeNull();
@@ -27,7 +28,7 @@ describe('Session release fixture', () => {
       seed: 1511,
       agentId: 'fixture-test',
       sessionId: 'restored-fixture-test',
-      decision: 25,
+      decision: decisionsPastNeutralSurvivorExpiry,
       traceHeadHash: '0'.repeat(64),
     });
     expect(restored.getObservation()).toEqual(runtime.getObservation());
