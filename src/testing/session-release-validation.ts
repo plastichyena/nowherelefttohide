@@ -84,6 +84,42 @@ export function parseSessionReleaseArguments(argv: readonly string[]): ParsedArg
 function bytes(value: unknown): number {
     return Buffer.byteLength(JSON.stringify(value), 'utf8');
 }
+function firstJsonDifference(left: unknown, right: unknown, path = '$'): string | null {
+    if (Object.is(left, right)) return null;
+    if (Array.isArray(left) || Array.isArray(right)) {
+        if (!Array.isArray(left) || !Array.isArray(right)) return `${path}: array/type mismatch`;
+        if (left.length !== right.length) return `${path}.length: ${left.length} !== ${right.length}`;
+        for (let index = 0; index < left.length; index += 1) {
+            const difference = firstJsonDifference(left[index], right[index], `${path}[${index}]`);
+            if (difference) return difference;
+        }
+        return null;
+    }
+    if (left !== null && right !== null && typeof left === 'object' && typeof right === 'object') {
+        const leftRecord = left as Record<string, unknown>;
+        const rightRecord = right as Record<string, unknown>;
+        const keys = [...new Set([...Object.keys(leftRecord), ...Object.keys(rightRecord)])].sort();
+        for (const key of keys) {
+            if (!Object.prototype.hasOwnProperty.call(leftRecord, key)) return `${path}.${key}: missing from expected`;
+            if (!Object.prototype.hasOwnProperty.call(rightRecord, key)) return `${path}.${key}: missing from actual`;
+            const difference = firstJsonDifference(leftRecord[key], rightRecord[key], `${path}.${key}`);
+            if (difference) return difference;
+        }
+        return null;
+    }
+    const render = (value: unknown): string => JSON.stringify(value)?.slice(0, 200) ?? String(value);
+    return `${path}: ${render(left)} !== ${render(right)}`;
+}
+function publicStateForHistoryComparison<T>(value: T): T {
+    const copy = JSON.parse(JSON.stringify(value)) as T;
+    const observation = (copy as { observation?: {
+        crisisSummary?: { alerts?: Array<{ sourceRevision?: number }> };
+        endTurnRisk?: { criticalAlerts?: Array<{ sourceRevision?: number }> };
+    } }).observation;
+    for (const alert of observation?.crisisSummary?.alerts ?? []) alert.sourceRevision = 0;
+    for (const alert of observation?.endTurnRisk?.criticalAlerts ?? []) alert.sourceRevision = 0;
+    return copy;
+}
 function assert(condition: unknown, message: string): asserts condition {
     if (!condition)
         throw new Error(message);
@@ -334,10 +370,11 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
     const historyLengthComparison = measure(timings, 'historyLengthComparisonMs', () => {
         const currentPrivateState = reference.exportPrivateState();
         const currentPrivateStateHash = sha256Json(currentPrivateState);
-        const currentPublicStateHash = sha256Json({
+        const currentPublicState = publicStateForHistoryComparison({
             observation: reference.getObservation(),
             legalActions: reference.getLegalActions(),
         });
+        const currentPublicStateHash = sha256Json(currentPublicState);
         const shortRoot = `${sessionRoot}-current-state-short`;
         if (existsSync(shortRoot)) throw new Error(`Refusing to reuse current-state comparison root: ${shortRoot}`);
 
@@ -379,10 +416,10 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
             target: 'full-snapshot',
             expectedRevision: shortCreated.active.revision,
         });
-        assert(
-            shortFull.value !== undefined && sha256Json(shortFull.value) === currentPublicStateHash,
-            'Current-state comparison Session did not preserve Observation and Legal Actions',
-        );
+        const comparableShortFull = publicStateForHistoryComparison(shortFull.value);
+        const shortDifference = firstJsonDifference(currentPublicState, comparableShortFull);
+        assert(shortFull.value !== undefined && shortDifference === null,
+            `Current-state comparison Session did not preserve Observation and Legal Actions (${shortDifference ?? 'missing value'})`);
 
         const longProbe = runFreshStatusProbe(sessionRoot, sessionId);
         const shortProbe = runFreshStatusProbe(shortRoot, shortSessionId);

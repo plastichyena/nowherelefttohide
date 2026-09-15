@@ -68,6 +68,22 @@ function roundMilliseconds(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
+function publicDocumentForHistoryComparison(observation: unknown, legalActions: unknown): Record<string, unknown> {
+  const document = JSON.parse(JSON.stringify({ observation, legalActions })) as {
+    observation?: {
+      crisisSummary?: { alerts?: Array<{ sourceRevision?: number }> };
+      endTurnRisk?: { criticalAlerts?: Array<{ sourceRevision?: number }> };
+    };
+    legalActions: unknown;
+  };
+  // A zero-history control Session has revision 0 even when it restores the
+  // same current GameState. Ignore only these revision-bound annotations when
+  // comparing public state across different retained history lengths.
+  for (const alert of document.observation?.crisisSummary?.alerts ?? []) alert.sourceRevision = 0;
+  for (const alert of document.observation?.endTurnRisk?.criticalAlerts ?? []) alert.sourceRevision = 0;
+  return document as Record<string, unknown>;
+}
+
 function optionValue(argv: readonly string[], index: number, name: string): { value: string; nextIndex: number } {
   const argument = argv[index]!;
   const prefix = `${name}=`;
@@ -129,7 +145,9 @@ export function runSessionStatusProbe(options: SessionStatusProbeOptions): Sessi
   if (!Object.prototype.hasOwnProperty.call(fullValue, 'observation') || !Object.prototype.hasOwnProperty.call(fullValue, 'legalActions')) {
     fail('full-snapshot did not return public Observation and Legal Actions');
   }
-  const publicObservationLegalSha256 = sha256Json({ observation: fullValue.observation, legalActions: fullValue.legalActions });
+  const publicObservationLegalSha256 = sha256Json(
+    publicDocumentForHistoryComparison(fullValue.observation, fullValue.legalActions),
+  );
   const ioAfter = procIo();
   const usage = process.resourceUsage();
   const peakRssBytes = usage.maxRSS * 1024;
