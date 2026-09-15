@@ -9,7 +9,7 @@ import type { SessionGameFactory, SessionGameRuntime } from '../session/types';
 
 interface SessionCapableAgentGame extends AgentGame {
   exportPrivateSessionState(): GameState;
-  restorePrivateSessionState(snapshot: GameState, options?: { agentId?: string }): unknown;
+  restorePrivateSessionState(snapshot: GameState, options?: { agentId?: string; decisionCount?: number }): unknown;
 }
 
 const INITIAL_HUMAN_TYPES: readonly UnitType[] = ['police', 'nationalGuard', 'riotPolice'];
@@ -107,9 +107,9 @@ function createPreparedGame(seed: number, agentId: string, buildId: string): Ses
 export function createSessionReleaseFixtureFactory(buildId: string): SessionGameFactory {
   return {
     createNew: ({ seed, agentId }) => adapt(createPreparedGame(seed, agentId, buildId)),
-    restore: ({ privateState, agentId }) => {
+    restore: ({ privateState, agentId, decision }) => {
       const game = createAgentGame({ buildId, recordHistory: false }) as SessionCapableAgentGame;
-      game.restorePrivateSessionState(privateState as unknown as GameState, { agentId });
+      game.restorePrivateSessionState(privateState as unknown as GameState, { agentId, decisionCount: decision });
       return adapt(game);
     },
   };
