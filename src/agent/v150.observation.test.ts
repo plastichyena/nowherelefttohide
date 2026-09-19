@@ -5,7 +5,7 @@ import { createAgentObservation } from './observation';
 
 describe('v1.5.0 public progression, Horde, and Crisis projections', () => {
   it('projects Human proficiency and charge state while keeping Zombies free of it', () => {
-    const state = createInitialState(15011, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const state = createInitialState(15011, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const observation = createAgentObservation(state);
     const police = observation.units.find((unit) => unit.type === 'police')!;
     const guard = observation.units.find((unit) => unit.type === 'nationalGuard')!;
@@ -22,7 +22,7 @@ describe('v1.5.0 public progression, Horde, and Crisis projections', () => {
   });
 
   it('returns all deterministic crisis alerts from public state without leaking private target data or mutating State', () => {
-    const state = createInitialState(15012, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const state = createInitialState(15012, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const capital = state.facilities.find((facility) => facility.type === 'capital')!;
     capital.infected = 3;
     capital.operationalStatus = 'infected';
@@ -46,7 +46,7 @@ describe('v1.5.0 public progression, Horde, and Crisis projections', () => {
   });
 
   it('lists only usable remaining Attack Charges in EndTurn Risk and exposes their projected consumption', () => {
-    const state = createInitialState(15013, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const state = createInitialState(15013, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const police = state.units.find((unit) => unit.type === 'police')!;
     const target = createUnit(state, 'crisis-target', 'zombie', { q: police.position.q + 1, r: police.position.r });
     target.hp = 1;
@@ -69,7 +69,7 @@ describe('v1.5.0 public progression, Horde, and Crisis projections', () => {
   });
 
   it('reveals only total scheduled Horde slots and possible types before spawning', () => {
-    const state = createInitialState(15014, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const state = createInitialState(15014, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const observation = createAgentObservation(state);
 
     expect(observation.horde.nextWave).toMatchObject({

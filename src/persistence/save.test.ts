@@ -129,9 +129,9 @@ describe('v1.6.0 Save Format 17', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 18,
+      formatVersion: 19,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-51x51-v6',
+      mapId: 'fixed-51x51-v7',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -242,10 +242,10 @@ describe('v1.6.0 Save Format 17', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(18);
-    expect(envelope.gameVersion).toBe('11.0.0');
-    expect(config.version).toBe('11.0.0');
-    expect(config.mapId).toBe('fixed-51x51-v6');
+    expect(envelope.formatVersion).toBe(19);
+    expect(envelope.gameVersion).toBe('12.0.0');
+    expect(config.version).toBe('12.0.0');
+    expect(config.mapId).toBe('fixed-51x51-v7');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
@@ -255,10 +255,10 @@ describe('v1.6.0 Save Format 17', () => {
     expect(config).not.toHaveProperty('finalHordeTurn');
     expect(config).toMatchObject({
       economy: {
-        initialZombieCount: 50,
-        initialHunterCount: { min: 1, max: 4 },
+        initialZombieCount: 40,
+        initialHunterCount: { min: 4, max: 4 },
         initialHunterMinDistance: 20,
-        initialGasCount: { min: 1, max: 2 },
+        initialGasCount: { min: 4, max: 4 },
         initialGasMinDistance: 9,
       },
       infection: {
@@ -301,12 +301,12 @@ describe('v1.6.0 Save Format 17', () => {
     expect((state.initialHunterPositions as unknown[]).length).toBeLessThanOrEqual(4);
     expect(state).toHaveProperty('initialGasPositions');
     expect((state.initialGasPositions as unknown[]).length).toBeGreaterThanOrEqual(1);
-    expect((state.initialGasPositions as unknown[]).length).toBeLessThanOrEqual(2);
+    expect((state.initialGasPositions as unknown[]).length).toBe(4);
     expect((state.map as Record<string, unknown>).facilities).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'army-base-1', type: 'armyBase' }),
     ]));
     expect(state.statistics).toMatchObject({
-      initialNormalZombies: 50,
+      initialNormalZombies: 40,
       noiseRespawnAttempts: 0,
       infectedPopulationConvertedToZombies: 0,
       groundVisionBlockedHexes: 0,
@@ -438,7 +438,7 @@ describe('v1.6.0 Save Format 17', () => {
 
   it('preserves terrain, Horde Zombie target state, Final Horde group, and Victory fields', () => {
     const config = createDefaultConfig({
-      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+      economy: { initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 } },
       horde: {
         warningLeadTurns: 1,
         waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 1 }, final: true }],
@@ -463,7 +463,7 @@ describe('v1.6.0 Save Format 17', () => {
 
   it('rejects duplicate or missing Pending Wave rosters that disagree with a public Wave count', () => {
     const config = createDefaultConfig({
-      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+      economy: { initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 } },
       horde: {
         warningLeadTurns: 1,
         waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 18 }, final: true }],

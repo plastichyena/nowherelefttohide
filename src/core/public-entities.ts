@@ -350,7 +350,7 @@ export function createPublicFacilityProjection(
     zombieTargetValue: facility.owner === 'player' ? facilityZombieTargetValue(state, facility) : 0,
     infectedPopulation: facility.owner === 'player' ? facility.infected : 0,
     populationCapacity: facility.workerCapacity,
-    populationLimitKind: isCityFacility(facility) ? 'soft' : 'hard',
+    populationLimitKind: facility.type === 'capital' || facility.type === 'city' ? 'soft' : 'hard',
     populationOperational,
     populationUnavailableReason,
     inSupply,
@@ -393,7 +393,7 @@ export function createPublicFacilityProjection(
       : null,
     temporaryHousing: facility.type === 'temporaryHousing'
       ? {
-        softCapacity: facility.workerCapacity,
+        hardCapacity: facility.workerCapacity,
         totalResidents: facility.workers + facility.infected,
         occupied: facility.workers > 0,
         populationPoolEligible: populationOperational && inSupply,

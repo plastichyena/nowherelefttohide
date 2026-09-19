@@ -35,17 +35,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6.1 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.6.1';
-export const GAME_RULES_VERSION = '11.0.0';
-export const SAVE_FORMAT_VERSION = '18';
-export const AGENT_API_VERSION = '16.0.0';
-export const OBSERVATION_API_VERSION = '16.0.0';
-export const BRIDGE_API_VERSION = '16.0.0';
-export const BALANCED_AGENT_VERSION = '10.0.0';
+/** v1.6.2 rejects all earlier state and public API schemas without migration. */
+export const APP_VERSION = '1.6.2';
+export const GAME_RULES_VERSION = '12.0.0';
+export const SAVE_FORMAT_VERSION = '19';
+export const AGENT_API_VERSION = '17.0.0';
+export const OBSERVATION_API_VERSION = '17.0.0';
+export const BRIDGE_API_VERSION = '17.0.0';
+export const BALANCED_AGENT_VERSION = '11.0.0';
 export const RANDOM_AGENT_VERSION = '6.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '15.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '12.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '16.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '13.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -260,7 +260,7 @@ export interface AgentFacilityObservation {
   decommissionRefundCivilianGoods: number | null;
   /** Public semantics for city-like, soft-capacity Temporary Housing. */
   temporaryHousing: null | {
-    softCapacity: number;
+    hardCapacity: number;
     totalResidents: number;
     occupied: boolean;
     populationPoolEligible: boolean;
@@ -649,7 +649,7 @@ export interface AgentApiInfo {
       stateTransitions: string[];
       simpleFarm: { workerCapacity: number; requiredPower: number; foodPerWorker: number; playerBuildLimit: string };
       civilianDroneBase: { workerCapacity: number; requiredPower: number; visionPerWorker: number };
-      temporaryHousing: { civilianGoodsProduction: string; productionConditions: string[]; softCapacity: number; requiredPower: number; vision: number; populationLimitKind: 'soft'; recruitmentHub: false };
+      temporaryHousing: { civilianGoodsProduction: string; productionConditions: string[]; hardCapacity: number; requiredPower: number; vision: number; populationLimitKind: 'hard'; recruitmentHub: false };
       windPowerPlant: { fixedPower: number; vision: number; noiseRadius: number; zombieTargetValue: 0; emitsNoise: true; playerBuildLimit: string; supplySource: false };
     };
     strategicForecast: {

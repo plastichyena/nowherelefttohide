@@ -12,7 +12,7 @@ import { prepareTestSnapshot } from './testConfig';
 function quietConfig() {
   return createDefaultConfig({
     economy: {
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialScreamerCount: 0,
       initialHunterCount: { min: 0, max: 0 },
       initialGasCount: { min: 0, max: 0 },
       initialResources: {

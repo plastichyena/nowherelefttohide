@@ -1,4 +1,4 @@
-import { initialUnitDeployment } from './initial-deployment';
+import { initialUnitDeployment, INITIAL_CHECKPOINT_DEPLOYMENT } from './initial-deployment';
 import { isHumanUnitType, isZombieUnitType } from './unit-catalog';
 import { assertValidGameConfig, cloneConfig } from './config';
 import { hexKey } from './hex';
@@ -7,6 +7,7 @@ import {
   FIXED_MAP_ID,
   generateInitialZombiePositions,
   generateInitialHunterPositions,
+  generateInitialScreamerPositions,
 } from './map';
 import { SeededRng } from './rng';
 import { getBranchSupplyRadius, isHexSupplied } from './supply';
@@ -26,7 +27,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '11.0.0';
+export const GAME_VERSION = '12.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -48,6 +49,14 @@ function emptyDirectionValues<T>(factory: () => T): Record<CardinalDirection, T>
 
 export function isCityFacility(facility: Pick<FacilityState, 'type'>): boolean {
   return facility.type === 'capital' || facility.type === 'city' || facility.type === 'temporaryHousing';
+}
+
+export function hasHardPopulationLimit(facility: Pick<FacilityState, 'type'>): boolean {
+  return facility.type !== 'capital' && facility.type !== 'city';
+}
+
+export function populationReceptionCapacity(facility: Pick<FacilityState, 'type' | 'workers' | 'infected' | 'workerCapacity'>): number {
+  return hasHardPopulationLimit(facility) ? Math.max(0, facility.workerCapacity - facility.workers - facility.infected) : Infinity;
 }
 
 export function isProductionFacility(facility: Pick<FacilityState, 'type'>): boolean {
@@ -458,6 +467,9 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   map.initialZombiePositions = generateInitialZombiePositions(map, rng, undefined, stateConfig.units.zombie.vision);
   const initialHunterPositions = generateInitialHunterPositions(map, rng, stateConfig.economy, stateConfig.units.hunterZombie.vision);
   const initialGasPositions = generateInitialGasPositions(map, rng, initialHunterPositions, stateConfig.economy, stateConfig.units.gasZombie.vision);
+  const initialScreamerPositions = generateInitialScreamerPositions(map, rng,
+    [...initialHunterPositions, ...initialGasPositions], stateConfig.economy.initialScreamerCount,
+    stateConfig.units.screamerZombie.vision);
   let securedOrder = 0;
   const facilities = map.facilities.map((definition) =>
     facilityStateFromDefinition(
@@ -478,7 +490,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       nextArrivalTurn:
         1 + rng.nextInt(stateConfig.refugees.arrivalIntervalMin, stateConfig.refugees.arrivalIntervalMax),
       checkpointActionsThisTurn: 0,
-      activeCheckpointId: null,
+      activeCheckpointId: INITIAL_CHECKPOINT_DEPLOYMENT.find(checkpoint => checkpoint.branchId === branch.id)!.id,
       standbyCheckpointIds: [],
       currentPolicy: 'normal' as const,
       hasBuiltCheckpoint: false,
@@ -537,16 +549,22 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     units: initialUnitDeployment(map, initialHunterPositions, stateConfig.economy.initialZombieCount).map(
       (unit) => createUnit({ config: stateConfig }, unit.id, unit.type, unit.position, 'ready', unit.proficiency),
     ),
-    checkpoints: [],
+    checkpoints: INITIAL_CHECKPOINT_DEPLOYMENT.map(checkpoint => ({
+      id: checkpoint.id, position: { ...checkpoint.position }, direction: checkpoint.branchId,
+      branchId: checkpoint.branchId, status: 'operational', waiting: 0, screening: 0, approved: 0,
+      remainingTurns: 0, screeningPolicy: 'normal', infected: 0, overrunProcessed: false,
+      nextArrivalTurn: roadBranches.find(branch => branch.branchId === checkpoint.branchId)!.nextArrivalTurn,
+      grandfatheredWaiting: 0, grandfatheredPolicy: null, waitingRiskPercent: 0,
+    })),
     barbedWire: [],
     nextBarbedWireNumber: 1,
     roadBranches,
     rejectedRefugeesByDirection: emptyRejectedRefugeeCounterByDirection(),
     pendingNoisePulses: [],
     pendingUnitProductions: [],
-    nextCheckpointNumber: 1,
+    nextCheckpointNumber: 5,
     nextConstructibleFacilityNumber: 1,
-    nextUnitNumber: 2,
+    nextUnitNumber: 5,
     nextEventNumber: 1,
     nextAssignmentOrder: securedOrder + 1,
     horde: {
@@ -703,7 +721,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       hunterZombiesKilled: 0,
       housingBuilt: 0, housingResidentTurns: 0, housingCivilianGoodsProduced: 0, housingOutageFacilityTurns: 0,
       gasZombiesKilled: 0, gasZombiesSpawned: initialGasPositions.length,
-      screamerZombiesKilled: 0, screamerZombiesSpawned: 0, screamerScreams: 0,
+      screamerZombiesKilled: 0, screamerZombiesSpawned: initialScreamerPositions.length, screamerScreams: 0,
       gasExplosions: 0, gasExplosionUnitDamage: 0,
       riotPoliceReanimations: 0,
       hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0 },
@@ -715,6 +733,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     gameOver: false,
     result: null,
   };
+  state.units.push(...initialGasPositions.map((position, index) => createUnit(state, `gas-zombie-initial-${index+1}`, 'gasZombie', position)));
+  state.units.push(...initialScreamerPositions.map((position, index) => createUnit(state, `screamer-zombie-initial-${index+1}`, 'screamerZombie', position)));
   synchronizePopulation(state);
   state.population.initialPopulation = populationLedgerTotal(state);
   const coverage = getPlayerVisionCoverage(state);
@@ -727,7 +747,6 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   state.statistics.aerialDiscoveriesInGroundBlockedArea = state.units.filter((unit) =>
     !unit.isPlayerUnit && coverage.groundBlocked.has(hexKey(unit.position)) && coverage.aerialVisible.has(hexKey(unit.position)),
   ).length;
-  state.units.push(...initialGasPositions.map((position, index) => createUnit(state, `gas-zombie-initial-${index+1}`, 'gasZombie', position)));
   createCityPopulationSnapshot(state);
   return state;
 }

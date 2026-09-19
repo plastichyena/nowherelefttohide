@@ -8,7 +8,7 @@ function forecastEngine(): GameEngine {
   return new GameEngine(15420, createDefaultConfig({
     economy: {
       initialResources: { fuel: 0, civilianGoods: 10_000 },
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialScreamerCount: 0,
       initialHunterCount: { min: 0, max: 0 },
       initialGasCount: { min: 0, max: 0 },
     },

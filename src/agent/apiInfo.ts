@@ -1,3 +1,4 @@
+import { ACTION_RESPONSE_SEMANTICS, ACTION_PLAY_GUIDANCE } from './action-input';
 import { publicQueryContract } from './query-contract';
 import { BARBED_WIRE_RULES } from '../core/barbed-wire';
 import type { GameConfig } from '../core/types';
@@ -97,6 +98,8 @@ export function createAgentApiInfo(
   };
   return cloneJson({
     queryContract: publicQueryContract(),
+    responseSemantics: ACTION_RESPONSE_SEMANTICS,
+    actionPlayGuidance: ACTION_PLAY_GUIDANCE,
     appVersion: APP_VERSION,
     gameRulesVersion: GAME_RULES_VERSION,
     saveFormatVersion: SAVE_FORMAT_VERSION,
@@ -515,12 +518,12 @@ export function createAgentApiInfo(
           visionPerWorker: 2,
         },
         temporaryHousing: {
-          civilianGoodsProduction: 'floor(min(healthyResidents, softCapacity) * 0.5), rounded per facility',
-          productionConditions: ['completed', 'operational', 'in_supply', 'powered', 'zero_infected'],
-          softCapacity: config.facilities.temporaryHousing.workerCapacity,
+          civilianGoodsProduction: 'none',
+          productionConditions: [],
+          hardCapacity: config.facilities.temporaryHousing.workerCapacity,
           requiredPower: config.facilities.temporaryHousing.production.powerCapacity,
           vision: config.facilities.temporaryHousing.visionRadius,
-          populationLimitKind: 'soft',
+          populationLimitKind: 'hard',
           recruitmentHub: false,
         },
         windPowerPlant: {

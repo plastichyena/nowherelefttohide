@@ -1,3 +1,4 @@
+import { populationReceptionCapacity } from './state';
 import type { GameState, FacilityState, EndTurnForecast, MilitaryGoodsForecast, HumanUnitType, NextTurnPenaltyForecast, PowerSupplyReason, ResourceType } from './types';
 import type { ArmyBaseMilitaryGoodsProjection, FacilityProductionProjection } from './economy-types';
 import { cloneState, isCityFacility, getFacilityState } from './state';
@@ -714,7 +715,7 @@ function overcrowdingTerms(state: Readonly<GameState>): Array<{ facilityId: stri
   return state.facilities
     .filter(
       (facility) =>
-        facility.owner === 'player' && facility.status === 'owned' && isCityFacility(facility),
+        facility.owner === 'player' && facility.status === 'owned' && (facility.type === 'capital' || facility.type === 'city'),
     )
     .map((facility) => ({
       facilityId: facility.id,
@@ -761,7 +762,7 @@ function applyKnownReception(
   amount: number,
 ): boolean {
   if (amount <= 0) return true;
-  if (recipients.length === 0) return false;
+  if (amount > recipients.reduce((total, facility) => total + populationReceptionCapacity(facility), 0)) return false;
   const normalCities = recipients.filter((facility) => facility.type !== 'temporaryHousing');
   const housings = recipients.filter((facility) => facility.type === 'temporaryHousing');
   const stableOrder = new Map(recipients.map((facility, index) => [facility.id, index]));
@@ -776,7 +777,7 @@ function applyKnownReception(
     }
   }
   while (remaining > 0) {
-    const target = [...recipients].sort((left, right) => {
+    const target = [...normalCities].sort((left, right) => {
       const leftCapacity = state.config.facilities[left.type].workerCapacity;
       const rightCapacity = state.config.facilities[right.type].workerCapacity;
       const leftPopulation = left.workers + (left.type === 'temporaryHousing' ? left.infected : 0);

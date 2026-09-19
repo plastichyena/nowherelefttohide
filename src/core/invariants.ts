@@ -1,3 +1,4 @@
+import { isZombieUnitType } from './unit-catalog';
 import { validateGameConfig } from './config';
 import { hexKey, hexWithinBounds } from './hex';
 import { initialArmyBaseMatchesSeed, isHordeSpawnReserve, isRoad, validateFixedMap } from './map';
@@ -207,7 +208,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     const publicWave = publicWavesByGroupId.get(pendingWave.groupId);
     const duplicateGroupId = pendingWaveGroupIds.has(pendingWave.groupId);
     pendingWaveGroupIds.add(pendingWave.groupId);
-    if (pendingWave.roster.some((type) => !['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'].includes(type))
+    if (pendingWave.roster.some((type) => !isZombieUnitType(type))
       || duplicateGroupId
       || !publicWave
       || pendingWave.waveIndex !== publicWave?.waveIndex
@@ -530,7 +531,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (!isNonNegativeInteger(facility.workers) || !isNonNegativeInteger(facility.infected)) {
       errors.push(`Facility ${facility.id} population must be non-negative integers`);
     }
-    if (!isCityFacility(facility) && facility.workers + facility.infected > facility.workerCapacity) {
+    if (facility.type !== 'capital' && facility.type !== 'city' && facility.workers + facility.infected > facility.workerCapacity) {
       errors.push(`Facility ${facility.id} exceeds worker capacity`);
     }
     if (!Number.isSafeInteger(facility.populationOperationalTurn) || facility.populationOperationalTurn < 1) {

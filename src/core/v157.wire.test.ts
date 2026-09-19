@@ -4,7 +4,7 @@ import { createInitialState, createUnit } from './state';
 import { damageWire, recordWireAttackCharge, wireBreakCost, wireCandidates } from './barbed-wire';
 import { createUnitLifecycle } from './unit-lifecycle';
 import { SeededRng } from './rng';
-import { GameEngine } from './engine';
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { createMovement } from './movement';
 import { decodeSaveCode, encodeSaveCode } from '../persistence/save';
 
@@ -81,7 +81,7 @@ describe('v1.5.7 wall and charge accounting', () => {
   });
 
   it('uses the actual Engine combat path for four occupied-wall attacks and no fifth attack', () => {
-    const engine = new GameEngine(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } } }));
     const state = engine.getState();
     const human = state.units.find(u => u.type === 'police')!;
     human.position = { q: 25, r: 24 }; human.canAttack = false; human.attackChargesRemaining = 0;

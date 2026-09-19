@@ -1,4 +1,4 @@
-name: AI Portable Player Package v1.6.1
+name: AI Portable Player Package v1.6.2
 
 on:
   workflow_run:
@@ -47,9 +47,16 @@ jobs:
       - name: Validate checkout before assembling Player package
         run: |
           npm run typecheck
-          npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts --exclude src/agent/balancedAgent.seed198.test.ts
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts --exclude src/agent/balancedAgent.seed198.test.ts
+          fi
+          npx --no-install vitest run src/session/v162.test.ts src/session/ai-session.test.ts src/replay/package.test.ts --pool=threads --maxWorkers=2
           npm run build
           node scripts/build-portable.mjs --out=dist/portable/session-cli.mjs
+
+      - name: Verify packaging revision
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}"
 
       - name: Assemble minimal Linux Player package
         id: package
@@ -124,6 +131,9 @@ jobs:
           echo "session_root=${SESSION_ROOT}" >> "${GITHUB_OUTPUT}"
           echo "smoke_report=${REPORT}" >> "${GITHUB_OUTPUT}"
 
+      - name: Measure Session startup and compare checkout/Portable contract
+        run: node scripts/session-startup-evidence.mjs --package="${{ steps.package.outputs.package_root }}" --out="${{ runner.temp }}/session-startup-linux.json"
+
       - name: Create distributable ZIP
         shell: bash
         run: |
@@ -165,6 +175,7 @@ jobs:
           path: |
             ${{ steps.smoke.outputs.smoke_report }}
             ${{ steps.evidence.outputs.evidence }}
+            ${{ runner.temp }}/session-startup-linux.json
           if-no-files-found: error
           retention-days: 14
 
@@ -210,12 +221,21 @@ jobs:
           $env:TMPDIR = $canonicalTemp
           npm run typecheck
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts --exclude src/agent/balancedAgent.seed198.test.ts
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts --exclude src/agent/balancedAgent.seed198.test.ts
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          npx --no-install vitest run src/session/v162.test.ts src/session/ai-session.test.ts src/replay/package.test.ts --pool=threads --maxWorkers=2
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/build-portable.mjs --out=dist/portable/session-cli.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify Windows packaging revision
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD) -ne '${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}') { throw 'Packaging revision differs from verified source' }
 
       - name: Assemble minimal Windows Player package
         id: package_windows
@@ -284,6 +304,9 @@ jobs:
           "session_root=$sessionRoot" | Add-Content $env:GITHUB_OUTPUT
           "smoke_report=$report" | Add-Content $env:GITHUB_OUTPUT
 
+      - name: Measure Windows Session startup and compare checkout/Portable contract
+        run: node scripts/session-startup-evidence.mjs --package="${{ steps.package_windows.outputs.package_root }}" --out="${{ runner.temp }}/session-startup-windows.json"
+
       - name: Create Windows distributable ZIP
         shell: pwsh
         run: |
@@ -320,5 +343,6 @@ jobs:
           path: |
             ${{ steps.smoke_windows.outputs.smoke_report }}
             ${{ steps.evidence_windows.outputs.evidence }}
+            ${{ runner.temp }}/session-startup-windows.json
           if-no-files-found: error
           retention-days: 14

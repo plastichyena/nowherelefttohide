@@ -15,7 +15,7 @@ it('preserves a wall through Session resume, checkpoint branching, executable re
   api.newSession({ sessionId: 'wall', seed: 1 });
   const before = api.status('wall');
   expect(before.observation.roadBranches).toHaveLength(4);
-  expect(before.observation.roadBranches.every(b => b.activeCheckpointId === null && b.managed === false)).toBe(true);
+  expect(before.observation.roadBranches.every(b => b.activeCheckpointId !== null && b.managed === true)).toBe(true);
   expect(before.observation.availableCityPopulation).toBeGreaterThan(0);
   const candidates = api.query('wall', { target: 'construction', filters: { facilityType: 'barbedWire', legalOnly: true }, pageSize: 1 });
   const candidate = candidates.items![0] as unknown as { position: { q: number; r: number } };

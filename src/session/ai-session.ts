@@ -1,3 +1,4 @@
+import { isGameActionInput, isPlainObject, isBoundedJson, hasOnlyKeys, isSafeId } from '../agent/action-input';
 import { cloneAction, cloneJson, actionKey } from '../agent/action';
 import { checkpointSupplyExplanation } from '../agent/decision-summary';
 import { createAgentGame } from '../agent/game';
@@ -49,14 +50,6 @@ import {
  */
 
 const ZERO_HASH = '0'.repeat(64);
-const MAX_INPUT_DEPTH = 32;
-const MAX_INPUT_STRING_LENGTH = 256;
-const MAX_INPUT_ARRAY_LENGTH = 4096;
-const MAX_INPUT_KEYS = 128;
-const MAX_ACTION_JSON_LENGTH = 16_384;
-const MAX_COORDINATE = 1_000;
-const MAX_POPULATION_VALUE = 100_000;
-const SAFE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const QUERY_TARGETS = Object.keys(QUERY_FILTER_SCHEMAS) as PublicQueryTarget[];
 
 interface CursorValue {
@@ -80,140 +73,6 @@ interface NormalizedActInput {
   action: GameAction;
   decisionSummary: string | null;
   requestedCommentLocale: AiSessionCommentLocale;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  try {
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
-  } catch {
-    return false;
-  }
-}
-
-/** Keep transport inputs within the pre-existing Browser Bridge structural limits. */
-function isBoundedJson(value: unknown, depth = 0, seen = new WeakSet<object>()): value is JsonValue {
-  if (depth > MAX_INPUT_DEPTH) return false;
-  if (value === null || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value) && Math.abs(value) <= MAX_POPULATION_VALUE;
-  if (typeof value === 'string') return value.length <= MAX_INPUT_STRING_LENGTH;
-  if (!isPlainObject(value) && !Array.isArray(value)) return false;
-  if (seen.has(value)) return false;
-  seen.add(value);
-  try {
-    if (Array.isArray(value)) return value.length <= MAX_INPUT_ARRAY_LENGTH && value.every((item) => isBoundedJson(item, depth + 1, seen));
-    const entries = Object.entries(value);
-    return entries.length <= MAX_INPUT_KEYS && entries.every(([key, item]) => key.length <= MAX_INPUT_STRING_LENGTH && isBoundedJson(item, depth + 1, seen));
-  } catch {
-    return false;
-  } finally {
-    seen.delete(value);
-  }
-}
-
-function jsonLength(value: unknown): number | null {
-  try {
-    if (!isBoundedJson(value)) return null;
-    const serialized = JSON.stringify(value);
-    return typeof serialized === 'string' ? serialized.length : null;
-  } catch {
-    return null;
-  }
-}
-
-function hasOnlyKeys(value: Record<string, unknown>, required: readonly string[], optional: readonly string[] = []): boolean {
-  const allowed = new Set([...required, ...optional]);
-  return required.every((key) => Object.prototype.hasOwnProperty.call(value, key))
-    && Object.keys(value).every((key) => allowed.has(key));
-}
-
-function isSafeId(value: unknown): value is string {
-  return typeof value === 'string' && SAFE_ID_PATTERN.test(value);
-}
-
-function isCoordinate(value: unknown): value is { q: number; r: number } {
-  return isPlainObject(value)
-    && hasOnlyKeys(value, ['q', 'r'])
-    && typeof value.q === 'number' && Number.isSafeInteger(value.q) && Math.abs(value.q) <= MAX_COORDINATE
-    && typeof value.r === 'number' && Number.isSafeInteger(value.r) && Math.abs(value.r) <= MAX_COORDINATE;
-}
-
-function isNonNegativeSafeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= MAX_POPULATION_VALUE;
-}
-
-/** Structural validation is intentionally separate from AgentGame legality validation. */
-function isCurrentActionShape(value: unknown): value is GameAction {
-  if (!isPlainObject(value) || jsonLength(value) === null || jsonLength(value)! > MAX_ACTION_JSON_LENGTH) return false;
-  try {
-    switch (value.type) {
-      case 'Move':
-        return hasOnlyKeys(value, ['type', 'unitId', 'destination']) && isSafeId(value.unitId) && isCoordinate(value.destination);
-      case 'Attack':
-        return hasOnlyKeys(value, ['type', 'attackerId', 'targetId']) && isSafeId(value.attackerId) && isSafeId(value.targetId);
-      case 'Wait':
-        return hasOnlyKeys(value, ['type', 'unitId']) && isSafeId(value.unitId);
-      case 'AssignWorkers':
-        return hasOnlyKeys(value, ['type', 'facilityId', 'workers']) && isSafeId(value.facilityId) && isNonNegativeSafeInteger(value.workers);
-      case 'TransferPopulation':
-        return hasOnlyKeys(value, ['type', 'fromFacilityId', 'toFacilityId', 'people'])
-          && isSafeId(value.fromFacilityId) && isSafeId(value.toFacilityId) && isNonNegativeSafeInteger(value.people);
-      case 'SetCheckpointPolicy':
-        return hasOnlyKeys(value, ['type', 'branchId', 'policy']) && isSafeId(value.branchId)
-          && (value.policy === 'passThrough' || value.policy === 'normal' || value.policy === 'strict');
-      case 'SetPowerSupply':
-        return hasOnlyKeys(value, ['type', 'facilityId', 'enabled']) && isSafeId(value.facilityId) && typeof value.enabled === 'boolean';
-      case 'BuildBarbedWire':
-        return hasOnlyKeys(value, ['type', 'position']) && isCoordinate(value.position);
-      case 'BuildCheckpoint':
-        return hasOnlyKeys(value, ['type', 'position'], ['branchId']) && isCoordinate(value.position)
-          && (value.branchId === undefined || isSafeId(value.branchId));
-      case 'BuildConstructibleFacility':
-        return hasOnlyKeys(value, ['type', 'facilityType', 'position'])
-          && (value.facilityType === 'simpleFarm' || value.facilityType === 'civilianDroneBase' || value.facilityType === 'temporaryHousing' || value.facilityType === 'windPowerPlant')
-          && isCoordinate(value.position);
-      case 'DecommissionConstructibleFacility':
-        return hasOnlyKeys(value, ['type', 'facilityId']) && isSafeId(value.facilityId);
-      case 'RelocateCheckpoint':
-        return hasOnlyKeys(value, ['type', 'checkpointId', 'position'], ['branchId'])
-          && isSafeId(value.checkpointId) && isCoordinate(value.position)
-          && (value.branchId === undefined || isSafeId(value.branchId));
-      case 'ActivateCheckpoint':
-        return hasOnlyKeys(value, ['type', 'branchId', 'checkpointId']) && isSafeId(value.branchId) && isSafeId(value.checkpointId);
-      case 'TurnAwayCheckpointRefugees':
-        return hasOnlyKeys(value, ['type', 'checkpointId', 'count']) && isSafeId(value.checkpointId)
-          && isNonNegativeSafeInteger(value.count) && value.count >= 1;
-      case 'ProduceUnit':
-        return hasOnlyKeys(value, ['type', 'unitType'], ['destination'])
-          && (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice' || value.unitType === 'reconTeam')
-          && (value.destination === undefined || isCoordinate(value.destination));
-      case 'EndTurn':
-        return hasOnlyKeys(value, ['type']);
-      default:
-        return false;
-    }
-  } catch {
-    return false;
-  }
-}
-
-/**
- * A later Core may add an action type. Such an action remains safe here only
- * when it exactly equals a currently published legal action; malformed future
- * actions still fail before a Decision is created.
- */
-function normalizeAction(value: unknown, legalActions: readonly GameAction[]): GameAction | null {
-  if (isCurrentActionShape(value)) return cloneAction(value);
-  if (!isPlainObject(value) || jsonLength(value) === null || jsonLength(value)! > MAX_ACTION_JSON_LENGTH
-    || typeof value.type !== 'string' || value.type === 'StartNewGame' || value.type === 'LoadSnapshot') return null;
-  try {
-    const key = canonicalAiSessionJson(value);
-    const matched = legalActions.find((action) => canonicalAiSessionJson(action) === key);
-    return matched ? cloneAction(matched) : null;
-  } catch {
-    return null;
-  }
 }
 
 function normalizeComment(value: unknown): string | null | AiSessionError {
@@ -498,7 +357,7 @@ export class AiSession implements AiSessionPort {
     const revisionFailure = this.requireCurrentRevision(input.generation, input.baseRevision, true);
     if (revisionFailure) return revisionFailure;
     const legalActions = this.game.getLegalActions();
-    const action = normalizeAction(input.action, legalActions);
+    const action = isGameActionInput(input.action) ? cloneAction(input.action) : null;
     if (!action) return this.failure('invalid_action_input', 'action must be one bounded, JSON-compatible GameAction');
     const legal = legalActions.some((candidate) => actionKey(candidate) === actionKey(action));
     let projection: AiSessionPreviewResult['projection'] = {
@@ -714,8 +573,8 @@ export class AiSession implements AiSessionPort {
           case 'construction': {
             const supplied = new Set(observation.supply.suppliedTileKeys);
             items = cloneJson([
-              ...observation.checkpointPositionCandidates,
-              ...observation.constructibleFacilityPositionCandidates,
+              ...observation.checkpointPositionCandidates.map(c => ({ ...c, facilityType: 'checkpoint' as const })),
+              ...observation.constructibleFacilityPositionCandidates.map(c => ({ ...c, actionType: 'BuildConstructibleFacility' as const })),
               ...observation.barbedWireCandidates.map((candidate) => ({ ...candidate, actionType: 'BuildBarbedWire', facilityType: 'barbedWire', reasonCode: candidate.reason })),
             ].map((item) => ({ ...item, inSupply: supplied.has(`${item.position.q},${item.position.r}`), revision: this.revision }))) as unknown as JsonValue[];
             break;
@@ -750,7 +609,7 @@ export class AiSession implements AiSessionPort {
     if (typeof generation !== 'number' || !Number.isSafeInteger(generation) || generation < 1) return { code: 'invalid_request', message: 'generation must be a positive safe integer' };
     if (typeof baseRevision !== 'number' || !Number.isSafeInteger(baseRevision) || baseRevision < 0) return { code: 'invalid_request', message: 'baseRevision must be a non-negative safe integer' };
     if (!isSafeId(requestId)) return { code: 'invalid_request', message: 'requestId must use 1-128 safe ASCII characters' };
-    const action = normalizeAction(raw.action, this.game.getLegalActions());
+    const action = isGameActionInput(raw.action) ? cloneAction(raw.action) : null;
     if (!action) return { code: 'invalid_action_input', message: 'action must be one bounded, JSON-compatible GameAction' };
     const decisionSummary = normalizeComment(raw.decisionSummary);
     if (isError(decisionSummary)) return decisionSummary;

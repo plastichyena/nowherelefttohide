@@ -1,3 +1,5 @@
+import { GameEngine } from './engine';
+import { createDefaultConfig } from './config';
 import { createCityPopulationSnapshot, populationLedgerTotal, synchronizePopulation } from './state';
 import type { GameState, HordeComposition, HordeConfig } from './types';
 
@@ -40,4 +42,39 @@ export function singleFinalWave(
     hunterZombieCapPerDirection: 1,
     movementNoiseRadius: 8,
   };
+}
+
+/** Focused regression stage: two actors, six owned sites, 100 civilians and unmanaged roads. Default deployment
+ * is tested separately; this keeps combat/placement scenarios independent of it.
+ * All actions still execute through the real current GameEngine. */
+export class TwoUnitScenarioEngine extends GameEngine {
+  constructor(seed: number, config = createDefaultConfig()) {
+    super(seed, config);
+    const state = this.getState() as GameState;
+    state.units = state.units.filter(unit => !unit.isPlayerUnit || ['police-1', 'national-guard-1'].includes(unit.id));
+    state.facilities.find(facility => facility.id === 'capital')!.workers = 41;
+    for (const id of ['city-1', 'military-factory-1']) {
+      const facility = state.facilities.find(candidate => candidate.id === id)!;
+      facility.owner = 'none'; facility.status = 'unowned';
+      facility.securedOrder = null; facility.populationOperationalTurn = Number.MAX_SAFE_INTEGER;
+      facility.firstCaptureRewardClaimed = false;
+      facility.earlyCaptureSurvivorStatus = facility.workers > 0 ? 'available' : 'lost';
+    }
+    clearScenarioCheckpoints(state);
+    state.nextUnitNumber = 2;
+    prepareTestSnapshot(state, true);
+    const result = this.step({ type: 'LoadSnapshot', snapshot: state });
+    if (result.error) throw new Error(result.error.message);
+  }
+}
+
+/** Explicitly stage an unmanaged-road scenario, including branch references. */
+export function clearScenarioCheckpoints(state: GameState): void {
+  state.checkpoints = [];
+  state.nextCheckpointNumber = 1;
+  for (const branch of state.roadBranches) {
+    branch.activeCheckpointId = null;
+    branch.standbyCheckpointIds = [];
+    branch.hasBuiltCheckpoint = false;
+  }
 }

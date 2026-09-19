@@ -1,6 +1,6 @@
 {
   "name": "nowhere-left-to-hide",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "private": true,
   "description": "Nowhere Left to Hide - a mobile-first hex strategy game PoC",
   "type": "module",
@@ -15,7 +15,8 @@
     "test:browser-bridge": "vite-node --script src/testing/browser-bridge-smoke.ts",
     "test:portable": "npm run test:browser-bridge && npm run test:external-ai-e2e",
     "test:external-ai-e2e": "vite-node --script src/testing/external-ai-e2e.ts",
-    "session": "vite-node --script src/session/session-cli.ts",
+    "session": "node scripts/run-session.mjs",
+    "session:dev": "vite-node --script src/session/session-cli.ts",
     "sim": "vite-node --script src/agent/sim-cli.ts",
     "typecheck": "tsc --noEmit",
     "build:portable-session": "node scripts/build-portable.mjs"

@@ -1351,6 +1351,7 @@ export interface EconomyConfig {
   initialHunterCount: { min: number; max: number };
   initialHunterMinDistance: number;
   initialGasCount: { min: number; max: number };
+  initialScreamerCount: number;
   initialGasMinDistance: number;
   populationConsumption: {
     food: number;

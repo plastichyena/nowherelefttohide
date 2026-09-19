@@ -1,3 +1,4 @@
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
 import {
@@ -5,7 +6,6 @@ import {
   forecastEndTurn,
   forecastFacilityProduction,
   forecastUnitRefills,
-  GameEngine,
   getConstructibleFacilityPositionCandidates,
   previewMove,
   unitMoveFuelCost,
@@ -24,7 +24,7 @@ function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): 
   return createDefaultConfig({
     horde: singleFinalWave(100),
     economy: {
-      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
+      initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: {
         food: 100_000,
         civilianGoods: 100_000,

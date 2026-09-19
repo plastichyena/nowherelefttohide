@@ -425,6 +425,17 @@ function scoreAction(
         }
         need = Math.max(need, 5);
       }
+      // Repair production before a stockpile reaches zero, using only public
+      // demand and output rates (including the effect of lost workers).
+      for (const [resource, output] of Object.entries(facility.production.outputsPerWorker)) {
+        const forecast = observation.strategicForecast.resources[resource as keyof typeof observation.strategicForecast.resources];
+        const runway = forecast?.runway.current;
+        if (!runway || !output || (runway.estimatedShortageTurn ?? Infinity) > 4 || (runway.netBurn ?? 0) <= 0) continue;
+        targetWorkers = Math.max(targetWorkers, Math.min(facility.populationCapacity,
+          facility.healthyPopulation + Math.ceil(runway.netBurn! / output)));
+        need = Math.max(need, 6);
+        if (delta > 0) reasonCodes.push('RESTORE_WORKERS_BEFORE_RUNWAY_EXHAUSTION');
+      }
       const beforeGap = Math.abs(facility.healthyPopulation - targetWorkers);
       const afterGap = Math.abs(action.workers - targetWorkers);
       const capital = observation.facilities.find((candidate) => candidate.type === 'capital' && candidate.owner === 'player');
@@ -511,7 +522,7 @@ function scoreAction(
     const to = facilities.get(action.toFacilityId);
     if (from && to) {
       const fromExcess = Math.max(0, from.healthyPopulation - from.populationCapacity);
-      const toRoom = Math.max(0, to.populationCapacity - to.healthyPopulation);
+      const toRoom = Math.max(0, to.populationCapacity - to.healthyPopulation - (to.type === 'temporaryHousing' ? to.infectedPopulation : 0));
       const relief = Math.min(action.people, fromExcess, toRoom);
       score += relief * weights.overcrowdingRelief;
       if (relief > 0) reasonCodes.push('RELIEVE_OVERCROWDING');
@@ -972,6 +983,16 @@ function scoreAction(
     }
   } else if (action.type === 'SetCheckpointPolicy') {
     const branch = branchFor(observation, action.branchId);
+    const intakeRisk = ['food', 'civilianGoods'].some(resource => {
+      const runway = observation.strategicForecast.resources[resource as 'food' | 'civilianGoods'].runway.current;
+      return runway.nextEndTurnShortage || (runway.estimatedShortageTurn ?? Infinity) <= 2;
+    });
+    if (intakeRisk || guaranteedDefeat) {
+      if (action.policy === 'deny') score += guaranteedDefeat ? 4_000 : 900;
+      else if (action.policy === 'normal' && branch?.currentPolicy === 'passThrough') score += 350;
+      else if (action.policy === 'passThrough') score -= 3_000;
+      reasonCodes.push('LIMIT_INTAKE_TO_RESOURCE_RUNWAY');
+    }
     if (action.policy === 'strict' && observation.population.healthyCivilians > 30) score += 55;
     if (action.policy === 'passThrough' && observation.population.healthyCivilians < 25) score += 50;
     if (action.policy === 'normal') score += 25;
@@ -1006,6 +1027,7 @@ function scoreAction(
       const severeQueue = checkpoint.queuePressureClass === 'high' || checkpoint.queuePressureClass === 'medium';
       score += maintenanceShortage > 0 ? 240 + Math.min(120, action.count * 5) : severeQueue ? 45 : -180;
       if (maintenanceShortage > 0) reasonCodes.push('TURN_AWAY_TO_AVOID_MAINTENANCE_SHORTAGE');
+      if (guaranteedDefeat && maintenanceShortage > 0) score += 4_000 + Math.min(maintenanceShortage, action.count) * 50;
       if (severeQueue) reasonCodes.push('RELIEVE_CHECKPOINT_QUEUE_PRESSURE');
       if (observation.horde.finalHordeStatus === 'notStarted') {
         score -= Math.ceil(action.count / 5) * (observation.horde.warningType === 'none' ? 35 : 80);
@@ -1034,6 +1056,28 @@ function scoreAction(
     reasonCodes.push('END_TURN_WHEN_SETTLED');
   }
 
+  if (!guaranteedDefeat && (action.type === 'Move' || action.type === 'Wait')) {
+    const unit = units.get(action.unitId);
+    if (unit) {
+      const destination = action.type === 'Move' ? action.destination : unit.position;
+      const capital = observation.facilities.find(f => f.type === 'capital' && f.owner === 'player');
+      if (capital && capital.infectedPopulation > 0 && hexDistance(destination, capital.position) === 0
+        && unit.attackChargesRemaining > 0 && unit.currentMilitaryGoods > 0) {
+        const safeSuppressor = unit.type === 'police' || unit.type === 'riotPolice';
+        score += safeSuppressor ? 6_000 : 800;
+        reasonCodes.push(safeSuppressor ? 'CAPITAL_ZERO_CIVILIAN_DAMAGE_SUPPRESSION' : 'CAPITAL_EMERGENCY_SUPPRESSION');
+      }
+      for (const site of ownedOperationalFacilities(observation).filter(f => isCriticalFacility(f.id, observation))) {
+        if (!observation.zombies.some(z => hexDistance(z.position, site.position) <= z.movement + 3)) continue;
+        const defenders = observation.units.filter(u => hexDistance(u.position, site.position) <= 2)
+          .sort((a, b) => hexDistance(a.position, site.position) - hexDistance(b.position, site.position) || a.id.localeCompare(b.id));
+        if (defenders.length === 1 && defenders[0]!.id === unit.id) {
+          if (hexDistance(destination, site.position) > 2) { score -= 5_000; reasonCodes.push('RETAIN_CRITICAL_SITE_DEFENDER'); }
+          else if (action.type === 'Wait') { score += 700; reasonCodes.push('HOLD_CRITICAL_SITE_DEFENSE'); }
+        }
+      }
+    }
+  }
   if (goal !== 'end_turn' && action.type !== 'EndTurn' && reasonCodes.length > 0) score += weights.goal[goal] * 0.05;
   return { action: cloneAction(action), score: Math.round(score * 100) / 100, reasonCodes };
 }

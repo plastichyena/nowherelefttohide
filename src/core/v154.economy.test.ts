@@ -14,14 +14,18 @@ import type { FacilityState, GameState, HexCoord } from './types';
 
 const config = () => createDefaultConfig({
   economy: {
-    initialZombieCount: 0,
+    initialZombieCount: 0, initialScreamerCount: 0,
     initialHunterCount: { min: 0, max: 0 },
     initialGasCount: { min: 0, max: 0 },
   },
 });
 
 function setup(): GameState {
-  return createInitialState(15401, config());
+  const state = createInitialState(15401, config());
+  const city = state.facilities.find(facility => facility.id === 'city-1')!;
+  city.owner = 'none'; city.status = 'unowned'; city.populationOperationalTurn = Number.MAX_SAFE_INTEGER;
+  createCityPopulationSnapshot(state);
+  return state;
 }
 
 function facility(state: GameState, id: string): FacilityState {
@@ -117,15 +121,15 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     const state = setup();
     isolatePowerScenario(state);
     const capital = facility(state, 'capital');
-    Object.assign(capital, { workers: capital.workerCapacity, operationalStatus: 'operational' });
-    const housing = addHousing(state, 'housing-overcrowded', capital.position, 20);
+    Object.assign(capital, { workers: capital.workerCapacity * 2, operationalStatus: 'operational' });
+    const housing = addHousing(state, 'housing-at-capacity', capital.position, 10);
     synchronizePopulation(state);
 
     const forecast = forecastEndTurn(state);
     const normalFood = forecast.populationConsumers * state.config.economy.populationConsumption.food;
     const normalCivilian = forecast.populationConsumers * state.config.economy.populationConsumption.civilianGoods;
     expect(forecast.overcrowding).toMatchObject({
-      cities: [{ facilityId: housing.id, excess: 10, softCap: 10 }],
+      cities: [{ facilityId: capital.id, excess: 100, softCap: 100 }],
       additionalFood: normalFood,
       additionalCivilianGoods: normalCivilian,
     });
@@ -139,6 +143,7 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     expect(forecast.food.maintenanceRequired).toBe(normalFood + normalFood + Math.ceil(normalFood / 100));
     expect(forecast.civilianGoods.maintenanceRequired).toBe(normalCivilian + normalCivilian + Math.ceil(normalCivilian / 100));
 
+    housing.workers = 9;
     housing.infected = 1;
     housing.operationalStatus = 'infected';
     expect(forecastEndTurn(state).housingOutage).toMatchObject({
@@ -264,7 +269,9 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     isolatePowerScenario(state);
     const capital = facility(state, 'capital');
     Object.assign(capital, { workers: capital.workerCapacity, operationalStatus: 'operational' });
-    const housing = addHousing(state, 'housing-public', { q: 0, r: 0 }, 20);
+    capital.workers = capital.workerCapacity + 10;
+    state.resources.food = 10000; state.resources.civilianGoods = 10000;
+    const housing = addHousing(state, 'housing-public', { q: 0, r: 0 }, 10);
     synchronizePopulation(state);
     registerCommittedState(state);
     const first = forecastNextTurnPenalties(state);
@@ -278,6 +285,7 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
 
     // A fresh committed State revision drops both warnings immediately.
     housing.workers = 0;
+    capital.workers = capital.workerCapacity;
     registerCommittedState(state);
     expect(deriveCrisisSummary(state).map((entry) => entry.reasonCode)).not.toEqual(expect.arrayContaining([
       'overcrowding_forecast',

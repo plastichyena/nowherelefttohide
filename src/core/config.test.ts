@@ -8,16 +8,16 @@ import {
 describe('v1.6 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('11.0.0');
-    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v6');
+    expect(DEFAULT_CONFIG.version).toBe('12.0.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v7');
     expect(DEFAULT_CONFIG.economy.initialRefineryAllowance).toBe(2_000);
     expect(DEFAULT_CONFIG.economy.oilFieldAllowancePerWorker).toBe(100);
-    expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(50);
+    expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(40);
     expect(DEFAULT_CONFIG.economy.initialResources).toMatchObject({
-      food: 230,
-      civilianGoods: 255,
-      militaryGoods: 75,
-      fuel: 92,
+      food: 330,
+      civilianGoods: 355,
+      militaryGoods: 175,
+      fuel: 192,
     });
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(15);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, outputs: { food: 10 }, powerMode: 'required' });
@@ -44,7 +44,7 @@ describe('v1.6 GameConfig', () => {
       screeningCapacity: 20,
     });
     expect(DEFAULT_CONFIG.checkpoint).toMatchObject({
-      constructionCivilianGoods: 5,
+      constructionCivilianGoods: 25,
       subsequentConstructionCivilianGoods: 25,
       relocationCivilianGoods: 25,
       maxPreparedPostsPerDirection: 5,
@@ -94,7 +94,7 @@ describe('v1.6 GameConfig', () => {
       civilianDroneBase: { workerCapacity: 5, buildCivilianGoods: 50, visionRadius: 15 },
     });
     expect(DEFAULT_CONFIG.economy.initialWorkersByFacility).toMatchObject({
-      capital: 41,
+      capital: 51,
       'farm-1': 23,
       'civilian-factory-1': 23,
       'refinery-1': 10,
@@ -121,14 +121,14 @@ describe('v1.6 GameConfig', () => {
     expect(config.horde.waves).toEqual(DEFAULT_CONFIG.horde.waves);
 
     config.economy.initialResources.food = 0;
-    expect(DEFAULT_CONFIG.economy.initialResources.food).toBe(230);
+    expect(DEFAULT_CONFIG.economy.initialResources.food).toBe(330);
 
     config.horde.waves[4]!.compositionPerDirection.zombie = 99;
     expect(DEFAULT_CONFIG.horde.waves[4]!.compositionPerDirection.zombie).toBe(8);
   });
 
   it('accepts zero initial Zombies but rejects more than the 50 fixed-map positions', () => {
-    expect(validateGameConfig(createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }))).toEqual({
+    expect(validateGameConfig(createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }))).toEqual({
       valid: true,
       errors: [],
     });

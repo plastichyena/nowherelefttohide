@@ -10,8 +10,8 @@ import type { GameAction, GameState } from './types';
 it('rejects the actual Random 69 unseen-wall build without leaking wall existence or changing state', () => {
   const seed = 69;
   const initial = createInitialState(seed, createDefaultConfig({
-    economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
-    units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
+    economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
+    units: { police: { vision: 0 }, nationalGuard: { vision: 0 }, riotPolice: { vision: 0 }, reconTeam: { vision: 0 } },
     vision: { capital: 0, ownedFacility: 0, operationalCheckpoint: 0 },
   }));
   const hidden = initial.map.tiles.find((tile) => validateAction(initial, {

@@ -1,3 +1,4 @@
+import { populationReceptionCapacity } from './state';
 import { stableFacilities, eligibleSnapshotCities, availableSupplyPopulation, calculateEconomyPlan, forecastEndTurn, forecastUnitRefills, forecastFacilityProduction, forecastNextTurnPenalties } from './economy-query';
 export { forecastEndTurn, forecastUnitRefills, forecastFacilityProduction, forecastProductionCapacity, forecastNextTurnPenalties } from './economy-query';
 import { getUnitLegalAttackProjections, forecastUnitSuppression, infectedSuppressionTarget } from './combat-query';
@@ -416,7 +417,7 @@ function withdrawFromSupplyCities(state: GameState, amount: number): Array<{ fac
 
 function distributeToReceptionCities(state: GameState, amount: number): Array<{ facilityId: string; people: number }> | null {
   const cities = eligibleSnapshotCities(state, 'reception');
-  if (amount > 0 && cities.length === 0) return null;
+  if (amount > cities.reduce((total, city) => total + populationReceptionCapacity(city), 0)) return null;
   let remaining = amount;
   const assigned = new Map<string, number>();
   const permanentCities = cities.filter((city) => city.type === 'capital' || city.type === 'city');
@@ -431,7 +432,7 @@ function distributeToReceptionCities(state: GameState, amount: number): Array<{ 
     if (remaining === 0) break;
   }
   while (remaining > 0) {
-    const city = cities.reduce((best, candidate) => {
+    const city = permanentCities.reduce((best, candidate) => {
       const candidateCap = state.config.facilities[candidate.type].workerCapacity;
       const bestCap = state.config.facilities[best.type].workerCapacity;
       const candidateOccupancy = candidate.workers + (candidate.type === 'temporaryHousing' ? candidate.infected : 0);
@@ -2969,7 +2970,7 @@ function validateAssignWorkers(state: Readonly<GameState>, action: Extract<GameA
       return error(action, 'insufficient_city_population', 'Eligible cities cannot supply enough population');
     }
   } else {
-    if (eligibleSnapshotCities(state, 'reception').length === 0) {
+    if (-difference > eligibleSnapshotCities(state, 'reception').reduce((total, city) => total + populationReceptionCapacity(city), 0)) {
       return error(action, 'no_safe_return_city', 'No eligible safe city can receive withdrawn workers');
     }
   }
@@ -3018,6 +3019,9 @@ function validateTransferPopulation(
   if (from.workers < action.people) {
     return error(action, 'insufficient_city_population', 'The source city does not have enough residents');
   }
+  if (action.people > populationReceptionCapacity(to)) {
+    return error(action, 'population_capacity_exceeded', 'Temporary Housing has a hard limit including infected residents');
+  }
   return { from, to };
 }
 
@@ -3051,7 +3055,7 @@ export function populationTransferCandidates(state: Readonly<GameState>) {
   return cities.flatMap(from => cities.filter(to => to.id !== from.id).map(to => {
     const result = validateTransferPopulation(state, { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 });
     const reason = 'code' in result ? result.code : null;
-    return { fromFacilityId: from.id, toFacilityId: to.id, fromReason: populationCityReason(state, from) ?? (from.workers <= 0 ? 'insufficient_city_population' : null), toReason: populationCityReason(state, to), actionBudgetReason: playerActionBudgetError(state, { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 })?.code ?? null, min: reason ? null : 1, max: reason ? null : from.workers, integerOnly: true as const, legal: reason === null, reason, constraints: ['turn_start_snapshot', 'safe_city', 'action_budget', 'source_healthy_residents'] };
+    return { fromFacilityId: from.id, toFacilityId: to.id, fromReason: populationCityReason(state, from) ?? (from.workers <= 0 ? 'insufficient_city_population' : null), toReason: populationCityReason(state, to), actionBudgetReason: playerActionBudgetError(state, { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 })?.code ?? null, min: reason ? null : 1, max: reason ? null : Math.min(from.workers, populationReceptionCapacity(to)), integerOnly: true as const, legal: reason === null, reason, constraints: ['turn_start_snapshot', 'safe_city', 'action_budget', 'source_healthy_residents'] };
   }));
 }
 
@@ -3179,10 +3183,7 @@ function validateCheckpointDestination(
 }
 
 export function getCheckpointBuildCost(state: Readonly<GameState>, branchId: string): number {
-  const branch = getRoadBranchState(state, branchId);
-  return branch?.hasBuiltCheckpoint
-    ? state.config.checkpoint.subsequentConstructionCivilianGoods
-    : state.config.checkpoint.constructionCivilianGoods;
+  return state.config.checkpoint.constructionCivilianGoods;
 }
 
 function validateBuildCheckpointAction(
@@ -4345,7 +4346,7 @@ export class GameEngine implements HeadlessGame {
     }
     const suppliedKeys = new Set(getSuppliedTileKeys(this.state));
     const supplyPopulationAvailable = availableSupplyPopulation(this.state);
-    const receptionCitiesAvailable = eligibleSnapshotCities(this.state, 'reception').length > 0;
+    const receptionCapacity = eligibleSnapshotCities(this.state, 'reception').reduce((total, city) => total + populationReceptionCapacity(city), 0);
     const visibleEnemies = getVisibleEnemyUnits(this.state);
     for (const unit of this.state.units.filter((candidate) => candidate.isPlayerUnit).sort((a, b) => a.id.localeCompare(b.id))) {
       if (unit.actionState !== 'acted') {
@@ -4377,7 +4378,7 @@ export class GameEngine implements HeadlessGame {
       for (let workers = 0; workers <= maximum; workers += 1) {
         if (
           workers !== facility.workers &&
-          (workers > facility.workers || receptionCitiesAvailable) &&
+          (workers > facility.workers || facility.workers - workers <= receptionCapacity) &&
           (workers < facility.workers || suppliedKeys.has(hexKey(facility.position)))
         ) actions.push({ type: 'AssignWorkers', facilityId: facility.id, workers });
       }
@@ -4393,13 +4394,15 @@ export class GameEngine implements HeadlessGame {
       if (from.workers <= 0) continue;
       for (const to of cities) {
         if (from.id === to.id) continue;
+        const maximum = Math.min(from.workers, populationReceptionCapacity(to));
+        if (maximum <= 0) continue;
         actions.push({ type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 });
-        if (from.workers > 1) {
+        if (maximum > 1) {
           actions.push({
             type: 'TransferPopulation',
             fromFacilityId: from.id,
             toFacilityId: to.id,
-            people: from.workers,
+            people: maximum,
           });
         }
       }

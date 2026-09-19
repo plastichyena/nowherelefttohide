@@ -4,7 +4,7 @@ import { createDefaultConfig } from '../core/config';
 import { createAgentObservation } from './observation';
 import { deriveCombatHazards, deriveImportantChanges, summarizeImportantChanges } from './decision-summary';
 import { QUERY_FILTER_SCHEMAS, publicQueryContract, validateQuerySchema } from './query-contract';
-import { GameEngine } from '../core/engine';
+import { TwoUnitScenarioEngine as GameEngine } from '../core/testConfig';
 
 it('reports actual forward expansion and rear standby coverage from accepted Core actions', () => {
   const engine = new GameEngine(1, createDefaultConfig({ vision: { capital: 50 } }));

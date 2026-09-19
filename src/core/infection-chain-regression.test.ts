@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixture from '../testing/fixtures/v155-random-seed3-actions.json';
-import { GameEngine } from './engine';
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { createDefaultConfig } from './config';
 import { validateInvariants } from './invariants';
 import { populationLedgerTotal } from './state';

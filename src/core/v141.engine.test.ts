@@ -1,3 +1,4 @@
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
 import {
@@ -5,7 +6,6 @@ import {
   forecastUnitCombatAtDistance,
   getUnitLegalAttackProjections,
   getUnitLegalMoveFuelProjections,
-  GameEngine,
   previewMove,
 } from './engine';
 import { hexNeighbors, hexWithinBounds } from './hex';
@@ -27,7 +27,7 @@ function quietEngine(seed = 1): GameEngine {
   return new GameEngine(seed, createDefaultConfig({
     horde: singleFinalWave(30),
     economy: {
-      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
+      initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 10_000, civilianGoods: 10_000, militaryGoods: 10_000, fuel: 10_000 },
     },
   }));

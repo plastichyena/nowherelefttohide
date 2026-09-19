@@ -10,6 +10,7 @@ export interface ImportantChange {
   relatedEventIds: string[];
   relatedEventTypes: string[];
   consequences: string[];
+  facilityPopulationChange?: import('./facility-changes').FacilityPopulationChange;
 }
 export interface ChangeDecision { decision: number; changes: readonly ImportantChange[] }
 const severity = { critical: 0, warning: 1, advisory: 2 };
@@ -51,6 +52,10 @@ export function deriveImportantChanges(before: AgentObservation, after: AgentObs
       }
     }
     add(`facility:${change.facilityId}`, 'facility', lost ? 'critical' : current && current.infectedPopulation > (old?.infectedPopulation ?? 0) ? 'warning' : 'advisory', [change.facilityId], reasons, consequences);
+    if (change.populationLoss) {
+      changes.at(-1)!.facilityPopulationChange = change.populationLoss;
+      changes.at(-1)!.severity = lost ? 'critical' : 'warning';
+    }
   }
   for (const old of before.units) {
     const current = after.units.find(u => u.id === old.id);
@@ -82,14 +87,16 @@ export function deriveImportantChanges(before: AgentObservation, after: AgentObs
 export function summarizeImportantChanges(records: Iterable<ChangeDecision>, fromDecision: number, toDecision: number, revision: number) {
   let totalCount = 0;
   let items: Array<ImportantChange & { decision: number }> = [];
+  const facilityChanges: Array<import('./facility-changes').FacilityPopulationChange & { decision: number }> = [];
   for (const record of records) {
+    for (const change of record.changes) if (change.facilityPopulationChange) facilityChanges.push({ ...change.facilityPopulationChange, decision: record.decision });
     totalCount += record.changes.length;
     items.push(...record.changes.map(change => ({ ...change, decision: record.decision })));
     items.sort((a, b) => severity[a.severity] - severity[b.severity] || b.decision - a.decision || a.id.localeCompare(b.id));
     items = items.slice(0, 10);
   }
   const detailQuery = { target: 'history', expectedRevision: revision, filters: { fromDecision, toDecision } };
-  return { items: items.map(item => {
+  return { facilityChanges, items: items.map(item => {
     const { entityIds, reasonCodes, relatedEventIds, relatedEventTypes, consequences, ...rest } = item;
     const arrays = { entityIds, reasonCodes, relatedEventIds, relatedEventTypes, consequences };
     return { ...rest, ...Object.fromEntries(Object.entries(arrays).map(([key, value]) => [key, value.slice(0, 10)])) as typeof arrays,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
-import { GameEngine } from './engine';
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { createInitialState, createUnit, populationLedgerTotal, synchronizePopulation } from './state';
 import type { GameState } from './types';
 import { prepareTestSnapshot } from './testConfig';
@@ -10,7 +10,7 @@ type MutableState = GameState;
 function quietConfig() {
   return createDefaultConfig({
     economy: {
-      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
+      initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 10_000, civilianGoods: 10_000, militaryGoods: 10_000, fuel: 10_000 },
     },
     refugees: {
@@ -45,13 +45,13 @@ function rebalance(state: MutableState): void {
 
 describe('v1.5.1 Human Unit progression and Riot defaults', () => {
   it('creates regular initial units, recruit production data, Riot Police, and the configured mixed-Horde rule', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } });
+    const config = createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } });
     const state = createInitialState(15001, config);
     const police = state.units.find((unit) => unit.type === 'police')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
 
-    expect(state.gameVersion).toBe('11.0.0');
-    expect(config.version).toBe('11.0.0');
+    expect(state.gameVersion).toBe('12.0.0');
+    expect(config.version).toBe('12.0.0');
     expect(police).toMatchObject({
       proficiency: 'regular', recruitSurvivalTurns: 0, regularZombieKills: 0,
       veteranPromotionPending: false, attack: 8, maxAttackCharges: 1, attackChargesRemaining: 1,
@@ -274,7 +274,7 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
 
   it('fills scheduled Horde Zombie slots deterministically and applies the per-direction Riot cap', () => {
     const config = createDefaultConfig({
-      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+      economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: {
         waves: [{
           turn: 1,

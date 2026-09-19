@@ -426,16 +426,9 @@ export class AgentGameAdapter implements AgentGame {
   }
 
   public getObservation(): AgentObservation {
-    const observation = cloneJson(this.currentObservation());
-    observation.crisisSummary.alerts = observation.crisisSummary.alerts.map((entry) => ({
-      ...entry,
-      sourceRevision: this.decisionCount,
-    }));
-    observation.endTurnRisk.criticalAlerts = observation.endTurnRisk.criticalAlerts.map((entry) => ({
-      ...entry,
-      sourceRevision: this.decisionCount,
-    }));
-    return observation;
+    // Rejected Decisions leave the committed Core observation unchanged.
+    // Session transports pin sourceRevision to their own revision on output.
+    return cloneJson(this.currentObservation());
   }
 
   private currentObservation(): AgentObservation {

@@ -56,11 +56,11 @@ describe('UI action projection', () => {
   it('projects location-based population totals without legacy pools', () => {
     const engine = new GameEngine(9, createDefaultConfig());
     const population = populationLocationTotals(engine.getState());
-    expect(population.cityResidents).toBe(41);
+    expect(population.cityResidents).toBe(51);
     expect(population.productionWorkers).toBe(59);
-    expect(population.healthyCivilians).toBe(100);
-    expect(population.unitPopulation).toBe(15);
-    expect(population.total).toBe(115);
+    expect(population.healthyCivilians).toBe(110);
+    expect(population.unitPopulation).toBe(45);
+    expect(population.total).toBe(155);
   });
 
   it('finds a city transfer only as the exact atomic GameAction', () => {
@@ -86,7 +86,7 @@ describe('UI action projection', () => {
     const projection = projectCityTransfer(state, 'capital', destination.id, 1, currentForecast);
 
     expect(projection).not.toBeNull();
-    expect(projection!.fromAfter).toBe(40);
+    expect(projection!.fromAfter).toBe(50);
     expect(projection!.toAfter).toBe(1);
     expect(projection!.forecast.populationConsumers).toBe(currentForecast.populationConsumers);
     // A newly populated City becomes an active required-power consumer. The

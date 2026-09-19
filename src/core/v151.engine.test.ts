@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig, validateGameConfig } from './config';
-import { GameEngine } from './engine';
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { hexDistance, hexKey } from './hex';
 import { ARMY_BASE_CANDIDATES, generateInitialHunterPositions, generateInitialZombiePositions, initialHunterPositionsMatchSeed } from './map';
 import { SeededRng } from './rng';
@@ -12,7 +12,7 @@ import { prepareTestSnapshot } from './testConfig';
 
 function quiet() {
   return createDefaultConfig({
-    economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialResources: { food: 10000, civilianGoods: 10000, fuel: 10000, militaryGoods: 10000 } },
+    economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialResources: { food: 10000, civilianGoods: 10000, fuel: 10000, militaryGoods: 10000 } },
     refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 },
     horde: { waves: [{ turn: 100, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
   });
@@ -56,7 +56,7 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
       rng.nextInt(0, ARMY_BASE_CANDIDATES.length - 1);
       expect(generateInitialZombiePositions(state.map, rng)).toEqual(state.map.initialZombiePositions);
       expect(generateInitialHunterPositions(state.map, rng, state.config.economy)).toEqual(state.initialHunterPositions);
-      expect(state.units.filter((unit) => unit.type === 'zombie')).toHaveLength(50);
+      expect(state.units.filter((unit) => unit.type === 'zombie')).toHaveLength(40);
       expect(state.initialHunterPositions.length).toBeGreaterThanOrEqual(1);
       expect(state.initialHunterPositions.length).toBeLessThanOrEqual(4);
       expect(initialHunterPositionsMatchSeed(state)).toBe(true);

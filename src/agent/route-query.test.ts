@@ -232,7 +232,7 @@ describe('public route query', () => {
   it('is unchanged when private enemy positions change outside public vision', () => {
     const state = createInitialState(15715, createDefaultConfig());
     const visible = getPlayerVisibleTileKeys(state);
-    const enemy = state.units.find((unit) => !unit.isPlayerUnit)!;
+    const enemy = state.units.find((unit) => !unit.isPlayerUnit && !visible.has(hexKey(unit.position)))!;
     const occupied = new Set(state.units.map((unit) => hexKey(unit.position)));
     const replacement = state.map.tiles.find((tile) =>
       tile.movementCost !== null && !visible.has(tile.key) && !occupied.has(tile.key))!;

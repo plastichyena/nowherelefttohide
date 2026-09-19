@@ -188,6 +188,14 @@ function commandSmoke(launcher, root) {
   assert(created.session?.preferredCommentLocale === 'ja', 'new command did not preserve preferredCommentLocale');
   statusView(invokeJson(launcher, ['status', ...sessionArgs(root, session)], { label: 'status command smoke' }), 'status command smoke');
 
+  const malformedPath = join(root, 'malformed-produce-unit.json');
+  writeUniqueJson(malformedPath, { type: 'ProduceUnit', facilityId: 'capital', unitType: 'police' });
+  const malformed = invokeLauncher(launcher, ['preview', ...sessionArgs(root, session), '--revision', '0', '--input', malformedPath], { allowFailure: true });
+  assert(malformed.status !== 0, 'malformed preview must fail before Core');
+  assert(parseJson(malformed.stderr.trim(), 'malformed preview').code === 'invalid_action_input', 'malformed preview returned the wrong error');
+  const afterMalformed = statusView(invokeJson(launcher, ['status', ...sessionArgs(root, session)]), 'status after malformed preview');
+  assert(afterMalformed.revision === 0 && sha256(afterMalformed.observation) === sha256(created.observation), 'malformed preview changed Session state');
+
   const snapshot = fullSnapshot(launcher, root, session, created.revision);
   const endTurn = endTurnAction(snapshot, 'command smoke');
   const previewInputPath = join(root, 'command-preview-action.json');
@@ -253,6 +261,7 @@ function commandSmoke(launcher, root) {
   return {
     commandCount: COMMANDS.length,
     commands: COMMANDS,
+    malformedPreviewRejectedWithoutMutation: true,
     checkpointId,
     branchArtifact,
     finitePlan: { sessionId: finiteSession, revision: finiteResumed.revision },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
-import { GameEngine } from './engine';
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { hexDistance, hexKey, hexNeighbors, hexWithinBounds } from './hex';
 import { getTile } from './map';
 import { createInitialState, createUnit, populationLedgerTotal, synchronizePopulation } from './state';
@@ -17,7 +17,7 @@ function quietConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}):
   return createDefaultConfig({
     horde: singleFinalWave(100),
     economy: {
-      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
+      initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 100_000, civilianGoods: 100_000, militaryGoods: 100_000, fuel: 100_000 },
     },
     refugees: {
@@ -78,16 +78,16 @@ function movePlayersAway(state: MutableState): void {
 }
 
 describe('v1.5.1 Core version, map, and initial state', () => {
-  it('creates a v11.0.0 state on fixed-51x51-v6 with all 50 initial Normal Zombies', () => {
+  it('creates a v11.0.0 state on fixed-51x51-v7 with all 40 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('11.0.0');
-    expect(state.mapId).toBe('fixed-51x51-v6');
-    expect(state.map.id).toBe('fixed-51x51-v6');
+    expect(state.gameVersion).toBe('12.0.0');
+    expect(state.mapId).toBe('fixed-51x51-v7');
+    expect(state.map.id).toBe('fixed-51x51-v7');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');
-    expect(zombies).toHaveLength(50);
-    expect(zombies.map((unit) => unit.position)).toEqual(state.map.initialZombiePositions);
+    expect(zombies).toHaveLength(40);
+    expect(zombies.map((unit) => unit.position)).toEqual(state.map.initialZombiePositions.slice(0, 40));
     expect(zombies.every((unit) => unit.hordeKind === null && unit.spawnGroupId === null)).toBe(true);
-    expect(state.statistics.initialNormalZombies).toBe(50);
+    expect(state.statistics.initialNormalZombies).toBe(40);
     expect(state.horde.totalSpawned).toBe(0);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
-import { forecastEndTurn, forecastFacilityProduction, GameEngine } from './engine';
-import { prepareTestSnapshot } from './testConfig';
+import { forecastEndTurn, forecastFacilityProduction } from './engine';
+import { TwoUnitScenarioEngine as GameEngine, prepareTestSnapshot } from './testConfig';
 import type { GameState } from './types';
 
 function editableState(engine: GameEngine): GameState {
@@ -24,7 +24,7 @@ function disableWindInEngine(engine: GameEngine): void {
 
 describe('v1.4.2 economy and required power grid', () => {
   it('uses Fuel only for actual required-power allocations', () => {
-    const engine = new GameEngine(127, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(127, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     disableWindInEngine(engine);
     const forecast = forecastEndTurn(engine.getState());
     expect(forecast.electricity).toMatchObject({
@@ -39,7 +39,7 @@ describe('v1.4.2 economy and required power grid', () => {
   });
 
   it('never chains same-turn Refinery Fuel into generation and uses only the one starting Fuel for refill', () => {
-    const engine = new GameEngine(128, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(128, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = editableState(engine);
     state.resources.fuel = 1;
     state.units.filter((unit) => unit.isPlayerUnit).forEach((unit) => { unit.currentFuel = 0; });
@@ -54,7 +54,7 @@ describe('v1.4.2 economy and required power grid', () => {
   });
 
   it('reserves starting Civilian Goods for maintenance and only then feeds Military Factories', () => {
-    const engine = new GameEngine(129, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(129, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = editableState(engine);
     disableWind(state);
     const military = state.facilities.find((facility) => facility.id === 'military-factory-1')!;
@@ -88,7 +88,7 @@ describe('v1.4.2 economy and required power grid', () => {
   });
 
   it('allocates required cities, then Farm/Civilian Factory, then input-ready Military Factory', () => {
-    const engine = new GameEngine(130, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(130, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = editableState(engine);
     disableWind(state);
     state.facilities.find((facility) => facility.id === 'power-plant-1')!.workers = 1;
@@ -102,7 +102,7 @@ describe('v1.4.2 economy and required power grid', () => {
   });
 
   it('changes required power requests only through SetPowerSupply and refreshes forecast immediately', () => {
-    const engine = new GameEngine(131, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(131, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     disableWindInEngine(engine);
     const before = forecastEndTurn(engine.getState());
     expect(before.electricity.requiredPowerDemand).toBe(40);
@@ -116,7 +116,7 @@ describe('v1.4.2 economy and required power grid', () => {
   });
 
   it('allows unlimited Power Supply changes without consuming the player action budget', () => {
-    const engine = new GameEngine(1311, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(1311, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = editableState(engine);
     disableWind(state);
     state.actionsTakenThisTurn = state.config.maxActionsPerTurn;
@@ -130,7 +130,7 @@ describe('v1.4.2 economy and required power grid', () => {
   });
 
   it('keeps Simple Farm power-free while allowing Refinery power switching', () => {
-    const engine = new GameEngine(13115, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(13115, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = editableState(engine);
     const simple = JSON.parse(JSON.stringify(state.facilities.find((facility) => facility.id === 'farm-2')!)) as GameState['facilities'][number];
     simple.id = 'simple-farm-test';
@@ -155,7 +155,7 @@ describe('v1.4.2 economy and required power grid', () => {
   });
 
   it('records unmet power reasons in End Turn events even when a facility did not request power', () => {
-    const engine = new GameEngine(1312, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(1312, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     disableWindInEngine(engine);
     expect(engine.step({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
@@ -166,12 +166,12 @@ describe('v1.4.2 economy and required power grid', () => {
     }));
     expect(result.events).toContainEqual(expect.objectContaining({
       type: 'power_allocated',
-      payload: expect.objectContaining({ facilityId: 'military-factory-1', supplied: false, reason: 'not_eligible', amount: 0 }),
+      payload: expect.objectContaining({ facilityId: 'military-factory-2', supplied: false, reason: 'not_eligible', amount: 0 }),
     }));
   });
 
   it('never partially powers a facility and keeps an unpowered city administratively usable', () => {
-    const engine = new GameEngine(132, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(132, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = editableState(engine);
     disableWind(state);
     const capital = state.facilities.find((facility) => facility.id === 'capital')!;
@@ -199,7 +199,7 @@ describe('v1.4.2 economy and required power grid', () => {
 
   it('rounds generation down to complete five-electricity allocations', () => {
     const engine = new GameEngine(133, createDefaultConfig({
-      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+      economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       facilities: { powerPlant: { production: { powerGeneration: 3 } } },
     }));
     const state = editableState(engine);

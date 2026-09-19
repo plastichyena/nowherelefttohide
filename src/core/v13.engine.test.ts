@@ -1,7 +1,8 @@
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
 import { singleFinalWave } from './testConfig';
-import { deriveVictoryProgress, GameEngine } from './engine';
+import { deriveVictoryProgress } from './engine';
 import { hexKey, hexNeighbors } from './hex';
 import { createUnit } from './state';
 import { isHexSuppliedByBranch } from './supply';

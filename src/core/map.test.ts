@@ -29,7 +29,7 @@ const rotate = ({ q, r }: { q: number; r: number }) => ({ q: 50 - q, r: 50 - r }
 
 describe('v1.6 fixed map', () => {
   it('uses the 51x51 fixed map contract and covers every hex exactly once', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v6');
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v7');
     expect(FIXED_MAP.width).toBe(FIXED_MAP_WIDTH);
     expect(FIXED_MAP.height).toBe(FIXED_MAP_HEIGHT);
     expect(FIXED_MAP.tiles).toHaveLength(51 * 51);
@@ -136,7 +136,7 @@ describe('v1.6 fixed map', () => {
     );
     const expected = {
       capital: ['capital', 25, 25, true],
-      'city-1': ['city', 25, 20, false],
+      'city-1': ['city', 25, 21, true],
       'city-2': ['city', 24, 8, false],
       'city-3': ['city', 33, 25, false],
       'city-4': ['city', 43, 24, false],
@@ -153,7 +153,7 @@ describe('v1.6 fixed map', () => {
       'civilian-factory-2': ['civilianFactory', 29, 13, false],
       'civilian-factory-3': ['civilianFactory', 22, 38, false],
       'civilian-factory-4': ['civilianFactory', 11, 28, false],
-      'military-factory-1': ['militaryFactory', 21, 25, false],
+      'military-factory-1': ['militaryFactory', 21, 25, true],
       'military-factory-2': ['militaryFactory', 22, 10, false],
       'military-factory-3': ['militaryFactory', 28, 40, false],
       'oilfield-north': ['oilField', 26, 13, false],
@@ -171,13 +171,15 @@ describe('v1.6 fixed map', () => {
     }
     expect(FIXED_MAP.facilities.filter((facility) => facility.startingOwned).map((facility) => facility.id)).toEqual([
       'capital',
+      'city-1',
       'farm-1',
       'civilian-factory-1',
+      'military-factory-1',
       'refinery-1',
       'power-plant-1',
       'wind-power-plant-1',
     ]);
-    expect(FIXED_MAP.facilities.reduce((sum, facility) => sum + facility.startingWorkers, 0)).toBe(100);
+    expect(FIXED_MAP.facilities.reduce((sum, facility) => sum + facility.startingWorkers, 0)).toBe(110);
     expect(FIXED_MAP.facilities.find((facility) => facility.id === 'wind-power-plant-1')).toMatchObject({
       startingWorkers: 0,
       workerCapacity: 0,
@@ -190,6 +192,8 @@ describe('v1.6 fixed map', () => {
   it('publishes canonical initial Unit positions and seed-selected safe Normal Zombies', () => {
     expect(FIXED_INITIAL_UNIT_POSITIONS).toEqual({
       police: { q: 24, r: 25 },
+      police2: { q: 25, r: 24 }, police3: { q: 25, r: 26 }, police4: { q: 24, r: 26 },
+      riotPolice: { q: 24, r: 24 }, reconTeam: { q: 26, r: 26 },
       nationalGuard: { q: 26, r: 25 },
     });
     expect(FIXED_INITIAL_ZOMBIE_POSITIONS).toHaveLength(FIXED_INITIAL_ZOMBIE_COUNT);
@@ -236,6 +240,6 @@ describe('v1.6 fixed map', () => {
     copy.tiles[0]!.road = !copy.tiles[0]!.road;
     copy.facilities[0]!.startingWorkers = 99;
     expect(copy.tiles[0]!.road).not.toBe(FIXED_MAP.tiles[0]!.road);
-    expect(FIXED_MAP.facilities[0]!.startingWorkers).toBe(41);
+    expect(FIXED_MAP.facilities[0]!.startingWorkers).toBe(51);
   });
 });

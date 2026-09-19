@@ -1,3 +1,4 @@
+import { ACTION_RESPONSE_SEMANTICS, ACTION_PLAY_GUIDANCE } from '../agent/action-input';
 import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -159,6 +160,8 @@ export function sessionCliHelp(): Record<string, unknown> {
   return {
     ok: true,
     usage: 'run-session.sh COMMAND [options]',
+    responseSemantics: ACTION_RESPONSE_SEMANTICS,
+    actionPlayGuidance: ACTION_PLAY_GUIDANCE,
     commands: [...COMMANDS],
     playTurn: {
       ...SESSION_PLAY_TURN_CAPABILITIES,

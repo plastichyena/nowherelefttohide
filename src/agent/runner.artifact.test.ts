@@ -13,7 +13,7 @@ describe('Agent Runner replay artifacts', () => {
   it('runs a deterministic random game and records a replay artifact', () => {
     const config = createDefaultConfig({
       maxActionsPerTurn: 4,
-      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+      economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { hordeZombie: { movement: 20, attack: 100 } },
       horde: {
         warningLeadTurns: 1,
@@ -40,7 +40,7 @@ describe('Agent Runner replay artifacts', () => {
     expect(first.artifact.fixedMap?.tiles.some((tile) => tile.terrain === 'forest')).toBe(true);
     expect(first.artifact.observationTrace?.[0]?.mapId).toBe(first.artifact.mapId);
     expect(first.artifact.observationTrace?.[0]).not.toHaveProperty('map');
-    expect(first.artifact.observationTrace?.[0]?.checkpointPositionCandidates).toHaveLength(100);
+    expect(first.artifact.observationTrace?.[0]?.checkpointPositionCandidates).toHaveLength(200);
     expect(first.artifact.observationTrace?.some((observation) => observation.horde.nextWaveIndex === 1)).toBe(true);
     expect(first.artifact.initialRoadArrivalSchedule).toHaveLength(4);
     expect(first.artifact.observationTrace).toHaveLength(first.actions.length + 1);

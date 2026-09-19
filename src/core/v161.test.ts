@@ -1,3 +1,4 @@
+import { clearScenarioCheckpoints } from './testConfig';
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_API_VERSION,
@@ -20,7 +21,7 @@ import { decodeSaveCode, encodeSaveCode, SAVE_FORMAT_VERSION } from '../persiste
 
 const QUIET_CONFIG: DeepPartial<GameConfig> = {
   economy: {
-    initialZombieCount: 0,
+    initialZombieCount: 0, initialScreamerCount: 0,
     initialHunterCount: { min: 0, max: 0 },
     initialGasCount: { min: 0, max: 0 },
     initialResources: { food: 100_000, civilianGoods: 100_000, militaryGoods: 100_000, fuel: 100_000 },
@@ -58,9 +59,9 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
       checkpoint: CHECKPOINT_SCHEMA_VERSION,
       map: FIXED_MAP_ID,
     }).toEqual({
-      app: '1.6.1', rules: '11.0.0', save: 18, publicSave: '18',
-      agent: '16.0.0', observation: '16.0.0', bridge: '16.0.0', artifact: '15.0.0',
-      session: '12.0.0', checkpoint: '12.0.0', map: 'fixed-51x51-v6',
+      app: '1.6.2', rules: '12.0.0', save: 19, publicSave: '19',
+      agent: '17.0.0', observation: '17.0.0', bridge: '17.0.0', artifact: '16.0.0',
+      session: '13.0.0', checkpoint: '13.0.0', map: 'fixed-51x51-v7',
     });
   });
 
@@ -75,15 +76,15 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
     expect(neutral.every((facility) => facility.earlyCaptureSurvivorStatus === 'available')).toBe(true);
   });
 
-  it('places 50 Normal Zombies away from Capital and outside the selected Army Base vision', () => {
+  it('places 40 Normal Zombies away from Capital and outside the selected Army Base vision', () => {
     const state = createInitialState(16102, createDefaultConfig());
     const capital = state.facilities.find((facility) => facility.type === 'capital')!;
     const base = state.facilities.find((facility) => facility.type === 'armyBase')!;
     const normals = state.units.filter((unit) => unit.type === 'zombie');
-    expect(normals).toHaveLength(50);
+    expect(normals).toHaveLength(40);
     expect(normals.every((unit) => hexDistance(unit.position, capital.position) >= 8)).toBe(true);
     expect(normals.every((unit) => hexDistance(unit.position, base.position) > state.config.units.zombie.vision)).toBe(true);
-    expect(new Set(normals.map((unit) => hexKey(unit.position))).size).toBe(50);
+    expect(new Set(normals.map((unit) => hexKey(unit.position))).size).toBe(40);
   });
 
   it('pins Recon combat, logistics, suppression, visibility and reanimation rules', () => {
@@ -140,7 +141,7 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
     game.reset({
       seed: 16106,
       configOverrides: {
-        economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } },
+        economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } },
         refugees: { arrivalIntervalMin: 100, arrivalIntervalMax: 100 },
         horde: {
           warningLeadTurns: 2,
@@ -165,7 +166,7 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
 
   it('round-trips all v1.6.1 state fields in Save 18 without rerolling', () => {
     const state = createInitialState(16107, createDefaultConfig());
-    state.checkpoints = [];
+    clearScenarioCheckpoints(state);
     resetLedgerBaseline(state);
     const code = encodeSaveCode(state);
     const decoded = decodeSaveCode(code);

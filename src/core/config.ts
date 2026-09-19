@@ -15,8 +15,8 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '11.0.0';
-export const DEFAULT_MAP_ID = 'fixed-51x51-v6';
+export const CONFIG_VERSION = '12.0.0';
+export const DEFAULT_MAP_ID = 'fixed-51x51-v7';
 
 const facilityIds: FacilityId[] = [
   'army-base-1',
@@ -219,15 +219,15 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
 };
 
 const initialResources: ResourceStock = {
-  food: 230,
-  civilianGoods: 255,
-  militaryGoods: 75,
-  fuel: 92,
+  food: 330,
+  civilianGoods: 355,
+  militaryGoods: 175,
+  fuel: 192,
 };
 
 const initialWorkersByFacility: Record<FacilityId, number> = {
   'army-base-1': 0,
-  capital: 41,
+  capital: 51,
   'city-1': 0,
   'city-2': 0,
   'city-3': 0,
@@ -263,12 +263,13 @@ const defaultEconomy: EconomyConfig = {
   initialRefineryAllowance: 2_000,
   oilFieldAllowancePerWorker: 100,
   initialWorkersByFacility,
-  initialZombieCount: 50,
+  initialZombieCount: 40,
   neutralSurvivorRewardLastTurn: 10,
-  initialHunterCount: { min: 1, max: 4 },
+  initialHunterCount: { min: 4, max: 4 },
   initialHunterMinDistance: 20,
-  initialGasCount: { min: 1, max: 2 },
+  initialGasCount: { min: 4, max: 4 },
   initialGasMinDistance: 9,
+  initialScreamerCount: 2,
 };
 
 const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopulationConfig> =
@@ -355,7 +356,7 @@ export const DEFAULT_CONFIG: GameConfig = {
         infectionPopulationRate: 0.25,
       },
       strict: {
-        turns: 5,
+        turns: 4,
         workerRate: 0.5,
         infectionRate: 0,
         infectionPopulationRate: 0,
@@ -377,7 +378,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   },
   checkpoint: {
     checkpointBonus: 25,
-    constructionCivilianGoods: 5,
+    constructionCivilianGoods: 25,
     subsequentConstructionCivilianGoods: 25,
     relocationCivilianGoods: 25,
     maxPreparedPostsPerDirection: 5,
@@ -719,6 +720,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     if (economy.initialHunterCount?.min > economy.initialHunterCount?.max) errors.push('economy.initialHunterCount.min cannot exceed max');
     requireInteger(errors, economy.initialHunterMinDistance, 'economy.initialHunterMinDistance', 0);
     requireInteger(errors, economy.initialZombieCount, 'economy.initialZombieCount', 0);
+    requireInteger(errors, economy.initialScreamerCount, 'economy.initialScreamerCount', 0);
     if (economy.initialZombieCount > FIXED_INITIAL_ZOMBIE_COUNT) {
       errors.push(`economy.initialZombieCount cannot exceed the ${FIXED_INITIAL_ZOMBIE_COUNT} fixed-map positions`);
     }

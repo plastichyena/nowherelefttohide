@@ -3,7 +3,7 @@ import { createDefaultConfig } from './config';
 import { hexKey } from './hex';
 import { deriveCheckpointRole, isHexSupplied, isHexSuppliedByBranch } from './supply';
 import { createUnit, synchronizePopulation } from './state';
-import { GameEngine } from './engine';
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 import { getPlayerVisibleTileKeys } from './visibility';
 import type {
@@ -23,7 +23,7 @@ function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): 
     windPower: { noiseRadius: 0 },
     horde: singleFinalWave(100),
     economy: {
-      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
+      initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: {
         food: 100_000,
         civilianGoods: 100_000,

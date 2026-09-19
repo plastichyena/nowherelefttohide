@@ -14,7 +14,7 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
 
 describe('AgentGame public boundary', { timeout: 60000 }, () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.6.1');
+    expect(APP_VERSION).toBe('1.6.2');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -31,14 +31,14 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(first.finalHordeTurn).toBe(70);
     expect(first.apiVersion).toBe(OBSERVATION_API_VERSION);
     expect(first.roadBranches).toHaveLength(4);
-    expect(first.checkpointPositionCandidates).toHaveLength(100);
+    expect(first.checkpointPositionCandidates).toHaveLength(200);
     expect(first.checkpointPositionCandidates.every((candidate) =>
       typeof candidate.legal === 'boolean' && (candidate.reasonCode === null || typeof candidate.reasonCode === 'string'),
     )).toBe(true);
     expect(first.roadBranches.every((branch) => branch.turnsUntilArrival === null || branch.turnsUntilArrival >= 0)).toBe(true);
     expect(first.roadBranches.every((branch) =>
       branch.currentPolicy === 'normal' &&
-      branch.preparedPostCount === 0 &&
+      branch.preparedPostCount === 1 &&
       branch.preparedPostLimit === 5 &&
       branch.standbyCheckpointIds.length === 0 &&
       branch.dormantCheckpointIds.length === 0 &&
@@ -56,9 +56,9 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     )).toBe(true);
     expect(first.map.hordeSpawnReserve).toHaveLength(392);
     expect(first.zombies.every((unit) => ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'].includes(unit.type))).toBe(true);
-    // The fixed v1.5 initial Zombies are outside initial shared vision; only
-    // visible enemies may enter the public Observation.
-    expect(first.zombies).toHaveLength(0);
+    // Recon can reveal initial enemies; every exposed enemy must lie in public vision.
+    expect(first.zombies.length).toBeGreaterThan(0);
+    expect(first.zombies.every(unit => first.map.tiles.some(tile => tile.q === unit.position.q && tile.r === unit.position.r && tile.visibleToPlayer))).toBe(true);
     expect(first.horde).toMatchObject({
       warningType: 'none',
       warningDirections: [],
@@ -121,7 +121,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('18');
+    expect(info.saveFormatVersion).toBe('19');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -169,7 +169,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
-    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v6', width: 51, height: 51 });
+    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v7', width: 51, height: 51 });
     expect(info.rules.map.hordeSpawnReserve).toHaveLength(392);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 70 });
     expect(info.rules.horde.waves).toEqual([
@@ -193,7 +193,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       activePerBranchLimit: 1,
       preparedPostLimit: 5,
       screeningCapacity: 20,
-      estimatedScreeningThroughputByPolicy: { passThrough: 20, normal: 10, strict: 4 },
+      estimatedScreeningThroughputByPolicy: { passThrough: 20, normal: 10, strict: 5 },
       queuePressureThresholds: {
         none: { min: 0, max: 0 },
         low: { min: 1, max: 20 },
@@ -219,7 +219,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
       costs: { simpleFarm: 25, civilianDroneBase: 50, temporaryHousing: 25, windPowerPlant: 150 },
       simpleFarm: { playerBuildLimit: 'roadBranchCount' },
-      temporaryHousing: { softCapacity: 10, requiredPower: 5, recruitmentHub: false },
+      temporaryHousing: { hardCapacity: 10, requiredPower: 5, recruitmentHub: false },
       windPowerPlant: { fixedPower: 15, noiseRadius: 8, zombieTargetValue: 0, emitsNoise: true, playerBuildLimit: '2 * roadBranchCount' },
     });
     expect(info.rules.production.powerAllocationOrder).toEqual([
@@ -324,7 +324,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
           warningLeadTurns: 1,
           waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 3 }, final: true }],
         },
-        economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+        economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
         units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       },
     });
@@ -364,7 +364,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
           warningLeadTurns: 1,
           waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 3 }, final: true }],
         },
-        economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+        economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
         refugees: { arrivalIntervalMin: 1, arrivalIntervalMax: 1, arrivalPeopleMin: 1, arrivalPeopleMax: 1 },
         units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       },
@@ -420,7 +420,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     game.reset({
       seed: 23,
       configOverrides: {
-        economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+        economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
         refugees: { arrivalIntervalMin: 1, arrivalIntervalMax: 1, arrivalPeopleMin: 1, arrivalPeopleMax: 1 },
       },
     });
@@ -443,7 +443,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('does not canonicalize a checkpoint action with the wrong branch', () => {
     const game = createAgentGame();
-    const before = game.reset({ seed: 12, configOverrides: { economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    const before = game.reset({ seed: 12, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const privateBefore = game.getDebugState();
     const legalBuild = game.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
     expect(legalBuild).toBeDefined();

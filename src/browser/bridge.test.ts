@@ -198,7 +198,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('rejects a checkpoint action whose branch does not match its position', () => {
     const api = bridge();
-    api.reset({ seed: 23, configOverrides: { economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    api.reset({ seed: 23, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const before = api.getObservation();
     const legalBuild = api.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
     expect(legalBuild).toBeDefined();
@@ -211,7 +211,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('exposes distinct legal BuildCheckpoint and RelocateCheckpoint actions', () => {
     const api = bridge();
-    api.reset({ seed: 23, configOverrides: { economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    api.reset({ seed: 23, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const build = api.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
     expect(build).toBeDefined();
     const built = api.step(build!);
@@ -228,7 +228,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('accepts a well-formed legal SetPowerSupply action through the public boundary', () => {
     const api = bridge();
-    api.reset({ seed: 127, configOverrides: { economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    api.reset({ seed: 127, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const action = api.getLegalActions().find(
       (candidate) => candidate.type === 'SetPowerSupply' && candidate.facilityId === 'farm-1',
     );
@@ -240,7 +240,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('accepts BuildConstructibleFacility through the same validated public boundary', () => {
     const api = bridge();
-    api.reset({ seed: 127, configOverrides: { economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    api.reset({ seed: 127, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const action = api.getLegalActions().find((candidate) => candidate.type === 'BuildConstructibleFacility');
     expect(action).toBeDefined();
     const result = api.step(action!);

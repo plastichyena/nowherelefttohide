@@ -12,15 +12,15 @@ it('explains a radius-five checkpoint without claiming adjacent Army Base supply
   const identity = resolveSessionIdentity({ NLTH_BUILD_ID: 'supply-help', NLTH_GIT_COMMIT: 'c'.repeat(40) });
   const api = new SessionService(new SessionStore(root), createAgentSessionGameFactory(identity.buildId), identity);
   api.newSession({ sessionId: 'supply', seed: 1 });
-  const result = api.step('supply', { action: { type: 'BuildCheckpoint', branchId: 'east', position: { q: 30, r: 25 } }, decisionSummary: 'Check actual supply effect' });
+  const result = api.step('supply', { action: { type: 'RelocateCheckpoint', checkpointId: 'checkpoint-2', branchId: 'east', position: { q: 29, r: 25 } }, decisionSummary: 'Check actual supply effect' });
   expect(result.accepted).toBe(true);
   expect(result.observation.facilities.find(f => f.id === 'army-base-1')?.inSupply).toBe(false);
-  expect(result.observation.checkpoints[0]).toMatchObject({ providesSupply: true, supplyExplanation: {
+  expect(result.observation.checkpoints.find(checkpoint => checkpoint.providesSupply && checkpoint.branchId === 'east')).toMatchObject({ providesSupply: true, supplyExplanation: {
     center: 'capital', initialRadius: 5, currentBranchRadius: 5,
     candidateQuery: { target: 'construction', expectedRevision: 1, filters: { branchId: 'east' } },
   } });
   expect(api.query('supply', { target: 'checkpoints' }).items![0]).toMatchObject({ supplyExplanation: { currentBranchRadius: 5 } });
-  expect(result.importantChanges.items.find(c => c.id === 'checkpoint:checkpoint-east-1')?.consequences).toEqual(expect.arrayContaining([
+  expect(result.importantChanges.items.find(c => c.id === 'checkpoint:checkpoint-east-5')?.consequences).toEqual(expect.arrayContaining([
     'branch_supply_radius:5->5', 'newly_supplied_facilities:0', 'supply_coverage_unchanged',
   ]));
   const candidates = api.query('supply', { target: 'construction', filters: { branchId: 'east', actionType: 'RelocateCheckpoint' } });

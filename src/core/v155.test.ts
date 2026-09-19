@@ -15,8 +15,8 @@ import { effectiveMovementCost, terrainDefenseAt } from './terrain';
 import { populationTransferCandidates, validateAction } from './engine';
 import { createAgentGame } from '../agent/game';
 import type { GameState } from './types';
-import { prepareTestSnapshot } from './testConfig';
-const setup = () => createInitialState(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: {min:0,max:0}, initialGasCount:{min:0,max:0} } }));
+import { clearScenarioCheckpoints, prepareTestSnapshot } from './testConfig';
+const setup = () => createInitialState(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: {min:0,max:0}, initialGasCount:{min:0,max:0} } }));
 describe('v1.6.0 housing maintenance balance', () => {
   it.each([0,1,2,9,10,11,25])('does not offset Civilian Goods maintenance with resident output: %s', people => {
     const s=setup(), f={...s.facilities[0]!,id:'housing-test',type:'temporaryHousing' as const,position:{q:24,r:25},constructible:true,workerCapacity:10,workers:people,infected:0,builtTurn:0,operationalStatus:'operational' as const};s.facilities.push(f);s.resources.fuel=1000;
@@ -72,7 +72,7 @@ describe('v1.5.5 public and terrain boundaries',()=>{
     const zero=generateRoadNetwork({...fixedRoadInput(map),style:{...input.style,optionalRatio:0}});expect(zero.segments.some(s=>s.id.startsWith('loop-'))).toBe(false);
   });
   it('previews visible Gas chains, terrain damage and population infection without hidden-enemy influence',()=>{
-    const state=setup();state.units=[];state.checkpoints=[];
+    const state=setup();state.units=[];clearScenarioCheckpoints(state);
     const add=(id:string,type:Parameters<typeof createUnit>[2],q:number,r:number,hp?:number)=>{const u=createUnit(state,id,type,{q,r});if(hp!==undefined)u.hp=hp;state.units.push(u);return u;};
     const human=add('observer','police',25,25,50),gas=add('gas','gasZombie',24,25,1),chain=add('gas-chain','gasZombie',24,24,1),enemy=add('victim','hordeZombie',23,25,40);
     const preview=gasAttackPreview(state,gas,1)!;expect(preview.explosions.map(e=>e.sourceId)).toEqual(['gas','gas-chain']);expect(preview.units.find(u=>u.unitId===human.id)?.damage).toBe(15);expect(preview.units.find(u=>u.unitId===enemy.id)?.damage).toBe(30);expect(preview.sites.find(s=>s.siteId==='capital')?.infected).toBe(30);
@@ -82,7 +82,7 @@ describe('v1.5.5 public and terrain boundaries',()=>{
 });
 
 it('matches visible Gas-chain damage and infection against an actual Core Attack',()=>{
- const state=setup();state.units=[];state.checkpoints=[];
+ const state=setup();state.units=[];clearScenarioCheckpoints(state);
  for(const [id,type,q,r,hp] of [['guard','nationalGuard',25,25,50],['root','gasZombie',24,25,1],['chain','gasZombie',24,24,1],['victim','policeZombie',23,25,25]] as const){const unit=createUnit(state,id,type,{q,r});unit.hp=Math.min(hp,unit.maxHp);state.units.push(unit);}
  state.nextUnitNumber=100;synchronizePopulation(state);state.population.initialPopulation=populationLedgerTotal(state);
  const engine=new GameEngine(1,state.config);const loaded=engine.step({type:'LoadSnapshot',snapshot:state});expect(loaded.error?.message).toBeUndefined();

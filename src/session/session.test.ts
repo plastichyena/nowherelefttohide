@@ -243,7 +243,7 @@ describe('AI Portable Session lifecycle', () => {
     const root = tempRoot('real-wave-resume');
     const api = agentService(root, {
       economy: {
-        initialZombieCount: 0,
+        initialZombieCount: 0, initialScreamerCount: 0,
         initialHunterCount: { min: 0, max: 0 },
         initialGasCount: { min: 0, max: 0 },
         initialResources: { food: 100_000, civilianGoods: 100_000, militaryGoods: 100_000, fuel: 100_000 },
@@ -299,11 +299,11 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '11.0.0',
-      mapId: 'fixed-51x51-v6',
+      gameVersion: '12.0.0',
+      mapId: 'fixed-51x51-v7',
       config: {
-        version: '11.0.0',
-        mapId: 'fixed-51x51-v6',
+        version: '12.0.0',
+        mapId: 'fixed-51x51-v7',
         infection: {
           zombieSpawnPopulationPerUnit: 5,
           maxZombieSpawnPerResolution: 6,

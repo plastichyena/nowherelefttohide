@@ -9,7 +9,7 @@ describe('unified Agent Runner', () => {
     const config = createDefaultConfig({
       horde: { warningLeadTurns: 1, waves: [{ turn: 30, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
       maxActionsPerTurn: 100,
-      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+      economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
     });
     const run = runAgentGame(12, {
       config,

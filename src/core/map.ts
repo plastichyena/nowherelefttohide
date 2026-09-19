@@ -22,7 +22,7 @@ export { getTile, getFacility, getHordeEntrance, isRoad, isHordeSpawnReserve, ca
  * identifier here rather than deriving it from caller config: map validation
  * and save loading must reject a different fixed-map contract.
  */
-export const FIXED_MAP_ID = 'fixed-51x51-v6' as const;
+export const FIXED_MAP_ID = 'fixed-51x51-v7' as const;
 export const FIXED_MAP_WIDTH = 51 as const;
 export const FIXED_MAP_HEIGHT = 51 as const;
 export const FIXED_FACILITY_COUNT = 25 as const;
@@ -54,8 +54,8 @@ const facilitySpecs: Array<{
   startingOwned: boolean;
   startingWorkers: number;
 }> = [
-  { id: 'capital', type: 'capital', position: { q: 25, r: 25 }, startingOwned: true, startingWorkers: 41 },
-  { id: 'city-1', type: 'city', position: { q: 25, r: 20 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'capital', type: 'capital', position: { q: 25, r: 25 }, startingOwned: true, startingWorkers: 51 },
+  { id: 'city-1', type: 'city', position: { q: 25, r: 21 }, startingOwned: true, startingWorkers: 0 },
   { id: 'city-2', type: 'city', position: { q: 24, r: 8 }, startingOwned: false, startingWorkers: 0 },
   { id: 'city-3', type: 'city', position: { q: 33, r: 25 }, startingOwned: false, startingWorkers: 0 },
   { id: 'city-4', type: 'city', position: { q: 43, r: 24 }, startingOwned: false, startingWorkers: 0 },
@@ -72,7 +72,7 @@ const facilitySpecs: Array<{
   { id: 'civilian-factory-2', type: 'civilianFactory', position: { q: 29, r: 13 }, startingOwned: false, startingWorkers: 0 },
   { id: 'civilian-factory-3', type: 'civilianFactory', position: { q: 22, r: 38 }, startingOwned: false, startingWorkers: 0 },
   { id: 'civilian-factory-4', type: 'civilianFactory', position: { q: 11, r: 28 }, startingOwned: false, startingWorkers: 0 },
-  { id: 'military-factory-1', type: 'militaryFactory', position: { q: 21, r: 25 }, startingOwned: false, startingWorkers: 0 },
+  { id: 'military-factory-1', type: 'militaryFactory', position: { q: 21, r: 25 }, startingOwned: true, startingWorkers: 0 },
   { id: 'military-factory-2', type: 'militaryFactory', position: { q: 22, r: 10 }, startingOwned: false, startingWorkers: 0 },
   { id: 'military-factory-3', type: 'militaryFactory', position: { q: 28, r: 40 }, startingOwned: false, startingWorkers: 0 },
   { id: 'oilfield-north', type: 'oilField', position: { q: 26, r: 13 }, startingOwned: false, startingWorkers: 0 },
@@ -806,7 +806,7 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
   const expectedFacilityIds = new Set(FIXED_FACILITY_IDS.filter((id) => !id.startsWith('oilfield-') || id === selectedOilId));
   const actualFacilityIds = new Set((map?.facilities ?? []).filter(f=>f.type!=='armyBase').map((facility) => facility.id));
   if (expectedFacilityIds.size !== actualFacilityIds.size || [...expectedFacilityIds].some((id) => !actualFacilityIds.has(id))) {
-    errors.push('map facilities must match the selected fixed v1.6.1 facility template');
+    errors.push('map facilities must match the selected fixed v1.6.2 facility template');
   }
 
   if (map && countStaticBuildablePlainHexes(map, 5) < 12) {
@@ -846,8 +846,11 @@ export function assertValidFixedMap(map: FixedMap): void {
 
 /** v2 seeded permanent base; plain candidates beside the roads are reachable without terrain edits. */
 export const ARMY_BASE_CANDIDATES: readonly HexCoord[] = [{q:26,r:19},{q:31,r:24},{q:24,r:31},{q:19,r:26}];
+export function selectArmyBasePosition(rng: SeededRng): HexCoord {
+  return { ...ARMY_BASE_CANDIDATES[rng.nextInt(0, ARMY_BASE_CANDIDATES.length - 1)]! };
+}
 export function placeArmyBase(map: FixedMap, rng: SeededRng, capacity = 10): void {
-  const position = { ...ARMY_BASE_CANDIDATES[rng.nextInt(0, ARMY_BASE_CANDIDATES.length - 1)]! };
+  const position = selectArmyBasePosition(rng);
   const tile = map.tiles.find(tile => hexKey(tile) === hexKey(position));
   if (!tile || tile.facilityId || !tile.playerOccupancyAllowed || tile.movementCost === null) throw new Error('Invalid Army Base candidate');
   tile.facilityId = 'army-base-1';
@@ -874,6 +877,19 @@ export function generateInitialGasPositions(map: FixedMap, rng: SeededRng, hunte
   if (candidates.length < count) throw new Error('Insufficient initial Gas candidates');
   for(let i=0;i<count;i++) { const j=rng.nextInt(i,candidates.length-1); [candidates[i],candidates[j]]=[candidates[j]!,candidates[i]!]; }
   return candidates.slice(0,count);
+}
+
+export function generateInitialScreamerPositions(
+  map: FixedMap, rng: SeededRng, specials: readonly HexCoord[], count: number, vision: number,
+): HexCoord[] {
+  const occupied = new Set([...map.initialZombiePositions, ...specials].map(hexKey));
+  const candidates = getInitialZombieCandidates(map, vision).filter(position => !occupied.has(hexKey(position)));
+  if (count > candidates.length) throw new Error('Insufficient initial Screamer candidates');
+  for (let index = 0; index < count; index += 1) {
+    const selected = rng.nextInt(index, candidates.length - 1);
+    [candidates[index], candidates[selected]] = [candidates[selected]!, candidates[index]!];
+  }
+  return candidates.slice(0, count);
 }
 export function initialGasPositionsMatchSeed(state: Pick<import('./types').GameState,'map'|'seed'|'config'|'initialGasPositions'>): boolean {
   try { const rng=new SeededRng(state.seed); rng.nextInt(0,ARMY_BASE_CANDIDATES.length-1); const map={...state.map,initialZombiePositions:generateInitialZombiePositions(state.map,rng,undefined,state.config.units.zombie.vision)}; const hunters=generateInitialHunterPositions(map,rng,state.config.economy,state.config.units.hunterZombie.vision); return JSON.stringify(generateInitialGasPositions(map,rng,hunters,state.config.economy,state.config.units.gasZombie.vision))===JSON.stringify(state.initialGasPositions); } catch { return false; }

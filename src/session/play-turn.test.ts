@@ -63,6 +63,7 @@ class Runtime implements SessionGameRuntime {
       if (action.unitId === 'spawn') this.state.enemy = true;
       if (action.unitId === 'lost') this.state.unitPresent = false;
       if (action.unitId === 'crisis') this.state.crisis = 8;
+      if (action.unitId === 'worsen-crisis') this.state.crisis = 3;
     } else if (action.type === 'Move') {
       // Intentionally leave the Unit at its original position.
     } else return { observation: this.getObservation(), events: [], error: { code: 'illegal_action', message: 'Unsupported test action' }, gameOver: false, result: null };
@@ -87,6 +88,21 @@ function factory(counter?: { restores: number }): SessionGameFactory {
 function service(path: string, counter?: { restores: number }): SessionService { return new SessionService(new SessionStore(path), factory(counter), identity); }
 
 describe('play-turn protocol', () => {
+  it.each([
+    [undefined, [0], 'crisis_worsened'],
+    ['facility_workers_zero', [0], 'crisis_worsened'],
+    ['unit_out_of_supply_risk', [0, 1], null],
+  ] as const)('exempts only an explicitly allowed worsening reason (%s)', (reason, executedIndexes, stopReason) => {
+    const api = service(root('worsened-allowlist'));
+    api.newSession({ sessionId: 'game' });
+    api.step('game', { action: { type: 'Wait', unitId: 'crisis' } });
+    const result = api.playTurnPlan('game', { expectedRevision: 1, actions: [
+      { requestId: 'worsen', action: { type: 'Wait', unitId: 'worsen-crisis' },
+        ...(reason ? { expectations: { allowedWorsenedCrisisReasonCodes: [reason] } } : {}) },
+      { requestId: 'continue', action: { type: 'Wait', unitId: 'safe' } },
+    ] });
+    expect(result).toMatchObject({ executedIndexes, stopReason });
+  });
   it('reuses one verified runtime, commits every action, and stops after the first EndTurn', () => {
     const path = root('plan');
     service(path).newSession({ sessionId: 'game' });
@@ -111,7 +127,7 @@ describe('play-turn protocol', () => {
     try {
       expect(api.query('game', { target: 'api', expectedRevision: 0 }).value).toMatchObject({
         unavailable: true,
-        sessionPlayTurn: { protocolVersion: '1.0.0', portableLauncher: './run-session.sh', portableLauncherWindows: '.\\run-session.cmd', limits: { maxPlanBytes: 8 * 1024 * 1024 } },
+        sessionPlayTurn: { protocolVersion: '1.1.0', portableLauncher: './run-session.sh', portableLauncherWindows: '.\\run-session.cmd', limits: { maxPlanBytes: 8 * 1024 * 1024 } },
       });
       expect(api.query('game', { target: 'legal-actions', expectedRevision: 0 }).revision).toBe(0);
       expect(api.playTurnAction('game', { type: 'action', requestId: 'interactive-runtime-1', action: { type: 'Wait', unitId: 'safe' }, decisionSummary: 'Use the retained runtime.', expectedRevision: 0 })).toMatchObject({ accepted: true, currentRevision: 1 });

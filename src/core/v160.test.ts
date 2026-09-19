@@ -1,3 +1,4 @@
+import { clearScenarioCheckpoints } from './testConfig';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
 import { calculateEconomyPlan, forecastEndTurn } from './economy-query';
@@ -17,7 +18,7 @@ import type { DeepPartial, FacilityState, GameConfig, GameState, HexCoord, Resou
 const NO_ENEMY_CONFIG: DeepPartial<GameConfig> = {
   checkpoint: { initialSupplyRadius: 20 },
   economy: {
-    initialZombieCount: 0,
+    initialZombieCount: 0, initialScreamerCount: 0,
     initialHunterCount: { min: 0, max: 0 },
     initialGasCount: { min: 0, max: 0 },
     initialResources: { food: 10_000, civilianGoods: 10_000, militaryGoods: 10_000, fuel: 10_000 },
@@ -116,7 +117,7 @@ function oilFixture(workers: number, remainingAllowance = 2_000): GameState {
 
 describe('v1.6 Core acceptance', () => {
   it('uses the v6 facility set with one Oil Field, four branches, and its one-hex access spur', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v6');
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v7');
     expect(FIXED_MAP.facilities).toHaveLength(FIXED_FACILITY_COUNT);
     expect(FIXED_MAP.roadBranches).toHaveLength(4);
     const removed = ['refinery-2', 'refinery-3', 'refinery-4', 'power-plant-2', 'power-plant-3'];
@@ -156,7 +157,7 @@ describe('v1.6 Core acceptance', () => {
       owner: 'player',
       status: 'owned',
       operationalStatus: 'operational',
-      workers: 20,
+      workers: 10,
       infected: 0,
       securedOrder: 100,
       lastAssignedOrder: 0,
@@ -172,16 +173,16 @@ describe('v1.6 Core acceptance', () => {
     synchronizePopulation(state);
 
     const forecast = forecastEndTurn(state);
-    expect(forecast.populationConsumers).toBe(20);
-    expect(forecast.maintenanceBreakdown.food.base).toBe(20);
-    expect(forecast.maintenanceBreakdown.civilianGoods.base).toBe(20);
+    expect(forecast.populationConsumers).toBe(10);
+    expect(forecast.maintenanceBreakdown.food.base).toBe(10);
+    expect(forecast.maintenanceBreakdown.civilianGoods.base).toBe(10);
   });
 
   it('grants each first neutral capture resource reward immediately, including out of Supply', () => {
     const expected: Array<[string, Partial<Record<ResourceType, number>>]> = [
-      ['city-1', { food: 100, civilianGoods: 100, fuel: 100 }],
+      ['city-3', { food: 100, civilianGoods: 100, fuel: 100 }],
       ['civilian-factory-2', { civilianGoods: 100 }],
-      ['military-factory-1', { militaryGoods: 100 }],
+      ['military-factory-2', { militaryGoods: 100 }],
       ['farm-2', { food: 100, fuel: 100 }],
       ['army-base-1', { food: 100, militaryGoods: 100 }],
     ];
@@ -303,7 +304,7 @@ describe('v1.6 Core acceptance', () => {
 
   it('previews the 150-goods Wind decision and rejects an unaffordable second build', () => {
     const state = testState();
-    state.checkpoints = [];
+    clearScenarioCheckpoints(state);
     state.config.units.nationalGuard.population = 160;
     state.units = [createUnit(state, 'fixture-guard', 'nationalGuard', { q: 25, r: 25 })];
     for (const candidate of state.facilities) {
@@ -348,7 +349,7 @@ describe('v1.6 Core acceptance', () => {
   it.each(['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie'] as ZombieUnitType[])('counts %s in enemyKillsTotal', (type) => {
     const engine = new GameEngine(16005, testConfig());
     const snapshot = engine.getState() as GameState;
-    const enemy = createUnit(snapshot, `test-${type}`, type, { q: 24, r: 24 });
+    const enemy = createUnit(snapshot, `test-${type}`, type, { q: 23, r: 26 });
     enemy.hp = 1;
     enemy.maxHp = 1;
     if (type === 'hordeZombie') {

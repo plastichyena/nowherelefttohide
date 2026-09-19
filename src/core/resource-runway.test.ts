@@ -15,7 +15,7 @@ function tenPersonNoProductionState(food: number): GameState {
   const state = createInitialState(15750, createDefaultConfig({
     economy: {
       initialResources: { food, civilianGoods: 1_000, militaryGoods: 1_000, fuel: 1_000 },
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialScreamerCount: 0,
       initialHunterCount: { min: 0, max: 0 },
       initialGasCount: { min: 0, max: 0 },
     },
@@ -187,7 +187,7 @@ describe('v1.5.7 resource runway', () => {
     disconnected.position = { q: remote!.q, r: remote!.r };
     const forecast = deriveStrategicForecast(state).resources.militaryGoods;
     expect(forecast.currentlyShort).toBe(false);
-    expect(forecast.currentDemand).toBe(1);
+    expect(forecast.currentDemand).toBe(2);
     expect(forecast.runway.current.nextEndTurnShortage).toBe(false);
     expect(forecast.runway.current.estimatedShortageTurn).toBeGreaterThan(1);
   });
@@ -196,7 +196,7 @@ describe('v1.5.7 resource runway', () => {
     const state = createInitialState(15751, createDefaultConfig({
       economy: {
         initialResources: { food: 100, civilianGoods: 1_000, militaryGoods: 1_000, fuel: 1_000 },
-        initialZombieCount: 0,
+        initialZombieCount: 0, initialScreamerCount: 0,
         initialHunterCount: { min: 0, max: 0 },
         initialGasCount: { min: 0, max: 0 },
       },

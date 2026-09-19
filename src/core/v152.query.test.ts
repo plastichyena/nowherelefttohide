@@ -7,7 +7,7 @@ import { getPlayerVisionCoverage } from './visibility';
 import { withReadOnlyQueryScope } from './query-cache';
 import type { GameState } from './types';
 
-const config = () => createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } });
+const config = () => createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } });
 
 describe('v1.5.2 committed query isolation', () => {
   it('shares public entity projections without exposing hidden enemies or mutable references', () => {

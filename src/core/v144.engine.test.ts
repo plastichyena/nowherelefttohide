@@ -1,6 +1,7 @@
+import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
-import { forecastEndTurn, GameEngine, getCheckpointBuildCost } from './engine';
+import { forecastEndTurn, getCheckpointBuildCost } from './engine';
 import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 import {
   createInitialState,
@@ -24,7 +25,7 @@ function load(engine: GameEngine, snapshot: Snapshot): void {
 function noInitialZombies() {
   return createDefaultConfig({
     economy: {
-      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
+      initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 5_000, civilianGoods: 5_000, militaryGoods: 5_000, fuel: 5_000 },
     },
     vision: { capital: 30 },
@@ -70,18 +71,18 @@ describe('v1.4.5 checkpoint and rejection rules', () => {
     expect(engine.getState()).toEqual(before);
   });
 
-  it('charges 5 Civilian Goods for the first branch build and 25 forever after', () => {
+  it('charges 25 Civilian Goods for both the first and subsequent branch builds', () => {
     const engine = new GameEngine(14401, noInitialZombies());
-    expect(getCheckpointBuildCost(engine.getState(), 'north')).toBe(5);
+    expect(getCheckpointBuildCost(engine.getState(), 'north')).toBe(25);
     const firstStock = engine.getState().resources.civilianGoods;
     expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 19 } }).error).toBeNull();
-    expect(engine.getState().resources.civilianGoods).toBe(firstStock - 5);
+    expect(engine.getState().resources.civilianGoods).toBe(firstStock - 25);
     expect(engine.getState().roadBranches.find((branch) => branch.branchId === 'north')?.hasBuiltCheckpoint).toBe(true);
     expect(getCheckpointBuildCost(engine.getState(), 'north')).toBe(25);
 
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const secondStock = engine.getState().resources.civilianGoods;
-    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 21 } }).error).toBeNull();
+    expect(engine.step({ type: 'BuildCheckpoint', branchId: 'north', position: { q: 25, r: 22 } }).error).toBeNull();
     expect(engine.getState().resources.civilianGoods).toBe(secondStock - 25);
   });
 
@@ -105,7 +106,7 @@ describe('v1.4.5 checkpoint and rejection rules', () => {
 
   it('adds ceil(rejected/5) normal Zombies on the participating front, resets it, and ends arrivals', () => {
     const config = createDefaultConfig({
-      economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } },
+      economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: {
         ...singleFinalWave(1, { hordeZombie: 1, zombie: 0 }, 1),
         specialZombieWeights: {

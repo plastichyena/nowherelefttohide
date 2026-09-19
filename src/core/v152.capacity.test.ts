@@ -7,7 +7,7 @@ import { deriveStrategicForecast } from './forecast';
 import type { GameState, ResourceType } from './types';
 
 const resources: ResourceType[] = ['food', 'civilianGoods', 'militaryGoods', 'fuel'];
-const config = () => createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 } } });
+const config = () => createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } });
 const setup = () => createInitialState(152, config());
 const facility = (state: GameState, id: string) => state.facilities.find(f => f.id === id)!;
 

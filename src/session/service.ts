@@ -1,3 +1,6 @@
+import { CRISIS_WORSENING_FACTS } from '../core/crisis';
+import type { CrisisReasonCode } from '../core/types';
+import { isGameActionInput } from '../agent/action-input';
 import { deriveStrategicMap, strategicMapItems } from '../agent/strategic-map';
 import { queryRoute, RouteQueryInputError, type RouteQueryInput } from '../agent/route-query';
 import { QUERY_FILTER_SCHEMAS, validateQuerySchema, publicQueryContract } from '../agent/query-contract';
@@ -101,7 +104,7 @@ export const SESSION_PLAY_TURN_CAPABILITIES: SessionPlayTurnCapabilities = {
   },
   inputSchema: {
     interactiveRequests: {
-      action: { type: 'action', action: 'GameAction', decisionSummary: 'optional; null/empty means no comment; non-empty 1-500 Unicode code points', expectedRevision: 'non-negative integer', requestId: '1-128 code points', expectations: { playerUnitHp: [{ unitId: 'string', minHp: 'non-negative integer', maxHp: 'integer >= minHp' }] } },
+      action: { type: 'action', action: 'GameAction', decisionSummary: 'optional; null/empty means no comment; non-empty 1-500 Unicode code points', expectedRevision: 'non-negative integer', requestId: '1-128 code points', expectations: { playerUnitHp: [{ unitId: 'string', minHp: 'non-negative integer', maxHp: 'integer >= minHp' }], allowedNewCrisisReasonCodes: Object.keys(CRISIS_WORSENING_FACTS), allowedWorsenedCrisisReasonCodes: Object.keys(CRISIS_WORSENING_FACTS), crisisAllowlists: 'optional arrays; exempt only matching reason codes for this action; unknown codes are input errors; all other stop conditions remain active' } },
       preview: { type: 'preview', action: 'GameAction', expectedRevision: 'non-negative integer' },
       query: { type: 'query', target: 'SessionQueryTarget', expectedRevision: 'optional non-negative integer', cursor: 'optional string', pageSize: 'optional 1-500 integer', filters: 'optional object' },
       close: { type: 'close' },
@@ -160,6 +163,8 @@ function descriptorWithHash(identity: SessionVersionIdentity, storeId: string, i
 function runBaseWithHash(value: Omit<SessionRunBase, 'runBaseIntegrityHash'>): SessionRunBase { return { ...value, runBaseIntegrityHash: sha256Json(value) }; }
 
 function traceObservation(observation: AgentObservation): SessionPublicDocument['observation'] {
+  // Transport revision is response metadata, not a game-state change. Keeping
+  // it canonical also preserves rejection hashes across resume and ZIP seek.
   return compactArtifactObservation(observation) as SessionPublicDocument['observation'];
 }
 function publicDocument(runtime: SessionGameRuntime): SessionPublicDocument {
@@ -364,9 +369,15 @@ function defaultCommentLocale(value: unknown): SessionCommentLocale {
 
 function validatePlayTurnExpectations(raw: unknown): SessionPlayTurnExpectations | undefined {
   if (raw === undefined) return undefined;
-  if (!isObject(raw) || Object.keys(raw).some((key) => key !== 'playerUnitHp') || !Array.isArray(raw.playerUnitHp)) throw new SessionError('invalid_play_turn_input', 'expectations may contain only a playerUnitHp array');
+  if (!isObject(raw) || Object.keys(raw).some(key => !['playerUnitHp', 'allowedNewCrisisReasonCodes', 'allowedWorsenedCrisisReasonCodes'].includes(key)) || (raw.playerUnitHp !== undefined && !Array.isArray(raw.playerUnitHp))) throw new SessionError('invalid_play_turn_input', 'expectations requires documented HP bounds or crisis reason allowlists');
+  const reasons = (key: string): CrisisReasonCode[] => {
+    const value = raw[key];
+    if (value === undefined) return [];
+    if (!Array.isArray(value) || value.some(code => typeof code !== 'string' || !Object.hasOwn(CRISIS_WORSENING_FACTS, code))) throw new SessionError('invalid_play_turn_input', `${key} contains an unknown crisis reason`);
+    return [...new Set(value)] as CrisisReasonCode[];
+  };
   const seen = new Set<string>();
-  const playerUnitHp = raw.playerUnitHp.map((item, index) => {
+  const playerUnitHp = ((raw.playerUnitHp ?? []) as unknown[]).map((item, index) => {
     if (!isObject(item) || Object.keys(item).some((key) => !['unitId', 'minHp', 'maxHp'].includes(key)) || typeof item.unitId !== 'string' || item.unitId.length === 0) throw new SessionError('invalid_play_turn_input', `expectations.playerUnitHp[${index}] is invalid`);
     const minHp = requireSafeInteger(item.minHp, `expectations.playerUnitHp[${index}].minHp`, 0);
     const maxHp = requireSafeInteger(item.maxHp, `expectations.playerUnitHp[${index}].maxHp`, minHp);
@@ -374,7 +385,7 @@ function validatePlayTurnExpectations(raw: unknown): SessionPlayTurnExpectations
     seen.add(item.unitId);
     return { unitId: item.unitId, minHp, maxHp };
   });
-  return { playerUnitHp };
+  return { playerUnitHp, allowedNewCrisisReasonCodes: reasons('allowedNewCrisisReasonCodes'), allowedWorsenedCrisisReasonCodes: reasons('allowedWorsenedCrisisReasonCodes') };
 }
 
 function playTurnStop(
@@ -408,6 +419,12 @@ function playTurnStop(
   const newEnemyIds = after.zombies.map((unit) => unit.id).filter((id) => !beforeEnemies.has(id)).sort();
   if (newEnemyIds.length > 0) return { reason: 'new_enemy_spotted', details: { enemyIds: newEnemyIds } };
   const crisis = comparePublicCrisisAlerts(before.crisisSummary.alerts, after.crisisSummary.alerts);
+  const unallowed = (ids: string[], allowed: CrisisReasonCode[] = []) => ids.filter(id => {
+    const alert = after.crisisSummary.alerts.find(alert => alert.id === id);
+    return !alert || !allowed.includes(alert.reasonCode);
+  });
+  crisis.newAlertIds = unallowed(crisis.newAlertIds, expectations?.allowedNewCrisisReasonCodes);
+  crisis.worsenedAlertIds = unallowed(crisis.worsenedAlertIds, expectations?.allowedWorsenedCrisisReasonCodes);
   if (crisis.newAlertIds.length > 0) return { reason: 'new_crisis', details: { alertIds: crisis.newAlertIds } };
   if (crisis.worsenedAlertIds.length > 0) return { reason: 'crisis_worsened', details: { alertIds: crisis.worsenedAlertIds } };
   return { reason: null, details: {} };
@@ -782,10 +799,10 @@ export class SessionService {
   }
 
   private validatePlayTurnAction(raw: unknown): SessionPlayTurnActionInput {
-    if (!isObject(raw) || Object.keys(raw).some((key) => !['type', 'action', 'decisionSummary', 'expectedRevision', 'requestId', 'expectations'].includes(key)) || raw.type !== 'action' || !isObject(raw.action)) throw new SessionError('invalid_play_turn_input', 'play-turn action requires only type, action, optional decisionSummary, expectedRevision, requestId, and optional expectations');
+    if (!isObject(raw) || Object.keys(raw).some((key) => !['type', 'action', 'decisionSummary', 'expectedRevision', 'requestId', 'expectations'].includes(key)) || raw.type !== 'action') throw new SessionError('invalid_play_turn_input', 'play-turn action requires only type, action, optional decisionSummary, expectedRevision, requestId, and optional expectations');
     const expectedRevision = requireSafeInteger(raw.expectedRevision, 'expectedRevision', 0);
     const expectations = validatePlayTurnExpectations(raw.expectations);
-    return { type: 'action', action: JSON.parse(canonicalJson(raw.action)) as GameAction, decisionSummary: normalizeDecisionSummary(raw.decisionSummary), expectedRevision, requestId: normalizeRequestId(raw.requestId), ...(expectations ? { expectations } : {}) };
+    return { type: 'action', action: validatedAction(raw.action), decisionSummary: normalizeDecisionSummary(raw.decisionSummary), expectedRevision, requestId: normalizeRequestId(raw.requestId), ...(expectations ? { expectations } : {}) };
   }
 
   private validatePlayTurnPlan(raw: unknown): SessionPlayTurnPlanInput {
@@ -890,7 +907,7 @@ export class SessionService {
           case 'population-transfers': items = observation.populationTransferCandidates.map(item => ({ ...item, revision })) as unknown as JsonValue[]; break;
           case 'construction': {
             const supplied = new Set(observation.supply.suppliedTileKeys);
-            items = [...observation.checkpointPositionCandidates, ...observation.constructibleFacilityPositionCandidates, ...observation.barbedWireCandidates.map(c => ({ ...c, actionType: 'BuildBarbedWire', facilityType: 'barbedWire', reasonCode: c.reason }))].map(item => ({ ...item, inSupply: supplied.has(`${item.position.q},${item.position.r}`), revision })) as unknown as JsonValue[]; break;
+            items = [...observation.checkpointPositionCandidates.map(c => ({ ...c, facilityType: 'checkpoint' as const })), ...observation.constructibleFacilityPositionCandidates.map(c => ({ ...c, actionType: 'BuildConstructibleFacility' as const })), ...observation.barbedWireCandidates.map(c => ({ ...c, actionType: 'BuildBarbedWire', facilityType: 'barbedWire', reasonCode: c.reason }))].map(item => ({ ...item, inSupply: supplied.has(`${item.position.q},${item.position.r}`), revision })) as unknown as JsonValue[]; break;
           }
           case 'legal-actions': items = loaded.publicState.legalActions as unknown as JsonValue[]; break;
           case 'forecast': value = { endTurnForecast: observation.endTurnForecast, strategicForecast: observation.strategicForecast } as unknown as JsonValue; break;
@@ -1223,9 +1240,9 @@ export class SessionService {
 
   private validateStepInput(raw: unknown): SessionStepInput {
     if (!isObject(raw) || Object.keys(raw).some((key) => !['action', 'decisionSummary', 'expectedRevision'].includes(key))) throw new SessionError('invalid_step_input', 'step input may contain only action, decisionSummary, and expectedRevision');
-    if (!Object.prototype.hasOwnProperty.call(raw, 'action') || !isObject(raw.action)) throw new SessionError('invalid_step_input', 'step input requires an action object');
+    if (!Object.prototype.hasOwnProperty.call(raw, 'action')) throw new SessionError('invalid_action_input', 'step input requires an action object');
     const expectedRevision = raw.expectedRevision === undefined ? undefined : requireSafeInteger(raw.expectedRevision, 'expectedRevision', 0);
-    return { action: JSON.parse(canonicalJson(raw.action)) as GameAction, decisionSummary: normalizeDecisionSummary(raw.decisionSummary), ...(expectedRevision === undefined ? {} : { expectedRevision }) };
+    return { action: validatedAction(raw.action), decisionSummary: normalizeDecisionSummary(raw.decisionSummary), ...(expectedRevision === undefined ? {} : { expectedRevision }) };
   }
 
   private loadCompatible(sessionId: string, continuation = false): LoadedSession {
@@ -1256,11 +1273,11 @@ export class SessionService {
     try {
       if (!isObject(rawInput)
         || Object.keys(rawInput).some((key) => !['action', 'expectedRevision'].includes(key))
-        || !isObject(rawInput.action)) {
+        || !Object.prototype.hasOwnProperty.call(rawInput, 'action')) {
         throw new SessionError('invalid_preview_input', 'preview input requires only action and expectedRevision');
       }
       const input: SessionPreviewInput = {
-        action: JSON.parse(canonicalJson(rawInput.action)) as GameAction,
+        action: validatedAction(rawInput.action),
         expectedRevision: requireSafeInteger(rawInput.expectedRevision, 'expectedRevision', 0),
       };
       const lock = this.store.acquireExistingLock(sessionId);
@@ -1386,4 +1403,9 @@ export class SessionService {
     const next = this.store.listCheckpoints(loaded.descriptor.sessionId).filter((checkpoint) => checkpoint.checkpointId.startsWith(prefix)).length + 1;
     return `${prefix}${String(next).padStart(3, '0')}`;
   }
+}
+
+function validatedAction(raw: unknown): GameAction {
+  if (!isGameActionInput(raw)) throw new SessionError('invalid_action_input', 'action must be one bounded GameAction with only its documented fields');
+  return JSON.parse(canonicalJson(raw)) as GameAction;
 }

@@ -14,7 +14,7 @@ function cloneState(state: Readonly<GameState>): GameState {
 function safeScenarioConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}) {
   return createDefaultConfig({
     economy: {
-      initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 },
+      initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: {
         food: 100_000,
         civilianGoods: 100_000,
@@ -190,7 +190,7 @@ describe('v1.4 Horde composition and combat', () => {
     const engine = new GameEngine(303, safeScenarioConfig({
       horde: {
         warningLeadTurns: 1,
-        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0 },
+        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, screamerZombie: 0, gasZombie: 0 },
         waves: [
           { turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 3, zombie: 2 }, final: false },
           { turn: 2, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 3 }, final: false },
@@ -214,7 +214,7 @@ describe('v1.4 Horde composition and combat', () => {
     const engine = new GameEngine(304, safeScenarioConfig({
       horde: {
         ...singleFinalWave(1, { hordeZombie: 1, zombie: 1 }),
-        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0 },
+        specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, screamerZombie: 0, gasZombie: 0 },
       },
       units: { zombie: { movement: 0 }, hordeZombie: { movement: 0 } },
     }));

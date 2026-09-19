@@ -23,7 +23,7 @@ export function createSessionReleaseConfig(): GameConfig {
   return createDefaultConfig({
     maxActionsPerTurn: 100,
     economy: {
-      initialZombieCount: 0,
+      initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 },
       initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 1_000_000, civilianGoods: 1_000_000, militaryGoods: 1_000_000, fuel: 1_000_000 },
     },
@@ -68,7 +68,7 @@ function prepareReleaseState(game: SessionCapableAgentGame, agentId: string): vo
     facility.earlyCaptureSurvivorStatus = 'lost';
   }
   const positions = availablePlayerPositions(state);
-  const requiredAdditionalUnits = 19;
+  const requiredAdditionalUnits = 21 - state.units.filter(unit => unit.isPlayerUnit).length;
   if (positions.length < requiredAdditionalUnits) throw new Error('Release fixture has insufficient legal positions for 21 human units');
   for (let index = 0; index < requiredAdditionalUnits; index += 1) {
     const type = INITIAL_HUMAN_TYPES[index % INITIAL_HUMAN_TYPES.length]!;

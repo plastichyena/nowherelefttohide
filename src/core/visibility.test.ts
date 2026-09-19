@@ -1,3 +1,4 @@
+import { clearScenarioCheckpoints } from './testConfig';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
 import { createInitialState } from './state';
@@ -57,7 +58,7 @@ describe('v1.4.4 player visibility', () => {
     });
     state.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-test';
     expect(getPlayerVisibleTileKeys(state).has('25,0')).toBe(true);
-    state.checkpoints[0]!.status = 'ruined';
+    state.checkpoints.find(checkpoint => checkpoint.id === 'checkpoint-test')!.status = 'ruined';
     expect(getPlayerVisibleTileKeys(state).has('25,0')).toBe(false);
   });
 
@@ -111,6 +112,7 @@ describe('v1.4.4 player visibility', () => {
 
   it('keeps Capital Vision independent from the initial Supply radius', () => {
     const state = createInitialState(3, createDefaultConfig({ checkpoint: { initialSupplyRadius: 0 } }));
+    clearScenarioCheckpoints(state);
     const capitalSightline = '25,20';
     expect(getPlayerVisibleTileKeys(state).has(capitalSightline)).toBe(true);
     expect(getSuppliedTileKeys(state)).not.toContain(capitalSightline);

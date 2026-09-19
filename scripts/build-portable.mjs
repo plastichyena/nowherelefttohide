@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 const DEFAULT_OUTPUT = 'dist/portable/session-cli.mjs';
@@ -23,7 +23,7 @@ function outputPath(argumentsList) {
 async function main() {
   const output = resolve(outputPath(process.argv.slice(2)));
   mkdirSync(dirname(output), { recursive: true });
-  await build({
+  const result = await build({
     entryPoints: [resolve('src/session/session-cli.ts')],
     outfile: output,
     bundle: true,
@@ -34,7 +34,10 @@ async function main() {
     minify: false,
     legalComments: 'none',
     external: ['node:*'],
+    metafile: true,
   });
+  const inputs = [...new Set([...Object.keys(result.metafile.inputs), 'package.json', 'package-lock.json', 'scripts/build-portable.mjs', 'scripts/run-session.mjs'])];
+  writeFileSync(`${output}.inputs.json`, JSON.stringify(inputs.map(path => ({ path: resolve(path), mtimeMs: statSync(path).mtimeMs, size: statSync(path).size }))));
   process.stdout.write(`${output}\n`);
 }
 

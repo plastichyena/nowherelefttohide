@@ -7,7 +7,7 @@ import type { GameState } from './types';
 
 const config = (units: number, final = false) => createDefaultConfig({
   economy: {
-    initialZombieCount: 0,
+    initialZombieCount: 0, initialScreamerCount: 0,
     initialHunterCount: { min: 0, max: 0 },
     initialGasCount: { min: 0, max: 0 },
     initialResources: { food: 100000, civilianGoods: 100000, militaryGoods: 100000, fuel: 100000 },
@@ -116,7 +116,7 @@ describe('v1.5.4 scheduled Wave pending roster', () => {
   it('keeps a newer same-direction Wave pending while the older roster still has entries after its batch', () => {
     const multiConfig = createDefaultConfig({
       economy: {
-        initialZombieCount: 0,
+        initialZombieCount: 0, initialScreamerCount: 0,
         initialHunterCount: { min: 0, max: 0 },
         initialGasCount: { min: 0, max: 0 },
         initialResources: { food: 100000, civilianGoods: 100000, militaryGoods: 100000, fuel: 100000 },
