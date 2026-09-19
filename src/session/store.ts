@@ -668,6 +668,15 @@ export class SessionStore {
     return readdirSync(assertSafeInputDirectory(this.safeRoot, checkpointDirectory)).filter((name) => name.endsWith(CHECKPOINT_META_SUFFIX)).map((name) => this.readCheckpointMetadata(directory, descriptor, join(checkpointDirectory, name))).sort((a, b) => a.decision - b.decision || a.checkpointId.localeCompare(b.checkpointId));
   }
 
+  /** Validate one checkpoint without reading unrelated historical payloads. */
+  public findCheckpoint(sessionId: string, checkpointId: string): SessionCheckpointMetadata | null {
+    assertSafeIdentifier(checkpointId, 'checkpointId');
+    const directory = this.sessionDirectory(sessionId);
+    const descriptor = this.readDescriptor(directory);
+    const path = join(directory, 'checkpoints', `${checkpointId}${CHECKPOINT_META_SUFFIX}`);
+    return existsSync(path) ? this.readCheckpointMetadata(directory, descriptor, path) : null;
+  }
+
   public loadCheckpoint(sessionId: string, checkpointId: string): { source: LoadedSession; metadata: SessionCheckpointMetadata; privateState: JsonValue; publicState: SessionPublicState } {
     assertSafeIdentifier(checkpointId, 'checkpointId');
     const directory = this.sessionDirectory(sessionId);

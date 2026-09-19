@@ -1,0 +1,35 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { expect, it } from 'vitest';
+import { createSessionReleaseFixtureFactory } from './session-release-fixture';
+import { resolveSessionIdentity } from '../session/agent-adapter';
+import { SessionService } from '../session/service';
+import { SessionStore } from '../session/store';
+import { assertSessionReleaseSnapshot } from './session-release-validation';
+import type { AgentObservation } from '../agent/types';
+import type { GameAction } from '../core/types';
+
+it('compares a real Core action with the Session full snapshot at its response revision', () => {
+  const root = mkdtempSync(join(tmpdir(), 'nlth-release-contract-'));
+  const identity = resolveSessionIdentity();
+  const factory = createSessionReleaseFixtureFactory(identity.buildId);
+  const reference = factory.createNew({ seed: 1511, agentId: 'snapshot-test' });
+  const service = new SessionService(new SessionStore(root), factory, identity);
+  service.newSession({ sessionId: 'snapshot', seed: 1511, agentId: 'snapshot-test' });
+  const action = reference.getLegalActions().find(action => action.type === 'Move')!;
+  expect(reference.step({ action }).error).toBeNull();
+  expect(service.step('snapshot', { action, expectedRevision: 0 }).accepted).toBe(true);
+  const snapshot = service.query('snapshot', { target: 'full-snapshot', expectedRevision: 1 });
+  expect(reference.getObservation().crisisSummary.alerts.length).toBeGreaterThan(0);
+  expect(() => assertSessionReleaseSnapshot(reference, snapshot.value, 1)).not.toThrow();
+  const wrongRevision = structuredClone(snapshot.value) as unknown as { observation: AgentObservation; legalActions: GameAction[] };
+  wrongRevision.observation.crisisSummary.alerts[0]!.sourceRevision = 2;
+  expect(() => assertSessionReleaseSnapshot(reference, wrongRevision, 1)).toThrow(/sourceRevision/);
+  const wrongState = structuredClone(snapshot.value) as unknown as typeof wrongRevision;
+  wrongState.observation.resources.food += 1;
+  expect(() => assertSessionReleaseSnapshot(reference, wrongState, 1)).toThrow(/resources.food/);
+  const wrongActions = structuredClone(snapshot.value) as unknown as typeof wrongRevision;
+  wrongActions.legalActions.pop();
+  expect(() => assertSessionReleaseSnapshot(reference, wrongActions, 1)).toThrow(/legalActions.length/);
+});

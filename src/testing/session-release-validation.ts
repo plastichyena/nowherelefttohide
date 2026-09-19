@@ -181,6 +181,15 @@ function fullDocument(runtime: SessionGameRuntime): {
         privateState: runtime.exportPrivateState(),
     };
 }
+export function assertSessionReleaseSnapshot(runtime: SessionGameRuntime, snapshot: unknown, revision: number): void {
+    const expected = { observation: runtime.getObservation(), legalActions: runtime.getLegalActions() };
+    // Session response annotations use the response revision, not the Core's
+    // internal revision. Compare every field, including these exact annotations.
+    for (const alert of expected.observation.crisisSummary.alerts) alert.sourceRevision = revision;
+    for (const alert of expected.observation.endTurnRisk.criticalAlerts) alert.sourceRevision = revision;
+    const difference = firstJsonDifference(expected, snapshot);
+    assert(difference === null, `Full Snapshot does not equal the reference AgentGame public state (${difference})`);
+}
 function mapPageDigest(service: SessionService, sessionId: string, revision: number): {
     pages: number;
     tiles: number;
@@ -482,7 +491,7 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
             },
         };
     });
-    assert(sha256Json(full.value) === sha256Json(expectedFull), 'Full Snapshot does not equal the reference AgentGame public state');
+    assertSessionReleaseSnapshot(reference, full.value, revision);
     const oldFullResponseBytes = bytes(expectedFull);
     const statuses: number[] = [];
     let compactResponseBytes = 0;

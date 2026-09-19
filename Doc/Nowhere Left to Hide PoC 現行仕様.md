@@ -2239,3 +2239,10 @@ MaxAttackCharges == 2 iff Human Unit is veteran; Horde Zombie is 4; other Units 
 - Doc/archiveは履歴として参照・変更せず、反映済みの確定要件は今回の依頼条件によりDoc直下に保持する。
 
 - 追加検証: 実際のPolice編成でCapital 51→46が損失として誤報される失敗を再現し、公開`population_conscripted.sources`に基づく除外で同じテストが成功。施設差分／Session／Replayの関連11件と型検査が成功。
+
+### 2026-09-20 長時間検証の修正
+
+- Commit `569c058`の通常CIはSession 1,000 Action検証のみがFull Snapshot不一致で失敗した。Core内部のAlert `sourceRevision`とSession応答Revisionの相違を1 Actionで再現し、現行仕様のSession応答契約に従って期待値を応答Revisionへ写して全項目比較するよう検証側を修正した。誤ったRevision、資源、合法Action集合は引き続き不一致として拒否する。
+- 同CommitのRelease Validationは200ゲーム・Replay集約が成功し、物理512 MiB検証が6時間上限で停止した。自動Checkpoint確認で毎Action前後に過去の全Checkpoint payloadを検証し直す処理を、決定的IDで現在必要なCheckpointだけ検証する処理へ変更した。明示的な一覧・読込の検証、現在のCheckpoint破損拒否、過去Checkpointからの分岐は維持する。Action件数、物理512 MiB基準、圧縮設定、Job時間上限は変更しない。
+- 修正前にSnapshot比較と過去Checkpointの再読込を回帰テストで失敗として確認し、修正後は新規3件・既存関連43件と型検査が成功した。日次専用11件は環境変数未指定のためskip。修正後のGitHub Actionsは依頼者指定に従って再実行のみとし、結果を監視せず、完了済みとは扱わない。
+- Windows／Node 22.14.0の小規模通し検証では通常6 Action＋分岐1 Action、大容量モード30 EndTurn＋分岐1 Actionが完了し、Full Snapshot、同一状態の長短履歴比較、Artifact出力／読込／Replay一致を確認した。大容量モードの公開Artifact実容量は19,896,196 bytesであり、512 MiB全体の結果の代用にはしない。Portable用CLIのbundleも成功した。

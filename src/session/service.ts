@@ -1342,7 +1342,6 @@ export class SessionService {
   }
 
   private ensureAutomaticCheckpoint(loaded: LoadedSession): SessionCheckpointMetadata[] {
-    const existing = new Set(this.store.listCheckpoints(loaded.descriptor.sessionId).map((checkpoint) => checkpoint.checkpointId));
     let kind: SessionCheckpointKind | null = null;
     if (loaded.active.gameOver) kind = 'final';
     else {
@@ -1351,7 +1350,10 @@ export class SessionService {
     }
     if (!kind) return [];
     const checkpointId = this.checkpointId(loaded, kind);
-    return existing.has(checkpointId) ? [] : [this.createCheckpoint(loaded, kind)];
+    // Automatic IDs are deterministic. Revalidating every historical checkpoint
+    // here made N EndTurns read O(N²) payloads. Validate just this checkpoint;
+    // explicit listing and loading still validate the requested stored history.
+    return this.store.findCheckpoint(loaded.descriptor.sessionId, checkpointId) ? [] : [this.createCheckpoint(loaded, kind)];
   }
 
   private createCheckpoint(loaded: LoadedSession, kind: SessionCheckpointKind): SessionCheckpointMetadata {
