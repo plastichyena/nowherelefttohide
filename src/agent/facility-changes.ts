@@ -23,6 +23,11 @@ function intentionalPopulationDelta(id: string, events: readonly AgentPublicEven
         if (move && typeof move === 'object' && !Array.isArray(move) && move.facilityId === id) delta -= Math.sign(Number(p.difference)) * Number(move.people);
       }
     }
+    if (event.type === 'population_conscripted' && Array.isArray(p.sources)) {
+      for (const source of p.sources) {
+        if (source && typeof source === 'object' && !Array.isArray(source) && source.facilityId === id) delta -= Number(source.people);
+      }
+    }
   }
   return delta;
 }

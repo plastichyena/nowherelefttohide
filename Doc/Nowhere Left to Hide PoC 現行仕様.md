@@ -1846,7 +1846,7 @@ Linux/Windows x64のPlayer ZIPにはBundled Node、bundle化Session CLI、launch
 
 - `step`、`preview`、interactive／finite `play-turn`、AiSessionは同じ厳密なGameAction入力検証を使う。未知Type、余分なfield、欠落field、型不正を`invalid_action_input`で拒否し、Core・Decision・revision・RNGを変更しない。形式上正しい不合法Actionは従来どおり`accepted: false`のDecisionとして記録する。CLIの`ok: true`はcommand処理成功でありAction受理とは独立する。
 - construction filterは`facilityType: checkpoint`と`actionType: BuildConstructibleFacility`を受理し、API schema・help・CLI・AiSessionで同一集合を返す。
-- 各DecisionのimportantChangesおよびCompact Summaryの`facilityChanges`は、所有生産施設・Capital／City／Housingの意図しない健康人口減少を稼働状態が変わらなくても記録する。前後健康人口／感染者／資源別生産量と差分、算出不能理由、確認できたEvent種別を持つ。意図的なWorker配置・人口移送だけの減少を除き、因果を推測しない。
+- 各DecisionのimportantChangesおよびCompact Summaryの`facilityChanges`は、所有生産施設・Capital／City／Housingの意図しない健康人口減少を稼働状態が変わらなくても記録する。前後健康人口／感染者／資源別生産量と差分、算出不能理由、確認できたEvent種別を持つ。意図的なWorker配置・人口移送・編成への徴集だけの減少を除き、因果を推測しない。
 - finite planのexpectationsは`allowedNewCrisisReasonCodes`と`allowedWorsenedCrisisReasonCodes`を独立に受け付け、該当Reasonだけ停止条件から除外する。未知Reasonは入力エラー。省略・空配列は安全側の停止を維持し、別ReasonのCrisis、新規敵、未予期の損害、喪失を無効化しない。Play Turn Protocolは`1.1.0`。
 - Enemy隣接でMoveを失う場合があり、Attack後Moveは不可、Move後AttackもInterceptionによるCharge消費に従う。感染拠点の人口操作・感染CapitalへのTransfer制約をHelpへ明記する。編成予約は拠点ごとに未完了1件、異なる拠点は独立、Army Base無償報酬は枠を消費せず、予約Actionは共通Action予算1を消費する。
 - 安全人口の固定値はない。runway、Guaranteed Defeat、生産余力、Queueを判断基準とする。BalancedはCapitalでPolice／Riotによる無損害鎮圧を優先し、接近中の敵に対して重要拠点の守備を維持し、runwayが短い生産施設のWorkerを補充し、危険な受入はNormal／Deny／Turn Awayで抑える。Housing容量超過は計画しない。
@@ -2237,3 +2237,5 @@ MaxAttackCharges == 2 iff Human Unit is veteran; Horde Zombie is 4; other Units 
 - Playwrightの実ブラウザでv1.6.2新規ゲーム、Turn 2、自動保存v19、reload後の継続、390×844の横overflowなしを確認した。GitHub Pages公開版とLinux／Windows Portable workflowの結果確認は配信対象Commitに対して実施する。
 - 長時間GitHub workflowは依頼者指定により起動確認までとし、結果監視・完了保証は行わない。
 - Doc/archiveは履歴として参照・変更せず、反映済みの確定要件は今回の依頼条件によりDoc直下に保持する。
+
+- 追加検証: 実際のPolice編成でCapital 51→46が損失として誤報される失敗を再現し、公開`population_conscripted.sources`に基づく除外で同じテストが成功。施設差分／Session／Replayの関連11件と型検査が成功。

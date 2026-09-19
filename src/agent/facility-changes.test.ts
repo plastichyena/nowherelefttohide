@@ -1,3 +1,4 @@
+import { createAgentGame } from './game';
 import { expect, it } from 'vitest';
 import { createInitialState } from '../core/state';
 import { createDefaultConfig } from '../core/config';
@@ -22,4 +23,17 @@ it('keeps a staffed factory 30 to 19 loss with output deltas even when productio
   expect(facilityChanges(before, after, intentional).find(change => change.facilityId === factory.id)).toBeUndefined();
   const mixed = [{ ...intentional[0]!, payload: { facilityId: factory.id, difference: -5, workers: 25, movements: [{ facilityId: 'capital', people: 5 }] } }, ...events];
   expect(facilityChanges(before, after, mixed).find(change => change.facilityId === factory.id)?.populationLoss?.healthyPopulation.unintendedDelta).toBe(-6);
+});
+
+
+it('does not report intentional recruitment population as civilian losses', () => {
+  const game = createAgentGame();
+  const before = game.reset({ seed: 1 });
+  const action = game.getLegalActions().find(a => a.type === 'ProduceUnit' && a.unitType === 'police');
+  expect(action).toBeDefined();
+  const step = game.step(action!);
+  expect(step.error).toBeNull();
+  expect(step.observation.population.cityResidents).toBe(before.population.cityResidents - 5);
+  const changes = deriveImportantChanges(before, step.observation, step.events);
+  expect(summarizeImportantChanges([{ decision: 1, changes }], 1, 1, 1).facilityChanges).toEqual([]);
 });
