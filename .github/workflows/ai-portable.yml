@@ -27,7 +27,9 @@ jobs:
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.head_sha == github.sha)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # A standalone dispatch also runs the full checkout suite before the
+    # packaged Seed 1/7 games, replays, startup measurements, and ZIP evidence.
+    timeout-minutes: 40
 
     steps:
       - name: Check out verified source revision
@@ -49,8 +51,9 @@ jobs:
           npm run typecheck
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts --exclude src/agent/balancedAgent.seed198.test.ts
+          else
+            npx --no-install vitest run src/session/v162.test.ts src/session/ai-session.test.ts src/replay/package.test.ts --pool=threads --maxWorkers=2
           fi
-          npx --no-install vitest run src/session/v162.test.ts src/session/ai-session.test.ts src/replay/package.test.ts --pool=threads --maxWorkers=2
           npm run build
           node scripts/build-portable.mjs --out=dist/portable/session-cli.mjs
 
@@ -224,9 +227,10 @@ jobs:
           if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
             npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts --exclude src/agent/balancedAgent.seed198.test.ts
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } else {
+            npx --no-install vitest run src/session/v162.test.ts src/session/ai-session.test.ts src/replay/package.test.ts --pool=threads --maxWorkers=2
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          npx --no-install vitest run src/session/v162.test.ts src/session/ai-session.test.ts src/replay/package.test.ts --pool=threads --maxWorkers=2
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/build-portable.mjs --out=dist/portable/session-cli.mjs
