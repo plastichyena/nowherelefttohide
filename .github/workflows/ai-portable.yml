@@ -192,7 +192,10 @@ jobs:
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.head_sha == github.sha)
     runs-on: windows-latest
-    timeout-minutes: 40
+    # Hosted Windows needs about 40 minutes for the full checkout suite and
+    # packaged Seed 1/7 games alone; leave time for startup/contract evidence
+    # and the final ZIP upload instead of cancelling successful validation.
+    timeout-minutes: 60
 
     steps:
       - name: Check out verified source revision
