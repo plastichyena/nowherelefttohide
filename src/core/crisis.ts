@@ -9,6 +9,15 @@ const severityOrder: Record<CrisisSeverity, number> = { critical: 0, warning: 1,
 
 /** Public fact comparisons, exhaustive for the current crisis contract. */
 export const CRISIS_WORSENING_FACTS = {
+  capital_resident_minimum: { healthyPopulation: 'down' },
+  public_health_food_stress: { deficit: 'up', stress: 'up', accumulation: 'up' },
+  public_health_civilian_goods_stress: { deficit: 'up', stress: 'up' },
+  food_starvation_risk: { rate: 'up', populationLost: 'up', accumulation: 'up' },
+  internal_infection_risk: { probability: 'up', expectedInfections: 'up', healthyPopulation: 'down' },
+  checkpoint_health_risk: { probability: 'up', waiting: 'up' },
+  refinery_allowance_runway_risk: { netBurn: 'up', estimatedTurnsRemaining: 'down' },
+  nuclear_early_capture_window: { turnsRemaining: 'down' },
+  nuclear_power_outage: { lostGeneration: 'up', shortage: 'up' },
   overcrowding_forecast: { penaltyRatio: 'up', additionalFood: 'up', additionalCivilianGoods: 'up' },
   temporary_housing_outage_forecast: { outageCount: 'up', penaltyRatio: 'up', additionalFood: 'up', additionalCivilianGoods: 'up' },
   capital_infection_uncontained: { infected: 'up', healthyPopulation: 'down', suppressionUnitAvailable: 'false' },
@@ -157,6 +166,21 @@ export function deriveCrisisSummary(state: Readonly<GameState>): CrisisAlert[] {
   }
 
   const forecast = forecastEndTurn(state);
+  const health = forecast.publicHealth;
+  if (capital && capital.workers <= 1) alerts.push(alert(capital.workers === 0 ? 'critical' : 'advisory', 'facility', 'capital_resident_minimum', [capital.id], { healthyPopulation: capital.workers, minimum: 1 }, ['TransferPopulation']));
+  for (const resource of ['food', 'civilianGoods'] as const) {
+    const deficit = resource === 'food' ? health.foodDeficit : health.civilianGoodsDeficit;
+    if (deficit > 0 || health.stressBefore[resource] > 0 || (resource === 'food' && health.accumulationBefore > 0)) alerts.push(alert(deficit > 0 ? 'warning' : 'advisory', 'resource', resource === 'food' ? 'public_health_food_stress' : 'public_health_civilian_goods_stress', [], { deficit, stress: health.stressAfter[resource], stressBefore: health.stressBefore[resource], accumulation: health.accumulationAfter, recoveryPerSuppliedTurn: 0.5 }, ['AssignWorkers']));
+  }
+  if (health.starvationRate > 0) alerts.push(alert('critical', 'resource', 'food_starvation_risk', [], { rate: health.starvationRate, populationLost: health.starvation.loss, accumulation: health.accumulationAfter, carry: health.starvation.carryAfter }, ['AssignWorkers']));
+  for (const risk of health.facilities.filter(f => f.probability > 0 && f.healthyPopulation > 0)) alerts.push(alert('warning', 'infection', 'internal_infection_risk', [risk.facilityId], { probability: risk.probability, expectedInfections: risk.expectedInfections, healthyPopulation: risk.healthyPopulation, causes: risk.causes, firstInfectionCanEmptySite: risk.firstInfectionCanEmptySite, spreadsFromTurn: state.turn + 1 }, ['TransferPopulation', 'AssignWorkers', 'SetPowerSupply']));
+  for (const risk of health.checkpoints.filter(c => c.probability > 0 || (c.policy === 'passThrough' && c.screeningProbability > 0.25))) alerts.push(alert('warning', 'checkpoint', 'checkpoint_health_risk', [risk.checkpointId], { probability: risk.probability, waiting: risk.waiting, screeningProbability: risk.screeningProbability, spreadsFromTurn: state.turn + 1 }, ['SetCheckpointPolicy', 'TurnAwayCheckpointRefugees']));
+  const allowance = forecast.refineryAllowance;
+  const { netBurn, estimatedTurnsRemaining } = allowance;
+  if (estimatedTurnsRemaining !== null && estimatedTurnsRemaining <= 3 && allowance.before > 0) alerts.push(alert(allowance.remaining === 0 ? 'critical' : 'warning', 'resource', 'refinery_allowance_runway_risk', [], { remainingAllowance: allowance.before, projectedFuelRefined: allowance.fuelRefined, oilCredits: allowance.oilCreditsEarned, netBurn, estimatedTurnsRemaining, refineryWorkers: state.facilities.filter(f => f.owner === 'player' && f.type === 'refinery').reduce((n,f) => n + f.workers,0), oilFieldWorkers: state.facilities.filter(f => f.owner === 'player' && f.type === 'oilField').reduce((n,f) => n + f.workers,0) }, ['AssignWorkers']));
+  if (state.nuclearObjective.reward === 'unclaimed' && state.turn >= 15) alerts.push(alert(state.turn >= 20 ? 'critical' : 'warning', 'facility', 'nuclear_early_capture_window', ['nuclear-power-plant-1'], { deadlineTurn: 20, turnsRemaining: Math.max(0,20-state.turn) }, ['Move']));
+  const plant = state.facilities.find(f => f.type === 'nuclearPowerPlant');
+  if (plant?.owner === 'player' && plant.workers > 0 && (!isHexSupplied(state, plant.position) || plant.infected > 0 || plant.operationalStatus !== 'operational') && forecast.electricity.shortage > 0) alerts.push(alert('warning', 'resource', 'nuclear_power_outage', [plant.id], { lostGeneration: plant.workers * state.config.facilities.nuclearPowerPlant.production.powerGeneration, shortage: forecast.electricity.shortage, reason: !isHexSupplied(state, plant.position) ? 'out_of_supply' : plant.operationalStatus }, ['Move']));
   const suppliedMilitaryShortages = forecast.militaryGoods.units.filter((unit) => unit.inSupply && unit.unfilledRefillDemand > 0);
   const unfilledSuppliedDemand = suppliedMilitaryShortages.reduce((sum, unit) => sum + unit.unfilledRefillDemand, 0);
   if (unfilledSuppliedDemand > 0) {

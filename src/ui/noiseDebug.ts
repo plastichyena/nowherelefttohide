@@ -41,7 +41,7 @@ export function deriveDevelopmentNoiseDebug(
   const center = { q, r };
   const radius = sourceUnitType === 'hordeZombie'
     ? state.config.horde.movementNoiseRadius
-    : state.config.units[sourceUnitType as 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam'].noiseRadius;
+    : state.config.units[sourceUnitType as 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam' | 'specialForces'].noiseRadius;
   const targeted = state.events.slice(emittedIndex + 1).find((event) =>
     event.type === 'noise_targeted' &&
     event.payload.sourceUnitId === emitted.payload.sourceUnitId &&

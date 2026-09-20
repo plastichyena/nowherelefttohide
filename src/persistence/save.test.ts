@@ -129,9 +129,9 @@ describe('v1.6.0 Save Format 17', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 19,
+      formatVersion: 20,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-51x51-v7',
+      mapId: 'fixed-51x51-v8',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -242,10 +242,10 @@ describe('v1.6.0 Save Format 17', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(19);
-    expect(envelope.gameVersion).toBe('12.0.0');
-    expect(config.version).toBe('12.0.0');
-    expect(config.mapId).toBe('fixed-51x51-v7');
+    expect(envelope.formatVersion).toBe(20);
+    expect(envelope.gameVersion).toBe('13.0.0');
+    expect(config.version).toBe('13.0.0');
+    expect(config.mapId).toBe('fixed-51x51-v8');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
@@ -449,13 +449,13 @@ describe('v1.6.0 Save Format 17', () => {
     expect(endTurn.error).toBeNull();
     const state = clone(endTurn.state);
     const finalHorde = state.units.filter((unit) => unit.hordeKind === 'final');
-    expect(finalHorde).toHaveLength(2);
+    expect(finalHorde).toHaveLength(3);
     expect(finalHorde.every((unit) => unit.hordeKind === 'final' && state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId!))).toBe(true);
-    expect(state.horde).toMatchObject({ finalHordeStatus: 'active', finalSpawnedCount: 2 });
-    expect(state.statistics).toHaveProperty('finalHordeSpawned', 2);
+    expect(state.horde).toMatchObject({ finalHordeStatus: 'active', finalSpawnedCount: 3 });
+    expect(state.statistics).toHaveProperty('finalHordeSpawned', 3);
     expect(state.statistics.finalHordeZombiesSpawned).toBe(1);
     expect(state.statistics.finalHordeSpawned).toBe(
-      state.statistics.finalHordeZombiesSpawned + state.statistics.finalNormalZombiesSpawned,
+      state.statistics.finalHordeZombiesSpawned + state.statistics.finalNormalZombiesSpawned + state.statistics.finalSpecialZombiesSpawnedByType.packZombie,
     );
     expect(state.statistics.terrainEntriesByType).toEqual({ plain: 0, forest: 0, mountain: 0, water: 0 });
     expect(decodeSaveCode(encodeSaveCode(state)).state).toEqual(state);

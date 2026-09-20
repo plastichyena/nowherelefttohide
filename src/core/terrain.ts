@@ -7,6 +7,7 @@ import type {
   HexCoord,
   TerrainDefenseSource,
   UnitState,
+  MovementDomain,
 } from './types';
 
 const movementRoadCache = new WeakMap<object, Set<string>>();
@@ -38,10 +39,13 @@ export function effectiveMovementCost(
   state: Readonly<TerrainState>,
   position: HexCoord,
   playerMovement = true,
+  _domain: MovementDomain = 'ground',
 ): number | null {
   const tile = getTile(state.map, position);
-  if (!tile || state.config.terrain.movementCost[tile.terrain] === null) return null;
+  if (!tile) return null;
   if (playerMovement && state.barbedWire?.some(w => w.hp > 0 && hexKey(w.position) === hexKey(position))) return 5;
+  if (hasMovementRoad(state.map, position)) return 1;
+  if (state.config.terrain.movementCost[tile.terrain] === null) return null;
   if (hasMovementRoad(state.map, position) || isUrbanHex(state, position)) return 1;
   return state.config.terrain.movementCost[tile.terrain];
 }
@@ -51,6 +55,7 @@ export function createMovementCostResolver(
   state: Readonly<TerrainState>,
   playerMovement = false,
   visible?: ReadonlySet<string>,
+  _domain: MovementDomain = 'ground',
 ): MovementCostResolver {
   const reference = createMapReference(state.map);
   const urban = new Set([
@@ -62,8 +67,9 @@ export function createMovementCostResolver(
   return (position) => {
     const tile = reference.getTile(position);
     if (!tile || (playerMovement && !reference.canPlayerOccupyHex(position))) return null;
-    if (state.config.terrain.movementCost[tile.terrain] === null) return null;
     if (playerMovement && wires.has(hexKey(position))) return 5;
+    if (tile.road || roads.has(hexKey(position))) return 1;
+    if (state.config.terrain.movementCost[tile.terrain] === null) return null;
     if (tile.road || roads.has(hexKey(position)) || tile.facilityId || urban.has(hexKey(position))) return 1;
     return state.config.terrain.movementCost[tile.terrain];
   };

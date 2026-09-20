@@ -35,17 +35,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6.2 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.6.2';
-export const GAME_RULES_VERSION = '12.0.0';
-export const SAVE_FORMAT_VERSION = '19';
-export const AGENT_API_VERSION = '17.0.0';
-export const OBSERVATION_API_VERSION = '17.0.0';
-export const BRIDGE_API_VERSION = '17.0.0';
+/** v1.6.3 rejects all earlier state and public API schemas without migration. */
+export const APP_VERSION = '1.6.3';
+export const GAME_RULES_VERSION = '13.0.0';
+export const SAVE_FORMAT_VERSION = '20';
+export const AGENT_API_VERSION = '18.0.0';
+export const OBSERVATION_API_VERSION = '18.0.0';
+export const BRIDGE_API_VERSION = '18.0.0';
 export const BALANCED_AGENT_VERSION = '11.0.0';
 export const RANDOM_AGENT_VERSION = '6.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '16.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '13.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '17.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '14.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -53,6 +53,7 @@ export type CrisisSeverity = 'critical' | 'warning' | 'advisory';
 
 /** Stable, public reason codes used by Crisis Summary projections. */
 export const CRISIS_REASON_CODES = [
+  'capital_resident_minimum', 'public_health_food_stress', 'public_health_civilian_goods_stress', 'food_starvation_risk', 'internal_infection_risk', 'checkpoint_health_risk', 'refinery_allowance_runway_risk', 'nuclear_early_capture_window', 'nuclear_power_outage',
   'overcrowding_forecast',
   'temporary_housing_outage_forecast',
   'capital_infection_uncontained',
@@ -277,6 +278,7 @@ export interface AgentFacilityObservation {
 }
 
 export interface AgentUnitObservation {
+  movementDomain: 'ground';
   spawnedInsideBarbedWire?: boolean;
   /** Independent conditional attacks, not an enemy movement/target prediction. */
   conditionalIncomingCombat?: Array<{ enemyId: string; condition: 'if_this_visible_enemy_attacks' } & ReturnType<typeof import('../core/barbed-wire').wireCombatProjection>>;
@@ -506,7 +508,7 @@ export interface AgentApiInfo {
     };
     infection: {
       stationedUnitsContainSpread: true;
-      automaticSuppressionTiming: 'infectionPhaseAfterEndTurn';
+      automaticSuppressionTiming: 'economyAfterRefillBeforeStarvation';
       policeSuppression: number;
       nationalGuardSuppression: number;
       nationalGuardCivilianDamageFormula: string;
@@ -790,6 +792,8 @@ export interface AgentGameResult {
 }
 
 export interface AgentObservation {
+  publicHealth: { stress: import('../core/types').GameState['publicHealthStress']; foodShortageAccumulation: number; starvationCarry: number };
+  nuclearObjective: { firstCapturedTurn: number | null; reward: 'unclaimed' | 'pending' | 'claimed' | 'expired'; deadlineTurn: number };
   workerAssignmentCandidates: ReturnType<typeof import('../core/engine').workerAssignmentCandidates>;
   barbedWire: import('../core/types').BarbedWireState[];
   barbedWireCandidates: ReturnType<typeof import('../core/barbed-wire').wireCandidates>;
@@ -1043,6 +1047,7 @@ export type HiddenRejectedRefugeeMetricKey = typeof HIDDEN_REJECTED_REFUGEE_METR
 
 /** Frozen Wave roster type draws are never part of a public Artifact or Session. */
 export const HIDDEN_HORDE_WAVE_METRIC_KEYS = [
+  'packZombiesSpawned',
   'periodicHordeZombiesSpawned',
   'periodicNormalZombiesSpawned',
   'finalHordeZombiesSpawned',

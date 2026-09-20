@@ -299,11 +299,11 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '12.0.0',
-      mapId: 'fixed-51x51-v7',
+      gameVersion: '13.0.0',
+      mapId: 'fixed-51x51-v8',
       config: {
-        version: '12.0.0',
-        mapId: 'fixed-51x51-v7',
+        version: '13.0.0',
+        mapId: 'fixed-51x51-v8',
         infection: {
           zombieSpawnPopulationPerUnit: 5,
           maxZombieSpawnPerResolution: 6,
@@ -350,6 +350,7 @@ describe('AI Portable Session lifecycle', () => {
     expect(accepted.accepted).toBe(true);
     expect(accepted.active.decision).toBe(1);
     expect(accepted.stateDelta).toEqual({
+      beforeTurn: 1, afterTurn: 2,
       facilityChanges: [],
       branchFlowChanges: [],
       newlyInfectedSites: [],

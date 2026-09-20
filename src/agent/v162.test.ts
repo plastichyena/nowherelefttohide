@@ -56,7 +56,9 @@ it('considers Deny before accepting more population during guaranteed resource d
   const state = game.getState() as GameState;
   state.resources.food = 0; state.resources.civilianGoods = 0;
   state.facilities.find(f => f.id === 'farm-1')!.workers = 0;
-  state.checkpoints[0]!.waiting = 100;
+  for (const facility of state.facilities) if (facility.owner === 'player') facility.workers = facility.type === 'capital' ? 1 : 0;
+  for (const checkpoint of state.checkpoints) { checkpoint.waiting = 0; checkpoint.screening = 0; checkpoint.approved = 0; }
+  state.foodShortageAccumulation = 7; state.starvationCarry = 0.95;
   state.roadBranches.find(b => b.branchId === 'north')!.currentPolicy = 'passThrough';
   prepareTestSnapshot(state);
   expect(game.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();

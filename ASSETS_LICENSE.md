@@ -71,3 +71,7 @@ Commercial use of the assets **as part of the permitted gameplay, media, researc
 ## Third-party rights
 
 This license applies only to rights held by the project author. Third-party software and other separately licensed material remain subject to their own terms as documented in `THIRD_PARTY_NOTICES` or their accompanying notices.
+
+## v1.6.3 asset provenance
+
+The water, bridge, nuclear plant, Special Forces and Pack Zombie images were generated for this project. Approved originals, prompts and integrity records are stored in `Art/reference/v1.6.3-concepts/`; runtime derivatives are produced by `scripts/build-v163-assets.py`. These project assets are covered by the same terms above.

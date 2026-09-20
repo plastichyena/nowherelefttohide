@@ -28,8 +28,8 @@ import {
 } from './boardAssets';
 
 describe('board asset registry', () => {
-  it('covers the required terrain, facilities, and unit mappings without water', () => {
-    expect(Object.keys(BOARD_ASSET_REGISTRY.terrain)).toEqual(['plain', 'forest', 'mountain']);
+  it('covers the required terrain, facilities, and unit mappings including water', () => {
+    expect(Object.keys(BOARD_ASSET_REGISTRY.terrain)).toEqual(['plain', 'water', 'forest', 'mountain']);
     expect(Object.keys(BOARD_ASSET_REGISTRY.facilities)).toEqual([
       'capital',
       'city',
@@ -39,6 +39,7 @@ describe('board asset registry', () => {
       'oilField',
       'refinery',
       'powerPlant',
+      'nuclearPowerPlant',
       'windPowerPlant',
       'simpleFarm',
       'civilianDroneBase',
@@ -56,14 +57,16 @@ describe('board asset registry', () => {
       'soldierZombie',
       'riotPolice',
       'reconTeam',
+      'specialForces',
+      'packZombie',
       'riotZombie',
       'hunterZombie',
       'gasZombie',
       'screamerZombie',
     ]);
-    expect('water' in BOARD_ASSET_REGISTRY.terrain).toBe(false);
-    expect(getTerrainAssetPath('water')).toBeNull();
-    expect(mapTerrainAsset('water')).toEqual({ key: 'water', path: null, fallback: true });
+    expect('water' in BOARD_ASSET_REGISTRY.terrain).toBe(true);
+    expect(getTerrainAssetPath('water')).toBe('terrain/terrain_water.png');
+    expect(mapTerrainAsset('water')).toEqual({ key: 'water', path: 'terrain/terrain_water.png', fallback: false });
     expect(getFacilityAssetPath('not-a-facility')).toBeNull();
     expect(getObstacleAssetPath('not-an-obstacle')).toBeNull();
     expect(getObstacleAssetPath('barbedWire')).toBe(BOARD_ASSET_REGISTRY.obstacles.barbedWire);
@@ -90,7 +93,7 @@ describe('board asset registry', () => {
     expect(isBoardZombieUnitType('gasZombie')).toBe(true);
     expect(isBoardZombieUnitType('screamerZombie')).toBe(true);
     expect(isBoardZombieUnitType('police')).toBe(false);
-    expect(BOARD_ASSET_PATHS.some((path) => /water/iu.test(path))).toBe(false);
+    expect(BOARD_ASSET_PATHS.some((path) => /water/iu.test(path))).toBe(true);
   });
 
   it('keeps Board and Board Legend on the exact same registry object', () => {

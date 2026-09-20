@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { bayLayout, bayCornerForSeed } from './bay';
 import { hexDistance, hexKey } from './hex';
 import {
   FIXED_FACILITY_COUNT,
@@ -29,20 +30,24 @@ const rotate = ({ q, r }: { q: number; r: number }) => ({ q: 50 - q, r: 50 - r }
 
 describe('v1.6 fixed map', () => {
   it('uses the 51x51 fixed map contract and covers every hex exactly once', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v7');
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v8');
     expect(FIXED_MAP.width).toBe(FIXED_MAP_WIDTH);
     expect(FIXED_MAP.height).toBe(FIXED_MAP_HEIGHT);
     expect(FIXED_MAP.tiles).toHaveLength(51 * 51);
     expect(new Set(FIXED_MAP.tiles.map((tile) => tile.key)).size).toBe(51 * 51);
-    expect(FIXED_MAP.tiles.every((tile) => tile.terrain !== 'water')).toBe(true);
+    expect(FIXED_MAP.tiles.filter((tile) => tile.terrain === 'water')).toHaveLength(54);
+    expect(new Set(FIXED_MAP.tiles.filter(t => t.terrain === 'water').map(key))).toEqual(bayLayout(bayCornerForSeed(0)).waterKeys);
 
     const counts = FIXED_MAP.tiles.reduce<Record<string, number>>((result, tile) => {
       result[tile.terrain] = (result[tile.terrain] ?? 0) + 1;
       return result;
     }, {});
-    expect(counts).toEqual({ plain: 1961, forest: 514, mountain: 126 });
-    expect(new Set(FIXED_MOUNTAIN_COORDINATES.map(key)).size).toBe(126);
-    expect(new Set(FIXED_FOREST_COORDINATES.map(key)).size).toBe(514);
+    expect(counts.water).toBe(54);
+    expect(counts.forest).toBe(FIXED_FOREST_COORDINATES.length);
+    expect(counts.mountain).toBe(FIXED_MOUNTAIN_COORDINATES.length);
+    expect(counts.plain).toBe(2601 - 54 - FIXED_FOREST_COORDINATES.length - FIXED_MOUNTAIN_COORDINATES.length);
+    expect(new Set(FIXED_MOUNTAIN_COORDINATES.map(key)).size).toBe(FIXED_MOUNTAIN_COORDINATES.length);
+    expect(new Set(FIXED_FOREST_COORDINATES.map(key)).size).toBe(FIXED_FOREST_COORDINATES.length);
     expect(new Set(FIXED_MOUNTAIN_COORDINATES.map(key).filter((coordinate) =>
       FIXED_FOREST_COORDINATES.some((forest) => key(forest) === coordinate),
     ))).toHaveLength(0);
@@ -60,7 +65,8 @@ describe('v1.6 fixed map', () => {
 
     // Road/Facility exclusion wins over the earlier terrain sets.
     for (const tile of FIXED_MAP.tiles) {
-      if (tile.road || tile.facilityId !== null) expect(tile.terrain).toBe('plain');
+      if (tile.facilityId !== null) expect(tile.terrain).toBe('plain');
+      if (tile.road) expect(['plain', 'water']).toContain(tile.terrain);
     }
   });
 
@@ -129,10 +135,10 @@ describe('v1.6 fixed map', () => {
     expect(canPlayerOccupyHex(replaced, { q: 15, r: 0 })).toBe(true);
   });
 
-  it('contains the 25 permanent v6 facilities with one selected Oil Field', () => {
+  it('contains the 26 permanent v8 facilities with one selected Oil Field and one Nuclear Power Plant', () => {
     expect(FIXED_MAP.facilities).toHaveLength(FIXED_FACILITY_COUNT);
     expect(FIXED_MAP.facilities.map((facility) => facility.id)).toEqual(
-      FIXED_FACILITY_IDS.filter((id) => !id.startsWith('oilfield-') || id === 'oilfield-north'),
+      [...FIXED_FACILITY_IDS.filter((id) => !id.startsWith('oilfield-') || id === 'oilfield-north'), 'nuclear-power-plant-1'],
     );
     const expected = {
       capital: ['capital', 25, 25, true],
@@ -165,7 +171,7 @@ describe('v1.6 fixed map', () => {
       'wind-power-plant-1': ['windPowerPlant', 26, 24, true],
     } as Record<string, [string, number, number, boolean]>;
     for (const facility of FIXED_MAP.facilities) {
-      const definition = expected[facility.id]!;
+      const definition = facility.type === 'nuclearPowerPlant' ? ['nuclearPowerPlant', bayLayout(bayCornerForSeed(0)).nuclear.q, bayLayout(bayCornerForSeed(0)).nuclear.r, false] : expected[facility.id]!;
       expect([facility.type, facility.position.q, facility.position.r, facility.startingOwned]).toEqual(definition);
       expect(at(facility.position.q, facility.position.r)?.facilityId).toBe(facility.id);
     }

@@ -1,0 +1,31 @@
+/** Shared public explanations: UI, Agent API and Portable use the same rule text. */
+export const RULES_V163 = {
+  ja: {
+    capital: '州都の行政・避難機能を維持するため、自発的な人口移動・労働者配置・徴兵では健康な住民を最低1人残します。感染・飢餓・敵による最後の1人の損失は防げません。',
+    screening: '通常審査は2ターン・1人ごとに5%の潜伏感染、厳格審査は5ターン・審査由来感染0%。両方とも残った審査対象者を全員受け入れます。素通りは基礎25%に待機過密・食料と民需品の衛生ストレスを加え、最大60%。審査開始時の方針を維持し、実際の受入先で人数分を判定します。厳格審査も受入後の生活環境や直接感染への免疫ではありません。',
+    waiting: '待機列の環境感染はwaitingだけが対象です。ストレス0では20人以下0%、40人1%、60人2%、100人4%／人／ターン、補正後最大12%。screening・approvedはこの抽選の対象外ですが、飢餓・直接感染・既存感染拡大の対象です。',
+    health: '食料・民需品不足、恒久都市の過密、仮設住宅の停電は生活環境感染を生みます。衛生ストレスは0.75×現在値＋0.40×不足率（上限1）。施設ごとの確率は0.03×衛生圧力²、最大3%／人／ターン。駐留は既存感染拡大を封じ込めますが、新たな環境感染は防ぎません。期待人数は確定損失ではありません。人口1の拠点は最初の感染で陥落・敗北し得ます。供給回復、人口分散、復電、待機列削減、審査方針で改善してください。',
+    starvation: '食料不足率を蓄積（0～7）し、更新後の蓄積が2を超えると飢餓が始まります。死亡率は不足率×(蓄積−2)×2%、最大10%。100%・50%・25%不足では3・5・9ターン目から。微量供給でも不足が続けば蓄積します。全量供給で死亡を止め、蓄積は毎ターン0.5回復。全国端数を繰り越し、健康な施設人口とwaiting／screening／approvedへ比例配分します。感染者・部隊は飢餓対象外。民需品不足による直接死亡はありません。',
+    grace: '生活環境・待機列・審査由来の新規感染は、発生ターンの感染拡大に参加せず、翌ターン終了から参加します。人口変換、施設停止、健康人口0による陥落・敗北は即時です。直接Zombie接触・攻撃・Gas爆発には猶予を追加しません。',
+    nuclear: '原子力発電所は州の電力供給を支える重要施設だ。最後の通信では精鋭部隊が守備に就いていたが、生死は不明。Turn20までの初回確保で特殊部隊1隊が満載・即行動可能で合流します。未確保ならTurn21にPack Zombieが出現します。原発はSupply内・感染なし・稼働中に1人500、5人で2500電力をFuelなしで供給します。',
+    specialForces: '過酷な訓練を耐え抜いた戦闘のエキスパート。敵に対して静かに苛烈な攻撃を加える。HP50・攻撃15・射程2・移動10。Regular3回／Veteran4回の共通攻撃権。生産不可。死因を問わずPack Zombie1隊に再アニメーションする。',
+    packZombie: '高い知能による連携と高い身体機能で人間を追い詰める。HP50・攻撃15・最大5回攻撃・移動10。軽減や反撃がなければ最大75ダメージで、平地のRiot Policeも倒し得る。実際の結果は地形・残り攻撃権・迎撃・反撃による。',
+    water: '水面はGround進入不可。水面上の道路は橋で移動コスト1。水面・橋には施設・検問所・有刺鉄線を建設できず、橋の新設・破壊・撤去はできません。',
+    finalHorde: 'この地域で最後の砦となった州都へ、各地の感染者が集結している。あらゆる脅威が押し寄せる最後の襲撃に備えよ。',
+    handoff: '5完了ターンまたは前回の自動Context Checkpointから128正式Decisionで引継ぎを生成。query context-handoff、status、play-turn開始は最新公開状態を使います。preferredCommentLocaleをSession全体で維持し、古いtool全文を再読せず必要な詳細をRevision付きQueryで取得してください。完全な履歴・Replay・Artifactは維持します。',
+  },
+  en: {
+    capital: 'Voluntary transfers, staffing and recruitment must leave one healthy Capital resident to sustain administration and evacuation. Infection, starvation and enemies can still remove the last resident.',
+    screening: 'Normal takes 2 turns with a fixed 5% latent infection chance per accepted person. Strict takes 5 turns with 0% screening-derived infection. Both accept all remaining screened people. Pass Through starts at 25%, increased by waiting crowding and food/goods health stress up to 60%. Policy locks when screening starts. Each actual destination is tested for its accepted population. Strict does not protect against later living-condition or direct infection.',
+    waiting: 'Only waiting people face queue-environment infection. With no stress: up to 20 people 0%, 40 people 1%, 60 people 2%, 100 people 4% per person per turn; corrected maximum 12%. Screening and approved pools are excluded from this draw, but remain exposed to starvation, direct infection and existing spread.',
+    health: 'Food/goods deficits, permanent-city crowding and Housing outages cause living-condition infection. Health stress updates as 0.75 × current + 0.40 × deficit, capped at 1. Per-person facility probability is 0.03 × pressure², maximum 3% per turn. Garrisons contain existing spread but do not prevent new environmental infections. Expected counts are not guaranteed losses. A one-person site can fall on its first infection. Restore supplies, disperse population, restore power, reduce waiting or improve screening.',
+    starvation: 'Food deficit accumulates in 0..7. Above 2, the death rate is deficit × (accumulation−2) × 2%, capped at 10%. Constant 100% / 50% / 25% deficits first produce a positive rate on turns 3 / 5 / 9. Tiny production does not avoid accumulation. Full supply stops deaths and recovers 0.5 per turn. National fractional carry persists; deaths are proportional across healthy facility and waiting/screening/approved pools. Infected and unit population are excluded. Civilian Goods shortage causes no direct deaths.',
+    grace: 'New living-condition, waiting and screening infections do not spread during their creation turn; they join spread at the next EndTurn. Population conversion, production interruption and zero-healthy-population falls/defeat remain immediate. Direct zombie contact, combat and Gas explosions get no new grace.',
+    nuclear: 'The nuclear plant once sustained the state. Its last transmission reported an elite guard; their fate is unknown. First capture by Turn 20 awards one fully supplied Special Forces unit ready to act. Never captured by Turn 21: one Pack Zombie appears. An owned, uninfected, operating plant needs Supply and generates 500 electricity per worker, up to 2500 with five workers, without Fuel.',
+    specialForces: 'Experts forged by harsh training, delivering quiet, devastating attacks. HP50, Attack15, Range2, Movement10. Regular3 / Veteran4 shared attack charges. Not recruitable. Death from any cause reanimates one Pack Zombie.',
+    packZombie: 'Intelligent coordination and exceptional physical ability hunt humanity. HP50, Attack15, up to five attacks, Movement10. Up to 75 unmitigated damage can kill Riot Police on open ground; terrain, remaining charges, interception and counterattacks affect the actual result.',
+    water: 'Ground units cannot enter water. A road over water is a bridge with movement cost 1. Neither water nor bridges permit facilities, checkpoints or barbed wire. Bridges cannot be built, removed or destroyed.',
+    finalHorde: 'Infected from across the region converge on the Capital, its last refuge. Prepare for the final assault and every kind of threat.',
+    handoff: 'Handoff checkpoints occur every 5 completed turns or 128 canonical Decisions since the last automatic checkpoint. query context-handoff, status and play-turn start rebuild the latest public state. Keep preferredCommentLocale throughout the Session. Read needed detail through revision-pinned queries instead of rereading old tool output. Full history, Replay and Artifact remain intact.',
+  },
+};

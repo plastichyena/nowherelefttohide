@@ -1,3 +1,4 @@
+import { forecastPublicHealth } from './public-health';
 import { populationReceptionCapacity } from './state';
 import type { GameState, FacilityState, EndTurnForecast, MilitaryGoodsForecast, HumanUnitType, NextTurnPenaltyForecast, PowerSupplyReason, ResourceType } from './types';
 import type { ArmyBaseMilitaryGoodsProjection, FacilityProductionProjection } from './economy-types';
@@ -35,8 +36,10 @@ export function eligibleSnapshotCities(
     );
 }
 
+export function withdrawableResidents(city: Pick<FacilityState, 'type' | 'workers'>): number { return Math.max(0, city.workers - (city.type === 'capital' ? 1 : 0)); }
+
 export function availableSupplyPopulation(state: GameState): number {
-  return eligibleSnapshotCities(state, 'supply').reduce((total, city) => total + city.workers, 0);
+  return eligibleSnapshotCities(state, 'supply').reduce((total, city) => total + withdrawableResidents(city), 0);
 }
 
 function emptyFacilityProjection(
@@ -226,12 +229,13 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const overcrowding = overcrowdingTerms(state);
   const normalFood = consumers * state.config.economy.populationConsumption.food;
   const normalCivilian = consumers * state.config.economy.populationConsumption.civilianGoods;
-  const overcrowdingFood = overcrowdingAdditionalConsumption(normalFood, overcrowding);
-  const overcrowdingCivilian = overcrowdingAdditionalConsumption(normalCivilian, overcrowding);
+  const overcrowdingFood = overcrowding.reduce((n, t) => n + Math.ceil(t.excess * state.config.economy.populationConsumption.food * 0.50), 0);
+  const overcrowdingCivilian = overcrowding.reduce((n, t) => n + Math.ceil(t.excess * state.config.economy.populationConsumption.civilianGoods * (1 + t.excess / t.softCap)), 0);
 
   const powerPlantPhysicalCapacity = facilities
     .filter((facility) => facility.type === 'powerPlant' && canProduce(facility))
     .reduce((total, facility) => total + facility.workers * state.config.facilities.powerPlant.production.powerGeneration, 0);
+  const nuclearPowerAvailable = facilities.filter(f => f.type === 'nuclearPowerPlant' && canProduce(f) && isHexSupplied(state, f.position)).reduce((n,f) => n + f.workers * state.config.facilities.nuclearPowerPlant.production.powerGeneration, 0);
   const windPowerAvailable = facilities
     .filter((facility) =>
       facility.type === 'windPowerPlant' &&
@@ -239,8 +243,9 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       facility.infected === 0 &&
       facility.operationalStatus === 'operational')
     .reduce((total, facility) => total + state.config.facilities.windPowerPlant.production.fixedPowerGeneration, 0);
-  const physicalGenerationCapacity = windPowerAvailable + powerPlantPhysicalCapacity;
-  const fuelLimitedGenerationCapacity = windPowerAvailable + Math.min(
+  const freePowerAvailable = windPowerAvailable + nuclearPowerAvailable;
+  const physicalGenerationCapacity = freePowerAvailable + powerPlantPhysicalCapacity;
+  const fuelLimitedGenerationCapacity = freePowerAvailable + Math.min(
     powerPlantPhysicalCapacity,
     Math.floor(state.resources.fuel / 2) * 5,
   );
@@ -484,7 +489,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     const inputs = facility.type === 'militaryFactory' && projectedPowerSupplied
       ? { civilianGoods: (rule.inputs.civilianGoods ?? 0) * operatingWorkers }
       : {};
-    const stoppedReason = !canProduce(facility) && !normalArmyBase
+    const stoppedReason = facility.type === 'nuclearPowerPlant' && !isHexSupplied(state, facility.position) ? 'out_of_supply' as const : !canProduce(facility) && !normalArmyBase
       ? facilityStoppedReason(facility)
       : powerMode === 'required' && !projectedPowerSupplied
         ? 'power_unavailable'
@@ -496,7 +501,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       operatingWorkers,
       inputs,
       outputs,
-      powerGeneration: facility.type === 'powerPlant' && canProduce(facility)
+      powerGeneration: (facility.type === 'powerPlant' || (facility.type === 'nuclearPowerPlant' && isHexSupplied(state, facility.position))) && canProduce(facility)
         ? rule.powerGeneration * facility.workers
         : facility.type === 'windPowerPlant' && isOwned(facility) && facility.operationalStatus === 'operational'
           ? rule.fixedPowerGeneration
@@ -529,8 +534,8 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   );
   const totalPowerDemand = requiredPowerDemand;
   const totalPowerAllocated = requiredPowerAllocated;
-  const generationFuelDemand = Math.max(0, totalPowerDemand - windPowerAvailable) / 5 * 2;
-  const projectedFuelUsed = Math.max(0, totalPowerAllocated - windPowerAvailable) / 5 * 2;
+  const generationFuelDemand = Math.max(0, totalPowerDemand - freePowerAvailable) / 5 * 2;
+  const projectedFuelUsed = Math.max(0, totalPowerAllocated - freePowerAvailable) / 5 * 2;
   const fuelAfterPower = Math.max(0, state.resources.fuel - projectedFuelUsed);
   const refillUnits = state.units
     .filter((unit) => unit.isPlayerUnit && isHexSupplied(state, unit.position) && unit.currentFuel < unit.maxFuel)
@@ -613,7 +618,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const unpoweredFacilities = projectedFacilities
     .filter((projection) => projection.powerMode !== 'none' && !projection.projectedPowerSupplied)
     .map((projection) => ({ facilityId: projection.facilityId, reason: projection.projectedPowerReason }));
-  return {
+  const result = {
     facilities: projectedFacilities,
     unitRefills: [...unitRefillAmounts.entries()].map(([unitId, amount]) => ({ unitId, amount })),
     armyBaseMilitaryGoodsRefills: militaryGoodsPlan.armyBaseMilitaryGoodsRefills,
@@ -668,6 +673,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
         maintenanceRequired: 0,
         turnStartFuel: state.resources.fuel,
         windPowerAvailable,
+        nuclearPowerAvailable,
         powerPlantPhysicalCapacity,
         projectedPowerFuelDemand: generationFuelDemand,
         projectedPowerFuelUsed: projectedFuelUsed,
@@ -695,6 +701,8 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
         availableForRefining: state.refineryAllowance.remainingAllowance + projectedOilCredits,
         fuelRefined: fuelProduction,
         remaining: Math.max(0, state.refineryAllowance.remainingAllowance + projectedOilCredits - fuelProduction),
+        netBurn: Math.max(0, fuelProduction - projectedOilCredits),
+        estimatedTurnsRemaining: fuelProduction > projectedOilCredits ? Math.floor(state.refineryAllowance.remainingAllowance / (fuelProduction - projectedOilCredits)) : null,
       },
       electricity: {
         physicalGenerationCapacity,
@@ -709,9 +717,10 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       },
     },
   };
+  return { ...result, forecast: { ...result.forecast, publicHealth: forecastPublicHealth(state, result.forecast) } };
 }
 
-function overcrowdingTerms(state: Readonly<GameState>): Array<{ facilityId: string; excess: number; softCap: number }> {
+function overcrowdingTerms(state: Readonly<GameState>) {
   return state.facilities
     .filter(
       (facility) =>
@@ -719,37 +728,16 @@ function overcrowdingTerms(state: Readonly<GameState>): Array<{ facilityId: stri
     )
     .map((facility) => ({
       facilityId: facility.id,
-      excess: Math.max(0, facility.workers - state.config.facilities[facility.type].workerCapacity),
+      excess: Math.max(0, facility.workers + facility.infected - state.config.facilities[facility.type].workerCapacity),
       softCap: state.config.facilities[facility.type].workerCapacity,
+      occupancy: facility.workers + facility.infected,
+      capacity: facility.workerCapacity,
+      extraFood: Math.ceil(Math.max(0, facility.workers + facility.infected - facility.workerCapacity) * state.config.economy.populationConsumption.food * 0.5),
+      extraCivilianGoods: Math.ceil(Math.max(0, facility.workers + facility.infected - facility.workerCapacity) * state.config.economy.populationConsumption.civilianGoods * (1 + Math.max(0, facility.workers + facility.infected - facility.workerCapacity) / facility.workerCapacity)),
+      healthPressure: Math.min(1, Math.max(0, (facility.workers + facility.infected) / facility.workerCapacity - 1)),
     }))
     .filter((term) => term.excess > 0)
     .sort((left, right) => left.facilityId.localeCompare(right.facilityId));
-}
-
-function gcdBigInt(left: bigint, right: bigint): bigint {
-  let a = left < 0n ? -left : left;
-  let b = right < 0n ? -right : right;
-  while (b !== 0n) {
-    const next = a % b;
-    a = b;
-    b = next;
-  }
-  return a;
-}
-
-function overcrowdingAdditionalConsumption(normal: number, terms: ReturnType<typeof overcrowdingTerms>): number {
-  if (normal <= 0 || terms.length === 0) return 0;
-  let numerator = 0n;
-  let denominator = 1n;
-  for (const term of terms) {
-    numerator = numerator * BigInt(term.softCap) + BigInt(term.excess) * denominator;
-    denominator *= BigInt(term.softCap);
-    const divisor = gcdBigInt(numerator, denominator);
-    numerator /= divisor;
-    denominator /= divisor;
-  }
-  const amount = (BigInt(normal) * numerator + denominator - 1n) / denominator;
-  return Math.max(1, Number(amount));
 }
 
 function overcrowdingPenaltyRatio(terms: ReturnType<typeof overcrowdingTerms>): number {

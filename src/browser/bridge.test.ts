@@ -15,6 +15,13 @@ const PUBLIC_METHODS = [
   'getArtifactPage',
 ];
 
+it('executes the Deny policy returned by the production Bridge legal actions', () => {
+  const api=createBrowserBridge();api.reset({seed:7});
+  const action=api.getLegalActions().find(a=>a.type==='SetCheckpointPolicy'&&a.policy==='deny');expect(action).toBeDefined();
+  const result=api.step(action!);expect(result.error).toBeNull();
+  expect(api.getObservation().checkpoints.some(c=>c.currentPolicy==='deny')).toBe(true);
+});
+
 const previousWindow = (globalThis as { window?: unknown }).window;
 const previousStorage = (globalThis as { localStorage?: unknown }).localStorage;
 

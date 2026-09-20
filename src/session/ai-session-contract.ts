@@ -17,7 +17,7 @@ import type { GameAction, JsonValue } from '../core/types';
  * This module deliberately imports only public Agent/Core types.  It does
  * not name a browser, a protocol, an SDK, or a storage implementation.
  */
-export const AI_SESSION_CONTRACT_VERSION = '1.0.0' as const;
+export const AI_SESSION_CONTRACT_VERSION = '1.1.0' as const;
 export const AI_SESSION_DEFAULT_QUERY_PAGE_SIZE = 100;
 export const AI_SESSION_MAX_QUERY_PAGE_SIZE = 500;
 export const AI_SESSION_MAX_COMMENT_CODE_POINTS = 500;
@@ -85,6 +85,7 @@ export interface AiSessionCreateOptions {
 }
 
 export interface AiSessionContext {
+  contextHandoff: import('./context-handoff').ContextHandoff;
   contractVersion: typeof AI_SESSION_CONTRACT_VERSION;
   sessionId: string;
   generation: number;
@@ -237,6 +238,7 @@ export interface AiSessionDecisionRecord {
   error: AgentActionError | null;
   events: AgentPublicEvent[];
   stateDelta: AiSessionStateDelta;
+  importantChanges?: import('../agent/decision-summary').ImportantChange[];
   gameOver: boolean;
   result: AgentGameResult | null;
   previousDecisionHash: string;

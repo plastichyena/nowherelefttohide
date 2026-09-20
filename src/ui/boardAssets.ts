@@ -79,7 +79,7 @@ export const BASE_URL = viteRuntimeEnv().BASE_URL ?? '/';
 /** Relative directory below the app base containing board runtime assets. */
 export const BOARD_ASSET_BASE_PATH = 'assets/board';
 
-export const BOARD_TERRAIN_TYPES = ['plain', 'forest', 'mountain'] as const;
+export const BOARD_TERRAIN_TYPES = ['plain', 'forest', 'mountain', 'water'] as const;
 export type BoardTerrainType = (typeof BOARD_TERRAIN_TYPES)[number];
 
 export const BOARD_FACILITY_TYPES = [
@@ -91,6 +91,7 @@ export const BOARD_FACILITY_TYPES = [
   'oilField',
   'refinery',
   'powerPlant',
+  'nuclearPowerPlant',
   'windPowerPlant',
   'simpleFarm',
   'civilianDroneBase',
@@ -111,6 +112,8 @@ export const BOARD_UNIT_TYPES = [
   'nationalGuard',
   'riotPolice',
   'reconTeam',
+  'specialForces',
+  'packZombie',
   'zombie',
   'hordeZombie',
   'policeZombie',
@@ -123,7 +126,7 @@ export const BOARD_UNIT_TYPES = [
 export type BoardUnitAssetType = (typeof BOARD_UNIT_TYPES)[number];
 
 /** Zombie-side unit types rendered by the Board (including reanimated units). */
-export const BOARD_ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as const;
+export const BOARD_ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
 export type BoardZombieUnitAssetType = (typeof BOARD_ZOMBIE_UNIT_TYPES)[number];
 
 export const BOARD_COMMON_STATE_LAYERS = ['infected', 'ruined'] as const;
@@ -145,10 +148,12 @@ export type BoardUnitStateLayer = (typeof BOARD_UNIT_STATE_LAYERS)[number];
 export const BOARD_ASSET_REGISTRY = {
   terrain: {
     plain: 'terrain/terrain_plain.png',
+    water: 'terrain/terrain_water.png',
     forest: 'terrain/terrain_forest.png',
     mountain: 'terrain/terrain_mountain.png',
   },
   overlays: {
+    bridge: 'overlays/terrain_bridge.png',
     road: 'overlays/terrain_road.png',
     urban: 'overlays/terrain_urban.png',
     unsecured: 'overlays/state_unsecured.png',
@@ -171,6 +176,7 @@ export const BOARD_ASSET_REGISTRY = {
     oilField: 'facilities/facility_oilfield.png',
     refinery: 'facilities/facility_refinery.png',
     powerPlant: 'facilities/facility_power_plant.png',
+    nuclearPowerPlant: 'facilities/facility_nuclear_power_plant.png',
     windPowerPlant: 'facilities/facility_wind_power_plant.png',
     simpleFarm: 'facilities/facility_simple_farm.png',
     civilianDroneBase: 'facilities/facility_civilian_drone_base.png',
@@ -190,6 +196,8 @@ export const BOARD_ASSET_REGISTRY = {
     soldierZombie: 'units/unit_soldier_zombie.png',
     riotPolice: 'units/unit_riot_police.png',
     reconTeam: 'units/unit_recon_team.png',
+    specialForces: 'units/unit_special_forces.png',
+    packZombie: 'units/unit_pack_zombie.png',
     riotZombie: 'units/unit_riot_zombie.png',
     hunterZombie: 'units/unit_hunter_zombie.png',
     gasZombie: 'units/unit_gas_zombie.png',
@@ -286,6 +294,7 @@ export const getUrbanAssetPath = (): string => BOARD_ASSET_REGISTRY.overlays.urb
 export function getAllBoardAssetPaths(): readonly string[] {
   return [
     ...Object.values(BOARD_ASSET_REGISTRY.terrain),
+    BOARD_ASSET_REGISTRY.overlays.bridge,
     BOARD_ASSET_REGISTRY.overlays.road,
     BOARD_ASSET_REGISTRY.overlays.urban,
     BOARD_ASSET_REGISTRY.overlays.unsecured,

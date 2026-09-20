@@ -1,10 +1,26 @@
 # Play Nowhere Left to Hide with an AI
 
-This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.6.2.
+This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.6.3.
 
 The portable Player packages produced by GitHub Actions contain a bundled Session CLI, a standalone Linux x64 or Windows x64 Node.js runtime, the Session launcher, this guide, build identity, and the required license notices. They deliberately do not contain the repository checkout, `node_modules`, TypeScript, Vite, Vitest, development scripts, or board images. No separate Node.js installation or `npm install` is required after extracting a package.
 
-## v1.6.2 decision aids and query discovery
+## v1.6.3 health, expedition and context handoff
+
+- Leave one healthy Capital resident when moving people, assigning workers or recruiting. Other eligible cities supply the remainder. Preview returns the before/after Capital population and exact rejection reason.
+- Normal screening takes 2 turns and accepts everyone with a fixed 5% latent infection probability per accepted person. Strict takes 5 turns and has no screening-derived infection. Pass Through starts at 25% and reaches at most 60% with waiting crowding and health stress. Infection is drawn separately for the people actually received at each destination; approved redistribution does not reroll.
+- Only waiting people undergo queue-environment infection. At zero stress, waiting 20/40/60/100 gives 0/1/2/4% per person, maximum 12% after stress. Screening and approved remain vulnerable to starvation and direct infection.
+- Food and Civilian Goods deficits update stress to `clamp(0.75 * current + 0.40 * deficit, 0, 1)`. Facility environmental infection is at most 3% per healthy person and also depends on city crowding and occupied Housing outages. Garrisons suppress existing spread but do not prevent these new infections. Strict does not protect later living conditions.
+- Food deficit accumulates to 7. Above 2, starvation rate is `min(0.10, deficit * max(accumulationAfter - 2, 0) * 0.02)`. Full supply stops deaths and reduces accumulation by 0.5. The national fractional carry persists and exact deaths are apportioned across healthy facilities and waiting/screening/approved. CG deficits cause no direct deaths. Tiny production cannot bypass starvation.
+- New indirect infections spread from the next EndTurn, while conversion, interruption and zero-healthy-population falls remain immediate. Direct zombie contacts/attacks and Gas explosions retain their existing behavior. Read `publicHealthForecast` and detailed `forecast` for causes, eligible counts, probabilities, expected infections, starvation allocations and deferred cohorts. Expected infections are conditional estimates, not guaranteed losses.
+- Water blocks all ground units; road-over-water bridges cost 1. Water and bridges prohibit construction. The seed-selected bay has one nuclear plant, initially empty and neutral, outside initial Supply. Owned, staffed, uninfected, operational and supplied nuclear workers each generate 500 electricity without Fuel, up to 2500. First capture by Turn20 gives one ready, fully loaded Regular Special Forces unit even outside Supply. If uncaptured, a Pack appears at Turn21. Blocked rewards stay pending and count five reinforcements only on actual placement.
+- Special Forces cannot be produced. They have HP50, Attack15, Range2, Movement10, Regular3/Veteran4 shared attack charges. Any death reanimates a Pack. Pack has HP50, Attack15, Movement10 and five attacks: unmitigated damage can kill Riot on open ground. Prepare for every kind of threat in the Final Horde; hidden allocations are never public.
+- `refineryAllowance.netBurn` and `estimatedTurnsRemaining` use the next-EndTurn operating plan, including Oil credits. Three or fewer turns warn; next-turn exhaustion is critical; net burn zero clears runway risk.
+
+`status.contextHandoff`, each `play-turn` start, and `query --target=context-handoff --revision=N` reconstruct the latest public truth. Automatic derived checkpoints occur every 5 completed Turns or 128 canonical Decisions since the previous automatic checkpoint. Formal legal rejections count; malformed input, reads, previews and requestId retries do not. Manual queries do not reset the automatic counter. Each bounded collection reports totals, omissions and revision-pinned detail queries. Critical warning groups, lineage, locale and Fair Play are retained. Keep human-facing comments and decisionSummary in preferredCommentLocale throughout the Session. After handoff, use the current state and query only needed details instead of rereading old tool output. Complete history, Replay and Artifact remain canonical and intact. Handoff is public information, not private engine state or private reasoning.
+
+Version boundaries: App1.6.3, Rules13, Save20, Agent/Observation/Bridge18, Artifact17, Session/Checkpoint14, PlayTurn1.2 and AiSession1.1. Older data is rejected without migration, deletion or overwrite; start a new v1.6.3 game.
+
+## v1.6.3 decision aids and query discovery
 
 Read `observation.importantChanges` after an action and on resume. Status retains important changes from the latest accepted EndTurn through the current decision, so an intervening move does not erase a production loss. Summaries are capped at ten entries and inner arrays at ten values; use their count/omission metadata and revision-pinned history hint for the full record. Branches exclude the parent's later decisions. `observation.combatHazards` lists up to five legal lethal Gas attacks that would kill public friendly units or topple owned sites; query units for complete attack previews before choosing an attack.
 
@@ -26,11 +42,11 @@ The CLI input file is the filter object itself. In a play-turn query it goes ins
 {"type":"query","target":"strategic-map","expectedRevision":0,"filters":{"collection":"nodes"},"pageSize":100}
 ```
 
-Unknown filters, invalid types and unsupported enum values are errors, not empty successful queries. CLI failures emit `{ "ok": false, "code": "...", "error": "..." }` to stderr and exit nonzero. `RelocateCheckpoint` requires both `checkpointId` and `position`. v1.6.1 and older Saves, Artifacts, Sessions and Checkpoints are incompatible; start a new v1.6.2 game. Wall HP is 20 and Horde Zombie maximum Attack Charge is 4; other zombie types retain their own configuration.
+Unknown filters, invalid types and unsupported enum values are errors, not empty successful queries. CLI failures emit `{ "ok": false, "code": "...", "error": "..." }` to stderr and exit nonzero. `RelocateCheckpoint` requires both `checkpointId` and `position`. v1.6.2 and older Saves, Artifacts, Sessions and Checkpoints are incompatible; start a new v1.6.3 game. Wall HP is 20 and Horde Zombie maximum Attack Charge is 4; other zombie types retain their own configuration.
 
 ## Playing a Session
 
-### v1.6.2 input and planning rules
+### v1.6.3 input and planning rules
 
 Always check `accepted` as well as `ok`: `ok: true` means the protocol command returned a result. `ok: true, accepted: false` means a structurally valid action was rejected by Core and recorded as a rejected Decision. Malformed actions fail with `invalid_action_input` without consuming a Decision or changing State/RNG. Unknown fields are rejected by Preview, Step, both Play-turn modes, and AiSession. For example, `ProduceUnit` accepts `unitType` and optional `destination`; it does **not** accept `facilityId`.
 
@@ -46,7 +62,7 @@ Recruitment has one pending reservation **per facility**, with independent slots
 
 New games begin with four active Normal checkpoints at radius 5; all additional construction and relocation costs 25 Civilian Goods. City-1 and Military Factory-1 are already owned. There are 110 healthy civilians, seven regular player units (four Police, one Riot Police, one Recon and one National Guard), stocks 330/355/175/192, and exactly 50 zombies (40 Normal, 4 Gas, 4 Hunter, 2 Screamer).
 
-Temporary Housing accepts at most 10 healthy plus infected residents. Strict screens 20 people in 4 turns, accepts 50% with zero infection, and is still slower than Normal. There is no fixed safe population: compare runway, `guaranteed_resource_defeat`, production capacity and queue demand before admitting more. Keep defenders for Capital, Power Plants and principal Food/Civilian Goods producers when threats approach. Police/Riot Police can suppress Capital infection without civilian damage.
+Temporary Housing accepts at most 10 healthy plus infected residents. Strict screens 20 people in 5 turns, accepts 100% with zero screening infection, and is still slower than Normal. There is no fixed safe population: compare runway, `guaranteed_resource_defeat`, production capacity and queue demand before admitting more. Keep defenders for Capital, Power Plants and principal Food/Civilian Goods producers when threats approach. Police/Riot Police can suppress Capital infection without civilian damage.
 
 In a repository checkout, `npm run session -- ...` builds the ESM bundle only when missing or when its dependencies change, then runs it with Node. Warm commands do not start Vite or transform TypeScript. `npm run session:dev -- ...` retains the development path; `npm run build:portable-session` builds explicitly. Portable and checkout use the same Session CLI module. Interactive `play-turn` remains the recommended path within a turn.
 
@@ -157,7 +173,7 @@ Use the exact Checkpoint ID returned by `save-checkpoint` or `list-checkpoints`;
 
 Session data defaults to `output/sessions`; pass the same `--root=PATH` to every command to use another root. Active state is committed after each well-formed Decision, so a later `status` continues the same Decision Log and Run Artifact. `artifact --out=PATH` creates a self-contained public Artifact Package directory without placing its full JSON on standard output; the response is a small manifest with the package path, schema, hash, and count. The result is stored in the Artifact stream footer. The directory contains `manifest.json`, streaming `artifact.ndjson`, and deduplicated public payloads. If Active data is reported corrupt or incompatible, do not edit private files and do not expect an automatic rollback: list the valid Checkpoints and explicitly create a new branch with `load-checkpoint`.
 
-The Session directory includes a private Save Format 19 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 13 stores immutable generation data, persistent request IDs, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. v1.6.1 and earlier AI Session, Checkpoint, Artifact, and Replay data are not migrated; start a new v1.6.2 AI Session and retain old data for use with its old release. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, exact neutral-survivor counts, Screamer radius, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 16.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
+The Session directory includes a private Save Format 20 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 14 stores immutable generation data, persistent request IDs, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. v1.6.2 and earlier AI Session, Checkpoint, Artifact, and Replay data are not migrated; start a new v1.6.3 AI Session and retain old data for use with its old release. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, exact neutral-survivor counts, Screamer radius, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 17.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
 
 For a quick built-in-agent smoke test from the repository checkout:
 
@@ -209,7 +225,7 @@ Recommended loop:
 
 `getRunArtifact()` remains the complete public Artifact API. For a bounded read of a large trace, use `getArtifactPage({ target, offset?, pageSize?, expectedRevision? })`. The allowed targets are `manifest`, `observations`, `actions`, `events`, and `invalid-attempts`; it returns the current Revision, target, `count`, `total`, `hasMore`, `nextOffset`, and public `items`. Pages default to 100 items and cannot exceed 500. It is read-only; an old `expectedRevision` is rejected without changing the game.
 
-## v1.6.2 tactical context
+## v1.6.3 tactical context
 
 Use the current `AgentObservation` as the source of truth for conditional forecasts. It does not reveal future random draws or private state.
 
@@ -262,7 +278,7 @@ There is no public `SuppressInfection` action. Infection response is resolved by
 
 When using the Session CLI, each `step` response also contains `stateDelta`, a public-only summary of newly infected/ruined sites, newly spotted or publicly lost enemies, Unit HP/supply changes, and Checkpoint role changes since the previous Decision. Ordinary `AgentObservation` and Human UI responses do not contain this Session-only field.
 
-## v1.6.2 Wave and housing decisions
+## v1.6.3 Wave and housing decisions
 
 - Each scheduled Wave freezes its roster on schedule, consumes the participating directions' rejection counters, and starts even with zero free Spawn slots. Each direction has a dedicated 22-Hex zone. Pending Waves spawn oldest first as slots become available; newly spawned Units act from the next Zombie Phase.
 - Read `baseWaveUnitCount`, `committedWaveUnitCount`, `spawnedSoFar`, and `pendingCount`, plus public direction/group/kind. `horde_wave_started` and `horde_spawn_batch` are separate events. Exact type composition, private counters, anchors, and hidden positions remain private.
@@ -276,7 +292,7 @@ When using the Session CLI, each `step` response also contains `stateDelta`, a p
 
 The AI player should not use `GameEngine.getState()`, `AgentGameAdapter.getDebugState()`, save internals, hidden future random values, or other non-public implementation details to make decisions. Those exist for development and diagnostics, not as player-visible information.
 
-The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.6.2` uses Game Rules `12.0.0`, Agent/Observation/Browser Bridge API `17.0.0`, Fixed Map `fixed-51x51-v7`, Save Format `19`, Artifact Schema `16.0.0`, Checkpoint/Session Schema `13.0.0`, Play-turn Protocol `1.1.0`, Balanced Agent `11.0.0`, and Random Agent `6.0.0`. Artifact Schema 16.0.0 packages public Wave/Warning/Site Event, Screamer/Army Base/Oil Field state, production-capacity and support-headroom state, Metrics, a lossless public Decision Log, request identity, and lineage without private Checkpoint state. v1.6.1 and earlier AI Replay, Artifact, Session, Checkpoint, and normal Save data are rejected without conversion or overwrite.
+The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.6.3` uses Game Rules `13.0.0`, Agent/Observation/Browser Bridge API `18.0.0`, Fixed Map `fixed-51x51-v8`, Save Format `20`, Artifact Schema `17.0.0`, Checkpoint/Session Schema `14.0.0`, Play-turn Protocol `1.2.0`, Balanced Agent `11.0.0`, and Random Agent `6.0.0`. Artifact Schema 17.0.0 packages public Wave/Warning/Site Event, Screamer/Army Base/Oil Field state, production-capacity and support-headroom state, Metrics, a lossless public Decision Log, request identity, and lineage without private Checkpoint state. v1.6.2 and earlier AI Replay, Artifact, Session, Checkpoint, and normal Save data are rejected without conversion or overwrite.
 
 ## Package layout
 
@@ -301,7 +317,7 @@ The Player package intentionally has no `package.json`, `node_modules`, source t
 
 The package is tied to a specific Git commit. `BUILD_INFO.txt` records the app version, commit SHA, and bundled Node.js version so a playthrough can be reproduced against the correct source revision.
 
-## v1.6.2 parameter queries and ZIP spectator
+## v1.6.3 parameter queries and ZIP spectator
 
 Read `status.observation.forecastSummary.endTurn.maintenancePopulation` and `maintenanceBreakdown` for healthy city/housing residents, production/base workers, unit personnel, and waiting/screening/approved upkeep. Facility queries expose production, inputs, stopping reasons, and `recovery` conditions separately. Attack previews expose visible Gas chains; they do not estimate hidden entities, reanimation/site-spawn consequences, or the later enemy phase. Turn Away affects waiting people only; its future Wave risk is qualitative.
 
@@ -320,9 +336,9 @@ The list of legal actions is finite and does not enumerate every legal integer. 
 
 `artifact` exports the public directory and sibling ZIP; `replayZipPath` identifies the file. The ZIP includes public ancestry, fixed map and explicit roads, comments, results, and verified payload references; it excludes private checkpoint state. Open **AIリプレイ観戦 / Watch AI replay** from the game title and select this ZIP locally. The viewer starts paused before the first Decision, supports 0.5/1/2/4× playback, previous/next Decision, exact-turn seeking, and stops at the end. Comments use Unicode code points: `min(8, max(3, ceil(length/20)))` seconds; absent comments skip directly to the one-second result phase. Logs retain 100 visited Decisions; older Decisions remain seekable.
 
-The spectator does not resume a Session or touch normal autosave. It supports v1.6.2 public packages with different viewer Build IDs, while executable replay/resume retains strict build checks. v1.6.1 and older versions, unsafe paths, bad hashes, missing payloads, corrupt ZIP entries and incompatible maps are rejected. Use the exported ZIP: its NDJSON stream must be stored, not recompressed. ZIP64/multivolume/encrypted archives are unsupported. Limits are 64 MiB per logical payload, 4 MiB per Decision line, 32 MiB ZIP directory, and one million Decisions; snapshot cache is bounded to 16 MiB. A total ZIP size over 50 MB is not by itself an error. Payload parsing and rendering still require browser working memory; cancel and choose another file if loading cannot complete. Physical phone memory and 512 MiB endurance are separate measurements, not universal guarantees.
+The spectator does not resume a Session or touch normal autosave. It supports v1.6.3 public packages with different viewer Build IDs, while executable replay/resume retains strict build checks. v1.6.2 and older versions, unsafe paths, bad hashes, missing payloads, corrupt ZIP entries and incompatible maps are rejected. Use the exported ZIP: its NDJSON stream must be stored, not recompressed. ZIP64/multivolume/encrypted archives are unsupported. Limits are 64 MiB per logical payload, 4 MiB per Decision line, 32 MiB ZIP directory, and one million Decisions; snapshot cache is bounded to 16 MiB. A total ZIP size over 50 MB is not by itself an error. Payload parsing and rendering still require browser working memory; cancel and choose another file if loading cannot complete. Physical phone memory and 512 MiB endurance are separate measurements, not universal guarantees.
 
-## v1.6.2 decision checklist (Linux and Windows)
+## v1.6.3 decision checklist (Linux and Windows)
 
 Keep the complete Compact response from `status` and every `play-turn` result. Do not print only resources and unit HP: that drops the reasons needed to operate the economy. Review all of these on every decision:
 

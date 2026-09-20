@@ -514,8 +514,8 @@ const FACILITY_TYPES: readonly string[] = [
   'capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery',
   'powerPlant', 'windPowerPlant', 'civilianDroneBase', 'simpleFarm', 'temporaryHousing', 'armyBase',
 ];
-const HUMAN_UNIT_TYPES: readonly HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice', 'reconTeam'];
-const SPECIAL_ZOMBIE_TYPES = ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as const;
+const HUMAN_UNIT_TYPES: readonly HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces'];
+const SPECIAL_ZOMBIE_TYPES = ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
 const ZOMBIE_TYPES = ['zombie', 'hordeZombie', ...SPECIAL_ZOMBIE_TYPES] as const;
 
 function isHumanUnitType(value: unknown): value is HumanUnitType {
@@ -808,6 +808,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     reconTeam: events.filter(
       (event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'reconTeam',
     ).length,
+    specialForces: events.filter((event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'specialForces').length,
     hordeZombie: statisticNumber(statistics, 'hordeMovementNoisePulses') ?? events.filter(
       (event) => event.type === 'noise_emitted' && event.payload.sourceKind === 'hordeZombie',
     ).length,
@@ -988,7 +989,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const finalSecuredFacilities = finalObservation.facilities.filter(
     (facility) => facility.owner === 'player' && facility.status === 'owned',
   ).length;
-  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 });
+  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, specialForces: 0 });
   const statisticHumanRecord = (key: string): Record<HumanUnitType, number> => {
     const source = numericRecord(isRecord(statistics) ? statistics[key] : undefined);
     return Object.fromEntries(HUMAN_UNIT_TYPES.map((type) => [type, source[type] ?? 0])) as Record<HumanUnitType, number>;

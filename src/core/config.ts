@@ -15,10 +15,11 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '12.0.0';
-export const DEFAULT_MAP_ID = 'fixed-51x51-v7';
+export const CONFIG_VERSION = '13.0.0';
+export const DEFAULT_MAP_ID = 'fixed-51x51-v8';
 
 const facilityIds: FacilityId[] = [
+  'nuclear-power-plant-1',
   'army-base-1',
   'capital',
   'city-1',
@@ -65,9 +66,21 @@ function production(
 }
 
 const defaultUnitConfig: UnitConfigMap = {
-  gasZombie: { maxAttackCharges: 1, hp: 35, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, explosionDamage: 30, explosionInfection: 30 },
-  screamerZombie: { maxAttackCharges: 1, hp: 15, attack: 10, movement: 3, range: 1, vision: 2, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, screamRadius: 30 },
+  specialForces: {
+    movementDomain: 'ground', regularAttackCharges: 3, veteranAttackCharges: 4,
+    hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 5, maxFuel: 44,
+    maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
+    attackMilitaryGoodsCostByRange: { 1: 2, 2: 4 }, suppressionMilitaryGoodsCost: 1,
+    militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
+    recruitmentFacilityTypes: [], productionCivilianGoods: 0, productionMilitaryGoods: 0,
+    fuelCostRule: 'nationalGuardLike', suppressionCivilianDamageRate: 0.5,
+    reanimationUnitType: 'packZombie', noiseClass: 'medium', noiseRadius: 4,
+  },
+  packZombie: { movementDomain: 'ground', maxAttackCharges: 5, hp: 50, attack: 15, movement: 10, range: 1, vision: 3, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0 },
+  gasZombie: { movementDomain: 'ground', maxAttackCharges: 1, hp: 35, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, explosionDamage: 30, explosionInfection: 30 },
+  screamerZombie: { movementDomain: 'ground', maxAttackCharges: 1, hp: 15, attack: 10, movement: 3, range: 1, vision: 2, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, screamRadius: 30 },
   police: {
+    movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 25, recruitAttack: 6, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 24,
     maxMilitaryGoods: 10, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 1: 2 }, suppressionMilitaryGoodsCost: 1,
@@ -77,6 +90,7 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0, reanimationUnitType: UNIT_CATALOG.police.reanimation, noiseClass: 'medium', noiseRadius: 4,
   },
   nationalGuard: {
+    movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 44,
     maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
     attackMilitaryGoodsCostByRange: { 1: 2, 2: 4 }, suppressionMilitaryGoodsCost: 1,
@@ -86,6 +100,7 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0.5, reanimationUnitType: UNIT_CATALOG.nationalGuard.reanimation, noiseClass: 'large', noiseRadius: 8,
   },
   riotPolice: {
+    movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 24,
     maxMilitaryGoods: 10, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 1: 2 }, suppressionMilitaryGoodsCost: 1,
@@ -95,6 +110,7 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0, reanimationUnitType: UNIT_CATALOG.riotPolice.reanimation, noiseClass: 'medium', noiseRadius: 5,
   },
   reconTeam: {
+    movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 25, recruitAttack: 9, movement: 10, range: 6, vision: 10, population: 5, maxFuel: 44,
     maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
     attackMilitaryGoodsCostByRange: { 1: 6, 2: 6, 3: 6, 4: 6, 5: 6, 6: 6 }, suppressionMilitaryGoodsCost: 1,
@@ -104,42 +120,42 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0.5, reanimationUnitType: UNIT_CATALOG.reconTeam.reanimation, noiseClass: 'medium', noiseRadius: 6,
   },
   zombie: {
-    maxAttackCharges: 1,
+    movementDomain: 'ground', maxAttackCharges: 1,
     hp: 15, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   hordeZombie: {
-    maxAttackCharges: 4,
+    movementDomain: 'ground', maxAttackCharges: 4,
     hp: 40, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   policeZombie: {
-    maxAttackCharges: 1,
+    movementDomain: 'ground', maxAttackCharges: 1,
     hp: 10, attack: 5, movement: 3, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   soldierZombie: {
-    maxAttackCharges: 1,
+    movementDomain: 'ground', maxAttackCharges: 1,
     hp: 20, attack: 10, movement: 5, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   riotZombie: {
-    maxAttackCharges: 1,
+    movementDomain: 'ground', maxAttackCharges: 1,
     hp: 60, attack: 5, movement: 3, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
   },
   hunterZombie: {
-    maxAttackCharges: 1,
+    movementDomain: 'ground', maxAttackCharges: 1,
     hp: 20, attack: 15, movement: 15, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
@@ -148,6 +164,7 @@ const defaultUnitConfig: UnitConfigMap = {
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
+  nuclearPowerPlant: { workerCapacity: 5, production: production({}, {}, 'none', 0, 500), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
   temporaryHousing: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 25, visionRadius: 1, zombieTargetValue: 0 },
   armyBase: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
   capital: {
@@ -226,6 +243,7 @@ const initialResources: ResourceStock = {
 };
 
 const initialWorkersByFacility: Record<FacilityId, number> = {
+  'nuclear-power-plant-1': 0,
   'army-base-1': 0,
   capital: 51,
   'city-1': 0,
@@ -306,6 +324,7 @@ export const DEFAULT_CONFIG: GameConfig = {
       nationalGuard: 'recruit',
       riotPolice: 'recruit',
       reconTeam: 'recruit',
+      specialForces: 'regular',
     },
     recruitSurvivalTurnsRequired: 5,
     regularAttackMultiplier: 1.25,
@@ -346,18 +365,18 @@ export const DEFAULT_CONFIG: GameConfig = {
       passThrough: {
         turns: 0,
         workerRate: 1,
-        infectionRate: 0.5,
+        infectionRate: 0.25,
         infectionPopulationRate: 0.5,
       },
       normal: {
         turns: 2,
-        workerRate: 0.75,
-        infectionRate: 0.25,
-        infectionPopulationRate: 0.25,
+        workerRate: 1,
+        infectionRate: 0.05,
+        infectionPopulationRate: 1,
       },
       strict: {
-        turns: 4,
-        workerRate: 0.5,
+        turns: 5,
+        workerRate: 1,
         infectionRate: 0,
         infectionPopulationRate: 0,
       },
@@ -497,12 +516,15 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       requireInteger(errors, unit[key], `units.${type}.${key}`, 0);
     }
     const human = isHumanUnitType(type);
+    if (unit.movementDomain !== 'ground') errors.push(`units.${type}.movementDomain must be ground`);
     if (human) {
       const humanUnit = unit as GameConfig['units']['police'];
+      requireInteger(errors, humanUnit.regularAttackCharges, `units.${type}.regularAttackCharges`, 1);
+      requireInteger(errors, humanUnit.veteranAttackCharges, `units.${type}.veteranAttackCharges`, 1);
       requireInteger(errors, humanUnit.recruitAttack, `units.${type}.recruitAttack`, 1);
       requireInteger(errors, humanUnit.productionCivilianGoods, `units.${type}.productionCivilianGoods`, 0);
       requireInteger(errors, humanUnit.productionMilitaryGoods, `units.${type}.productionMilitaryGoods`, 0);
-      if (!Array.isArray(humanUnit.recruitmentFacilityTypes) || humanUnit.recruitmentFacilityTypes.length === 0) {
+      if (!Array.isArray(humanUnit.recruitmentFacilityTypes) || (type !== 'specialForces' && humanUnit.recruitmentFacilityTypes.length === 0)) {
         errors.push(`units.${type}.recruitmentFacilityTypes is required`);
       }
       if (!['policeLike', 'nationalGuardLike'].includes(humanUnit.fuelCostRule)) {
@@ -579,6 +601,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     'militaryFactory',
     'refinery',
     'powerPlant',
+    'nuclearPowerPlant',
     'windPowerPlant',
     'simpleFarm',
     'civilianDroneBase',
@@ -642,6 +665,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push('initialFacilityPopulation is required');
   } else {
     const facilityTypeById: Record<FacilityId, FacilityType> = {
+      'nuclear-power-plant-1': 'nuclearPowerPlant',
       'army-base-1': 'armyBase',
       capital: 'capital',
       'city-1': 'city',

@@ -6,6 +6,8 @@ export const UNIT_CATALOG = {
   nationalGuard: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
   riotPolice: { faction: 'human', ai: null, waveSlot: null, reanimation: 'riotZombie' },
   reconTeam: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
+  specialForces: { faction: 'human', ai: null, waveSlot: null, reanimation: 'packZombie' },
+  packZombie: { faction: 'zombie', ai: 'normal', waveSlot: null, reanimation: null },
   zombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
   hordeZombie: { faction: 'zombie', ai: 'horde', waveSlot: 'horde', reanimation: null },
   policeZombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },
@@ -40,4 +42,4 @@ export const HUMAN_UNIT_TYPES = Object.freeze(UNIT_TYPES.filter(isHumanUnitType)
 export const ZOMBIE_UNIT_TYPES = Object.freeze(UNIT_TYPES.filter(isZombieUnitType));
 export const WAVE_NON_HORDE_TYPES = Object.freeze(ZOMBIE_UNIT_TYPES.filter(
   (type) => UNIT_CATALOG[type].waveSlot === 'nonHorde',
-)) as readonly Exclude<ZombieUnitType, 'hordeZombie'>[];
+)) as readonly Exclude<ZombieUnitType, 'hordeZombie' | 'packZombie'>[];

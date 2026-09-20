@@ -726,7 +726,7 @@ function scoreAction(
       }
       const safeGuardPosition = unit.type === 'nationalGuard' && afterZombie <= effectiveRange && afterZombie > 1;
       if (unit.hp / unit.maxHp < BALANCED_THRESHOLDS.lowHpRatio && afterZombie <= 2 && !safeGuardPosition) {
-        score -= 2_000;
+        score -= 10_000;
         reasonCodes.push('AVOID_LOW_HP_RISK');
       }
       if (unit.hp < unit.maxHp && !unit.inSupply) {
@@ -780,7 +780,7 @@ function scoreAction(
       score += weights.recoveryWait * unit.recoveryRateIfTurnEndsNow * 2 * (1 - unit.hp / unit.maxHp);
       reasonCodes.push('COMBAT_RECOVERY_10_PERCENT');
     } else if (unit && unit.hp < unit.maxHp && unit.recoveryClassIfTurnEndsNow === 'outOfSupply') {
-      score -= weights.recoveryWait;
+      score -= weights.recoveryWait * 10;
       reasonCodes.push('RECOVERY_OUT_OF_SUPPLY');
     }
     if ((unit?.type === 'police' || unit?.type === 'riotPolice') && unit.inSupply && unit.hp === unit.maxHp

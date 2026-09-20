@@ -1,0 +1,102 @@
+[
+  {
+    "file": "facility_nuclear_power_plant.png",
+    "size": [
+      1254,
+      1254
+    ],
+    "mode": "RGBA",
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      0,
+      21,
+      1226,
+      1254
+    ],
+    "bytes": 1246135,
+    "sha256": "63f5d4cc6d86b95b647f6f2fc8b22680a568be1f853fba693c4058a397037c7f"
+  },
+  {
+    "file": "terrain_bridge.png",
+    "size": [
+      1254,
+      1254
+    ],
+    "mode": "RGBA",
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      73,
+      52,
+      1254,
+      1198
+    ],
+    "bytes": 315101,
+    "sha256": "061c307e24d677eee3c9286067e22ac1c1d3262f9e0616b93b39a149a58a0ba9"
+  },
+  {
+    "file": "terrain_water.png",
+    "size": [
+      1254,
+      1254
+    ],
+    "mode": "RGBA",
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      0,
+      7,
+      1208,
+      1237
+    ],
+    "bytes": 1632523,
+    "sha256": "31165c5bf62746e7095831d70db9e9555f48b03ef14585a5d70299c1d093c052"
+  },
+  {
+    "file": "unit_pack_zombie.png",
+    "size": [
+      1254,
+      1254
+    ],
+    "mode": "RGBA",
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      0,
+      0,
+      1236,
+      1228
+    ],
+    "bytes": 1665600,
+    "sha256": "d44e9d4373206d05bcc201b95bd8d91352681b884e9a25e9abb364eb899d2654"
+  },
+  {
+    "file": "unit_special_forces.png",
+    "size": [
+      1254,
+      1254
+    ],
+    "mode": "RGBA",
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      41,
+      49,
+      1222,
+      1254
+    ],
+    "bytes": 1332338,
+    "sha256": "43053cd672a746e55e929793c43f6e1e379aa9fff0117ecf2f00c02e18097c84"
+  }
+]

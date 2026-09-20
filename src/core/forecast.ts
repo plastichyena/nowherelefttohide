@@ -110,6 +110,7 @@ export function deriveStrategicForecast(state: Readonly<GameState>): StrategicFo
           {
             electricityContributorKind: largestFacility?.type === 'windPowerPlant'
               ? 'wind'
+              : largestFacility?.type === 'nuclearPowerPlant' ? 'nuclear'
               : largestFacility?.type === 'powerPlant'
                 ? 'fuel_power'
                 : null,
@@ -121,11 +122,12 @@ export function deriveStrategicForecast(state: Readonly<GameState>): StrategicFo
     }),
   ) as StrategicForecast['resources'];
 
-  const afterFood = Math.max(0, state.population.healthyCivilians - economy.food.shortage);
-  const afterCivilianGoods = Math.max(0, afterFood - economy.civilianGoods.maintenanceShortage);
+  const afterFood = Math.max(0, state.population.healthyCivilians - economy.publicHealth.starvation.allocations.filter(p => p.kind === 'facility').reduce((n,p) => n + p.loss,0));
+  const afterCivilianGoods = afterFood;
   const guaranteed = afterCivilianGoods === 0;
   return {
     productionCapacity: forecastProductionCapacity(state),
+    refineryAllowance: { ...economy.refineryAllowance },
     nextTurnPenalties: forecastNextTurnPenalties(state),
     resources,
     guaranteedDefeat: {

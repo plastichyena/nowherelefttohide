@@ -48,6 +48,7 @@ export type FacilityType =
   | 'oilField'
   | 'refinery'
   | 'powerPlant'
+  | 'nuclearPowerPlant'
   | 'windPowerPlant'
   | 'simpleFarm'
   | 'civilianDroneBase'
@@ -74,6 +75,8 @@ export type UnitType =
   | 'nationalGuard'
   | 'riotPolice'
   | 'reconTeam'
+  | 'specialForces'
+  | 'packZombie'
   | 'zombie'
   | 'hordeZombie'
   | 'policeZombie'
@@ -86,7 +89,10 @@ export type UnitType =
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
 
-export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam'>;
+export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam' | 'specialForces'>;
+
+export type MovementDomain = 'ground';
+export interface InfectionGrace { count: number; spreadsFromTurn: number }
 
 export type ZombieUnitType = Exclude<UnitType, HumanUnitType>;
 
@@ -206,6 +212,7 @@ export interface FixedMap {
 }
 
 export interface FacilityState extends FacilityDefinition {
+  infectionGrace?: InfectionGrace[];
   armyBase?: { militaryGoods: number; interceptionsRemaining: number; reward: 'unclaimed' | 'pending' | 'claimed' | 'expired' };
   owner: 'player' | 'none';
   status: FacilityStatus;
@@ -254,6 +261,7 @@ export interface PopulationState {
   nationalGuard: number;
   riotPolice: number;
   reconTeam: number;
+  specialForces: number;
   /** Population in units is tracked separately from civilian workers. */
   unitPopulation: number;
   /** Facility assignment is kept as an array so it remains JSON-only. */
@@ -286,6 +294,9 @@ export interface CityPopulationSnapshot {
 }
 
 export interface UnitState {
+  movementDomain: MovementDomain;
+  /** Private scheduling gate for atomic reanimation. */
+  firstZombieActionTurn?: number;
   /** Same-Hex Human reanimation only; cleared on exit or obstacle destruction. */
   reanimatedOnBarbedWireId?: string;
   id: string;
@@ -337,6 +348,7 @@ export interface UnitState {
 }
 
 export interface CheckpointState {
+  infectionGrace?: InfectionGrace[];
   id: string;
   position: HexCoord;
   direction: CardinalDirection;
@@ -486,6 +498,8 @@ export type GameEventType =
   | 'refugees_arrived'
   | 'refugees_screened'
   | 'latent_infection'
+  | 'public_health_infection'
+  | 'nuclear_objective_updated'
   | 'infection_spread'
   | 'site_infection_started'
   | 'infection_suppressed'
@@ -692,6 +706,13 @@ export interface GameStatistics {
   screamerZombiesKilled: number;
   screamerZombiesSpawned: number;
   screamerScreams: number;
+  packZombiesSpawned: number;
+  packZombiesKilled: number;
+  specialForcesReanimations: number;
+  starvationDeaths: number;
+  screeningInfections: number;
+  waitingInfections: number;
+  livingConditionInfections: number;
   housingBuilt: number;
   housingResidentTurns: number;
   housingCivilianGoodsProduced: number;
@@ -699,8 +720,8 @@ export interface GameStatistics {
   gasExplosions: number;
   gasExplosionUnitDamage: number;
   riotPoliceReanimations: number;
-  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie' | 'screamerZombie', number>;
-  finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie' | 'screamerZombie', number>;
+  hordeSpecialSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie' | 'screamerZombie' | 'packZombie', number>;
+  finalSpecialZombiesSpawnedByType: Record<'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie' | 'screamerZombie' | 'packZombie', number>;
   noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie' | 'screamerZombie' | 'armyBase' | 'windPowerPlant', number>;
   hordeMovementNoisePulses: number;
   hordeNoiseRespawnedByType: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie', number>;
@@ -735,6 +756,7 @@ export interface CivilianGoodsForecast extends ForecastResourceRequirement {
 export interface FuelForecast extends ForecastResourceRequirement {
   turnStartFuel: number;
   windPowerAvailable: number;
+  nuclearPowerAvailable: number;
   powerPlantPhysicalCapacity: number;
   projectedPowerFuelDemand: number;
   projectedPowerFuelUsed: number;
@@ -813,6 +835,7 @@ export interface GuaranteedDefeatForecast {
 export type QueuePressureClass = 'none' | 'low' | 'medium' | 'high';
 
 export interface StrategicForecast {
+  refineryAllowance: EndTurnForecast['refineryAllowance'];
   nextTurnPenalties: NextTurnPenaltyForecast;
   resources: Record<StrategicResourceType, CriticalResourceDependencyForecast>;
   guaranteedDefeat: GuaranteedDefeatForecast;
@@ -885,7 +908,7 @@ export interface NextTurnPenaltyForecast {
   targetTurn: number;
   overcrowding: {
     active: boolean;
-    facilities: Array<{ facilityId: FacilityId; excess: number; softCap: number }>;
+    facilities: Array<{ facilityId: FacilityId; excess: number; softCap: number; occupancy: number; capacity: number; extraFood: number; extraCivilianGoods: number; healthPressure: number }>;
     penaltyRatio: number;
     additionalFood: number;
     additionalCivilianGoods: number;
@@ -894,6 +917,7 @@ export interface NextTurnPenaltyForecast {
 }
 
 export interface EndTurnForecast {
+  publicHealth: import('./public-health').PublicHealthForecast;
   housingOutage: HousingOutageForecast;
   populationConsumers: number;
   maintenancePopulation: { residents: number; workers: number; units: number; queue: { waiting: number; screening: number; approved: number } };
@@ -901,7 +925,7 @@ export interface EndTurnForecast {
 
   overcrowding: {
     /** Exact sum represented as per-city rational terms. */
-    cities: Array<{ facilityId: FacilityId; excess: number; softCap: number }>;
+    cities: Array<{ facilityId: FacilityId; excess: number; softCap: number; occupancy: number; capacity: number; extraFood: number; extraCivilianGoods: number; healthPressure: number }>;
     additionalFood: number;
     additionalCivilianGoods: number;
   };
@@ -915,6 +939,8 @@ export interface EndTurnForecast {
     availableForRefining: number;
     fuelRefined: number;
     remaining: number;
+    netBurn: number;
+    estimatedTurnsRemaining: number | null;
   };
   electricity: {
     physicalGenerationCapacity: number;
@@ -933,6 +959,15 @@ export interface EndTurnForecast {
 export type CrisisSeverity = 'critical' | 'warning' | 'advisory';
 
 export type CrisisReasonCode =
+  | 'capital_resident_minimum'
+  | 'public_health_food_stress'
+  | 'public_health_civilian_goods_stress'
+  | 'food_starvation_risk'
+  | 'internal_infection_risk'
+  | 'checkpoint_health_risk'
+  | 'refinery_allowance_runway_risk'
+  | 'nuclear_early_capture_window'
+  | 'nuclear_power_outage'
   | 'overcrowding_forecast'
   | 'temporary_housing_outage_forecast'
   | 'capital_infection_uncontained'
@@ -991,6 +1026,10 @@ export interface BarbedWireState {
 }
 
 export interface GameState {
+  publicHealthStress: { food: number; civilianGoods: number };
+  foodShortageAccumulation: number;
+  starvationCarry: number;
+  nuclearObjective: { firstCapturedTurn: number | null; reward: 'unclaimed' | 'pending' | 'claimed' | 'expired'; failureSpawn: 'none' | 'pending' | 'spawned' };
   barbedWire: BarbedWireState[];
   nextBarbedWireNumber: number;
   /** Private seed-bound initial Hunter placement; never part of Agent map. */
@@ -1185,6 +1224,7 @@ export interface HeadlessGame {
 }
 
 export interface BaseUnitConfig {
+  movementDomain: MovementDomain;
   hp: number;
   movement: number;
   range: number;
@@ -1200,13 +1240,15 @@ export interface BaseUnitConfig {
 }
 
 export interface HumanUnitConfig extends BaseUnitConfig {
+  regularAttackCharges: number;
+  veteranAttackCharges: number;
   recruitAttack: number;
   recruitmentFacilityTypes: Array<'capital' | 'city' | 'armyBase'>;
   productionCivilianGoods: number;
   productionMilitaryGoods: number;
   fuelCostRule: 'policeLike' | 'nationalGuardLike';
   suppressionCivilianDamageRate: number;
-  reanimationUnitType: 'policeZombie' | 'soldierZombie' | 'riotZombie';
+  reanimationUnitType: 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'packZombie';
   noiseClass: NoiseClass;
   noiseRadius: number;
 }
@@ -1223,6 +1265,8 @@ export interface UnitConfigMap {
   nationalGuard: HumanUnitConfig;
   riotPolice: HumanUnitConfig;
   reconTeam: HumanUnitConfig;
+  specialForces: HumanUnitConfig;
+  packZombie: ZombieUnitConfig;
   zombie: ZombieUnitConfig;
   hordeZombie: ZombieUnitConfig;
   policeZombie: ZombieUnitConfig;

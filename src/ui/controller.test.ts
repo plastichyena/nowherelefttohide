@@ -14,7 +14,7 @@ import type { AgentFacilityObservation } from '../agent/types';
 import { createDefaultConfig } from '../core/config';
 import { forecastEndTurn, GameEngine } from '../core/engine';
 import { createAgentObservation } from '../agent/observation';
-import { actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, hordeCompositionLabel, hordePublicCounts, hordePublicEventViewModels, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, newGameRefugeeDefaults, nextTurnPenaltyForecastSummary, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectHordePublicEvent, projectImportantEvent, recruitmentOptionsForFacility, renderArmyBaseDetails, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderHordePublicEventHistory, renderHordeWarningCard, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNextTurnPenaltyForecast, renderNoiseEventLog, renderRecruitmentAccordion, renderUnitMilitaryGoodsDetails, renderVictoryProgress, resolveTileSelection, roadBranchForPosition, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep, victoryProgressViewModel } from './controller';
+import { crisisSummaryViewModel, renderCrisisStrip, actionForCheckpointCandidate, boardLegendViewModel, branchPanelViewModel, checkpointCandidateViewModels, checkpointRoleFor, formatImportantEvent, hordeCompositionLabel, hordePublicCounts, hordePublicEventViewModels, importantEventToastText, importantEventViewModels, loadValidationError, localizeActionError, localizeSaveLoadError, newGameRefugeeDefaults, nextTurnPenaltyForecastSummary, noiseClassForUnit, phaseIndicatorViewModel, placeBoardContextUi, powerHudViewModel, projectHordePublicEvent, projectImportantEvent, recruitmentOptionsForFacility, renderArmyBaseDetails, renderAttackPreview, renderBoardLegend, renderBranchPanel, renderEndTurnForecast, renderHordePublicEventHistory, renderHordeWarningCard, renderImportantEventHistory, renderMilitaryGoodsForecast, renderNextTurnPenaltyForecast, renderNoiseEventLog, renderRecruitmentAccordion, renderUnitMilitaryGoodsDetails, renderVictoryProgress, resolveTileSelection, roadBranchForPosition, selectionShowsSupplyOverlay, shouldAutosaveAfterLoad, titleVersionLabel, unitActionAvailability, unitInteractionCancelStep, victoryProgressViewModel } from './controller';
 import { ASSET_REGISTRY } from './boardAssets';
 import { createTranslator } from './i18n';
 import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
@@ -61,8 +61,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.6.2');
-    expect(titleVersionLabel('en')).toContain('1.6.2');
+    expect(titleVersionLabel('ja')).toContain('1.6.3');
+    expect(titleVersionLabel('en')).toContain('1.6.3');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -309,26 +309,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.6.1-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.6.2-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.1以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.2');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.2以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.3');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.1 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.2');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.2 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.3');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 12.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 19');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 12.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 19');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 13.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 20');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 13.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 20');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.1以前' : 'v1.6.1 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.1以前' : 'v1.6.1 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.1以前' : 'v1.6.1-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.1以前' : 'v1.6.1-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.1以前' : 'v1.6.1-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2-or-earlier');
     }
   });
 
@@ -932,4 +932,15 @@ describe('controller view models', () => {
     expect(registryLegend).toContain('/assets/board/units/unit_riot_zombie.png');
     expect(registryLegend).toContain('/assets/board/units/unit_hunter_zombie.png');
   });
+});
+
+
+it.each(['ja', 'en'] as const)('renders v1.6.3 starvation causes and numbers in %s without internal codes', locale => {
+  const summary = crisisSummaryViewModel({ crisisSummary: { alerts: [{ id:'starvation',severity:'critical',reasonCode:'food_starvation_risk',entityIds:[],publicFacts:{rate:0.05,populationLost:3,accumulation:4.5,carry:0.25} }] } });
+  const html = renderCrisisStrip(summary, locale);
+  expect(html).toContain(locale === 'ja' ? '飢餓死亡の危険' : 'Starvation danger');
+  expect(html).toContain('5%');
+  expect(html).toContain('3');
+  expect(html).not.toContain('food_starvation_risk');
+  expect(html).not.toContain('{populationLost}');
 });

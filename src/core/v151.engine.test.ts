@@ -155,12 +155,13 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
     const result = new GameEngine(151, config).step({ type: 'EndTurn' });
     expect(result.error?.message ?? null).toBeNull();
     const wave = result.state.units.filter((unit) => unit.hordeKind === 'final');
-    expect(wave).toHaveLength(64);
+    expect(wave).toHaveLength(65);
+    expect(wave.filter(unit => unit.type === 'packZombie')).toHaveLength(1);
     for (const group of result.state.horde.finalSpawnGroupIds) {
       const units = wave.filter((unit) => unit.spawnGroupId === group);
       expect(units.filter((unit) => unit.type === 'riotZombie')).toHaveLength(1);
       expect(units.filter((unit) => unit.type === 'hunterZombie')).toHaveLength(1);
-      expect(units.filter((unit) => unit.type !== 'hordeZombie').every((unit) => unit.maxAttackCharges === 1)).toBe(true);
+      expect(units.filter((unit) => unit.type !== 'hordeZombie' && unit.type !== 'packZombie').every((unit) => unit.maxAttackCharges === 1)).toBe(true);
     }
   });
 });

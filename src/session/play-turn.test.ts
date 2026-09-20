@@ -31,6 +31,9 @@ function observation(state: RuntimeState): AgentObservation {
     emergencyMovementPoints: 0, emergencyMovementAvailable: false,
   };
   return {
+    publicHealth: { stress: { food: 0, civilianGoods: 0 }, foodShortageAccumulation: 0, starvationCarry: 0 },
+    refineryAllowance: { initialAllowance:1000,oilCreditsEarned:0,fuelRefined:0,remainingAllowance:1000 },
+    nuclearObjective: { firstCapturedTurn: null, reward: 'unclaimed', deadlineTurn: 20 },
     apiVersion: '11.0.0', gameRulesVersion: '6.0.0', turn: state.turn, finalHordeTurn: 50, phase: 'player',
     map: { id: 'test-map', width: 2, height: 1, coordinateSystem: 'axial-q-r', hordeSpawnReserve: [], tiles: [] } as never,
     resources: { food: 10, civilianGoods: 10, militaryGoods: 10, fuel: 10, electricityCapacity: 0, electricityRequired: 0 },
@@ -45,7 +48,7 @@ function observation(state: RuntimeState): AgentObservation {
     finalHordeDefeated: false, suppliedAreaZombieClear: !state.enemy, suppliedAreaInfectionClear: true,
     crisisSummary: { alerts: state.crisis > 0 ? [{ id: 'unit_out_of_supply_risk:unit-1', severity: 'warning', category: 'unit', reasonCode: 'unit_out_of_supply_risk', entityIds: ['unit-1'], publicFacts: { hp: state.crisis, fuel: 1, militaryGoods: 1 } }] : [], criticalCount: 0, warningCount: state.crisis > 0 ? 1 : 0, advisoryCount: 0 },
     endTurnRisk: { readyUnits: [], unitsWithMoveRemaining: [], unitsWithAttackChargesRemaining: [], uncontainedInfectedSites: [], criticalAlerts: [], forecastGuaranteedDefeat: false },
-    endTurnForecast: { overcrowding: { cities: [], additionalCivilianGoods: 0, additionalFood: 0 }, food: { shortage: 0 }, civilianGoods: { shortage: 0 }, militaryGoods: { totalUnfilledRefillDemand: 0, units: [] }, fuel: { totalFuelShortage: 0, windPowerAvailable: 0 }, electricity: { shortage: 0 } } as never,
+    endTurnForecast: { publicHealth: { foodDeficit: 0, civilianGoodsDeficit: 0, stressBefore: {food:0,civilianGoods:0}, stressAfter: {food:0,civilianGoods:0}, accumulationBefore:0, accumulationAfter:0, threshold:2, accumulationCap:7, starvationRate:0, starvation:{population:1,loss:0,carryBefore:0,carryAfter:0,allocations:[]},facilities:[],checkpoints:[],conditions:'No shortage in protocol fixture.' }, overcrowding: { cities: [], additionalCivilianGoods: 0, additionalFood: 0 }, food: { shortage: 0 }, civilianGoods: { shortage: 0 }, militaryGoods: { totalUnfilledRefillDemand: 0, units: [] }, fuel: { totalFuelShortage: 0, windPowerAvailable: 0 }, electricity: { shortage: 0 } } as never,
     strategicForecast: { resources: {}, guaranteedDefeat: { guaranteed: false }, productionCapacity: { targetTurn: state.turn, cityPopulationBasis: 'current_healthy_residents', facilityScope: 'player_owned_completed_not_ruined_including_temporarily_unavailable', boundsSimultaneouslyAchievable: false, blockingReasonsOverlap: true, exactReallocationCapacityComputed: false, availableCityPopulation: 1, remainingActions: 1, resources: Object.fromEntries(['food', 'civilianGoods', 'militaryGoods', 'fuel'].map((key) => [key, { projectedEndTurnOutput: 0, ratedUpperBoundAtCurrentCityPopulation: 0, ratedGapUpperBound: 0, utilizationRatio: null, blockingReasonCounts: {} }])), electricity: { availableGenerationCapacity: 0, demand: 0, allocated: 0, unallocatedAvailableCapacity: 0, storable: false, fuelBasis: 'turn_start_stock' }, facilities: [] } } as never,
     gameOver: false, result: null,
   };
@@ -127,7 +130,7 @@ describe('play-turn protocol', () => {
     try {
       expect(api.query('game', { target: 'api', expectedRevision: 0 }).value).toMatchObject({
         unavailable: true,
-        sessionPlayTurn: { protocolVersion: '1.1.0', portableLauncher: './run-session.sh', portableLauncherWindows: '.\\run-session.cmd', limits: { maxPlanBytes: 8 * 1024 * 1024 } },
+        sessionPlayTurn: { protocolVersion: '1.2.0', portableLauncher: './run-session.sh', portableLauncherWindows: '.\\run-session.cmd', limits: { maxPlanBytes: 8 * 1024 * 1024 } },
       });
       expect(api.query('game', { target: 'legal-actions', expectedRevision: 0 }).revision).toBe(0);
       expect(api.playTurnAction('game', { type: 'action', requestId: 'interactive-runtime-1', action: { type: 'Wait', unitId: 'safe' }, decisionSummary: 'Use the retained runtime.', expectedRevision: 0 })).toMatchObject({ accepted: true, currentRevision: 1 });

@@ -89,7 +89,7 @@ it('keeps excess approved refugees queued and rejects worker withdrawal when onl
   expect(engine.step({ type: 'LoadSnapshot', snapshot: overCapacity }).error?.code).toBe('invalid_snapshot');
 });
 
-it('charges 25 for initial-post relocation and rear construction, and resolves Strict after four screening turns', () => {
+it('charges 25 for initial-post relocation and rear construction, and resolves Strict after five screening turns', () => {
   const engine = new GameEngine(1, quiet());
   const initial = engine.getState().resources.civilianGoods;
   expect(engine.step({ type: 'RelocateCheckpoint', checkpointId: 'checkpoint-2', position: { q: 29, r: 25 } }).error).toBeNull();
@@ -101,9 +101,9 @@ it('charges 25 for initial-post relocation and rear construction, and resolves S
   prepareTestSnapshot(state);
   expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
   expect(engine.step({ type: 'SetCheckpointPolicy', branchId: 'north', policy: 'strict' }).error).toBeNull();
-  expect(engine.step({ type: 'EndTurn' }).state.checkpoints[0]).toMatchObject({ screening: 20, remainingTurns: 4 });
+  expect(engine.step({ type: 'EndTurn' }).state.checkpoints[0]).toMatchObject({ screening: 20, remainingTurns: 5 });
   const civilians = engine.getState().population.healthyCivilians;
-  for (const remainingTurns of [3, 2, 1]) {
+  for (const remainingTurns of [4, 3, 2, 1]) {
     const next = engine.step({ type: 'EndTurn' });
     expect(next.error).toBeNull();
     expect(next.state.checkpoints[0]).toMatchObject({ screening: 20, remainingTurns });
@@ -111,7 +111,7 @@ it('charges 25 for initial-post relocation and rear construction, and resolves S
   const resolved = engine.step({ type: 'EndTurn' });
   expect(resolved.error).toBeNull();
   expect(resolved.state.checkpoints[0]).toMatchObject({ screening: 0, remainingTurns: 0, infected: 0 });
-  expect(resolved.state.population.healthyCivilians).toBe(civilians + 10);
+  expect(resolved.state.population.healthyCivilians).toBe(civilians + 20);
 });
 
 it('receives the ordinary first scheduled arrivals at all four initial checkpoints', () => {

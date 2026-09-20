@@ -1,4 +1,6 @@
 import { populationReceptionCapacity } from './state';
+import { withdrawableResidents } from './economy-query';
+import { addInfectionGrace, binomial, consumeInfected, domainRng, graceCount, internalInfectionRisk, screeningProbability, starvationAllocation, starvationPools, waitingProbability } from './public-health';
 import { stableFacilities, eligibleSnapshotCities, availableSupplyPopulation, calculateEconomyPlan, forecastEndTurn, forecastUnitRefills, forecastFacilityProduction, forecastNextTurnPenalties } from './economy-query';
 export { forecastEndTurn, forecastUnitRefills, forecastFacilityProduction, forecastProductionCapacity, forecastNextTurnPenalties } from './economy-query';
 import { getUnitLegalAttackProjections, forecastUnitSuppression, infectedSuppressionTarget } from './combat-query';
@@ -285,6 +287,11 @@ const FIRST_CAPTURE_REWARDS: Partial<Record<FacilityState['type'], Partial<Recor
 };
 
 function claimFirstCaptureReward(state: GameState, facility: FacilityState): Partial<Record<ResourceType, number>> {
+  if (facility.type === 'nuclearPowerPlant' && state.nuclearObjective.firstCapturedTurn === null) {
+    state.nuclearObjective.firstCapturedTurn = state.turn;
+    if (state.turn <= 20) state.nuclearObjective.reward = 'pending';
+    settleNuclearObjective(state);
+  }
   if (facility.firstCaptureRewardClaimed) return {};
   facility.firstCaptureRewardClaimed = true;
   const reward = FIRST_CAPTURE_REWARDS[facility.type] ?? {};
@@ -292,6 +299,44 @@ function claimFirstCaptureReward(state: GameState, facility: FacilityState): Par
     state.resources[resource] += amount;
   }
   return reward;
+}
+
+export function nuclearReinforcementPosition(state: Readonly<GameState>, reward: boolean): HexCoord | null {
+  const plant = state.facilities.find(f => f.type === 'nuclearPowerPlant');
+  if (!plant) return null;
+  const occupied = occupiedKeys(state);
+  const tile = state.map.tiles.filter(t => !occupied.has(t.key) && effectiveMovementCost(state, t, false) !== null && (reward ? canPlayerOccupyHex(state.map, t) : !wireAt(state, t)))
+    .sort((a,b) => hexDistance(plant.position,a) - hexDistance(plant.position,b) || a.q-b.q || a.r-b.r)[0];
+  return tile ? { q: tile.q, r: tile.r } : null;
+}
+
+function settleNuclearObjective(state: GameState): void {
+  const objective = state.nuclearObjective;
+  const plant = state.facilities.find(f => f.type === 'nuclearPowerPlant');
+  if (!plant) return;
+  if (state.turn >= 21 && objective.reward === 'unclaimed') {
+    objective.reward = 'expired'; objective.failureSpawn = 'pending';
+    emit(state, 'nuclear_objective_updated', { reward: 'expired', deadlineTurn: 20, reason: 'deadline_expired' });
+  }
+  const reward = objective.reward === 'pending';
+  if (!reward && objective.failureSpawn !== 'pending') return;
+  const position = nuclearReinforcementPosition(state, reward);
+  if (!position) return;
+  const unit = createUnit(state, `${reward ? 'special-forces' : 'pack-zombie'}-${state.nextUnitNumber++}`, reward ? 'specialForces' : 'packZombie', { q: position.q, r: position.r }, 'ready', 'regular');
+  unit.canMove = true; unit.canAttack = true;
+  if (!reward) unit.firstZombieActionTurn = state.turn;
+  state.units.push(unit);
+  if (reward) {
+    objective.reward = 'claimed'; state.population.cumulativeReinforcements += unit.population;
+    emit(state, 'nuclear_objective_updated', { reward: 'claimed', unitId: unit.id, facilityId: plant.id, reinforcementPopulation: unit.population });
+  } else {
+    objective.failureSpawn = 'spawned'; state.statistics.packZombiesSpawned += 1;
+    const rng = domainRng(state.seed, 'nuclear-failure-occupancy');
+    const queue: SpawnOccupancyEntry[] = [];
+    applyGeneratedZombieOccupancy(state, unit, rng, queue, '', 0);
+    processSpawnOccupancyQueue(state, rng, queue);
+  }
+  synchronizePopulation(state);
 }
 
 function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRng.fromState(state.rngState)): void {
@@ -331,6 +376,7 @@ function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRn
     facility.populationOperationalTurn = state.turn + 1;
     facility.securedOrder ??= state.facilities.reduce((max, f) => Math.max(max, f.securedOrder ?? -1), -1) + 1;
     facility.lastAssignedOrder = state.nextAssignmentOrder++;
+    if (facility.type === 'nuclearPowerPlant') claimFirstCaptureReward(state, facility);
     emit(state, 'facility_recovered', { facilityId: facility.id, unitId: unit.id, recovering: true });
     return;
   }
@@ -403,7 +449,7 @@ function withdrawFromSupplyCities(state: GameState, amount: number): Array<{ fac
   let remaining = amount;
   const changes: Array<{ facilityId: string; people: number }> = [];
   for (const city of eligibleSnapshotCities(state, 'supply')) {
-    const people = Math.min(remaining, city.workers);
+    const people = Math.min(remaining, withdrawableResidents(city));
     if (people > 0) changes.push({ facilityId: city.id, people });
     remaining -= people;
     if (remaining === 0) break;
@@ -448,36 +494,22 @@ function distributeToReceptionCities(state: GameState, amount: number): Array<{ 
     .map(([facilityId, people]) => ({ facilityId, people }));
 }
 
-function healthyLatentInfectionTargets(state: GameState): FacilityState[] {
-  return state.facilities
-    .filter(
-      (facility) =>
-        facility.owner === 'player' &&
-        facility.status === 'owned' &&
-        facility.workers > 0,
-    )
-    .sort((left, right) => left.id.localeCompare(right.id));
-}
-
-function establishLatentInfectionInState(
-  state: GameState,
-  rng: SeededRng,
-  checkpointId: string,
-  latentInfected: number,
-): void {
-  if (latentInfected <= 0) return;
-  const candidates = healthyLatentInfectionTargets(state);
-  if (candidates.length === 0) return;
-  const target = rng.pick(candidates);
-  const converted = Math.min(target.workers, latentInfected);
-  const wasInfected = target.infected > 0;
-  target.workers -= converted;
-  target.infected += converted;
-  target.operationalStatus = 'infected';
-  if (converted > 0 && !wasInfected) {
-    markSiteInfectionStarted(state, 'facility', target.id, target.type, target.position, converted, 'latent_infection');
+function infectAcceptedRefugees(state: GameState, sourceId: string, placements: Array<{ facilityId: string; people: number }>, probability: number, rng: SeededRng): void {
+  for (const placement of placements) {
+    const target = getFacilityState(state, placement.facilityId)!;
+    const converted = binomial(placement.people, probability, domainRng(state.seed, 'screening:' + state.turn + ':' + sourceId + ':' + target.id));
+    if (converted <= 0) continue;
+    const wasInfected = target.infected > 0;
+    target.workers -= converted; target.infected += converted; addInfectionGrace(target, converted, state.turn);
+    target.operationalStatus = 'infected';
+    state.statistics.screeningInfections += converted;
+    state.statistics.infectionLosses += converted;
+    state.statistics.civilianLosses += converted;
+    if (!wasInfected) markSiteInfectionStarted(state, 'facility', target.id, target.type, target.position, converted, 'latent_infection');
+    emit(state, 'latent_infection', { checkpointId: sourceId, facilityId: target.id, infected: converted, probability, populationAtRisk: placement.people, cause: 'screening', spreadsFromTurn: state.turn + 1 });
+    if (target.workers === 0) overrunFacility(state, target, rng);
+    if (checkImmediateDefeat(state)) return;
   }
-  emit(state, 'latent_infection', { checkpointId, facilityId: target.id, infected: converted });
 }
 
 function placeApprovedRefugees(state: GameState): void {
@@ -500,73 +532,25 @@ function placeApprovedRefugees(state: GameState): void {
 
 function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rng: SeededRng): void {
   const screened = checkpoint.screening;
-  if (screened <= 0) {
-    return;
-  }
-  const policy = state.config.refugees.policies[checkpoint.screeningPolicy];
-  checkpoint.screening = 0;
-  checkpoint.remainingTurns = 0;
-  const acceptedWorkers = Math.floor(screened * policy.workerRate);
-  const rejected = screened - acceptedWorkers;
-  state.population.cumulativeDepartures += rejected;
-  state.statistics.refugeesDeparted += rejected;
+  if (screened <= 0) return;
+  const probability = screeningProbability(checkpoint.screeningPolicy, checkpoint.waiting, state.config.refugees.screeningCapacity, state.publicHealthStress);
+  checkpoint.screening = 0; checkpoint.remainingTurns = 0;
   state.statistics.refugeesScreenedByPolicy[checkpoint.screeningPolicy] += screened;
-  state.statistics.refugeesAccepted += acceptedWorkers;
-  if (checkpoint.screeningPolicy === 'normal' || checkpoint.screeningPolicy === 'strict') {
-    state.statistics.refugeesRejectedByDirectionAndPolicy[checkpoint.direction][checkpoint.screeningPolicy] += rejected;
-    const contributesToFutureHorde = state.horde.finalHordeStatus === 'notStarted';
-    if (contributesToFutureHorde) {
-      state.rejectedRefugeesByDirection[checkpoint.direction][
-        checkpoint.screeningPolicy === 'normal' ? 'normalRejected' : 'strictRejected'
-      ] += rejected;
-    }
-    if (rejected > 0) {
-      emit(state, 'checkpoint_refugees_rejected', {
-        checkpointId: checkpoint.id,
-        direction: checkpoint.direction,
-        policy: checkpoint.screeningPolicy,
-        count: rejected,
-        contributesToFutureHorde,
-      });
-    }
-  }
-  let latentInfected = 0;
-  if (acceptedWorkers > 0 && policy.infectionRate > 0 && rng.chance(policy.infectionRate)) {
-    latentInfected = Math.ceil(acceptedWorkers * policy.infectionPopulationRate);
-  }
-  emit(state, 'refugees_screened', {
-    checkpointId: checkpoint.id,
-    screened,
-    acceptedWorkers,
-    policy: checkpoint.screeningPolicy,
-  });
-  const placements = distributeToReceptionCities(state, acceptedWorkers);
+  state.statistics.refugeesAccepted += screened;
+  emit(state, 'refugees_screened', { checkpointId: checkpoint.id, screened, acceptedWorkers: screened, policy: checkpoint.screeningPolicy, probability });
+  const placements = distributeToReceptionCities(state, screened);
   if (placements) {
-    for (const placement of placements) {
-      emit(state, 'population_transferred', {
-        from: checkpoint.id,
-        to: placement.facilityId,
-        people: placement.people,
-        reason: 'screening_approved',
-      });
-    }
-    establishLatentInfectionInState(state, rng, checkpoint.id, latentInfected);
+    for (const placement of placements) emit(state, 'population_transferred', { from: checkpoint.id, to: placement.facilityId, people: placement.people, reason: 'screening_approved' });
+    infectAcceptedRefugees(state, checkpoint.id, placements, probability, rng);
   } else {
-    checkpoint.approved += acceptedWorkers;
-    const converted = removeCheckpointPeople(
-      checkpoint,
-      latentInfected,
-      ['approved', 'screening', 'waiting'],
-    );
-    const wasInfected = checkpoint.infected > 0;
-    checkpoint.infected += converted;
-    if (converted > 0) {
-      if (!wasInfected) markSiteInfectionStarted(state, 'checkpoint', checkpoint.id, deriveCheckpointRole(state, checkpoint), checkpoint.position, converted, 'latent_infection');
-      emit(state, 'latent_infection', { checkpointId: checkpoint.id, infected: converted, pool: 'checkpoint' });
-    }
-    if (totalCheckpointPeople(checkpoint) === 0 && checkpoint.infected > 0) {
-      overrunCheckpoint(state, checkpoint, rng);
-    }
+    const converted = binomial(screened, probability, domainRng(state.seed, 'screening:' + state.turn + ':' + checkpoint.id + ':approved'));
+    checkpoint.approved += screened - converted;
+    checkpoint.infected += converted; addInfectionGrace(checkpoint, converted, state.turn);
+    state.statistics.screeningInfections += converted;
+    state.statistics.infectionLosses += converted;
+    state.statistics.civilianLosses += converted;
+    if (converted > 0) emit(state, 'latent_infection', { checkpointId: checkpoint.id, infected: converted, probability, pool: 'approved', cause: 'screening', spreadsFromTurn: state.turn + 1 });
+    if (totalCheckpointPeople(checkpoint) === 0 && checkpoint.infected > 0) overrunCheckpoint(state, checkpoint, rng);
   }
 }
 
@@ -650,30 +634,10 @@ function processUnmanagedArrival(
       reason: 'unmanaged_pass_through',
     });
   }
-  if (accepted > 0 && policy.infectionRate > 0 && rng.chance(policy.infectionRate)) {
-    establishLatentInfectionInState(
-      state,
-      rng,
-      `road-${branchId}`,
-      Math.ceil(accepted * policy.infectionPopulationRate),
-    );
-  }
+  infectAcceptedRefugees(state, 'road-' + branchId, placements, screeningProbability('passThrough', 0, state.config.refugees.screeningCapacity, state.publicHealthStress), rng);
 }
 
 function processRefugees(state: GameState, rng: SeededRng): void {
-  for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
-    const risk = checkpoint.waitingRiskPercent ?? 0;
-    checkpoint.waitingRiskPercent = 0;
-    if (risk > 0 && checkpoint.waiting > 0 && rng.nextInt(1, 100) <= risk) {
-      const infected = removeWaitingPeople(
-        checkpoint,
-        rng.nextInt(state.config.refugees.waitingRiskInfectionMin, state.config.refugees.waitingRiskInfectionMax),
-      );
-      checkpoint.infected += infected;
-      if (infected > 0) emit(state, 'checkpoint_waiting_risk_infection', { checkpointId: checkpoint.id, infected });
-    }
-  }
-
   for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!['operational', 'remnant'].includes(checkpoint.status)) continue;
     if (checkpoint.screening > 0 && checkpoint.remainingTurns > 0) {
@@ -747,13 +711,16 @@ function processRefugees(state: GameState, rng: SeededRng): void {
   }
   for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!['operational', 'remnant'].includes(checkpoint.status)) continue;
-    checkpoint.waitingRiskPercent = Math.min(
-      state.config.refugees.waitingRiskMaxPercent,
-      Math.max(0, checkpoint.waiting - state.config.refugees.waitingRiskThreshold),
-    );
-    if (checkpoint.waitingRiskPercent > 0) emit(state, 'checkpoint_waiting_risk_reserved', {
-      checkpointId: checkpoint.id, riskPercent: checkpoint.waitingRiskPercent,
-    });
+    const probability = waitingProbability(checkpoint.waiting, state.config.refugees.screeningCapacity, state.publicHealthStress);
+    const converted = binomial(checkpoint.waiting, probability, domainRng(state.seed, 'waiting:' + state.turn + ':' + checkpoint.id));
+    checkpoint.waitingRiskPercent = probability * 100;
+    removeWaitingPeople(checkpoint, converted); checkpoint.infected += converted; addInfectionGrace(checkpoint, converted, state.turn);
+    state.statistics.waitingInfections += converted;
+    state.statistics.infectionLosses += converted;
+    state.statistics.civilianLosses += converted;
+    if (converted > 0) emit(state, 'checkpoint_waiting_risk_infection', { checkpointId: checkpoint.id, infected: converted, probability, populationAtRisk: checkpoint.waiting + converted, causes: { foodStress: state.publicHealthStress.food, civilianGoodsStress: state.publicHealthStress.civilianGoods }, cause: 'waiting', spreadsFromTurn: state.turn + 1 });
+    if (totalCheckpointPeople(checkpoint) === 0 && checkpoint.infected > 0) overrunCheckpoint(state, checkpoint, rng);
+    if (checkImmediateDefeat(state)) return;
   }
   resolveCheckpointRemnants(state);
 }
@@ -778,71 +745,28 @@ function expireNeutralFacilitySurvivors(state: GameState): void {
   }
 }
 
-function removeWorkersForShortage(state: GameState, amount: number, resource: 'food' | 'civilianGoods'): number {
-  let remaining = Math.max(0, Math.floor(amount));
-  let removed = 0;
-  const directionOrder = new Map(CANONICAL_DIRECTIONS.map((direction, index) => [direction, index]));
-  const checkpoints = [...state.checkpoints].sort(
-    (left, right) =>
-      (directionOrder.get(left.direction) ?? Number.MAX_SAFE_INTEGER) -
-        (directionOrder.get(right.direction) ?? Number.MAX_SAFE_INTEGER) ||
-      left.id.localeCompare(right.id),
-  );
-  for (const checkpoint of checkpoints) {
-    const loss = Math.min(remaining, totalCheckpointPeople(checkpoint));
-    if (loss <= 0) continue;
-    const actual = removeCheckpointPeople(checkpoint, loss, ['waiting', 'screening', 'approved']);
-    remaining -= actual;
-    removed += actual;
-    emit(state, 'resource_shortage', {
-      resource,
-      checkpointId: checkpoint.id,
-      populationLost: actual,
-      rejectedCounterChanged: false,
-    });
-    if (remaining === 0) break;
-  }
-  const cities = state.cityPopulationSnapshot.supply
-    .map((entry) => getFacilityState(state, entry.facilityId))
-    .filter(
-      (facility): facility is FacilityState =>
-        facility !== undefined && facility.owner === 'player' && isCityFacility(facility) && facility.workers > 0,
-    );
-  for (const facility of cities) {
-    const loss = Math.min(remaining, facility.workers);
-    facility.workers -= loss;
-    if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
-    remaining -= loss;
-    removed += loss;
-    if (loss > 0) emit(state, 'resource_shortage', { resource, facilityId: facility.id, populationLost: loss });
-    if (remaining === 0) break;
-  }
-  const facilities = [...state.facilities]
-    .filter(
-      (facility) =>
-        facility.owner === 'player' && isProductionFacility(facility) && facility.workers > 0,
-    )
-    .sort(
-      (left, right) =>
-        (right.securedOrder ?? -1) - (left.securedOrder ?? -1) || left.id.localeCompare(right.id),
-    );
-  for (const facility of facilities) {
-    const loss = Math.min(remaining, facility.workers);
-    facility.workers -= loss;
-    if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
-    remaining -= loss;
-    removed += loss;
-    if (loss > 0) emit(state, 'resource_shortage', { resource, facilityId: facility.id, populationLost: loss });
-    if (remaining === 0) {
-      break;
+function applyStarvation(state: GameState, rate: number): void {
+  const plan = starvationAllocation(starvationPools(state), rate, state.starvationCarry);
+  state.starvationCarry = plan.carryAfter;
+  for (const allocation of plan.allocations) {
+    if (allocation.loss <= 0) continue;
+    if (allocation.kind === 'facility') {
+      const site = getFacilityState(state, allocation.id)!; site.workers -= allocation.loss;
+      if (site.armyBase) site.armyBase.interceptionsRemaining = Math.min(site.armyBase.interceptionsRemaining, site.workers);
+    } else {
+      const site = state.checkpoints.find(c => c.id === allocation.id)!;
+      if (allocation.pool === 'waiting') removeWaitingPeople(site, allocation.loss);
+      else if (allocation.pool === 'screening' || allocation.pool === 'approved') site[allocation.pool] -= allocation.loss;
+      if (site.screening === 0) site.remainingTurns = 0;
     }
+    emit(state, 'resource_shortage', { resource: 'food', cause: 'starvation', [allocation.kind + 'Id']: allocation.id, pool: allocation.pool, populationLost: allocation.loss });
   }
-  state.statistics.civilianLosses += removed;
-  state.statistics.resourceShortageLosses += removed;
-  state.statistics.resourceShortageLossesTotal += removed;
-  state.statistics.finalEconomyResourceShortageLosses += removed;
-  state.population.cumulativeDeaths += removed;
-  return removed;
+  state.statistics.starvationDeaths += plan.loss;
+  state.statistics.civilianLosses += plan.loss;
+  state.statistics.resourceShortageLosses += plan.loss;
+  state.statistics.resourceShortageLossesTotal += plan.loss;
+  state.statistics.finalEconomyResourceShortageLosses += plan.loss;
+  state.population.cumulativeDeaths += plan.loss;
 }
 
 function processEconomy(state: GameState): FacilityProductionProjection[] {
@@ -850,6 +774,8 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
   state.statistics.finalEconomyResourceShortageLosses = 0;
   const plan = calculateEconomyPlan(state);
   const forecast = plan.forecast;
+  state.publicHealthStress = { ...forecast.publicHealth.stressAfter };
+  state.foodShortageAccumulation = forecast.publicHealth.accumulationAfter;
   const housing = state.facilities.filter(f => f.type === 'temporaryHousing' && f.owner === 'player');
   state.statistics.housingResidentTurns += housing.reduce((n, f) => n + f.workers, 0);
   state.statistics.housingOutageFacilityTurns += forecast.housingOutage.outageCount;
@@ -986,13 +912,17 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
       food: forecast.food.shortage,
       civilianGoods: forecast.civilianGoods.maintenanceShortage,
     });
-    removeWorkersForShortage(state, forecast.food.shortage, 'food');
-    synchronizePopulation(state);
-    if (checkImmediateDefeat(state)) return plan.facilities;
-    removeWorkersForShortage(state, forecast.civilianGoods.maintenanceShortage, 'civilianGoods');
-    synchronizePopulation(state);
-    if (checkImmediateDefeat(state)) return plan.facilities;
   }
+  // Existing infected are suppressed after resupply and before starvation. New infections are handled later.
+  for (const facility of stableFacilities(state)) {
+    const unit = getUnitAt(state, facility.position);
+    if (unit?.isPlayerUnit) while (facility.infected > 0 && suppressFacility(state, facility, unit)) { /* shared charges */ }
+  }
+  for (const checkpoint of [...state.checkpoints].sort((a,b) => a.id.localeCompare(b.id))) {
+    const unit = getUnitAt(state, checkpoint.position);
+    if (unit?.isPlayerUnit) while (checkpoint.infected > 0 && suppressCheckpoint(state, checkpoint, unit, SeededRng.fromState(state.rngState))) { /* shared charges */ }
+  }
+  applyStarvation(state, forecast.publicHealth.starvationRate);
   synchronizePopulation(state);
   return plan.facilities;
 }
@@ -1004,7 +934,7 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
  */
 function nearestHumanSpawnPosition(state: GameState, origin: HexCoord, rng: SeededRng): HexCoord | null {
   const occupied=occupiedKeys(state);
-  const available=state.map.tiles.filter(t=>!occupied.has(t.key)&&t.movementCost!==null&&canPlayerOccupyHex(state.map,t));
+  const available=state.map.tiles.filter(t=>!occupied.has(t.key)&&effectiveMovementCost(state,t,false)!==null&&canPlayerOccupyHex(state.map,t));
   if(available.length===0)return null;
   const distance=Math.min(...available.map(t=>hexDistance(origin,t)));
   const nearest=available.filter(t=>hexDistance(origin,t)===distance).sort((a,b)=>a.q-b.q||a.r-b.r).map(({q,r})=>({q,r}));
@@ -1146,7 +1076,7 @@ function eligibleAdjacentZombieSpawnPositions(state: Readonly<GameState>, origin
     .filter((position) => !occupied.has(hexKey(position)) && !wireAt(state, position))
     .filter((position) => {
       const tile = getTile(state.map, position);
-      return tile !== undefined && state.config.terrain.movementCost[tile.terrain] !== null;
+      return tile !== undefined && effectiveMovementCost(state, tile, false) !== null;
     })
     .sort((left, right) => left.q - right.q || left.r - right.r);
 }
@@ -1268,7 +1198,7 @@ function fallFacility(
   if (facilityIndex < 0) return;
   if (facility.type === 'windPowerPlant') {
     facility.operationalStatus = 'disabled';
-    facility.infected = 0;
+    consumeInfected(facility, facility.infected);
     facility.workers = 0;
     emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type });
     return;
@@ -1325,7 +1255,7 @@ function fallFacility(
     chainRootEventId,
     chainDepth,
   );
-  facility.infected = result.remainingInfected;
+  consumeInfected(facility, Math.max(0, facility.infected - result.remainingInfected));
   emit(state, 'facility_overrun', {
     facilityId: facility.id,
     infectedAtFall,
@@ -1469,7 +1399,7 @@ function fallCheckpoint(
     chainRootEventId,
     chainDepth,
   );
-  checkpoint.infected = result.remainingInfected;
+  consumeInfected(checkpoint, Math.max(0, checkpoint.infected - result.remainingInfected));
   emit(state, 'facility_overrun', {
     checkpointId: checkpoint.id,
     branchId: checkpoint.branchId ?? checkpoint.direction,
@@ -1530,7 +1460,7 @@ function applyGeneratedZombieOccupancy(
       fallFacility(state, facility, rng, queue, 'empty_zombie_occupation', chainRootEventId, chainDepth + 1);
     } else if (facility.type === 'windPowerPlant' || ((facility.constructible || facility.type === 'armyBase') && facility.workers === 0 && facility.infected === 0)) {
       facility.operationalStatus = 'disabled';
-      facility.infected = 0;
+      consumeInfected(facility, facility.infected);
       emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type, source: zombie.id, immediateSpawnOccupation: true });
     } else {
       const wasInfected = facility.infected > 0;
@@ -1596,7 +1526,7 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
   if (unit.currentMilitaryGoods < militaryGoodsCost) return false;
   const amount = unit.attack;
   const suppressed = Math.min(facility.infected, amount);
-  facility.infected -= suppressed;
+  consumeInfected(facility, suppressed);
   state.population.cumulativeDeaths += suppressed;
   const civilianDamageRate = state.config.units[unit.type as HumanUnitType].suppressionCivilianDamageRate;
   if (civilianDamageRate > 0) {
@@ -1642,7 +1572,7 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
   const beforeSupply = checkpoint.status === 'ruined' ? getSuppliedTileKeys(state) : [];
   const amount = unit.attack;
   const suppressed = Math.min(checkpoint.infected, amount);
-  checkpoint.infected -= suppressed;
+  consumeInfected(checkpoint, suppressed);
   state.population.cumulativeDeaths += suppressed;
   const civilianDamageRate = state.config.units[unit.type as HumanUnitType].suppressionCivilianDamageRate;
   if (civilianDamageRate > 0) {
@@ -1706,6 +1636,22 @@ function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit:
 }
 
 function processInternalInfection(state: GameState, rng: SeededRng): void {
+  for (const facility of [...state.facilities].sort((a,b) => a.id.localeCompare(b.id))) {
+    if (facility.owner !== 'player' || facility.workers <= 0) continue;
+    const risk = internalInfectionRisk(facility, state.publicHealthStress, facility.lastPowerSupplied === false || !isHexSupplied(state, facility.position));
+    const converted = binomial(facility.workers, risk.probability, domainRng(state.seed, `internal:${state.turn}:${facility.id}`));
+    if (converted <= 0) continue;
+    const wasInfected = facility.infected > 0;
+    facility.workers -= converted; facility.infected += converted; addInfectionGrace(facility, converted, state.turn);
+    facility.operationalStatus = 'infected';
+    if (!wasInfected) markSiteInfectionStarted(state, 'facility', facility.id, facility.type, facility.position, converted, 'public_health');
+    state.statistics.livingConditionInfections += converted;
+    state.statistics.infectionLosses += converted;
+    state.statistics.civilianLosses += converted;
+    emit(state, 'public_health_infection', { facilityId: facility.id, infected: converted, cause: 'living_conditions', probability: risk.probability, populationAtRisk: risk.healthyPopulation, causes: risk.causes, spreadsFromTurn: state.turn + 1 });
+    if (facility.workers === 0) overrunFacility(state, facility, rng);
+    if (checkImmediateDefeat(state)) return;
+  }
   for (const facility of stableFacilities(state)) {
     if (!state.facilities.includes(facility)) continue;
     const recapture = facilityRecaptureConditions(state, facility);
@@ -1715,13 +1661,8 @@ function processInternalInfection(state: GameState, rng: SeededRng): void {
     }
     const occupant = getUnitAt(state, facility.position);
     const guarded = occupant?.isPlayerUnit === true;
-    if (guarded) {
-      while (facility.infected > 0 && suppressFacility(state, facility, occupant!)) {
-        // Veteran units may spend a second remaining charge on the same site.
-      }
-    }
     if (!guarded && facility.infected > 0) {
-      const spread = Math.min(facility.workers, facility.infected * state.config.infection.facilitySpreadPerTurn);
+      const spread = Math.min(facility.workers, Math.max(0, facility.infected - graceCount(facility, state.turn)) * state.config.infection.facilitySpreadPerTurn);
       facility.workers -= spread;
     if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
       facility.infected += spread;
@@ -1745,13 +1686,8 @@ function processInternalInfection(state: GameState, rng: SeededRng): void {
     }
     const occupant = getUnitAt(state, checkpoint.position);
     const guarded = occupant?.isPlayerUnit === true;
-    if (guarded) {
-      while (checkpoint.infected > 0 && suppressCheckpoint(state, checkpoint, occupant!, rng)) {
-        // Resolve one deterministic suppression check per remaining charge.
-      }
-    }
     if (!guarded && checkpoint.infected > 0) {
-      const spread = Math.min(totalCheckpointPeople(checkpoint), checkpoint.infected * state.config.infection.facilitySpreadPerTurn);
+      const spread = Math.min(totalCheckpointPeople(checkpoint), Math.max(0, checkpoint.infected - graceCount(checkpoint, state.turn)) * state.config.infection.facilitySpreadPerTurn);
       const removed = removeCheckpointPeople(checkpoint, spread);
       checkpoint.infected += removed;
       if (removed > 0) {
@@ -1893,7 +1829,7 @@ function terrainDistanceMap(state: Readonly<GameState>, target: HexCoord, zombie
     for (const predecessor of hexNeighbors(current.position)) {
       if (!hexWithinBounds(predecessor, state.map.width, state.map.height)) continue;
       const predecessorTile = getTile(state.map, predecessor);
-      if (!predecessorTile || state.config.terrain.movementCost[predecessorTile.terrain] === null) continue;
+      if (!predecessorTile || effectiveMovementCost(state, predecessorTile, false) === null) continue;
       const distance = current.distance + enteredCost;
       const key = hexKey(predecessor);
       if ((distances.get(key) ?? Number.POSITIVE_INFINITY) <= distance) continue;
@@ -2076,7 +2012,7 @@ function resolveFallenSiteNoiseRespawns(
         0,
         sourceUnitType,
       );
-      site.facility.infected = result.remainingInfected;
+      consumeInfected(site.facility, Math.max(0, site.facility.infected - result.remainingInfected));
     } else {
       const result = resolveSiteZombieSpawn(
         state,
@@ -2093,7 +2029,7 @@ function resolveFallenSiteNoiseRespawns(
         0,
         sourceUnitType,
       );
-      site.checkpoint.infected = result.remainingInfected;
+      consumeInfected(site.checkpoint, Math.max(0, site.checkpoint.infected - result.remainingInfected));
     }
     processSpawnOccupancyQueue(state, rng, queue);
   }
@@ -2249,7 +2185,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
     .sort();
   for (const zombieId of zombieIds) {
     const zombie = getUnit(state, zombieId);
-    if (!zombie) continue;
+    if (!zombie || (zombie.firstZombieActionTurn ?? 0) > state.turn) continue;
     const occupiedCapital = getFacilityAt(state, zombie.position);
     if (occupiedCapital?.type === 'capital' && occupiedCapital.status !== 'ruined'
       && occupiedCapital.workers === 0 && occupiedCapital.infected === 0) {
@@ -2408,7 +2344,7 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
       ) {
         facility.operationalStatus = 'disabled';
         if (facility.armyBase?.reward === 'unclaimed') facility.armyBase.reward = 'expired';
-        facility.infected = 0;
+        consumeInfected(facility, facility.infected);
         emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type, source: zombie.id });
       } else if (facility.status !== 'ruined') {
         const wasInfected = facility.infected > 0;
@@ -2493,6 +2429,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
     }
     const kind = wave.final ? 'final' as const : 'periodic' as const;
     const groupIds: string[] = [];
+    const packDirection = wave.final ? domainRng(state.seed, 'final-pack-direction').pick([...state.horde.warningDirections].sort()) : null;
     for (const direction of state.horde.warningDirections) {
       if (!getHordeEntrance(state.map, direction) || getHordeSpawnZone(state.map, direction).length !== 22) {
         return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', `Invalid Horde Spawn Zone for ${direction}`);
@@ -2503,6 +2440,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
       const bonusCount = Math.ceil(rejectedTotal / 5);
       const baseWaveUnitCount = wave.compositionPerDirection.hordeZombie + wave.compositionPerDirection.zombie;
       const roster = freezeWaveRoster(state, rng, waveIndex, wave.compositionPerDirection.hordeZombie, wave.compositionPerDirection.zombie, bonusCount);
+      if (wave.final && direction === packDirection) roster.push('packZombie');
       const pending: PendingWave = {
         waveIndex, direction, groupId, kind, baseWaveUnitCount,
         committedWaveUnitCount: roster.length, spawnedSoFar: 0, roster,
@@ -2589,7 +2527,8 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
     state.statistics.hunterZombiesSpawned += count('hunterZombie');
     state.statistics.gasZombiesSpawned += count('gasZombie');
     state.statistics.screamerZombiesSpawned += count('screamerZombie');
-    for (const type of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as const) {
+    state.statistics.packZombiesSpawned += count('packZombie');
+    for (const type of ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const) {
       state.statistics.hordeSpecialSpawnedByType[type] += count(type);
       if (pending.kind === 'final') state.statistics.finalSpecialZombiesSpawnedByType[type] += count(type);
     }
@@ -2744,13 +2683,14 @@ function checkImmediateGameEnd(state: GameState): boolean {
 }
 
 function startPlayerTurn(state: GameState, rng: SeededRng): void {
+  settleNuclearObjective(state);
   beginHordeWarningIfDue(state, rng);
   for(const f of state.facilities) settleArmyReward(state,f,rng);
   for (const unit of state.units.filter(isHumanUnit).sort((left, right) => left.id.localeCompare(right.id))) {
     if (unit.proficiency === 'regular' && unit.veteranPromotionPending) {
       unit.proficiency = 'veteran';
       unit.veteranPromotionPending = false;
-      unit.maxAttackCharges = state.config.unitExperience.veteranAttackCharges;
+      unit.maxAttackCharges = state.config.units[unit.type].veteranAttackCharges;
       state.statistics.veteranPromotionsByType[unit.type] += 1;
       emit(state, 'unit_promoted', {
         unitId: unit.id, unitType: unit.type, from: 'regular', into: 'veteran',
@@ -2762,7 +2702,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
         unit.proficiency = 'regular';
         unit.attack = effectiveAttackForProficiency(state, unit.type, 'regular');
         unit.regularZombieKills = 0;
-        unit.maxAttackCharges = 1;
+        unit.maxAttackCharges = state.config.units[unit.type].regularAttackCharges;
         state.statistics.regularPromotionsByType[unit.type] += 1;
         emit(state, 'unit_promoted', {
           unitId: unit.id, unitType: unit.type, from: 'recruit', into: 'regular',
@@ -2967,7 +2907,8 @@ function validateAssignWorkers(state: Readonly<GameState>, action: Extract<GameA
       return error(action, 'facility_out_of_supply', 'Workers cannot be added outside the supply network');
     }
     if (availableSupplyPopulation(state) < difference) {
-      return error(action, 'insufficient_city_population', 'Eligible cities cannot supply enough population');
+      const raw = eligibleSnapshotCities(state, 'supply').reduce((n, city) => n + city.workers, 0);
+      return error(action, raw >= difference ? 'capital_minimum_resident_required' : 'insufficient_city_population', 'The Capital must retain one healthy resident; eligible cities cannot supply enough population');
     }
   } else {
     if (-difference > eligibleSnapshotCities(state, 'reception').reduce((total, city) => total + populationReceptionCapacity(city), 0)) {
@@ -3016,6 +2957,7 @@ function validateTransferPopulation(
   if (!from || !to || !eligible.has(from.id) || !eligible.has(to.id)) {
     return error(action, 'ineligible_city', 'Both cities must be safe and eligible in the turn-start snapshot');
   }
+  if (from.type === 'capital' && from.workers >= action.people && withdrawableResidents(from) < action.people) return error(action, 'capital_minimum_resident_required', 'The Capital must retain one healthy resident for administration and evacuation');
   if (from.workers < action.people) {
     return error(action, 'insufficient_city_population', 'The source city does not have enough residents');
   }
@@ -3046,7 +2988,7 @@ export function workerAssignmentCandidates(state: Readonly<GameState>) {
     return { facilityId: facility.id, availablePopulation, currentWorkers: facility.workers, targetReason,
       populationReason: availablePopulation <= 0 ? 'insufficient_city_population' : null,
       actionBudgetReason: playerActionBudgetError(state, { type: 'AssignWorkers', facilityId: facility.id, workers: facility.workers + 1 })?.code ?? null,
-      reason: 'code' in result ? result.code : null, populationSources: state.facilities.filter(isCityFacility).map(city => ({ facilityId: city.id, healthyPopulation: city.workers, reason: populationCityReason(state, city), availablePopulation: populationCityReason(state, city) === null ? city.workers : 0 })) };
+      reason: 'code' in result ? result.code : null, populationSources: state.facilities.filter(isCityFacility).map(city => ({ facilityId: city.id, healthyPopulation: city.workers, reason: populationCityReason(state, city), availablePopulation: populationCityReason(state, city) === null ? withdrawableResidents(city) : 0 })) };
   });
 }
 
@@ -3055,7 +2997,7 @@ export function populationTransferCandidates(state: Readonly<GameState>) {
   return cities.flatMap(from => cities.filter(to => to.id !== from.id).map(to => {
     const result = validateTransferPopulation(state, { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 });
     const reason = 'code' in result ? result.code : null;
-    return { fromFacilityId: from.id, toFacilityId: to.id, fromReason: populationCityReason(state, from) ?? (from.workers <= 0 ? 'insufficient_city_population' : null), toReason: populationCityReason(state, to), actionBudgetReason: playerActionBudgetError(state, { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 })?.code ?? null, min: reason ? null : 1, max: reason ? null : Math.min(from.workers, populationReceptionCapacity(to)), integerOnly: true as const, legal: reason === null, reason, constraints: ['turn_start_snapshot', 'safe_city', 'action_budget', 'source_healthy_residents'] };
+    return { fromFacilityId: from.id, toFacilityId: to.id, fromReason: populationCityReason(state, from) ?? (from.workers <= 0 ? 'insufficient_city_population' : null), toReason: populationCityReason(state, to), actionBudgetReason: playerActionBudgetError(state, { type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 })?.code ?? null, min: reason ? null : 1, max: reason ? null : Math.min(withdrawableResidents(from), populationReceptionCapacity(to)), integerOnly: true as const, legal: reason === null, reason, constraints: ['turn_start_snapshot', 'safe_city', 'action_budget', 'source_healthy_residents'] };
   }));
 }
 
@@ -3668,6 +3610,7 @@ function validateProduceUnit(state: Readonly<GameState>, action: Extract<GameAct
   }
   if (state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) return error(action, 'city_busy', 'This city already has a reservation');
   const costs = unitProductionCosts(state, action.unitType);
+  if (availableSupplyPopulation(state) < costs.population && eligibleSnapshotCities(state, 'supply').reduce((n,c) => n + c.workers, 0) >= costs.population) return error(action, 'capital_minimum_resident_required', 'The Capital must retain one healthy resident');
   if (
     availableSupplyPopulation(state) < costs.population ||
     civilianWorkerCount(state) - costs.population <= 0 ||
@@ -4394,7 +4337,7 @@ export class GameEngine implements HeadlessGame {
       if (from.workers <= 0) continue;
       for (const to of cities) {
         if (from.id === to.id) continue;
-        const maximum = Math.min(from.workers, populationReceptionCapacity(to));
+        const maximum = Math.min(withdrawableResidents(from), populationReceptionCapacity(to));
         if (maximum <= 0) continue;
         actions.push({ type: 'TransferPopulation', fromFacilityId: from.id, toFacilityId: to.id, people: 1 });
         if (maximum > 1) {

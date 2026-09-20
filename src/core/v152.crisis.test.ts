@@ -4,6 +4,25 @@ import type { CrisisAlert, JsonObject } from './types';
 
 type FactCase = [CrisisAlert['reasonCode'], string, string | number | boolean | null, string | number | boolean | null];
 const worseningCases: FactCase[] = [
+  ['capital_resident_minimum', 'healthyPopulation', 2, 1],
+  ['public_health_food_stress', 'deficit', 0.1, 0.2],
+  ['public_health_food_stress', 'stress', 0.1, 0.2],
+  ['public_health_food_stress', 'accumulation', 1, 2],
+  ['public_health_civilian_goods_stress', 'deficit', 0.1, 0.2],
+  ['public_health_civilian_goods_stress', 'stress', 0.1, 0.2],
+  ['food_starvation_risk', 'rate', 0.01, 0.02],
+  ['food_starvation_risk', 'populationLost', 1, 2],
+  ['food_starvation_risk', 'accumulation', 1, 2],
+  ['internal_infection_risk', 'probability', 0.01, 0.02],
+  ['internal_infection_risk', 'expectedInfections', 1, 2],
+  ['internal_infection_risk', 'healthyPopulation', 2, 1],
+  ['checkpoint_health_risk', 'probability', 0.01, 0.02],
+  ['checkpoint_health_risk', 'waiting', 21, 22],
+  ['refinery_allowance_runway_risk', 'netBurn', 1, 2],
+  ['refinery_allowance_runway_risk', 'estimatedTurnsRemaining', 3, 2],
+  ['nuclear_early_capture_window', 'turnsRemaining', 2, 1],
+  ['nuclear_power_outage', 'lostGeneration', 500, 1000],
+  ['nuclear_power_outage', 'shortage', 1, 2],
   ['overcrowding_forecast', 'penaltyRatio', 0.1, 0.2],
   ['overcrowding_forecast', 'additionalFood', 1, 2],
   ['overcrowding_forecast', 'additionalCivilianGoods', 1, 2],
@@ -59,6 +78,7 @@ describe('v1.5.4 public crisis worsening contract', () => {
       'production_outage', 'resource_runway_risk', 'overcrowding_forecast', 'temporary_housing_outage_forecast',
       'military_goods_national_shortage', 'military_goods_supply_disconnected', 'facility_workers_zero',
       'refinery_allowance_exhausted', 'oil_field_allowance_blocked',
+      'capital_resident_minimum', 'public_health_food_stress', 'public_health_civilian_goods_stress', 'food_starvation_risk', 'internal_infection_risk', 'checkpoint_health_risk', 'refinery_allowance_runway_risk', 'nuclear_early_capture_window', 'nuclear_power_outage',
     ].sort());
     expect(worseningCases.map(([reason, key]) => `${reason}:${key}`).sort()).toEqual(
       Object.entries(CRISIS_WORSENING_FACTS).flatMap(([reason, facts]) => Object.keys(facts).map(key => `${reason}:${key}`)).sort());

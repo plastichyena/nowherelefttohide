@@ -1,0 +1,48 @@
+{
+  "date": "2026-09-20",
+  "method": "built-in image_gen",
+  "status": "generated source assets; game integration and board QA pending",
+  "assets": [
+    {
+      "file": "unit_special_forces.png",
+      "intendedRuntimePath": "public/assets/board/units/unit_special_forces.png",
+      "references": [
+        "public/assets/board/units/unit_national_guard.png"
+      ],
+      "prompt": "Use case: style-transfer. Asset type: transparent PNG strategy-game unit sprite. Edit the supplied National Guard sprite into a NEW Special Forces sprite for Nowhere Left to Hide. Preserve the existing square composition, camera angle, hand-painted gritty pixel-art-like miniature style, bold dark outlines, subdued olive palette, full body visibility, compact squad arrangement and generous transparent margins. Exactly FIVE distinct living adult soldiers, each with modern assault rifle, suppressor and compact optic, tactical helmets and professional elite equipment, coordinated alert poses. Clearly human, healthy skin. Differentiate from ordinary guard using better fitted dark olive equipment, no bright sci-fi effects. Preserve small-board readability rather than adding tiny noisy details. No text, insignia, real unit emblems, UI, ground tile, border, extra people. Genuine transparent alpha background, no painted checkerboard or solid background. Return only the sprite image."
+    },
+    {
+      "file": "unit_pack_zombie.png",
+      "intendedRuntimePath": "public/assets/board/units/unit_pack_zombie.png",
+      "references": [
+        "unit_special_forces.png",
+        "public/assets/board/units/unit_soldier_zombie.png"
+      ],
+      "prompt": "Use case: style-transfer. Asset type: transparent game unit sprite, Pack Zombie. Input image 1 is the edit target: the new FIVE-person Special Forces squad. Input image 2 is an existing soldier zombie sprite, reference only for undead appearance and game style. Transform exactly those FIVE special-forces people into a coordinated, athletic, dangerous zombie pack. Preserve square framing, full-body composition, each character's recognizable tactical helmet/armor and matching dark olive uniforms, five-person silhouette, hand-painted outlined miniature style and transparent margins. Change poses to aggressive forward-reaching clawing/lunging melee stances; cold gray-green decayed faces, torn equipment, visible undead expressions. Their rifles must be slung, broken or hanging unused, not aimed or fired: these zombies attack in melee. Visually distinct from healthy soldiers at small scale, restrained dried stains rather than graphic gore. No additional people, ground, text, faction emblem, backdrop or UI. Genuine transparent alpha background, no checkerboard painted in. One squad sprite only."
+    },
+    {
+      "file": "facility_nuclear_power_plant.png",
+      "intendedRuntimePath": "public/assets/board/facilities/facility_nuclear_power_plant.png",
+      "references": [
+        "public/assets/board/facilities/facility_power_plant.png"
+      ],
+      "prompt": "Use case: style-transfer. Asset type: transparent strategy-game facility sprite. Edit the provided conventional power plant into a Nuclear Power Plant asset for the same game. Preserve square framing, miniature isometric three-quarter overhead view, compact diamond-shaped facility footprint, gritty hand-painted game style, fine dark outlines, subdued gray/concrete and muted teal industrial palette, warm small highlights, broad transparent outer margins. Replace conventional smokestack plant with a clearly readable compact nuclear facility: two large concrete hyperboloid cooling towers, one domed containment building, low turbine hall, a small switchyard. Coherent single plant, visually legible reduced to a small board icon. Cooling towers are the major silhouette; only a little subtle steam, no smoke plume filling the margin. The facility sits on land; do not paint surrounding sea or a whole map. No people, labels, readable lettering, logos, UI, radiation disaster, flames or crater. Genuine transparent alpha outside the small facility footprint. Only one facility asset."
+    },
+    {
+      "file": "terrain_water.png",
+      "intendedRuntimePath": "public/assets/board/terrain/terrain_water.png",
+      "references": [
+        "public/assets/board/terrain/terrain_plain.png"
+      ],
+      "prompt": "Use case: style-transfer. Asset type: base terrain hex texture for a top-down strategy board. Edit the supplied plain-terrain image: preserve EXACTLY its point-up regular hex geometry and square framing (top vertex at center x/y 2%, bottom vertex 98%, left/right vertical sides near 10%/90%, no isometric extrusion). Replace ALL tan land inside the hex with calm dark blue-green bay water, hand-painted fine subtle ripples, subdued desaturated teal palette matching the existing game's terrain, evenly distributed texture, low contrast for readable units. Water must fill the entire hex consistently right up to every edge so adjacent tiles form a contiguous body of water. No shoreline, sand, rocks, islands, vegetation, boats, foam outline, border, text or icons. Replace the exterior dark teal backdrop with genuine transparent alpha outside the hex; no checkerboard painted in. Flat overhead view, no thick slab or side walls. One water terrain tile only."
+    },
+    {
+      "file": "terrain_bridge.png",
+      "intendedRuntimePath": "public/assets/board/overlays/terrain_bridge.png",
+      "references": [
+        "public/assets/board/overlays/terrain_road.png"
+      ],
+      "prompt": "Use case: style-transfer. Asset type: transparent bridge road overlay for a pointy-hex strategy game. Input is the existing road-overlay texture: a road starts at the image center and extends horizontally to the right edge, on transparency. Create a NEW bridge version of THIS SAME HALF-SEGMENT geometry. Preserve a square canvas, road running strictly horizontally from x=50% to x=100% at y=50%, approximately y=42% to 58% road deck width. Top-down orthographic, no isometric perspective. Muted dark charcoal asphalt deck, simple pale yellow road marking, thin weathered concrete/steel guardrails along upper and lower edges. Keep the LEFT center junction end clean and open so two rotated copies can connect without a cap or bumper across the road. The RIGHT end extends seamlessly to canvas edge. Bridge identity comes only from narrow guardrails and light concrete deck edging, visually matching gritty muted game art. No water, shoreline, pillars, towers, terrain tile, vehicles, people, text, badges, background, shadows extending over a large area, or checkerboard. The entire left half and all areas outside the bridge are genuinely transparent alpha. One bridge connection segment only; do not render a full centered bridge."
+    }
+  ]
+}

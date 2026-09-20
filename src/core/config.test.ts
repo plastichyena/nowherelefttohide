@@ -8,8 +8,8 @@ import {
 describe('v1.6 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('12.0.0');
-    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v7');
+    expect(DEFAULT_CONFIG.version).toBe('13.0.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v8');
     expect(DEFAULT_CONFIG.economy.initialRefineryAllowance).toBe(2_000);
     expect(DEFAULT_CONFIG.economy.oilFieldAllowancePerWorker).toBe(100);
     expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(40);
@@ -52,7 +52,7 @@ describe('v1.6 GameConfig', () => {
       initialSupplyRadius: 5,
     });
     expect(DEFAULT_CONFIG.unitExperience).toEqual({
-      productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit', reconTeam: 'recruit' },
+      productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit', reconTeam: 'recruit', specialForces: 'regular' },
       recruitSurvivalTurnsRequired: 5,
       regularAttackMultiplier: 1.25,
       regularAttackRounding: 'ceil',

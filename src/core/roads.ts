@@ -59,7 +59,7 @@ function planner(input: RoadInput, network: RoadNetwork) {
   const graph = roadConnections(network);
   const existing = new Set(roadEdges(network).map(e => edgeKey(e.a, e.b)));
   const sites = new Set(input.facilities.filter(f => !['capital', 'city'].includes(f.type)).map(f => hexKey(f.position)));
-  const allowed = (p: HexCoord) => { const t = tiles.get(hexKey(p)); return !!t && t.terrain !== 'water' && t.playerOccupancyAllowed && !forbidden.has(hexKey(p)); };
+  const allowed = (p: HexCoord) => { const t = tiles.get(hexKey(p)); return !!t && (t.terrain !== 'water' || t.road) && t.playerOccupancyAllowed && !forbidden.has(hexKey(p)); };
   const route = (start: HexCoord, targets: ReadonlySet<string>, aesthetic = true): Route | null => {
     type Node = { p: HexCoord; direction: number; cost: number; fresh: number; turns: number; previous: Node | null; serial: number };
     let serial = 0;
@@ -81,7 +81,8 @@ function planner(input: RoadInput, network: RoadNetwork) {
         if (!shared && sites.has(hexKey(node.p)) && hexKey(node.p) !== hexKey(start)) continue;
         if (!shared && ((graph.get(hexKey(p))?.length ?? 0) >= 4 || (graph.get(hexKey(node.p))?.length ?? 0) >= 4)) continue;
         const bend = node.direction < 0 ? 0 : Math.min((direction - node.direction + 6) % 6, (node.direction - direction + 6) % 6);
-        const terrain = tiles.get(hexKey(p))!.terrain as 'plain' | 'forest' | 'mountain';
+        const baseTerrain = tiles.get(hexKey(p))!.terrain;
+        const terrain = baseTerrain === 'water' ? 'plain' : baseTerrain;
         const nearRoad = !targets.has(hexKey(p)) && !graph.has(hexKey(p)) && hexDistance(p, start) > 2 && hexNeighbors(p).some(n => graph.has(hexKey(n)));
         const cost = (shared && aesthetic ? input.style.shared : input.style[terrain]) + (aesthetic ? bend * input.style.turn + (direction === 1 || direction === 4 ? input.style.offAxis : 0) + (nearRoad ? input.style.parallel : 0) : 0);
         const next: Node = { p, direction, cost: node.cost + cost, fresh: node.fresh + (shared ? 0 : 1), turns: node.turns + (bend > 0 ? 1 : 0), previous: node, serial: serial++ };

@@ -249,9 +249,9 @@ describe('Agent Observation 8.0.0 rule projections', () => {
 
     expect(observation.finalHordeTurn).toBe(70);
     expect(observation.map.tiles).toHaveLength(2601);
-    expect(observation.map.tiles.filter((tile) => tile.terrain === 'forest')).toHaveLength(514);
-    expect(observation.map.tiles.filter((tile) => tile.terrain === 'mountain')).toHaveLength(126);
-    expect(observation.map.tiles.filter((tile) => tile.terrain === 'water')).toHaveLength(0);
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'forest').map(t => [t.q,t.r])).toEqual([...state.map.tiles].filter(t => t.terrain === 'forest').sort((a,b)=>a.q-b.q||a.r-b.r).map(t => [t.q,t.r]));
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'mountain').map(t => [t.q,t.r])).toEqual([...state.map.tiles].filter(t => t.terrain === 'mountain').sort((a,b)=>a.q-b.q||a.r-b.r).map(t => [t.q,t.r]));
+    expect(observation.map.tiles.filter((tile) => tile.terrain === 'water')).toHaveLength(54);
     expect(observation.map.tiles.find((tile) => tile.terrain === 'forest')).toMatchObject({
       road: false,
       effectiveMovementCost: 2,

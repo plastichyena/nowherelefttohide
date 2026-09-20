@@ -1,3 +1,5 @@
+import { compactPublicHealth } from '../core/public-health';
+import { buildContextHandoff, handoffJson } from './context-handoff';
 import { CRISIS_WORSENING_FACTS } from '../core/crisis';
 import type { CrisisReasonCode } from '../core/types';
 import { isGameActionInput } from '../agent/action-input';
@@ -252,6 +254,9 @@ function compactSnapshot(loaded: LoadedSession, changes = summarizeImportantChan
     && facility.production.stoppedReason !== null
   );
   return {
+    publicHealth: clone(observation.publicHealth),
+    nuclearObjective: clone(observation.nuclearObjective),
+    refineryAllowance: clone(observation.refineryAllowance),
     importantChanges: changes,
     combatHazards: deriveCombatHazards(observation, loaded.active.revision),
     apiVersion: observation.apiVersion,
@@ -270,6 +275,7 @@ function compactSnapshot(loaded: LoadedSession, changes = summarizeImportantChan
     victory: clone(observation.victory),
     crisisSummary: crisisSummaryAtRevision(observation.crisisSummary, loaded.active.revision),
     endTurnRisk: endTurnRiskAtRevision(observation.endTurnRisk, loaded.active.revision),
+    publicHealthForecast: compactPublicHealth(observation.endTurnForecast.publicHealth),
     forecastSummary: forecastSummary(observation),
     productionCapacity: productionCapacitySummary(observation),
     supportHeadroom: clone(observation.supportHeadroom ?? {
@@ -338,13 +344,22 @@ function statusResult(loaded: LoadedSession, sessionMetrics: SessionMetrics, sto
   const baseline = loaded.descriptor.branchBase?.baseDecision ?? 0;
   let from = baseline + 1;
   const records: ChangeDecision[] = [];
-  for (const record of store.iterateAllDecisionRecords(loaded.descriptor.sessionId)) {
-    if (record.decision <= baseline) continue;
-    if (record.accepted && record.inputAction.type === 'EndTurn') { records.length = 0; from = record.decision; }
-    records.push({ decision: record.decision, changes: record.importantChanges });
+  function *handoffHistory() {
+    for (const record of store.iterateAllDecisionRecords(loaded.descriptor.sessionId)) {
+      if (record.decision > baseline) {
+        if (record.accepted && record.inputAction.type === 'EndTurn') { records.length = 0; from = record.decision; }
+        records.push({ decision: record.decision, changes: record.importantChanges });
+      }
+      yield record;
+    }
   }
+  const contextHandoff = buildContextHandoff(loaded.publicState.observation, { sessionId: loaded.descriptor.sessionId, revision: loaded.active.revision, preferredCommentLocale: loaded.descriptor.preferredCommentLocale, branchLineage: loaded.descriptor.branchBase }, handoffHistory());
   const summary = summarizeImportantChanges(records, Math.min(from, loaded.active.decision), loaded.active.decision, loaded.active.revision);
-  return { session: clone(loaded.descriptor), active: clone(loaded.active), revision: loaded.active.revision, observation: compactSnapshot(loaded, summary), gameOver: loaded.publicState.gameOver, result: clone(loaded.publicState.result), sessionMetrics: clone(sessionMetrics) };
+  if (contextHandoff.contextCheckpoint.decision > 0 && contextHandoff.contextCheckpoint.decision === loaded.active.decision) {
+    const path = assertSafeOutputPath(store.safeRoot, join(store.sessionsRoot, loaded.descriptor.sessionId, 'context-' + loaded.active.decision + '.json'));
+    if (!existsSync(path)) writeFileSync(path, canonicalJson(contextHandoff), { encoding: 'utf8', flag: 'wx' });
+  }
+  return { contextHandoff, session: clone(loaded.descriptor), active: clone(loaded.active), revision: loaded.active.revision, observation: compactSnapshot(loaded, summary), gameOver: loaded.publicState.gameOver, result: clone(loaded.publicState.result), sessionMetrics: clone(sessionMetrics) };
 }
 
 function sortedUnique(values: Iterable<string>): string[] { return [...new Set(values)].sort((a, b) => a.localeCompare(b)); }
@@ -449,6 +464,8 @@ export function deriveSessionStateDelta(before: AgentObservation, after: AgentOb
   const beforeCheckpoints = new Map(before.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint] as const));
   return {
     newlyInfectedSites: sortedUnique([...afterSites.values()].filter((site) => site.infected > 0 && (beforeSites.get(site.id)?.infected ?? 0) <= 0).map((site) => site.id)),
+    beforeTurn: before.turn,
+    afterTurn: after.turn,
     facilityChanges: facilityChanges(before, after, events),
     branchFlowChanges: branchFlowChanges(before, after),
     newlyRuinedSites: sortedUnique([...afterSites.values()].filter((site) => ['ruined', 'abandoned'].includes(site.status) && !['ruined', 'abandoned'].includes(beforeSites.get(site.id)?.status ?? '')).map((site) => site.id)),
@@ -880,6 +897,7 @@ export class SessionService {
           revision,
         );
         switch (rawInput.target) {
+          case 'context-handoff': value = handoffJson(buildContextHandoff(observation, { sessionId, revision, preferredCommentLocale: loaded.descriptor.preferredCommentLocale, branchLineage: loaded.descriptor.branchBase }, this.store.iterateAllDecisionRecords(sessionId))); break;
           case 'api': value = { ...(clone(runtime.getApiInfo?.() ?? { unavailable: true }) as unknown as Record<string, JsonValue>), queryContract: publicQueryContract() as unknown as JsonValue, sessionPlayTurn: clone(SESSION_PLAY_TURN_CAPABILITIES) as unknown as JsonValue } as unknown as JsonValue; break;
           case 'map': {
             const { tiles, ...mapInfo } = observation.map;

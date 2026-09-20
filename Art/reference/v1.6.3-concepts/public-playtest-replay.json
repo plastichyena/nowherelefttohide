@@ -1,0 +1,28 @@
+[
+  {
+    "seed": 1,
+    "acceptedActions": 125,
+    "recordedRejectedInputs": 5,
+    "outcome": "lost",
+    "reason": "capitalLost",
+    "turn": 28,
+    "replayMatched": true,
+    "starvationDeaths": 11,
+    "screeningInfections": 0,
+    "waitingInfections": 13,
+    "livingConditionInfections": 18
+  },
+  {
+    "seed": 7,
+    "acceptedActions": 79,
+    "recordedRejectedInputs": 0,
+    "outcome": "lost",
+    "reason": "capitalLost",
+    "turn": 27,
+    "replayMatched": true,
+    "starvationDeaths": 0,
+    "screeningInfections": 20,
+    "waitingInfections": 0,
+    "livingConditionInfections": 8
+  }
+]

@@ -69,12 +69,15 @@ describe('board runtime PNG files', () => {
     }
   });
 
-  it('keeps transparent sprites and overlays, omits water, and stays below 3 MiB', () => {
+  it('keeps transparent sprites and overlays, includes water, and stays below 3 MiB', () => {
     const paths = [...BOARD_ASSET_PATHS];
     expect(paths).toHaveLength(new Set(paths).size);
-    expect(paths.some((path) => /water/iu.test(path))).toBe(false);
-    expect(paths.filter((path) => path.startsWith('units/'))).toHaveLength(12);
+    expect(paths.some((path) => /water/iu.test(path))).toBe(true);
+    expect(paths.filter((path) => path.startsWith('units/'))).toHaveLength(14);
     expect(paths).toEqual(expect.arrayContaining([
+      'overlays/terrain_bridge.png',
+      'units/unit_special_forces.png',
+      'units/unit_pack_zombie.png',
       'units/unit_police.png',
       'units/unit_national_guard.png',
       'units/unit_police_zombie.png',
@@ -86,7 +89,7 @@ describe('board runtime PNG files', () => {
       'units/unit_recon_team.png',
       'units/unit_screamer_zombie.png',
     ]));
-    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(14);
+    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(15);
     expect(paths).toEqual(expect.arrayContaining([
       'facilities/facility_army_base.png',
       'facilities/facility_temporary_housing.png',

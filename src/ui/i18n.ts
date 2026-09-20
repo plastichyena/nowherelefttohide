@@ -1,3 +1,4 @@
+import { RULES_V163 } from '../core/rules-v163';
 export type Locale = 'ja' | 'en';
 
 export interface TranslationTable {
@@ -560,10 +561,10 @@ const JA: TranslationTable = {
   unavailable: '利用不可',
   noSave: '保存データがありません',
   loadError: 'セーブデータを読み込めません',
-  legacySaveNotice: 'v1.6.1以前の自動保存・セーブコード・JSONはv1.6.2と互換性がなく読み込めません。旧データは変換・削除・上書きされません。「最初から」で新しいゲームを開始してください。',
-  legacySaveError: 'v1.6.1以前のセーブデータはv1.6.2で読み込めません。現在の状態は変更されず、元データも保持されます。「最初から」を選択してください。',
-  migrationSaveError: 'v1.6.1以前のSaveはv1.6.2へ移行できないため読み込めません。現在の状態と元データは変更されていません。',
-  migratedSaveNotice: 'v1.6.1以前のSaveはv1.6.2へ移行されません。元データは変更・削除・上書きされません。',
+  legacySaveNotice: 'v1.6.2以前の自動保存・セーブコード・JSONはv1.6.3と互換性がなく読み込めません。旧データは変換・削除・上書きされません。「最初から」で新しいゲームを開始してください。',
+  legacySaveError: 'v1.6.2以前のセーブデータはv1.6.3で読み込めません。現在の状態は変更されず、元データも保持されます。「最初から」を選択してください。',
+  migrationSaveError: 'v1.6.2以前のSaveはv1.6.3へ移行できないため読み込めません。現在の状態と元データは変更されていません。',
+  migratedSaveNotice: 'v1.6.2以前のSaveはv1.6.3へ移行されません。元データは変更・削除・上書きされません。',
   saved: '自動保存しました',
   saveFailed: '保存に失敗しました',
   manualSave: '手動保存',
@@ -790,7 +791,7 @@ const JA: TranslationTable = {
   eventCauseCombatNoise: 'Combat Noise',
   tipNoise: 'Human CombatとHordeの実移動は共通Noise Pulseを発生させます。Police・Riot Police・ReconはMedium、National GuardはLargeを公開し、Horde移動NoiseはRadius 8です。Screamerは人間を初めて発見すると位置非公開の特大Noiseを1回発生させます。通常AI系Zombieは次のZombie Phaseで反応し、Hiddenな反応個体・Target・発生位置・Screamerの正確なRadiusは公開しません。',
   tipCrisis: 'Crisis Summaryは公開Stateから重大度別に危機を整理します。End Turn時はCritical件数、攻撃可能Charge、感染を自動鎮圧できるUnitだけを短く確認できます。',
-  tipSave: 'v1.6.2は新規ゲーム専用で、v1.6.1以前の通常Save・AI Replay・Artifact・Session・Checkpointを読み込みません。旧データは変換・削除・上書きされません。Game Rules 12.0.0／Save Format 19を使用します。新規ゲーム開始時、正常に完了したEnd Turn後、勝利・敗北確定時に自動保存し、任意のタイミングで手動保存できます。',
+  tipSave: 'v1.6.3は新規ゲーム専用で、v1.6.2以前の通常Save・AI Replay・Artifact・Session・Checkpointを読み込みません。旧データは変換・削除・上書きされません。Game Rules 13.0.0／Save Format 20を使用します。新規ゲーム開始時、正常に完了したEnd Turn後、勝利・敗北確定時に自動保存し、任意のタイミングで手動保存できます。',
   tipInfectionEvents: '感染者5人につきNormal Zombie 1体を生成し、1回最大6体です。隣接空き不足分は拠点へ残り、陥落拠点はCombat Noiseで再流出します。連鎖陥落と建設施設の消滅は重要イベント履歴へ記録します。',
   tipTerrain: 'TerrainはPlain／Forest／Mountain／Waterで、RoadとUrbanは重畳表示です。RoadまたはUrbanは実効Cost 1、Forest上のZombieにはForest防御が適用されます。',
   tipVision: 'Human Unit・Player所有施設・稼働CheckpointのVisionが合成されます。Ground VisionはForest／Mountainの最初のHexを表示してその先を遮蔽し、Aerial Vision（Civilian Drone Base）はTerrain LOSを無視します。Zombie Vision、Noise、Attack lineはTerrainに遮られません。',
@@ -1485,10 +1486,10 @@ const EN: TranslationTable = {
   unavailable: 'Unavailable',
   noSave: 'No save data',
   loadError: 'Could not load save data',
-  legacySaveNotice: 'Autosaves, save codes, and JSON from v1.6.1 or earlier are incompatible with v1.6.2. Legacy data is never converted, deleted, or overwritten. Choose New Game to start again.',
-  legacySaveError: 'This save is from v1.6.1 or earlier and cannot be loaded by v1.6.2. Your current state remains unchanged and the source data is retained. Choose New Game.',
-  migrationSaveError: 'v1.6.1-or-earlier saves cannot be migrated to v1.6.2. The current state and source data were not changed.',
-  migratedSaveNotice: 'v1.6.1-or-earlier saves are not migrated to v1.6.2. Source data is never changed, deleted, or overwritten.',
+  legacySaveNotice: 'Autosaves, save codes, and JSON from v1.6.2 or earlier are incompatible with v1.6.3. Legacy data is never converted, deleted, or overwritten. Choose New Game to start again.',
+  legacySaveError: 'This save is from v1.6.2 or earlier and cannot be loaded by v1.6.3. Your current state remains unchanged and the source data is retained. Choose New Game.',
+  migrationSaveError: 'v1.6.2-or-earlier saves cannot be migrated to v1.6.3. The current state and source data were not changed.',
+  migratedSaveNotice: 'v1.6.2-or-earlier saves are not migrated to v1.6.3. Source data is never changed, deleted, or overwritten.',
   saved: 'Autosaved',
   saveFailed: 'Save failed',
   manualSave: 'Manual save',
@@ -1715,7 +1716,7 @@ const EN: TranslationTable = {
   eventCauseCombatNoise: 'Combat Noise',
   tipNoise: 'Human combat and actual Horde movement emit common Noise Pulses. Police, Riot Police, and Recon expose Medium; National Guard exposes Large; and Horde movement uses Radius 8. A Screamer emits one position-hidden extra-large Noise when it first discovers humans. Normal-AI Zombies react at the next Zombie Phase. Hidden responders, targets, source positions, and the exact Screamer radius are never public.',
   tipCrisis: 'Crisis Summary groups threats derived from public state by severity. End Turn confirmation briefly shows the Critical count, Units with attack Charges, and Units able to auto-suppress infection.',
-  tipSave: 'v1.6.2 is for new games only and does not load v1.6.1-or-earlier normal Saves, AI Replays, Artifacts, Sessions, or Checkpoints. Legacy data is never converted, deleted, or overwritten. It uses Game Rules 12.0.0 and Save Format 19. Autosave runs at New Game start, after a successful End Turn, and when victory or defeat is confirmed; manual save remains available.',
+  tipSave: 'v1.6.3 is for new games only and does not load v1.6.2-or-earlier normal Saves, AI Replays, Artifacts, Sessions, or Checkpoints. Legacy data is never converted, deleted, or overwritten. It uses Game Rules 13.0.0 and Save Format 20. Autosave runs at New Game start, after a successful End Turn, and when victory or defeat is confirmed; manual save remains available.',
   tipInfectionEvents: 'One Normal Zombie is requested per 5 infected people, up to 6 per resolution. Missing adjacent space remains infected, and fallen sites can release Zombies again through Combat Noise. Chain falls and Constructible Facility destruction appear in Important Event History.',
   tipTerrain: 'Base Terrain is Plain, Forest, Mountain, or Water; Road and Urban are overlays. Road or Urban costs 1 movement, and Zombies receive Forest defense on Forest tiles.',
   tipVision: 'Visibility is the union of Human Unit, Player-owned Facility, and operational Checkpoint Vision. Ground Vision shows the first Forest/Mountain Hex and hides beyond it; Aerial Vision from Civilian Drone Bases ignores Terrain LOS. Zombie Vision, Noise, and Attack lines are not blocked by Terrain.',
@@ -1853,6 +1854,55 @@ const EN: TranslationTable = {
   'crisisReason.production_outage': 'Significant production is forecast to stop. Check the facility production and power reasons.',
   guideSteps: 'Use the menu beside a unit to choose Move, Attack, or Wait. After choosing a destination or target, confirm with the nearby ✓ or return to target selection with ×. Adjust workers and city transfers, then check the shortage forecast before ending the turn.',
 };
+
+for (const [locale, table] of [['ja', JA], ['en', EN]] as const) {
+  const rules = RULES_V163[locale];
+  Object.assign(table, {
+    nuclearPowerPlant: locale === 'ja' ? '原子力発電所' : 'Nuclear Power Plant',
+    'facility.nuclearPowerPlant': locale === 'ja' ? '原子力発電所' : 'Nuclear Power Plant',
+    specialForces: locale === 'ja' ? '特殊部隊' : 'Special Forces',
+    packZombie: 'Pack Zombie',
+    bridge: locale === 'ja' ? '橋' : 'Bridge',
+    'legendDescription.bridge': rules.water,
+    'legendDescription.nuclearPowerPlant': rules.nuclear,
+    'legendDescription.specialForces': rules.specialForces,
+    'legendDescription.packZombie': rules.packZombie,
+    'legendDescription.water': rules.water,
+    tipCheckpoint: rules.screening + ' ' + rules.waiting,
+    policyTradeoff: rules.screening,
+    tipPolicy: rules.screening + ' ' + rules.waiting,
+    tipFuel: locale === 'ja' ? 'WindとSupply内の稼働原発はFuel不要で先に使います。残る実割当電力5につき開始時Fuel2を火力発電所が消費し、その後にSupply内Unitへ補給します。当Turnの精製Fuelを先取りしません。' : 'Wind and supplied operational nuclear generation are used first without Fuel. Power Plants consume two turn-start Fuel per remaining five allocated electricity, then supplied units refill. This-turn refined Fuel is not borrowed early.',
+    tipShortage: rules.starvation + ' ' + rules.health,
+    overcrowdingRate: locale === 'ja' ? '都市ごとの超過率' : 'Per-city excess ratio',
+    'error.capital_minimum_resident_required': rules.capital,
+  });
+  const alerts: Record<string, [string, string]> = locale === 'ja' ? {
+    capital_resident_minimum: ['州都の健康住民が少ない', rules.capital],
+    public_health_food_stress: ['食料と衛生の悪化', '不足率 {deficit}、衛生ストレス {stress}、食料蓄積 {accumulation}。全量供給で蓄積を0.5回復、衛生ストレスは25%減衰。'],
+    public_health_civilian_goods_stress: ['民需品と衛生の悪化', '不足率 {deficit}、衛生ストレス {stress}。直接死亡はありませんが、感染リスクが残ります。'],
+    food_starvation_risk: ['飢餓死亡の危険', '死亡率 {rate}、予測損失 {populationLost}、蓄積 {accumulation}、端数 {carry}。今Turnの整数損失0でも蓄積が続けば死亡します。'],
+    internal_infection_risk: ['生活環境による感染リスク', '健康人口 {healthyPopulation}、1人あたり確率 {probability}、期待人数 {expectedInfections}。駐留中も発生し得ます。少人口拠点では初回感染で陥落し得ます。'],
+    checkpoint_health_risk: ['検問所の衛生リスク', 'waiting {waiting}、1人あたり確率 {probability}、審査潜伏感染確率 {screeningProbability}。新規間接感染の拡大は翌Turn終了から。'],
+    refinery_allowance_runway_risk: ['精製枠がまもなく枯渇', '残量 {remainingAllowance}、予測使用量 {projectedFuelRefined}、Oil Field増分 {oilCredits}、正味消費 {netBurn}、残り約 {estimatedTurnsRemaining} Turn（現条件を維持した場合）。'],
+    nuclear_early_capture_window: ['原発確保の期限', 'Turn20まで残り {turnsRemaining} Turn。期限内の初回確保で特殊部隊が合流。未確保ならTurn21にPack Zombie出現。'],
+    nuclear_power_outage: ['原発の発電停止', '停止原因 {reason}、失う出力 {lostGeneration}、電力不足 {shortage}。Supplyと施設状態を回復してください。'],
+  } : {
+    capital_resident_minimum: ['Few healthy Capital residents', rules.capital],
+    public_health_food_stress: ['Food and health stress', 'Deficit {deficit}; health stress {stress}; accumulation {accumulation}. Full supply recovers 0.5 accumulation and 25% stress per turn.'],
+    public_health_civilian_goods_stress: ['Civilian Goods health stress', 'Deficit {deficit}; stress {stress}. No direct deaths, but infection risk persists.'],
+    food_starvation_risk: ['Starvation danger', 'Rate {rate}; projected deaths {populationLost}; accumulation {accumulation}; carry {carry}. Zero integer deaths this turn does not remove future danger.'],
+    internal_infection_risk: ['Living-condition infection risk', 'Healthy {healthyPopulation}; per-person probability {probability}; expected count {expectedInfections}. Garrisons do not prevent this draw. A small site can fall on its first infection.'],
+    checkpoint_health_risk: ['Checkpoint health risk', 'Waiting {waiting}; per-person probability {probability}; screening probability {screeningProbability}. New indirect infections spread from the next EndTurn.'],
+    refinery_allowance_runway_risk: ['Refining allowance running out', 'Remaining {remainingAllowance}; projected use {projectedFuelRefined}; Oil Field credits {oilCredits}; net burn {netBurn}; about {estimatedTurnsRemaining} turns at current operation.'],
+    nuclear_early_capture_window: ['Nuclear capture deadline', '{turnsRemaining} turns until Turn20. First capture in time awards Special Forces; never captured by Turn21 causes a Pack Zombie.'],
+    nuclear_power_outage: ['Nuclear generation stopped', 'Reason {reason}; lost output {lostGeneration}; power shortage {shortage}. Restore Supply and operation.'],
+  };
+  for (const [code,[title,body]] of Object.entries(alerts)) {
+    table['alert.'+code+'.title']=title;
+    table['alert.'+code+'.body']=body;
+    table['crisisReason.'+code]=title;
+  }
+}
 
 const TABLES: Record<Locale, TranslationTable> = { ja: JA, en: EN };
 

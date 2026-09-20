@@ -1,3 +1,5 @@
+import { BAY_CORNERS, BAY_WATER_COUNT, bayCornerForSeed, bayLayout, type BayCorner } from './bay';
+import { hasMovementRoad } from './terrain';
 import { generateRoadNetwork, fixedRoadInput, connectRoadAccess, roadHash } from './roads';
 import type {
   BaseTerrain,
@@ -22,10 +24,10 @@ export { getTile, getFacility, getHordeEntrance, isRoad, isHordeSpawnReserve, ca
  * identifier here rather than deriving it from caller config: map validation
  * and save loading must reject a different fixed-map contract.
  */
-export const FIXED_MAP_ID = 'fixed-51x51-v7' as const;
+export const FIXED_MAP_ID = 'fixed-51x51-v8' as const;
 export const FIXED_MAP_WIDTH = 51 as const;
 export const FIXED_MAP_HEIGHT = 51 as const;
-export const FIXED_FACILITY_COUNT = 25 as const;
+export const FIXED_FACILITY_COUNT = 26 as const;
 export const FIXED_INITIAL_ZOMBIE_COUNT = 50 as const;
 
 /**
@@ -109,6 +111,7 @@ const capacityByType: Record<string, number> = {
   oilField: 5,
   refinery: 30,
   powerPlant: 30,
+  nuclearPowerPlant: 5,
   windPowerPlant: 0,
 };
 
@@ -254,7 +257,7 @@ function createTiles(roads: Set<string>): HexTile[] {
 
 function createFacilities(
   capacities: Readonly<Record<string, number>> = capacityByType,
-  selectedOilFieldId = OIL_FIELD_CANDIDATES[0]!.id,
+  selectedOilFieldId: string = OIL_FIELD_CANDIDATES[0]!.id,
 ): FacilityDefinition[] {
   return facilitySpecs.filter((spec) => spec.type !== 'oilField' || spec.id === selectedOilFieldId).map((spec) => ({
     id: spec.id,
@@ -357,10 +360,19 @@ let baseRoadCache: { key: string; roads: import('./roads').RoadNetwork } | null 
 function buildFixedMap(
   capacities: Readonly<Record<string, number>> = capacityByType,
   selectedOilFieldId = OIL_FIELD_CANDIDATES[0]!.id,
+  corner: BayCorner = bayCornerForSeed(0),
 ): FixedMap {
   const roads = roadKeySet();
   const tiles = createTiles(roads);
   const facilities = createFacilities(capacities, selectedOilFieldId);
+  const bay = bayLayout(corner);
+  for (const tile of tiles) {
+    if (bay.waterKeys.has(tile.key)) { if (tile.facilityId || roads.has(tile.key)) throw new Error('Bay overlaps protected map geometry'); tile.terrain = 'water'; tile.movementCost = null; }
+  }
+  facilities.push({ id: 'nuclear-power-plant-1', type: 'nuclearPowerPlant', nameKey: 'facility.nuclearPowerPlant', position: bay.nuclear, workerCapacity: capacities.nuclearPowerPlant ?? 5, startingOwned: false, startingWorkers: 0, startingInfected: 0 });
+  const nuclearTile = tiles.find(t => t.key === hexKey(bay.nuclear))!;
+  nuclearTile.terrain = 'plain'; nuclearTile.movementCost = 1;
+  for (const position of bay.bridge) { const tile = tiles.find(t => t.key === hexKey(position))!; if (tile.terrain === 'water') tile.road = true; }
   const hordeEntrances = createEntrances();
   const roadBranches = createRoadBranches();
   const hordeSpawnReserve = tiles
@@ -382,6 +394,7 @@ function buildFixedMap(
   }
 
   const roadInput = fixedRoadInput({ tiles, facilities, roadBranches, width: FIXED_MAP_WIDTH, height: FIXED_MAP_HEIGHT });
+  roadInput.trunks = [...roadInput.trunks, { id: 'bay-bridge', role: 'access', path: bay.bridge }];
   const cacheKey = roadHash(roadInput);
   if (!baseRoadCache || baseRoadCache.key !== cacheKey) baseRoadCache = { key: cacheKey, roads: generateRoadNetwork(roadInput) };
   return {
@@ -417,7 +430,7 @@ export function getInitialZombieCandidates(map: FixedMap, armyBaseVision = 3): H
   const trunkKeys = new Set(map.roadBranches.flatMap((branch) => branch.roadTiles.map(hexKey)));
   const hardCandidates = map.tiles
     .filter((tile) => {
-      if (tile.movementCost === null) return false;
+      if ((tile.movementCost === null && !hasMovementRoad(map, tile))) return false;
       if (facilityKeys.has(tile.key) || humanKeys.has(tile.key)) return false;
       if (hexDistance(capital.position, tile) < 8) return false;
       return !armyBase || hexDistance(armyBase.position, tile) > armyBaseVision;
@@ -493,7 +506,7 @@ export function generateInitialHunterPositions(
     ...map.initialZombiePositions.map(hexKey),
   ]);
   const armyBase = map.facilities.find((facility) => facility.type === 'armyBase');
-  const candidates = map.tiles.filter((tile) => tile.movementCost !== null
+  const candidates = map.tiles.filter((tile) => (tile.movementCost !== null || hasMovementRoad(map, tile))
     && !occupied.has(tile.key)
     && hexDistance(capital.position, tile) >= options.initialHunterMinDistance)
     .filter((tile) => !armyBase || hexDistance(armyBase.position, tile) > armyBaseVision)
@@ -578,7 +591,7 @@ export function createFixedMap(
   seed = 0,
 ): FixedMap {
   const selected = oilFieldCandidateForSeed(seed);
-  const map = buildFixedMap(capacities, selected.id);
+  const map = buildFixedMap(capacities, selected.id, bayCornerForSeed(seed));
   map.initialZombiePositions = generateInitialZombiePositions(map, seed);
   return cloneMap(map);
 }
@@ -651,7 +664,7 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     if (tile.movementCost !== expectedCost) {
       errors.push(`tile movement cost does not match terrain: ${tile.key}`);
     }
-    if (tile.road && tile.terrain !== 'plain') {
+    if (tile.road && tile.terrain !== 'plain' && tile.terrain !== 'water') {
       errors.push(`road base terrain must be plain: ${tile.key}`);
     }
     if (tile.facilityId !== null && tile.terrain !== 'plain') {
@@ -676,21 +689,11 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
       { plain: 0, forest: 0, mountain: 0, water: 0 },
     )
     : null;
-  if (
-    terrainCounts &&
-    (terrainCounts.water !== 0 ||
-      terrainCounts.plain + terrainCounts.forest + terrainCounts.mountain !== FIXED_MAP_WIDTH * FIXED_MAP_HEIGHT)
-  ) {
-    errors.push('map terrain must cover all 2601 hexes with no Water');
-  }
-  if (terrainCounts && (
-    terrainCounts.plain !== 1961
-    || terrainCounts.forest !== 514
-    || terrainCounts.mountain !== 126
-    || terrainCounts.water !== 0
-  )) {
-    errors.push('map terrain counts must be Plain 1961, Forest 514, Mountain 126, Water 0');
-  }
+  if (terrainCounts && terrainCounts.water !== BAY_WATER_COUNT) errors.push('Bay water count must be ' + BAY_WATER_COUNT);
+  const nuclear = map.facilities.find(f => f.type === 'nuclearPowerPlant');
+  if (map.facilities.filter(f => f.type === 'nuclearPowerPlant').length !== 1) errors.push('Exactly one Nuclear Power Plant is required');
+  const actualWater = map.tiles.filter(t => t.terrain === 'water').map(t => t.key).sort().join(';');
+  if (!BAY_CORNERS.some(c => { const bay = bayLayout(c); return actualWater === [...bay.waterKeys].sort().join(';') && nuclear && hexKey(nuclear.position) === hexKey(bay.nuclear); })) errors.push('Bay and nuclear placement do not match a fixed template');
 
   const facilityPositions = new Set<string>();
   for (const facility of map?.facilities ?? []) {
@@ -799,14 +802,15 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
       errors.push(`initial zombie is within Capital safety distance: ${key}`);
     }
     const tile = map?.tiles.find((candidate) => candidate.key === key);
-    if (tile?.movementCost === null) errors.push(`initial zombie is on impassable terrain: ${key}`);
+    if (tile?.movementCost === null && !hasMovementRoad(map, position)) errors.push(`initial zombie is on impassable terrain: ${key}`);
   }
 
   const selectedOilId = (map?.facilities ?? []).find((facility) => facility.type === 'oilField')?.id;
   const expectedFacilityIds = new Set(FIXED_FACILITY_IDS.filter((id) => !id.startsWith('oilfield-') || id === selectedOilId));
+  expectedFacilityIds.add('nuclear-power-plant-1');
   const actualFacilityIds = new Set((map?.facilities ?? []).filter(f=>f.type!=='armyBase').map((facility) => facility.id));
   if (expectedFacilityIds.size !== actualFacilityIds.size || [...expectedFacilityIds].some((id) => !actualFacilityIds.has(id))) {
-    errors.push('map facilities must match the selected fixed v1.6.2 facility template');
+    errors.push('map facilities must match the selected fixed v1.6.3 facility template');
   }
 
   if (map && countStaticBuildablePlainHexes(map, 5) < 12) {
@@ -815,11 +819,12 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
 
   // Normalize only caller-provided capacity overrides before comparing
   // structure, matching the legacy API while preserving one canonical map.
+  const savedCorner = BAY_CORNERS.find(c => nuclear && hexKey(bayLayout(c).nuclear) === hexKey(nuclear.position)) ?? bayCornerForSeed(0);
   const canonicalCandidate = map ? cloneMap(map) : null;
   if (canonicalCandidate) {
     if (!canonicalCandidate.roads) errors.push('Missing connector road network');
     else {
-      const selectedMap = buildFixedMap(capacityByType, selectedOilId);
+      const selectedMap = buildFixedMap(capacityByType, selectedOilId, savedCorner);
       const expected = structuredClone(selectedMap.roads!);
       const base = canonicalCandidate.facilities.find(f => f.type === 'armyBase');
       if (base) connectRoadAccess(fixedRoadInput(canonicalCandidate), expected, base.position, 'access-army-base-1');
@@ -832,7 +837,7 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
       facility.workerCapacity = capacityByType[facility.type] ?? facility.workerCapacity;
     }
   }
-  const expectedCanonicalMap = selectedOilId ? buildFixedMap(capacityByType, selectedOilId) : baseFixedMap;
+  const expectedCanonicalMap = selectedOilId ? buildFixedMap(capacityByType, selectedOilId, savedCorner) : baseFixedMap;
   if (canonicalCandidate && canonicalStaticMapJson(canonicalCandidate) !== canonicalStaticMapJson(expectedCanonicalMap)) {
     errors.push('map must match the fixed 51x51 map template');
   }
@@ -852,7 +857,7 @@ export function selectArmyBasePosition(rng: SeededRng): HexCoord {
 export function placeArmyBase(map: FixedMap, rng: SeededRng, capacity = 10): void {
   const position = selectArmyBasePosition(rng);
   const tile = map.tiles.find(tile => hexKey(tile) === hexKey(position));
-  if (!tile || tile.facilityId || !tile.playerOccupancyAllowed || tile.movementCost === null) throw new Error('Invalid Army Base candidate');
+  if (!tile || tile.facilityId || !tile.playerOccupancyAllowed || (tile.movementCost === null && !hasMovementRoad(map, tile))) throw new Error('Invalid Army Base candidate');
   tile.facilityId = 'army-base-1';
   if (map.roads) connectRoadAccess(fixedRoadInput(map), map.roads, position, 'access-army-base-1');
   map.facilities.push({id:'army-base-1', type:'armyBase', nameKey:'facility.armyBase', position, workerCapacity:capacity, startingOwned:false, startingWorkers:0, startingInfected:0});
@@ -867,7 +872,7 @@ export function generateInitialGasPositions(map: FixedMap, rng: SeededRng, hunte
   const capital = map.facilities.find(f => f.type === 'capital')!;
   const armyBase = map.facilities.find((facility) => facility.type === 'armyBase');
   const candidates = map.tiles
-    .filter((tile) => tile.movementCost !== null
+    .filter((tile) => (tile.movementCost !== null || hasMovementRoad(map, tile))
       && !occupied.has(tile.key)
       && hexDistance(tile, capital.position) >= options.initialGasMinDistance
       && (!armyBase || hexDistance(tile, armyBase.position) > armyBaseVision))

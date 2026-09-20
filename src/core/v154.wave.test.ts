@@ -29,16 +29,16 @@ function load(engine: GameEngine, state: GameState): void {
 }
 
 describe('v1.5.4 scheduled Wave pending roster', () => {
-  it('freezes all 30 entries, exposes committed counts, and drains the 22-Hex zone over multiple Horde phases', () => {
+  it('freezes all 30 base entries plus one Final Pack, exposes committed counts, and drains the 22-Hex zone over multiple Horde phases', () => {
     const engine = new GameEngine(154, config(30, true));
     const first = engine.step({ type: 'EndTurn' });
     expect(first.error).toBeNull();
     const wave = first.state.horde.waves[0]!;
-    expect(wave).toMatchObject({ baseWaveUnitCount: 30, committedWaveUnitCount: 30, spawnedSoFar: 22, pendingCount: 8 });
-    expect(first.state.horde.pendingWaves[0]?.roster).toHaveLength(8);
+    expect(wave).toMatchObject({ baseWaveUnitCount: 30, committedWaveUnitCount: 31, spawnedSoFar: 22, pendingCount: 9 });
+    expect(first.state.horde.pendingWaves[0]?.roster).toHaveLength(9);
     expect(first.events.filter((event) => event.type === 'horde_wave_started')).toHaveLength(1);
     expect(first.events.find((event) => event.type === 'horde_spawn_batch')?.payload).toMatchObject({
-      spawnedThisBatch: 22, spawnedSoFar: 22, pendingCount: 8,
+      spawnedThisBatch: 22, spawnedSoFar: 22, pendingCount: 9,
     });
     const groupId = wave.groupId;
     const zone = new Set(getHordeSpawnZone(first.state.map, wave.direction).map(({ q, r }) => `${q},${r}`));
@@ -55,8 +55,8 @@ describe('v1.5.4 scheduled Wave pending roster', () => {
     const second = engine.step({ type: 'EndTurn' });
     expect(second.error).toBeNull();
     expect(second.state.horde.pendingWaves).toHaveLength(0);
-    expect(second.state.horde.waves[0]).toMatchObject({ spawnedSoFar: 30, pendingCount: 0 });
-    expect(second.state.units.filter((unit) => unit.spawnGroupId === groupId)).toHaveLength(30);
+    expect(second.state.horde.waves[0]).toMatchObject({ spawnedSoFar: 31, pendingCount: 0 });
+    expect(second.state.units.filter((unit) => unit.spawnGroupId === groupId)).toHaveLength(31);
     expect(second.state.units.some((unit) => firstPositions.has(unit.id)
       && firstPositions.get(unit.id) !== `${unit.position.q},${unit.position.r}`)).toBe(true);
   });
@@ -75,8 +75,8 @@ describe('v1.5.4 scheduled Wave pending roster', () => {
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
     expect(result.state.horde.finalHordeStatus).toBe('active');
-    expect(result.state.horde.waves[0]).toMatchObject({ committedWaveUnitCount: 5, spawnedSoFar: 0, pendingCount: 5 });
-    expect(result.state.horde.pendingWaves[0]?.roster).toHaveLength(5);
+    expect(result.state.horde.waves[0]).toMatchObject({ committedWaveUnitCount: 6, spawnedSoFar: 0, pendingCount: 6 });
+    expect(result.state.horde.pendingWaves[0]?.roster).toHaveLength(6);
     expect(result.state.units.some((unit) => unit.hordeKind === 'final')).toBe(false);
     expect(result.gameOver).toBe(false);
   });
@@ -101,13 +101,13 @@ describe('v1.5.4 scheduled Wave pending roster', () => {
     expect(result.error).toBeNull();
     expect(result.state.horde.waves[0]).toMatchObject({
       baseWaveUnitCount: 2,
-      committedWaveUnitCount: 4,
-      spawnedSoFar: 4,
+      committedWaveUnitCount: 5,
+      spawnedSoFar: 5,
       pendingCount: 0,
     });
     const groupId = result.state.horde.waves[0]!.groupId;
     expect(result.state.units.filter((unit) => unit.spawnGroupId === groupId).map((unit) => unit.type))
-      .toEqual(['hordeZombie', 'hordeZombie', 'policeZombie', 'policeZombie']);
+      .toEqual(['hordeZombie', 'hordeZombie', 'policeZombie', 'policeZombie', 'packZombie']);
     expect(result.state.rejectedRefugeesByDirection[direction]).toEqual({ normalRejected: 0, strictRejected: 0, turnedAway: 0 });
     expect(result.events.find((event) => event.type === 'horde_rejected_bonus_applied')?.payload)
       .toMatchObject({ direction, rejectedTotal: 6, extraNormalZombies: 2 });

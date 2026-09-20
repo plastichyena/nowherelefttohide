@@ -20,6 +20,9 @@ const map = {
 
 function observation(turn: number): AgentObservation {
   return {
+    publicHealth: { stress: { food: 0, civilianGoods: 0 }, foodShortageAccumulation: 0, starvationCarry: 0 },
+    refineryAllowance: { initialAllowance:1000,oilCreditsEarned:0,fuelRefined:0,remainingAllowance:1000 },
+    nuclearObjective: { firstCapturedTurn: null, reward: 'unclaimed', deadlineTurn: 20 },
     apiVersion: '8.0.0', gameRulesVersion: '4.0.0', turn, finalHordeTurn: 50, phase: 'player', map,
     resources: { food: 10 + turn, civilianGoods: 10, militaryGoods: 10, fuel: 10, electricityCapacity: 0, electricityRequired: 0 },
     population: { healthyCivilians: 1, cityResidents: 1, productionWorkers: 0, unitPopulation: 0, waitingRefugees: 0, screeningRefugees: 0, approvedRefugees: 0, infected: 0 },
@@ -29,9 +32,9 @@ function observation(turn: number): AgentObservation {
     horde: { warningType: 'none', warningDirections: [], nextWaveIndex: null, nextWave: null, spawnTurn: null, finalHordeStatus: 'notStarted', turnsRemaining: 0, nextSpawnTurn: null, waves: [], waveTotals: [], finalPendingCount: 0 },
     victory: { finalHordeDefeated: false, suppliedAreaZombieClear: true, suppliedAreaInfectionClear: true },
     finalHordeDefeated: false, suppliedAreaZombieClear: true, suppliedAreaInfectionClear: true,
-    crisisSummary: { items: [], highestSeverity: null } as never,
+    crisisSummary: { alerts: [], criticalCount: 0, warningCount: 0, advisoryCount: 0 } as never,
     endTurnRisk: { confirmationRecommended: false, reasons: [] } as never,
-    endTurnForecast: {
+    endTurnForecast: { publicHealth: { foodDeficit: 0, civilianGoodsDeficit: 0, stressBefore: {food:0,civilianGoods:0}, stressAfter: {food:0,civilianGoods:0}, accumulationBefore:0, accumulationAfter:0, threshold:2, accumulationCap:7, starvationRate:0, starvation:{population:1,loss:0,carryBefore:0,carryAfter:0,allocations:[]},facilities:[],checkpoints:[],conditions:'No shortage in protocol fixture.' },
       overcrowding: { cities: [], additionalCivilianGoods: 0, additionalFood: 0 },
       food: { shortage: 0 }, civilianGoods: { shortage: 0 },
       militaryGoods: { totalUnfilledRefillDemand: 0, units: [] },

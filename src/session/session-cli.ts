@@ -1,4 +1,6 @@
 import { ACTION_RESPONSE_SEMANTICS, ACTION_PLAY_GUIDANCE } from '../agent/action-input';
+import { RULES_V163 } from '../core/rules-v163';
+import { CONTEXT_HANDOFF_LIMITS } from './context-handoff';
 import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -162,6 +164,8 @@ export function sessionCliHelp(): Record<string, unknown> {
     usage: 'run-session.sh COMMAND [options]',
     responseSemantics: ACTION_RESPONSE_SEMANTICS,
     actionPlayGuidance: ACTION_PLAY_GUIDANCE,
+    contextHandoff: { guidance: RULES_V163.en.handoff, limits: CONTEXT_HANDOFF_LIMITS, query: 'query --session=my-game --target=context-handoff --revision=N', locale: 'Keep human-facing comments and decisionSummary in preferredCommentLocale for the whole Session.' },
+    rulesV163: RULES_V163.en,
     commands: [...COMMANDS],
     playTurn: {
       ...SESSION_PLAY_TURN_CAPABILITIES,
@@ -345,7 +349,7 @@ export async function runInteractivePlayTurn(
     }
   };
   try {
-    await writeJsonToWritable(output, { ok: true, command: 'play-turn', kind: 'start', protocolVersion: PLAY_TURN_PROTOCOL_VERSION, sessionId, startRevision: turn.startRevision, startTurn: turn.startTurn, observation: turn.status.observation, gameOver: turn.status.gameOver, result: turn.status.result, capabilities: SESSION_PLAY_TURN_CAPABILITIES });
+    await writeJsonToWritable(output, { ok: true, command: 'play-turn', kind: 'start', protocolVersion: PLAY_TURN_PROTOCOL_VERSION, sessionId, startRevision: turn.startRevision, startTurn: turn.startTurn, contextHandoff: turn.status.contextHandoff, observation: turn.status.observation, gameOver: turn.status.gameOver, result: turn.status.result, capabilities: SESSION_PLAY_TURN_CAPABILITIES });
     while (!exitReason) {
       const next = await nextChunk(iterator, idleTimeoutMs);
       if (next.timedOut) { exitReason = 'idle_timeout'; break; }

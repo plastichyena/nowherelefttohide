@@ -294,6 +294,7 @@ const FALLBACK_FACILITY_SYMBOL: Record<string, string> = {
   militaryFactory: '⚒',
   refinery: '◈',
   powerPlant: '⚡',
+  nuclearPowerPlant: '☢',
   windPowerPlant: '≋',
   simpleFarm: 'f',
   civilianDroneBase: '✈',
@@ -306,6 +307,8 @@ const FALLBACK_UNIT_SYMBOL: Record<string, string> = {
   nationalGuard: 'G',
   riotPolice: 'RP',
   reconTeam: 'RC',
+  specialForces: 'SF',
+  packZombie: 'PK',
   zombie: 'Z',
   hordeZombie: 'H',
   policeZombie: 'PZ',
@@ -1387,8 +1390,12 @@ export class HexBoardScene extends Phaser.Scene {
       const center = this.hexToWorld(state, tile);
       for (const edge of this.roadConnectionCache.get(hexKey(tile)) ?? []) {
         const other = this.hexToWorld(state, edge.position);
+        if (tile.terrain === 'water' && !this.boardLodActive()) {
+          const span = Math.hypot(other.x-center.x, other.y-center.y);
+          if (this.drawTexture(this.roadLayer, BOARD_ASSET_REGISTRY.overlays.bridge, center, span, span, Math.atan2(other.y-center.y, other.x-center.x))) continue;
+        }
         const width = edge.role === 'trunk' ? 6 : edge.role === 'collector' ? 3.5 : 2;
-        this.roadFallbackGraphics.lineStyle(width, edge.role === 'trunk' ? 0xb5a98d : edge.role === 'collector' ? 0x968e7b : 0x777467, 1);
+        this.roadFallbackGraphics.lineStyle(tile.terrain === 'water' ? 7 : width, tile.terrain === 'water' ? 0xc2bca9 : edge.role === 'trunk' ? 0xb5a98d : edge.role === 'collector' ? 0x968e7b : 0x777467, 1);
         this.roadFallbackGraphics.lineBetween(center.x, center.y, (center.x + other.x) / 2, (center.y + other.y) / 2);
       }
       return;
@@ -1666,6 +1673,7 @@ export class HexBoardScene extends Phaser.Scene {
         militaryFactory: t('militaryFactory'),
         refinery: t('refinery'),
         powerPlant: t('powerPlant'),
+        nuclearPowerPlant: t('nuclearPowerPlant'),
         windPowerPlant: t('windPowerPlant'),
         simpleFarm: t('simpleFarm'),
         civilianDroneBase: t('civilianDroneBase'),
@@ -1770,12 +1778,12 @@ export class HexBoardScene extends Phaser.Scene {
       const proficiencyLabel = proficiency ? t(`proficiency.${proficiency}`) : null;
       const maxCharges = typeof unitRecord.maxAttackCharges === 'number' ? Math.max(1, Math.trunc(unitRecord.maxAttackCharges)) : 1;
       const charges = typeof unitRecord.attackChargesRemaining === 'number' ? Math.max(0, Math.min(maxCharges, Math.trunc(unitRecord.attackChargesRemaining))) : maxCharges;
-      const typeLabel = unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
+      const typeLabel = unit.type === 'specialForces' ? t('specialForces') : unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
       const supplyLabel = suppliedTiles.has(tileKey) ? t('supplied') : t('outOfSupply');
       const details = `${typeLabel}${proficiencyLabel ? ` (${proficiencyLabel})` : ''} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
       this.addLabel(`unit:${unit.id}:detail`, details, position.x, position.y + 23, '#f3f7f9', 8, true);
     } else if (isZombie && render.selectedZombieId === unit.id) {
-      const typeLabel = unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : (unit.type as string) === 'hunterZombie' ? t('hunterZombie') : (unit.type as string) === 'gasZombie' ? t('gasZombie') : (unit.type as string) === 'screamerZombie' ? t('screamerZombie') : t('zombie');
+      const typeLabel = unit.type === 'packZombie' ? t('packZombie') : unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : (unit.type as string) === 'hunterZombie' ? t('hunterZombie') : (unit.type as string) === 'gasZombie' ? t('gasZombie') : (unit.type as string) === 'screamerZombie' ? t('screamerZombie') : t('zombie');
       this.addLabel(`unit:${unit.id}:detail`, `${typeLabel} HP ${unit.hp}/${unit.maxHp}`, position.x, position.y + 23, '#f3f7f9', 8, true);
     }
     void t;

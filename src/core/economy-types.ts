@@ -47,7 +47,7 @@ export interface FacilityProductionProjection {
   baseOutputs: Partial<Record<ResourceType, number>>;
   /** Lifetime Refinery allowance added by this Oil Field in the phase. */
   allowanceCredits: number;
-  stoppedReason: 'building' | 'recovering' | 'disabled' | 'ruined' | 'infection' | 'not_owned' | 'no_workers' | 'power_unavailable' | 'input_shortage' | null;
+  stoppedReason: 'out_of_supply' | 'building' | 'recovering' | 'disabled' | 'ruined' | 'infection' | 'not_owned' | 'no_workers' | 'power_unavailable' | 'input_shortage' | null;
   /** Present only for Army Base facilities; it does not consume production inputs. */
   armyBaseMilitaryGoods: ArmyBaseMilitaryGoodsProjection | null;
 }

@@ -18,6 +18,7 @@ export interface EconomyPreviewSnapshot {
   militaryGoods: number;
   fuel: number;
   electricity: { capacity: number; required: number; shortage: number };
+  publicHealth: EndTurnForecast['publicHealth'];
   populationLoss: number;
   projectedHealthyCivilians: number;
   guaranteedDefeat: boolean;
@@ -25,6 +26,9 @@ export interface EconomyPreviewSnapshot {
 }
 
 export interface CoreActionPreview {
+  capitalResidents: { before: number; after: number };
+  capitalMinimum: 1;
+  capitalResidentDelta: number;
   baseRevision: number;
   action: GameAction;
   legal: boolean;
@@ -45,14 +49,14 @@ export interface CoreActionPreview {
 }
 
 function shortagePopulationLoss(state: Readonly<GameState>, forecast: EndTurnForecast): number {
-  const afterFood = Math.max(0, state.population.healthyCivilians - forecast.food.shortage);
-  const afterCivilian = Math.max(0, afterFood - forecast.civilianGoods.maintenanceShortage);
-  return state.population.healthyCivilians - afterCivilian;
+  return forecast.publicHealth.starvation.allocations.filter(p => p.kind === 'facility').reduce((n,p) => n + p.loss,0);
 }
 
 function snapshot(state: Readonly<GameState>, forecast: EndTurnForecast): EconomyPreviewSnapshot {
   const populationLoss = shortagePopulationLoss(state, forecast);
-  const projectedHealthyCivilians = Math.max(0, state.population.healthyCivilians - populationLoss);
+  const projectedHealthyCivilians = forecast.publicHealth.starvation.allocations
+    .filter(pool => pool.kind === 'facility')
+    .reduce((total, pool) => total + pool.population - pool.loss, 0);
   return {
     food: forecast.food.endingStock,
     civilianGoods: forecast.civilianGoods.endingStock,
@@ -63,6 +67,7 @@ function snapshot(state: Readonly<GameState>, forecast: EndTurnForecast): Econom
       required: forecast.electricity.requiredPowerDemand,
       shortage: forecast.electricity.shortage,
     },
+    publicHealth: structuredClone(forecast.publicHealth),
     populationLoss,
     projectedHealthyCivilians,
     guaranteedDefeat: projectedHealthyCivilians === 0,
@@ -166,6 +171,9 @@ export function previewCoreAction(
   const recovered = afterState.facilities.find((facility) => facility.recoveryOperationalTurn !== null
     && beforeState.facilities.find((candidate) => candidate.id === facility.id)?.recoveryOperationalTurn !== facility.recoveryOperationalTurn);
   return {
+    capitalResidents: { before: beforeState.facilities.find(f => f.type === 'capital')!.workers, after: afterState.facilities.find(f => f.type === 'capital')!.workers },
+    capitalMinimum: 1,
+    capitalResidentDelta: afterState.facilities.find(f => f.type === 'capital')!.workers - beforeState.facilities.find(f => f.type === 'capital')!.workers,
     baseRevision,
     action: structuredClone(action),
     legal,

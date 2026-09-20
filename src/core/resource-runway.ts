@@ -30,7 +30,7 @@ export type ResourceRunwayOrder =
   | 'civilian_goods_reservation'
   | 'production_after_demand';
 
-export type ElectricityContributorKind = 'wind' | 'fuel_power';
+export type ElectricityContributorKind = 'wind' | 'nuclear' | 'fuel_power';
 
 export interface ResourceRunwayContext {
   electricityContributorKind?: ElectricityContributorKind | null;
@@ -196,7 +196,7 @@ export function deriveResourceRunwayForecast(
       const currentProduction = economy.electricity.availableGenerationCapacity;
       const windWithoutLargest = Math.max(
         0,
-        economy.fuel.windPowerAvailable - (electricityContributorKind === 'wind' ? largestOutput : 0),
+        economy.fuel.windPowerAvailable + economy.fuel.nuclearPowerAvailable - (electricityContributorKind === 'wind' || electricityContributorKind === 'nuclear' ? largestOutput : 0),
       );
       const powerPlantWithoutLargest = Math.max(
         0,

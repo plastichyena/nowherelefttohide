@@ -8,5 +8,8 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    // Session artifacts and quarantined files can contain very large trees.
+    // They are not source inputs and must not stall the dev/CLI watcher.
+    watch: { ignored: ['**/.safe-delete/**', '**/output/**', '**/dist/**'] },
   },
 });

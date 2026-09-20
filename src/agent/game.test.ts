@@ -14,7 +14,7 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
 
 describe('AgentGame public boundary', { timeout: 60000 }, () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.6.2');
+    expect(APP_VERSION).toBe('1.6.3');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -121,7 +121,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('19');
+    expect(info.saveFormatVersion).toBe('20');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -169,7 +169,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
-    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v7', width: 51, height: 51 });
+    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v8', width: 51, height: 51 });
     expect(info.rules.map.hordeSpawnReserve).toHaveLength(392);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 70 });
     expect(info.rules.horde.waves).toEqual([
@@ -193,7 +193,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       activePerBranchLimit: 1,
       preparedPostLimit: 5,
       screeningCapacity: 20,
-      estimatedScreeningThroughputByPolicy: { passThrough: 20, normal: 10, strict: 5 },
+      estimatedScreeningThroughputByPolicy: { passThrough: 20, normal: 10, strict: 4 },
       queuePressureThresholds: {
         none: { min: 0, max: 0 },
         low: { min: 1, max: 20 },
@@ -337,15 +337,15 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(batchEvents).toHaveLength(1);
     expect(waveEvents[0]!.payload).toMatchObject({
       waveIndex: 1, direction: expect.any(String), groupId: expect.any(String), kind: 'final',
-      baseWaveUnitCount: 4, committedWaveUnitCount: 4, spawnedSoFar: 0, pendingCount: 4,
+      baseWaveUnitCount: 4, committedWaveUnitCount: 5, spawnedSoFar: 0, pendingCount: 5,
     });
     expect(batchEvents[0]!.payload).toMatchObject({
       waveIndex: 1, direction: expect.any(String), groupId: expect.any(String), kind: 'final',
-      spawnedThisBatch: 4, spawnedSoFar: 4, pendingCount: 0,
+      spawnedThisBatch: 5, spawnedSoFar: 5, pendingCount: 0,
     });
     expect(result.observation.horde.waveTotals).toEqual([{
       waveIndex: 1, kind: 'final', baseWaveUnitCount: 4,
-      committedWaveUnitCount: 4, spawnedSoFar: 4, pendingCount: 0,
+      committedWaveUnitCount: 5, spawnedSoFar: 5, pendingCount: 0,
     }]);
     for (const hiddenField of [
       'zombieId', 'q', 'r', 'spawnGroupId', 'spawnGroupIds', 'units', 'position',
@@ -392,17 +392,17 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       result = game.step({ type: 'EndTurn' });
     }
     const spawned = result.events.find((event) => event.type === 'horde_spawn_batch');
-    expect(spawned?.payload).toMatchObject({ spawnedThisBatch: 5, spawnedSoFar: 5, pendingCount: 0 });
+    expect(spawned?.payload).toMatchObject({ spawnedThisBatch: 6, spawnedSoFar: 6, pendingCount: 0 });
     const publicWave = result.observation.horde.waveTotals.find((wave) => wave.waveIndex === 1);
     expect(publicWave).toMatchObject({
       baseWaveUnitCount: 4,
-      committedWaveUnitCount: 5,
-      spawnedSoFar: 5,
+      committedWaveUnitCount: 6,
+      spawnedSoFar: 6,
       pendingCount: 0,
     });
     // The private roster may contain mixed types; the only public fact is the
     // frozen aggregate count that includes the rejected-refugee bonus.
-    expect((game.getDebugState() as GameState).units.filter(u=>u.hordeKind==='final'&&u.type!=='hordeZombie')).toHaveLength(4);
+    expect((game.getDebugState() as GameState).units.filter(u=>u.hordeKind==='final'&&u.type!=='hordeZombie')).toHaveLength(5);
     const publicArtifact = game.getRunArtifact();
     for (const privateField of [
       'rejectedRefugeesByDirection',

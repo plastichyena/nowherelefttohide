@@ -1,3 +1,4 @@
+import { FIXED_MAP_ID } from '../core/map';
 import { applyLosslessJsonDiff } from '../session/public-diff';
 import { APP_VERSION, ARTIFACT_SCHEMA_VERSION, OBSERVATION_API_VERSION, GAME_RULES_VERSION, SAVE_FORMAT_VERSION, AGENT_API_VERSION, BRIDGE_API_VERSION } from '../agent/types';
 import { SESSION_ARTIFACT_PACKAGE_VERSION, SESSION_SCHEMA_VERSION } from '../session/types';
@@ -90,7 +91,7 @@ export class ReplayPackage {
     await this.zip.open();this.manifest=await this.zip.json('manifest.json',MiB);
     checkHash(this.manifest as unknown as Record<string,unknown>,'manifestHash');
     const m=this.manifest;
-    if(m.gameRulesVersion!==GAME_RULES_VERSION || String(m.saveFormatVersion)!==SAVE_FORMAT_VERSION || m.agentApiVersion!==AGENT_API_VERSION || m.bridgeApiVersion!==BRIDGE_API_VERSION || m.appVersion!==APP_VERSION || m.artifactSchemaVersion!==ARTIFACT_SCHEMA_VERSION || m.observationApiVersion!==OBSERVATION_API_VERSION || m.mapId!=='fixed-51x51-v7' || m.packageVersion!==SESSION_ARTIFACT_PACKAGE_VERSION || m.sessionSchemaVersion!==SESSION_SCHEMA_VERSION) fail('Unsupported replay version: v1.6.2 public Artifact required; start a new v1.6.2 game/Session (旧Replay非対応、新規v1.6.2 Sessionを開始してください)');
+    if(m.gameRulesVersion!==GAME_RULES_VERSION || String(m.saveFormatVersion)!==SAVE_FORMAT_VERSION || m.agentApiVersion!==AGENT_API_VERSION || m.bridgeApiVersion!==BRIDGE_API_VERSION || m.appVersion!==APP_VERSION || m.artifactSchemaVersion!==ARTIFACT_SCHEMA_VERSION || m.observationApiVersion!==OBSERVATION_API_VERSION || m.mapId!==FIXED_MAP_ID || m.packageVersion!==SESSION_ARTIFACT_PACKAGE_VERSION || m.sessionSchemaVersion!==SESSION_SCHEMA_VERSION) fail('Unsupported replay version: v1.6.3 public Artifact required; start a new v1.6.3 game/Session (旧Replay非対応、新規v1.6.3 Sessionを開始してください)');
     // Exported streams are stored, permitting random byte-range access without extracting history.
     const stream=this.zip.entries.get('artifact.ndjson');if(!stream || stream.method!==0)fail('Replay requires a stored artifact.ndjson entry; use the Portable ZIP export');
     const digest=new Digest();let pending=new Uint8Array(), accepted=0, offset=0, previous='0'.repeat(64), snapshot=-1, footer=false, document:SessionPublicDocument|undefined;

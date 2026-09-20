@@ -1,3 +1,5 @@
+import { RULES_V163 } from '../core/rules-v163';
+import { CONTEXT_HANDOFF_LIMITS } from '../session/context-handoff';
 import { ACTION_RESPONSE_SEMANTICS, ACTION_PLAY_GUIDANCE } from './action-input';
 import { publicQueryContract } from './query-contract';
 import { BARBED_WIRE_RULES } from '../core/barbed-wire';
@@ -79,6 +81,15 @@ export function createAgentApiInfo(
     Object.entries(productionProficiencyByType).map(([key, value]) => [key, publicProficiency(value)]),
   );
   const crisisCategories: Record<CrisisReasonCode, { severity: CrisisSeverity; category: string }> = {
+    capital_resident_minimum: { severity: 'advisory', category: 'facility' },
+    public_health_food_stress: { severity: 'warning', category: 'resource' },
+    public_health_civilian_goods_stress: { severity: 'warning', category: 'resource' },
+    food_starvation_risk: { severity: 'critical', category: 'resource' },
+    internal_infection_risk: { severity: 'warning', category: 'infection' },
+    checkpoint_health_risk: { severity: 'warning', category: 'checkpoint' },
+    refinery_allowance_runway_risk: { severity: 'warning', category: 'resource' },
+    nuclear_early_capture_window: { severity: 'warning', category: 'facility' },
+    nuclear_power_outage: { severity: 'warning', category: 'resource' },
     overcrowding_forecast: { severity: 'warning', category: 'resource' },
     temporary_housing_outage_forecast: { severity: 'warning', category: 'resource' },
     capital_infection_uncontained: { severity: 'critical', category: 'infection' },
@@ -178,10 +189,11 @@ export function createAgentApiInfo(
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
     rules: {
+      v163: { explanations: RULES_V163, contextHandoffLimits: CONTEXT_HANDOFF_LIMITS, capitalMinimum: 1, healthStress: { persistence: 0.75, deficitWeight: 0.40 }, starvation: { threshold: 2, cap: 7, recovery: 0.5, maximumRate: 0.10 }, screening: { normal: 0.05, strict: 0, passThroughBase: 0.25, passThroughCap: 0.60 }, infectionGrace: 'next_end_turn', nuclearCaptureDeadline: 20, nuclearFailureTurn: 21 },
       barbedWire: BARBED_WIRE_RULES,
       gasZombie: { explosionDamage:config.units.gasZombie.explosionDamage, explosionInfection:config.units.gasZombie.explosionInfection,radius:1,excludesCenter:true,initialCount:cloneJson(config.economy.initialGasCount),initialMinDistance:config.economy.initialGasMinDistance,finalWaves:2,capPerDirection:config.horde.gasZombieCapPerDirection },
       armyBase: {maxMilitaryGoods:config.armyBase.maxMilitaryGoods,interceptionCost:config.armyBase.interceptionCost,attack:config.armyBase.attack,range:config.armyBase.range,staffedVision:config.armyBase.staffedVision,rewardLastTurn:config.armyBase.rewardLastTurn,interceptionNoiseRadius:config.armyBase.noiseRadius,recruitmentPower:config.facilities.armyBase.production.powerCapacity,cityPopulationOnly:true},
-      zombies: Object.fromEntries((['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as const).map((type) => {
+      zombies: Object.fromEntries((['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const).map((type) => {
         const { hp, attack, movement, range, vision, maxAttackCharges } = config.units[type];
         return [type, { hp, attack, movement, range, vision, maxAttackCharges, ai: type === 'hordeZombie' ? 'horde' : 'normal' }];
       })) as AgentApiInfo['rules']['zombies'],
@@ -193,7 +205,7 @@ export function createAgentApiInfo(
         regularAttackRounding: unitExperience.regularAttackRounding === 'floor' ? 'floor' : 'ceil',
         veteranZombieKillsRequired: getNumber(unitExperience, 'veteranZombieKillsRequired', 5),
         veteranAttackCharges: getNumber(unitExperience, 'veteranAttackCharges', 2),
-        killCreditTypes: ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as never,
+        killCreditTypes: ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as never,
       },
       crisis: {
         severityOrder: ['critical', 'warning', 'advisory'],
@@ -255,7 +267,7 @@ export function createAgentApiInfo(
       },
       infection: {
         stationedUnitsContainSpread: true,
-        automaticSuppressionTiming: 'infectionPhaseAfterEndTurn',
+        automaticSuppressionTiming: 'economyAfterRefillBeforeStarvation',
         policeSuppression: getNumber(policeUnit, 'recruitAttack', 4),
         nationalGuardSuppression: getNumber(nationalGuardUnit, 'recruitAttack', 8),
         nationalGuardCivilianDamageFormula: `ceil(suppressionPower * ${getNumber(nationalGuardUnit, 'suppressionCivilianDamageRate', 0.5)})`,
@@ -265,6 +277,8 @@ export function createAgentApiInfo(
         noiseRespawnEnabled: config.infection.noiseRespawnEnabled,
       },
       ranges: {
+        specialForces: { baseRange: config.units.specialForces.range },
+        packZombie: { baseRange: config.units.packZombie.range },
         police: { baseRange: getNumber(policeUnit, 'range', 1) },
         nationalGuard: { baseRange: getNumber(nationalGuardUnit, 'range', 2) },
         reconTeam: { baseRange: getNumber(reconTeam, 'range', 6) },

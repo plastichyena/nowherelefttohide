@@ -175,7 +175,7 @@ function isBridgeAction(value: unknown): value is GameAction {
         return (
           hasOnlyKeys(value, ['type', 'branchId', 'policy']) &&
           isSafeId(value.branchId) &&
-          (value.policy === 'passThrough' || value.policy === 'normal' || value.policy === 'strict')
+          (value.policy === 'passThrough' || value.policy === 'normal' || value.policy === 'strict' || value.policy === 'deny')
         );
       case 'SetPowerSupply':
         return (

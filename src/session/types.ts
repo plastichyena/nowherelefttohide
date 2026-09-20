@@ -9,12 +9,12 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** v1.6.2 deliberately rejects every earlier Session/Checkpoint schema. */
-export const CHECKPOINT_SCHEMA_VERSION = '13.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '13.0.0' as const;
+/** v1.6.3 deliberately rejects every earlier Session/Checkpoint schema. */
+export const CHECKPOINT_SCHEMA_VERSION = '14.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '14.0.0' as const;
 export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
 export const SESSION_ARTIFACT_PACKAGE_VERSION = '1.0.0' as const;
-export const PLAY_TURN_PROTOCOL_VERSION = '1.1.0' as const;
+export const PLAY_TURN_PROTOCOL_VERSION = '1.2.0' as const;
 export const DEFAULT_CHECKPOINT_INTERVAL = 5;
 export const PUBLIC_SNAPSHOT_INTERVAL = 50;
 export const DEFAULT_QUERY_PAGE_SIZE = 100;
@@ -163,6 +163,8 @@ export type SessionPlayTurnStopReason =
   | 'end_turn_completed';
 
 export interface SessionStateDelta {
+  beforeTurn?: number;
+  afterTurn?: number;
   facilityChanges?: ReturnType<typeof import('../agent/facility-changes').facilityChanges>;
   branchFlowChanges?: ReturnType<typeof import('../agent/facility-changes').branchFlowChanges>;
   newlyInfectedSites: string[];
@@ -280,6 +282,10 @@ export interface SessionCheckpointMetadata extends SessionVersionIdentity, Sessi
 export interface SessionPublicState extends SessionPublicDocument { decision: number; traceHeadHash: string; documentHash: string }
 
 export interface SessionCompactSnapshot {
+  publicHealthForecast: ReturnType<typeof import('../core/public-health').compactPublicHealth>;
+  publicHealth: AgentObservation['publicHealth'];
+  nuclearObjective: AgentObservation['nuclearObjective'];
+  refineryAllowance?: AgentObservation['refineryAllowance'];
   importantChanges: ReturnType<typeof import('../agent/decision-summary').summarizeImportantChanges>;
   combatHazards: ReturnType<typeof import('../agent/decision-summary').deriveCombatHazards>;
   availableCityPopulation: number;
@@ -325,6 +331,7 @@ export interface SessionPlayTurnCapabilities {
 }
 
 export interface SessionStatusResult {
+  contextHandoff: import('./context-handoff').ContextHandoff;
   session: SessionDescriptor;
   active: ActiveCommit;
   revision: number;

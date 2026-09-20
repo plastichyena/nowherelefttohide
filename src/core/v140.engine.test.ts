@@ -365,10 +365,11 @@ describe('v1.4 Strategic Forecast and Queue Pressure', () => {
     expect(currentlyShort.singlePointOfFailure).toBe(false);
   });
 
-  it('predicts Guaranteed Defeat in Food-before-Civilian-Goods order from public economy only', () => {
+  it('predicts accumulated starvation defeat and excludes direct Civilian Goods deaths using only public economy', () => {
     const foodState = createInitialState(1431, safeConfig({ economy: { initialResources: { food: 0, civilianGoods: 0 } } }));
     for (const facility of foodState.facilities) if (facility.owner === 'player') facility.workers = 0;
     facilityAt(foodState, 'capital').workers = 1;
+    foodState.foodShortageAccumulation = 7; foodState.starvationCarry = 0.95;
     syncScenario(foodState);
     const food = deriveStrategicForecast(foodState).guaranteedDefeat;
     expect(food).toMatchObject({ guaranteed: true, causeResource: 'food', defeatReason: 'healthyCiviliansLost', projectedHealthyCivilians: 0 });
@@ -378,7 +379,7 @@ describe('v1.4 Strategic Forecast and Queue Pressure', () => {
     facilityAt(goodsState, 'capital').workers = 1;
     syncScenario(goodsState);
     const civilianGoods = deriveStrategicForecast(goodsState).guaranteedDefeat;
-    expect(civilianGoods).toMatchObject({ guaranteed: true, causeResource: 'civilianGoods', defeatReason: 'healthyCiviliansLost', projectedHealthyCivilians: 0 });
+    expect(civilianGoods).toMatchObject({ guaranteed: false, causeResource: null, defeatReason: null, projectedHealthyCivilians: 1 });
 
     const hidden = cloneState(goodsState);
     hidden.units.push(createUnit(hidden, 'hidden-forecast-zombie', 'zombie', { q: 0, r: 0 }));

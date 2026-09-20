@@ -77,6 +77,7 @@ function destroyUnit(
   if (unit.type === 'hunterZombie') state.statistics.hunterZombiesKilled += 1;
   if (unit.type === 'gasZombie') state.statistics.gasZombiesKilled += 1;
   if (unit.type === 'screamerZombie') state.statistics.screamerZombiesKilled += 1;
+  if (unit.type === 'packZombie') state.statistics.packZombiesKilled += 1;
   if (!unit.isPlayerUnit) state.statistics.enemyKillsTotal += 1;
   if (!unit.isPlayerUnit && unit.hordeKind === 'final') state.statistics.finalHordeKilled += 1;
   emit(state, 'unit_destroyed', {
@@ -97,7 +98,7 @@ function destroyUnit(
     const reanimatedType = state.config.units[unit.type].reanimationUnitType;
     const prefix = reanimatedType === 'policeZombie'
       ? 'police-zombie'
-      : reanimatedType === 'soldierZombie' ? 'soldier-zombie' : 'riot-zombie';
+      : reanimatedType === 'soldierZombie' ? 'soldier-zombie' : reanimatedType === 'packZombie' ? 'pack-zombie' : 'riot-zombie';
     let id = `${prefix}-${state.nextUnitNumber}`;
     while (state.units.some((candidate) => candidate.id === id)) {
       state.nextUnitNumber += 1;
@@ -107,8 +108,9 @@ function destroyUnit(
     const reanimated = createUnit(state, id, reanimatedType, unit.position);
     const survivingWire = wireAt(state, unit.position);
     if (survivingWire) reanimated.reanimatedOnBarbedWireId = survivingWire.id;
-    reanimated.canMove = false;
-    reanimated.canAttack = false;
+    reanimated.canMove = reanimatedType === 'packZombie' && state.phase !== 'zombie';
+    reanimated.canAttack = reanimated.canMove;
+    if (reanimatedType === 'packZombie') reanimated.firstZombieActionTurn = state.phase === 'zombie' ? state.turn + 1 : state.turn;
     state.units.push(reanimated);
     if (reanimatedType === 'policeZombie') {
       state.statistics.policeZombiesSpawned += 1;
@@ -117,9 +119,12 @@ function destroyUnit(
       if (reanimatedType === 'soldierZombie') {
         state.statistics.soldierZombiesSpawned += 1;
         if (unit.type === 'nationalGuard') state.statistics.nationalGuardReanimations += 1;
-      } else {
+      } else if (reanimatedType === 'riotZombie') {
         state.statistics.riotZombiesSpawned += 1;
         state.statistics.riotPoliceReanimations += 1;
+      } else if (reanimatedType === 'packZombie') {
+        state.statistics.packZombiesSpawned += 1;
+        state.statistics.specialForcesReanimations += 1;
       }
     }
     const event = emit(state, 'human_unit_reanimated', {

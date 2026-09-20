@@ -31,8 +31,8 @@ export interface QuerySchema {
   description?: string;
 }
 
-const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam'] as const satisfies readonly HumanUnitType[];
-const FACILITY_TYPES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase'] as const satisfies readonly FacilityType[];
+const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces'] as const satisfies readonly HumanUnitType[];
+const FACILITY_TYPES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase'] as const satisfies readonly FacilityType[];
 const CONSTRUCTIBLE_TYPES = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const satisfies readonly ConstructibleFacilityType[];
 const FACILITY_STATUSES = ['unowned', 'owned', 'ruined'] as const satisfies readonly FacilityStatus[];
 const FACILITY_OPERATIONAL_STATUSES = ['building', 'operational', 'stopped', 'infected', 'disabled', 'recovering', 'ruined'] as const satisfies readonly FacilityOperationalStatus[];
@@ -61,6 +61,7 @@ const unitRoute = object({ moverUnitId: string, source: reference, destination: 
 const referenceRoute = object({ source: reference, destination: reference, includeHexPath: { ...bool, default: false }, ranges }, ['source', 'destination']);
 export const QUERY_FILTER_SCHEMAS = {
   api: object({}),
+  'context-handoff': object({}),
   map: object({ ...bounds, terrain: { enum: TERRAINS }, road: bool, movementRoad: bool, passable: bool, urban: bool, facilityId: nullableString, checkpointId: nullableString, visibleToPlayer: bool, playerOccupancyAllowed: bool }),
   units: object({ ...bounds, id: string, type: { enum: HUMAN_UNIT_TYPES }, unitType: { enum: HUMAN_UNIT_TYPES }, proficiency: { enum: UNIT_PROFICIENCIES }, actionState: { enum: UNIT_ACTION_STATES }, inSupply: bool, canMove: bool, canAttack: bool, isScheduledWaveMember: { enum: [false] }, isFinalWaveMember: { enum: [false] } }),
   facilities: object({ ...bounds, id: string, type: { enum: FACILITY_TYPES }, owner: { enum: ['player', 'none'] }, status: { enum: FACILITY_STATUSES }, inSupply: bool, operationalStatus: { enum: FACILITY_OPERATIONAL_STATUSES }, constructible: bool, populationLimitKind: { enum: ['soft', 'hard'] }, populationOperational: bool }),
@@ -203,6 +204,7 @@ const strategicEdgeSchema = object({
 type ResponseMode = 'items' | 'value' | 'items-and-value';
 interface TargetResponseSpec { mode: ResponseMode; itemType?: string; itemSchema?: QuerySchema; valueType?: string; valueSchema?: QuerySchema }
 const TARGET_RESPONSE_SPECS: Record<PublicQueryTarget, TargetResponseSpec> = {
+  'context-handoff': { mode: 'value', valueType: 'ContextHandoff', valueSchema: opaqueObject('Latest revision-pinned public state; bounded facilities 24, units 24, visible enemies 24, changes 20, unique intent 5, checkpoints 8. Includes counts, omissions, detail queries, all crisis categories and durable locale/Fair Play constraints. Auto checkpoints after 5 completed turns or 128 canonical decisions; reads never reset the decision baseline.') },
   api: { mode: 'value', valueType: 'AgentApiInfo + queryContract + SessionPlayTurnCapabilities', valueSchema: opaqueObject('Public API discovery value.') },
   map: { mode: 'items-and-value', itemType: 'AgentMapTileObservation', itemSchema: opaqueObject('Public Map tile.'), valueType: 'AgentMapObservation metadata', valueSchema: opaqueObject('Map metadata and visibleTileKeys; tiles are paged items.') },
   units: { mode: 'items', itemType: 'AgentUnitObservation' },

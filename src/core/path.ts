@@ -1,3 +1,4 @@
+import { hasMovementRoad } from './terrain';
 import { HEX_DIRECTION_ORDER, hexKey, hexNeighbor, hexWithinBounds } from './hex';
 import { createMapReference } from './map-reference';
 import type { FixedMap, HexCoord } from './types';
@@ -50,7 +51,7 @@ class PathFrontier {
 
 function mapMovementCostResolver(map: FixedMap): MovementCostResolver {
   const reference = createMapReference(map);
-  return (position) => reference.getTile(position)?.movementCost ?? null;
+  return (position) => hasMovementRoad(map, position) ? 1 : reference.getTile(position)?.movementCost ?? null;
 }
 
 function coordinateSignature(position: HexCoord): string {

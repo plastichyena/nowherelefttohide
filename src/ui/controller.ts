@@ -1,3 +1,5 @@
+import { renderHealthDetails, renderNuclearObjective } from './publicHealth';
+import { RULES_V163 } from '../core/rules-v163';
 import { roadConnections } from '../core/roads';
 import { showReplay } from '../replay/view';
 import { createDefaultConfig } from '../core/config';
@@ -208,7 +210,7 @@ export function unitProficiencyViewModel(
   unit: { type: string },
   config?: unknown,
 ): UnitProficiencyViewModel | null {
-  if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam'].includes(String(unit.type))) return null;
+  if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces'].includes(String(unit.type))) return null;
   const source = unit as unknown as UnknownRecord;
   const configRecord = unknownRecord(config);
   const experience = configRecord.unitExperience && typeof configRecord.unitExperience === 'object'
@@ -315,6 +317,18 @@ function crisisReasonLabel(alert: CrisisAlertViewModel, locale: Locale): string 
 function crisisFactsLabel(alert: CrisisAlertViewModel, locale: Locale): string {
   const t = createTranslator(locale);
   const facts = alert.publicFacts;
+  const bodyKey = `alert.${alert.reasonCode}.body`;
+  const body = t(bodyKey);
+  if (body !== bodyKey) return body.replace(/\{([a-zA-Z]+)\}/g, (_match, key: string) => {
+    const value = facts[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return ['probability', 'screeningProbability', 'rate', 'deficit'].includes(key)
+        ? formatPercent(value, locale)
+        : String(Math.round(value * 1000) / 1000);
+    }
+    if (key === 'reason') return stoppedReasonLabel(typeof value === 'string' ? value : null, locale);
+    return value === undefined || value === null ? '—' : String(value);
+  });
   const pieces: string[] = [];
   const infected = typeof facts.infected === 'number' ? boundedCount(facts.infected) : null;
   if (infected !== null) pieces.push(`${t('infected')} ${infected}`);
@@ -760,7 +774,7 @@ export type NoiseClass = 'small' | 'medium' | 'large' | 'extraLarge';
 
 /** Production-safe class mapping. Exact Core radii never cross this helper. */
 export function noiseClassForUnit(unitType: string): NoiseClass | null {
-  if (unitType === 'police') return 'medium';
+  if (unitType === 'police' || unitType === 'specialForces') return 'medium';
   if (unitType === 'nationalGuard') return 'large';
   return null;
 }
@@ -1027,6 +1041,7 @@ export function renderImportantEventHistory(
 }
 
 const OPERATIONAL_ALERT_TYPES = new Set<GameEvent['type']>([
+  'public_health_infection', 'latent_infection', 'nuclear_objective_updated', 'resource_shortage',
   'screamer_scream',
   'survivors_rescued',
   'survivors_expired',
@@ -1039,6 +1054,14 @@ const OPERATIONAL_ALERT_TYPES = new Set<GameEvent['type']>([
 function operationalAlertText(event: GameEvent, locale: Locale): string | null {
   const payload = unknownRecord(event.payload);
   if (!OPERATIONAL_ALERT_TYPES.has(event.type)) return null;
+  if (event.type === 'resource_shortage') return payload.cause === 'starvation' ? (locale === 'ja' ? `${payload.facilityId ?? payload.checkpointId}: 飢餓で${payload.populationLost}人が死亡。` : `${payload.facilityId ?? payload.checkpointId}: ${payload.populationLost} starvation deaths.`) : null;
+  if (event.type === 'nuclear_objective_updated') return locale === 'ja'
+    ? (payload.reward === 'claimed' ? '原発を確保し、特殊部隊が合流した。' : '原発の早期確保期限を過ぎた。')
+    : (payload.reward === 'claimed' ? 'The plant is secured. Special Forces have joined.' : 'The early nuclear capture deadline has passed.');
+  if (event.type === 'public_health_infection' || event.type === 'latent_infection') {
+    const cause = event.type === 'public_health_infection' ? (locale === 'ja' ? '生活環境' : 'living conditions') : (locale === 'ja' ? '審査' : 'screening');
+    return locale === 'ja' ? `${payload.facilityId ?? payload.checkpointId}: ${cause}由来の感染${payload.infected}人（1人あたり${(Number(payload.probability)*100).toFixed(2)}%）。拡大はTurn ${payload.spreadsFromTurn}終了から。停止・陥落は即時判定。` : `${payload.facilityId ?? payload.checkpointId}: ${payload.infected} infections from ${cause} (${(Number(payload.probability)*100).toFixed(2)}% per person). Spread starts at EndTurn ${payload.spreadsFromTurn}; disruption and falls apply immediately.`;
+  }
   if (event.type === 'screamer_scream') return locale === 'ja'
     ? '悍ましい叫び声が響き渡った'
     : 'A horrifying scream echoed across the area.';
@@ -1575,10 +1598,10 @@ export interface BoardLegendViewModel {
   sections: BoardLegendSection[];
 }
 
-const LEGEND_TERRAINS = ['plain', 'forest', 'mountain'] as const;
-const LEGEND_OVERLAYS = ['road', 'urban'] as const;
-const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie'] as const;
-const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'checkpoint'] as const;
+const LEGEND_TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const;
+const LEGEND_OVERLAYS = ['road', 'bridge', 'urban'] as const;
+const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
+const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'checkpoint'] as const;
 const LEGEND_OBSTACLES = ['barbedWire'] as const;
 
 function legendAssetFromRegistry(
@@ -1697,7 +1720,7 @@ function configLegendEntries(
     const attack = unit.attack ?? unit.recruitAttack ?? 0;
     const attackCharges = typeof unit.maxAttackCharges === 'number'
       ? String(Math.max(0, Math.trunc(unit.maxAttackCharges)))
-      : `${t('proficiency.recruit')} 1 / ${t('proficiency.regular')} 1 / ${t('proficiency.veteran')} ${config.unitExperience.veteranAttackCharges}`;
+      : `${key === 'specialForces' ? '' : `${t('proficiency.recruit')} 1 / `}${t('proficiency.regular')} ${unit.regularAttackCharges ?? 1} / ${t('proficiency.veteran')} ${unit.veteranAttackCharges ?? config.unitExperience.veteranAttackCharges}`;
     add(`unit.${key}`, unitLabel(key, locale), `${t('legendHp')} ${unit.hp ?? 0} · ${t('legendAttack')} ${attack} · ${t('legendMovement')} ${unit.movement ?? 0} · ${t('legendRange')} ${unit.range ?? 0} · ${t('legendVision')} ${unit.vision ?? 0} · ${t('legendPopulation')} ${unit.population ?? 0} · ${t('legendAttackCharges')} ${attackCharges}`);
   }
   for (const key of LEGEND_FACILITIES) {
@@ -1712,7 +1735,7 @@ function configLegendEntries(
     add(`facility.${key}`, facilityLabel(key, locale), `${t('legendWorkers')} ${facility.workerCapacity} · ${t('legendMode')} ${powerModeLabel(production.powerMode, locale)} · ${t('legendPowerCapacity')} ${production.powerCapacity} · ${t('legendPowerGeneration')} ${generation} · ${t('legendInputs')} ${formatResourceAmounts(production.inputs, locale, true)} · ${t('legendOutputs')} ${formatResourceAmounts(production.outputs, locale, true)}${build}${target}`);
   }
   add('populationConsumption', t('legendPopulationConsumption'), `${t('food')} ${config.economy.populationConsumption.food} · ${t('civilianGoods')} ${config.economy.populationConsumption.civilianGoods}`);
-  for (const key of ['police', 'nationalGuard', 'riotPolice', 'reconTeam'] as const) {
+  for (const key of ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces'] as const) {
     const unit = unknownRecord((config.units as unknown as UnknownRecord)[key]);
     if (Object.keys(unit).length === 0) continue;
     const attackCosts = Object.entries(unknownRecord(unit.attackMilitaryGoodsCostByRange))
@@ -1741,7 +1764,7 @@ function configLegendEntries(
   add('initialGasCount', t('legendInitialGasCount'), `${config.economy.initialGasCount.min}–${config.economy.initialGasCount.max}`);
   add('initialGasDistance', t('legendInitialGasDistance'), String(config.economy.initialGasMinDistance));
   add('gasExplosion', t('legendGasExplosion'), `${t('damage')} ${config.units.gasZombie.explosionDamage} · ${t('infected')} ${config.units.gasZombie.explosionInfection} · ${t('range')} 1`);
-  add('spawnReserve', t('spawnReserve'), `${t('spawnReserveTileCount')} 200 · ${t('spawnReserveReason')}`);
+  add('spawnReserve', t('spawnReserve'), `${t('spawnReserveTileCount')} 392 · ${t('spawnReserveReason')}`);
   add('initialSupplyRadius', t('initialSupplyRadius'), String(config.checkpoint.initialSupplyRadius));
   add('checkpointMaxPerDirection', t('checkpointMaxPerDirection'), String(config.checkpoint.maxPreparedPostsPerDirection));
   add('checkpointConstructionCost', t('checkpointConstructionCost'), String(config.checkpoint.constructionCivilianGoods));
@@ -1796,7 +1819,7 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
     powerPlant: ['電力Capacityを発電する施設。Turn-start Fuelの制限を受けます。', 'Generates power Capacity and is limited by Turn-start Fuel.'],
     armyBase: ['恒久施設。健常Workerによる迎撃、専用軍需品、早期確保報酬、都市人口を使う州兵編成を扱います。', 'A permanent facility with staffed interceptions, dedicated Military Goods, an early-capture reward, and National Guard recruitment from city residents.'],
     checkpoint: ['道路上の避難民を待機・審査・合格の3プールで管理します。1回の審査枠は20人です。', 'Manages road refugees through waiting, screening, and approved pools. Each batch screens up to 20 people.'],
-    spawnReserve: ['盤面外周200 HexのSpawn Reserve。Player Unit・Facility・Checkpointは配置できませんが、Playerの攻撃とHordeのSpawn・Damageは可能です。', 'The outer 200-Hex Spawn Reserve. Player Units, Facilities, and Checkpoints cannot occupy it; Player attacks and Horde Spawn/damage remain allowed.'],
+    spawnReserve: ['盤面外周392 HexのSpawn Reserve。Player Unit・Facility・Checkpointは配置できませんが、Playerの攻撃とHordeのSpawn・Damageは可能です。', 'The outer 392-Hex Spawn Reserve. Player Units, Facilities, and Checkpoints cannot occupy it; Player attacks and Horde Spawn/damage remain allowed.'],
     unowned: ['未確保。人口操作や生産はできません。', 'Unsecured. Population actions and production are unavailable.'],
     owned: ['確保済み。安全と操作可能Turnの条件を満たせば利用できます。', 'Secured. Available when safe and past its operational turn.'],
     stopped: ['現在停止。状態Markerで停止理由を示します。', 'Currently stopped. The state marker identifies the reason.'],
@@ -1816,8 +1839,8 @@ function legendSections(
 ): BoardLegendSection[] {
   const t = createTranslator(locale);
   const terrain = LEGEND_TERRAINS.map((key) => legendAssetEntry(registry, 'terrain', key, terrainLabel(key, locale), legendDescription(key, locale, t), key === 'plain' ? '◇' : key === 'forest' ? '♣' : '△'));
-  const overlays = LEGEND_OVERLAYS.map((key) => legendAssetEntry(registry, 'overlay', key, key === 'road' ? t('roadOverlay') : t('urbanOverlay'), legendDescription(key, locale, t), key === 'road' ? '═' : '▦'));
-  const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'riotPolice' ? 'RP' : key === 'reconTeam' ? 'RC' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : key === 'soldierZombie' ? 'SZ' : key === 'riotZombie' ? 'RZ' : key === 'gasZombie' ? 'GZ' : key === 'screamerZombie' ? 'SC' : 'HZ'));
+  const overlays = LEGEND_OVERLAYS.map((key) => legendAssetEntry(registry, 'overlay', key, key === 'road' ? t('roadOverlay') : key === 'bridge' ? t('bridge') : t('urbanOverlay'), legendDescription(key, locale, t), key === 'road' || key === 'bridge' ? '═' : '▦'));
+  const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'specialForces' ? 'SF' : key === 'packZombie' ? 'PK' : key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'riotPolice' ? 'RP' : key === 'reconTeam' ? 'RC' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : key === 'soldierZombie' ? 'SZ' : key === 'riotZombie' ? 'RZ' : key === 'gasZombie' ? 'GZ' : key === 'screamerZombie' ? 'SC' : 'HZ'));
   const horde = (['periodic', 'final'] as const).map((key) => legendAssetEntry(registry, 'horde', key, key === 'periodic' ? t('periodicHorde') : t('finalHorde'), legendDescription(key, locale, t), key === 'periodic' ? '↝' : '✹'));
   const facilities = LEGEND_FACILITIES.map((key) => legendAssetEntry(registry, 'facility', key, key === 'checkpoint' ? t('checkpoint') : facilityLabel(key, locale), legendDescription(key, locale, t), key === 'capital' ? '★' : key === 'city' ? '⌂' : key === 'checkpoint' ? '⊞' : '▣'));
   const obstacles = LEGEND_OBSTACLES.map((key) => legendAssetEntry(registry, 'obstacle', key, t(key), legendDescription(key, locale, t), 'W'));
@@ -2068,6 +2091,7 @@ function facilityLabel(type: string, locale: Locale): string {
     oilField: ['油田', 'Oil Field'],
     refinery: ['製油所', 'Refinery'],
     powerPlant: ['発電所', 'Power Plant'],
+    nuclearPowerPlant: ['原子力発電所', 'Nuclear Power Plant'],
     windPowerPlant: ['風力発電所', 'Wind Power Plant'],
     simpleFarm: ['簡易農場', 'Simple Farm'],
     civilianDroneBase: ['民間ドローン基地', 'Civilian Drone Base'],
@@ -2159,6 +2183,8 @@ function unitLabel(type: string, locale: Locale): string {
     nationalGuard: ['州兵', 'National Guard'],
     riotPolice: ['機動隊', 'Riot Police'],
     reconTeam: ['偵察隊', 'Recon'],
+    specialForces: ['特殊部隊', 'Special Forces'],
+    packZombie: ['Pack Zombie', 'Pack Zombie'],
     zombie: ['ゾンビ', 'Zombie'],
     hordeZombie: ['Hordeゾンビ', 'Horde Zombie'],
     policeZombie: ['警察ゾンビ', 'Police Zombie'],
@@ -3247,6 +3273,8 @@ export class GameUiController {
         <button class="icon-button modal-close" aria-label="${escapeHtml(t('back'))}" data-action="title">×</button>
         <p class="eyebrow">${escapeHtml(t('options'))}</p>
         <h2 id="new-game-heading">${escapeHtml(t('newGame'))}</h2>
+        <p class="nuclear-intro">${escapeHtml(RULES_V163[this.locale].nuclear)}</p>
+        <p class="muted">${escapeHtml(RULES_V163[this.locale].finalHorde)}</p>
         <form data-form="new-game" class="settings-form">
           <label>${escapeHtml(t('newSeed'))}<input name="seed" type="number" inputmode="numeric" value="${Date.now() % 2147483647}" /></label>
           <section class="fixed-horde-schedule" aria-labelledby="horde-schedule-heading"><h3 id="horde-schedule-heading">${escapeHtml(t('hordeSchedule'))}</h3><p class="muted">${escapeHtml(t('fixedHordeScheduleHint'))}</p><ul>${schedule}</ul></section>
@@ -5265,7 +5293,7 @@ export class GameUiController {
 
   private showGuide(): void {
     const t = this.translator();
-    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="guide"><section class="modal-card floating-card guide-card" aria-labelledby="guide-heading"><div class="guide-icon">◇</div><h2 id="guide-heading">${escapeHtml(t('guideTitle'))}</h2><p>${escapeHtml(t('guideBody'))}</p><p>${escapeHtml(t('guideSteps'))}</p><button class="primary-button" data-action="guide-close">${escapeHtml(t('close'))}</button></section></div>`);
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="guide"><section class="modal-card floating-card guide-card" aria-labelledby="guide-heading"><div class="guide-icon">◇</div><h2 id="guide-heading">${escapeHtml(t('guideTitle'))}</h2><p>${escapeHtml(t('guideBody'))}</p><p>${escapeHtml(t('guideSteps'))}</p><p>${escapeHtml(RULES_V163[this.locale].nuclear)}</p><button class="primary-button" data-action="guide-close">${escapeHtml(t('close'))}</button></section></div>`);
   }
 
   private showHelp(): void {
@@ -5274,7 +5302,7 @@ export class GameUiController {
       .map((key) => `<li>${escapeHtml(t(key))}</li>`)
       .join('');
     const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
-    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${escapeHtml(t('close'))}" data-action="dismiss-modal">×</button><h2 id="help-heading">${escapeHtml(t('help'))}</h2><p>${escapeHtml(t('helpBody'))}</p><h3>${escapeHtml(t('move'))}</h3><p>${escapeHtml(t('guideSteps'))}</p><details class="board-legend-disclosure" data-board-legend-disclosure="true"><summary>${escapeHtml(t('legendTitle'))}</summary>${legend}</details><h3>${escapeHtml(t('tipsTitle'))}</h3><ul class="tips-list">${tips}</ul><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></section></div>`);
+    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${escapeHtml(t('close'))}" data-action="dismiss-modal">×</button><h2 id="help-heading">${escapeHtml(t('help'))}</h2><p>${escapeHtml(t('helpBody'))}</p>${Object.values(RULES_V163[this.locale]).map(text => `<p>${escapeHtml(text)}</p>`).join('')}<h3>${escapeHtml(t('move'))}</h3><p>${escapeHtml(t('guideSteps'))}</p><details class="board-legend-disclosure" data-board-legend-disclosure="true"><summary>${escapeHtml(t('legendTitle'))}</summary>${legend}</details><h3>${escapeHtml(t('tipsTitle'))}</h3><ul class="tips-list">${tips}</ul><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></section></div>`);
   }
 
   private updateFacilitySupplementalControls(): void {
@@ -5617,9 +5645,9 @@ export class GameUiController {
       const moreEvents = this.eventHistoryLimit < 50 && eventCount > this.eventHistoryLimit
         ? `<button type="button" class="secondary-button overview-more-events" data-action="show-more-events">${escapeHtml(t('showMoreEvents'))}</button>`
         : '';
-      const penaltyForecast = renderNextTurnPenaltyForecast(this.queryStrategicForecast(), this.locale);
+      const penaltyForecast = renderHealthDetails(this.state, this.locale) + renderNextTurnPenaltyForecast(this.queryStrategicForecast(), this.locale);
       const constructionContent = this.renderConstructionOverview();
-      body.innerHTML = `${overviewSectionMarkup('crisis', t('crisisSection'), crisisSummary, `${renderCrisisList(crisis, this.locale, this.crisisExpandedGroups)}${risk.forecastGuaranteedDefeat ? `<p class="warning-text">${escapeHtml(t('guaranteedDefeat'))}</p>` : ''}`, isOpen('crisis'), this.locale)}${overviewSectionMarkup('population', t('populationLocations'), `${population.total} ${t('population')}`, populationContent, isOpen('population'), this.locale)}${overviewSectionMarkup('branches', t('branchPanel'), t('arrivalSchedule'), branchContent, isOpen('branches'), this.locale)}${overviewSectionMarkup('events', t('importantEventHistory'), `${Math.min(50, eventCount)}/50`, `${eventHistory}${hordeEventHistory}${operationalEventHistory}${moreEvents}`, isOpen('events'), this.locale)}${overviewSectionMarkup('forecast', t('nextTurnPenaltyForecast'), nextTurnPenaltyForecastSummary(this.queryStrategicForecast(), this.locale), penaltyForecast, isOpen('forecast'), this.locale)}${overviewSectionMarkup('construction', t('buildFacility'), t('localBuildOnly'), constructionContent, isOpen('construction'), this.locale)}`;
+      body.innerHTML = `${renderNuclearObjective(this.state, this.locale)}${overviewSectionMarkup('crisis', t('crisisSection'), crisisSummary, `${renderCrisisList(crisis, this.locale, this.crisisExpandedGroups)}${risk.forecastGuaranteedDefeat ? `<p class="warning-text">${escapeHtml(t('guaranteedDefeat'))}</p>` : ''}`, isOpen('crisis'), this.locale)}${overviewSectionMarkup('population', t('populationLocations'), `${population.total} ${t('population')}`, populationContent, isOpen('population'), this.locale)}${overviewSectionMarkup('branches', t('branchPanel'), t('arrivalSchedule'), branchContent, isOpen('branches'), this.locale)}${overviewSectionMarkup('events', t('importantEventHistory'), `${Math.min(50, eventCount)}/50`, `${eventHistory}${hordeEventHistory}${operationalEventHistory}${moreEvents}`, isOpen('events'), this.locale)}${overviewSectionMarkup('forecast', t('nextTurnPenaltyForecast'), nextTurnPenaltyForecastSummary(this.queryStrategicForecast(), this.locale), penaltyForecast, isOpen('forecast'), this.locale)}${overviewSectionMarkup('construction', t('buildFacility'), t('localBuildOnly'), constructionContent, isOpen('construction'), this.locale)}`;
       return;
     }
     if (selected.kind === 'unit') {
@@ -5778,7 +5806,7 @@ export class GameUiController {
     const decommissionControl = isDecommissionableType
       ? `<section class="decommission-editor" data-decommission-editor="true"><h3>${escapeHtml(t('decommissionFacility'))}</h3><p class="muted">${escapeHtml(t('decommissionConditions'))}</p><p>${escapeHtml(t('decommissionRefund'))}: <strong>${decommissionRefund} ${escapeHtml(t('civilianGoods'))}</strong></p><button class="secondary-button" data-action="decommission-facility" data-facility-id="${escapeHtml(facility.id)}" ${decommissionReason ? 'disabled' : ''}>${escapeHtml(t('decommissionFacility'))}</button>${decommissionReason ? `<p class="warning-text" data-decommission-reason="true">${escapeHtml(decommissionReason)}</p>` : '<p class="muted" data-decommission-reason="true"></p>'}</section>`
       : '';
-    body.innerHTML = this.renderSameHexTabs(facility.position, selected) + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${housingDetails}${armyBaseDetails}${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
+    body.innerHTML = renderHealthDetails(this.state, this.locale, facility.id) + (facility.type === 'nuclearPowerPlant' ? renderNuclearObjective(this.state,this.locale) : '') + this.renderSameHexTabs(facility.position, selected) + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${housingDetails}${armyBaseDetails}${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
     body.insertAdjacentHTML('beforeend', this.renderFacilityForecast(publicFacility));
     this.updateTransferPreview();
     this.updateRecruitmentReasons();
@@ -6092,8 +6120,8 @@ export class GameUiController {
     const turnAwayControl = `<section class="checkpoint-turn-away" data-turn-away-section="true"><h3>${escapeHtml(t('turnAwayRefugees'))}</h3><p class="muted">${escapeHtml(t('turnAwayHint'))}</p><label>${escapeHtml(t('turnAwayCount'))}<input type="number" min="1" max="${checkpoint.waiting}" step="1" value="${turnAwayRequestedCount || 1}" inputmode="numeric" data-turn-away-count="true" data-checkpoint-id="${escapeHtml(checkpoint.id)}" ${turnAwayEligible ? '' : 'disabled'} /></label><button class="secondary-button" data-action="turn-away-refugees" data-checkpoint-id="${escapeHtml(checkpoint.id)}" ${turnAwayReason || !turnAwayEligible ? 'disabled' : ''}>${escapeHtml(t('turnAwayRefugees'))}</button>${turnAwayReason ? `<p class="warning-text" data-turn-away-reason="true">${escapeHtml(turnAwayReason)}</p>` : '<p class="warning-text" data-turn-away-reason="true" hidden></p>'}<p class="muted">${escapeHtml(t(arrivalsStopped ? 'refugeeRejectionAfterFinal' : 'refugeeRejectionWarning'))}</p>${awayDetails}</section>`;
     const grandfatheredWaiting = publicCheckpoint?.grandfatheredWaiting ?? checkpoint.grandfatheredWaiting ?? 0;
     const grandfatheredPolicy = publicCheckpoint?.grandfatheredPolicy ?? checkpoint.grandfatheredPolicy ?? null;
-    const waitingRiskPercent = publicCheckpoint?.waitingRiskPercent ?? checkpoint.waitingRiskPercent ?? 0;
-    const queueMaintenance = `<section class="checkpoint-queue-maintenance" data-checkpoint-queue-maintenance="true"><h3>${escapeHtml(t('checkpointQueueMaintenance'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('checkpointMaintenanceHealthy'))}</dt><dd>${queuePeople}</dd></div><div><dt>${this.locale === 'ja' ? '切替前waiting' : 'Grandfathered waiting'}</dt><dd>${grandfatheredWaiting}${grandfatheredPolicy ? ` · ${escapeHtml(t(grandfatheredPolicy))}` : ''}</dd></div><div><dt>${this.locale === 'ja' ? '予約済み過密感染Risk' : 'Reserved crowding infection risk'}</dt><dd>${waitingRiskPercent}%</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceFood'))}</dt><dd>${queueFoodMaintenance}</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceCivilianGoods'))}</dt><dd>${queueCivilianGoodsMaintenance}</dd></div></dl><p class="muted">${escapeHtml(t('infected'))}: ${checkpoint.infected} · ${escapeHtml(t('checkpointMaintenanceHealthy'))} ${escapeHtml(t('checkpointMaintenanceHealthyHint'))}</p>${branchPolicy === 'deny' ? `<p class="muted" data-deny-policy-help="true">${this.locale === 'ja' ? '切替後の新規Arrivalだけを自動拒否します。切替前waitingは保存された旧Policyで審査を続け、既存screening / approvedは維持されます。' : 'Only arrivals after the switch are denied automatically. Grandfathered waiting continues under its saved prior policy; existing screening and approved groups remain.'}</p>` : ''}</section>`;
+    const waitingRiskPercent = (forecastEndTurn(this.state!).publicHealth.checkpoints.find(c => c.checkpointId === checkpoint.id)?.probability ?? 0) * 100;
+    const queueMaintenance = `<section class="checkpoint-queue-maintenance" data-checkpoint-queue-maintenance="true"><h3>${escapeHtml(t('checkpointQueueMaintenance'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('checkpointMaintenanceHealthy'))}</dt><dd>${queuePeople}</dd></div><div><dt>${this.locale === 'ja' ? '切替前waiting' : 'Grandfathered waiting'}</dt><dd>${grandfatheredWaiting}${grandfatheredPolicy ? ` · ${escapeHtml(t(grandfatheredPolicy))}` : ''}</dd></div><div><dt>${this.locale === 'ja' ? '待機1人あたりの感染確率' : 'Infection probability per waiting person'}</dt><dd>${waitingRiskPercent}%</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceFood'))}</dt><dd>${queueFoodMaintenance}</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceCivilianGoods'))}</dt><dd>${queueCivilianGoodsMaintenance}</dd></div></dl><p class="muted">${escapeHtml(t('infected'))}: ${checkpoint.infected} · ${escapeHtml(t('checkpointMaintenanceHealthy'))} ${escapeHtml(t('checkpointMaintenanceHealthyHint'))}</p>${branchPolicy === 'deny' ? `<p class="muted" data-deny-policy-help="true">${this.locale === 'ja' ? '切替後の新規Arrivalだけを自動拒否します。切替前waitingは保存された旧Policyで審査を続け、既存screening / approvedは維持されます。' : 'Only arrivals after the switch are denied automatically. Grandfathered waiting continues under its saved prior policy; existing screening and approved groups remain.'}</p>` : ''}</section>`;
     const arrivalStopNotice = arrivalsStopped ? `<p class="warning-text refugee-arrivals-stopped" data-refugee-arrivals-stopped="true">${escapeHtml(t('refugeeArrivalsStopped'))}</p>` : '';
     const newPolicies: CheckpointPolicy[] = ['passThrough', 'normal', 'strict', 'deny'];
     const newPolicyOptions = newPolicies.map((policy) => '<option value="' + policy + '" ' + (branchPolicy === policy ? 'selected' : '') + '>' + escapeHtml(t(policy)) + '</option>').join('');
@@ -6110,7 +6138,7 @@ export class GameUiController {
       escapeHtml(t('approved')) + '</dt><dd>' + String(checkpoint.approved) + '</dd></div><div><dt>' + escapeHtml(t('infected')) +
       '</dt><dd>' + String(checkpoint.infected) + '</dd></div><div><dt>' + escapeHtml(t('checkpointBonus')) + '</dt><dd>' + String(checkpointBonus) + '</dd></div><div><dt>' + escapeHtml(t('screeningCapacity')) + '</dt><dd>' + String(screeningCapacity) + '</dd></div><div><dt>' + escapeHtml(t('screeningThroughput')) + '</dt><dd>' + String(screeningThroughput) + ' / ' + escapeHtml(t('turn')) + '</dd></div><div><dt>' + escapeHtml(t('policyTurns')) + '</dt><dd>' + String(screeningTurns) + '</dd></div><div><dt>' + escapeHtml(t('queuePressure')) + '</dt><dd>' + escapeHtml(checkpointQueuePressure) + '</dd></div><div><dt>' + escapeHtml(t('remainingScreeningTurns')) +
       '</dt><dd>' + String(checkpoint.remainingTurns) + '</dd></div></dl><p class="muted">' + escapeHtml(t('tipCheckpoint')) +
-      '</p>' + arrivalStopNotice + queueMaintenance + turnAwayControl + '<p class="checkpoint-role-help"><strong>' + escapeHtml(t('checkpointRole')) + '</strong>: ' + escapeHtml(roleLabel) + '</p><label>' + escapeHtml(t('branchPolicy')) + '<select data-policy="' + escapeHtml(branchId) + '" ' +
+      '</p>' + renderHealthDetails(this.state!, this.locale, checkpoint.id) + arrivalStopNotice + queueMaintenance + turnAwayControl + '<p class="checkpoint-role-help"><strong>' + escapeHtml(t('checkpointRole')) + '</strong>: ' + escapeHtml(roleLabel) + '</p><label>' + escapeHtml(t('branchPolicy')) + '<select data-policy="' + escapeHtml(branchId) + '" ' +
        (policyEditable ? '' : 'disabled') + '>' + newPolicyOptions + '</select></label><p class="muted">' + escapeHtml(t('checkpointPolicy')) + ': ' + escapeHtml(t(branchPolicy)) + ' · ' + escapeHtml(t('nextPolicy')) + ': ' + escapeHtml(t(checkpoint.screeningPolicy)) + '</p>' + infectionSection + '<section class="policy-details"><h3>' + escapeHtml(t('policyDetails')) + '</h3><p class="muted">' + escapeHtml(t('policyTradeoff')) + '</p><ul class="policy-list">' + policyDetails + '</ul></section>' +
       (newPolicyReason ? '<p class="warning-text">' + escapeHtml(newPolicyReason) + '</p>' : '') +
       ((role === 'standby' || role === 'dormant') ? '<section class="checkpoint-activation"><p class="muted">' + escapeHtml(t('activateCheckpointHint')) + '</p><button class="secondary-button" data-action="activate-checkpoint" data-branch-id="' + escapeHtml(branchId) + '" data-checkpoint-id="' + escapeHtml(checkpoint.id) + '" ' + (activationAvailable ? '' : 'disabled') + '>' + escapeHtml(t('activateCheckpoint')) + '</button>' + (activationReason ? '<p class="warning-text">' + escapeHtml(activationReason) + '</p>' : '') + '</section>' : '') +

@@ -27,7 +27,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '12.0.0';
+export const GAME_VERSION = '13.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -60,7 +60,7 @@ export function populationReceptionCapacity(facility: Pick<FacilityState, 'type'
 }
 
 export function isProductionFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return ['farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'simpleFarm', 'civilianDroneBase', 'armyBase']
+  return ['farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'simpleFarm', 'civilianDroneBase', 'armyBase']
     .includes(facility.type);
 }
 
@@ -136,12 +136,13 @@ export function createUnit(
   const attack = human
     ? effectiveAttackForProficiency(state, type as HumanUnitType, resolvedProficiency!)
     : (stats as GameConfig['units']['zombie']).attack;
-  const maxAttackCharges = resolvedProficiency === 'veteran'
-    ? state.config.unitExperience.veteranAttackCharges
-    : human ? 1 : (stats as GameConfig['units']['zombie']).maxAttackCharges;
+  const maxAttackCharges = human
+    ? resolvedProficiency === 'veteran' ? (stats as GameConfig['units']['police']).veteranAttackCharges : (stats as GameConfig['units']['police']).regularAttackCharges
+    : (stats as GameConfig['units']['zombie']).maxAttackCharges;
   return {
     id,
     type,
+    movementDomain: stats.movementDomain,
     position: { ...position },
     hp: stats.hp,
     maxHp: stats.hp,
@@ -210,6 +211,7 @@ export function synchronizePopulation(state: GameState): void {
     state.pendingUnitProductions
       .filter((order) => order.unitType === 'reconTeam')
       .reduce((total, order) => total + order.population, 0);
+  const specialForces = state.units.filter(unit => unit.type === 'specialForces').reduce((n, unit) => n + unit.population, 0);
   const waiting = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.waiting, 0);
   const screening = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.screening, 0);
   const approved = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.approved, 0);
@@ -222,7 +224,8 @@ export function synchronizePopulation(state: GameState): void {
   state.population.nationalGuard = nationalGuard;
   state.population.riotPolice = riotPolice;
   state.population.reconTeam = reconTeam;
-  state.population.unitPopulation = police + nationalGuard + riotPolice + reconTeam;
+  state.population.specialForces = specialForces;
+  state.population.unitPopulation = police + nationalGuard + riotPolice + reconTeam + specialForces;
   state.population.waitingRefugees = waiting;
   state.population.screeningRefugees = screening;
   state.population.approvedRefugees = approved;
@@ -235,7 +238,7 @@ export function synchronizePopulation(state: GameState): void {
 
   state.statistics.maxPopulation = Math.max(
     state.statistics.maxPopulation,
-    cityResidents + productionWorkers + waiting + screening + approved + police + nationalGuard + riotPolice + reconTeam,
+    cityResidents + productionWorkers + waiting + screening + approved + police + nationalGuard + riotPolice + reconTeam + specialForces,
   );
   state.statistics.maxSecuredFacilities = Math.max(
     state.statistics.maxSecuredFacilities,
@@ -344,7 +347,7 @@ function facilityStateFromDefinition(
     populationConfig,
     rng,
   );
-  const usesDefaultNeutralSurvivors = !owned
+  const usesDefaultNeutralSurvivors = !owned && definition.type !== 'nuclearPowerPlant'
     && populationConfig.survivors === null
     && populationConfig.survivorRange === null;
   if (usesDefaultNeutralSurvivors) {
@@ -384,7 +387,7 @@ function facilityStateFromDefinition(
     builtTurn: null,
     recoveryOperationalTurn: null,
     firstCaptureRewardClaimed: owned,
-    earlyCaptureSurvivorStatus: owned ? 'notApplicable' : configuredWorkers > 0 ? 'available' : 'lost',
+    earlyCaptureSurvivorStatus: owned || definition.type === 'nuclearPowerPlant' ? 'notApplicable' : configuredWorkers > 0 ? 'available' : 'lost',
   };
 }
 
@@ -498,6 +501,10 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   const state: GameState = {
     initialHunterPositions,
     initialGasPositions,
+    publicHealthStress: { food: 0, civilianGoods: 0 },
+    foodShortageAccumulation: 0,
+    starvationCarry: 0,
+    nuclearObjective: { firstCapturedTurn: null, reward: 'unclaimed', failureSpawn: 'none' },
     gameVersion: GAME_VERSION,
     config: stateConfig,
     seed,
@@ -520,6 +527,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       nationalGuard: 0,
       riotPolice: 0,
       reconTeam: 0,
+      specialForces: 0,
       unitPopulation: 0,
       facilityWorkers: [],
       waitingRefugees: 0,
@@ -709,10 +717,10 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       civilianDroneBasesDecommissioned: 0,
       civilianGoodsRefundedFromDecommission: 0,
       policeLongRangeMoves: 0,
-      recruitsCommissionedByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 },
-      regularPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 },
-      veteranPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 },
-      veteranZombieKillsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0 },
+      recruitsCommissionedByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, specialForces: 0 },
+      regularPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, specialForces: 0 },
+      veteranPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, specialForces: 0 },
+      veteranZombieKillsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, specialForces: 0 },
       riotPoliceProduced: 0,
       riotPoliceLost: 0,
       riotZombiesSpawned: 0,
@@ -722,11 +730,13 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       housingBuilt: 0, housingResidentTurns: 0, housingCivilianGoodsProduced: 0, housingOutageFacilityTurns: 0,
       gasZombiesKilled: 0, gasZombiesSpawned: initialGasPositions.length,
       screamerZombiesKilled: 0, screamerZombiesSpawned: initialScreamerPositions.length, screamerScreams: 0,
+      packZombiesSpawned: 0, packZombiesKilled: 0, specialForcesReanimations: 0,
+      starvationDeaths: 0, screeningInfections: 0, waitingInfections: 0, livingConditionInfections: 0,
       gasExplosions: 0, gasExplosionUnitDamage: 0,
       riotPoliceReanimations: 0,
-      hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0 },
-      finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0 },
-      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, hordeZombie: 0, screamerZombie: 0, armyBase: 0, windPowerPlant: 0 },
+      hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0, packZombie: 0 },
+      finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0, packZombie: 0 },
+      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, specialForces: 0, hordeZombie: 0, screamerZombie: 0, armyBase: 0, windPowerPlant: 0 },
       hordeMovementNoisePulses: 0,
       hordeNoiseRespawnedByType: { zombie: 0, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
     },

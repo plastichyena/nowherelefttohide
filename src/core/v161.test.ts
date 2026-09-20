@@ -59,9 +59,9 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
       checkpoint: CHECKPOINT_SCHEMA_VERSION,
       map: FIXED_MAP_ID,
     }).toEqual({
-      app: '1.6.2', rules: '12.0.0', save: 19, publicSave: '19',
-      agent: '17.0.0', observation: '17.0.0', bridge: '17.0.0', artifact: '16.0.0',
-      session: '13.0.0', checkpoint: '13.0.0', map: 'fixed-51x51-v7',
+      app: '1.6.3', rules: '13.0.0', save: 20, publicSave: '20',
+      agent: '18.0.0', observation: '18.0.0', bridge: '18.0.0', artifact: '17.0.0',
+      session: '14.0.0', checkpoint: '14.0.0', map: 'fixed-51x51-v8',
     });
   });
 
@@ -70,7 +70,7 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
     const second = createInitialState(16101, createDefaultConfig());
     expect(second).toEqual(first);
     expect(first.facilities.filter((facility) => facility.type === 'oilField')).toHaveLength(1);
-    const neutral = first.facilities.filter((facility) => facility.owner === 'none');
+    const neutral = first.facilities.filter((facility) => facility.owner === 'none' && facility.type !== 'nuclearPowerPlant');
     expect(neutral.length).toBeGreaterThan(0);
     expect(neutral.every((facility) => facility.workers >= 1 && facility.workers <= Math.min(10, facility.workerCapacity))).toBe(true);
     expect(neutral.every((facility) => facility.earlyCaptureSurvivorStatus === 'available')).toBe(true);
@@ -130,7 +130,8 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
       expect(result.error).toBeNull();
     }
     const state = engine.getState();
-    const neutral = state.facilities.filter((facility) => facility.owner === 'none');
+    const neutral = state.facilities.filter((facility) => facility.owner === 'none' && facility.type !== 'nuclearPowerPlant');
+    expect(state.facilities.find(f => f.type === 'nuclearPowerPlant')?.earlyCaptureSurvivorStatus).toBe('notApplicable');
     expect(neutral.every((facility) => facility.workers === 0)).toBe(true);
     expect(neutral.every((facility) => facility.earlyCaptureSurvivorStatus === 'lost')).toBe(true);
     expect(state.events.some((event) => event.type === 'survivors_expired')).toBe(true);

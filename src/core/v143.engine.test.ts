@@ -17,7 +17,7 @@ function quietConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}):
   return createDefaultConfig({
     horde: singleFinalWave(100),
     economy: {
-      initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
+      initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 },
       initialResources: { food: 100_000, civilianGoods: 100_000, militaryGoods: 100_000, fuel: 100_000 },
     },
     refugees: {
@@ -55,6 +55,8 @@ function rebalance(state: MutableState): void {
 }
 
 function addZombie(state: MutableState, id: string, position: HexCoord): UnitState {
+  const existing = state.units.find(unit => hexKey(unit.position) === hexKey(position));
+  if (existing) return existing;
   const zombie = createUnit(state, id, 'zombie', position);
   zombie.movement = 0;
   zombie.attack = 0;
@@ -78,11 +80,11 @@ function movePlayersAway(state: MutableState): void {
 }
 
 describe('v1.5.1 Core version, map, and initial state', () => {
-  it('creates a v11.0.0 state on fixed-51x51-v7 with all 40 initial Normal Zombies', () => {
+  it('creates a v11.0.0 state on fixed-51x51-v8 with all 40 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('12.0.0');
-    expect(state.mapId).toBe('fixed-51x51-v7');
-    expect(state.map.id).toBe('fixed-51x51-v7');
+    expect(state.gameVersion).toBe('13.0.0');
+    expect(state.mapId).toBe('fixed-51x51-v8');
+    expect(state.map.id).toBe('fixed-51x51-v8');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');
     expect(zombies).toHaveLength(40);
     expect(zombies.map((unit) => unit.position)).toEqual(state.map.initialZombiePositions.slice(0, 40));
@@ -288,6 +290,7 @@ describe('v1.4.4 generated Zombie immediate occupancy and FIFO chains', () => {
       infected: 5,
       overrunProcessed: false,
     };
+    checkpoint.waiting = 1;
     setup.checkpoints.push(checkpoint);
     setup.roadBranches.find((branch) => branch.branchId === 'west')!.activeCheckpointId = checkpoint.id;
     source.workers = 0;
@@ -312,7 +315,7 @@ describe('v1.4.4 generated Zombie immediate occupancy and FIFO chains', () => {
     expect(chainFall?.payload).toMatchObject({
       siteKind: 'checkpoint',
       cause: 'spawn_immediate_occupation',
-      infectedAtFall: 5,
+      infectedAtFall: 6,
       requestedSpawnCount: 1,
       actualSpawnCount: 1,
       chainDepth: 1,
@@ -320,7 +323,7 @@ describe('v1.4.4 generated Zombie immediate occupancy and FIFO chains', () => {
     });
     expect(result.state.checkpoints.find((candidate) => candidate.id === checkpoint.id)).toMatchObject({
       status: 'ruined',
-      infected: 0,
+      infected: 1, // Six infected minus the five consumed by one spawned Zombie.
     });
     const rootIds = new Set((rootSpawn?.payload.spawnedUnitIds as string[]) ?? []);
     const rootUnits = result.state.units.filter((unit) => rootIds.has(unit.id));

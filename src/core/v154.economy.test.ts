@@ -130,8 +130,8 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     const normalCivilian = forecast.populationConsumers * state.config.economy.populationConsumption.civilianGoods;
     expect(forecast.overcrowding).toMatchObject({
       cities: [{ facilityId: capital.id, excess: 100, softCap: 100 }],
-      additionalFood: normalFood,
-      additionalCivilianGoods: normalCivilian,
+      additionalFood: 50,
+      additionalCivilianGoods: 200,
     });
     expect(forecast.housingOutage).toMatchObject({
       facilities: [{ facilityId: housing.id, reason: 'power_shortage' }],
@@ -140,8 +140,8 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
       additionalFood: Math.ceil(normalFood / 100),
       additionalCivilianGoods: Math.ceil(normalCivilian / 100),
     });
-    expect(forecast.food.maintenanceRequired).toBe(normalFood + normalFood + Math.ceil(normalFood / 100));
-    expect(forecast.civilianGoods.maintenanceRequired).toBe(normalCivilian + normalCivilian + Math.ceil(normalCivilian / 100));
+    expect(forecast.food.maintenanceRequired).toBe(normalFood + 50 + Math.ceil(normalFood / 100));
+    expect(forecast.civilianGoods.maintenanceRequired).toBe(normalCivilian + 200 + Math.ceil(normalCivilian / 100));
 
     housing.workers = 9;
     housing.infected = 1;
@@ -160,7 +160,7 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     const capital = facility(state, 'capital');
     const housing = addHousing(state, 'housing-disconnected', { q: 0, r: 0 }, 4);
     createCityPopulationSnapshot(state);
-    expect(availableSupplyPopulation(state)).toBe(capital.workers);
+    expect(availableSupplyPopulation(state)).toBe(capital.workers - 1);
     expect(forecastEndTurn(state).housingOutage.facilities).toContainEqual({
       facilityId: housing.id,
       reason: 'supply_disconnected',
@@ -210,7 +210,7 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     reception.facilities = reception.facilities.filter((candidate) => candidate.id !== building.id);
     const withoutCapacity = forecastNextTurnPenalties(reception);
     expect(withoutCapacity.overcrowding.facilities).toEqual([
-      { facilityId: receptionCapital.id, excess: 10, softCap: receptionCapital.workerCapacity },
+      expect.objectContaining({ facilityId: receptionCapital.id, excess: 10, softCap: receptionCapital.workerCapacity, extraFood: 5, extraCivilianGoods: 11 }),
     ]);
   });
 
@@ -226,14 +226,15 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     });
     const accepted = Math.floor(10 * currentReception.config.refugees.policies.strict.workerRate);
     expect(currentReception.config.refugees.policies.strict.infectionRate).toBe(0);
-    expect(forecastNextTurnPenalties(currentReception).overcrowding.facilities).toContainEqual({
+    expect(forecastNextTurnPenalties(currentReception).overcrowding.facilities).toContainEqual(expect.objectContaining({
       facilityId: capital.id,
       excess: accepted,
       softCap: capital.workerCapacity,
-    });
+    }));
 
     // With no eligible current-snapshot recipient, the confirmed workers stay
     // approved and enter the Housing only after it completes next Player Turn.
+    capital.workers -= 1; // Convert a resident, preserving occupancy at the soft cap.
     capital.infected = 1;
     capital.operationalStatus = 'infected';
     expect(forecastNextTurnPenalties(currentReception).overcrowding.active).toBe(false);
@@ -257,11 +258,11 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
       status: 'operational', waiting: 0, screening: 2, approved: 0, remainingTurns: 1,
       screeningPolicy: 'strict', nextArrivalTurn: null, infected: 0,
     });
-    expect(forecastNextTurnPenalties(tied).overcrowding.facilities).toContainEqual({
+    expect(forecastNextTurnPenalties(tied).overcrowding.facilities).toContainEqual(expect.objectContaining({
       facilityId: tiedCity.id,
       excess: 1,
       softCap: tiedCity.workerCapacity,
-    });
+    }));
   });
 
   it('returns detached cached forecasts, creates and clears both crisis reasons, and keeps Housing vision without power or Supply', () => {

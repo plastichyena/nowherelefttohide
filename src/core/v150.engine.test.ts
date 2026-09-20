@@ -50,8 +50,8 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     const police = state.units.find((unit) => unit.type === 'police')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
 
-    expect(state.gameVersion).toBe('12.0.0');
-    expect(config.version).toBe('12.0.0');
+    expect(state.gameVersion).toBe('13.0.0');
+    expect(config.version).toBe('13.0.0');
     expect(police).toMatchObject({
       proficiency: 'regular', recruitSurvivalTurns: 0, regularZombieKills: 0,
       veteranPromotionPending: false, attack: 8, maxAttackCharges: 1, attackChargesRemaining: 1,
@@ -297,7 +297,8 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     expect(scheduled).toEqual(second.state.units
       .filter((unit) => unit.spawnGroupId !== null)
       .map((unit) => ({ id: unit.id, type: unit.type, position: unit.position, hordeKind: unit.hordeKind })));
-    expect(scheduled).toHaveLength(4);
+    expect(scheduled).toHaveLength(5);
+    expect(scheduled.filter(unit => unit.type === 'packZombie')).toHaveLength(1);
     expect(scheduled.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(1);
     expect(scheduled.filter((unit) => unit.type === 'riotZombie')).toHaveLength(1);
     expect(scheduled.filter((unit) => unit.type === 'zombie')).toHaveLength(2);

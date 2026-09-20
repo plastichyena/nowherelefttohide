@@ -275,6 +275,7 @@ describe('Balanced Agent scenario intentions', () => {
       { type: 'EndTurn' },
     ], (value) => {
       value.units.find((candidate) => candidate.id === unit.id)!.hp = 1;
+      value.zombies = [zombie];
     });
     expect(result.action.type).not.toBe('Move');
   });
@@ -370,6 +371,7 @@ describe('Balanced Agent scenario intentions', () => {
       target.recoveryClassIfTurnEndsNow = 'outOfSupply';
       target.recoveryRateIfTurnEndsNow = 0;
       target.recoveryBaseAmountIfTurnEndsNow = 0;
+      value.zombies = []; // Isolate recovery from a separate hold-the-threatened-site priority.
     });
     expect(wait.action.type).toBe('EndTurn');
   });

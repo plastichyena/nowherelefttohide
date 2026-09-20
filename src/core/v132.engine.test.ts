@@ -141,8 +141,8 @@ describe('v1.4 Horde composition and combat', () => {
       for (const groupId of groupIds) {
         const group = engine.getState().units.filter((unit) => unit.spawnGroupId === groupId);
         expect(group.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(wave.compositionPerDirection.hordeZombie);
-        expect(group.filter((unit) => unit.type !== 'hordeZombie')).toHaveLength(wave.compositionPerDirection.zombie);
-        expect(group.filter((unit) => unit.type !== 'hordeZombie').every((unit) =>
+        expect(group.filter((unit) => unit.type !== 'hordeZombie' && unit.type !== 'packZombie')).toHaveLength(wave.compositionPerDirection.zombie);
+        expect(group.filter((unit) => unit.type !== 'hordeZombie' && unit.type !== 'packZombie').every((unit) =>
           ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'].includes(unit.type),
         )).toBe(true);
         expect(group.every((unit) => unit.hordeKind === (wave.final ? 'final' : 'periodic'))).toBe(true);
@@ -163,7 +163,8 @@ describe('v1.4 Horde composition and combat', () => {
       .reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.hordeZombie, 0);
     const expectedFinalNonHorde = schedule.filter((wave) => wave.final)
       .reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.zombie, 0);
-    expect(finalGroup).toHaveLength(expectedFinalSpawned);
+    expect(finalGroup).toHaveLength(expectedFinalSpawned + 1);
+    expect(finalGroup.filter(unit => unit.type === 'packZombie')).toHaveLength(1);
     const finalProgress = cloneState(engine.getState());
     finalProgress.units = finalProgress.units.filter((unit) => !unit.spawnGroupId || !finalIds.includes(unit.spawnGroupId) || unit.id === finalGroup[0]!.id);
     expect(deriveVictoryProgress(finalProgress).finalHordeDefeated).toBe(false);
@@ -173,17 +174,17 @@ describe('v1.4 Horde composition and combat', () => {
       type: 'horde_wave_started',
       payload: expect.objectContaining({ hordeKind: 'final', waveIndex: 5, direction: 'north' }),
     }));
-    expect(engine.getState().horde).toMatchObject({ finalSpawnedCount: expectedFinalSpawned, totalSpawned: expectedTotalSpawned });
+    expect(engine.getState().horde).toMatchObject({ finalSpawnedCount: expectedFinalSpawned + 1, totalSpawned: expectedTotalSpawned + 1 });
     const statistics = engine.getState().statistics;
     const finalSpecial = Object.values(statistics.finalSpecialZombiesSpawnedByType).reduce((sum, value) => sum + value, 0);
     const allSpecial = Object.values(statistics.hordeSpecialSpawnedByType).reduce((sum, value) => sum + value, 0);
     expect(statistics).toMatchObject({
       periodicHordeZombiesSpawned: expectedPeriodicHorde,
       finalHordeZombiesSpawned: expectedFinalHorde,
-      finalHordeSpawned: expectedFinalSpawned,
+      finalHordeSpawned: expectedFinalSpawned + 1,
     });
     expect(statistics.periodicNormalZombiesSpawned + allSpecial - finalSpecial).toBe(expectedPeriodicNonHorde);
-    expect(statistics.finalNormalZombiesSpawned + finalSpecial).toBe(expectedFinalNonHorde);
+    expect(statistics.finalNormalZombiesSpawned + finalSpecial).toBe(expectedFinalNonHorde + 1);
   }, 60_000);
 
   it('uses custom per-type composition arithmetic for Periodic and Final groups', () => {
@@ -254,9 +255,11 @@ describe('v1.4 Horde composition and combat', () => {
       normalZombiesKilled: 1,
       hordeZombiesKilled: 1,
       finalHordeKilled: 2,
-      finalHordeDefeated: true,
+      finalHordeDefeated: false,
     });
-    expect(hordeKill.state.horde.finalHordeStatus).toBe('defeated');
+    expect(hordeKill.state.horde.finalHordeStatus).toBe('active');
+    expect(hordeKill.state.units.filter(unit => unit.hordeKind === 'final')).toHaveLength(1);
+    expect(hordeKill.state.units.find(unit => unit.hordeKind === 'final')?.type).toBe('packZombie');
   });
 
   it('reproduces Mixed Horde unit IDs, types, groups, positions, and RNG state for the same seed and actions', () => {

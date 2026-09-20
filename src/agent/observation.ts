@@ -342,6 +342,8 @@ function createAgentObservationInScope(
   const crisisSummary = publicCrisisSummary(state);
   const endTurnRisk = publicEndTurnRisk(state);
   return cloneJson({
+    publicHealth: { stress: { ...state.publicHealthStress }, foodShortageAccumulation: state.foodShortageAccumulation, starvationCarry: state.starvationCarry },
+    nuclearObjective: { firstCapturedTurn: state.nuclearObjective.firstCapturedTurn, reward: state.nuclearObjective.reward, deadlineTurn: 20 },
     apiVersion: OBSERVATION_API_VERSION,
     barbedWire: state.barbedWire.filter(w => visibleTileKeys.has(hexKey(w.position))),
     barbedWireCandidates: wireCandidates(state),
@@ -509,7 +511,7 @@ export function restoreArtifactObservation(
       const facilityId = tile.facilityId;
       const checkpointId = checkpointByPosition.get(key) ?? null;
       const urban = facilityId !== null || dynamicFacilityId !== null || checkpointId !== null;
-      const effectiveMovementCost = tile.terrain === 'water' ? null : trace.barbedWire.some(w => hexKey(w.position) === key) ? 5 : urban || tile.road || movementRoads.has(key)
+      const effectiveMovementCost = trace.barbedWire.some(w => hexKey(w.position) === key) ? 5 : urban || tile.road || movementRoads.has(key)
         ? 1
         : terrainMovement.get(tile.terrain) ?? tile.effectiveMovementCost;
       const defense = urban
@@ -522,7 +524,7 @@ export function restoreArtifactObservation(
         checkpointId,
         passable: effectiveMovementCost !== null,
         effectiveMovementCost,
-        ...(Object.hasOwn(tile, 'unobstructedMovementCost') ? { unobstructedMovementCost: tile.terrain === 'water' ? null : urban || tile.road || movementRoads.has(key) ? 1 : terrainMovement.get(tile.terrain) ?? tile.effectiveMovementCost } : {}),
+        ...(Object.hasOwn(tile, 'unobstructedMovementCost') ? { unobstructedMovementCost: urban || tile.road || movementRoads.has(key) ? 1 : terrainMovement.get(tile.terrain) ?? tile.effectiveMovementCost } : {}),
         terrainDefenseSource: defense.source,
         terrainDamageMultiplier: defense.multiplier,
         visibleToPlayer: visible.has(key),

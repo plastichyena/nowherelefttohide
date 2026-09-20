@@ -117,7 +117,7 @@ function oilFixture(workers: number, remainingAllowance = 2_000): GameState {
 
 describe('v1.6 Core acceptance', () => {
   it('uses the v6 facility set with one Oil Field, four branches, and its one-hex access spur', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v7');
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v8');
     expect(FIXED_MAP.facilities).toHaveLength(FIXED_FACILITY_COUNT);
     expect(FIXED_MAP.roadBranches).toHaveLength(4);
     const removed = ['refinery-2', 'refinery-3', 'refinery-4', 'power-plant-2', 'power-plant-3'];
@@ -332,7 +332,7 @@ describe('v1.6 Core acceptance', () => {
     const firstAction = { type: 'BuildConstructibleFacility', facilityType: 'windPowerPlant', position: firstCandidate.position } as const;
     const firstPreview = previewCoreAction(engine.getState(), firstAction, 219);
     expect(firstPreview.nextEndTurn.before).toMatchObject({ civilianGoods: 13, populationLoss: 0, projectedHealthyCivilians: 137 });
-    expect(firstPreview.nextEndTurn.after).toMatchObject({ civilianGoods: 0, populationLoss: 137, projectedHealthyCivilians: 0, guaranteedDefeat: true });
+    expect(firstPreview.nextEndTurn.after).toMatchObject({ civilianGoods: 0, populationLoss: 0, projectedHealthyCivilians: 137, guaranteedDefeat: false });
     expect(engine.getState().resources.civilianGoods).toBe(273);
 
     expect(engine.step(firstAction).error).toBeNull();
@@ -379,7 +379,8 @@ describe('v1.6 Core acceptance', () => {
     for (const candidate of snapshot.facilities) {
       candidate.operationalStatus = candidate.type === 'windPowerPlant' ? 'operational' : 'disabled';
     }
-    snapshot.resources.food = 114;
+    snapshot.resources.food = 0;
+    snapshot.foodShortageAccumulation = 7;
     snapshot.resources.civilianGoods = 10_000;
     snapshot.resources.militaryGoods = 10_000;
     snapshot.resources.fuel = 10_000;

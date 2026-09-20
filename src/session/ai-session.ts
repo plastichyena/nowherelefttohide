@@ -1,6 +1,7 @@
+import { buildContextHandoff, handoffJson, type ContextHandoff } from './context-handoff';
 import { isGameActionInput, isPlainObject, isBoundedJson, hasOnlyKeys, isSafeId } from '../agent/action-input';
 import { cloneAction, cloneJson, actionKey } from '../agent/action';
-import { checkpointSupplyExplanation } from '../agent/decision-summary';
+import { checkpointSupplyExplanation, deriveImportantChanges } from '../agent/decision-summary';
 import { createAgentGame } from '../agent/game';
 import {
   QUERY_FILTER_SCHEMAS,
@@ -278,6 +279,8 @@ export class AiSession implements AiSessionPort {
   private readonly previewProjector: AiSessionCreateOptions['previewProjector'];
   private readonly requestLedger = new Map<string, RequestLedgerEntry>();
   private readonly decisions: AiSessionDecisionRecord[] = [];
+  private automaticContextCheckpoint: ContextHandoff | null = null;
+  private handoff() { return buildContextHandoff(this.game.getObservation(), { sessionId: this.sessionId, revision: this.revision, preferredCommentLocale: this.preferredCommentLocale, branchLineage: null }, this.decisions); }
   private lifecycle: AiSessionLifecycle = 'active';
   private revision = 0;
   private acting = false;
@@ -302,6 +305,7 @@ export class AiSession implements AiSessionPort {
   public getContext(): AiSessionContext {
     const actionReasonCode = this.lifecycle === 'paused' ? 'paused' : this.lifecycle === 'ended' ? 'session_ended' : null;
     return cloneJson({
+      contextHandoff: this.handoff(),
       contractVersion: AI_SESSION_CONTRACT_VERSION,
       sessionId: this.sessionId,
       generation: this.generation,
@@ -452,12 +456,15 @@ export class AiSession implements AiSessionPort {
       error: stepped.error ? cloneJson(stepped.error) : null,
       events: cloneJson(stepped.events),
       stateDelta: cloneStepDelta(stepped, before),
+      importantChanges: accepted ? deriveImportantChanges(before, after, stepped.events) : [],
       gameOver: stepped.gameOver,
       result: cloneJson(stepped.result),
       previousDecisionHash: this.decisions.at(-1)?.decisionHash ?? ZERO_HASH,
     };
     const record: AiSessionDecisionRecord = { ...withoutHash, decisionHash: sha256AiSessionJson(withoutHash) };
     this.decisions.push(cloneJson(record));
+    const handoff = this.handoff();
+    if (handoff.contextCheckpoint.decision === this.revision) this.automaticContextCheckpoint = handoff;
     if (stepped.gameOver) this.lifecycle = 'ended';
     const result: AiSessionActResult = {
       // Do not vary this DTO on retry: equal request payloads must yield an
@@ -543,6 +550,7 @@ export class AiSession implements AiSessionPort {
     } else {
       try {
         switch (target) {
+          case 'context-handoff': value = handoffJson(this.handoff()); break;
           case 'api':
             value = cloneJson({ ...this.game.getApiInfo(), queryContract: publicQueryContract() }) as unknown as JsonValue;
             break;

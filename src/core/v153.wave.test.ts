@@ -10,7 +10,8 @@ it('restricts Gas to the last two waves and caps it independently per direction 
     const result=engine.step({type:'EndTurn'});
     expect(result.error).toBeNull();
     const spawned=result.state.units.filter(unit=>unit.spawnGroupId?.startsWith(`wave-${index}-`));
-    expect(spawned).toHaveLength(5);
+    expect(spawned).toHaveLength(index === 3 ? 6 : 5);
+    expect(spawned.filter(unit=>unit.type==='packZombie')).toHaveLength(index === 3 ? 1 : 0);
     expect(spawned.filter(unit=>unit.type==='gasZombie')).toHaveLength(index===1?0:1);
     expect(spawned.filter(unit=>unit.type==='riotZombie')).toHaveLength(1);
     expect(spawned.filter(unit=>unit.type==='hunterZombie')).toHaveLength(1);

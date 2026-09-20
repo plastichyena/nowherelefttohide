@@ -45,7 +45,7 @@ describe('v1.5.5 roads',()=>{
     const s=setup();const tile=s.map.tiles.find(t=>t.terrain==='forest'&&t.playerOccupancyAllowed)!;const adjacent=s.map.tiles.find(t=>hexDistance(t,tile)===1)!;
     s.map.roads={...s.map.roads!,segments:[...s.map.roads!.segments,{id:'test',role:'access',path:[{q:adjacent.q,r:adjacent.r},{q:tile.q,r:tile.r}]}]};
     expect(effectiveMovementCost(s,tile)).toBe(1);expect(tile.terrain).toBe('forest');expect(terrainDefenseAt(s,{type:'zombie',position:tile,isPlayerUnit:false}).source).toBe('forest');
-    tile.terrain='water';expect(effectiveMovementCost(s,tile)).toBeNull();
+    tile.terrain='water';expect(effectiveMovementCost(s,tile)).toBe(1);
   });
 });
 describe('v1.5.5 population parameter domain',()=>{

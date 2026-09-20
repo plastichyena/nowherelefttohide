@@ -24,7 +24,7 @@ describe('GameEngine', () => {
     const first = createInitialState(42, config);
     const second = createInitialState(42, config);
     expect(first).toEqual(second);
-    expect(first.facilities).toHaveLength(26);
+    expect(first.facilities).toHaveLength(27);
     expect(first.facilities.filter((facility) => facility.status === 'owned')).toHaveLength(8);
     expect(first.population.healthyCivilians).toBe(110);
     expect(first.facilities.find((facility) => facility.id === 'capital')?.workers).toBe(51);
@@ -232,7 +232,7 @@ describe('GameEngine', () => {
     expect(engine.getState().units.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(2);
     expect(engine.step({ type: 'EndTurn' }).result).toBeNull();
     expect(engine.getState().horde.spawnedWaveIndices).toEqual([1, 2]);
-    expect(engine.getState().horde).toMatchObject({ finalHordeStatus: 'active', finalSpawnedCount: 1, totalSpawned: 4 });
+    expect(engine.getState().horde).toMatchObject({ finalHordeStatus: 'active', finalSpawnedCount: 2, totalSpawned: 5 });
   });
 
   it('stops infection spread for a facility after stationed suppression, even with infected people remaining', () => {
@@ -434,9 +434,10 @@ describe('GameEngine', () => {
     snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-north-1';
     synchronizePopulation(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
-    const beforeNormal = engine.getState().population.cityResidents;
+    const beforeNormal = engine.getState().statistics.refugeesAccepted;
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().population.cityResidents).toBe(beforeNormal + 3);
+    expect(engine.getState().statistics.refugeesAccepted).toBe(beforeNormal + 4);
+    expect(engine.getState().events.find(e => e.type === 'refugees_screened')?.payload).toMatchObject({policy:'normal',acceptedWorkers:4,probability:0.05});
 
     const passThrough = engine.getState() as ReturnType<typeof createInitialState>;
     const checkpoint = passThrough.checkpoints[0]!;
@@ -446,9 +447,9 @@ describe('GameEngine', () => {
     checkpoint.nextArrivalTurn = null;
     synchronizePopulation(passThrough);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: passThrough }).error).toBeNull();
-    const beforePass = engine.getState().population.cityResidents;
+    const beforePass = engine.getState().statistics.refugeesAccepted;
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().population.cityResidents).toBe(beforePass + 4);
+    expect(engine.getState().statistics.refugeesAccepted).toBe(beforePass + 4);
 
     const strict = engine.getState() as ReturnType<typeof createInitialState>;
     strict.checkpoints[0]!.waiting = 4;
@@ -457,9 +458,9 @@ describe('GameEngine', () => {
     strict.checkpoints[0]!.nextArrivalTurn = null;
     synchronizePopulation(strict);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: strict }).error).toBeNull();
-    const beforeStrict = engine.getState().population.cityResidents;
+    const beforeStrict = engine.getState().statistics.refugeesAccepted;
     for (let turn = 0; turn < 6; turn += 1) expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().population.cityResidents).toBe(beforeStrict + 2);
+    expect(engine.getState().statistics.refugeesAccepted).toBe(beforeStrict + 4);
   });
 
   it('overruns and recovers a facility through infection, and loses immediately when the capital falls', () => {
@@ -496,8 +497,10 @@ describe('GameEngine', () => {
     const capital = capitalLoss.facilities.find((facility) => facility.id === 'capital')!;
     capital.workers = 1;
     capital.infected = 1;
+    capital.infectionGrace = []; // Explicit pre-existing infection in this staged fall scenario.
     synchronizePopulation(capitalLoss);
-    expect(engine.step({ type: 'LoadSnapshot', snapshot: capitalLoss }).error).toBeNull();
+    const capitalLoad = engine.step({ type: 'LoadSnapshot', snapshot: capitalLoss });
+    expect(capitalLoad.error, capitalLoad.error?.message).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).result?.reason).toBe('capitalLost');
   });
 
@@ -594,7 +597,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.getState().horde).toMatchObject({ spawnedWaveIndices: [1, 2], totalSpawned: 6 });
     expect(engine.step({ type: 'EndTurn' }).result).toBeNull();
-    expect(engine.getState().horde).toMatchObject({ totalSpawned: 18, finalHordeStatus: 'active', finalSpawnedCount: 12 });
+    expect(engine.getState().horde).toMatchObject({ totalSpawned: 19, finalHordeStatus: 'active', finalSpawnedCount: 13 });
   });
 
   it('freezes deterministic supply and reception rankings for the whole player turn', () => {
@@ -705,12 +708,12 @@ describe('GameEngine', () => {
     createCityPopulationSnapshot(snapshot);
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const forecast = forecastEndTurn(engine.getState());
-    expect(forecast.overcrowding).toMatchObject({ additionalFood: 2, additionalCivilianGoods: 2 });
+    expect(forecast.overcrowding).toMatchObject({ additionalFood: 1, additionalCivilianGoods: 2 });
     const result = engine.step({ type: 'EndTurn' });
     expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'civilianGoods' && event.payload.amount === 50)).toBe(true);
   });
 
-  it('adds exact overcrowding fractions from multiple cities without a rate cap', () => {
+  it('adds local overcrowding costs from three cities without a national multiplier', () => {
     const engine = new GameEngine(210, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.facilities.find((facility) => facility.id === 'capital')!.workers = 110;
@@ -727,8 +730,8 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const forecast = forecastEndTurn(engine.getState());
     expect(forecast.overcrowding.cities).toHaveLength(3);
-    expect(forecast.overcrowding.additionalFood).toBe(Math.ceil(forecast.populationConsumers * 0.3));
-    expect(forecast.overcrowding.additionalCivilianGoods).toBe(Math.ceil(forecast.populationConsumers * 0.3));
+    expect(forecast.overcrowding.additionalFood).toBe(5 + 3 + 3);
+    expect(forecast.overcrowding.additionalCivilianGoods).toBe(11 + 6 + 6);
   });
 
   it('enforces recruitment hubs, supply-order conscription, and the last-civilian guard', () => {
@@ -745,7 +748,7 @@ describe('GameEngine', () => {
     createCityPopulationSnapshot(last);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: last }).error).toBeNull();
     const before = engine.getState();
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 25, r: 25 } }).error?.code).toBe('insufficient_production_cost');
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 25, r: 25 } }).error?.code).toBe('capital_minimum_resident_required');
     expect(engine.getState()).toEqual(before);
   });
 
@@ -784,17 +787,17 @@ describe('GameEngine', () => {
     expect(engine.getState().facilities.find((facility) => facility.id === 'capital')!.workers).toBe(capitalBefore + 3);
   });
 
-  it('converts latent infection at a blocked checkpoint in approved-first order and reserves overrun for the next phase', () => {
+  it('rolls only the newly approved batch at a blocked checkpoint and defers its spread to the next EndTurn', () => {
     const config = createDefaultConfig({
       horde: singleFinalWave(2),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
-      refugees: { policies: { passThrough: { infectionRate: 1, infectionPopulationRate: 1 } } },
+      refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 },
     });
     const engine = new GameEngine(207, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.checkpoints.push({
       id: 'checkpoint-north-1', position: { q: 25, r: 19 }, direction: 'north', status: 'operational',
-      waiting: 2, screening: 0, approved: 0, remainingTurns: 0, screeningPolicy: 'passThrough', nextArrivalTurn: null, infected: 0,
+      waiting: 20, screening: 0, approved: 0, remainingTurns: 0, screeningPolicy: 'passThrough', nextArrivalTurn: null, infected: 0,
     });
     snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.activeCheckpointId = 'checkpoint-north-1';
     snapshot.roadBranches.find((branch) => branch.branchId === 'north')!.currentPolicy = 'passThrough';
@@ -803,8 +806,12 @@ describe('GameEngine', () => {
     snapshot.cityPopulationSnapshot.reception.forEach((entry) => { entry.eligible = false; });
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
-    expect(engine.getState().checkpoints[0]).toMatchObject({ waiting: 0, screening: 0, approved: 0, status: 'ruined' });
-    expect(engine.getState().checkpoints[0]!.infected).toBeGreaterThan(0);
+    const checkpoint = engine.getState().checkpoints[0]!;
+    expect(checkpoint).toMatchObject({ waiting: 0, screening: 0, status: 'operational' });
+    expect(checkpoint.infected).toBeGreaterThan(0);
+    const placed = engine.getState().events.filter(event => event.type === 'population_transferred' && event.payload.from === checkpoint.id && event.payload.reason === 'approved_refugees').reduce((sum,event)=>sum + Number(event.payload.people),0);
+    expect(checkpoint.approved + checkpoint.infected + placed).toBe(20);
+    expect(checkpoint.infectionGrace).toEqual([{ count: checkpoint.infected, spreadsFromTurn: 2 }]);
   });
 
   it('spreads checkpoint internal infection waiting-first while same-turn food production prevents losses', () => {

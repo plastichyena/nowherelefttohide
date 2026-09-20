@@ -1,4 +1,5 @@
 import { facilityRecaptureConditions } from './facility-recovery';
+import { isHumanUnitType } from './unit-catalog';
 import { wireAt, wireCombatProjection } from './barbed-wire';
 /**
  * Public entity projections shared by the Human UI and Agent Query API.
@@ -60,10 +61,6 @@ function finiteNumber(value: unknown, fallback: number): number {
 
 function unitString(value: unknown): string {
   return typeof value === 'string' ? value : '';
-}
-
-function isHumanUnitType(type: string): boolean {
-  return type === 'police' || type === 'nationalGuard' || type === 'riotPolice' || type === 'reconTeam';
 }
 
 function multiplyResources(
@@ -189,6 +186,7 @@ export function createPublicUnitProjection(
       sites:[...state.facilities.filter(f=>hexDistance(f.position,unit.position)===1 && (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(f.position))).map(f=>({siteId:f.id,infection:Math.min(f.workers,state.config.units.gasZombie.explosionInfection)})),...state.checkpoints.filter(c=>hexDistance(c.position,unit.position)===1 && (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(c.position))).map(c=>({siteId:c.id,infection:Math.min(c.waiting+c.screening+c.approved,state.config.units.gasZombie.explosionInfection)}))],
     } } : {}),
     unitType: unit.type,
+    movementDomain: unit.movementDomain,
     proficiency,
     recruitSurvivalTurns,
     turnsUntilRegular,
