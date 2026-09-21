@@ -733,7 +733,10 @@ function expireNeutralFacilitySurvivors(state: GameState): void {
     facility.workers = 0;
     facility.infected += expired;
     facility.earlyCaptureSurvivorStatus = 'lost';
-    if (facility.armyBase) facility.armyBase.reward = 'expired';
+    if (facility.armyBase) {
+      facility.armyBase.reward = 'expired';
+      facility.armyBase.interceptionsRemaining = 0;
+    }
     if (expired > 0) {
       facility.operationalStatus = 'infected';
       emit(state, 'survivors_expired', {
@@ -1245,6 +1248,7 @@ function fallFacility(
   facility.owner = 'none';
   facility.operationalStatus = 'ruined';
   facility.workers = 0;
+  if (facility.armyBase) facility.armyBase.interceptionsRemaining = 0;
   const result = resolveSiteZombieSpawn(
     state,
     { siteKind: 'facility', siteId: facility.id, siteType: facility.type, position: facility.position, currentInfected: infectedAtFall },
@@ -1643,6 +1647,7 @@ function processInternalInfection(state: GameState, rng: SeededRng): void {
     if (converted <= 0) continue;
     const wasInfected = facility.infected > 0;
     facility.workers -= converted; facility.infected += converted; addInfectionGrace(facility, converted, state.turn);
+    if (facility.armyBase) facility.armyBase.interceptionsRemaining = Math.min(facility.armyBase.interceptionsRemaining, facility.workers);
     facility.operationalStatus = 'infected';
     if (!wasInfected) markSiteInfectionStarted(state, 'facility', facility.id, facility.type, facility.position, converted, 'public_health');
     state.statistics.livingConditionInfections += converted;

@@ -1,5 +1,5 @@
 import { compactPublicHealth } from '../core/public-health';
-import { buildContextHandoff, handoffJson } from './context-handoff';
+import { ContextHandoffHistory, projectContextHandoff, handoffJson } from './context-handoff';
 import { CRISIS_WORSENING_FACTS } from '../core/crisis';
 import type { CrisisReasonCode } from '../core/types';
 import { isGameActionInput } from '../agent/action-input';
@@ -340,21 +340,26 @@ export interface SessionServiceOptions {
   publicSnapshotInterval?: number;
 }
 
-function statusResult(loaded: LoadedSession, sessionMetrics: SessionMetrics, store: SessionStore): SessionStatusResult {
-  const baseline = loaded.descriptor.branchBase?.baseDecision ?? 0;
-  let from = baseline + 1;
-  const records: ChangeDecision[] = [];
-  function *handoffHistory() {
-    for (const record of store.iterateAllDecisionRecords(loaded.descriptor.sessionId)) {
-      if (record.decision > baseline) {
-        if (record.accepted && record.inputAction.type === 'EndTurn') { records.length = 0; from = record.decision; }
-        records.push({ decision: record.decision, changes: record.importantChanges });
-      }
-      yield record;
+class SessionGuidanceHistory {
+  readonly context = new ContextHandoffHistory();
+  readonly records: ChangeDecision[] = [];
+  from: number;
+  constructor(private readonly baseline: number) { this.from = baseline + 1; }
+
+  push(record: PublicDecisionRecord): void {
+    this.context.push(record);
+    if (record.decision > this.baseline) {
+      if (record.accepted && record.inputAction.type === 'EndTurn') { this.records.length = 0; this.from = record.decision; }
+      // Keep only the current Turn's changes, not empty formal rejections or
+      // old records and their full public payload references.
+      if (record.importantChanges.length) this.records.push({ decision: record.decision, changes: clone(record.importantChanges) });
     }
   }
-  const contextHandoff = buildContextHandoff(loaded.publicState.observation, { sessionId: loaded.descriptor.sessionId, revision: loaded.active.revision, preferredCommentLocale: loaded.descriptor.preferredCommentLocale, branchLineage: loaded.descriptor.branchBase }, handoffHistory());
-  const summary = summarizeImportantChanges(records, Math.min(from, loaded.active.decision), loaded.active.decision, loaded.active.revision);
+}
+
+function statusResult(loaded: LoadedSession, sessionMetrics: SessionMetrics, store: SessionStore, history: SessionGuidanceHistory): SessionStatusResult {
+  const contextHandoff = projectContextHandoff(loaded.publicState.observation, { sessionId: loaded.descriptor.sessionId, revision: loaded.active.revision, preferredCommentLocale: loaded.descriptor.preferredCommentLocale, branchLineage: loaded.descriptor.branchBase }, history.context);
+  const summary = clone(summarizeImportantChanges(history.records, Math.min(history.from, loaded.active.decision), loaded.active.decision, loaded.active.revision));
   if (contextHandoff.contextCheckpoint.decision > 0 && contextHandoff.contextCheckpoint.decision === loaded.active.decision) {
     const path = assertSafeOutputPath(store.safeRoot, join(store.sessionsRoot, loaded.descriptor.sessionId, 'context-' + loaded.active.decision + '.json'));
     if (!existsSync(path)) writeFileSync(path, canonicalJson(contextHandoff), { encoding: 'utf8', flag: 'wx' });
@@ -562,6 +567,7 @@ function matchesFilters(item: JsonValue, filters: Record<string, JsonValue>): bo
 
 export class SessionService {
   private readonly continuations = new Map<string, LoadedSession>();
+  private readonly guidance = new Map<string, { commitIntegrityHash: string; history: SessionGuidanceHistory }>();
   private readonly runtimes = new Map<string, { commitIntegrityHash: string; runtime: SessionGameRuntime }>();
   private readonly activePlayTurns = new Set<string>();
   private readonly publicSnapshotInterval: number;
@@ -593,7 +599,7 @@ export class SessionService {
       const active = this.store.create(descriptor, runBase, clone(runtime.exportPrivateState()), initialState);
       const loaded = this.loadCompatible(active.sessionId);
       this.cacheRuntime(sessionId, loaded, runtime);
-      return statusResult(loaded, this.store.readSessionMetrics(sessionId), this.store);
+      return this.statusResult(loaded);
     } finally { lock.release(); }
   }
 
@@ -605,7 +611,7 @@ export class SessionService {
         this.restoreAndVerify(loaded, true);
         this.ensureAutomaticCheckpoint(loaded);
         this.store.recordDiagnostic(sessionId, 'activeSessionResumed', 'status');
-        return statusResult(loaded, this.store.readSessionMetrics(sessionId), this.store);
+        return this.statusResult(loaded);
       } finally { lock.release(); }
     } catch (error) { return this.rejectWithDiagnostics(sessionId, 'status', error); }
   }
@@ -658,9 +664,12 @@ export class SessionService {
       if (!accepted) this.store.recordDiagnostic(sessionId, 'invalidDecision', request ? 'play-turn' : 'step');
       const committed: LoadedSession = { directory: loaded.directory, descriptor: loaded.descriptor, runBase: loaded.runBase, active: nextActive, privateState: afterPrivate, publicState: nextPublic, lastDecision: record };
       const checkpointsCreated = this.ensureAutomaticCheckpoint(committed);
+      const history = this.guidanceFor(loaded);
+      history.push(record);
+      this.guidance.set(sessionId, { commitIntegrityHash: nextActive.commitIntegrityHash, history });
       this.cacheContinuation(sessionId, { ...committed, privateState: null });
       this.cacheRuntime(sessionId, committed, runtime);
-      return { ...statusResult(committed, this.store.readSessionMetrics(sessionId), this.store), active: clone(nextActive), accepted, error: clone(result.error), events: clone(result.events), stateDelta: clone(stateDelta), importantChanges: summarizeImportantChanges([{ decision: record.decision, changes: record.importantChanges }], record.decision, record.decision, nextActive.revision), decisionRecord: clone(record), checkpointsCreated };
+      return { ...this.statusResult(committed), active: clone(nextActive), accepted, error: clone(result.error), events: clone(result.events), stateDelta: clone(stateDelta), importantChanges: summarizeImportantChanges([{ decision: record.decision, changes: record.importantChanges }], record.decision, record.decision, nextActive.revision), decisionRecord: clone(record), checkpointsCreated };
     } catch (error) {
       this.closeContinuation(sessionId);
       throw error;
@@ -727,7 +736,7 @@ export class SessionService {
     if (indexed.status === 'committed') {
       const loaded = this.loadCompatible(sessionId, true);
       this.restoreAndVerify(loaded, true);
-      return this.playTurnActionResult(statusResult(loaded, this.store.readSessionMetrics(sessionId), this.store), indexed.record, true);
+      return this.playTurnActionResult(this.statusResult(loaded), indexed.record, true);
     }
     const stepped = this.commitStep(sessionId, { action: input.action, decisionSummary: input.decisionSummary ?? null, expectedRevision: input.expectedRevision }, { requestId: input.requestId, requestHash, requestedCommentLocale, ...(input.expectations ? { expectations: input.expectations } : {}) });
     return this.playTurnActionResult(stepped, stepped.decisionRecord, false);
@@ -799,12 +808,13 @@ export class SessionService {
   public closeContinuation(sessionId: string): void {
     this.continuations.delete(sessionId);
     this.runtimes.delete(sessionId);
+    this.guidance.delete(sessionId);
   }
 
   public playTurnStatus(sessionId: string): SessionStatusResult {
     const loaded = this.loadCompatible(sessionId, true);
     this.restoreAndVerify(loaded, true);
-    return statusResult(loaded, this.store.readSessionMetrics(sessionId), this.store);
+    return this.statusResult(loaded);
   }
 
   private playTurnActionResult(status: SessionStatusResult, record: PublicDecisionRecord, replayed: boolean): SessionPlayTurnActionResult {
@@ -861,7 +871,7 @@ export class SessionService {
         const loaded = this.loadCompatible(active.sessionId);
         this.restoreAndVerify(loaded);
         this.store.recordDiagnostic(sourceSessionId, 'branchedSessionCreated', 'load-checkpoint');
-        return statusResult(loaded, this.store.readSessionMetrics(newSessionId), this.store);
+        return this.statusResult(loaded);
       } finally { lock.release(); }
     } catch (error) { return this.rejectWithDiagnostics(sourceSessionId, 'load-checkpoint', error); }
   }
@@ -897,7 +907,7 @@ export class SessionService {
           revision,
         );
         switch (rawInput.target) {
-          case 'context-handoff': value = handoffJson(buildContextHandoff(observation, { sessionId, revision, preferredCommentLocale: loaded.descriptor.preferredCommentLocale, branchLineage: loaded.descriptor.branchBase }, this.store.iterateAllDecisionRecords(sessionId))); break;
+          case 'context-handoff': value = handoffJson(projectContextHandoff(observation, { sessionId, revision, preferredCommentLocale: loaded.descriptor.preferredCommentLocale, branchLineage: loaded.descriptor.branchBase }, this.guidanceFor(loaded).context)); break;
           case 'api': value = { ...(clone(runtime.getApiInfo?.() ?? { unavailable: true }) as unknown as Record<string, JsonValue>), queryContract: publicQueryContract() as unknown as JsonValue, sessionPlayTurn: clone(SESSION_PLAY_TURN_CAPABILITIES) as unknown as JsonValue } as unknown as JsonValue; break;
           case 'map': {
             const { tiles, ...mapInfo } = observation.map;
@@ -1276,10 +1286,33 @@ export class SessionService {
         this.runtimes.delete(sessionId);
       }
     }
-    const loaded = this.store.load(sessionId);
-    this.assertDescriptorCompatible(loaded.descriptor);
-    this.cacheContinuation(sessionId, loaded);
-    return loaded;
+    // Rebuild derived guidance in the same streamed pass that verifies stored
+    // history. A continued action then consumes only its newly committed record.
+    let history: SessionGuidanceHistory | undefined;
+    try {
+      const loaded = this.store.load(sessionId, (record, descriptor) => {
+        history ??= new SessionGuidanceHistory(descriptor.branchBase?.baseDecision ?? 0);
+        history.push(record);
+      });
+      this.assertDescriptorCompatible(loaded.descriptor);
+      history ??= new SessionGuidanceHistory(loaded.descriptor.branchBase?.baseDecision ?? 0);
+      this.guidance.set(sessionId, { commitIntegrityHash: loaded.active.commitIntegrityHash, history });
+      this.cacheContinuation(sessionId, loaded);
+      return loaded;
+    } catch (error) {
+      this.closeContinuation(sessionId);
+      throw error;
+    }
+  }
+
+  private guidanceFor(loaded: LoadedSession): SessionGuidanceHistory {
+    const cached = this.guidance.get(loaded.descriptor.sessionId);
+    if (cached?.commitIntegrityHash !== loaded.active.commitIntegrityHash) throw new SessionError('session_corrupt', 'Guidance does not match the validated Active generation');
+    return cached.history;
+  }
+
+  private statusResult(loaded: LoadedSession): SessionStatusResult {
+    return statusResult(loaded, this.store.readSessionMetrics(loaded.descriptor.sessionId), this.store, this.guidanceFor(loaded));
   }
   private assertDescriptorCompatible(descriptor: SessionDescriptor): void {
     for (const field of ['appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit', 'mapId'] as const) if (descriptor[field] !== this.identity[field]) throw new SessionError('session_version_mismatch', `Session ${field} ${String(descriptor[field])} does not match ${String(this.identity[field])}`);
@@ -1346,6 +1379,7 @@ export class SessionService {
       if (oldest === undefined) break;
       this.continuations.delete(oldest);
       this.runtimes.delete(oldest);
+      this.guidance.delete(oldest);
     }
   }
 

@@ -460,10 +460,10 @@ export class SessionStore {
     });
   }
 
-  public load(sessionId: string): LoadedSession {
+  public load(sessionId: string, onDecision?: (record: PublicDecisionRecord, descriptor: SessionDescriptor) => void): LoadedSession {
     const directory = this.sessionDirectory(sessionId);
     const descriptor = this.readDescriptor(directory);
-    this.validateBranchBase(descriptor);
+    this.validateBranchBase(descriptor, onDecision);
     const runBase = parseJson<SessionRunBase>(readFileSync(assertSafeInputFile(this.safeRoot, join(directory, 'run.partial.json')), 'utf8'), 'run.partial.json');
     ensureObject(runBase, 'run.partial.json');
     if (runBase.sessionId !== descriptor.sessionId || runBase.buildId !== descriptor.buildId || runBase.runBaseIntegrityHash !== integrityHash(runBase as unknown as Record<string, unknown>, 'runBaseIntegrityHash')) {
@@ -475,7 +475,10 @@ export class SessionStore {
     const privateState = this.readPrivateState(active.privateState);
     const publicState = this.readPublicState(active.publicState, active);
     let lastDecision: PublicDecisionRecord | null = null;
-    for (const record of this.iterateLocalDecisionRecords(directory, descriptor, active, descriptor.branchBase?.basePublicSnapshotHash ?? runBase.initialPublicHash)) lastDecision = record;
+    for (const record of this.iterateLocalDecisionRecords(directory, descriptor, active, descriptor.branchBase?.basePublicSnapshotHash ?? runBase.initialPublicHash)) {
+      lastDecision = record;
+      onDecision?.(record, descriptor);
+    }
     return { directory, descriptor, runBase, active, privateState, publicState, lastDecision };
   }
 
@@ -815,12 +818,12 @@ export class SessionStore {
     return descriptor;
   }
 
-  private validateBranchBase(descriptor: SessionDescriptor): void {
+  private validateBranchBase(descriptor: SessionDescriptor, onDecision?: (record: PublicDecisionRecord, descriptor: SessionDescriptor) => void): void {
     if (!descriptor.branchBase) return;
     const manifest = this.readAncestorManifest(descriptor);
     const base = descriptor.branchBase;
     if (manifest.rootSessionId !== base.rootSessionId || manifest.baseDecision !== base.baseDecision || manifest.baseTraceHeadHash !== base.baseTraceHeadHash || manifest.basePublicSnapshotHash !== base.basePublicSnapshotHash) throw new SessionError('ancestor_manifest_invalid', 'Ancestor Manifest does not match branchBase');
-    for (const _record of this.iterateAncestorRecords(descriptor, manifest)) { /* streamed validation */ }
+    for (const record of this.iterateAncestorRecords(descriptor, manifest)) onDecision?.(record, descriptor);
   }
 
   private readAncestorManifest(descriptor: SessionDescriptor): SessionAncestorManifest {
