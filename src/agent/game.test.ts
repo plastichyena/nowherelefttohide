@@ -14,7 +14,7 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
 
 describe('AgentGame public boundary', { timeout: 60000 }, () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.6.3');
+    expect(APP_VERSION).toBe('1.6.4');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -121,7 +121,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('20');
+    expect(info.saveFormatVersion).toBe('21');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -173,11 +173,11 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.rules.map.hordeSpawnReserve).toHaveLength(392);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 70 });
     expect(info.rules.horde.waves).toEqual([
-      expect.objectContaining({ index: 1, turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 3 }, nonHordeSlotCountPerDirection: 3, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie'], final: false }),
-      expect.objectContaining({ index: 2, turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 5 }, nonHordeSlotCountPerDirection: 5, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie'], final: false }),
-      expect.objectContaining({ index: 3, turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie'], final: false }),
-      expect.objectContaining({ index: 4, turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, nonHordeSlotCountPerDirection: 7, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
-      expect.objectContaining({ index: 5, turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 8 }, nonHordeSlotCountPerDirection: 8, possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: true }),
+      expect.objectContaining({ index: 1, turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 3 }, variantSlotCountPerDirection: 3, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
+      expect.objectContaining({ index: 2, turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 5 }, variantSlotCountPerDirection: 5, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
+      expect.objectContaining({ index: 3, turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 7 }, variantSlotCountPerDirection: 7, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
+      expect.objectContaining({ index: 4, turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, variantSlotCountPerDirection: 7, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
+      expect.objectContaining({ index: 5, turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 8 }, variantSlotCountPerDirection: 8, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: true }),
     ]);
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',
@@ -217,8 +217,8 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     });
     expect(info.rules.constructibleFacilities).toMatchObject({
       types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
-      costs: { simpleFarm: 25, civilianDroneBase: 50, temporaryHousing: 25, windPowerPlant: 150 },
-      simpleFarm: { playerBuildLimit: 'roadBranchCount' },
+      costs: { simpleFarm: 50, civilianDroneBase: 50, temporaryHousing: 50, windPowerPlant: 150 },
+      simpleFarm: { playerBuildLimit: 'unlimited' },
       temporaryHousing: { hardCapacity: 10, requiredPower: 5, recruitmentHub: false },
       windPowerPlant: { fixedPower: 15, noiseRadius: 8, zombieTargetValue: 0, emitsNoise: true, playerBuildLimit: '2 * roadBranchCount' },
     });
@@ -402,7 +402,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     });
     // The private roster may contain mixed types; the only public fact is the
     // frozen aggregate count that includes the rejected-refugee bonus.
-    expect((game.getDebugState() as GameState).units.filter(u=>u.hordeKind==='final'&&u.type!=='hordeZombie')).toHaveLength(5);
+    expect((game.getDebugState() as GameState).units.filter(u=>u.hordeKind==='final')).toHaveLength(6);
     const publicArtifact = game.getRunArtifact();
     for (const privateField of [
       'rejectedRefugeesByDirection',

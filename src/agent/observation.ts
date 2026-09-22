@@ -1,3 +1,4 @@
+import { HUMAN_UNIT_TYPES } from '../core/unit-catalog';
 import { roadConnections } from '../core/roads';
 import { wireCandidates } from '../core/barbed-wire';
 import {
@@ -77,7 +78,11 @@ function importantSiteEvents(state: Readonly<GameState>): AgentPublicEvent[] {
     .map((event) => ({
       ...event,
       payload: Object.fromEntries(
-        Object.entries(event.payload).filter(([field]) => IMPORTANT_SITE_EVENT_FIELDS.has(field)),
+        Object.entries(event.payload).filter(([field]) => {
+          const facility=state.facilities.find(f=>f.id===event.payload.siteId);
+          const unknown=facility&&facility.owner!=='player'&&!facility.firstCaptureRewardClaimed;
+          return IMPORTANT_SITE_EVENT_FIELDS.has(field)&&(!unknown||['siteKind','siteId','siteType','q','r','cause','sourceUnitType'].includes(field));
+        }),
       ),
     })) as AgentPublicEvent[];
 }
@@ -326,13 +331,13 @@ function createAgentObservationInScope(
   const compositionRecord = (nextWaveRecord?.compositionPerDirection && typeof nextWaveRecord.compositionPerDirection === 'object'
     ? nextWaveRecord.compositionPerDirection
     : {}) as Record<string, unknown>;
-  const nonHordeSlotCountPerDirection = Math.max(0, Math.floor(finiteNumber(
-    nextWaveRecord?.nonHordeSlotCountPerDirection ?? nextWaveRecord?.nonHordeSlotsPerDirection ?? compositionRecord.zombie,
+  const variantSlotCountPerDirection = Math.max(0, Math.floor(finiteNumber(
+    nextWaveRecord?.variantSlotCountPerDirection ?? compositionRecord.zombie,
     0,
   )));
-  const possibleNonHordeTypes = Array.isArray(nextWaveRecord?.possibleNonHordeTypes)
-    ? nextWaveRecord!.possibleNonHordeTypes.filter((value): value is UnitType => typeof value === 'string')
-    : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', ...(state.horde.nextWaveIndex !== null && state.horde.nextWaveIndex >= Math.max(1,state.config.horde.waves.length-1) ? ['gasZombie'] : [])].filter((value) => value in state.config.units) as UnitType[];
+  const possibleVariantTypes = Array.isArray(nextWaveRecord?.possibleVariantTypes)
+    ? nextWaveRecord!.possibleVariantTypes.filter((value): value is UnitType => typeof value === 'string')
+    : ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'].filter((value) => value in state.config.units) as UnitType[];
   // The schedule turn is public even before a warning starts. The selected
   // directions remain private until the warning event/observation is active.
   const publicSpawnTurn = nextWave?.turn ?? state.horde.lastSpawnTurn;
@@ -342,6 +347,7 @@ function createAgentObservationInScope(
   const crisisSummary = publicCrisisSummary(state);
   const endTurnRisk = publicEndTurnRisk(state);
   return cloneJson({
+    siteFallRules: { zombieSpawnPopulationPerUnit: state.config.infection.zombieSpawnPopulationPerUnit, maxZombieSpawnPerResolution: state.config.infection.maxZombieSpawnPerResolution },
     publicHealth: { stress: { ...state.publicHealthStress }, foodShortageAccumulation: state.foodShortageAccumulation, starvationCarry: state.starvationCarry },
     nuclearObjective: { firstCapturedTurn: state.nuclearObjective.firstCapturedTurn, reward: state.nuclearObjective.reward, deadlineTurn: 20 },
     apiVersion: OBSERVATION_API_VERSION,
@@ -386,6 +392,7 @@ function createAgentObservationInScope(
          }),
        hordeSpawnReserve: state.map.hordeSpawnReserve.map((position) => ({ ...position })),
     },
+    productionLedger: Object.fromEntries(HUMAN_UNIT_TYPES.map(type=>{const completed=state.completedProductions[type],reserved=state.pendingUnitProductions.filter(o=>o.unitType===type).length,limit=state.config.units[type].productionLimitPerGame;return [type,{completed,reserved,limit,remaining:limit===null?null:Math.max(0,limit-completed-reserved)}];})) as AgentObservation['productionLedger'],
     resources: cloneJson(state.resources),
     refineryAllowance: cloneJson(state.refineryAllowance),
     supportHeadroom: deriveSupportHeadroom(state, endTurnForecast),
@@ -435,8 +442,8 @@ function createAgentObservationInScope(
         spawnTurn: nextWave.turn,
         directionCount: nextWave.directionCount,
         compositionPerDirection: cloneJson(nextWave.compositionPerDirection),
-        nonHordeSlotCountPerDirection,
-        possibleNonHordeTypes,
+        variantSlotCountPerDirection,
+        possibleVariantTypes,
         final: nextWave.final,
       } : null,
       spawnTurn: publicSpawnTurn,

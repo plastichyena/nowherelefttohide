@@ -158,6 +158,10 @@ function isBridgeAction(value: unknown): value is GameAction {
     switch (value.type) {
       case 'Move':
         return hasOnlyKeys(value, ['type', 'unitId', 'destination']) && isSafeId(value.unitId) && isCoordinate(value.destination);
+      case 'ChangeUnitMode':
+        return hasOnlyKeys(value,['type','unitId','mode']) && isSafeId(value.unitId) && (value.mode==='packed'||value.mode==='deployed');
+      case 'AttackHex':
+        return hasOnlyKeys(value,['type','attackerId','position']) && isSafeId(value.attackerId) && isCoordinate(value.position);
       case 'Attack':
         return hasOnlyKeys(value, ['type', 'attackerId', 'targetId']) && isSafeId(value.attackerId) && isSafeId(value.targetId);
       case 'Wait':
@@ -211,7 +215,7 @@ function isBridgeAction(value: unknown): value is GameAction {
       case 'ProduceUnit':
         return (
           hasOnlyKeys(value, ['type', 'unitType'], ['destination']) &&
-          (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice' || value.unitType === 'reconTeam') &&
+          (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice' || value.unitType === 'reconTeam' || value.unitType === 'fieldArtillery') &&
           (value.destination === undefined || isCoordinate(value.destination))
         );
       case 'EndTurn':

@@ -104,7 +104,7 @@ describe('v1.4.5 checkpoint and rejection rules', () => {
     expect(result.state.statistics.refugeesTurnedAwayByDirection.north).toBe(4);
   });
 
-  it('adds ceil(rejected/5) normal Zombies on the participating front, resets it, and ends arrivals', () => {
+  it('adds ceil(rejected/5) normalized Horde Zombies on the participating front, resets it, and ends arrivals', () => {
     const config = createDefaultConfig({
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: {
@@ -124,8 +124,8 @@ describe('v1.4.5 checkpoint and rejection rules', () => {
 
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const state = engine.getState();
-    expect(state.units.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(1);
-    expect(state.units.filter((unit) => unit.type === 'zombie')).toHaveLength(2);
+    expect(state.units.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(3);
+    expect(state.units.filter((unit) => unit.type === 'zombie')).toHaveLength(0);
     expect(Object.values(state.statistics.rejectedBonusZombiesByDirection).reduce((a, b) => a + b, 0)).toBe(2);
     expect(Object.values(state.statistics.rejectedCounterResetsByDirection).reduce((a, b) => a + b, 0)).toBe(1);
     expect(state.roadBranches.every((branch) => branch.nextArrivalTurn === null)).toBe(true);

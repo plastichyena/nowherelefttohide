@@ -299,10 +299,10 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '13.0.0',
+      gameVersion: '14.0.0',
       mapId: 'fixed-51x51-v8',
       config: {
-        version: '13.0.0',
+        version: '14.0.0',
         mapId: 'fixed-51x51-v8',
         infection: {
           zombieSpawnPopulationPerUnit: 5,

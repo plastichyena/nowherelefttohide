@@ -113,6 +113,7 @@ export const BOARD_UNIT_TYPES = [
   'riotPolice',
   'reconTeam',
   'specialForces',
+  'fieldArtillery',
   'packZombie',
   'zombie',
   'hordeZombie',
@@ -145,6 +146,8 @@ export type BoardUnitStateLayer = (typeof BOARD_UNIT_STATE_LAYERS)[number];
  * Relative runtime paths.  State images are shared: a single infected or
  * ruined overlay is used for both general facilities and checkpoints.
  */
+export const ARTILLERY_ASSETS = { packed: 'units/unit_field_artillery_packed.png', deployed: 'units/unit_field_artillery_deployed.png' } as const;
+
 export const BOARD_ASSET_REGISTRY = {
   terrain: {
     plain: 'terrain/terrain_plain.png',
@@ -188,6 +191,7 @@ export const BOARD_ASSET_REGISTRY = {
     barbedWire: 'obstacles/obstacle_barbed_wire.png',
   },
   units: {
+    fieldArtillery: 'units/unit_field_artillery_packed.png',
     police: 'units/unit_police.png',
     nationalGuard: 'units/unit_national_guard.png',
     zombie: 'units/unit_zombie.png',
@@ -310,6 +314,7 @@ export function getAllBoardAssetPaths(): readonly string[] {
     ...Object.values(BOARD_ASSET_REGISTRY.facilities),
     ...Object.values(BOARD_ASSET_REGISTRY.obstacles),
     ...Object.values(BOARD_ASSET_REGISTRY.units),
+    ARTILLERY_ASSETS.deployed,
   ];
 }
 
@@ -507,7 +512,7 @@ export interface UnitAssetMapping {
  * common Horde threat marker and the distinct Final outer marker.
  */
 export function mapUnitAssetLayers(
-  unit: Pick<UnitState, 'type' | 'hordeKind'>,
+  unit: Pick<UnitState, 'type' | 'hordeKind'> & Partial<Pick<UnitState, 'mode'>>,
 ): UnitAssetMapping {
   const isHorde = unit.type === 'hordeZombie' || unit.hordeKind === 'periodic' || unit.hordeKind === 'final';
   const isFinalHorde = unit.hordeKind === 'final';
@@ -516,7 +521,7 @@ export function mapUnitAssetLayers(
   if (isFinalHorde) layers.push('final');
   const overlays = layers.map((layer) => BOARD_UNIT_OVERLAYS[layer]);
   return {
-    base: getUnitAssetPath(unit.type),
+    base: resolveUnitAssetPath(unit),
     layers,
     stateLayers: layers,
     overlays,
@@ -629,4 +634,8 @@ export function roadConnectionMask(directions: readonly HexDirection[]): number 
  */
 export function roadDirectionBetween(from: HexCoord, to: HexCoord): HexDirection | null {
   return hexDirectionBetween(from, to);
+}
+
+export function resolveUnitAssetPath(unit: Pick<UnitState,'type'> & Partial<Pick<UnitState,'mode'>>): string | null {
+  return unit.type === 'fieldArtillery' ? ARTILLERY_ASSETS[unit.mode ?? 'packed'] : getUnitAssetPath(unit.type);
 }

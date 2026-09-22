@@ -75,3 +75,7 @@ This license applies only to rights held by the project author. Third-party soft
 ## v1.6.3 asset provenance
 
 The water, bridge, nuclear plant, Special Forces and Pack Zombie images were generated for this project. Approved originals, prompts and integrity records are stored in `Art/reference/v1.6.3-concepts/`; runtime derivatives are produced by `scripts/build-v163-assets.py`. These project assets are covered by the same terms above.
+
+## v1.6.4 asset provenance
+
+The packed and deployed Field Artillery images derive from the two originals approved by the project author on 2026-09-21. Sources, exact prompts and approval records are in `Art/reference/v1.6.4-concepts/`; `scripts/build-v164-assets.py` creates the 256px transparent runtime PNGs in `public/assets/board/units/`. They are covered by the same project asset terms above.

@@ -11,7 +11,7 @@ describe('v1.6.1 deterministic full initial state', () => {
       expect(state.barbedWire).toEqual([]);
       expect(state.nextBarbedWireNumber).toBe(1);
       expect(state).toEqual(repeated);
-      expect(state.gameVersion).toBe('13.0.0');
+      expect(state.gameVersion).toBe('14.0.0');
       expect(state.mapId).toBe('fixed-51x51-v8');
       expect(state.facilities.filter((facility) => facility.type === 'oilField')).toHaveLength(1);
       expect(state.rngState).toEqual(repeated.rngState);

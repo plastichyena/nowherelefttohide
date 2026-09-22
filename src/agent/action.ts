@@ -5,6 +5,8 @@ export function cloneJson<T>(value: T): T {
 }
 
 export function actionKey(action: GameAction): string {
+  if (action.type === 'AttackHex') return `AttackHex|${action.attackerId}|${action.position.q},${action.position.r}`;
+  if (action.type === 'ChangeUnitMode') return `ChangeUnitMode|${action.unitId}|${action.mode}`;
   if (action.type === 'BuildBarbedWire') return `BuildBarbedWire|${action.position.q},${action.position.r}`;
   if (action.type === 'Move') return `Move|${action.unitId}|${action.destination.q},${action.destination.r}`;
   if (action.type === 'Attack') return `Attack|${action.attackerId}|${action.targetId}`;
@@ -34,4 +36,12 @@ export function cloneAction(action: GameAction): GameAction {
 
 export function sortActions(actions: readonly GameAction[]): GameAction[] {
   return [...actions].sort((left, right) => actionKey(left).localeCompare(actionKey(right)));
+}
+
+/** Resolve optional branch shorthand against the canonical public legal list. */
+export function matchLegalAction(action: GameAction, legal: readonly GameAction[]): GameAction | undefined {
+  if ((action.type === 'RelocateCheckpoint' || action.type === 'BuildCheckpoint') && action.branchId === undefined) {
+    return legal.find(candidate => candidate.type === action.type && 'position' in candidate && candidate.position.q === action.position.q && candidate.position.r === action.position.r && (action.type !== 'RelocateCheckpoint' || ('checkpointId' in candidate && candidate.checkpointId === action.checkpointId)));
+  }
+  const key=actionKey(action);return legal.find(candidate=>actionKey(candidate)===key);
 }

@@ -5,7 +5,7 @@ import { SeededRng } from './rng';
 import { isHumanUnit, getUnitAt } from './state';
 import { canPlayerOccupyHex, getTile } from './map';
 import { effectiveMovementCost } from './terrain';
-import { unitMoveFuelCost } from './movement-query';
+import { unitMoveFuelCost, movementFuelCost } from './movement-query';
 import { emit } from './events-internal';
 import { wireAt, damageWire } from './barbed-wire';
 interface MovementHooks {
@@ -67,7 +67,7 @@ function applyMovement(
   if (state.units.some((unit) => unit.id === mover.id)) {
     if (isHumanUnit(mover)) {
       const fuelUsed = movementMode === 'normal'
-        ? unitMoveFuelCost(mover.type as HumanUnitType, traversed.length)
+        ? movementFuelCost(state, mover, traversed.length, spent)
         : 0;
       mover.currentFuel = Math.max(0, mover.currentFuel - fuelUsed);
       mover.activity.moved = traversed.length > 0;
@@ -86,7 +86,7 @@ function applyMovement(
       effectiveMovementCost: spent,
       movementMode: isHumanUnit(mover) ? movementMode : 'normal',
       fuelUsed: isHumanUnit(mover) && movementMode === 'normal'
-        ? unitMoveFuelCost(mover.type as HumanUnitType, traversed.length)
+        ? movementFuelCost(state, mover, traversed.length, spent)
         : 0,
     });
     tryCapture(state, mover, rng);

@@ -1,6 +1,6 @@
 # Nowhere Left to Hide
 
-v1.6.3では、Capitalの最低住民1人、食料不足の蓄積と飢餓、公衆衛生・待機列・審査由来の感染と1ターンの感染拡大猶予を導入しました。Normalは2 Turn・潜伏感染5%、Strictは5 Turn・0%、双方100%受入です。4方向から選ばれる湾・橋・原発、早期確保報酬の特殊部隊、Pack Zombie、最新公開状態から再構成するContext Handoffを追加します。v1.6.2以前のSave／AIデータは非破壊で拒否します。
+v1.6.4ではField Artillery／野戦砲を追加しました。Army Baseで生涯2隊まで生産し、梱包・展開を切り替え、可視Hexへ確率付き範囲砲撃を行います。味方・内部人口への被害確認、共通のLive／Replay盤面、陥落検問所の駐留復旧、簡易農場・仮設住宅の民需品50、農場数無制限、全WaveのGasと通常枠Horde化に対応しました。表示名はSoldier／兵士へ統一し、内部ID `nationalGuard` は維持します。v1.6.3以前のSave／AIデータは旧データを保ったまま拒否します。
 
 v1.5.2で行ったPC Chromeの比較証跡は[`v152-performance-evidence.json`](src/testing/fixtures/v152-performance-evidence.json)、AI CLIは[`play-turn-performance-evidence.json`](src/session/play-turn-performance-evidence.json)に記録しています。390×844の同一Saveで、序盤の選択中央値は849→98ms、Turn 51の移動先確認は4,146→108ms、ターン終了操作全体は6,881→987msでした。Core単体のTurn 51は683→372msで、旧新版144回のStepResult hashが一致しています。ブラウザ値には自動操作と描画待ちが含まれ、SOG05の実測値ではありません。パン・ピンチ・人口スライダーは概ね横ばいで、選択・プレビュー・確定・資源／シート表示が主に改善しました。
 
@@ -21,7 +21,7 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 固定51×51ヘックス、29既存恒久施設とSeedで追加されるArmy Base、東西南北の道路支線とHorde入口、外周2列392 HexのHorde Spawn Reserve
 - Plain／Forest／Mountainの固定地形、重み付き移動、Urban／Forest防御、共通VisibilityとFog of War
 - 州都、地方都市、農場、工場、製油所、発電所の確保・稼働・感染・陥落・復旧
-- Police Movement 15／National Guard Movement 10／Riot Police Movement 10、機種別Fuel、Fuel 0 Emergency Movement、Unit別携行軍需品、補給、迎撃、攻撃、反撃、待機、自然回復
+- Police Movement 15／Soldier Movement 10／Riot Police Movement 10、機種別Fuel、Fuel 0 Emergency Movement、Unit別携行軍需品、補給、迎撃、攻撃、反撃、待機、自然回復
 - 食料・民需品・軍需品・燃料・電力Capacityの生産と不足処理
 - Fuel不要のWind Power Plant、Supply内に建設できるSimple Farm／Civilian Drone Base／Temporary Housing／Wind Power Plant
 - Fuel／電力、Single Point of Failure、確定経済敗北、Checkpoint供給効果、Queue PressureのForecast
@@ -40,7 +40,7 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 - 1 Turnを同じNodeプロセスで対話できる`play-turn`、互換用の既存8コマンド、Active Session、Public Decision Log、履歴Checkpoint、分岐Session、Compact応答と詳細query
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.6.3の確定要件と実装・検証結果は現行仕様18.11へ反映します。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.6.4の変更規則とローカル検証結果は現行仕様18.14に記録します。GitHub Actionsは起動確認までを今回の範囲とし、完了結果・配布先の検証は別途確認します。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## v1.5.5 公開検証
 
@@ -78,7 +78,7 @@ Open https://plastichyena.github.io/nowherelefttohide/ and use the documented wi
 
 公開APIは `getApiInfo`、`reset`、`getObservation`、`getLegalActions`、`step`、`isGameOver`、`getResult`、`getRunArtifact`、`getArtifactPage` です。`getApiInfo()` はVersion、公開メソッド、Fair Play境界、回復・感染・射程・検問所方針・Checkpoint候補Schema／Reason Code・生産/電力の静的ルールを返します。`getRunArtifact()` は既存の完全互換の公開Artifactを返します。大きな履歴は読み取り専用の `getArtifactPage({ target, offset?, pageSize?, expectedRevision? })` で、`manifest`、`observations`、`actions`、`events`、`invalid-attempts`を既定100件・最大500件ずつ取得できます。応答はRevision、件数、総数、続き、次Offset、item列を含み、State変更後の古いRevisionは状態不変で拒否します。`getState`、`LoadSnapshot`、保存操作、ファイル操作、ネットワークアクセス、Batch実行は公開しません。
 
-Human UIとAgentは同じCore Visibility／Crisis Summary／EndTurn Riskを使い、Checkpointの新設・移設には対象地点と州都側からの幹線道路全区間の現在視界が必要です。Hidden Zombieは候補や実行を妨害せず、可視Zombieだけが妨害理由になります。Ground VisionはForest／Mountainで遮蔽され、Civilian Drone BaseのAerial Visionは遮蔽を無視します。ObservationはGround／Aerial種別と最新50件の重要Site Eventを返します。初期ZombieはSeedで位置が決まるNormal 40体、Hunter 4体、Gas 4体、Screamer 2体の合計50体です。全初期Zombieは選択されたArmy BaseのZombie視界外です。Police Zombie／Soldier Zombie／Riot Zombie／Hunter Zombie／Gas Zombie／Screamer Zombieを含む敵は可視時だけ公開します。拒絶Counter、Screamerの内部Radius、未確定の増援数は非公開です。Wave開始後は基礎人数・Bonus込み確定人数・出現済み人数・Pending人数を公開します。Human Unitの熟練度、Attack Charge、Hordeの非Horde slot数と抽選候補も公開Observationへ含まれますが、未確定の抽選結果、Hidden Enemyの反応数・ID・Target・非可視Spawn位置は公開しません。
+Human UIとAgentは同じCore Visibility／Crisis Summary／EndTurn Riskを使い、Checkpointの新設・移設には対象地点と州都側からの幹線道路全区間の現在視界が必要です。Hidden Zombieは候補や実行を妨害せず、可視Zombieだけが妨害理由になります。Ground VisionはForest／Mountainで遮蔽され、Civilian Drone BaseのAerial Visionは遮蔽を無視します。ObservationはGround／Aerial種別と最新50件の重要Site Eventを返します。初期ZombieはSeedで位置が決まるNormal 40体、Hunter 4体、Gas 4体、Screamer 2体の合計50体です。全初期Zombieは選択されたArmy BaseのZombie視界外です。Police Zombie／Soldier Zombie／Riot Zombie／Hunter Zombie／Gas Zombie／Screamer Zombieを含む敵は可視時だけ公開します。拒絶Counter、Screamerの内部Radius、未確定の増援数は非公開です。Wave開始後は基礎人数・Bonus込み確定人数・出現済み人数・Pending人数を公開します。Human Unitの熟練度、Attack Charge、Hordeのvariant slot数と抽選候補も公開Observationへ含まれますが、未確定の抽選結果、Hidden Enemyの反応数・ID・Target・非可視Spawn位置は公開しません。
 
 ## Agent Simulation CLI
 
@@ -93,7 +93,7 @@ npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random,balanced
 
 ## AI Session CLI
 
-Session CLIは、外部AIが同じゲームを安全に続けるための永続入口です。通常は`play-turn`を1 Turnにつき1回起動し、行単位JSONで結果を読んでから次のActionを決めます。対話接続を保持できない環境では、有限のAction計画を同じ入口へ渡せます。途中の新しい敵、移動中断、想定外の損害、危機の発生・悪化、拒否、Game Overでは残りを停止して再判断します。通常のSave Format 14とは分離したSessionディレクトリに、Actionごとに更新するActive状態、圧縮・分割された損失なしの公開履歴、既定5完了Turnごとの履歴Checkpointを保存します。Compact応答と`query`は公開情報だけを返し、Private Checkpoint内の完全GameState、RNG、Rejected CounterなどのHidden情報は再開専用です。
+Session CLIは、外部AIが同じゲームを安全に続けるための永続入口です。通常は`play-turn`を1 Turnにつき1回起動し、行単位JSONで結果を読んでから次のActionを決めます。対話接続を保持できない環境では、有限のAction計画を同じ入口へ渡せます。途中の新しい敵、移動中断、想定外の損害、危機の発生・悪化、拒否、Game Overでは残りを停止して再判断します。通常のSave Format 21とは分離したSessionディレクトリに、Actionごとに更新するActive状態、圧縮・分割された損失なしの公開履歴、既定5完了Turnごとの履歴Checkpointを保存します。Compact応答と`query`は公開情報だけを返し、Private Checkpoint内の完全GameState、RNG、Rejected CounterなどのHidden情報は再開専用です。
 
 ローカルリポジトリでは次のように実行します。
 

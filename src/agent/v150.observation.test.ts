@@ -76,8 +76,8 @@ describe('v1.5.0 public progression, Horde, and Crisis projections', () => {
       spawnTurn: 10,
       directionCount: 1,
       compositionPerDirection: { hordeZombie: 5, zombie: 3 },
-      nonHordeSlotCountPerDirection: 3,
-      possibleNonHordeTypes: ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie'],
+      variantSlotCountPerDirection: 3,
+      possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'],
       final: false,
     });
     expect(JSON.stringify(observation.horde)).not.toContain('spawnGroupId');

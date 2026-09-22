@@ -1,6 +1,6 @@
 import { buildContextHandoff, handoffJson, type ContextHandoff } from './context-handoff';
 import { isGameActionInput, isPlainObject, isBoundedJson, hasOnlyKeys, isSafeId } from '../agent/action-input';
-import { cloneAction, cloneJson, actionKey } from '../agent/action';
+import { cloneAction, cloneJson, actionKey, matchLegalAction } from '../agent/action';
 import { checkpointSupplyExplanation, deriveImportantChanges } from '../agent/decision-summary';
 import { createAgentGame } from '../agent/game';
 import {
@@ -363,7 +363,7 @@ export class AiSession implements AiSessionPort {
     const legalActions = this.game.getLegalActions();
     const action = isGameActionInput(input.action) ? cloneAction(input.action) : null;
     if (!action) return this.failure('invalid_action_input', 'action must be one bounded, JSON-compatible GameAction');
-    const legal = legalActions.some((candidate) => actionKey(candidate) === actionKey(action));
+    const legal = !!matchLegalAction(action,legalActions);
     let projection: AiSessionPreviewResult['projection'] = {
       kind: 'legal_action_check_only', reasonCode: 'economy_preview_unavailable', value: null,
     };

@@ -1,3 +1,4 @@
+import { isHumanUnitType } from '../core/unit-catalog';
 import { HEX_DIRECTION_ORDER, hexKey, hexNeighbor, hexWithinBounds } from '../core/hex';
 import { findShortestPath, pathMovementCost, type MovementCostResolver } from '../core/path';
 import type { RoadRole } from '../core/roads';
@@ -40,6 +41,7 @@ export interface RouteQueryInput {
 }
 
 export interface RouteQueryUnit {
+  artillery?: {fuelPerMovementPoint?:number};
   id: string;
   type: UnitType;
   position: HexCoord;
@@ -339,7 +341,7 @@ function unitSingleAction(
     movementMode,
     movementBudget,
     effectiveMovementCost: effectiveCost,
-    fuelCost: path ? (movementMode === 'normal' ? unitMoveFuelCost(unit.type as HumanUnitType, path.length - 1) : 0) : null,
+    fuelCost: path ? (movementMode === 'normal' ? (unit.type==='fieldArtillery'?(effectiveCost??0)*(unit.artillery?.fuelPerMovementPoint??10):unitMoveFuelCost(unit.type as HumanUnitType,path.length-1)) : 0) : null,
     projectedFuelAfterMove: null,
   });
   if (!path || effectiveCost === null) return unavailable('route_unavailable');
@@ -357,7 +359,7 @@ function unitSingleAction(
   if (unit.actionState === 'acted') return unavailable('unit_already_acted');
   if (!unit.canMove) return unavailable('unit_cannot_move');
   if (effectiveCost > movementBudget) return unavailable('out_of_range');
-  const fuelCost = movementMode === 'normal' ? unitMoveFuelCost(unit.type as HumanUnitType, path.length - 1) : 0;
+  const fuelCost = movementMode === 'normal' ? (unit.type==='fieldArtillery'?(effectiveCost??0)*(unit.artillery?.fuelPerMovementPoint??10):unitMoveFuelCost(unit.type as HumanUnitType,path.length-1)) : 0;
   if (movementMode === 'normal' && unit.currentFuel < fuelCost) return unavailable('insufficient_unit_fuel');
   const destination = path.at(-1)!;
   const projection = unit.fuelCostByLegalMove.find((entry) => hexKey(entry.destination) === hexKey(destination));
@@ -417,7 +419,7 @@ export function queryRoute(source: Readonly<RouteQuerySource>, input: Readonly<R
       }
       throw new RouteQueryInputError('unknown_unit', `Unknown player unit: ${input.moverUnitId}`);
     }
-    if (mover.type !== 'police' && mover.type !== 'nationalGuard' && mover.type !== 'riotPolice') {
+    if (!isHumanUnitType(mover.type)) {
       throw new RouteQueryInputError('enemy_unit_not_allowed', 'Enemy units cannot be route movement actors');
     }
   }

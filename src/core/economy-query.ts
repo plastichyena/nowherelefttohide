@@ -885,7 +885,7 @@ export function forecastEndTurn(state: Readonly<GameState>): EndTurnForecast {
 }
 
 /**
- * Forecast the power result of accepting an Army Base National Guard
+ * Forecast the power result of accepting an Army Base Soldier
  * reservation without registering a speculative State in the query cache.
  * A caller can use this before dispatching ProduceUnit to warn that the
  * reservation is legal but will wait for power.

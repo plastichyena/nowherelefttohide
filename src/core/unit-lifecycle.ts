@@ -236,7 +236,8 @@ function resolveGasExplosions(
       q: explosion.position.q,
       r: explosion.position.r,
       radius: 1,
-      baseUnitDamage: config.explosionDamage,
+      baseHumanDamage: config.explosionDamage,
+      baseZombieDamage: config.explosionZombieDamage,
       maxSiteInfection: config.explosionInfection,
     });
 
@@ -244,7 +245,7 @@ function resolveGasExplosions(
       state.statistics.gasExplosionUnitDamage += applyDamageWithoutDeath(
         state,
         target,
-        config.explosionDamage,
+        target.isPlayerUnit ? config.explosionDamage : config.explosionZombieDamage,
         explosion.sourceUnitId,
         'gas_explosion',
       );
@@ -266,7 +267,7 @@ function resolveGasExplosions(
 }
 
 function creditZombieKill(state: GameState, sourceId: string, target: UnitState, cause: string): void {
-  if (!!target.isPlayerUnit || !['attack', 'interception', 'counterattack'].includes(cause)) return;
+  if (!!target.isPlayerUnit || !['attack', 'interception', 'counterattack', 'artillery'].includes(cause)) return;
   const source = getUnit(state, sourceId);
   if (!source || !isHumanUnit(source) || source.proficiency === null) return;
   if (source.proficiency === 'recruit') return;
@@ -314,5 +315,16 @@ function dealDamage(
   }
 }
 
-  return { dealDamage };
+  function dealAreaDamage(state: GameState, hits: Array<{ unit: UnitState; damage: number }>, sourceId: string, rng: SeededRng, populations: () => void, falls: () => void): void {
+    const explosionQueue: GasExplosionEntry[] = [];
+    for (const hit of hits) applyDamageWithoutDeath(state, hit.unit, hit.damage, sourceId, 'artillery');
+    populations();
+    for (const hit of hits) if (hit.unit.hp <= 0) {
+      creditZombieKill(state, sourceId, hit.unit, 'artillery');
+      destroyUnit(state, hit.unit, 'artillery', rng, explosionQueue);
+    }
+    falls();
+    resolveGasExplosions(state, rng, explosionQueue);
+  }
+  return { dealDamage, dealAreaDamage };
 }

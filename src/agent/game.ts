@@ -6,7 +6,7 @@ import { coreActionPreviewJson } from '../core/action-preview';
 import { hexKey } from '../core/hex';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
 import type { DeepPartial, GameAction, GameConfig, GameEvent, GameState, JsonObject, JsonValue } from '../core/types';
-import { actionKey, cloneAction, cloneJson, sortActions } from './action';
+import { matchLegalAction, actionKey, cloneAction, cloneJson, sortActions } from './action';
 import { compactArtifactObservation, createAgentObservation, createAgentResult } from './observation';
 import {
   AGENT_API_VERSION,
@@ -206,6 +206,20 @@ function publicEvents(
         if (event.payload.publicVisible !== true) return null;
       }
       let payload = cloneJson(event.payload) as JsonObject;
+      if (['damage','terrain_defense_applied','unit_destroyed','unit_kill_credited'].includes(event.type)) {
+        const target = event.type === 'unit_destroyed' ? payload.unitId : payload.targetId;
+        if (typeof target === 'string' && enemyById.has(target) && !visibleEnemyIds.has(target)) return null;
+      }
+      if(event.type==='gas_explosion' && typeof payload.sourceUnitId==='string' && enemyById.has(payload.sourceUnitId) && !visibleEnemyIds.has(payload.sourceUnitId))return null;
+      if (event.type === 'artillery_population_damage') {
+        const site=before.facilities.find(f=>f.id===payload.siteId);
+        if(site && site.owner!=='player')return null;
+      }
+      if (event.type === 'artillery_fired') {
+        const at=payload.impactHex as {q:number;r:number};
+        payload={unitId:payload.unitId,aimedHex:payload.aimedHex,militaryGoodsCost:payload.militaryGoodsCost};
+        if(at&&visibleTiles.has(hexKey(at)))payload.impactHex=at;
+      }
       if (event.type === 'screamer_scream') payload = {
         noiseClass: 'extraLarge',
         message: { ja: '悍ましい叫び声(特大ノイズ)', en: 'Horrifying scream (extra-large noise)' },
@@ -254,12 +268,12 @@ function publicEvents(
           ? payload.directions.filter((direction): direction is 'north' | 'east' | 'south' | 'west' =>
             direction === 'north' || direction === 'east' || direction === 'south' || direction === 'west')
           : [];
-        const possibleNonHordeTypes = Array.isArray(waveRecord?.possibleNonHordeTypes)
-          ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
-          : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', ...(waveIndex !== null && waveIndex >= Math.max(1,after.config.horde.waves.length-1) ? ['gasZombie'] : [])];
+        const possibleVariantTypes = Array.isArray(waveRecord?.possibleVariantTypes)
+          ? waveRecord.possibleVariantTypes.filter((value): value is string => typeof value === 'string')
+          : ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'];
         if (wave && directions.length > 0) {
-          const slotValue = waveRecord?.nonHordeSlotCountPerDirection ?? waveRecord?.nonHordeSlotsPerDirection ?? composition.zombie;
-          const nonHordeSlotCountPerDirection = typeof slotValue === 'number' && Number.isSafeInteger(slotValue)
+          const slotValue = waveRecord?.variantSlotCountPerDirection ?? composition.zombie;
+          const variantSlotCountPerDirection = typeof slotValue === 'number' && Number.isSafeInteger(slotValue)
             ? slotValue
             : 0;
           payload = {
@@ -267,8 +281,8 @@ function publicEvents(
             spawnTurn: wave.turn,
             directions,
             hordeZombieCountPerDirection: wave.compositionPerDirection.hordeZombie,
-            nonHordeSlotCountPerDirection,
-            possibleNonHordeTypes,
+            variantSlotCountPerDirection,
+            possibleVariantTypes,
             final: wave.final,
           };
         }
@@ -292,6 +306,11 @@ function publicEvents(
       ) {
         delete payload.q;
         delete payload.r;
+      }
+      const affectedSiteId=payload.siteId??payload.facilityId;
+      const affectedSite=before.facilities.find(f=>f.id===affectedSiteId);
+      if(affectedSite&&affectedSite.owner!=='player'&&!affectedSite.firstCaptureRewardClaimed){
+        for(const key of ['amount','infectedAtFall','requestedSpawnCount','actualSpawnCount','remainingInfected','remainingHealthy','infected','constructibleInfectedDeaths','people','healthyBefore','healthyAfter'])delete payload[key];
       }
       delete payload.spawnGroupId;
       return { ...event, payload } as AgentPublicEvent;
@@ -470,8 +489,7 @@ export class AgentGameAdapter implements AgentGame {
     const legal = this.currentLegalActions();
     let matched: GameAction | undefined;
     try {
-      const candidateKey = actionKey(action);
-      matched = legal.find((candidate) => actionKey(candidate) === candidateKey);
+      matched = matchLegalAction(action,legal);
       if (action.type === 'TransferPopulation' && !validateAction(this.engine.getState(), action)) matched = cloneAction(action);
     } catch {
       matched = undefined;

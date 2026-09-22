@@ -129,7 +129,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 20,
+      formatVersion: 21,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-51x51-v8',
       seed: 77,
@@ -242,9 +242,9 @@ describe('v1.6.0 Save Format 17', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(20);
-    expect(envelope.gameVersion).toBe('13.0.0');
-    expect(config.version).toBe('13.0.0');
+    expect(envelope.formatVersion).toBe(21);
+    expect(envelope.gameVersion).toBe('14.0.0');
+    expect(config.version).toBe('14.0.0');
     expect(config.mapId).toBe('fixed-51x51-v8');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
@@ -253,6 +253,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(state).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('maxTurns');
     expect(config).not.toHaveProperty('finalHordeTurn');
+    expect(config.horde).not.toHaveProperty('gasZombieCapPerDirection');
     expect(config).toMatchObject({
       economy: {
         initialZombieCount: 40,
@@ -279,7 +280,7 @@ describe('v1.6.0 Save Format 17', () => {
         specialZombieWeights: { zombie: 65, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5, screamerZombie: 5 },
         riotZombieCapPerDirection: 1,
         hunterZombieCapPerDirection: 1,
-        gasZombieCapPerDirection: 1,
+
         movementNoiseRadius: 8,
       },
       windPower: { noiseRadius: 8 },
@@ -455,7 +456,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(state.statistics).toHaveProperty('finalHordeSpawned', 3);
     expect(state.statistics.finalHordeZombiesSpawned).toBe(1);
     expect(state.statistics.finalHordeSpawned).toBe(
-      state.statistics.finalHordeZombiesSpawned + state.statistics.finalNormalZombiesSpawned + state.statistics.finalSpecialZombiesSpawnedByType.packZombie,
+      state.statistics.finalHordeZombiesSpawned + state.statistics.finalNormalZombiesSpawned + Object.values(state.statistics.finalSpecialZombiesSpawnedByType).reduce((n,v)=>n+v,0),
     );
     expect(state.statistics.terrainEntriesByType).toEqual({ plain: 0, forest: 0, mountain: 0, water: 0 });
     expect(decodeSaveCode(encodeSaveCode(state)).state).toEqual(state);
@@ -641,14 +642,14 @@ describe('v1.6.0 Save Format 17', () => {
     expect(tamperedResult.errors.join(' ')).toMatch(/checksum/i);
   });
 
-  it('uses the v18 autosave key and never rewrites or removes the v17 legacy key', () => {
+  it('uses v21 and preserves the rejected v1.6.3 / v20 autosave byte-for-byte', () => {
     const storage = new MemoryStorage();
     const legacy = exportedEnvelope(initialState(9));
-    legacy.formatVersion = 10;
-    legacy.gameVersion = '3.0.0';
+    legacy.formatVersion = 20;
+    legacy.gameVersion = '13.0.0';
     const legacyState = legacy.state as Record<string, unknown>;
-    legacyState.gameVersion = '3.0.0';
-    (legacyState.config as Record<string, unknown>).version = '3.0.0';
+    legacyState.gameVersion = '13.0.0';
+    (legacyState.config as Record<string, unknown>).version = '13.0.0';
     storage.setItem(LEGACY_AUTOSAVE_KEY, codeForEnvelope(legacy));
     const beforeLegacy = storage.getItem(LEGACY_AUTOSAVE_KEY);
     const store = new AutoSaveStore({ storage });

@@ -85,7 +85,7 @@ describe('Balanced Agent scenario intentions', () => {
     expect(result.trace?.reasonCodes).toContain('PREVENT_POWER_CASCADE');
   });
 
-  it('prefers Police automatic suppression over National Guard civilian damage', () => {
+  it('prefers Police automatic suppression over Soldier civilian damage', () => {
     const facility = observation.facilities[0]!;
     const police = observation.units.find((unit) => unit.type === 'police')!;
     const guard = observation.units.find((unit) => unit.type === 'nationalGuard')!;
@@ -159,7 +159,7 @@ describe('Balanced Agent scenario intentions', () => {
     expect(result.trace?.reasonCodes).toContain('POLICE_RESPOND_TO_INFECTION');
   });
 
-  it('positions National Guard at a frontline facility when Horde arrival is imminent', () => {
+  it('positions Soldier at a frontline facility when Horde arrival is imminent', () => {
     const unit = observation.units[0]!;
     const entrance = observation.map.tiles.find((tile) => tile.hordeEntranceDirections.length > 0)!;
     const frontline = observation.facilities

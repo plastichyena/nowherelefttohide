@@ -13,7 +13,7 @@ function engine() {
   } }));
 }
 
-it('chooses legal zero-civilian-damage Capital suppression over National Guard suppression', () => {
+it('chooses legal zero-civilian-damage Capital suppression over Soldier suppression', () => {
   const game = engine();
   const state = game.getState() as GameState;
   const capital = state.facilities.find(f => f.id === 'capital')!;

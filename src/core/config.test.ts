@@ -8,7 +8,7 @@ import {
 describe('v1.6 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('13.0.0');
+    expect(DEFAULT_CONFIG.version).toBe('14.0.0');
     expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v8');
     expect(DEFAULT_CONFIG.economy.initialRefineryAllowance).toBe(2_000);
     expect(DEFAULT_CONFIG.economy.oilFieldAllowancePerWorker).toBe(100);
@@ -52,7 +52,7 @@ describe('v1.6 GameConfig', () => {
       initialSupplyRadius: 5,
     });
     expect(DEFAULT_CONFIG.unitExperience).toEqual({
-      productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit', reconTeam: 'recruit', specialForces: 'regular' },
+      productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit', reconTeam: 'recruit', specialForces: 'regular', fieldArtillery: 'recruit' },
       recruitSurvivalTurnsRequired: 5,
       regularAttackMultiplier: 1.25,
       regularAttackRounding: 'ceil',
@@ -90,7 +90,7 @@ describe('v1.6 GameConfig', () => {
         buildCivilianGoods: 150,
         zombieTargetValue: 0,
       },
-      simpleFarm: { workerCapacity: 10, buildCivilianGoods: 25 },
+      simpleFarm: { workerCapacity: 10, buildCivilianGoods: 50 },
       civilianDroneBase: { workerCapacity: 5, buildCivilianGoods: 50, visionRadius: 15 },
     });
     expect(DEFAULT_CONFIG.economy.initialWorkersByFacility).toMatchObject({

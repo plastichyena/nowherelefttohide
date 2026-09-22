@@ -395,7 +395,7 @@ describe('v1.5.1 Hunter and shared-charge rule coverage', () => {
       && event.payload.militaryGoodsCost === 1)).toBe(true);
   });
 
-  it('uses National Guard attack 12 for suppression and preserves infection without Military Goods', () => {
+  it('uses Soldier attack 12 for suppression and preserves infection without Military Goods', () => {
     const withGoods = emptyEngine();
     const facilityWithGoods = withGoods.state.facilities.find((candidate) => candidate.id === 'farm-1')!;
     const guardWithGoods = createUnit(withGoods.state, 'ng-suppression-goods', 'nationalGuard', facilityWithGoods.position, 'ready', 'recruit');

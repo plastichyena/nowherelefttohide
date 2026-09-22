@@ -52,6 +52,9 @@ export interface BoardRenderState {
   selectedZombieId?: string | null;
   legalDestinations?: readonly HexCoord[];
   attackTargetIds?: readonly string[];
+  artilleryTargetHexes?: readonly HexCoord[];
+  artilleryBlastHexes?: readonly HexCoord[];
+  artilleryImpactHexes?: readonly HexCoord[];
   pendingPath?: readonly HexCoord[];
   /** All entrances warned for the next configured wave. */
   hordeDirections?: readonly CardinalDirection[];
@@ -1130,7 +1133,7 @@ export class HexBoardScene extends Phaser.Scene {
     const visible = [...visibleTileKeys].sort().join(',');
     const units = state.units
       .filter((unit) => isUnitVisible(unit, visibleTileKeys))
-      .map((unit) => `${unit.id}:${unit.type}:${unit.hordeKind ?? ''}:${unit.actionState}:${unit.position.q},${unit.position.r}`)
+      .map((unit) => `${unit.id}:${unit.type}:${unit.mode??''}:${unit.hordeKind ?? ''}:${unit.actionState}:${unit.position.q},${unit.position.r}`)
       .join('|');
     return `${visible}#${units}`;
   }
@@ -1151,6 +1154,7 @@ export class HexBoardScene extends Phaser.Scene {
     const legal = new Set((render.legalDestinations ?? []).map((position) => hexKey(position)));
     const path = new Set((render.pendingPath ?? []).map((position) => hexKey(position)));
     const attackTargets = new Set(render.attackTargetIds ?? []);
+    const artilleryTargets=new Set(render.artilleryTargetHexes?.map(hexKey)??[]),artilleryBlast=new Set(render.artilleryBlastHexes?.map(hexKey)??[]),artilleryImpact=new Set(render.artilleryImpactHexes?.map(hexKey)??[]);
     const suppliedTiles = new Set(render.suppliedTileKeys ?? []);
     // Build candidate markers were intentionally removed from Human UI in
     // v1.4.5. Keep the board-wide marker pass strictly for Relocate; callers
@@ -1329,6 +1333,9 @@ export class HexBoardScene extends Phaser.Scene {
       const checkpoint = checkpointsByTile.get(key);
       const tileSelected = selected ? sameHex(selected, tile) : false;
       this.drawTileDynamic(state, tile, center, key, tileSelected, legal.has(key), path.has(key), hordeRouteKeys.has(key), hordeEntranceKeys.has(key), reserveKeys.has(key), hordeTarget, hordeWarningType, selectedVision, render, suppliedTiles, checkpointLegalPreview, checkpointInvalidPreview, selectedCheckpointPreview, constructibleLegalPreview, constructibleInvalidPreview, selectedConstructiblePreview);
+      if(artilleryTargets.has(key))this.drawMarker(this.graphics,center,0xffaa44,.12);
+      if(artilleryBlast.has(key))this.drawMarker(this.graphics,center,0xff5544,.25);
+      if(artilleryImpact.has(key)){this.graphics.lineStyle(2,0xffdd77,.9);this.graphics.strokeCircle(center.x,center.y,HEX_SIZE*.72);}
       if (facility) this.drawFacilityDynamic(facility, productionByFacility.get(facility.id), center, tileSelected, render, suppliedTiles, key, t);
       if (checkpoint) this.drawCheckpointDynamic(state, checkpoint, center, tileSelected, suppliedTiles, key, t);
       const wire = wiresByTile.get(key);
@@ -1778,7 +1785,7 @@ export class HexBoardScene extends Phaser.Scene {
       const proficiencyLabel = proficiency ? t(`proficiency.${proficiency}`) : null;
       const maxCharges = typeof unitRecord.maxAttackCharges === 'number' ? Math.max(1, Math.trunc(unitRecord.maxAttackCharges)) : 1;
       const charges = typeof unitRecord.attackChargesRemaining === 'number' ? Math.max(0, Math.min(maxCharges, Math.trunc(unitRecord.attackChargesRemaining))) : maxCharges;
-      const typeLabel = unit.type === 'specialForces' ? t('specialForces') : unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
+      const typeLabel = unit.type === 'fieldArtillery' ? t('fieldArtillery') : unit.type === 'specialForces' ? t('specialForces') : unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
       const supplyLabel = suppliedTiles.has(tileKey) ? t('supplied') : t('outOfSupply');
       const details = `${typeLabel}${proficiencyLabel ? ` (${proficiencyLabel})` : ''} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
       this.addLabel(`unit:${unit.id}:detail`, details, position.x, position.y + 23, '#f3f7f9', 8, true);

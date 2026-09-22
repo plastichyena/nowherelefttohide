@@ -1,5 +1,7 @@
 import type { GameAction, JsonValue } from '../core/types';
 
+export const ACTION_SCHEMA_VERSION = '2.0.0';
+
 export const ACTION_RESPONSE_SEMANTICS = {
   ok: 'The CLI/protocol command was processed successfully; this does not mean the GameAction was accepted.',
   accepted: 'true only when Core accepted and applied the GameAction. Always inspect accepted as well as ok.',
@@ -9,9 +11,9 @@ export const ACTION_RESPONSE_SEMANTICS = {
 
 export const ACTION_PLAY_GUIDANCE = {
   movement: 'Adjacent enemies can remove legal moves. Retreat before contact. Attack then Move is forbidden; Move then Attack requires remaining charge. Interception during movement can spend that charge.',
-  recruitment: 'Each recruitment facility may hold one pending reservation. Different facilities have independent slots. The free Army Base National Guard reward consumes no reservation slot; ordinary recruitment uses one shared global action.',
+  recruitment: 'Each recruitment facility may hold one pending reservation. Different facilities have independent slots. The free Army Base Soldier reward consumes no reservation slot; ordinary recruitment uses one shared global action.',
   infection: 'Infected facilities cannot assign or withdraw workers. Population transfers require both cities, including Capital, to be safe and eligible in the turn-start snapshot.',
-  intake: 'Strict takes 4 turns for 20 people, accepts 50% with zero infection, and remains slower than Normal. There is no fixed safe population: compare resource runway, guaranteed_resource_defeat, production capacity and queue demand.',
+  intake: 'Strict takes 5 turns for 20 people, accepts 100% with zero latent infection, and remains slower than Normal. There is no fixed safe population: compare resource runway, guaranteed_resource_defeat, production capacity and queue demand.',
   defense: 'Keep defense available for Capital, Power Plants and principal Food/Civilian Goods producers when visible threats approach.',
   housing: 'Temporary Housing has a hard limit of 10 healthy plus infected residents; inspect population-transfers min/max.',
 } as const;
@@ -93,6 +95,10 @@ export function isGameActionInput(value: unknown): value is GameAction {
     switch (value.type) {
       case 'Move':
         return hasOnlyKeys(value, ['type', 'unitId', 'destination']) && isSafeId(value.unitId) && isCoordinate(value.destination);
+      case 'AttackHex':
+        return hasOnlyKeys(value, ['type','attackerId','position']) && isSafeId(value.attackerId) && isCoordinate(value.position);
+      case 'ChangeUnitMode':
+        return hasOnlyKeys(value, ['type','unitId','mode']) && isSafeId(value.unitId) && (value.mode === 'packed' || value.mode === 'deployed');
       case 'Attack':
         return hasOnlyKeys(value, ['type', 'attackerId', 'targetId']) && isSafeId(value.attackerId) && isSafeId(value.targetId);
       case 'Wait':
@@ -129,7 +135,7 @@ export function isGameActionInput(value: unknown): value is GameAction {
           && isNonNegativeSafeInteger(value.count) && value.count >= 1;
       case 'ProduceUnit':
         return hasOnlyKeys(value, ['type', 'unitType'], ['destination'])
-          && (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice' || value.unitType === 'reconTeam')
+          && (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice' || value.unitType === 'reconTeam' || value.unitType === 'fieldArtillery')
           && (value.destination === undefined || isCoordinate(value.destination));
       case 'EndTurn':
         return hasOnlyKeys(value, ['type']);

@@ -194,3 +194,19 @@ are the Registry assets listed above. The v1.4 references are in
 `Art/reference/v1.4-facility-concepts/` and are original project artwork only.
 The v1.5.0 Riot references are in
 `Art/reference/v1.5.0-unit-concepts/` and are original project artwork only.
+
+
+## v1.6.4 Field Artillery
+
+The approved September 21 originals and prompts are retained in
+`Art/reference/v1.6.4-concepts/`. `scripts/build-v164-assets.py` derives the
+256×256 RGBA runtime assets. Normal play, Live and Replay share the mode-aware
+asset resolver and retain an individual fallback for missing images.
+
+| Runtime path | Type / mode | Approved composition |
+| --- | --- | --- |
+| `units/unit_field_artillery_packed.png` | `fieldArtillery` / `packed` | Truck and towed gun, without soldiers |
+| `units/unit_field_artillery_deployed.png` | `fieldArtillery` / `deployed` | Emplaced gun and crew, without truck |
+
+The existing `nationalGuard` ID and `unit_national_guard.png` path are retained;
+the current display name is Soldier / 兵士.

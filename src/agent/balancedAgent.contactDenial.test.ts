@@ -108,7 +108,7 @@ describe('Balanced Agent facility-contact denial', () => {
     expect(result.action).toEqual({ type: 'Attack', attackerId: guard.id, targetId: threat.id });
   });
 
-  it('moves National Guard into firing range of a facility-contact threat before chasing a nearer decoy', () => {
+  it('moves Soldier into firing range of a facility-contact threat before chasing a nearer decoy', () => {
     const observation = stabilize(freshObservation());
     const targetFacility = facilityById(observation, 'military-factory-1');
     for (const facility of observation.facilities) {

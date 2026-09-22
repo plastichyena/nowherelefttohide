@@ -15,7 +15,7 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '13.0.0';
+export const CONFIG_VERSION = '14.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v8';
 
 const facilityIds: FacilityId[] = [
@@ -65,8 +65,11 @@ function production(
   return { inputs, outputs, powerMode, requiresPower: powerMode === 'required', powerCapacity, powerGeneration, fixedPowerGeneration };
 }
 
+const standardHuman = { capabilities: { capture: true, recoverCheckpoint: true, suppress: true, contain: true }, productionFuel: 0, productionLimitPerGame: null };
+
 const defaultUnitConfig: UnitConfigMap = {
   specialForces: {
+    ...standardHuman,
     movementDomain: 'ground', regularAttackCharges: 3, veteranAttackCharges: 4,
     hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 5, maxFuel: 44,
     maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
@@ -76,10 +79,24 @@ const defaultUnitConfig: UnitConfigMap = {
     fuelCostRule: 'nationalGuardLike', suppressionCivilianDamageRate: 0.5,
     reanimationUnitType: 'packZombie', noiseClass: 'medium', noiseRadius: 4,
   },
+  fieldArtillery: {
+    ...standardHuman, capabilities: { capture: false, recoverCheckpoint: false, suppress: false, contain: false },
+    movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 1,
+    hp: 25, recruitAttack: 7, movement: 10, range: 1, vision: 5, population: 5, maxFuel: 100, maxMilitaryGoods: 100,
+    fixedMilitaryGoodsUpkeepPerTurn: 1, attackMilitaryGoodsCostByRange: { 1: 4 }, suppressionMilitaryGoodsCost: 0,
+    militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 1, recruitmentFacilityTypes: ['armyBase'],
+    productionCivilianGoods: 100, productionMilitaryGoods: 200, productionFuel: 100, productionLimitPerGame: 2,
+    fuelCostRule: 'perMovementPoint', fuelPerMovementPoint: 10, suppressionCivilianDamageRate: 0,
+    reanimationUnitType: 'soldierZombie', noiseClass: 'large', noiseRadius: 6,
+    deployed: { recruitAttack: 40, movement: 0, minRange: 10, range: 200, militaryGoodsCost: 50, noiseRadius: 40 },
+    scatter: { recruit: { hitProbability: 0.5, radius: 2 }, regular: { hitProbability: 0.5, radius: 1 }, veteran: { hitProbability: 1, radius: 0 } },
+    friendlyFire: true, facilityPopulationDamage: true,
+  },
   packZombie: { movementDomain: 'ground', maxAttackCharges: 5, hp: 50, attack: 15, movement: 10, range: 1, vision: 3, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0 },
-  gasZombie: { movementDomain: 'ground', maxAttackCharges: 1, hp: 35, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, explosionDamage: 30, explosionInfection: 30 },
+  gasZombie: { movementDomain: 'ground', maxAttackCharges: 1, hp: 35, attack: 5, movement: 3, range: 1, vision: 3, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, explosionDamage: 30, explosionZombieDamage: 15, explosionInfection: 30 },
   screamerZombie: { movementDomain: 'ground', maxAttackCharges: 1, hp: 15, attack: 10, movement: 3, range: 1, vision: 2, population: 0, maxFuel: 0, maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0, militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0, screamRadius: 30 },
   police: {
+    ...standardHuman,
     movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 25, recruitAttack: 6, movement: 15, range: 1, vision: 5, population: 5, maxFuel: 24,
     maxMilitaryGoods: 10, fixedMilitaryGoodsUpkeepPerTurn: 0,
@@ -90,6 +107,7 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0, reanimationUnitType: UNIT_CATALOG.police.reanimation, noiseClass: 'medium', noiseRadius: 4,
   },
   nationalGuard: {
+    ...standardHuman,
     movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 44,
     maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
@@ -100,6 +118,7 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0.5, reanimationUnitType: UNIT_CATALOG.nationalGuard.reanimation, noiseClass: 'large', noiseRadius: 8,
   },
   riotPolice: {
+    ...standardHuman,
     movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 24,
     maxMilitaryGoods: 10, fixedMilitaryGoodsUpkeepPerTurn: 0,
@@ -110,6 +129,7 @@ const defaultUnitConfig: UnitConfigMap = {
     suppressionCivilianDamageRate: 0, reanimationUnitType: UNIT_CATALOG.riotPolice.reanimation, noiseClass: 'medium', noiseRadius: 5,
   },
   reconTeam: {
+    ...standardHuman,
     movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 25, recruitAttack: 9, movement: 10, range: 6, vision: 10, population: 5, maxFuel: 44,
     maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
@@ -165,7 +185,7 @@ const defaultUnitConfig: UnitConfigMap = {
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
   nuclearPowerPlant: { workerCapacity: 5, production: production({}, {}, 'none', 0, 500), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
-  temporaryHousing: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 25, visionRadius: 1, zombieTargetValue: 0 },
+  temporaryHousing: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 50, visionRadius: 1, zombieTargetValue: 0 },
   armyBase: { workerCapacity: 10, production: production({}, {}, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
   capital: {
     workerCapacity: 100,
@@ -225,7 +245,7 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
     workerCapacity: 10,
     production: production(emptyInputs(), { food: 5 }, 'none'),
     overrunSpawnCount: 2,
-    buildCivilianGoods: 25, visionRadius: 1, zombieTargetValue: 0,
+    buildCivilianGoods: 50, visionRadius: 1, zombieTargetValue: 0,
   },
   civilianDroneBase: {
     workerCapacity: 5,
@@ -320,6 +340,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   units: defaultUnitConfig,
   unitExperience: {
     productionProficiencyByType: {
+      fieldArtillery: 'recruit',
       police: 'recruit',
       nationalGuard: 'recruit',
       riotPolice: 'recruit',
@@ -352,7 +373,6 @@ export const DEFAULT_CONFIG: GameConfig = {
     specialZombieWeights: { zombie: 65, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5, screamerZombie: 5 },
     riotZombieCapPerDirection: 1,
     hunterZombieCapPerDirection: 1,
-    gasZombieCapPerDirection: 1,
     movementNoiseRadius: 8,
   },
   refugees: {
@@ -523,11 +543,14 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       requireInteger(errors, humanUnit.veteranAttackCharges, `units.${type}.veteranAttackCharges`, 1);
       requireInteger(errors, humanUnit.recruitAttack, `units.${type}.recruitAttack`, 1);
       requireInteger(errors, humanUnit.productionCivilianGoods, `units.${type}.productionCivilianGoods`, 0);
+      requireInteger(errors, humanUnit.productionFuel, `units.${type}.productionFuel`, 0);
+      if (humanUnit.productionLimitPerGame !== null) requireInteger(errors, humanUnit.productionLimitPerGame, `units.${type}.productionLimitPerGame`, 0);
+      for (const capability of ['capture','recoverCheckpoint','suppress','contain'] as const) if (typeof humanUnit.capabilities?.[capability] !== 'boolean') errors.push(`Invalid ${type} capability ${capability}`);
       requireInteger(errors, humanUnit.productionMilitaryGoods, `units.${type}.productionMilitaryGoods`, 0);
       if (!Array.isArray(humanUnit.recruitmentFacilityTypes) || (type !== 'specialForces' && humanUnit.recruitmentFacilityTypes.length === 0)) {
         errors.push(`units.${type}.recruitmentFacilityTypes is required`);
       }
-      if (!['policeLike', 'nationalGuardLike'].includes(humanUnit.fuelCostRule)) {
+      if (!['policeLike', 'nationalGuardLike', 'perMovementPoint'].includes(humanUnit.fuelCostRule)) {
         errors.push(`units.${type}.fuelCostRule is invalid`);
       }
       if (!['small', 'medium', 'large', 'extraLarge'].includes(humanUnit.noiseClass)) {
@@ -573,6 +596,22 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     }
   }
 
+  const artillery = config.units.fieldArtillery;
+  if (!artillery?.deployed || !artillery.scatter) errors.push('fieldArtillery deployed and scatter configuration is required');
+  else {
+    for (const key of ['recruitAttack','minRange','range','militaryGoodsCost','noiseRadius'] as const) requireInteger(errors,artillery.deployed[key],`units.fieldArtillery.deployed.${key}`,1);
+    if (artillery.deployed.movement !== 0 || artillery.deployed.range < artillery.deployed.minRange) errors.push('fieldArtillery deployed movement/range is invalid');
+    requireInteger(errors,artillery.fuelPerMovementPoint,'units.fieldArtillery.fuelPerMovementPoint',1);
+    for (const proficiency of ['recruit','regular','veteran'] as const) {
+      const rule = artillery.scatter[proficiency];
+      if (!rule || !Number.isFinite(rule.hitProbability) || rule.hitProbability<0 || rule.hitProbability>1) errors.push(`fieldArtillery ${proficiency} hit probability is invalid`);
+      if (rule) requireInteger(errors,rule.radius,`fieldArtillery.${proficiency}.scatterRadius`,0);
+      if (rule && rule.hitProbability<1 && rule.radius<1) errors.push('Artillery misses require a scatter radius');
+    }
+    for (const key of ['friendlyFire','facilityPopulationDamage'] as const) if(typeof artillery[key]!=='boolean') errors.push(`fieldArtillery.${key} must be boolean`);
+  }
+  requireInteger(errors,config.units.gasZombie.explosionZombieDamage,'units.gasZombie.explosionZombieDamage',0);
+  if (Object.prototype.hasOwnProperty.call(config.horde,'gasZombieCapPerDirection')) errors.push('horde.gasZombieCapPerDirection is obsolete; Gas is unlimited in every wave');
   const experience = config.unitExperience;
   if (!experience || typeof experience !== 'object') {
     errors.push('unitExperience is required');
@@ -929,7 +968,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   for (const key of ['maxMilitaryGoods','interceptionCost','attack','range','noiseRadius','staffedVision','rewardLastTurn'] as const) requireInteger(errors,config.armyBase?.[key],`armyBase.${key}`,key==='interceptionCost'?1:0);
   requireInteger(errors,config.units?.gasZombie?.explosionDamage,'units.gasZombie.explosionDamage',0);
   requireInteger(errors,config.units?.gasZombie?.explosionInfection,'units.gasZombie.explosionInfection',0);
-  requireInteger(errors,config.horde?.gasZombieCapPerDirection,'horde.gasZombieCapPerDirection',0);
+  requireInteger(errors,config.units?.gasZombie?.explosionZombieDamage,'units.gasZombie.explosionZombieDamage',0);
   requireInteger(errors,config.economy?.initialGasCount?.min,'economy.initialGasCount.min',0);
   requireInteger(errors,config.economy?.initialGasCount?.max,'economy.initialGasCount.max',0);
   requireInteger(errors,config.economy?.initialGasMinDistance,'economy.initialGasMinDistance',9);

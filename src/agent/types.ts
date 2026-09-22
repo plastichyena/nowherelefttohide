@@ -1,3 +1,4 @@
+import type { ArtilleryPreview } from '../core/artillery';
 import type {
   CardinalDirection,
   CheckpointPolicy,
@@ -35,17 +36,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6.3 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.6.3';
-export const GAME_RULES_VERSION = '13.0.0';
-export const SAVE_FORMAT_VERSION = '20';
-export const AGENT_API_VERSION = '18.0.0';
-export const OBSERVATION_API_VERSION = '18.0.0';
-export const BRIDGE_API_VERSION = '18.0.0';
-export const BALANCED_AGENT_VERSION = '11.0.0';
-export const RANDOM_AGENT_VERSION = '6.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '17.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '14.0.0';
+/** v1.6.4 rejects all earlier state and public API schemas without migration. */
+export const APP_VERSION = '1.6.4';
+export const GAME_RULES_VERSION = '14.0.0';
+export const SAVE_FORMAT_VERSION = '21';
+export const AGENT_API_VERSION = '19.0.0';
+export const OBSERVATION_API_VERSION = '19.0.0';
+export const BRIDGE_API_VERSION = '19.0.0';
+export const BALANCED_AGENT_VERSION = '12.0.0';
+export const RANDOM_AGENT_VERSION = '7.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '18.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '15.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -278,11 +279,16 @@ export interface AgentFacilityObservation {
 }
 
 export interface AgentUnitObservation {
+  mode?: import('../core/types').UnitMode;
+  modeLockedUntilTurn?: number | null;
+  capabilities?: import('../core/types').HumanUnitConfig['capabilities'];
+  production?: { completed: number; reserved: number; limit: number | null; remaining: number | null };
+  artillery?: { fuelPerMovementPoint?:number; targetPreviews: ArtilleryPreview[]; minRange: number; militaryGoodsCost: number; hitProbability: number; scatterRadius: number; legalTargetHexes: HexCoord[] };
   movementDomain: 'ground';
   spawnedInsideBarbedWire?: boolean;
   /** Independent conditional attacks, not an enemy movement/target prediction. */
   conditionalIncomingCombat?: Array<{ enemyId: string; condition: 'if_this_visible_enemy_attacks' } & ReturnType<typeof import('../core/barbed-wire').wireCombatProjection>>;
-  deathExplosion?: { radius:number; excludesCenter:true; baseUnitDamage:number; maxSiteInfection:number; units:Array<{unitId:string;damage:number}>; sites:Array<{siteId:string;infection:number}> };
+  deathExplosion?: { radius:number; excludesCenter:true; baseUnitDamage:number; baseZombieDamage?:number; maxSiteInfection:number; units:Array<{unitId:string;damage:number}>; sites:Array<{siteId:string;infection:number}> };
   id: string;
   type: UnitType;
   /** Explicit v1.4 name; `type` remains as the established alias. */
@@ -343,6 +349,7 @@ export interface AgentUnitObservation {
     effectiveMovementCost: number;
   }>;
   attackPreviews: Array<{
+    artillery?: import('../core/artillery').ArtilleryPreview;
     gasExplosion: import('../core/gas-preview').GasAttackPreview | null;
     targetUnitId: string;
     distance: number;
@@ -379,6 +386,7 @@ export interface AgentUnitObservation {
 }
 
 export interface AgentCheckpointObservation {
+  recovery?: { ready: boolean; missing: string[]; automatic: true };
   checkpointBonus?: number;
   turnAwayPreview?: { waitingOnly: boolean; maxPeople: number; foodMaintenanceReduction: number; civilianGoodsMaintenanceReduction: number; additionalPenalties: string; futureWaveRisk: boolean };
   id: string;
@@ -422,6 +430,7 @@ export interface AgentCheckpointObservation {
 }
 
 export interface AgentApiInfo {
+  actionSchemaVersion: string;
   queryContract: ReturnType<typeof import('./query-contract').publicQueryContract>;
   actionContracts: Record<string, { required: string[]; example: import('../core/types').GameAction; conditions: string[] }>;
   parameterQueries: { transferPopulation: string; legalActionsExhaustive: false; revisionRequiredForSession: true };
@@ -445,8 +454,9 @@ export interface AgentApiInfo {
   };
   prohibited: string[];
   rules: {
+    v164: { explanations: typeof import('../core/rules-v164').RULES_V164; artillery: GameConfig['units']['fieldArtillery']; humanCapabilities: Record<HumanUnitType,GameConfig['units']['police']['capabilities']>; productionLimits: Record<HumanUnitType,number|null> };
     barbedWire: typeof import('../core/barbed-wire').BARBED_WIRE_RULES;
-    gasZombie?: { explosionDamage:number; explosionInfection:number; radius:number; excludesCenter:boolean; initialCount:{min:number;max:number}; initialMinDistance:number; finalWaves:number; capPerDirection:number };
+    gasZombie?: { explosionDamage:number; explosionInfection:number; radius:number; excludesCenter:boolean; initialCount:{min:number;max:number}; initialMinDistance:number; allWaves:boolean; capPerDirection:null; explosionZombieDamage:number };
     armyBase?: Omit<GameConfig['armyBase'], 'noiseRadius'> & { interceptionNoiseRadius:number; recruitmentPower:number; cityPopulationOnly:boolean };
     zombies: Record<import('../core/types').ZombieUnitType, { hp: number; attack: number; movement: number; range: number; vision: number; maxAttackCharges: number; ai: 'normal' | 'horde' }>;
     proficiency: {
@@ -568,8 +578,8 @@ export interface AgentApiInfo {
         turn: number;
         directionCount: number;
         compositionPerDirection: HordeComposition;
-        nonHordeSlotCountPerDirection?: number;
-        possibleNonHordeTypes?: UnitType[];
+        variantSlotCountPerDirection?: number;
+        possibleVariantTypes?: UnitType[];
         final: boolean;
       }>;
       finalHordeTurn: number;
@@ -792,6 +802,9 @@ export interface AgentGameResult {
 }
 
 export interface AgentObservation {
+  /** Public Config used to distinguish infection, zombie conversion and actual deaths. */
+  siteFallRules?: { zombieSpawnPopulationPerUnit: number; maxZombieSpawnPerResolution: number };
+  productionLedger?: Record<HumanUnitType,{completed:number;reserved:number;limit:number|null;remaining:number|null}>;
   publicHealth: { stress: import('../core/types').GameState['publicHealthStress']; foodShortageAccumulation: number; starvationCarry: number };
   nuclearObjective: { firstCapturedTurn: number | null; reward: 'unclaimed' | 'pending' | 'claimed' | 'expired'; deadlineTurn: number };
   workerAssignmentCandidates: ReturnType<typeof import('../core/engine').workerAssignmentCandidates>;
@@ -837,10 +850,10 @@ export interface AgentObservation {
       spawnTurn: number;
       directionCount: number;
       compositionPerDirection: HordeComposition;
-      /** Number of non-Horde slots per direction; exact draw is not public before Spawn. */
-      nonHordeSlotCountPerDirection?: number;
-      /** Candidate types for each non-Horde slot, in public deterministic order. */
-      possibleNonHordeTypes?: UnitType[];
+      /** Number of variant draw slots per direction; exact draw is not public before Spawn. */
+      variantSlotCountPerDirection?: number;
+      /** Candidate types for each variant draw slot, in public deterministic order. */
+      possibleVariantTypes?: UnitType[];
       final: boolean;
     } | null;
     spawnTurn: number | null;

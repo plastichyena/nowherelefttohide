@@ -1,3 +1,4 @@
+import { artilleryActionAssessment } from './artillery-policy';
 import { hexDistance, hexKey } from '../core/hex';
 import { wireBreakCost } from '../core/barbed-wire';
 import type { FacilityType, GameAction, HexCoord } from '../core/types';
@@ -273,7 +274,19 @@ function scoreAction(
     }
   }
 
-  if (action.type === 'Attack') {
+  const artillery = artilleryActionAssessment(observation, action);
+  if (artillery) {
+    const gun = observation.units.find(u=>u.id === (action as Extract<GameAction,{type:'Attack'}>).attackerId)!;
+    const target = action.type==='AttackHex' ? action.position : action.type==='Attack' ? observation.zombies.find(z=>z.id===action.targetId)?.position : undefined;
+    const preview = gun.artillery?.targetPreviews.find(p=>target && hexKey(p.aimedHex)===hexKey(target));
+    score += artillery.allowed ? weights.attack + (preview?.unitRisks.filter(u=>!u.player).reduce((n,u)=>n+u.expectedDamage,0)??0) + (artillery.emergency?500:0) : -100000;
+    reasonCodes.push(`ARTILLERY_${artillery.reason.toUpperCase()}`);
+  } else if (action.type === 'ChangeUnitMode') {
+    const gun = observation.units.find(u=>u.id===action.unitId)!;
+    const distant = observation.zombies.some(z=>{const d=hexDistance(gun.position,z.position);return d>=10&&d<=200;});
+    score += action.mode==='deployed' && distant && gun.currentMilitaryGoods>=50 ? 25 : action.mode==='packed' && !distant ? 10 : -100;
+    reasonCodes.push('ARTILLERY_MODE_FOR_PUBLIC_TARGETS');
+  } else if (action.type === 'Attack') {
     const attacker = units.get(action.attackerId);
     const target = zombies.get(action.targetId);
     const threat = threatByZombie.get(action.targetId);
@@ -844,7 +857,7 @@ function scoreAction(
       score += weights.suppression * 1.25;
       reasonCodes.push('BUILD_RIOT_BLOCKADE_RESERVE');
     }
-    const productionCost = action.unitType === 'police' ? 10 : 25;
+    const productionCost = action.unitType === 'fieldArtillery' ? 200 : action.unitType === 'police' ? 10 : 25;
     const projectedFixedUpkeep = action.unitType === 'police' ? 0 : 1;
     const unsupportedTurns = activeMilitaryFactory ? 1 : 2;
     const minimumMilitaryStock = productionCost
@@ -1118,7 +1131,7 @@ export class BalancedAgent implements GameAgent {
       const type = observation.units.find((unit) => unit.id === action.unitId)?.type;
       return type === 'police' || type === 'riotPolice';
     });
-    let candidates = sortActions(legalActions).map((action) => scoreAction(
+    let candidates = sortActions(legalActions).filter(action=>artilleryActionAssessment(observation,action)?.allowed!==false).map((action) => scoreAction(
       action,
       observation,
       goal,

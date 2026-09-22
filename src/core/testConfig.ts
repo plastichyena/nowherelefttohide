@@ -38,7 +38,6 @@ export function singleFinalWave(
     waves: [{ turn, directionCount, compositionPerDirection: { ...composition }, final: true }],
     specialZombieWeights: { zombie: 100, policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0 },
     riotZombieCapPerDirection: 1,
-    gasZombieCapPerDirection: 1,
     hunterZombieCapPerDirection: 1,
     movementNoiseRadius: 8,
   };

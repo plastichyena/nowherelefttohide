@@ -282,7 +282,7 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
     expect(facilityAt(engine.getState(), built.id).workers).toBe(1);
   });
 
-  it('enforces independent per-Type limits and does not count a destroyed facility', () => {
+  it('allows a fifth Simple Farm while preserving independent Drone Base construction', () => {
     const engine = new GameEngine(1421, safeConfig());
     const farms: string[] = [];
     for (let index = 0; index < 4; index += 1) {
@@ -290,11 +290,9 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
       expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position }).error).toBeNull();
       farms.push(engine.getState().facilities.find((facility) => facility.constructible && facility.type === 'simpleFarm' && !farms.includes(facility.id))!.id);
     }
-    const fifth = engine.getConstructibleFacilityPositionCandidates('simpleFarm')
-      .find((candidate) => candidate.reasonCode === 'constructible_facility_limit_reached');
-    expect(fifth).toBeDefined();
-    expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: fifth!.position }).error?.code)
-      .toBe('constructible_facility_limit_reached');
+    const fifth = firstBuildable(engine,'simpleFarm');
+    expect(engine.step({type:'BuildConstructibleFacility',facilityType:'simpleFarm',position:fifth}).error).toBeNull();
+    expect(engine.getState().facilities.filter(f=>f.type==='simpleFarm'&&f.constructible)).toHaveLength(5);
     const dronePosition = firstBuildable(engine, 'civilianDroneBase');
     expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'civilianDroneBase', position: dronePosition }).error).toBeNull();
     expect(engine.getState().facilities.filter((facility) => facility.constructible && facility.type === 'civilianDroneBase')).toHaveLength(1);

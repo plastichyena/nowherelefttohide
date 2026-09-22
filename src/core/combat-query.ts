@@ -1,3 +1,5 @@
+import { previewArtillery, type ArtilleryPreview } from './artillery';
+import { deployedArtillery, hasCapability, canReact } from './unit-capabilities';
 import { gasAttackPreview, type GasAttackPreview } from './gas-preview';
 import { wireCombatProjection } from './barbed-wire';
 import { hexKey, hexDistance } from './hex';
@@ -31,7 +33,7 @@ export function forecastUnitCombatAtDistance(
   distance: number,
 ): UnitCombatProjection {
   const normalizedDistance = Math.max(0, Math.floor(distance));
-  if (normalizedDistance < 1 || normalizedDistance > unit.range) {
+  if (normalizedDistance < (deployedArtillery(unit) ? state.config.units.fieldArtillery.deployed.minRange : 1) || normalizedDistance > unit.range) {
     return {
       distance: normalizedDistance,
       canAttack: false,
@@ -52,7 +54,7 @@ export function forecastUnitCombatAtDistance(
     };
   }
   const config = state.config.units[unit.type as HumanUnitType];
-  const configuredCost = config.attackMilitaryGoodsCostByRange[normalizedDistance];
+  const configuredCost = deployedArtillery(unit) ? state.config.units.fieldArtillery.deployed.militaryGoodsCost : config.attackMilitaryGoodsCostByRange[normalizedDistance];
   const militaryGoodsCost = Number.isInteger(configuredCost) ? configuredCost : 0;
   if (unit.currentMilitaryGoods >= militaryGoodsCost) {
     return {
@@ -86,6 +88,7 @@ export function forecastUnitCombatAtDistance(
 
 
 export interface UnitLegalAttackProjection {
+  artillery?: ArtilleryPreview;
   conditionalCounterattack: ReturnType<typeof wireCombatProjection> | null;
   gasExplosion: GasAttackPreview | null;
   targetUnitId: string;
@@ -119,9 +122,11 @@ export function getUnitLegalAttackProjections(
       const projection = forecastUnitCombatAtDistance(snapshot, unit, distance);
       if (!projection.canAttack) return null;
       const terrainDamage = terrainAdjustedDamage(snapshot, target, projection.effectiveAttack);
+      const artillery = deployedArtillery(unit) ? previewArtillery(state, unit, target.position) : undefined;
       return {
-        conditionalCounterattack: terrainDamage.finalDamage < target.hp && target.canAttack && forecastUnitCombatAtDistance(snapshot, target, distance).canAttack ? wireCombatProjection(snapshot, unit, forecastUnitCombatAtDistance(snapshot, target, distance).effectiveAttack) : null,
-        gasExplosion: gasAttackPreview(state, target, terrainDamage.finalDamage),
+        ...(artillery ? {artillery} : {}),
+        conditionalCounterattack: !artillery && terrainDamage.finalDamage < target.hp && canReact(target) && forecastUnitCombatAtDistance(snapshot, target, distance).canAttack ? wireCombatProjection(snapshot, unit, forecastUnitCombatAtDistance(snapshot, target, distance).effectiveAttack) : null,
+        gasExplosion: artillery ? null : gasAttackPreview(state, target, terrainDamage.finalDamage),
         targetUnitId: target.id,
         distance,
         militaryGoodsCost: projection.militaryGoodsCost,
@@ -129,7 +134,7 @@ export function getUnitLegalAttackProjections(
         projectedAttackChargesRemaining: Math.max(0, unit.attackChargesRemaining - 1),
         effectiveAttack: projection.effectiveAttack,
         projectedDamageBeforeTerrain: terrainDamage.baseDamage,
-        projectedDamageAfterTerrain: Math.min(target.hp, terrainDamage.finalDamage),
+        projectedDamageAfterTerrain: artillery ? artillery.unitRisks.find(u=>u.unitId===target.id)?.expectedDamage??0 : Math.min(target.hp, terrainDamage.finalDamage),
       };
     })
     .filter((entry): entry is UnitLegalAttackProjection => entry !== null)
@@ -153,6 +158,7 @@ export function infectedSuppressionTarget(
   state: Readonly<GameState>,
   unit: Readonly<UnitState>,
 ): FacilityState | CheckpointState | null {
+  if (!hasCapability(state,unit,'suppress')) return null;
   const key = hexKey(unit.position);
   return state.facilities.find((candidate) => hexKey(candidate.position) === key && candidate.infected > 0)
     ?? state.checkpoints.find((candidate) => hexKey(candidate.position) === key && candidate.infected > 0)
@@ -170,6 +176,7 @@ export function forecastUnitSuppression(
     !unit.canAttack ||
     unit.attackChargesRemaining <= 0
   ) return null;
+  if (!hasCapability(state, unit, 'suppress')) return null;
   const target = infectedSuppressionTarget(state, unit);
   if (!target) return null;
   const facility = 'workers' in target ? target : null;

@@ -6,6 +6,7 @@ export const UNIT_CATALOG = {
   nationalGuard: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
   riotPolice: { faction: 'human', ai: null, waveSlot: null, reanimation: 'riotZombie' },
   reconTeam: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
+  fieldArtillery: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
   specialForces: { faction: 'human', ai: null, waveSlot: null, reanimation: 'packZombie' },
   packZombie: { faction: 'zombie', ai: 'normal', waveSlot: null, reanimation: null },
   zombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },

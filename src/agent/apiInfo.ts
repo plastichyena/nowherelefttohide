@@ -1,6 +1,8 @@
+import { RULES_V164 } from '../core/rules-v164';
+import { HUMAN_UNIT_TYPES } from '../core/unit-catalog';
 import { RULES_V163 } from '../core/rules-v163';
 import { CONTEXT_HANDOFF_LIMITS } from '../session/context-handoff';
-import { ACTION_RESPONSE_SEMANTICS, ACTION_PLAY_GUIDANCE } from './action-input';
+import { ACTION_SCHEMA_VERSION, ACTION_RESPONSE_SEMANTICS, ACTION_PLAY_GUIDANCE } from './action-input';
 import { publicQueryContract } from './query-contract';
 import { BARBED_WIRE_RULES } from '../core/barbed-wire';
 import type { GameConfig } from '../core/types';
@@ -108,6 +110,7 @@ export function createAgentApiInfo(
     oil_field_allowance_blocked: { severity: 'warning', category: 'facility' },
   };
   return cloneJson({
+    actionSchemaVersion: ACTION_SCHEMA_VERSION,
     queryContract: publicQueryContract(),
     responseSemantics: ACTION_RESPONSE_SEMANTICS,
     actionPlayGuidance: ACTION_PLAY_GUIDANCE,
@@ -122,6 +125,8 @@ export function createAgentApiInfo(
     methods: [...PUBLIC_METHODS],
     parameterQueries: { construction: 'query construction; filters facilityType, legalOnly, inSupply, reasonCode, q/r or qMin/qMax/rMin/rMax; paginated and revision-bound', transferPopulation: 'query population-transfers; filters fromFacilityId/toFacilityId; min/max inclusive, positive integers, expectedRevision', legalActionsExhaustive: false, revisionRequiredForSession: true },
     actionContracts: {
+      AttackHex: { required:['attackerId','position'],example:{type:'AttackHex',attackerId:'fieldArtillery-1',position:{q:25,r:25}},conditions:['deployed and unlocked; one charge and 50 carried Military Goods','visible Hex at distance 10..200, including empty or water; no LOS','preview returns a probability distribution without execution RNG','re-preview after revision changes; human collateral requires confirmation; AI must evaluate all emergency conditions'] },
+      ChangeUnitMode: { required:['unitId','mode'],example:{type:'ChangeUnitMode',unitId:'fieldArtillery-1',mode:'deployed'},conditions:['unused artillery this turn, packed/deployed only','no resource payment; all actions and reactions locked until next player turn'] },
       RelocateCheckpoint: { required: ['checkpointId', 'position'], example: { type: 'RelocateCheckpoint', checkpointId: 'checkpoint-1', position: { q: 25, r: 21 } }, conditions: ['known operational checkpoint', 'same branch', 'visible capital-side road route', 'query construction for current legal destinations'] },
       BuildBarbedWire: { required: ['position'], example: { type: 'BuildBarbedWire', position: { q: 21, r: 26 } }, conditions: ['query construction facilityType=barbedWire', 'visible supplied empty passable hex', 'visible adjacent and radial inspection area', 'no adjacent enemy', 'radial separation at least 3', 'Civilian Goods 5 + Military Goods 5; one action'] },
       Move: { required: ['unitId', 'destination'], example: { type: 'Move', unitId: 'police-1', destination: { q: 24, r: 25 } }, conditions: ['legal destination', 'move budget', 'supply/fuel projection'] },
@@ -165,7 +170,7 @@ export function createAgentApiInfo(
       'The fixed outer-ring Horde Spawn Reserve is public; Player units and Player placements cannot occupy it, while Zombies and attacks may use it under normal rules.',
       'Horde schedule and selected warning directions are public at the documented warning boundary. At roster freeze, each direction/group and whole-wave count are public; pending Type breakdowns and hidden Spawn details are not.',
       'Required facilities produce their standard output only when powered. Simple Farm is a power-free Food 5/worker redundancy and has no SetPowerSupply action.',
-      'Human combat Noise exposes only its public class. Police, Riot Police, and Recon are Medium; National Guard is Large. Screamer events expose only the Extra Large class.',
+      'Human combat Noise exposes only its public class. Police, Riot Police, and Recon are Medium; Soldier is Large. Screamer events expose only the Extra Large class.',
       'Ground Vision uses deterministic hex-line LOS: Forest and Mountain are visible blockers and hide Hexes beyond them. Civilian Drone Base provides terrain-ignoring Aerial Vision.',
       'Public site events report infection onset, fall, requested/actual adjacent Spawn counts, remaining infected population, Noise outflow, and chain origin without hidden Zombie IDs or positions.',
       'importantSiteEvents repeats the latest 50 of those public site events in every Observation, including off-screen site coordinates and status facts.',
@@ -189,9 +194,10 @@ export function createAgentApiInfo(
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
     rules: {
+      v164: {explanations:RULES_V164,artillery:cloneJson(config.units.fieldArtillery),humanCapabilities:Object.fromEntries(HUMAN_UNIT_TYPES.map(t=>[t,config.units[t].capabilities])) as AgentApiInfo['rules']['v164']['humanCapabilities'],productionLimits:Object.fromEntries(HUMAN_UNIT_TYPES.map(t=>[t,config.units[t].productionLimitPerGame])) as AgentApiInfo['rules']['v164']['productionLimits']},
       v163: { explanations: RULES_V163, contextHandoffLimits: CONTEXT_HANDOFF_LIMITS, capitalMinimum: 1, healthStress: { persistence: 0.75, deficitWeight: 0.40 }, starvation: { threshold: 2, cap: 7, recovery: 0.5, maximumRate: 0.10 }, screening: { normal: 0.05, strict: 0, passThroughBase: 0.25, passThroughCap: 0.60 }, infectionGrace: 'next_end_turn', nuclearCaptureDeadline: 20, nuclearFailureTurn: 21 },
       barbedWire: BARBED_WIRE_RULES,
-      gasZombie: { explosionDamage:config.units.gasZombie.explosionDamage, explosionInfection:config.units.gasZombie.explosionInfection,radius:1,excludesCenter:true,initialCount:cloneJson(config.economy.initialGasCount),initialMinDistance:config.economy.initialGasMinDistance,finalWaves:2,capPerDirection:config.horde.gasZombieCapPerDirection },
+      gasZombie: { explosionDamage:config.units.gasZombie.explosionDamage, explosionInfection:config.units.gasZombie.explosionInfection,radius:1,excludesCenter:true,initialCount:cloneJson(config.economy.initialGasCount),initialMinDistance:config.economy.initialGasMinDistance,allWaves:true,capPerDirection:null,explosionZombieDamage:config.units.gasZombie.explosionZombieDamage },
       armyBase: {maxMilitaryGoods:config.armyBase.maxMilitaryGoods,interceptionCost:config.armyBase.interceptionCost,attack:config.armyBase.attack,range:config.armyBase.range,staffedVision:config.armyBase.staffedVision,rewardLastTurn:config.armyBase.rewardLastTurn,interceptionNoiseRadius:config.armyBase.noiseRadius,recruitmentPower:config.facilities.armyBase.production.powerCapacity,cityPopulationOnly:true},
       zombies: Object.fromEntries((['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const).map((type) => {
         const { hp, attack, movement, range, vision, maxAttackCharges } = config.units[type];
@@ -342,19 +348,19 @@ export function createAgentApiInfo(
           const composition = waveRecord.compositionPerDirection as Record<string, unknown>;
           const nonHordeSlots = getNumber(
             waveRecord,
-            'nonHordeSlotCountPerDirection',
+            'variantSlotCountPerDirection',
             getNumber(composition, 'zombie', 0),
           );
-          const possibleNonHordeTypes = Array.isArray(waveRecord.possibleNonHordeTypes)
-            ? waveRecord.possibleNonHordeTypes.filter((value): value is string => typeof value === 'string')
-            : ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', ...(index >= Math.max(0,config.horde.waves.length-2) ? ['gasZombie'] : [])].filter((type) => Object.prototype.hasOwnProperty.call(units, type));
+          const possibleVariantTypes = Array.isArray(waveRecord.possibleVariantTypes)
+            ? waveRecord.possibleVariantTypes.filter((value): value is string => typeof value === 'string')
+            : ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'].filter((type) => Object.prototype.hasOwnProperty.call(units, type));
           return {
             index: index + 1,
             turn: wave.turn,
             directionCount: wave.directionCount,
             compositionPerDirection: cloneJson(wave.compositionPerDirection),
-            nonHordeSlotCountPerDirection: nonHordeSlots,
-            possibleNonHordeTypes: possibleNonHordeTypes as never,
+            variantSlotCountPerDirection: nonHordeSlots,
+            possibleVariantTypes: possibleVariantTypes as never,
             final: wave.final,
           };
         }),
@@ -497,7 +503,7 @@ export function createAgentApiInfo(
       },
       constructibleFacilities: {
         types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
-        limitFormula: 'Simple Farm: roadBranchCount; Drone: ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor); Temporary Housing: unlimited; Wind: 2 * roadBranchCount',
+        limitFormula: 'Simple Farm: unlimited; Drone: ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor); Temporary Housing: unlimited; Wind: 2 * roadBranchCount',
         buildConditions: [
           'inside_player_supply',
           'currently_visible_hex',
@@ -524,7 +530,7 @@ export function createAgentApiInfo(
           workerCapacity: config.facilities.simpleFarm.workerCapacity,
           requiredPower: 0,
           foodPerWorker: config.facilities.simpleFarm.production.outputs.food ?? 0,
-          playerBuildLimit: 'roadBranchCount',
+          playerBuildLimit: 'unlimited',
         },
         civilianDroneBase: {
           workerCapacity: config.facilities.civilianDroneBase.workerCapacity,

@@ -1,3 +1,4 @@
+import { PublicBoardRenderer, publicBoardFrame } from '../ui/publicBoard';
 import type { AgentObservation } from '../agent/types';
 import { createAiSession } from '../session/ai-session';
 import type { AiSessionActInput, AiSessionActResult, AiSessionPort, AiSessionResponse } from '../session/ai-session-contract';
@@ -50,6 +51,7 @@ export class LiveAiViewer {
   private readonly launcher: HTMLButtonElement;
   private readonly panel: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
+  private readonly board: PublicBoardRenderer;
   private readonly current: HTMLElement;
   private readonly result: HTMLElement;
   private readonly log: HTMLElement;
@@ -73,7 +75,7 @@ export class LiveAiViewer {
           <button type="button" data-live-ai="end">End</button>
           <button type="button" data-live-ai="close">Close</button>
         </div>
-        <div class="live-ai-board"><canvas aria-label="Live AI public board"></canvas></div>
+        <div class="live-ai-board"><canvas aria-label="Live AI public board"></canvas></div><button type="button" data-live-ai="fit">Fit / 全体</button><section class="public-board-details"></section>
         <section class="live-ai-current" aria-live="polite">WebMCP client can start after Start.</section>
         <pre class="live-ai-result" aria-live="polite"></pre>
         <p class="live-ai-omitted" hidden></p>
@@ -83,6 +85,7 @@ export class LiveAiViewer {
     this.launcher = this.host.querySelector('.live-ai-launcher')!;
     this.panel = this.host.querySelector('.live-ai-panel')!;
     this.canvas = this.host.querySelector('canvas')!;
+    this.board = new PublicBoardRenderer(this.canvas, this.host.querySelector('.public-board-details')!, locale());
     this.current = this.host.querySelector('.live-ai-current')!;
     this.result = this.host.querySelector('.live-ai-result')!;
     this.log = this.host.querySelector('.live-ai-log')!;
@@ -151,6 +154,7 @@ export class LiveAiViewer {
     const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-live-ai]');
     if (!button) return;
     switch (button.dataset.liveAi) {
+      case 'fit': this.board.fit(); break;
       case 'start': void this.start(); break;
       case 'pause': if (this.session) { this.session.setPaused(true); this.state.textContent = 'paused'; } break;
       case 'resume': if (this.session) { this.session.setPaused(false); this.state.textContent = 'active'; } break;
@@ -213,28 +217,8 @@ export class LiveAiViewer {
   private render(observation: AgentObservation): Promise<void> {
     return new Promise((resolve, reject) => window.requestAnimationFrame(() => {
       try {
-      const rect = this.canvas.getBoundingClientRect();
-      const backing = boundedCanvasBackingSize(rect.width || 640, rect.height || 360, window.devicePixelRatio);
-      this.canvas.width = backing.width;
-      this.canvas.height = backing.height;
-      const context = this.canvas.getContext('2d');
-      if (!context) throw new Error('canvas_context_unavailable');
-      context.setTransform(backing.scale, 0, 0, backing.scale, 0, 0);
-      const width = Math.max(1, rect.width || 640);
-      const height = Math.max(1, rect.height || 360);
-      context.fillStyle = '#111827'; context.fillRect(0, 0, width, height);
-      const cellW = width / Math.max(1, observation.map.width);
-      const cellH = height / Math.max(1, observation.map.height);
-      for (const tile of observation.map.tiles) {
-        context.fillStyle = tile.terrain === 'mountain' ? '#59606a' : tile.terrain === 'forest' ? '#274936' : '#3c4a3e';
-        context.fillRect(tile.q * cellW, tile.r * cellH, Math.max(1, cellW), Math.max(1, cellH));
-        if (tile.road || tile.movementRoad) { context.fillStyle = '#a99672'; context.fillRect(tile.q * cellW, tile.r * cellH, Math.max(1, cellW), Math.max(1, cellH)); }
-      }
-      const mark = (q: number, r: number, color: string, radius: number) => { context.fillStyle = color; context.beginPath(); context.arc((q + .5) * cellW, (r + .5) * cellH, radius, 0, Math.PI * 2); context.fill(); };
-      for (const facility of observation.facilities) mark(facility.position.q, facility.position.r, facility.type === 'oilField' ? '#d59b37' : '#68b0ab', Math.max(2, Math.min(5, cellW * 1.2)));
-      for (const unit of observation.units) mark(unit.position.q, unit.position.r, '#60a5fa', Math.max(2, Math.min(5, cellW * 1.2)));
-      for (const zombie of observation.zombies) mark(zombie.position.q, zombie.position.r, '#ef4444', Math.max(2, Math.min(5, cellW * 1.2)));
-      this.canvas.dataset.backingPixels = String(this.canvas.width * this.canvas.height);
+      this.board.setLocale(locale());
+      this.board.setFrame(publicBoardFrame(observation));
       resolve();
       } catch (error) {
         reject(error);

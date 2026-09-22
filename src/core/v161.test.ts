@@ -59,9 +59,9 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
       checkpoint: CHECKPOINT_SCHEMA_VERSION,
       map: FIXED_MAP_ID,
     }).toEqual({
-      app: '1.6.3', rules: '13.0.0', save: 20, publicSave: '20',
-      agent: '18.0.0', observation: '18.0.0', bridge: '18.0.0', artifact: '17.0.0',
-      session: '14.0.0', checkpoint: '14.0.0', map: 'fixed-51x51-v8',
+      app: '1.6.4', rules: '14.0.0', save: 21, publicSave: '21',
+      agent: '19.0.0', observation: '19.0.0', bridge: '19.0.0', artifact: '18.0.0',
+      session: '15.0.0', checkpoint: '15.0.0', map: 'fixed-51x51-v8',
     });
   });
 
@@ -109,7 +109,7 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
     });
   });
 
-  it('applies the Range-1 shortage rule only to Police, Riot Police and National Guard', () => {
+  it('applies the Range-1 shortage rule only to Police, Riot Police and Soldier', () => {
     const state = createInitialState(16104, quietConfig());
     for (const type of ['police', 'riotPolice', 'nationalGuard'] as const) {
       const unit = createUnit(state, `short-${type}`, type, { q: 25, r: 25 });

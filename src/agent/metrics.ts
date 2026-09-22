@@ -84,8 +84,8 @@ export interface HordeWaveMetric {
     hunterZombie?: number;
   };
   /** Publicly declared slot count; the per-slot draw remains hidden until Spawn. */
-  nonHordeSlotCountPerDirection?: number;
-  possibleNonHordeTypes?: string[];
+  variantSlotCountPerDirection?: number;
+  possibleVariantTypes?: string[];
   specialZombieSpawnedByType?: Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
   specialZombieKilledByType?: Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
   final: boolean;
@@ -514,7 +514,7 @@ const FACILITY_TYPES: readonly string[] = [
   'capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery',
   'powerPlant', 'windPowerPlant', 'civilianDroneBase', 'simpleFarm', 'temporaryHousing', 'armyBase',
 ];
-const HUMAN_UNIT_TYPES: readonly HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces'];
+const HUMAN_UNIT_TYPES: readonly HumanUnitType[] = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery'];
 const SPECIAL_ZOMBIE_TYPES = ['policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
 const ZOMBIE_TYPES = ['zombie', 'hordeZombie', ...SPECIAL_ZOMBIE_TYPES] as const;
 
@@ -808,6 +808,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     reconTeam: events.filter(
       (event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'reconTeam',
     ).length,
+    fieldArtillery: events.filter(e => e.type === 'noise_emitted' && e.payload.sourceUnitType === 'fieldArtillery').length,
     specialForces: events.filter((event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'specialForces').length,
     hordeZombie: statisticNumber(statistics, 'hordeMovementNoisePulses') ?? events.filter(
       (event) => event.type === 'noise_emitted' && event.payload.sourceKind === 'hordeZombie',
@@ -989,7 +990,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const finalSecuredFacilities = finalObservation.facilities.filter(
     (facility) => facility.owner === 'player' && facility.status === 'owned',
   ).length;
-  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, specialForces: 0 });
+  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, specialForces: 0 });
   const statisticHumanRecord = (key: string): Record<HumanUnitType, number> => {
     const source = numericRecord(isRecord(statistics) ? statistics[key] : undefined);
     return Object.fromEntries(HUMAN_UNIT_TYPES.map((type) => [type, source[type] ?? 0])) as Record<HumanUnitType, number>;
@@ -1397,11 +1398,11 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
         && candidate.payload.waveIndex === waveIndex).length,
     ])) as Record<typeof SPECIAL_ZOMBIE_TYPES[number], number>;
     const waveRecord = wave as unknown as Record<string, unknown>;
-    const nonHordeSlotCountPerDirection = numberOrZero(
-      waveRecord.nonHordeSlotCountPerDirection ?? waveRecord.nonHordeSlotsPerDirection,
+    const variantSlotCountPerDirection = numberOrZero(
+      waveRecord.variantSlotCountPerDirection,
     ) || (baseComposition.zombie > 0 ? baseComposition.zombie : undefined);
-    const possibleNonHordeTypes = Array.isArray(waveRecord.possibleNonHordeTypes)
-      ? waveRecord.possibleNonHordeTypes.filter((type): type is string => typeof type === 'string')
+    const possibleVariantTypes = Array.isArray(waveRecord.possibleVariantTypes)
+      ? waveRecord.possibleVariantTypes.filter((type): type is string => typeof type === 'string')
       : undefined;
     const hordeZombieKilled = events.filter((candidate) => candidate.type === 'unit_destroyed'
       && candidate.payload.unitType === 'hordeZombie'
@@ -1411,7 +1412,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       && candidate.payload.waveIndex === waveIndex).reduce((total, candidate) => total + 1, 0);
     for (const direction of directions) {
       hordeDirectionSpawnCounts[direction].hordeZombie += baseComposition.hordeZombie;
-      hordeDirectionSpawnCounts[direction].normalZombie += nonHordeSlotCountPerDirection ?? baseComposition.zombie;
+      hordeDirectionSpawnCounts[direction].normalZombie += variantSlotCountPerDirection ?? baseComposition.zombie;
     }
     return {
       index: waveIndex,
@@ -1422,8 +1423,8 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
       spawnedSoFar: publicTotals?.spawnedSoFar ?? 0,
       pendingCount: publicTotals?.pendingCount ?? 0,
       compositionPerDirection: baseComposition,
-      ...(nonHordeSlotCountPerDirection === undefined ? {} : { nonHordeSlotCountPerDirection }),
-      ...(possibleNonHordeTypes === undefined ? {} : { possibleNonHordeTypes }),
+      ...(variantSlotCountPerDirection === undefined ? {} : { variantSlotCountPerDirection }),
+      ...(possibleVariantTypes === undefined ? {} : { possibleVariantTypes }),
       specialZombieSpawnedByType,
       specialZombieKilledByType,
       final: wave.final,

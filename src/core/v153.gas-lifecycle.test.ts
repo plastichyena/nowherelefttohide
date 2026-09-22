@@ -101,8 +101,8 @@ describe('v1.5.3 Gas Zombie lifecycle', () => {
 
     expect(state.units.some((unit) => unit.id === gas.id)).toBe(false);
     expect(state.units.some((unit) => unit.id === plain.id)).toBe(true);
-    expect(plain.hp).toBe(10);
-    expect(forest.hp).toBe(5);
+    expect(plain.hp).toBe(25);
+    expect(forest.hp).toBe(12);
     expect(humanInForest.hp).toBe(20);
     expect(centerUnit.hp).toBe(centerUnit.maxHp);
     expect(distanceTwo.hp).toBe(distanceTwo.maxHp);
@@ -114,14 +114,14 @@ describe('v1.5.3 Gas Zombie lifecycle', () => {
       `facility:${facility.id}`,
     ]);
     expect(state.statistics.gasExplosions).toBe(1);
-    expect(state.statistics.gasExplosionUnitDamage).toBe(30 + 15 + 30);
+    expect(state.statistics.gasExplosionUnitDamage).toBe(15 + 8 + 30);
   });
 
   it('defers every death and fall until all direct effects finish, then resolves simultaneous Gas deaths in ID-stable FIFO order', () => {
     const state = freshState(15302);
     const root = pushUnit(state, 'gas-root', 'gasZombie', 10, 10);
-    const gasZ = pushUnit(state, 'gas-z', 'gasZombie', 10, 9, 30);
-    const gasA = pushUnit(state, 'gas-a', 'gasZombie', 11, 10, 30);
+    const gasZ = pushUnit(state, 'gas-z', 'gasZombie', 10, 9, 15);
+    const gasA = pushUnit(state, 'gas-a', 'gasZombie', 11, 10, 15);
     const facility = state.facilities.find((candidate) => candidate.type === 'farm')!;
     facility.position = { q: 9, r: 10 };
     facility.workers = 1;
@@ -187,7 +187,7 @@ describe('v1.5.3 Gas Zombie lifecycle', () => {
   it('allows a unit spawned after one snapshot to become a target of the next queued Gas explosion', () => {
     const state = freshState(15305);
     const root = pushUnit(state, 'gas-root', 'gasZombie', 10, 10);
-    pushUnit(state, 'gas-next', 'gasZombie', 11, 10, 30);
+    pushUnit(state, 'gas-next', 'gasZombie', 11, 10, 15);
     let spawned = false;
     const { dealDamage } = createHarness(state, {
       falls: (_targets, sourceId) => {

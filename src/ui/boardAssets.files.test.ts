@@ -73,7 +73,7 @@ describe('board runtime PNG files', () => {
     const paths = [...BOARD_ASSET_PATHS];
     expect(paths).toHaveLength(new Set(paths).size);
     expect(paths.some((path) => /water/iu.test(path))).toBe(true);
-    expect(paths.filter((path) => path.startsWith('units/'))).toHaveLength(14);
+    expect(paths.filter((path) => path.startsWith('units/'))).toHaveLength(16);
     expect(paths).toEqual(expect.arrayContaining([
       'overlays/terrain_bridge.png',
       'units/unit_special_forces.png',

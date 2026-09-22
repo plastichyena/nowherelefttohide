@@ -1,0 +1,15 @@
+{
+  "method": "built-in image_gen",
+  "status": "Both candidate_v1 images approved by the user on 2026-09-21 as production source art. No runtime integration.",
+  "requirements": "Doc/Nowhere Left to Hide PoC v1.6.4 アップデート要件 確定版.md",
+  "assets": [
+    {
+      "file": "unit_field_artillery_packed_candidate_v1.png",
+      "prompt": "Use case: stylized-concept. Create one transparent PNG strategy game unit sprite for Nowhere Left to Hide: PACKED FIELD ARTILLERY. One olive-drab military cargo truck towing one old-fashioned field howitzer with a long barrel, two wheels, folded trails mechanically connected to the rear tow hitch. Truck and gun only, NO people anywhere, including cab. Coherent recognizable towing arrangement. Gritty hand-painted comic-like miniature game art, strong dark outlines, muted olive/brown palette, readable chunky shapes, subtle worn metal, three-quarter slightly elevated view. Entire truck and entire towed cannon visible, compact diagonal square composition, generous clear margins, legible at 256px. Genuine transparent alpha background. No ground tile, scene, dust, text, logos, border, UI, muzzle flash, extra vehicles or weapons. This is a mobile hex strategy board asset, not a photo. Output one square image."
+    },
+    {
+      "file": "unit_field_artillery_deployed_candidate_v1.png",
+      "prompt": "Use case: stylized-concept. Create one transparent PNG strategy game unit sprite for Nowhere Left to Hide: DEPLOYED FIELD ARTILLERY. One old-fashioned olive-drab towed field howitzer with long barrel, two wheels and spread split trails resting on the ground, prepared to fire, with exactly THREE adult human artillery crew in olive camouflage uniforms and helmets positioned naturally at the breech and beside the carriage. NO truck, towing vehicle or other vehicle. Cannon is dominant, crew subordinate, clean readable silhouettes. Gritty hand-painted comic-like miniature game art, strong dark outlines, muted olive/brown palette, chunky readable shapes, subtle worn metal, three-quarter slightly elevated view. Whole barrel, wheels, trails and all crew visible in a compact square composition with generous transparent margins, legible at 256px. Genuine transparent alpha background. No ground tile, scenery, text, emblems, borders, UI, muzzle flash or extra guns. This is a mobile hex strategy board asset, not a photo. Output one square image."
+    }
+  ]
+}

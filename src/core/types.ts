@@ -76,6 +76,7 @@ export type UnitType =
   | 'riotPolice'
   | 'reconTeam'
   | 'specialForces'
+  | 'fieldArtillery'
   | 'packZombie'
   | 'zombie'
   | 'hordeZombie'
@@ -89,7 +90,9 @@ export type UnitType =
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
 
-export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam' | 'specialForces'>;
+export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam' | 'specialForces' | 'fieldArtillery'>;
+
+export type UnitMode = 'packed' | 'deployed';
 
 export type MovementDomain = 'ground';
 export interface InfectionGrace { count: number; spreadsFromTurn: number }
@@ -262,6 +265,7 @@ export interface PopulationState {
   riotPolice: number;
   reconTeam: number;
   specialForces: number;
+  fieldArtillery: number;
   /** Population in units is tracked separately from civilian workers. */
   unitPopulation: number;
   /** Facility assignment is kept as an array so it remains JSON-only. */
@@ -294,6 +298,8 @@ export interface CityPopulationSnapshot {
 }
 
 export interface UnitState {
+  mode?: UnitMode;
+  modeChangedTurn?: number;
   movementDomain: MovementDomain;
   /** Private scheduling gate for atomic reanimation. */
   firstZombieActionTurn?: number;
@@ -465,6 +471,7 @@ export type NoisePulseSourceKind = 'humanCombat' | 'hordeMovement' | 'armyBase' 
 
 /** Internal deterministic work item. Public projections never expose center or source id. */
 export interface NoisePulse {
+  secondaryCenter?: HexCoord;
   id: string;
   center: HexCoord;
   radius: number;
@@ -474,6 +481,9 @@ export interface NoisePulse {
 }
 
 export type GameEventType =
+  | 'unit_mode_changed'
+  | 'artillery_fired'
+  | 'artillery_population_damage'
   | 'barbed_wire_built'
   | 'barbed_wire_attack_charge'
   | 'barbed_wire_damaged'
@@ -1026,6 +1036,8 @@ export interface BarbedWireState {
 }
 
 export interface GameState {
+  completedProductions: Record<HumanUnitType, number>;
+  artilleryRngState: RngState;
   publicHealthStress: { food: number; civilianGoods: number };
   foodShortageAccumulation: number;
   starvationCarry: number;
@@ -1179,6 +1191,8 @@ export interface LoadSnapshotAction {
 }
 
 export type GameAction =
+  | { type: 'ChangeUnitMode'; unitId: string; mode: UnitMode }
+  | { type: 'AttackHex'; attackerId: string; position: HexCoord }
   | { type: 'BuildBarbedWire'; position: HexCoord }
   | MoveAction
   | AttackAction
@@ -1240,13 +1254,16 @@ export interface BaseUnitConfig {
 }
 
 export interface HumanUnitConfig extends BaseUnitConfig {
+  capabilities: { capture: boolean; recoverCheckpoint: boolean; suppress: boolean; contain: boolean };
+  productionFuel: number;
+  productionLimitPerGame: number | null;
   regularAttackCharges: number;
   veteranAttackCharges: number;
   recruitAttack: number;
   recruitmentFacilityTypes: Array<'capital' | 'city' | 'armyBase'>;
   productionCivilianGoods: number;
   productionMilitaryGoods: number;
-  fuelCostRule: 'policeLike' | 'nationalGuardLike';
+  fuelCostRule: 'policeLike' | 'nationalGuardLike' | 'perMovementPoint';
   suppressionCivilianDamageRate: number;
   reanimationUnitType: 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'packZombie';
   noiseClass: NoiseClass;
@@ -1266,6 +1283,11 @@ export interface UnitConfigMap {
   riotPolice: HumanUnitConfig;
   reconTeam: HumanUnitConfig;
   specialForces: HumanUnitConfig;
+  fieldArtillery: HumanUnitConfig & {
+    deployed: { recruitAttack: number; movement: number; minRange: number; range: number; militaryGoodsCost: number; noiseRadius: number };
+    scatter: Record<UnitProficiency, { hitProbability: number; radius: number }>;
+    fuelPerMovementPoint: number; friendlyFire: boolean; facilityPopulationDamage: boolean;
+  };
   packZombie: ZombieUnitConfig;
   zombie: ZombieUnitConfig;
   hordeZombie: ZombieUnitConfig;
@@ -1273,7 +1295,7 @@ export interface UnitConfigMap {
   soldierZombie: ZombieUnitConfig;
   riotZombie: ZombieUnitConfig;
   hunterZombie: ZombieUnitConfig;
-  gasZombie: ZombieUnitConfig & { explosionDamage: number; explosionInfection: number };
+  gasZombie: ZombieUnitConfig & { explosionDamage: number; explosionZombieDamage: number; explosionInfection: number };
   screamerZombie: ZombieUnitConfig & { screamRadius: number };
 }
 
@@ -1322,7 +1344,6 @@ export interface HordeConfig {
   specialZombieWeights: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number> & { screamerZombie?: number };
   riotZombieCapPerDirection: number;
   hunterZombieCapPerDirection: number;
-  gasZombieCapPerDirection: number;
   movementNoiseRadius: number;
 }
 

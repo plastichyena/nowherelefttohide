@@ -61,13 +61,13 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.6.3');
-    expect(titleVersionLabel('en')).toContain('1.6.3');
+    expect(titleVersionLabel('ja')).toContain('1.6.4');
+    expect(titleVersionLabel('en')).toContain('1.6.4');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
 
-  it('uses Core refugee defaults and distinguishes Gas weights in the last two Waves', () => {
+  it('uses Core refugee defaults and uses the same Gas weights in every Wave', () => {
     const config = createDefaultConfig();
     expect(newGameRefugeeDefaults(config)).toEqual({
       intervalMin: config.refugees.arrivalIntervalMin,
@@ -76,10 +76,10 @@ describe('controller view models', () => {
       peopleMax: 20,
     });
     expect(hordeCompositionLabel(config.horde.waves[0], 'en', config)).toContain(
-      'Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 0',
+      'Horde Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 5',
     );
     expect(hordeCompositionLabel(config.horde.waves.at(-2), 'en', config)).toContain(
-      'Zombie 60 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 5',
+      'Horde Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 5',
     );
   });
 
@@ -87,7 +87,7 @@ describe('controller view models', () => {
     const config = createDefaultConfig();
     const capital = { id: 'capital', type: 'capital', position: { q: 25, r: 25 } } as FacilityState;
     const armyBase = { id: 'army-base-1', type: 'armyBase', position: { q: 25, r: 19 } } as FacilityState;
-    const state = { config } as GameState;
+    const state = { config, completedProductions: {}, pendingUnitProductions: [] } as unknown as GameState;
     const capitalActions = (['police', 'nationalGuard', 'riotPolice', 'reconTeam'] as const).map((unitType) => ({
       type: 'ProduceUnit' as const, unitType, destination: { ...capital.position },
     }));
@@ -110,12 +110,12 @@ describe('controller view models', () => {
       legal: true,
     });
     expect(recruitmentOptionsForFacility(state, armyBase, baseActions, 'en').map((option) => option.unitType))
-      .toEqual(['nationalGuard', 'reconTeam']);
+      .toEqual(['nationalGuard', 'reconTeam', 'fieldArtillery']);
     const markup = renderRecruitmentAccordion(state, armyBase, baseActions, 'en');
     expect(markup).toContain('<details class="recruitment-accordion"');
     expect(markup).not.toMatch(/<details[^>]*\sopen(?:\s|>)/);
     expect(markup).toContain('aria-expanded="false"');
-    expect(markup).toContain('National Guard');
+    expect(markup).toContain('Soldier');
     expect(markup).toContain('Population 10');
     expect(markup).toContain('Civilian 20');
     expect(markup).toContain('Military 25');
@@ -309,26 +309,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.6.2-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.6.3-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.2以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.3');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.3以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.4');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.2 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.3');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.3 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.4');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 13.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 20');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 13.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 20');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 14.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 21');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 14.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 21');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.2以前' : 'v1.6.2-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.3以前' : 'v1.6.3 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.3以前' : 'v1.6.3 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.3以前' : 'v1.6.3-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.3以前' : 'v1.6.3-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.3以前' : 'v1.6.3-or-earlier');
     }
   });
 
@@ -914,8 +914,8 @@ describe('controller view models', () => {
     expect(english).toContain('Police Zombie');
     expect(english).toContain('Soldier Zombie');
     expect(english).toContain('Special Slot weights');
-    expect(english).toContain('Before the last two Waves: Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 0');
-    expect(english).toContain('Last two Waves: Zombie 60 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 5');
+    expect(english).toContain('Every Wave: Horde Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 5');
+    expect(english).toContain('Every Wave: Horde Zombie 65 / Police Zombie 10 / Soldier Zombie 10 / Riot Zombie 5 / Hunter Zombie 5 / Screamer Zombie 5 / Gas Zombie 5');
     expect(english).toContain('Special Slot caps');
     expect(english).toContain('Riot Zombie 1 · Hunter Zombie 1');
     expect(english).toContain('Initial Hunter count');
@@ -935,7 +935,7 @@ describe('controller view models', () => {
 });
 
 
-it.each(['ja', 'en'] as const)('renders v1.6.3 starvation causes and numbers in %s without internal codes', locale => {
+it.each(['ja', 'en'] as const)('renders v1.6.4 starvation causes and numbers in %s without internal codes', locale => {
   const summary = crisisSummaryViewModel({ crisisSummary: { alerts: [{ id:'starvation',severity:'critical',reasonCode:'food_starvation_risk',entityIds:[],publicFacts:{rate:0.05,populationLost:3,accumulation:4.5,carry:0.25} }] } });
   const html = renderCrisisStrip(summary, locale);
   expect(html).toContain(locale === 'ja' ? '飢餓死亡の危険' : 'Starvation danger');

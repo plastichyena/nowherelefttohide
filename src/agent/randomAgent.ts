@@ -1,3 +1,4 @@
+import { artilleryActionAssessment } from './artillery-policy';
 import { SeededRng } from '../core/rng';
 import type { GameAction } from '../core/types';
 import { actionKey, cloneAction, sortActions } from './action';
@@ -35,7 +36,7 @@ export class RandomAgent implements GameAgent {
     if (legalActions.length === 0) {
       throw new Error('Random Agent cannot decide without a legal action');
     }
-    const ordered = sortActions(legalActions);
+    const ordered = sortActions(legalActions).filter(action=>artilleryActionAssessment(_observation,action)?.allowed!==false);
     // EndTurn is the only safe action at the engine action limit.  Prefer it
     // when it is the sole candidate; this also makes small fake games useful
     // in unit tests and avoids consuming a chooser draw unnecessarily.

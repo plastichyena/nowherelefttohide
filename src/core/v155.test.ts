@@ -75,7 +75,7 @@ describe('v1.5.5 public and terrain boundaries',()=>{
     const state=setup();state.units=[];clearScenarioCheckpoints(state);
     const add=(id:string,type:Parameters<typeof createUnit>[2],q:number,r:number,hp?:number)=>{const u=createUnit(state,id,type,{q,r});if(hp!==undefined)u.hp=hp;state.units.push(u);return u;};
     const human=add('observer','police',25,25,50),gas=add('gas','gasZombie',24,25,1),chain=add('gas-chain','gasZombie',24,24,1),enemy=add('victim','hordeZombie',23,25,40);
-    const preview=gasAttackPreview(state,gas,1)!;expect(preview.explosions.map(e=>e.sourceId)).toEqual(['gas','gas-chain']);expect(preview.units.find(u=>u.unitId===human.id)?.damage).toBe(15);expect(preview.units.find(u=>u.unitId===enemy.id)?.damage).toBe(30);expect(preview.sites.find(s=>s.siteId==='capital')?.infected).toBe(30);
+    const preview=gasAttackPreview(state,gas,1)!;expect(preview.explosions.map(e=>e.sourceId)).toEqual(['gas','gas-chain']);expect(preview.units.find(u=>u.unitId===human.id)?.damage).toBe(15);expect(preview.units.find(u=>u.unitId===enemy.id)?.damage).toBe(16);expect(preview.sites.find(s=>s.siteId==='capital')?.infected).toBe(30);
     const hidden=add('hidden-gas','gasZombie',1,1,1);expect(gasAttackPreview(state,gas,1)).toEqual(preview);hidden.hp=100;expect(gasAttackPreview(state,gas,1)).toEqual(preview);
     expect(gasAttackPreview(state,gas,0)?.trigger).toBe('nonlethal_no_explosion');expect(gasAttackPreview(state,gas,0)?.explosions).toEqual([]);
   });

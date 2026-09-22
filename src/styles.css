@@ -644,3 +644,15 @@ button.crisis-alert:hover, button.crisis-alert:focus-visible { border-color: #ff
   .live-ai-board { height: min(42vh, 300px); min-height: 130px; }
   .live-ai-result { max-height: 5.5rem; }
 }
+
+.public-board-details { padding: .75rem; background: #182622; border: 1px solid #456156; border-radius: .5rem; overflow-wrap: anywhere; }
+.public-board-details dl { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; gap: .3rem .75rem; margin: .5rem 0; }
+.public-board-details dt { color: #abbfb5; }
+.public-board-details dd { margin: 0; }
+.live-ai-board canvas { touch-action: none; }
+
+.artillery-preview { max-width: min(30rem, 65vw); max-height: 45vh; overflow: auto; font-size: .8rem; padding: .4rem; }
+.modal-card .artillery-preview { max-width: 100%; max-height: 50vh; }
+.artillery-preview p { margin: .35rem 0; }
+.artillery-preview summary { min-height: 44px; cursor: pointer; }
+.artillery-details { border: 1px solid #9f8853; border-radius: .5rem; padding: .65rem; }

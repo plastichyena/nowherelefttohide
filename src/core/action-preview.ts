@@ -1,5 +1,7 @@
 import { forecastEndTurn } from './economy-query';
-import { GameEngine } from './engine';
+import { previewArtillery, type ArtilleryPreview } from './artillery';
+import { deployedArtillery } from './unit-capabilities';
+import { GameEngine, validateAction } from './engine';
 import { cloneState } from './state';
 import type { EndTurnForecast, GameAction, GameState, JsonValue, ResourceType } from './types';
 
@@ -26,6 +28,7 @@ export interface EconomyPreviewSnapshot {
 }
 
 export interface CoreActionPreview {
+  artillery?: ArtilleryPreview;
   capitalResidents: { before: number; after: number };
   capitalMinimum: 1;
   capitalResidentDelta: number;
@@ -129,6 +132,9 @@ export function previewCoreAction(
   const beforeForecast = forecastEndTurn(beforeState);
   const beforeHeadroom = deriveSupportHeadroom(beforeState, beforeForecast);
   let afterState = beforeState;
+  const artilleryUnit = 'attackerId' in action ? beforeState.units.find(u=>u.id===action.attackerId&&deployedArtillery(u)) : undefined;
+  const artilleryAim = action.type === 'AttackHex' ? action.position : action.type === 'Attack' ? beforeState.units.find(u=>u.id===action.targetId)?.position : undefined;
+  const artillery = artilleryUnit && artilleryAim ? previewArtillery(beforeState,artilleryUnit,artilleryAim) : undefined;
   let legal = true;
   let reasonCode: string | null = null;
   let reason: string | null = null;
@@ -137,6 +143,10 @@ export function previewCoreAction(
     legal = false;
     reasonCode = 'preview_unsupported_action';
     reason = 'Session lifecycle actions are not previewable';
+  } else if (artillery) {
+    const validation = validateAction(beforeState,action);
+    legal = validation === null; reasonCode=validation?.code??null; reason=validation?.message??null;
+    // Never execute a stochastic attack on a clone: that reveals the live stream's future.
   } else if (action.type !== 'EndTurn') {
     const scratch = new GameEngine(beforeState.seed, beforeState.config);
     const loaded = scratch.step({ type: 'LoadSnapshot', snapshot: beforeState });
@@ -171,6 +181,7 @@ export function previewCoreAction(
   const recovered = afterState.facilities.find((facility) => facility.recoveryOperationalTurn !== null
     && beforeState.facilities.find((candidate) => candidate.id === facility.id)?.recoveryOperationalTurn !== facility.recoveryOperationalTurn);
   return {
+    ...(artillery ? {artillery} : {}),
     capitalResidents: { before: beforeState.facilities.find(f => f.type === 'capital')!.workers, after: afterState.facilities.find(f => f.type === 'capital')!.workers },
     capitalMinimum: 1,
     capitalResidentDelta: afterState.facilities.find(f => f.type === 'capital')!.workers - beforeState.facilities.find(f => f.type === 'capital')!.workers,

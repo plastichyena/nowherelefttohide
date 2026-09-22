@@ -1,3 +1,4 @@
+import { deployedArtillery, canReact } from './unit-capabilities';
 import type { GameState, UnitState, HexCoord, MoveAction, ActionError, GameAction } from './types';
 import { hexKey, hexDistance, hexWithinBounds } from './hex';
 import { getUnit, getUnitAt } from './state';
@@ -12,6 +13,7 @@ function isPlayerPhase(state: Readonly<GameState>): boolean { return state.phase
 import type { HumanUnitType } from './types';
 
 export function unitMoveFuelCost(unitType: HumanUnitType, distance: number): number {
+  if (unitType === 'fieldArtillery') return Math.max(0, Math.floor(distance)) * 10;
   const entered = Math.max(0, Math.floor(distance));
   if (entered === 0) return 0;
   const base = entered <= 5
@@ -22,6 +24,10 @@ export function unitMoveFuelCost(unitType: HumanUnitType, distance: number): num
   return base * 2;
 }
 
+
+export function movementFuelCost(state: Readonly<GameState>, unit: UnitState, hexes: number, movementPoints: number): number {
+  return unit.type === 'fieldArtillery' ? movementPoints * state.config.units.fieldArtillery.fuelPerMovementPoint : unitMoveFuelCost(unit.type as HumanUnitType,hexes);
+}
 
 export interface MovePreview {
   legal: boolean;
@@ -41,7 +47,7 @@ export function interceptorsAt(state: GameState, mover: UnitState, position: Hex
       (candidate) =>
         candidate.id !== mover.id &&
         candidate.isPlayerUnit !== mover.isPlayerUnit &&
-        candidate.canAttack &&
+        canReact(candidate) &&
         forecastUnitCombatAtDistance(state, candidate, hexDistance(candidate.position, position)).canAttack,
     )
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -58,7 +64,7 @@ export function getMovePath(state: GameState, action: MoveAction): {
   if (!unit || !unit.isPlayerUnit) {
     return error(action, 'unknown_unit', 'A player unit is required');
   }
-  if (!isPlayerPhase(state) || unit.actionState === 'acted' || !unit.canMove) {
+  if (!isPlayerPhase(state) || unit.actionState === 'acted' || !unit.canMove || deployedArtillery(unit)) {
     return error(action, 'unit_cannot_move', 'This unit cannot move now');
   }
   if (!hexWithinBounds(action.destination, state.map.width, state.map.height)) {
@@ -95,7 +101,7 @@ export function getMovePath(state: GameState, action: MoveAction): {
   if (path.length <= 1 || effectiveCost > movementBudget) {
     return error(action, 'out_of_range', 'Destination exceeds movement range');
   }
-  const fuelCost = movementMode === 'normal' ? unitMoveFuelCost(unit.type as HumanUnitType, path.length - 1) : 0;
+  const fuelCost = movementMode === 'normal' ? movementFuelCost(state, unit, path.length - 1, effectiveCost) : 0;
   if (movementMode === 'normal' && unit.currentFuel < fuelCost) {
     return error(action, 'insufficient_unit_fuel', 'The unit does not have enough Fuel for this move');
   }
@@ -123,7 +129,7 @@ function computeReachableMovePaths(state: GameState, unit: UnitState) {
     movementBudget,
     blocked,
     createMovementCostResolver(state, true, visible),
-  ).filter((entry) => movementMode === 'emergency' || unit.currentFuel >= unitMoveFuelCost(unit.type as HumanUnitType, entry.path.length - 1));
+  ).filter((entry) => movementMode === 'emergency' || unit.currentFuel >= movementFuelCost(state, unit, entry.path.length - 1, entry.cost));
 }
 
 export function reachableDestinations(state: GameState, unit: UnitState): HexCoord[] {
@@ -142,10 +148,10 @@ export function getUnitLegalMoveFuelProjections(
 }> {
   const snapshot = state as GameState;
   const unit = getUnit(snapshot, unitId);
-  if (!unit || !unit.isPlayerUnit || unit.actionState === 'acted' || !unit.canMove || snapshot.phase !== 'player') return [];
+  if (!unit || !unit.isPlayerUnit || unit.actionState === 'acted' || !unit.canMove || deployedArtillery(unit) || snapshot.phase !== 'player') return [];
   return reachableMovePaths(snapshot, unit).map((entry) => {
     const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
-    const fuelCost = movementMode === 'normal' ? unitMoveFuelCost(unit.type as HumanUnitType, entry.path.length - 1) : 0;
+    const fuelCost = movementMode === 'normal' ? movementFuelCost(state, unit, entry.path.length - 1, entry.cost) : 0;
     return {
       destination: { ...entry.position },
       fuelCost,
@@ -183,7 +189,7 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
       const partialPath = candidate.path.slice(0, entered + 1);
       const effectiveCost = pathMovementCost(partialPath, createMovementCostResolver(snapshot, true, initiallyVisible));
       const fuelCost = candidate.movementMode === 'normal'
-        ? unitMoveFuelCost(mover.type as HumanUnitType, entered)
+        ? movementFuelCost(state, mover, entered, effectiveCost)
         : 0;
       return {
         legal: true,

@@ -49,7 +49,7 @@ function findCombatArena(
 
 function resetGuardForAttack(state: GameState): UnitState {
   const guard = state.units.find((unit) => unit.type === 'nationalGuard');
-  if (!guard) throw new Error('National Guard is missing');
+  if (!guard) throw new Error('Soldier is missing');
   guard.actionState = 'ready';
   guard.canAttack = true;
   guard.canMove = true;
@@ -140,8 +140,9 @@ describe('v1.4 Horde composition and combat', () => {
       expect(new Set(groupIds).size).toBe(wave.directionCount);
       for (const groupId of groupIds) {
         const group = engine.getState().units.filter((unit) => unit.spawnGroupId === groupId);
-        expect(group.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(wave.compositionPerDirection.hordeZombie);
-        expect(group.filter((unit) => unit.type !== 'hordeZombie' && unit.type !== 'packZombie')).toHaveLength(wave.compositionPerDirection.zombie);
+        expect(group.filter((unit) => unit.type === 'hordeZombie').length).toBeGreaterThanOrEqual(wave.compositionPerDirection.hordeZombie);
+        expect(group.filter(unit=>unit.type==='zombie')).toHaveLength(0);
+        expect(group.filter(unit=>unit.type!=='packZombie')).toHaveLength(wave.compositionPerDirection.hordeZombie+wave.compositionPerDirection.zombie);
         expect(group.filter((unit) => unit.type !== 'hordeZombie' && unit.type !== 'packZombie').every((unit) =>
           ['zombie', 'policeZombie', 'soldierZombie', 'riotZombie'].includes(unit.type),
         )).toBe(true);
@@ -179,12 +180,12 @@ describe('v1.4 Horde composition and combat', () => {
     const finalSpecial = Object.values(statistics.finalSpecialZombiesSpawnedByType).reduce((sum, value) => sum + value, 0);
     const allSpecial = Object.values(statistics.hordeSpecialSpawnedByType).reduce((sum, value) => sum + value, 0);
     expect(statistics).toMatchObject({
-      periodicHordeZombiesSpawned: expectedPeriodicHorde,
-      finalHordeZombiesSpawned: expectedFinalHorde,
+      periodicNormalZombiesSpawned: 0,
+      finalNormalZombiesSpawned: 0,
       finalHordeSpawned: expectedFinalSpawned + 1,
     });
-    expect(statistics.periodicNormalZombiesSpawned + allSpecial - finalSpecial).toBe(expectedPeriodicNonHorde);
-    expect(statistics.finalNormalZombiesSpawned + finalSpecial).toBe(expectedFinalNonHorde + 1);
+    expect(statistics.periodicHordeZombiesSpawned + allSpecial - finalSpecial).toBe(expectedPeriodicHorde + expectedPeriodicNonHorde);
+    expect(statistics.finalHordeZombiesSpawned + finalSpecial).toBe(expectedFinalHorde + expectedFinalNonHorde + 1);
   }, 60_000);
 
   it('uses custom per-type composition arithmetic for Periodic and Final groups', () => {
@@ -206,12 +207,12 @@ describe('v1.4 Horde composition and combat', () => {
     const first = state.units.filter((unit) => unit.spawnGroupId === 'wave-1-north' || unit.spawnGroupId === 'wave-1-east' || unit.spawnGroupId === 'wave-1-south' || unit.spawnGroupId === 'wave-1-west');
     const second = state.units.filter((unit) => unit.spawnGroupId === 'wave-2-north' || unit.spawnGroupId === 'wave-2-east' || unit.spawnGroupId === 'wave-2-south' || unit.spawnGroupId === 'wave-2-west');
     const final = state.units.filter((unit) => unit.spawnGroupId !== null && state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId));
-    expect([first.filter((unit) => unit.type === 'hordeZombie').length, first.filter((unit) => unit.type === 'zombie').length]).toEqual([3, 2]);
-    expect([second.filter((unit) => unit.type === 'hordeZombie').length, second.filter((unit) => unit.type === 'zombie').length]).toEqual([5, 3]);
-    expect([final.filter((unit) => unit.type === 'hordeZombie').length, final.filter((unit) => unit.type === 'zombie').length]).toEqual([4, 3]);
+    expect([first.filter((unit) => unit.type === 'hordeZombie').length, first.filter((unit) => unit.type === 'zombie').length]).toEqual([5, 0]);
+    expect([second.filter((unit) => unit.type === 'hordeZombie').length, second.filter((unit) => unit.type === 'zombie').length]).toEqual([8, 0]);
+    expect([final.filter((unit) => unit.type === 'hordeZombie').length, final.filter((unit) => unit.type === 'zombie').length]).toEqual([7, 0]);
   });
 
-  it('counts Final Normal Zombies as Final members and in both kill metrics', () => {
+  it('counts normalized Final Wave members as Horde Zombies in both kill metrics', () => {
     const engine = new GameEngine(304, safeScenarioConfig({
       horde: {
         ...singleFinalWave(1, { hordeZombie: 1, zombie: 1 }),
@@ -222,7 +223,7 @@ describe('v1.4 Horde composition and combat', () => {
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     const spawned = cloneState(engine.getState());
     const finalGroupId = spawned.horde.finalSpawnGroupIds[0]!;
-    const normal = spawned.units.find((unit) => unit.type === 'zombie' && unit.spawnGroupId === finalGroupId)!;
+    const normal = spawned.units.filter(unit=>unit.type==='hordeZombie'&&unit.spawnGroupId===finalGroupId)[1]!;
     const horde = spawned.units.find((unit) => unit.type === 'hordeZombie' && unit.spawnGroupId === finalGroupId)!;
 
     const normalOnly = cloneState(spawned);
@@ -240,7 +241,7 @@ describe('v1.4 Horde composition and combat', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot: spawned }).error).toBeNull();
     const normalKill = engine.step({ type: 'Attack', attackerId: guard.id, targetId: normal.id });
     expect(normalKill.error).toBeNull();
-    expect(normalKill.state.statistics).toMatchObject({ normalZombiesKilled: 1, finalHordeKilled: 1 });
+    expect(normalKill.state.statistics).toMatchObject({ normalZombiesKilled: 0, hordeZombiesKilled: 1, finalHordeKilled: 1 });
     expect(normalKill.state.horde.finalHordeStatus).toBe('active');
 
     const hordeSetup = cloneState(normalKill.state);
@@ -252,8 +253,8 @@ describe('v1.4 Horde composition and combat', () => {
     const hordeKill = engine.step({ type: 'Attack', attackerId: resetGuard.id, targetId: survivingHorde.id });
     expect(hordeKill.error).toBeNull();
     expect(hordeKill.state.statistics).toMatchObject({
-      normalZombiesKilled: 1,
-      hordeZombiesKilled: 1,
+      normalZombiesKilled: 0,
+      hordeZombiesKilled: 2,
       finalHordeKilled: 2,
       finalHordeDefeated: false,
     });
