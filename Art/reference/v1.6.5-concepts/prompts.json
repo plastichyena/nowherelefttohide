@@ -1,0 +1,40 @@
+{
+  "date": "2026-09-23",
+  "method": "built-in image_gen",
+  "status": "Generated candidates, awaiting user visual selection. No runtime integration.",
+  "requirements": "Doc/Nowhere Left to Hide PoC v1.6.5 アップデート要件 確定版.md",
+  "styleReferencesInspected": [
+    "public/assets/board/facilities/facility_army_base.png",
+    "Art/reference/v1.6.4-concepts/unit_field_artillery_packed_candidate_v1.png"
+  ],
+  "assets": [
+    {
+      "file": "facility_air_base_candidate_v1.png",
+      "prompt": "Use case: stylized-concept. Asset type: one transparent PNG facility sprite for the mobile hex strategy game Nowhere Left to Hide. Create a compact military AIR BASE, a single miniature facility with a clearly visible broad diagonal asphalt RUNWAY, white dashed runway centerline and threshold stripes, one low olive-green aircraft hangar and a compact control tower beside the runway. The runway must dominate the readable silhouette and remain unmistakable at 256px. Gritty hand-painted 2D strategy board art, fine strong dark outlines, compact isometric three-quarter elevated view, muted olive green, slate teal, warm gray concrete and restrained ochre details, coherent with painted military base miniatures. Centered square composition, all buildings and full short runway visible, generous transparent margins. Only the compact facility footprint has paving; outside it is genuinely transparent alpha, not a painted checkerboard. No surrounding scenery or map terrain, no people, parked aircraft, vehicles, flags, insignia, readable words, numbers, labels, logos, border, UI or watermark. Output one image, not a sheet of variants.",
+      "sourceOutput": "exec-11122390-7b2e-4fa6-a0ac-a7dd8d040dda.png",
+      "references": []
+    },
+    {
+      "file": "unit_multipurpose_helicopter_landed_candidate_v1.png",
+      "prompt": "Use case: stylized-concept. Asset type: single transparent PNG unit sprite for mobile hex strategy game Nowhere Left to Hide. Create one LANDED multipurpose military helicopter, original fictional medium twin-engine utility helicopter inspired by a Black Hawk silhouette, subdued olive drab metal, dark cockpit glazing, closed side doors, robust wheeled landing gear with tires visibly supporting the fuselage in a settled level ground stance. Main rotor is COMPLETELY STOPPED: exactly four crisp sharply defined individual stationary rotor blades, no blur, no spinning disk, no motion lines. Tail rotor is stopped too. Gritty hand-painted miniature illustration, strong fine dark outlines, worn muted olive/brown military palette, chunky readable forms, coherent with painted truck-and-field-howitzer strategy game sprites. Elevated three-quarter view, nose pointing lower-left, tail upper-right; entire main rotor and tail fully visible in centered square frame with generous transparent padding. One helicopter only; no people, firing, external troop figures, cargo, giant added weapon pods, labels, logos or insignia. Genuine transparent alpha outside the helicopter, no terrain tile, no ground plane, no dust, no opaque background, no cast shadow or checkerboard painted in. Landing wheels clearly lowered and planted, aircraft must NOT look airborne. Readable at 256px. Output one image.",
+      "sourceOutput": "exec-941684d9-fd91-46c1-b5d5-84c19b37289c.png",
+      "references": []
+    },
+    {
+      "file": "unit_multipurpose_helicopter_airborne_candidate_v2.png",
+      "prompt": "Use case: precise-object-edit. The input is an airborne helicopter game sprite that must be preserved. Make only a framing and clean-edge correction: zoom OUT so the entire same helicopter INCLUDING the full spinning main rotor ellipse and full tail rotor disk fits INSIDE a centered square with at least 10% completely transparent empty margin on ALL four edges. Reduce the complete object as a unit; do not change proportions. Preserve exact fuselage, olive paint, windows, doors, nose lower-left, tail upper-right, camera, landing gear, spinning rotor motion blur, outlined painted style. Clean stray light-colored specks outside the rotor; the semi-transparent rotor boundary should be soft and clean. Genuine transparent alpha background, absolutely no solid rectangle, checkerboard, frame, ground or text. Do not crop any part. One corrected sprite only.",
+      "sourceOutput": "exec-ebae535b-1fd4-4eaa-8fb2-798ada2a812e.png",
+      "references": [
+        "exec-d4d0de5b-dcc6-4050-a5c8-b03ce9158d11.png"
+      ],
+      "previousGeneration": {
+        "prompt": "Use case: precise-object-edit. Asset type: transparent PNG AIRBORNE variant of the same Nowhere Left to Hide helicopter sprite. Input image is the edit target, the landed helicopter. Preserve exactly its recognizable fictional Black-Hawk-inspired medium twin-engine fuselage design, olive drab coloring, nose facing lower-left, tail upper-right, window and door layout, worn painted surfaces, gritty miniature illustration and dark outlines, and elevated three-quarter camera angle. Change only flight-state cues: the main rotor is spinning rapidly, shown as an unmistakable semi-transparent elliptical rotor sweep with controlled radial motion blur and ghosted blades instead of four sharply frozen blades; tail rotor also visibly spins; give the same airframe a subtle lifted forward-flight attitude, landing wheels hanging freely, no ground contact. All rotor sweep, tail and wheels remain fully inside square framing with at least 6 percent clear outer padding. Clear silhouette at 256px; rotor blur must visibly distinguish this from the stationary-rotor landed state without obscuring the body. Genuine transparent alpha around the aircraft and within semi-transparent rotor blur. No background, ground plane, shadow, dust, scenery, people, second helicopter, text, labels, logos, weapons firing or UI. One image only.",
+        "sourceOutput": "exec-d4d0de5b-dcc6-4050-a5c8-b03ce9158d11.png",
+        "references": [
+          "unit_multipurpose_helicopter_landed_candidate_v1.png"
+        ],
+        "status": "Framing revision superseded by v2; original preserved in Codex generated_images."
+      }
+    }
+  ]
+}
