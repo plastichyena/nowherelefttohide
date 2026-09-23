@@ -1,0 +1,85 @@
+{
+  "version": "1.6.5",
+  "recordedDate": "2026-09-24",
+  "source": {
+    "runId": 35860218832,
+    "url": "https://github.com/plastichyena/nowherelefttohide/actions/runs/35860218832",
+    "commit": "0eb3a1901940ebea571708e231c3a7694d8b9261",
+    "conclusion": "failure",
+    "failedJobId": 107178325884,
+    "failedJob": "Session v1.6.5 physical 512 MiB Package validation",
+    "error": "EndTurn is not a legal Core action at decision 27",
+    "zipViewer": "skipped because Session generation failed",
+    "successfulAgentShards": 20,
+    "all200GamesAndReplaysVerified": true,
+    "coverage": {
+      "games": 200,
+      "seedsPerAgent": 100,
+      "balancedMaxFinalTurn": 33,
+      "finalHordeSpawnedRuns": 0,
+      "finalHordeReachableRuns": 0
+    }
+  },
+  "reproduction": {
+    "seed": 1511,
+    "cliArguments": "--decisions=30 --large-mib=1",
+    "sameDecision27Failure": true,
+    "terminalTurn": 26,
+    "outcome": "lost",
+    "reason": "capitalLost",
+    "packZombiesSpawned": 2,
+    "airBaseFailureSpawn": "spawned",
+    "nuclearFailureSpawn": "spawned",
+    "regressionBefore": "The extended quiet-fixture test fails at decision 26 because the real Core enters game over."
+  },
+  "fix": {
+    "scope": "Session endurance fixture, its regression test, and manual workflow selection; no game runtime or default rule changes",
+    "cause": "Independent nuclear and Air Base deadline Packs remained enabled after neutral survivor populations were cleared.",
+    "fixtureObjectiveDeadlines": {
+      "nuclearPowerPlant": 1000000,
+      "airBase": 1000000
+    },
+    "rationale": "Defer scheduled threats beyond the controlled storage test window, matching the existing Final Wave schedule. Every action still uses GameEngine.",
+    "workflow": "session_only=true runs the physical 512 MiB Session and ZIP viewer only. The default false retains full validation. Existing evidence reuse guards remain unchanged."
+  },
+  "localValidation": {
+    "typecheck": "passed",
+    "vitest": {
+      "uniqueTests": 30,
+      "files": 5,
+      "finalFailedTests": 0,
+      "initialPostFixResult": "29 passed; the expanded 31-EndTurn regression exceeded the default 20-second timeout. Its timeout alone was raised to 60 seconds; both fixture tests then passed.",
+      "filesTested": [
+        "src/testing/session-release-fixture.test.ts",
+        "src/testing/session-release-validation.test.ts",
+        "src/testing/session-release-size.test.ts",
+        "src/core/v165.boundaries.test.ts",
+        "src/core/v165.system.test.ts"
+      ]
+    },
+    "releaseReuseGuardsPassed": 3,
+    "workflowYamlAndDispatchCombinationsPassed": 4,
+    "smallPhysicalSession": {
+      "status": "passed",
+      "requestedDecisions": 30,
+      "executedDecisions": 30,
+      "minimumMiB": 1,
+      "artifactDecisionsIncludingBranch": 31,
+      "artifactBytes": 20499759,
+      "artifactReadMatched": true,
+      "artifactReplayMatched": true,
+      "fullSnapshotMatched": true,
+      "longAndShortHistoryCurrentPrivateStateMatched": true,
+      "longAndShortHistoryCurrentPublicStateMatched": true,
+      "compactResponseRatio": 0.04279251152783991,
+      "platform": "win32",
+      "node": "v22.14.0",
+      "report": "output/v165-ci-fix/after.json"
+    }
+  },
+  "limitations": [
+    "The original 200-game run reached no Final Horde; this is progression evidence, not Final Horde coverage.",
+    "The local physical Session uses a 1 MiB minimum and 30 decisions; it does not replace the required 512 MiB and 1000-decision run.",
+    "The new GitHub Session-only run will be checked for launch only; its result is not yet verified."
+  ]
+}

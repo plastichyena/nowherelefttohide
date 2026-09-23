@@ -3384,3 +3384,14 @@ SessionのCompact応答とContext Handoffにも飛行状態、輸送関係、残
 - WebMCPはローカルChromeにネイティブAPIがないため登録APIアダプターを使用。実Session/Coreで9ツール登録、合法/違法/重複ActionのBatch独立性・Revision不変、実Action後のLive更新を確認した。ネイティブ対応ブラウザで検証済みとは扱わない。
 - 日次専用11件は環境フラグ未指定で条件付きskip。GitHubの全200ゲーム、大規模Session、Linux/Windows配布物、Pagesの完了結果は未確認。依頼に従い今回のpush後はworkflowの起動確認だけを行い、監視しない。起動は成功・公開完了を意味しない。
 - 確定要件は本節へ反映済み。依頼者の `Doc/archive/` 変更禁止に従い本要件をDoc直下へ保持し、作業開始時からあった文書移動は引継ぎコミットに保存した。archiveの内容を実装根拠として読んでいない。
+
+
+### 18.15.18 v1.6.5 Release Validation失敗の調査・修正（2026-09-24）
+
+- 対象は [Run 35860218832](https://github.com/plastichyena/nowherelefttohide/actions/runs/35860218832)、Commit `0eb3a1901940ebea571708e231c3a7694d8b9261`。Random／Balanced各Seed1～100の全20 shardと200ゲーム・Replay集計は成功した。Balancedの最大到達Turnは33、Final Horde到達は0であり、Final Hordeの実戦網羅を意味しない。
+- 失敗は物理512 MiB Session検証の `EndTurn is not a legal Core action at decision 27`。同じSeed1511と検証用Configでローカル再現し、期限超過によるPack Zombieが原発・空軍基地から合計2体出現し、Turn26の州都陥落で終局していたことを確認した。中立生存者を0にする既存の検証設定だけでは、v1.6.5の独立した期限処理を防げていなかった。
+- 長時間保存検証用Configに限り、両施設の期限を既存のFinal Waveと同じTurn1,000,000へ延期した。標準ゲームの期限・敗北処理は変更しない。51×51・21部隊、実GameEngine Action、Snapshot／分岐／Replay一致、1,000判断以上・実容量512 MiB以上・ZIP読込／seek／cancelという検証条件は維持する。
+- 回帰テストは30 EndTurnと保存復帰後の1 EndTurn、敵不在・Pack出現0を検証する。修正前は26手目のゲーム終了で失敗し、修正後は成功した。拡張した実Coreテストは約23秒かかるため、当該テストだけ上限を20秒から60秒に変更した。関連5ファイルの30件は各ファイルの最終実行で成功、型検査と証跡再利用ガード3件も成功した。
+- 同じ大容量検証ScriptをWindows／Node22.14.0、`--decisions=30 --large-mib=1` で通し、30 EndTurn＋分岐1 Action、Full Snapshot、同一現在状態の長短履歴比較、Artifact読込／Replay一致を確認した。実Artifact容量は20,499,759 bytes、Compact応答比は約4.28%。これは512 MiB全量・1,000判断の代用ではない。
+- Workflowへ `session_only` を追加した。既定値falseでは従来の全検証、trueでは物理512 MiB SessionとZIP Viewerのみを実行し、Run名にもSession-onlyと表示する。成功済み200ゲームは再実行せず、部分実行を新しい全体検証成功として扱わない。新Runは起動確認までとし、512 MiB全量の成功判定は後日の結果確認に残す。
+- 追補証跡は `src/testing/fixtures/v165-validation-followup.json`。前節の初回ローカル検証記録は当時の事実として保持する。

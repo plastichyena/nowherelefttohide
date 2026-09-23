@@ -16,8 +16,9 @@ const INITIAL_HUMAN_TYPES: readonly UnitType[] = ['police', 'nationalGuard', 'ri
 
 /**
  * Quiet, valid Core configuration for the Session release fixture. The Final
- * Wave remains in the actual rules/config but is scheduled outside this long
- * controlled window; all 1,000+ actions still flow through GameEngine.
+ * Wave and facility objective deadlines remain in the actual rules/config but
+ * are scheduled outside this long controlled window; all 1,000+ actions still
+ * flow through GameEngine.
  */
 export function createSessionReleaseConfig(): GameConfig {
   return createDefaultConfig({
@@ -28,6 +29,12 @@ export function createSessionReleaseConfig(): GameConfig {
       initialResources: { food: 1_000_000, civilianGoods: 1_000_000, militaryGoods: 1_000_000, fuel: 1_000_000 },
     },
     refugees: { arrivalIntervalMin: 1_000_000, arrivalIntervalMax: 1_000_000 },
+    // v1.6.5 objectives spawn Packs even when neutral survivor populations
+    // are zero. Defer both deadlines just like the scheduled Final Wave.
+    objectives: {
+      nuclearPowerPlant: { rewardDeadlineTurn: 1_000_000 },
+      airBase: { rewardDeadlineTurn: 1_000_000 },
+    },
     units: {
       police: { movement: 1, vision: 1 },
       nationalGuard: { movement: 1, vision: 1 },

@@ -1,8 +1,14 @@
 name: v1.6.5 Release Validation
+run-name: v1.6.5 ${{ inputs.session_only && 'Session-only validation' || 'Release Validation' }}
 
 on:
   workflow_dispatch:
     inputs:
+      session_only:
+        description: 'Validate only the physical 512 MiB Session and ZIP viewer; excludes the 200-game gate and ignores reuse_run_id'
+        required: false
+        type: boolean
+        default: false
       reuse_run_id:
         description: 'Optional completed run whose 200 replays and large Session passed; runtime must be unchanged'
         required: false
@@ -19,7 +25,7 @@ concurrency:
 
 jobs:
   agent-validation:
-    if: inputs.reuse_run_id == ''
+    if: inputs.reuse_run_id == '' && !inputs.session_only
     name: v1.6.5 ${{ matrix.agent }} seeds ${{ matrix.start }} + 9
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -98,7 +104,7 @@ jobs:
           path: output/release-reports/release-summary.json
 
   session-large-package-validation:
-    if: inputs.reuse_run_id == ''
+    if: inputs.reuse_run_id == '' || inputs.session_only
     name: Session v1.6.5 physical 512 MiB Package validation
     # This is a separate manual-release job. It verifies actual Core EndTurn
     # transitions and a physical Artifact Package without gating Pages.
@@ -134,7 +140,7 @@ jobs:
 
   verify-existing-executions:
     name: Verify unchanged runtime against successful recorded executions
-    if: inputs.reuse_run_id != ''
+    if: inputs.reuse_run_id != '' && !inputs.session_only
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
