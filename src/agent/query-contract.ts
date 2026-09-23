@@ -31,8 +31,8 @@ export interface QuerySchema {
   description?: string;
 }
 
-const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery'] as const satisfies readonly HumanUnitType[];
-const FACILITY_TYPES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase'] as const satisfies readonly FacilityType[];
+const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter'] as const satisfies readonly HumanUnitType[];
+const FACILITY_TYPES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'airBase'] as const satisfies readonly FacilityType[];
 const CONSTRUCTIBLE_TYPES = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const satisfies readonly ConstructibleFacilityType[];
 const FACILITY_STATUSES = ['unowned', 'owned', 'ruined'] as const satisfies readonly FacilityStatus[];
 const FACILITY_OPERATIONAL_STATUSES = ['building', 'operational', 'stopped', 'infected', 'disabled', 'recovering', 'ruined'] as const satisfies readonly FacilityOperationalStatus[];
@@ -42,7 +42,7 @@ const CHECKPOINT_POLICIES = ['passThrough', 'normal', 'strict', 'deny'] as const
 const UNIT_ACTION_STATES = ['ready', 'moved', 'acted', 'destroyed'] as const satisfies readonly UnitActionState[];
 const UNIT_PROFICIENCIES = ['recruit', 'regular', 'veteran'] as const satisfies readonly UnitProficiency[];
 const TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const satisfies readonly BaseTerrain[];
-const QUERYABLE_ACTION_TYPES = ['ChangeUnitMode', 'AttackHex', 'BuildBarbedWire', 'Move', 'Attack', 'Wait', 'AssignWorkers', 'TransferPopulation', 'SetCheckpointPolicy', 'SetPowerSupply', 'BuildConstructibleFacility', 'BuildCheckpoint', 'RelocateCheckpoint', 'ActivateCheckpoint', 'TurnAwayCheckpointRefugees', 'DecommissionConstructibleFacility', 'ProduceUnit', 'EndTurn'] as const satisfies readonly GameAction['type'][];
+const QUERYABLE_ACTION_TYPES = ['TakeOff','Land','BoardAircraft','DisembarkAircraft','LaunchMilitaryDrone','ChangeUnitMode', 'AttackHex', 'BuildBarbedWire', 'Move', 'Attack', 'Wait', 'AssignWorkers', 'TransferPopulation', 'SetCheckpointPolicy', 'SetPowerSupply', 'BuildConstructibleFacility', 'BuildCheckpoint', 'RelocateCheckpoint', 'ActivateCheckpoint', 'TurnAwayCheckpointRefugees', 'DecommissionConstructibleFacility', 'ProduceUnit', 'EndTurn'] as const satisfies readonly GameAction['type'][];
 
 const string: QuerySchema = { type: 'string', minLength: 1 };
 const nullableString: QuerySchema = { type: ['string', 'null'], minLength: 1 };
@@ -63,6 +63,9 @@ export const QUERY_FILTER_SCHEMAS = {
   api: object({}),
   'context-handoff': object({}),
   map: object({ ...bounds, terrain: { enum: TERRAINS }, road: bool, movementRoad: bool, passable: bool, urban: bool, facilityId: nullableString, checkpointId: nullableString, visibleToPlayer: bool, playerOccupancyAllowed: bool }),
+  enemies: object({ ...bounds, id: string, type: {enum:['zombie','hordeZombie','policeZombie','soldierZombie','riotZombie','hunterZombie','gasZombie','screamerZombie','packZombie']}, canMove: bool, canAttack: bool, canTargetAir: bool, isScheduledWaveMember: bool, isFinalWaveMember: bool }),
+  'production-candidates': object({facilityId:string,unitType:{enum:HUMAN_UNIT_TYPES},legal:bool,legalOnly:bool,reasonCode:nullableString}),
+  'attack-candidates': object({unitId:string,attackerId:string,targetId:string,targetKind:{enum:['enemy','hex']},legal:bool,legalOnly:bool,reasonCode:nullableString}),
   units: object({ ...bounds, mode: {enum:['packed','deployed']}, id: string, type: { enum: HUMAN_UNIT_TYPES }, unitType: { enum: HUMAN_UNIT_TYPES }, proficiency: { enum: UNIT_PROFICIENCIES }, actionState: { enum: UNIT_ACTION_STATES }, inSupply: bool, canMove: bool, canAttack: bool, isScheduledWaveMember: { enum: [false] }, isFinalWaveMember: { enum: [false] } }),
   facilities: object({ ...bounds, id: string, type: { enum: FACILITY_TYPES }, owner: { enum: ['player', 'none'] }, status: { enum: FACILITY_STATUSES }, inSupply: bool, operationalStatus: { enum: FACILITY_OPERATIONAL_STATUSES }, constructible: bool, populationLimitKind: { enum: ['soft', 'hard'] }, populationOperational: bool }),
   checkpoints: object({ ...bounds, id: string, branchId: string, direction: { enum: ['north', 'east', 'south', 'west'] }, role: { enum: CHECKPOINT_ROLES }, status: { enum: CHECKPOINT_STATUSES }, currentPolicy: { enum: CHECKPOINT_POLICIES }, providesSupply: bool, infectionContained: bool }),
@@ -207,6 +210,9 @@ const TARGET_RESPONSE_SPECS: Record<PublicQueryTarget, TargetResponseSpec> = {
   'context-handoff': { mode: 'value', valueType: 'ContextHandoff', valueSchema: opaqueObject('Latest revision-pinned public state; bounded facilities 24, units 24, visible enemies 24, changes 20, unique intent 5, checkpoints 8. Includes counts, omissions, detail queries, all crisis categories and durable locale/Fair Play constraints. Auto checkpoints after 5 completed turns or 128 canonical decisions; reads never reset the decision baseline.') },
   api: { mode: 'value', valueType: 'AgentApiInfo + queryContract + SessionPlayTurnCapabilities', valueSchema: opaqueObject('Public API discovery value.') },
   map: { mode: 'items-and-value', itemType: 'AgentMapTileObservation', itemSchema: opaqueObject('Public Map tile.'), valueType: 'AgentMapObservation metadata', valueSchema: opaqueObject('Map metadata and visibleTileKeys; tiles are paged items.') },
+  enemies: {mode:'items',itemType:'Currently visible Enemy; same public unit projection including canTargetAir'},
+  'production-candidates': {mode:'items',itemType:'ProductionCandidate; all known compatible facilities/types by default; explicit facilityId/unitType also explains incompatible pairs; placement is a current public estimate'},
+  'attack-candidates': {mode:'items',itemType:'AttackCandidate; every Player Unit against every visible enemy plus every visible Hex for deployed artillery; optional unitId/targetKind; use revision-pinned cursors until hasMore=false'},
   units: { mode: 'items', itemType: 'AgentUnitObservation' },
   facilities: { mode: 'items', itemType: 'AgentFacilityObservation' },
   checkpoints: { mode: 'items', itemType: 'AgentCheckpointObservation + Session supplyExplanation', itemSchema: opaqueObject('Existing posts. supplyExplanation reports capital-centered branch radius and a revision-pinned construction candidateQuery. providesSupply denotes Active role, not newly added coverage.') },
@@ -227,7 +233,7 @@ const TARGET_RESPONSE_SPECS: Record<PublicQueryTarget, TargetResponseSpec> = {
   },
   route: { mode: 'value', valueType: 'RouteQueryResult', valueSchema: routeValueSchema },
 };
-const CURSOR_TARGETS = new Set<PublicQueryTarget>(['map', 'units', 'facilities', 'checkpoints', 'branches', 'construction', 'legal-actions', 'history', 'population-transfers', 'worker-assignments', 'strategic-map']);
+const CURSOR_TARGETS = new Set<PublicQueryTarget>(['enemies','production-candidates','attack-candidates','map', 'units', 'facilities', 'checkpoints', 'branches', 'construction', 'legal-actions', 'history', 'population-transfers', 'worker-assignments', 'strategic-map']);
 
 function responseEnvelope(target: PublicQueryTarget, spec: TargetResponseSpec): QuerySchema {
   const properties: Record<string, QuerySchema> = {
@@ -247,7 +253,7 @@ function responseEnvelope(target: PublicQueryTarget, spec: TargetResponseSpec): 
 export function publicQueryContract() {
   const listFields = ['sessionId', 'revision', 'target', 'count', 'total', 'hasMore', 'nextCursor', 'items'];
   return {
-    schemaFormat: 'JSON Schema', schemaVersion: '2020-12', contractVersion: '1.1.0',
+    schemaFormat: 'JSON Schema', schemaVersion: '2020-12', contractVersion: '1.2.0',
     requestEnvelopes: {
       programmatic: { required: ['target'], optional: ['expectedRevision', 'cursor', 'pageSize', 'filters'], fields: { target: { enum: Object.keys(QUERY_FILTER_SCHEMAS) }, expectedRevision: { type: 'integer', minimum: 0 }, cursor: string, pageSize: { type: 'integer', minimum: 1, maximum: 500, default: 100 }, filters: { type: 'object', default: {} } } },
       cliInputFile: 'The --input JSON file contains the selected target filter object directly.',

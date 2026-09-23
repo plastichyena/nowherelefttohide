@@ -1,3 +1,6 @@
+import { occupiesGroundLayer, isAirborne } from './unit-capabilities';
+import { effectiveMovementCost, hasMovementRoad } from './terrain';
+import { getTile } from './map-reference';
 import type { GameState, UnitState } from './types';
 import type { SeededRng } from './rng';
 import { createUnit, isHumanUnit, getUnit } from './state';
@@ -5,7 +8,7 @@ import { isHexSupplied } from './supply';
 import { terrainAdjustedDamage } from './terrain';
 import { damageWire, wireAt } from './barbed-wire';
 import { emit } from './events-internal';
-import { hexKey, hexNeighbors, hexWithinBounds } from './hex';
+import { hexKey, hexNeighbors, hexWithinBounds, hexDistance } from './hex';
 
 export interface SpawnOccupancyEntry {
   unitId: string;
@@ -60,6 +63,13 @@ function destroyUnit(
     return;
   }
   state.units.splice(index, 1);
+  if (unit.transportedByUnitId) {
+    const carrier = state.units.find(u=>u.id===unit.transportedByUnitId); if(carrier) delete carrier.cargoUnitId;
+    delete unit.transportedByUnitId;
+  }
+  const cargo = state.units.find(u=>u.id===unit.cargoUnitId);
+  delete unit.cargoUnitId;
+  if(cargo) { cargo.position={...unit.position}; delete cargo.transportedByUnitId; destroyUnit(state,cargo,cause,rng,explosionQueue); }
   if (isHumanUnit(unit)) {
     state.statistics.unitLosses += 1;
     state.population.cumulativeDeaths += unit.population;
@@ -94,8 +104,20 @@ function destroyUnit(
   if (unit.type === 'gasZombie') {
     explosionQueue.push({ sourceUnitId: unit.id, position: { ...unit.position } });
   }
+  if (isHumanUnit(unit)) reanimate(state,unit,cause,rng);
+}
+
+function reanimate(state: GameState, unit: UnitState, cause: string, rng: SeededRng): void {
   if (isHumanUnit(unit)) {
     const reanimatedType = state.config.units[unit.type].reanimationUnitType;
+    if (!reanimatedType) return;
+    const deathTile = getTile(state.map,unit.position);
+    if (deathTile?.terrain === 'water' && !hasMovementRoad(state.map,unit.position)) return;
+    const occupied = new Set(state.units.filter(occupiesGroundLayer).map(u=>hexKey(u.position)));
+    const destination = state.map.tiles.filter(t=>!occupied.has(t.key) && effectiveMovementCost(state,t,false)!==null && (!wireAt(state,t) || t.key===hexKey(unit.position)))
+      .sort((a,b)=>hexDistance(unit.position,a)-hexDistance(unit.position,b)||a.q-b.q||a.r-b.r)[0];
+    if (!destination) { state.pendingReanimations.push({humanUnitId:unit.id,humanUnitType:unit.type,zombieUnitType:reanimatedType,position:{...unit.position},cause}); return; }
+    const spawnPosition = {q:destination.q,r:destination.r};
     const prefix = reanimatedType === 'policeZombie'
       ? 'police-zombie'
       : reanimatedType === 'soldierZombie' ? 'soldier-zombie' : reanimatedType === 'packZombie' ? 'pack-zombie' : 'riot-zombie';
@@ -105,12 +127,12 @@ function destroyUnit(
       id = `${prefix}-${state.nextUnitNumber}`;
     }
     state.nextUnitNumber += 1;
-    const reanimated = createUnit(state, id, reanimatedType, unit.position);
-    const survivingWire = wireAt(state, unit.position);
+    const reanimated = createUnit(state, id, reanimatedType, spawnPosition);
+    const survivingWire = wireAt(state, spawnPosition);
     if (survivingWire) reanimated.reanimatedOnBarbedWireId = survivingWire.id;
     reanimated.canMove = reanimatedType === 'packZombie' && state.phase !== 'zombie';
     reanimated.canAttack = reanimated.canMove;
-    if (reanimatedType === 'packZombie') reanimated.firstZombieActionTurn = state.phase === 'zombie' ? state.turn + 1 : state.turn;
+    reanimated.firstZombieActionTurn = state.phase === 'zombie' ? state.turn + 1 : state.turn;
     state.units.push(reanimated);
     if (reanimatedType === 'policeZombie') {
       state.statistics.policeZombiesSpawned += 1;
@@ -165,7 +187,9 @@ function applyDamageWithoutDeath(
   sourceId: string,
   cause: string,
 ): number {
-  if (target.isPlayerUnit && ['attack', 'counterattack', 'interception'].includes(cause)) {
+  if ((isAirborne(target) || target.transportedByUnitId) && ['artillery','gas_explosion'].includes(cause)) return 0;
+  if (!occupiesGroundLayer(target) && target.transportedByUnitId) return 0;
+  if (occupiesGroundLayer(target) && target.isPlayerUnit && ['attack', 'counterattack', 'interception'].includes(cause)) {
     amount -= damageWire(state, target.position, amount, true);
   }
   const adjusted = terrainAdjustedDamage(state, target, amount);
@@ -225,7 +249,7 @@ function resolveGasExplosions(
         .map(hexKey),
     );
     const unitSnapshot = state.units
-      .filter((unit) => unit.hp > 0 && adjacentKeys.has(hexKey(unit.position)))
+      .filter((unit) => unit.hp > 0 && occupiesGroundLayer(unit) && adjacentKeys.has(hexKey(unit.position)))
       .sort((left, right) => left.id.localeCompare(right.id));
     const siteSnapshot = snapshotExplosionSites(state, adjacentKeys);
     const config = state.config.units.gasZombie;
@@ -326,5 +350,12 @@ function dealDamage(
     falls();
     resolveGasExplosions(state, rng, explosionQueue);
   }
-  return { dealDamage, dealAreaDamage };
+  function destroyForCrash(state: GameState, unit: UnitState, rng: SeededRng): void {
+    const explosions: GasExplosionEntry[] = []; destroyUnit(state,unit,'aircraft_crash',rng,explosions); resolveGasExplosions(state,rng,explosions);
+  }
+  function retryPendingReanimations(state: GameState, rng: SeededRng): void {
+    const pending=state.pendingReanimations; state.pendingReanimations=[];
+    for(const entry of pending) reanimate(state,createUnit(state,entry.humanUnitId,entry.humanUnitType,entry.position),entry.cause,rng);
+  }
+  return { dealDamage, dealAreaDamage, destroyForCrash, retryPendingReanimations };
 }

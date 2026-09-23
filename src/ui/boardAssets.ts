@@ -97,6 +97,7 @@ export const BOARD_FACILITY_TYPES = [
   'civilianDroneBase',
   'temporaryHousing',
   'armyBase',
+  'airBase',
 ] as const satisfies readonly FacilityType[];
 
 export const BOARD_FACILITY_ASSET_TYPES = [...BOARD_FACILITY_TYPES, 'checkpoint'] as const;
@@ -114,6 +115,7 @@ export const BOARD_UNIT_TYPES = [
   'reconTeam',
   'specialForces',
   'fieldArtillery',
+  'multipurposeHelicopter',
   'packZombie',
   'zombie',
   'hordeZombie',
@@ -146,6 +148,8 @@ export type BoardUnitStateLayer = (typeof BOARD_UNIT_STATE_LAYERS)[number];
  * Relative runtime paths.  State images are shared: a single infected or
  * ruined overlay is used for both general facilities and checkpoints.
  */
+export const HELICOPTER_ASSETS = { landed: 'units/unit_multipurpose_helicopter_landed.png', airborne: 'units/unit_multipurpose_helicopter_airborne.png' } as const;
+
 export const ARTILLERY_ASSETS = { packed: 'units/unit_field_artillery_packed.png', deployed: 'units/unit_field_artillery_deployed.png' } as const;
 
 export const BOARD_ASSET_REGISTRY = {
@@ -185,6 +189,7 @@ export const BOARD_ASSET_REGISTRY = {
     civilianDroneBase: 'facilities/facility_civilian_drone_base.png',
     temporaryHousing: 'facilities/facility_temporary_housing.png',
     armyBase: 'facilities/facility_army_base.png',
+    airBase: 'facilities/facility_air_base.png',
     checkpoint: 'facilities/facility_checkpoint.png',
   },
   obstacles: {
@@ -192,6 +197,7 @@ export const BOARD_ASSET_REGISTRY = {
   },
   units: {
     fieldArtillery: 'units/unit_field_artillery_packed.png',
+    multipurposeHelicopter: HELICOPTER_ASSETS.landed,
     police: 'units/unit_police.png',
     nationalGuard: 'units/unit_national_guard.png',
     zombie: 'units/unit_zombie.png',
@@ -315,6 +321,7 @@ export function getAllBoardAssetPaths(): readonly string[] {
     ...Object.values(BOARD_ASSET_REGISTRY.obstacles),
     ...Object.values(BOARD_ASSET_REGISTRY.units),
     ARTILLERY_ASSETS.deployed,
+    HELICOPTER_ASSETS.airborne,
   ];
 }
 
@@ -512,7 +519,7 @@ export interface UnitAssetMapping {
  * common Horde threat marker and the distinct Final outer marker.
  */
 export function mapUnitAssetLayers(
-  unit: Pick<UnitState, 'type' | 'hordeKind'> & Partial<Pick<UnitState, 'mode'>>,
+  unit: Pick<UnitState, 'type' | 'hordeKind'> & Partial<Pick<UnitState, 'mode' | 'flightState'>>,
 ): UnitAssetMapping {
   const isHorde = unit.type === 'hordeZombie' || unit.hordeKind === 'periodic' || unit.hordeKind === 'final';
   const isFinalHorde = unit.hordeKind === 'final';
@@ -636,6 +643,7 @@ export function roadDirectionBetween(from: HexCoord, to: HexCoord): HexDirection
   return hexDirectionBetween(from, to);
 }
 
-export function resolveUnitAssetPath(unit: Pick<UnitState,'type'> & Partial<Pick<UnitState,'mode'>>): string | null {
+export function resolveUnitAssetPath(unit: Pick<UnitState,'type'> & Partial<Pick<UnitState,'mode' | 'flightState'>>): string | null {
+  if (unit.type === 'multipurposeHelicopter') return HELICOPTER_ASSETS[unit.flightState ?? 'landed'];
   return unit.type === 'fieldArtillery' ? ARTILLERY_ASSETS[unit.mode ?? 'packed'] : getUnitAssetPath(unit.type);
 }

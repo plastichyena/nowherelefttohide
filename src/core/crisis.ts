@@ -16,6 +16,7 @@ export const CRISIS_WORSENING_FACTS = {
   internal_infection_risk: { probability: 'up', expectedInfections: 'up', healthyPopulation: 'down' },
   checkpoint_health_risk: { probability: 'up', waiting: 'up' },
   refinery_allowance_runway_risk: { netBurn: 'up', estimatedTurnsRemaining: 'down' },
+  air_base_early_capture_window: { turnsRemaining: 'down' },
   nuclear_early_capture_window: { turnsRemaining: 'down' },
   nuclear_power_outage: { lostGeneration: 'up', shortage: 'up' },
   overcrowding_forecast: { penaltyRatio: 'up', additionalFood: 'up', additionalCivilianGoods: 'up' },
@@ -178,7 +179,8 @@ export function deriveCrisisSummary(state: Readonly<GameState>): CrisisAlert[] {
   const allowance = forecast.refineryAllowance;
   const { netBurn, estimatedTurnsRemaining } = allowance;
   if (estimatedTurnsRemaining !== null && estimatedTurnsRemaining <= 3 && allowance.before > 0) alerts.push(alert(allowance.remaining === 0 ? 'critical' : 'warning', 'resource', 'refinery_allowance_runway_risk', [], { remainingAllowance: allowance.before, projectedFuelRefined: allowance.fuelRefined, oilCredits: allowance.oilCreditsEarned, netBurn, estimatedTurnsRemaining, refineryWorkers: state.facilities.filter(f => f.owner === 'player' && f.type === 'refinery').reduce((n,f) => n + f.workers,0), oilFieldWorkers: state.facilities.filter(f => f.owner === 'player' && f.type === 'oilField').reduce((n,f) => n + f.workers,0) }, ['AssignWorkers']));
-  if (state.nuclearObjective.reward === 'unclaimed' && state.turn >= 15) alerts.push(alert(state.turn >= 20 ? 'critical' : 'warning', 'facility', 'nuclear_early_capture_window', ['nuclear-power-plant-1'], { deadlineTurn: 20, turnsRemaining: Math.max(0,20-state.turn) }, ['Move']));
+  if (state.nuclearObjective.reward === 'unclaimed' && state.turn >= state.config.objectives.nuclearPowerPlant.rewardDeadlineTurn - 5) alerts.push(alert(state.turn >= state.config.objectives.nuclearPowerPlant.rewardDeadlineTurn ? 'critical' : 'warning', 'facility', 'nuclear_early_capture_window', ['nuclear-power-plant-1'], { deadlineTurn: state.config.objectives.nuclearPowerPlant.rewardDeadlineTurn, turnsRemaining: Math.max(0,state.config.objectives.nuclearPowerPlant.rewardDeadlineTurn-state.turn) }, ['Move']));
+  if (state.airBaseObjective.firstCapturedTurn === null && state.turn >= state.config.objectives.airBase.rewardDeadlineTurn-5 && state.turn <= state.config.objectives.airBase.rewardDeadlineTurn) alerts.push(alert(state.turn === state.config.objectives.airBase.rewardDeadlineTurn?'critical':'warning','facility','air_base_early_capture_window',['air-base-1'],{deadlineTurn:state.config.objectives.airBase.rewardDeadlineTurn,turnsRemaining:Math.max(0,state.config.objectives.airBase.rewardDeadlineTurn-state.turn)},['Move']));
   const plant = state.facilities.find(f => f.type === 'nuclearPowerPlant');
   if (plant?.owner === 'player' && plant.workers > 0 && (!isHexSupplied(state, plant.position) || plant.infected > 0 || plant.operationalStatus !== 'operational') && forecast.electricity.shortage > 0) alerts.push(alert('warning', 'resource', 'nuclear_power_outage', [plant.id], { lostGeneration: plant.workers * state.config.facilities.nuclearPowerPlant.production.powerGeneration, shortage: forecast.electricity.shortage, reason: !isHexSupplied(state, plant.position) ? 'out_of_supply' : plant.operationalStatus }, ['Move']));
   const suppliedMilitaryShortages = forecast.militaryGoods.units.filter((unit) => unit.inSupply && unit.unfilledRefillDemand > 0);

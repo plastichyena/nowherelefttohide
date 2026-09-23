@@ -197,7 +197,7 @@ describe('Developer / Browser Bridge', () => {
     const before = api.getObservation();
     const result = api.step({ type: 'Wait', unitId: 'missing-unit' });
     expect(result.error).not.toBeNull();
-    expect(result.error?.code).toBe('action_not_legal');
+    expect(result.error?.code).toBe('cannot_wait');
     expect(api.getObservation()).toEqual(before);
     expect(api.getRunArtifact().invalidAttempts).toHaveLength(1);
     expect(api.getRunArtifact().invalidAttempts[0].action).toEqual({ type: 'Wait', unitId: 'missing-unit' });

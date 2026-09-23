@@ -1,4 +1,4 @@
-import { humanAttack } from './unit-capabilities';
+import { humanAttack, occupiesGroundLayer } from './unit-capabilities';
 import { domainRng } from './public-health';
 import { HUMAN_UNIT_TYPES } from './unit-catalog';
 import { initialUnitDeployment, INITIAL_CHECKPOINT_DEPLOYMENT } from './initial-deployment';
@@ -6,7 +6,7 @@ import { isHumanUnitType, isZombieUnitType } from './unit-catalog';
 import { assertValidGameConfig, cloneConfig } from './config';
 import { hexKey } from './hex';
 import {
-  createFixedMap, placeArmyBase, generateInitialGasPositions,
+  createFixedMap, placeArmyBase, placeAirBase, generateInitialGasPositions,
   FIXED_MAP_ID,
   generateInitialZombiePositions,
   generateInitialHunterPositions,
@@ -30,7 +30,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '14.0.0';
+export const GAME_VERSION = '15.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -63,7 +63,7 @@ export function populationReceptionCapacity(facility: Pick<FacilityState, 'type'
 }
 
 export function isProductionFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return ['farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'simpleFarm', 'civilianDroneBase', 'armyBase']
+  return ['farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'simpleFarm', 'civilianDroneBase', 'armyBase', 'airBase']
     .includes(facility.type);
 }
 
@@ -95,7 +95,7 @@ export function getUnit(state: GameState, unitId: string): UnitState | undefined
 
 export function getUnitAt(state: GameState, position: HexCoord): UnitState | undefined {
   const key = positionKey(position);
-  return state.units.find((unit) => positionKey(unit.position) === key);
+  return state.units.find((unit) => occupiesGroundLayer(unit) && positionKey(unit.position) === key);
 }
 
 export function isHumanUnit(unit: UnitState): unit is UnitState & { type: HumanUnitType } {
@@ -142,6 +142,7 @@ export function createUnit(
   return {
     id,
     type,
+    ...(type === 'multipurposeHelicopter' ? { flightState: 'landed' as const } : {}),
     ...(type === 'fieldArtillery' ? { mode: 'packed' as const } : {}),
     movementDomain: stats.movementDomain,
     position: { ...position },
@@ -164,7 +165,7 @@ export function createUnit(
     maxMilitaryGoods: stats.maxMilitaryGoods,
     actionState,
     canAttack: true,
-    canMove: !isZombieUnit({ type }),
+    canMove: !isZombieUnit({ type }) && type !== 'multipurposeHelicopter',
     isPlayerUnit: !isZombieUnit({ type }),
     inheritedTarget: null,
     previousFallbackPosition: null,
@@ -214,6 +215,7 @@ export function synchronizePopulation(state: GameState): void {
       .reduce((total, order) => total + order.population, 0);
   const fieldArtillery = state.units.filter(u => u.type === 'fieldArtillery').reduce((n,u) => n + u.population, 0) + state.pendingUnitProductions.filter(o => o.unitType === 'fieldArtillery').reduce((n,o) => n + o.population, 0);
   state.population.fieldArtillery = fieldArtillery;
+  state.population.multipurposeHelicopter = state.units.filter(u=>u.type==='multipurposeHelicopter').reduce((n,u)=>n+u.population,0) + state.pendingUnitProductions.filter(o=>o.unitType==='multipurposeHelicopter').reduce((n,o)=>n+o.population,0);
   const specialForces = state.units.filter(unit => unit.type === 'specialForces').reduce((n, unit) => n + unit.population, 0);
   const waiting = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.waiting, 0);
   const screening = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.screening, 0);
@@ -228,7 +230,7 @@ export function synchronizePopulation(state: GameState): void {
   state.population.riotPolice = riotPolice;
   state.population.reconTeam = reconTeam;
   state.population.specialForces = specialForces;
-  state.population.unitPopulation = police + nationalGuard + riotPolice + reconTeam + specialForces + fieldArtillery;
+  state.population.unitPopulation = police + nationalGuard + riotPolice + reconTeam + specialForces + fieldArtillery + state.units.filter(u => u.type === 'multipurposeHelicopter').reduce((n,u)=>n+u.population,0) + state.pendingUnitProductions.filter(o=>o.unitType === 'multipurposeHelicopter').reduce((n,o)=>n+o.population,0);
   state.population.waitingRefugees = waiting;
   state.population.screeningRefugees = screening;
   state.population.approvedRefugees = approved;
@@ -367,7 +369,7 @@ function facilityStateFromDefinition(
   }
   return {
     ...definition,
-    ...(definition.type === 'armyBase' ? { armyBase: { militaryGoods: config.armyBase.maxMilitaryGoods, interceptionsRemaining: 0, reward: 'unclaimed' as const } } : {}),
+    ...(['armyBase', 'airBase'].includes(definition.type) ? { armyBase: { militaryGoods: config.armyBase.maxMilitaryGoods, interceptionsRemaining: 0, reward: 'unclaimed' as const } } : {}),
     workerCapacity,
     owner: owned ? 'player' : 'none',
     status: owned ? 'owned' : 'unowned',
@@ -470,6 +472,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   // canonical set even when a test Config requests fewer initial Zombies so
   // the map snapshot and replay contract remain stable.
   placeArmyBase(map, rng, stateConfig.facilities.armyBase.workerCapacity);
+  placeAirBase(map, rng, stateConfig.facilities.airBase.workerCapacity);
   map.initialZombiePositions = generateInitialZombiePositions(map, rng, undefined, stateConfig.units.zombie.vision);
   const initialHunterPositions = generateInitialHunterPositions(map, rng, stateConfig.economy, stateConfig.units.hunterZombie.vision);
   const initialGasPositions = generateInitialGasPositions(map, rng, initialHunterPositions, stateConfig.economy, stateConfig.units.gasZombie.vision);
@@ -502,6 +505,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       hasBuiltCheckpoint: false,
     }));
   const state: GameState = {
+    militaryDrone: null, pendingReanimations: [],
+    airBaseObjective: { firstCapturedTurn: null, fellBeforeCapture: false, reward: 'unclaimed', failureSpawn: 'none' },
     initialHunterPositions,
     initialGasPositions,
     publicHealthStress: { food: 0, civilianGoods: 0 },
@@ -530,7 +535,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       nationalGuard: 0,
       riotPolice: 0,
       reconTeam: 0,
-      fieldArtillery: 0, specialForces: 0,
+      fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0,
       unitPopulation: 0,
       facilityWorkers: [],
       waitingRefugees: 0,
@@ -722,10 +727,10 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       civilianDroneBasesDecommissioned: 0,
       civilianGoodsRefundedFromDecommission: 0,
       policeLongRangeMoves: 0,
-      recruitsCommissionedByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, specialForces: 0 },
-      regularPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, specialForces: 0 },
-      veteranPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, specialForces: 0 },
-      veteranZombieKillsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, specialForces: 0 },
+      recruitsCommissionedByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
+      regularPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
+      veteranPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
+      veteranZombieKillsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
       riotPoliceProduced: 0,
       riotPoliceLost: 0,
       riotZombiesSpawned: 0,
@@ -741,7 +746,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       riotPoliceReanimations: 0,
       hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0, packZombie: 0 },
       finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0, packZombie: 0 },
-      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, specialForces: 0, hordeZombie: 0, screamerZombie: 0, armyBase: 0, windPowerPlant: 0 },
+      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0, hordeZombie: 0, screamerZombie: 0, armyBase: 0, windPowerPlant: 0 },
       hordeMovementNoisePulses: 0,
       hordeNoiseRespawnedByType: { zombie: 0, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
     },
@@ -767,7 +772,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
 }
 
 export function nextHumanUnitId(state: GameState, type: HumanUnitType): string {
-  const prefix = type === 'fieldArtillery' ? 'field-artillery' : type === 'specialForces' ? 'special-forces' : type === 'police' ? 'police' : type === 'nationalGuard' ? 'national-guard' : type === 'riotPolice' ? 'riot-police' : 'recon-team';
+  const prefix = type === 'multipurposeHelicopter' ? 'multipurpose-helicopter' : type === 'fieldArtillery' ? 'field-artillery' : type === 'specialForces' ? 'special-forces' : type === 'police' ? 'police' : type === 'nationalGuard' ? 'national-guard' : type === 'riotPolice' ? 'riot-police' : 'recon-team';
   const id = `${prefix}-${state.nextUnitNumber}`;
   state.nextUnitNumber += 1;
   return id;

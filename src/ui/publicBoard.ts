@@ -1,7 +1,7 @@
 import type { AgentMapObservation, AgentObservation } from '../agent/types';
 import type { SessionPublicDocument } from '../session/types';
 import type { HexCoord } from '../core/types';
-import { hexKey } from '../core/hex';
+import { hexDistance, hexKey } from '../core/hex';
 import { roadEdges } from '../core/roads';
 import { BOARD_ASSET_REGISTRY, resolveBoardAssetUrl, resolveUnitAssetPath, mapFacilityAssetLayers, mapCheckpointAssetLayers, mapUnitAssetLayers } from './boardAssets';
 import { createTranslator, type Locale } from './i18n';
@@ -23,10 +23,10 @@ export interface PublicBoardEntity { key: string; kind: 'unit'|'facility'|'check
 export function publicBoardEntities(frame: PublicBoardFrame): PublicBoardEntity[] {
   const visible=new Set(frame.observation.visibleTileKeys);
   return [
-    ...[...frame.observation.units,...frame.observation.zombies.filter(u=>visible.has(hexKey(u.position)))].map(u=>({key:`unit:${u.id}`,kind:'unit' as const,position:u.position,data:u as unknown as Record<string,unknown>})),
+    ...[...frame.observation.units.filter(u=>!u.transportedByUnitId),...frame.observation.zombies.filter(u=>visible.has(hexKey(u.position)))].map(u=>({key:`unit:${u.id}`,kind:'unit' as const,position:u.position,data:u as unknown as Record<string,unknown>})),
     ...frame.observation.facilities.map(f=>({key:`facility:${f.id}`,kind:'facility' as const,position:f.position,data:f as unknown as Record<string,unknown>})),
     ...frame.observation.checkpoints.map(c=>({key:`checkpoint:${c.id}`,kind:'checkpoint' as const,position:c.position,data:c as unknown as Record<string,unknown>})),
-  ];
+  ].sort((a,b)=>(a.kind==='unit'?(a.data.flightState==='airborne'?2:1):0)-(b.kind==='unit'?(b.data.flightState==='airborne'?2:1):0));
 }
 
 /** Shared Live/Replay renderer: accepts only public projections, never GameState. */
@@ -93,8 +93,10 @@ export class PublicBoardRenderer {
     const rows:Array<[string,unknown]>=[['ID',d.id],['Hex',`${e.position.q}, ${e.position.r}`]];
     const label=(ja:string,en:string)=>this.locale==='ja'?ja:en;
     const t=createTranslator(this.locale);
+    if(this.frame?.observation.militaryDrone?.active){const drone=this.frame.observation.militaryDrone;rows.push([label('軍用ドローン','Military Drone'),`${drone.center?.q},${drone.center?.r} · ${label('半径','Radius')} ${drone.radius} · Turn ${(drone.expiresBeforeTurn??0)-1}`]);}
     if(e.kind==='unit'){
       rows.push(['HP',`${d.hp} / ${d.maxHp}`],[label('状態','Mode'),d.mode==='packed'?label('梱包','Packed'):d.mode==='deployed'?label('展開','Deployed'):undefined],[label('熟練度','Proficiency'),d.proficiency? t(`proficiency.${d.proficiency}`,String(d.proficiency)):undefined],[label('攻撃 / 射程','Attack / Range'),`${d.attack} / ${d.artillery?(d.artillery as {minRange:number}).minRange+'–':''}${d.range}`],[label('燃料','Fuel'),`${d.currentFuel} / ${d.maxFuel}`],[label('軍需品','Military Goods'),`${d.currentMilitaryGoods} / ${d.maxMilitaryGoods}`],[label('攻撃回数','Charges'),`${d.attackChargesRemaining} / ${d.maxAttackCharges}`],[label('補給','Supply'),d.inSupply?label('補給内','In supply'):label('補給外','Out of supply')],[label('行動解禁ターン','Unlock turn'),d.modeLockedUntilTurn]);
+      rows.push([label('飛行状態','Flight'),d.flightState?label(d.flightState==='airborne'?'飛行中':'着陸中',String(d.flightState)):undefined],[label('搭乗部隊','Cargo'),d.cargoUnitId],[label('対空攻撃','Anti-air'),d.canTargetAir?label('可能','Yes'):label('不可','No')]);
       const production=d.production as {completed:number;reserved:number;remaining:number|null}|undefined;
       if(production?.remaining!==null&&production)rows.push([label('生涯生産 / 予約 / 残枠','Lifetime / Reserved / Remaining'),`${production.completed} / ${production.reserved} / ${production.remaining}`]);
       const capabilities=d.capabilities as Record<string,boolean>|undefined;
@@ -119,15 +121,15 @@ export class PublicBoardRenderer {
     if(!this.frame)return;const {map,observation}=this.frame,visible=new Set(observation.visibleTileKeys);
     const tiles=new Map(map.tiles.map(t=>[hexKey(t),t]));
     for(const tile of map.tiles){const p=g.transform(tile);if(p.x < -g.scale||p.y < -g.scale||p.x>g.width+g.scale||p.y>g.height+g.scale)continue;
-      ctx.beginPath();for(let k=0;k<6;k++){const a=(60*k-30)*Math.PI/180,x=p.x+Math.cos(a)*g.scale,y=p.y+Math.sin(a)*g.scale;k?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();ctx.fillStyle=tile.terrain==='forest'?'#355447':tile.terrain==='mountain'?'#5d615d':tile.terrain==='water'?'#345569':'#6b7053';ctx.globalAlpha=visible.has(hexKey(tile))?1:.3;ctx.fill();if(this.zoom>=1.5){ctx.save();ctx.clip();this.sprite(ctx,BOARD_ASSET_REGISTRY.terrain[tile.terrain],p.x,p.y,g.scale*2);ctx.restore();}ctx.globalAlpha=1;
+      ctx.beginPath();for(let k=0;k<6;k++){const a=(60*k-30)*Math.PI/180,x=p.x+Math.cos(a)*g.scale,y=p.y+Math.sin(a)*g.scale;k?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();ctx.fillStyle=tile.terrain==='forest'?'#355447':tile.terrain==='mountain'?'#5d615d':tile.terrain==='water'?'#345569':'#6b7053';ctx.globalAlpha=visible.has(hexKey(tile))?1:.3;ctx.fill();if(this.zoom>=1.5){ctx.save();ctx.clip();this.sprite(ctx,BOARD_ASSET_REGISTRY.terrain[tile.terrain],p.x,p.y,g.scale*2);ctx.restore();}ctx.globalAlpha=1;const drone=observation.militaryDrone;if(drone?.active&&drone.center&&hexDistance(tile,drone.center)===drone.radius){ctx.strokeStyle='#77ddff';ctx.lineWidth=1.5;ctx.stroke();}if(drone?.active&&drone.center&&hexDistance(tile,drone.center)===0){ctx.fillStyle='#77ddff';ctx.font=`${Math.max(11,g.scale)}px sans-serif`;ctx.fillText('D',p.x,p.y-g.scale);}
     }
     if(map.roads)for(const edge of roadEdges(map.roads)){const a=g.transform(edge.a),b=g.transform(edge.b);ctx.strokeStyle=edge.role==='trunk'?'#b5a98d':edge.role==='collector'?'#968e7b':'#777467';ctx.lineWidth=Math.max(.5,g.scale*(edge.role==='trunk'?.28:.13));ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();if(this.zoom>=1.5)for(const [tile,at,other] of [[edge.a,a,b],[edge.b,b,a]] as const){if(tiles.get(hexKey(tile))?.terrain!=='water')continue;ctx.save();ctx.translate(at.x,at.y);ctx.rotate(Math.atan2(other.y-at.y,other.x-at.x));this.sprite(ctx,BOARD_ASSET_REGISTRY.overlays.bridge,0,0,Math.hypot(other.x-at.x,other.y-at.y));ctx.restore();}}
     for(const wire of observation.barbedWire){const p=g.transform(wire.position);ctx.strokeStyle='#e4e9ed';ctx.strokeRect(p.x-g.scale*.7,p.y-g.scale*.7,g.scale*1.4,g.scale*1.4);if(this.zoom>=1.5)this.sprite(ctx,BOARD_ASSET_REGISTRY.obstacles.barbedWire,p.x,p.y,g.scale*2);}
     // Facilities first, Units last. Selection remains independent of draw order.
-    for(const e of [...this.entities].sort((a,b)=>(a.kind==='unit'?1:0)-(b.kind==='unit'?1:0))){const p=g.transform(e.position),d=e.data;const path=e.kind==='unit'?resolveUnitAssetPath({type:d.type as never,mode:d.mode as never}):e.kind==='checkpoint'?BOARD_ASSET_REGISTRY.facilities.checkpoint:BOARD_ASSET_REGISTRY.facilities[d.type as keyof typeof BOARD_ASSET_REGISTRY.facilities];ctx.fillStyle=e.kind==='unit'?(observation.units.some(u=>u.id===d.id)?'#67d5c7':'#e8796b'):e.kind==='checkpoint'?'#d7a14d':d.owner==='player'?'#dfce85':'#8d8b80';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(2,g.scale*.5),0,Math.PI*2);ctx.fill();if(path&&this.zoom>=1.5){
+    for(const e of this.entities){const p=g.transform(e.position),d=e.data;if(d.flightState==='airborne'){p.x+=g.scale*.35;p.y-=g.scale*.35;}const path=e.kind==='unit'?resolveUnitAssetPath({type:d.type as never,mode:d.mode as never,flightState:d.flightState as never}):e.kind==='checkpoint'?BOARD_ASSET_REGISTRY.facilities.checkpoint:BOARD_ASSET_REGISTRY.facilities[d.type as keyof typeof BOARD_ASSET_REGISTRY.facilities];ctx.fillStyle=e.kind==='unit'?(observation.units.some(u=>u.id===d.id)?'#67d5c7':'#e8796b'):e.kind==='checkpoint'?'#d7a14d':d.owner==='player'?'#dfce85':'#8d8b80';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(2,g.scale*.5),0,Math.PI*2);ctx.fill();if(path&&this.zoom>=1.5){
       const size=Math.max(14,g.scale*2);this.sprite(ctx,path,p.x,p.y,size);
-      const overlays=e.kind==='facility'?mapFacilityAssetLayers({type:d.type as never,owner:d.owner as never,status:d.status as never,operationalStatus:d.operationalStatus as never,infected:Number(d.infectedPopulation??0)}).overlays:e.kind==='checkpoint'?mapCheckpointAssetLayers({status:d.status as never,infected:Number(d.infected??0)}).overlays:mapUnitAssetLayers({type:d.type as never,mode:d.mode as never,hordeKind:d.isFinalWaveMember?'final':d.isScheduledWaveMember?'periodic':null}).overlays;
+      const overlays=e.kind==='facility'?mapFacilityAssetLayers({type:d.type as never,owner:d.owner as never,status:d.status as never,operationalStatus:d.operationalStatus as never,infected:Number(d.infectedPopulation??0)}).overlays:e.kind==='checkpoint'?mapCheckpointAssetLayers({status:d.status as never,infected:Number(d.infected??0)}).overlays:mapUnitAssetLayers({type:d.type as never,mode:d.mode as never,flightState:d.flightState as never,hordeKind:d.isFinalWaveMember?'final':d.isScheduledWaveMember?'periodic':null}).overlays;
       for(const overlay of overlays)this.sprite(ctx,overlay,p.x,p.y,size);
-    }if(this.selected===e.key){ctx.strokeStyle='#ffe28a';ctx.lineWidth=2;ctx.strokeRect(p.x-g.scale,p.y-g.scale,g.scale*2,g.scale*2);}}
+    }if(d.flightState==='airborne'||d.cargoUnitId){ctx.fillStyle='#efffff';ctx.font=`${Math.max(10,g.scale*.65)}px sans-serif`;ctx.fillText(`${d.flightState==='airborne'?'▲':''}${d.cargoUnitId?'▣':''}`,p.x,p.y-g.scale*.7);}if(this.selected===e.key){ctx.strokeStyle='#ffe28a';ctx.lineWidth=2;ctx.strokeRect(p.x-g.scale,p.y-g.scale,g.scale*2,g.scale*2);}}
   }
 }

@@ -3,7 +3,7 @@ import { GameEngine, nuclearReinforcementPosition } from './engine';
 import { createDefaultConfig } from './config';
 import { prepareTestSnapshot, clearScenarioCheckpoints } from './testConfig';
 import { createUnit } from './state';
-import { hexKey, hexNeighbors } from './hex';
+import { hexDistance, hexKey, hexNeighbors } from './hex';
 import { effectiveMovementCost } from './terrain';
 import { forecastEndTurn } from './economy-query';
 import { forecastUnitCombatAtDistance } from './combat-query';
@@ -15,35 +15,35 @@ import type { GameState } from './types';
 
 const quiet = () => createDefaultConfig({ economy: { initialZombieCount:0, initialScreamerCount:0, initialHunterCount:{min:0,max:0}, initialGasCount:{min:0,max:0}, initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000} }, refugees:{arrivalIntervalMin:999,arrivalIntervalMax:999}, horde:{waves:[{turn:100,directionCount:4,compositionPerDirection:{hordeZombie:1,zombie:0},final:true}]} });
 function load(e:GameEngine,s:GameState){prepareTestSnapshot(s); const result=e.step({type:'LoadSnapshot',snapshot:s}); expect(result.error,result.error?.message).toBeNull();}
-function captureReady(turn=20){const e=new GameEngine(1,quiet()),s=e.getState() as GameState; s.turn=turn; const p=s.facilities.find(f=>f.type==='nuclearPowerPlant')!; const neighbor=hexNeighbors(p.position).find(h=>effectiveMovementCost(s,h)!==null&&!s.units.some(u=>hexKey(u.position)===hexKey(h)))!; const u=s.units.find(u=>u.isPlayerUnit)!; u.position=neighbor; load(e,s); return {e,p,u};}
+function captureReady(turn=10){const e=new GameEngine(1,quiet()),s=e.getState() as GameState; s.turn=turn; const p=s.facilities.find(f=>f.type==='nuclearPowerPlant')!; const neighbor=hexNeighbors(p.position).find(h=>effectiveMovementCost(s,h)!==null&&!s.units.some(u=>hexKey(u.position)===hexKey(h)))!; const u=s.units.find(u=>u.isPlayerUnit)!; u.position=neighbor; load(e,s); return {e,p,u};}
 
-it('captures on Turn20 outside Supply, grants exactly five people once, and round-trips reward state',()=>{
+it('captures on Turn10 outside Supply, grants exactly five people once, and round-trips reward state',()=>{
  const {e,p,u}=captureReady(); const before=e.getState().population.cumulativeReinforcements;
  const moved=e.step({type:'Move',unitId:u.id,destination:p.position}); expect(moved.error).toBeNull();
- expect(moved.state.nuclearObjective).toMatchObject({firstCapturedTurn:20,reward:'claimed',failureSpawn:'none'});
+ expect(moved.state.nuclearObjective).toMatchObject({firstCapturedTurn:10,reward:'claimed',failureSpawn:'none'});
  const sf=moved.state.units.find(u=>u.type==='specialForces')!; expect(sf).toMatchObject({hp:50,currentFuel:44,currentMilitaryGoods:40,proficiency:'regular',maxAttackCharges:3,canMove:true,canAttack:true});
  expect(moved.state.population.cumulativeReinforcements-before).toBe(5); expect(sf.position).not.toEqual(p.position);
  const restored=importSaveJson(exportSaveJson(moved.state as GameState)); expect(restored.valid).toBe(true);
  const end=e.step({type:'EndTurn'}); expect(end.error).toBeNull(); expect(end.state.nuclearObjective.failureSpawn).toBe('none'); expect(end.state.units.filter(u=>u.type==='specialForces')).toHaveLength(1); expect(validateInvariants(end.state as GameState).errors).toEqual([]);
 });
 
-it('expires at the start of Turn21 without exposing a hidden Pack spawn',()=>{
- const e=new GameEngine(7,quiet()),s=e.getState() as GameState;s.turn=20;load(e,s);
- const end=e.step({type:'EndTurn'}); expect(end.error).toBeNull(); expect(end.state.turn).toBe(21); expect(end.state.nuclearObjective).toMatchObject({reward:'expired',failureSpawn:'spawned'});
- const pack=end.state.units.find(u=>u.type==='packZombie')!;expect(pack).toMatchObject({attackChargesRemaining:5,firstZombieActionTurn:21});
- const game=createAgentGame({recordHistory:false});const obs=game.restorePrivateSessionState(end.state as GameState);expect(JSON.stringify(obs)).not.toContain('failureSpawn');expect(obs.zombies.some(z=>z.id===pack.id)).toBe(false);
+it('expires at the start of Turn11 without exposing a hidden Pack spawn',()=>{
+ const e=new GameEngine(7,quiet()),s=e.getState() as GameState;s.turn=10;load(e,s);
+ const end=e.step({type:'EndTurn'}); expect(end.error).toBeNull(); expect(end.state.turn).toBe(11); expect(end.state.nuclearObjective).toMatchObject({reward:'expired',failureSpawn:'spawned'});
+ const plant=end.state.facilities.find(f=>f.type==='nuclearPowerPlant')!;const pack=end.state.units.filter(u=>u.type==='packZombie').sort((a,b)=>hexDistance(a.position,plant.position)-hexDistance(b.position,plant.position))[0]!;expect(pack).toMatchObject({attackChargesRemaining:5,firstZombieActionTurn:11});
+ const game=createAgentGame({recordHistory:false});const obs=game.restorePrivateSessionState(end.state as GameState);expect(obs.nuclearObjective).not.toHaveProperty('failureSpawn');expect(obs.zombies.some(z=>z.id===pack.id)).toBe(false);
  expect(end.events.some(e=>e.type==='nuclear_objective_updated'&&JSON.stringify(e.payload).includes('pack'))).toBe(false);
 });
 
 it('defers a blocked reward beyond the deadline and accounts for reinforcements only on placement',()=>{
- const e=new GameEngine(1,quiet()),s=e.getState() as GameState;s.turn=20;s.nuclearObjective={firstCapturedTurn:20,reward:'pending',failureSpawn:'none'};
+ const e=new GameEngine(1,quiet()),s=e.getState() as GameState;s.turn=10;s.nuclearObjective={firstCapturedTurn:10,reward:'pending',failureSpawn:'none'};
  const occupied=new Set(s.units.map(u=>hexKey(u.position)));
  for(const t of s.map.tiles.filter(t=>t.playerOccupancyAllowed&&effectiveMovementCost(s,t)!==null&&!occupied.has(t.key)))s.units.push(createUnit(s,`block-${t.key}`,'zombie',t));
  load(e,s);const full=e.getState() as GameState; const before=full.population.cumulativeReinforcements;
  expect(nuclearReinforcementPosition(full,true)).toBeNull();
  // Pending state survives save independently of an opportunity to place it.
  expect(importSaveJson(exportSaveJson(full)).valid).toBe(true);
- const opened=structuredClone(s);opened.turn=21;opened.units=opened.units.filter(u=>!u.id.startsWith('block-'));load(e,opened);
+ const opened=structuredClone(s);opened.turn=11;opened.units=opened.units.filter(u=>!u.id.startsWith('block-'));load(e,opened);
  const result=e.step({type:'EndTurn'});expect(result.error).toBeNull();expect(result.state.nuclearObjective.reward).toBe('claimed');expect(result.state.population.cumulativeReinforcements-before).toBe(5);
 },60000);
 

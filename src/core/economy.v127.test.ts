@@ -29,13 +29,13 @@ describe('v1.4.2 economy and required power grid', () => {
     const forecast = forecastEndTurn(engine.getState());
     expect(forecast.electricity).toMatchObject({
       physicalGenerationCapacity: 45,
-      requiredPowerDemand: 40,
-      requiredPowerAllocated: 40,
+      requiredPowerDemand: 80,
+      requiredPowerAllocated: 30,
     });
     // Five electricity requires two Fuel and only actually allocated capacity burns it.
-    expect(forecast.fuel).toMatchObject({ generationFuelDemand: 16, projectedFuelUsed: 16 });
+    expect(forecast.fuel).toMatchObject({ generationFuelDemand: 32, projectedFuelUsed: 12 });
     expect(forecast.food).toMatchObject({ projectedProduction: 230, maintenanceRequired: 115, shortage: 0 });
-    expect(forecast.civilianGoods.projectedProduction).toBe(271);
+    expect(forecast.civilianGoods.projectedProduction).toBe(41);
   });
 
   it('never chains same-turn Refinery Fuel into generation and uses only the one starting Fuel for refill', () => {
@@ -57,6 +57,7 @@ describe('v1.4.2 economy and required power grid', () => {
     const engine = new GameEngine(129, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = editableState(engine);
     disableWind(state);
+    state.facilities.find(f => f.id === 'power-plant-1')!.workers = 6;
     const military = state.facilities.find((facility) => facility.id === 'military-factory-1')!;
     military.owner = 'player';
     military.status = 'owned';
@@ -73,7 +74,7 @@ describe('v1.4.2 economy and required power grid', () => {
     state.resources.civilianGoods = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const none = forecastEndTurn(engine.getState());
-    expect(none.civilianGoods).toMatchObject({ productionInputDemand: 5, productionInputAllocated: 0, productionInputShortage: 5 });
+    expect(none.civilianGoods).toMatchObject({ productionInputDemand: 10, productionInputAllocated: 0, productionInputShortage: 10 });
     expect(none.militaryGoods.projectedProduction).toBe(0);
 
     const withStock = editableState(engine);
@@ -84,15 +85,15 @@ describe('v1.4.2 economy and required power grid', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot: withStock }).error).toBeNull();
     const partial = forecastEndTurn(engine.getState());
     expect(partial.civilianGoods.productionInputAllocated).toBe(2);
-    expect(partial.militaryGoods.projectedProduction).toBeGreaterThanOrEqual(4);
+    expect(partial.militaryGoods.projectedProduction).toBe(1);
   });
 
   it('allocates required cities, then Farm/Civilian Factory, then input-ready Military Factory', () => {
     const engine = new GameEngine(130, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = editableState(engine);
     disableWind(state);
-    state.facilities.find((facility) => facility.id === 'power-plant-1')!.workers = 1;
-    state.facilities.find((facility) => facility.id === 'capital')!.workers += 2;
+    state.facilities.find((facility) => facility.id === 'power-plant-1')!.workers = 2;
+    state.facilities.find((facility) => facility.id === 'capital')!.workers += 1;
     prepareTestSnapshot(state);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const projections = forecastFacilityProduction(engine.getState());
@@ -105,7 +106,7 @@ describe('v1.4.2 economy and required power grid', () => {
     const engine = new GameEngine(131, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     disableWindInEngine(engine);
     const before = forecastEndTurn(engine.getState());
-    expect(before.electricity.requiredPowerDemand).toBe(40);
+    expect(before.electricity.requiredPowerDemand).toBe(80);
     const result = engine.step({ type: 'SetPowerSupply', facilityId: 'farm-1', enabled: false });
     expect(result.error).toBeNull();
     expect(forecastEndTurn(engine.getState()).electricity.requiredPowerDemand).toBe(

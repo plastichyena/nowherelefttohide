@@ -91,7 +91,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const before = engine.getState();
     expect(getUnitLegalAttackProjections(before, guard.id)).toHaveLength(0);
-    expect(engine.step({ type: 'Attack', attackerId: guard.id, targetId: zombie.id }).error?.code).toBe('attack_not_legal');
+    expect(engine.step({ type: 'Attack', attackerId: guard.id, targetId: zombie.id }).error?.code).toBe('insufficient_military_goods');
     expect(engine.getState()).toEqual(before);
 
     const ready = mutableState(engine);
@@ -262,7 +262,8 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
     factory.owner = 'player';
     factory.status = 'owned';
     factory.operationalStatus = 'operational';
-    factory.workers = 1;
+    factory.workers = 4;
+    state.facilities.find(f => f.id === 'power-plant-1')!.workers = 10;
     factory.securedOrder = 20;
     factory.populationOperationalTurn = 1;
     factory.powerSupplyEnabled = true;

@@ -9,9 +9,9 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** v1.6.4 deliberately rejects every earlier Session/Checkpoint schema. */
-export const CHECKPOINT_SCHEMA_VERSION = '15.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '15.0.0' as const;
+/** v1.6.5 deliberately rejects every earlier Session/Checkpoint schema. */
+export const CHECKPOINT_SCHEMA_VERSION = '16.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '16.0.0' as const;
 export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
 export const SESSION_ARTIFACT_PACKAGE_VERSION = '1.0.0' as const;
 export const PLAY_TURN_PROTOCOL_VERSION = '1.2.0' as const;
@@ -30,7 +30,7 @@ export const ZERO_HASH = '0'.repeat(64);
 
 export type SessionCommentLocale = 'ja' | 'en';
 
-export type SessionCommand = 'new' | 'status' | 'step' | 'preview' | 'play-turn' | 'save-checkpoint' | 'list-checkpoints' | 'load-checkpoint' | 'query' | 'artifact';
+export type SessionCommand = 'new' | 'status' | 'step' | 'preview' | 'preview-batch' | 'play-turn' | 'save-checkpoint' | 'list-checkpoints' | 'load-checkpoint' | 'query' | 'artifact';
 
 export interface SessionVersionIdentity {
   appVersion: string;
@@ -299,7 +299,9 @@ export interface SessionCompactSnapshot {
   resources: AgentObservation['resources'];
   population: AgentObservation['population'];
   facilities: Array<Pick<AgentObservation['facilities'][number], 'id' | 'type' | 'position' | 'status' | 'owner' | 'healthyPopulation' | 'infectedPopulation' | 'inSupply' | 'operationalStatus' | 'populationCapacity' | 'populationOperational' | 'populationUnavailableReason' | 'populationIncreaseAvailable' | 'populationDecreaseAvailable'> & { production: Pick<AgentObservation['facilities'][number]['production'], 'stoppedReason' | 'projectedPowerReason'>; recovery: Pick<AgentObservation['facilities'][number]['recovery'], 'status' | 'missingConditions'> }>;
-  units: Array<Pick<AgentObservation['units'][number], 'id' | 'type' | 'unitType' | 'position' | 'hp' | 'maxHp' | 'proficiency' | 'attackChargesRemaining' | 'maxAttackCharges' | 'canMove' | 'canAttack' | 'inSupply' | 'currentFuel' | 'maxFuel' | 'currentMilitaryGoods' | 'maxMilitaryGoods' | 'fixedMilitaryGoodsUpkeepPerTurn' | 'attack' | 'baseRecruitAttack' | 'effectiveAttack' | 'movement' | 'effectiveMovementCostAtPosition' | 'baseRange' | 'effectiveRange' | 'rangeModifierReason' | 'emergencyMovementPoints' | 'emergencyMovementAvailable'>>;
+  units: Array<Pick<AgentObservation['units'][number], 'id' | 'type' | 'unitType' | 'position' | 'hp' | 'maxHp' | 'proficiency' | 'attackChargesRemaining' | 'maxAttackCharges' | 'canMove' | 'canAttack' | 'inSupply' | 'currentFuel' | 'maxFuel' | 'currentMilitaryGoods' | 'maxMilitaryGoods' | 'fixedMilitaryGoodsUpkeepPerTurn' | 'attack' | 'baseRecruitAttack' | 'effectiveAttack' | 'movement' | 'effectiveMovementCostAtPosition' | 'baseRange' | 'effectiveRange' | 'rangeModifierReason' | 'emergencyMovementPoints' | 'emergencyMovementAvailable' | 'flightState' | 'movementDomain' | 'cargoUnitId' | 'cargoUnitType' | 'transportedByUnitId' | 'canTakeOff' | 'canLand' | 'canBoard' | 'canDisembark' | 'canRefuel' | 'canResupplyMilitaryGoods' | 'takeOffReasonCode' | 'landReasonCode' | 'supplyReasonCode' | 'production'>>;
+  militaryDrone: AgentObservation['militaryDrone'];
+  facilityObjectives: AgentObservation['facilityObjectives'];
   visibleEnemies: AgentObservation['zombies'];
   checkpoints: Array<Pick<AgentObservation['checkpoints'][number], 'id' | 'branchId' | 'position' | 'status' | 'role' | 'waiting' | 'screening' | 'approved' | 'infected' | 'currentPolicy' | 'providesSupply'> & { supplyExplanation: ReturnType<typeof import('../agent/decision-summary').checkpointSupplyExplanation> }>;
   horde: AgentObservation['horde'];
@@ -390,6 +392,7 @@ export interface SessionGameRuntime {
   getApiInfo?(): AgentApiInfo;
   getObservation(): AgentObservation;
   getLegalActions(): GameAction[];
+  queryCandidates?(target: 'production-candidates' | 'attack-candidates', filters?: Record<string, JsonValue>): JsonValue[];
   previewAction?(action: GameAction, baseRevision: number): JsonValue;
   step(input: SessionStepInput): AgentStepResult;
   isGameOver(): boolean;

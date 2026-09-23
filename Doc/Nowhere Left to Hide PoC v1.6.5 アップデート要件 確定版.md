@@ -1,12 +1,12 @@
 # Nowhere Left to Hide PoC v1.6.5 アップデート要件 確定版
 
-- ステータス: 要件確定・実装未着手
+- ステータス: 実装・ローカル検証済み（長時間GitHub検証の結果確認は別途）
 - 基準Version: v1.6.4
 - 策定日: 2026-09-23
 - 根拠: v1.6.5ドラフト、依頼者との1問1答（問1～39）、`Nowhere Left to Hide PoC 現行仕様.md` のv1.6.4安定版
-- アセット: 本書確定後に同じタスクで3画像を生成済み。依頼者の見た目確認・採用待ち。原本とプロンプトは `Art/reference/v1.6.5-concepts/` に保存。生成と承認を区別する。
+- アセット: 本書確定後に同じタスクで3画像を生成済み。2026-09-23に依頼者が3枚とも採用を承認し、ゲームへ組込み済み。原本とプロンプトは `Art/reference/v1.6.5-concepts/` に保存。生成と承認を区別する。
 
-本書は次期実装の変更要件であり、実装・検証済みの宣言ではない。未変更部分は現行仕様を継承する。現行仕様は実装・必要な検証・動作確認の完了後に更新する。履歴ドラフトや過去の確定要件より本書の変更内容を優先する。
+本書の変更要件は現行仕様18.15へ反映済み。未変更部分は従来の現行仕様を継承する。実施した検証と未確認の範囲は現行仕様18.15.17および `src/testing/fixtures/v165-acceptance-evidence.json` に記録する。履歴ドラフトや過去の確定要件より本書の変更内容を優先する。
 
 ## 1. 目的・対象範囲
 
@@ -14,7 +14,7 @@ AI向けQuery / Previewの往復量を減らすとともに、経済・電力・
 
 状態変更はGameAction → GameEngine経由に限定し、Game CoreをPhaser/UIから分離する。航空の移動領域、占有、攻撃可能性、輸送、搭乗時燃料移送、一時視界、期限付き施設Objectiveを共通機構として設計する。Normal UI、組み込みAI、外部Agent API、WebMCP、Save、Replay、Live Viewerで同じルール・公開境界を使う。
 
-今回の作業段階は要件定義とアセット制作。ゲーム実装、プッシュ、配布はこの文書作成だけでは実施済みとしない。
+本書作成時は要件定義とアセット制作を行い、その後の実装作業でゲームへ反映した。GitHub workflowの起動と配布物の検証成功は区別する。
 
 ## 2. AI向けQuery / Preview
 
@@ -368,7 +368,7 @@ Helpは勝敗、経済と人口、電力、施設、人間Unit、Zombie、補給
 
 描画用Registry/ResolverをNormal Game、Replay、WebMCP Live Viewerで共有し、Flight Stateから対応画像を選ぶ。Cargo表示やDrone Vision範囲は共通Rendererで扱う。小縮尺・FoW・低ZoomのFallbackを維持する。
 
-生成候補は `facility_air_base_candidate_v1.png`、`unit_multipurpose_helicopter_landed_candidate_v1.png`、`unit_multipurpose_helicopter_airborne_candidate_v2.png`。いずれも上記保存ディレクトリ内にあり、現時点では見た目確認待ち。制作記録は同ディレクトリの `README.md` / `prompts.json` を参照する。
+生成候補は `facility_air_base_candidate_v1.png`、`unit_multipurpose_helicopter_landed_candidate_v1.png`、`unit_multipurpose_helicopter_airborne_candidate_v2.png`。いずれも上記保存ディレクトリ内にあり、2026-09-23に3枚とも採用承認済み。制作記録は同ディレクトリの `README.md` / `prompts.json` を参照する。
 
 ## 15. Config・State・Version・Replay
 

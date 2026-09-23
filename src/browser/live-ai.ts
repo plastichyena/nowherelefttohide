@@ -142,7 +142,7 @@ export class LiveAiViewer {
       await this.render(this.latestObservation);
     }
     this.state.textContent = `active · ${locale()}`;
-    this.current.textContent = 'Session started. Discover the eight nlth_* WebMCP tools.';
+    this.current.textContent = 'Session started. Discover the nine nlth_* WebMCP tools.';
     this.result.textContent = '';
     this.log.replaceChildren();
     this.omittedDecisions = 0;

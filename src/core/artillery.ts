@@ -1,3 +1,4 @@
+import { occupiesGroundLayer } from './unit-capabilities';
 import { hexDistance, hexKey, hexNeighbors, hexWithinBounds } from './hex';
 import { terrainAdjustedDamage } from './terrain';
 import { getPlayerVisibleTileKeys } from './visibility';
@@ -53,7 +54,7 @@ export function artilleryAttackReason(state: Readonly<GameState>, unit: UnitStat
 
 export function previewArtillery(state: Readonly<GameState>, unit: UnitState, aim: HexCoord): ArtilleryPreview {
   const impacts = artilleryImpacts(state, unit, aim), visible = getPlayerVisibleTileKeys(state);
-  const publicUnits = state.units.filter(u => u.isPlayerUnit || visible.has(hexKey(u.position)));
+  const publicUnits = state.units.filter(u => occupiesGroundLayer(u) && (u.isPlayerUnit || visible.has(hexKey(u.position))));
   const blast = new Map<string, HexCoord>();
   for (const impact of impacts) for (const p of [impact.position, ...hexNeighbors(impact.position)]) if (hexWithinBounds(p,state.map.width,state.map.height)) blast.set(hexKey(p),p);
   // Conservatively close over all public Gas that could die to direct damage or a preceding Gas.

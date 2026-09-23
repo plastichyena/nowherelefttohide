@@ -14,7 +14,7 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
 
 describe('AgentGame public boundary', { timeout: 60000 }, () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.6.4');
+    expect(APP_VERSION).toBe('1.6.5');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -78,7 +78,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('invalidates checkpoint candidate projections when Drone Base vision changes', () => {
     const game = createAgentGame();
-    game.reset({ seed: 1423, agent: { id: 'vision-cache-test' } });
+    game.reset({ seed: 1423, configOverrides: { facilities: { powerPlant: { production: { powerGeneration: 100 } } } }, agent: { id: 'vision-cache-test' } });
     const build = game.getLegalActions().find(
       (action): action is Extract<GameAction, { type: 'BuildConstructibleFacility' }> =>
         action.type === 'BuildConstructibleFacility' && action.facilityType === 'civilianDroneBase',
@@ -121,7 +121,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('21');
+    expect(info.saveFormatVersion).toBe('22');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -169,15 +169,15 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       'suppliedAreaZombieClear',
       'suppliedAreaInfectionClear',
     ]);
-    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v8', width: 51, height: 51 });
+    expect(info.rules.map).toMatchObject({ id: 'fixed-51x51-v9', width: 51, height: 51 });
     expect(info.rules.map.hordeSpawnReserve).toHaveLength(392);
     expect(info.rules.horde).toMatchObject({ warningLeadTurns: 2, finalHordeTurn: 70 });
     expect(info.rules.horde.waves).toEqual([
-      expect.objectContaining({ index: 1, turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 3 }, variantSlotCountPerDirection: 3, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
-      expect.objectContaining({ index: 2, turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 5 }, variantSlotCountPerDirection: 5, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
-      expect.objectContaining({ index: 3, turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 7 }, variantSlotCountPerDirection: 7, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
-      expect.objectContaining({ index: 4, turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, variantSlotCountPerDirection: 7, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
-      expect.objectContaining({ index: 5, turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 8 }, variantSlotCountPerDirection: 8, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: true }),
+      expect.objectContaining({ index: 1, turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 4 }, variantSlotCountPerDirection: 4, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
+      expect.objectContaining({ index: 2, turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 6 }, variantSlotCountPerDirection: 6, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
+      expect.objectContaining({ index: 3, turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 9 }, variantSlotCountPerDirection: 9, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
+      expect.objectContaining({ index: 4, turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 9 }, variantSlotCountPerDirection: 9, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: false }),
+      expect.objectContaining({ index: 5, turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 10 }, variantSlotCountPerDirection: 10, possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'], final: true }),
     ]);
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',
@@ -219,7 +219,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
       costs: { simpleFarm: 50, civilianDroneBase: 50, temporaryHousing: 50, windPowerPlant: 150 },
       simpleFarm: { playerBuildLimit: 'unlimited' },
-      temporaryHousing: { hardCapacity: 10, requiredPower: 5, recruitmentHub: false },
+      temporaryHousing: { hardCapacity: 10, requiredPower: 10, recruitmentHub: false },
       windPowerPlant: { fixedPower: 15, noiseRadius: 8, zombieTargetValue: 0, emitsNoise: true, playerBuildLimit: '2 * roadBranchCount' },
     });
     expect(info.rules.production.powerAllocationOrder).toEqual([
@@ -275,7 +275,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     const game = createAgentGame();
     const before = game.reset({ seed: 9, agent: { id: 'safe-agent' } });
     const rejected = game.step({ type: 'Wait', unitId: 'does-not-exist' });
-    expect(rejected.error?.code).toBe('action_not_legal');
+    expect(rejected.error?.code).toBe('cannot_wait');
     expect(rejected.observation).toEqual(before);
     expect(game.getRunArtifact().acceptedActions).toHaveLength(0);
     expect(game.getRunArtifact().artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);

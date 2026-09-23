@@ -1,0 +1,81 @@
+{
+  "release": "1.6.5",
+  "date": "2026-09-23",
+  "subagentsUsed": false,
+  "assets": "All three candidates approved by the user and integrated",
+  "initialRegression": {
+    "completedFiles": 113,
+    "reportedTests": 988,
+    "passed": 902,
+    "failed": 75,
+    "conditionalSkipped": 11,
+    "wholeRunCompleted": false,
+    "interruptedFile": "src/agent/balancedAgent.batch.test.ts",
+    "reason": "Old-diff long seed batch stopped; latest-commit CI runs the full range. All completed-file failures resolved by targeted reruns."
+  },
+  "finalAcceptance": {
+    "files": 10,
+    "passed": 126,
+    "failed": 0,
+    "skipped": 0
+  },
+  "finalSessionBridgeWebMcpLive": {
+    "files": 4,
+    "passed": 40,
+    "failed": 0
+  },
+  "latestStandardBalanced": {
+    "seeds": [
+      1
+    ],
+    "completedWithoutTechnicalFailure": true
+  },
+  "publicScenario": {
+    "script": "scripts/v165-local-acceptance.ts",
+    "acceptedActions": 12,
+    "replayMatched": true,
+    "compactAndHandoffAviationPreserved": true
+  },
+  "build": {
+    "typecheck": "passed",
+    "production": "passed",
+    "releaseReportToolsPassed": 8,
+    "portableBridgeSmoke": "passed",
+    "externalPublicApi": {
+      "seed": 1,
+      "decisions": 10,
+      "outcome": "lost",
+      "turn": 10,
+      "replayMatched": true
+    }
+  },
+  "browser": {
+    "engine": "Chrome",
+    "viewports": [
+      [
+        929,
+        917
+      ],
+      [
+        1280,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "localOnly": true,
+    "realMobileHardware": false,
+    "webMcp": "Registration API adapter; real Session/Core and Live renderer; 9 tools; independent batch and committed act verified",
+    "consoleErrors": 0
+  },
+  "pendingExternalValidation": [
+    "CI long seed batches",
+    "200 release games",
+    "large Session endurance",
+    "Linux/Windows portable packages",
+    "deployed Pages"
+  ],
+  "workflowPolicy": "Verify started only; no monitoring or outcome claims"
+}

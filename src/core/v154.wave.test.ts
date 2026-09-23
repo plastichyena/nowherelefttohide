@@ -34,17 +34,17 @@ describe('v1.5.4 scheduled Wave pending roster', () => {
     const first = engine.step({ type: 'EndTurn' });
     expect(first.error).toBeNull();
     const wave = first.state.horde.waves[0]!;
-    expect(wave).toMatchObject({ baseWaveUnitCount: 30, committedWaveUnitCount: 31, spawnedSoFar: 21, pendingCount: 10 });
-    expect(first.state.horde.pendingWaves[0]?.roster).toHaveLength(10);
+    expect(wave).toMatchObject({ baseWaveUnitCount: 30, committedWaveUnitCount: 31, spawnedSoFar: 22, pendingCount: 9 });
+    expect(first.state.horde.pendingWaves[0]?.roster).toHaveLength(9);
     expect(first.events.filter((event) => event.type === 'horde_wave_started')).toHaveLength(1);
     expect(first.events.find((event) => event.type === 'horde_spawn_batch')?.payload).toMatchObject({
-      spawnedThisBatch: 21, spawnedSoFar: 21, pendingCount: 10,
+      spawnedThisBatch: 22, spawnedSoFar: 22, pendingCount: 9,
     });
     const groupId = wave.groupId;
     const zone = new Set(getHordeSpawnZone(first.state.map, wave.direction).map(({ q, r }) => `${q},${r}`));
     const firstBatch = first.state.units.filter((unit) => unit.spawnGroupId === groupId);
-    expect(firstBatch).toHaveLength(21);
-    expect(firstBatch.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(10);
+    expect(firstBatch).toHaveLength(22);
+    expect(firstBatch.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(8);
     expect(firstBatch.every((unit) => zone.has(`${unit.position.q},${unit.position.r}`))).toBe(true);
     expect(firstBatch.every((unit) => unit.canMove && unit.canAttack)).toBe(true); // armed only at the next Player Turn start
     expect(firstBatch.filter((unit) => unit.type !== 'hordeZombie').every((unit) =>

@@ -1,3 +1,4 @@
+import { RULES_V165 } from '../core/rules-v165';
 import { RULES_V164 } from '../core/rules-v164';
 import { HUMAN_UNIT_TYPES } from '../core/unit-catalog';
 import { RULES_V163 } from '../core/rules-v163';
@@ -90,6 +91,7 @@ export function createAgentApiInfo(
     internal_infection_risk: { severity: 'warning', category: 'infection' },
     checkpoint_health_risk: { severity: 'warning', category: 'checkpoint' },
     refinery_allowance_runway_risk: { severity: 'warning', category: 'resource' },
+    air_base_early_capture_window: { severity: 'warning', category: 'facility' },
     nuclear_early_capture_window: { severity: 'warning', category: 'facility' },
     nuclear_power_outage: { severity: 'warning', category: 'resource' },
     overcrowding_forecast: { severity: 'warning', category: 'resource' },
@@ -194,14 +196,15 @@ export function createAgentApiInfo(
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
     rules: {
+      v165: {explanations:RULES_V165,helicopter:cloneJson(config.units.multipurposeHelicopter),airBase:cloneJson(config.facilities.airBase),objectives:cloneJson(config.objectives),militaryDrone:cloneJson(config.militaryDrone)},
       v164: {explanations:RULES_V164,artillery:cloneJson(config.units.fieldArtillery),humanCapabilities:Object.fromEntries(HUMAN_UNIT_TYPES.map(t=>[t,config.units[t].capabilities])) as AgentApiInfo['rules']['v164']['humanCapabilities'],productionLimits:Object.fromEntries(HUMAN_UNIT_TYPES.map(t=>[t,config.units[t].productionLimitPerGame])) as AgentApiInfo['rules']['v164']['productionLimits']},
-      v163: { explanations: RULES_V163, contextHandoffLimits: CONTEXT_HANDOFF_LIMITS, capitalMinimum: 1, healthStress: { persistence: 0.75, deficitWeight: 0.40 }, starvation: { threshold: 2, cap: 7, recovery: 0.5, maximumRate: 0.10 }, screening: { normal: 0.05, strict: 0, passThroughBase: 0.25, passThroughCap: 0.60 }, infectionGrace: 'next_end_turn', nuclearCaptureDeadline: 20, nuclearFailureTurn: 21 },
+      v163: { explanations: RULES_V163, contextHandoffLimits: CONTEXT_HANDOFF_LIMITS, capitalMinimum: 1, healthStress: { persistence: 0.75, deficitWeight: 0.40 }, starvation: { threshold: 2, cap: 7, recovery: 0.5, maximumRate: 0.10 }, screening: { normal: 0.05, strict: 0, passThroughBase: 0.25, passThroughCap: 0.60 }, infectionGrace: 'next_end_turn', nuclearCaptureDeadline: config.objectives.nuclearPowerPlant.rewardDeadlineTurn, nuclearFailureTurn: config.objectives.nuclearPowerPlant.rewardDeadlineTurn+1 },
       barbedWire: BARBED_WIRE_RULES,
       gasZombie: { explosionDamage:config.units.gasZombie.explosionDamage, explosionInfection:config.units.gasZombie.explosionInfection,radius:1,excludesCenter:true,initialCount:cloneJson(config.economy.initialGasCount),initialMinDistance:config.economy.initialGasMinDistance,allWaves:true,capPerDirection:null,explosionZombieDamage:config.units.gasZombie.explosionZombieDamage },
       armyBase: {maxMilitaryGoods:config.armyBase.maxMilitaryGoods,interceptionCost:config.armyBase.interceptionCost,attack:config.armyBase.attack,range:config.armyBase.range,staffedVision:config.armyBase.staffedVision,rewardLastTurn:config.armyBase.rewardLastTurn,interceptionNoiseRadius:config.armyBase.noiseRadius,recruitmentPower:config.facilities.armyBase.production.powerCapacity,cityPopulationOnly:true},
       zombies: Object.fromEntries((['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const).map((type) => {
-        const { hp, attack, movement, range, vision, maxAttackCharges } = config.units[type];
-        return [type, { hp, attack, movement, range, vision, maxAttackCharges, ai: type === 'hordeZombie' ? 'horde' : 'normal' }];
+        const { hp, attack, movement, range, vision, maxAttackCharges, canTargetAir } = config.units[type];
+        return [type, { hp, attack, movement, range, vision, maxAttackCharges, canTargetAir, ai: type === 'hordeZombie' ? 'horde' : 'normal' }];
       })) as AgentApiInfo['rules']['zombies'],
       proficiency: {
         values: ['recruit', 'regular', 'veteran'],

@@ -82,9 +82,9 @@ function movePlayersAway(state: MutableState): void {
 describe('v1.5.1 Core version, map, and initial state', () => {
   it('creates a v11.0.0 state on fixed-51x51-v8 with all 40 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('14.0.0');
-    expect(state.mapId).toBe('fixed-51x51-v8');
-    expect(state.map.id).toBe('fixed-51x51-v8');
+    expect(state.gameVersion).toBe('15.0.0');
+    expect(state.mapId).toBe('fixed-51x51-v9');
+    expect(state.map.id).toBe('fixed-51x51-v9');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');
     expect(zombies).toHaveLength(40);
     expect(zombies.map((unit) => unit.position)).toEqual(state.map.initialZombiePositions.slice(0, 40));
@@ -423,7 +423,7 @@ describe('v1.4.4 Combat Noise respawn', () => {
     expect(result.state.statistics.noiseRespawnZombiesSpawned).toBe(1);
     const spawnedIds = (result.events.find((event) => event.type === 'site_zombies_spawned' && event.payload.siteId === fallen.id)?.payload.spawnedUnitIds as string[]) ?? [];
     expect(result.state.units.filter((unit) => spawnedIds.includes(unit.id)).every((unit) =>
-      unit.type === 'zombie' && unit.hordeKind === null && unit.spawnGroupId === null,
+      ['zombie','gasZombie','hunterZombie','screamerZombie'].includes(unit.type) && unit.hordeKind === null && unit.spawnGroupId === null,
     )).toBe(true);
   });
 });

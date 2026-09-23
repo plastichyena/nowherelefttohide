@@ -41,6 +41,8 @@ export interface RouteQueryInput {
 }
 
 export interface RouteQueryUnit {
+  flightState?: 'landed' | 'airborne';
+  transportedByUnitId?: string;
   artillery?: {fuelPerMovementPoint?:number};
   id: string;
   type: UnitType;
@@ -356,6 +358,7 @@ function unitSingleAction(
     projectedFuelAfterMove: unit.currentFuel,
   };
   if (source.phase !== 'player') return unavailable('not_player_phase');
+  if (unit.transportedByUnitId) return unavailable('unit_transported');
   if (unit.actionState === 'acted') return unavailable('unit_already_acted');
   if (!unit.canMove) return unavailable('unit_cannot_move');
   if (effectiveCost > movementBudget) return unavailable('out_of_range');
@@ -443,12 +446,14 @@ export function queryRoute(source: Readonly<RouteQuerySource>, input: Readonly<R
     const tile = tiles.get(hexKey(position));
     return tile?.unobstructedMovementCost ?? tile?.effectiveMovementCost ?? null;
   };
+  const flying = mover?.flightState === 'airborne';
   const publiclyOccupied = new Set([
-    ...mutableSource.units.filter((unit) => unit.id !== mover?.id).map((unit) => hexKey(unit.position)),
-    ...mutableSource.zombies.map((unit) => hexKey(unit.position)),
+    ...mutableSource.units.filter((unit) => unit.id !== mover?.id && !unit.transportedByUnitId && (flying ? unit.flightState === 'airborne' : unit.flightState !== 'airborne')).map((unit) => hexKey(unit.position)),
+    ...(flying ? [] : mutableSource.zombies.map((unit) => hexKey(unit.position))),
   ]);
   const unitResolver: MovementCostResolver = (position) => {
     const tile = tiles.get(hexKey(position));
+    if (flying) return tile ? 1 : null;
     if (!tile?.playerOccupancyAllowed) return null;
     return tile.effectiveMovementCost;
   };

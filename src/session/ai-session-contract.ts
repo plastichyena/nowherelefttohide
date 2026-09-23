@@ -17,7 +17,7 @@ import type { GameAction, JsonValue } from '../core/types';
  * This module deliberately imports only public Agent/Core types.  It does
  * not name a browser, a protocol, an SDK, or a storage implementation.
  */
-export const AI_SESSION_CONTRACT_VERSION = '1.1.0' as const;
+export const AI_SESSION_CONTRACT_VERSION = '1.2.0' as const;
 export const AI_SESSION_DEFAULT_QUERY_PAGE_SIZE = 100;
 export const AI_SESSION_MAX_QUERY_PAGE_SIZE = 500;
 export const AI_SESSION_MAX_COMMENT_CODE_POINTS = 500;
@@ -175,6 +175,8 @@ export interface AiSessionPreviewInput extends AiSessionRevisionInput {
   baseRevision: number;
   action: GameAction;
 }
+export interface AiSessionBatchPreviewInput extends AiSessionRevisionInput { baseRevision: number; actions: GameAction[] }
+export interface AiSessionBatchPreviewResult { baseRevision: number; independent: true; results: AiSessionPreviewResult[] }
 
 export interface AiSessionPreviewProjectorInput {
   generation: number;
@@ -288,6 +290,7 @@ export interface AiSessionPort {
   query(input: AiSessionQueryInput): AiSessionResponse<AiSessionQueryResult>;
   getLegalActions(input: AiSessionLegalActionsInput): AiSessionResponse<AiSessionLegalActionsResult>;
   previewAction(input: AiSessionPreviewInput): AiSessionResponse<AiSessionPreviewResult>;
+  previewActions(input: AiSessionBatchPreviewInput): AiSessionResponse<AiSessionBatchPreviewResult>;
   act(input: AiSessionActInput): AiSessionResponse<AiSessionActResult>;
   getRequestResult(requestId: string): AiSessionResponse<AiSessionRequestResult>;
   getResult(): AiSessionResponse<AiSessionGameResult>;

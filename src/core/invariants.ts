@@ -1,8 +1,9 @@
-import { humanAttack } from './unit-capabilities';
+import { validateAviationState } from './aviation-invariants';
+import { humanAttack, isAirborne, occupiesGroundLayer } from './unit-capabilities';
 import { isHumanUnitType, HUMAN_UNIT_TYPES, isZombieUnitType } from './unit-catalog';
 import { validateGameConfig } from './config';
 import { hexKey, hexWithinBounds } from './hex';
-import { initialArmyBaseMatchesSeed, isHordeSpawnReserve, isRoad, validateFixedMap } from './map';
+import { initialArmyBaseMatchesSeed, initialAirBaseMatchesSeed, isHordeSpawnReserve, isRoad, validateFixedMap } from './map';
 import { civilianWorkerCount, effectiveAttackForProficiency, isCityFacility, populationLedgerTotal, resourceConsumerPopulation } from './state';
 import type { GameState } from './types';
 import { BARBED_WIRE_RULES, radialConflict } from './barbed-wire';
@@ -37,7 +38,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     !state.resources ||
     !state.refineryAllowance ||
     !state.publicHealthStress ||
-    !state.nuclearObjective ||
+    !state.nuclearObjective || !state.airBaseObjective || !Array.isArray(state.pendingReanimations) ||
     !state.statistics ||
     !state.horde ||
     !Array.isArray(state.barbedWire) ||
@@ -76,14 +77,15 @@ export function validateInvariants(state: GameState): InvariantResult {
   const objective = state.nuclearObjective;
   if (!['unclaimed','pending','claimed','expired'].includes(objective.reward) || !['none','pending','spawned'].includes(objective.failureSpawn)
     || (objective.firstCapturedTurn !== null && (!Number.isInteger(objective.firstCapturedTurn) || objective.firstCapturedTurn < 1 || objective.firstCapturedTurn > state.turn))
-    || (['pending','claimed'].includes(objective.reward) && (objective.firstCapturedTurn === null || objective.firstCapturedTurn > 20))
+    || (['pending','claimed'].includes(objective.reward) && (objective.firstCapturedTurn === null || objective.firstCapturedTurn > state.config.objectives.nuclearPowerPlant.rewardDeadlineTurn))
     || (objective.failureSpawn !== 'none' && objective.reward !== 'expired')) errors.push('Invalid nuclear objective state');
   for (const site of [...state.facilities, ...state.checkpoints]) {
     if (site.infectionGrace === undefined) continue;
     if (!Array.isArray(site.infectionGrace) || site.infectionGrace.some(g => !g || !Number.isInteger(g.count) || g.count <= 0 || !Number.isInteger(g.spreadsFromTurn) || g.spreadsFromTurn < 2 || g.spreadsFromTurn > state.turn + 1)
       || site.infectionGrace.reduce((n,g) => n + g.count,0) > site.infected) errors.push(`Invalid infection grace: ${site.id}`);
   }
-  for (const unit of state.units) if (unit.movementDomain !== 'ground' || (unit.firstZombieActionTurn !== undefined && (!Number.isInteger(unit.firstZombieActionTurn) || unit.firstZombieActionTurn < 1 || unit.firstZombieActionTurn > state.turn + 1))) errors.push(`Invalid movement domain or action turn: ${unit.id}`);
+  for (const unit of state.units) if (unit.movementDomain !== (isAirborne(unit)?'air':'ground') || (unit.firstZombieActionTurn !== undefined && (!Number.isInteger(unit.firstZombieActionTurn) || unit.firstZombieActionTurn < 1 || unit.firstZombieActionTurn > state.turn + 1))) errors.push(`Invalid movement domain or action turn: ${unit.id}`);
+  if(config.valid) errors.push(...validateAviationState(state));
   const wireIds = new Set<string>();
   if (!Number.isSafeInteger(state.nextBarbedWireNumber) || state.nextBarbedWireNumber < 1) errors.push('Invalid next Barbed Wire number');
   const wirePositions = new Set<string>();
@@ -447,7 +449,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       }
     }
   }
-  for (const unitType of ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery'] as const) {
+  for (const unitType of ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter'] as const) {
     for (const field of ['recruitsCommissionedByType', 'regularPromotionsByType', 'veteranPromotionsByType', 'veteranZombieKillsByType'] as const) {
       if (!isNonNegativeInteger(state.statistics[field]?.[unitType])) errors.push(`Statistic ${field}.${unitType} must be a non-negative integer`);
     }
@@ -508,6 +510,8 @@ export function validateInvariants(state: GameState): InvariantResult {
 
   const mapFacilityById = new Map(state.map.facilities.map((facility) => [facility.id, facility]));
   const armyBases = state.facilities.filter((facility) => facility.type === 'armyBase');
+  if (!initialAirBaseMatchesSeed(state)) errors.push('Invalid seeded Air Base');
+  if(state.facilities.filter(f=>f.type==='airBase').length!==1) errors.push('Exactly one Air Base is required');
   if (armyBases.length !== 1) errors.push('State must contain exactly one Army Base');
   if (state.facilities.filter((facility) => !facility.constructible).length !== state.map.facilities.length) {
     errors.push('Permanent facility state count must match map');
@@ -543,7 +547,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (!['available', 'rescued', 'lost', 'notApplicable'].includes(facility.earlyCaptureSurvivorStatus ?? '')) {
       errors.push(`Facility ${facility.id} has an invalid early-capture Survivor state`);
     }
-    if (facility.type === 'armyBase') {
+    if (['armyBase','airBase'].includes(facility.type)) {
       if (facility.constructible) errors.push(`Army Base ${facility.id} cannot be constructible`);
       if (!facility.armyBase) {
         errors.push(`Army Base ${facility.id} must retain Army Base state`);
@@ -611,14 +615,14 @@ export function validateInvariants(state: GameState): InvariantResult {
       errors.push(`Duplicate unit id ${unit.id}`);
     }
     knownUnitIds.add(unit.id);
-    const key = hexKey(unit.position);
+    const key = (isAirborne(unit)?'air:':'ground:') + hexKey(unit.position);
     if (!hexWithinBounds(unit.position, state.map.width, state.map.height)) {
       errors.push(`Unit ${unit.id} is outside the map`);
     }
-    if (occupied.has(key)) {
+    if (!unit.transportedByUnitId && occupied.has(key)) {
       errors.push(`More than one unit occupies ${key}`);
     }
-    occupied.add(key);
+    if (!unit.transportedByUnitId) occupied.add(key);
     if (!isNonNegativeInteger(unit.hp) || !isNonNegativeInteger(unit.maxHp) || unit.hp > unit.maxHp) {
       errors.push(`Unit ${unit.id} has invalid HP`);
     }
@@ -644,7 +648,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       && (unit.currentMilitaryGoods !== 0 || unit.maxMilitaryGoods !== 0)) {
       errors.push(`Zombie unit ${unit.id} cannot store Military Goods`);
     }
-    if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'].includes(unit.type)) {
+    if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'].includes(unit.type)) {
       errors.push(`Unit ${unit.id} has an invalid type`);
     }
     const shouldBePlayerUnit = isHumanUnitType(unit.type);
@@ -652,7 +656,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (typeof unit.hasScreamed !== 'boolean' || (unit.type !== 'screamerZombie' && unit.hasScreamed)) {
       errors.push(`Unit ${unit.id} has invalid Screamer state`);
     }
-    if (unit.isPlayerUnit && isHordeSpawnReserve(state.map, unit.position)) {
+    if (unit.isPlayerUnit && occupiesGroundLayer(unit) && isHordeSpawnReserve(state.map, unit.position)) {
       errors.push(`Player unit ${unit.id} cannot occupy the Horde Spawn Reserve`);
     }
     if (!isNonNegativeInteger(unit.vision)) errors.push(`Unit ${unit.id} has invalid vision`);
@@ -729,7 +733,7 @@ export function validateInvariants(state: GameState): InvariantResult {
       || !isNonNegativeInteger(pulse.emittedTurn)) {
       errors.push('Pending Noise Pulse is invalid');
     }
-    const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery'].includes(pulse.sourceUnitType))
+    const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter'].includes(pulse.sourceUnitType))
       || (pulse.sourceKind === 'hordeMovement' && pulse.sourceUnitType === 'hordeZombie')
       || (pulse.sourceKind === 'armyBase' && pulse.sourceUnitType === 'armyBase')
       || (pulse.sourceKind === 'windPower' && pulse.sourceUnitType === 'windPowerPlant')
@@ -864,7 +868,7 @@ export function validateInvariants(state: GameState): InvariantResult {
   const pendingProductionIds = new Set<string>();
   const pendingProductionFacilities = new Set<string>();
   for (const order of state.pendingUnitProductions ?? []) {
-    if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery'].includes(order.unitType)
+    if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter'].includes(order.unitType)
       || !mapFacilityById.has(order.cityFacilityId) || !isNonNegativeInteger(order.population) || !isNonNegativeInteger(order.readyTurn)) {
       errors.push(`Pending unit production ${order.id} is invalid`);
     }
@@ -873,8 +877,8 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (pendingProductionFacilities.has(order.cityFacilityId)) errors.push(`Facility ${order.cityFacilityId} has more than one pending unit production`);
     pendingProductionFacilities.add(order.cityFacilityId);
     const facility = state.facilities.find((candidate) => candidate.id === order.cityFacilityId);
-    if (facility?.type === 'armyBase') {
-      if (!state.config.units[order.unitType].recruitmentFacilityTypes.includes('armyBase') || typeof order.powerReady !== 'boolean') {
+    if (facility && ['armyBase','airBase'].includes(facility.type)) {
+      if (!state.config.units[order.unitType].recruitmentFacilityTypes.includes(facility.type as 'armyBase' | 'airBase') || typeof order.powerReady !== 'boolean') {
         errors.push(`Army Base reservation ${order.id} requires an eligible Human Unit and power state`);
       }
     } else if (order.powerReady !== undefined) {
@@ -922,7 +926,7 @@ export function validateInvariants(state: GameState): InvariantResult {
   const specialForces = state.units.filter(u => u.type === 'specialForces').reduce((n,u) => n + u.population,0);
   if (state.population.specialForces !== specialForces || state.population.police !== police || state.population.nationalGuard !== nationalGuard
     || state.population.riotPolice !== riotPolice || state.population.reconTeam !== reconTeam
-    || state.population.unitPopulation !== police + nationalGuard + riotPolice + reconTeam + specialForces + fieldArtillery) {
+    || state.population.unitPopulation !== police + nationalGuard + riotPolice + reconTeam + specialForces + fieldArtillery + state.population.multipurposeHelicopter) {
     errors.push('Unit population totals are out of sync');
   }
   const waiting = state.checkpoints.reduce((sum, checkpoint) => sum + checkpoint.waiting, 0);

@@ -1,5 +1,4 @@
-import { RULES_V164 } from '../core/rules-v164';
-import { ARTILLERY_ASSETS } from '../ui/boardAssets';
+import { ARTILLERY_ASSETS, HELICOPTER_ASSETS } from '../ui/boardAssets';
 import { PublicBoardRenderer, publicBoardFrame } from '../ui/publicBoard';
 import { BOARD_ASSET_REGISTRY, resolveBoardAssetUrl } from '../ui/boardAssets';
 import { ReplayPackage, ReplayZip } from './package';
@@ -7,7 +6,6 @@ import { roadEdges } from '../core/roads';
 import { hexKey } from '../core/hex';
 import type { SessionPublicDocument } from '../session/types';
 import type { Locale } from '../ui/i18n';
-import { RULES_V163 } from '../core/rules-v163';
 
 export const commentDuration = (comment: string): number => comment ? Math.min(8, Math.max(3, Math.ceil(Array.from(comment).length / 20))) * 1000 : 0;
 
@@ -17,16 +15,20 @@ export function showReplay(root: HTMLElement, locale: Locale, exit: () => void):
   root.className = 'app-shell replay-screen';
   root.innerHTML = `<main class="replay-view"><header><h1>${ja ? 'AIリプレイ観戦' : 'Watch AI replay'}</h1><button data-replay="exit">${ja ? 'タイトルへ' : 'Title'}</button></header><div class="replay-file"><label>${ja ? '公開Artifact ZIPを選択' : 'Choose public Artifact ZIP'} <input type="file" accept=".zip,application/zip" data-replay="file"></label><button data-replay="cancel">${ja ? '読込中止' : 'Cancel loading'}</button><p role="status" data-replay="status"></p></div><canvas data-replay="board" aria-label="${ja ? 'AIに公開された盤面' : 'Board visible to AI'}"></canvas><section class="public-board-details"></section><nav aria-label="Replay"><button data-replay="prev">◀</button><button data-replay="play">${ja ? '再生' : 'Play'}</button><button data-replay="next">▶</button><label>${ja ? '速度' : 'Speed'} <select data-replay="speed"><option value="0.5">0.5×</option><option selected value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label><label>Turn <input data-replay="turn" type="number" min="1" value="1"></label><button data-replay="seek">${ja ? '移動' : 'Go'}</button><button data-replay="fit">${ja ? '全体' : 'Fit'}</button></nav><p data-replay="position"></p><p data-replay="health"></p><section class="replay-comment"><h2>${ja ? 'AIの判断コメント' : 'AI decision comment'}</h2><p data-replay="comment"></p><small>${ja ? 'AIのコメントには誤認が含まれる場合があります。' : 'AI comments may contain mistaken assumptions.'}</small></section><section class="replay-log"><h2>${ja ? 'ゲームの結果ログ' : 'Game result log'}</h2><p data-replay="action"></p><small>${ja ? '直近100判断のログを保持します。過去の判断はターン移動で再表示できます。' : 'Keeps logs for 100 Decisions. Seek a turn to revisit older Decisions.'}</small><ol data-replay="events"></ol></section></main>`;
   const legend=document.createElement('details');
-  const title=document.createElement('summary');title.textContent=ja?'v1.6.4 凡例・ルール':'v1.6.4 legend and rules';legend.append(title);
+  const title=document.createElement('summary');title.textContent=ja?'盤面の凡例':'Board legend';legend.append(title);
   for(const [label,path,description] of [
-    [ja?'水面':'Water',BOARD_ASSET_REGISTRY.terrain.water,RULES_V163[locale].water],
-    [ja?'橋':'Bridge',BOARD_ASSET_REGISTRY.overlays.bridge,RULES_V163[locale].water],
-    [ja?'原子力発電所':'Nuclear power plant',BOARD_ASSET_REGISTRY.facilities.nuclearPowerPlant,RULES_V163[locale].nuclear],
-    [ja?'特殊部隊':'Special Forces',BOARD_ASSET_REGISTRY.units.specialForces,RULES_V163[locale].specialForces],
-    [ja?'野戦砲・梱包':'Field Artillery · Packed',ARTILLERY_ASSETS.packed,RULES_V164[locale].artillery],
-    [ja?'野戦砲・展開':'Field Artillery · Deployed',ARTILLERY_ASSETS.deployed,RULES_V164[locale].bombardment],
-    ['Pack Zombie',BOARD_ASSET_REGISTRY.units.packZombie,RULES_V163[locale].packZombie],
+    [ja?'水面':'Water',BOARD_ASSET_REGISTRY.terrain.water,ja?'青い水面のHex。':'Blue water Hex.'],
+    [ja?'橋':'Bridge',BOARD_ASSET_REGISTRY.overlays.bridge,ja?'水面を横切る道路。':'Road crossing water.'],
+    [ja?'原子力発電所':'Nuclear power plant',BOARD_ASSET_REGISTRY.facilities.nuclearPowerPlant,ja?'大型の冷却塔。':'Large cooling towers.'],
+    [ja?'空軍基地':'Air Base',BOARD_ASSET_REGISTRY.facilities.airBase,ja?'滑走路と格納庫。':'Runway and hangars.'],
+    [ja?'特殊部隊':'Special Forces',BOARD_ASSET_REGISTRY.units.specialForces,ja?'特殊装備の歩兵。':'Infantry with specialist equipment.'],
+    [ja?'野戦砲・梱包':'Field Artillery · Packed',ARTILLERY_ASSETS.packed,ja?'牽引する姿勢。':'Towed stance.'],
+    [ja?'野戦砲・展開':'Field Artillery · Deployed',ARTILLERY_ASSETS.deployed,ja?'砲脚を広げた射撃姿勢。':'Firing stance with spread trails.'],
+    [ja?'ヘリ・着陸':'Helicopter · Landed',HELICOPTER_ASSETS.landed,ja?'静止ローターと接地姿勢。':'Stopped rotor and grounded stance.'],
+    [ja?'ヘリ・飛行':'Helicopter · Airborne',HELICOPTER_ASSETS.airborne,ja?'回転ローターと▲。▣は搭乗者。':'Spinning rotor and ▲. ▣ indicates cargo.'],
+    ['Pack Zombie',BOARD_ASSET_REGISTRY.units.packZombie,ja?'密集した群れ。':'A tightly packed group.'],
   ]) { const row=document.createElement('p'),icon=document.createElement('img');icon.src=resolveBoardAssetUrl(path!);icon.alt=label!;icon.width=40;icon.height=40;row.append(icon,document.createTextNode(` ${label}: ${description}`));legend.append(row); }
+  const droneLegend=document.createElement('p');droneLegend.textContent=ja?'Dと水色の範囲は軍用ドローンの視界です。':'D and the cyan area mark Military Drone vision.';legend.append(droneLegend);
   root.querySelector('.replay-view')!.append(legend);
   const get = <T extends HTMLElement>(name: string) => root.querySelector<T>(`[data-replay="${name}"]`)!;
   const status = get('status'), canvas = get<HTMLCanvasElement>('board');

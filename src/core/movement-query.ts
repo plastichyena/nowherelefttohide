@@ -1,4 +1,5 @@
-import { deployedArtillery, canReact } from './unit-capabilities';
+import { canOccupyAirHex, emergencyLandingPreview } from './aircraft';
+import { deployedArtillery, canReact, isAirborne, occupiesGroundLayer, canTargetUnit } from './unit-capabilities';
 import type { GameState, UnitState, HexCoord, MoveAction, ActionError, GameAction } from './types';
 import { hexKey, hexDistance, hexWithinBounds } from './hex';
 import { getUnit, getUnitAt } from './state';
@@ -13,6 +14,7 @@ function isPlayerPhase(state: Readonly<GameState>): boolean { return state.phase
 import type { HumanUnitType } from './types';
 
 export function unitMoveFuelCost(unitType: HumanUnitType, distance: number): number {
+  if (unitType === 'multipurposeHelicopter') return Math.max(0, Math.floor(distance)) * 5;
   if (unitType === 'fieldArtillery') return Math.max(0, Math.floor(distance)) * 10;
   const entered = Math.max(0, Math.floor(distance));
   if (entered === 0) return 0;
@@ -26,12 +28,15 @@ export function unitMoveFuelCost(unitType: HumanUnitType, distance: number): num
 
 
 export function movementFuelCost(state: Readonly<GameState>, unit: UnitState, hexes: number, movementPoints: number): number {
+  if (isAirborne(unit)) return Math.min(unit.currentFuel, movementPoints * state.config.units.multipurposeHelicopter.fuelPerMovementPoint);
   return unit.type === 'fieldArtillery' ? movementPoints * state.config.units.fieldArtillery.fuelPerMovementPoint : unitMoveFuelCost(unit.type as HumanUnitType,hexes);
 }
 
 export interface MovePreview {
   legal: boolean;
   reason: string | null;
+  emergencyLanding?: ReturnType<typeof emergencyLandingPreview>;
+  fuelExhaustionHex?: HexCoord | null;
   path: HexCoord[];
   reached: HexCoord | null;
   interception: { interceptorId: string; position: HexCoord } | null;
@@ -47,7 +52,7 @@ export function interceptorsAt(state: GameState, mover: UnitState, position: Hex
       (candidate) =>
         candidate.id !== mover.id &&
         candidate.isPlayerUnit !== mover.isPlayerUnit &&
-        canReact(candidate) &&
+        canReact(candidate) && canTargetUnit(state, candidate, mover) &&
         forecastUnitCombatAtDistance(state, candidate, hexDistance(candidate.position, position)).canAttack,
     )
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -64,23 +69,26 @@ export function getMovePath(state: GameState, action: MoveAction): {
   if (!unit || !unit.isPlayerUnit) {
     return error(action, 'unknown_unit', 'A player unit is required');
   }
+  if (unit.transportedByUnitId) return error(action, 'unit_transported', 'Transported units cannot move');
+  if (unit.type === 'multipurposeHelicopter' && !isAirborne(unit)) return error(action, 'aircraft_not_airborne', 'Take off before moving');
+  if (isAirborne(unit) && unit.currentFuel <= 0) return error(action, 'insufficient_unit_fuel', 'Flight requires fuel');
   if (!isPlayerPhase(state) || unit.actionState === 'acted' || !unit.canMove || deployedArtillery(unit)) {
     return error(action, 'unit_cannot_move', 'This unit cannot move now');
   }
   if (!hexWithinBounds(action.destination, state.map.width, state.map.height)) {
     return error(action, 'outside_map', 'Destination is outside the map');
   }
-  if (isHordeSpawnReserve(state.map, action.destination)) {
+  if (!isAirborne(unit) && isHordeSpawnReserve(state.map, action.destination)) {
     return error(action, 'horde_spawn_reserve', 'Player units cannot enter or cross the Horde Spawn Reserve');
   }
   const visible = getPlayerVisibleTileKeys(state);
-  const destinationUnit = getUnitAt(state, action.destination);
+  const destinationUnit = isAirborne(unit) ? state.units.find(u=>u.id!==unit.id && isAirborne(u) && hexKey(u.position)===hexKey(action.destination)) : getUnitAt(state, action.destination);
   if (destinationUnit && (destinationUnit.isPlayerUnit || visible.has(hexKey(destinationUnit.position)))) {
     return error(action, 'occupied_destination', 'Destination is occupied');
   }
   const publicBlocked = new Set(
     state.units
-      .filter((candidate) => candidate.id !== unit.id && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
+      .filter((candidate) => candidate.id !== unit.id && (isAirborne(unit) ? isAirborne(candidate) : occupiesGroundLayer(candidate)) && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
       .map((candidate) => hexKey(candidate.position)),
   );
   const path = findShortestPath(
@@ -88,7 +96,7 @@ export function getMovePath(state: GameState, action: MoveAction): {
     unit.position,
     action.destination,
     publicBlocked,
-    createMovementCostResolver(state, true, visible),
+    unitMovementCostResolver(state, unit, visible),
   );
   if (!path) {
     return error(action, 'no_path', 'No path is available');
@@ -97,7 +105,7 @@ export function getMovePath(state: GameState, action: MoveAction): {
   const movementBudget = movementMode === 'emergency'
     ? state.config.units[unit.type as HumanUnitType].emergencyMovementPoints
     : unit.movement;
-  const effectiveCost = pathMovementCost(path, createMovementCostResolver(state, true, visible));
+  const effectiveCost = pathMovementCost(path, unitMovementCostResolver(state, unit, visible));
   if (path.length <= 1 || effectiveCost > movementBudget) {
     return error(action, 'out_of_range', 'Destination exceeds movement range');
   }
@@ -116,7 +124,7 @@ function computeReachableMovePaths(state: GameState, unit: UnitState) {
   const visible = getPlayerVisibleTileKeys(state);
   const blocked = new Set(
     state.units
-      .filter((candidate) => candidate.id !== unit.id && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
+      .filter((candidate) => candidate.id !== unit.id && (isAirborne(unit) ? isAirborne(candidate) : occupiesGroundLayer(candidate)) && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
       .map((candidate) => hexKey(candidate.position)),
   );
   const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
@@ -128,7 +136,7 @@ function computeReachableMovePaths(state: GameState, unit: UnitState) {
     unit.position,
     movementBudget,
     blocked,
-    createMovementCostResolver(state, true, visible),
+    unitMovementCostResolver(state, unit, visible),
   ).filter((entry) => movementMode === 'emergency' || unit.currentFuel >= movementFuelCost(state, unit, entry.path.length - 1, entry.cost));
 }
 
@@ -148,7 +156,7 @@ export function getUnitLegalMoveFuelProjections(
 }> {
   const snapshot = state as GameState;
   const unit = getUnit(snapshot, unitId);
-  if (!unit || !unit.isPlayerUnit || unit.actionState === 'acted' || !unit.canMove || deployedArtillery(unit) || snapshot.phase !== 'player') return [];
+  if (!unit || !unit.isPlayerUnit || unit.transportedByUnitId || (unit.type === 'multipurposeHelicopter' && !isAirborne(unit)) || unit.actionState === 'acted' || !unit.canMove || deployedArtillery(unit) || snapshot.phase !== 'player') return [];
   return reachableMovePaths(snapshot, unit).map((entry) => {
     const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
     const fuelCost = movementMode === 'normal' ? movementFuelCost(state, unit, entry.path.length - 1, entry.cost) : 0;
@@ -181,13 +189,19 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
     };
   }
   const mover = candidate.unit;
-  for (const position of candidate.path.slice(1)) {
+  const exhaustionIndex = isAirborne(mover) ? Math.ceil(mover.currentFuel / state.config.units.multipurposeHelicopter.fuelPerMovementPoint) : Infinity;
+  for (const [index, position] of candidate.path.slice(1).entries()) {
+    if (index + 1 >= exhaustionIndex) return {
+      legal: true, reason: null, path: candidate.path, reached: {...position}, interception: null,
+      fuelCost: mover.currentFuel, projectedFuelAfterMove: 0, movementMode: 'normal', effectiveMovementCost: index+1,
+      fuelExhaustionHex: {...position}, emergencyLanding: emergencyLandingPreview(state,mover,position),
+    };
     const interceptors = interceptorsAt(snapshot, mover, position)
       .filter((interceptor) => initiallyVisible.has(hexKey(interceptor.position)));
     if (interceptors[0]) {
       const entered = candidate.path.findIndex((step) => hexKey(step) === hexKey(position));
       const partialPath = candidate.path.slice(0, entered + 1);
-      const effectiveCost = pathMovementCost(partialPath, createMovementCostResolver(snapshot, true, initiallyVisible));
+      const effectiveCost = pathMovementCost(partialPath, unitMovementCostResolver(snapshot, mover, initiallyVisible));
       const fuelCost = candidate.movementMode === 'normal'
         ? movementFuelCost(state, mover, entered, effectiveCost)
         : 0;
@@ -215,4 +229,8 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
     movementMode: candidate.movementMode,
     effectiveMovementCost: candidate.effectiveMovementCost,
   };
+}
+
+function unitMovementCostResolver(state: Readonly<GameState>, unit: UnitState, visible: ReadonlySet<string>) {
+  return isAirborne(unit) ? (p: HexCoord) => canOccupyAirHex(state,p,unit.id) ? 1 : null : createMovementCostResolver(state,true,visible);
 }

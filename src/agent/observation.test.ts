@@ -47,7 +47,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
       requiresPower: true,
       powerMode: 'required',
       powerSupplyEnabled: true,
-      requiredPowerCapacity: 5,
+      requiredPowerCapacity: 10,
       stoppedReason: 'infection',
     });
   });

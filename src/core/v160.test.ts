@@ -117,7 +117,7 @@ function oilFixture(workers: number, remainingAllowance = 2_000): GameState {
 
 describe('v1.6 Core acceptance', () => {
   it('uses the v6 facility set with one Oil Field, four branches, and its one-hex access spur', () => {
-    expect(FIXED_MAP_ID).toBe('fixed-51x51-v8');
+    expect(FIXED_MAP_ID).toBe('fixed-51x51-v9');
     expect(FIXED_MAP.facilities).toHaveLength(FIXED_FACILITY_COUNT);
     expect(FIXED_MAP.roadBranches).toHaveLength(4);
     const removed = ['refinery-2', 'refinery-3', 'refinery-4', 'power-plant-2', 'power-plant-3'];
@@ -319,6 +319,7 @@ describe('v1.6 Core acceptance', () => {
     setFacilityOperating(facility(state, 'farm-2'), 30);
     setFacilityOperating(facility(state, 'farm-3'), 30);
     setFacilityOperating(facility(state, 'farm-4'), 10);
+    state.config.facilities.windPowerPlant.production.fixedPowerGeneration = 30;
     setFacilityOperating(facility(state, 'wind-power-plant-1'), 0);
     state.resources.food = 10_000;
     state.resources.civilianGoods = 273;

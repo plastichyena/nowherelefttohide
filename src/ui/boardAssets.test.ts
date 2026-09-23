@@ -45,11 +45,13 @@ describe('board asset registry', () => {
       'civilianDroneBase',
       'temporaryHousing',
       'armyBase',
+      'airBase',
       'checkpoint',
     ]);
     expect(Object.keys(BOARD_ASSET_REGISTRY.obstacles)).toEqual(['barbedWire']);
     expect(Object.keys(BOARD_ASSET_REGISTRY.units)).toEqual([
       'fieldArtillery',
+      'multipurposeHelicopter',
       'police',
       'nationalGuard',
       'zombie',

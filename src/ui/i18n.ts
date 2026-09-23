@@ -561,10 +561,10 @@ const JA: TranslationTable = {
   unavailable: '利用不可',
   noSave: '保存データがありません',
   loadError: 'セーブデータを読み込めません',
-  legacySaveNotice: 'v1.6.3以前の自動保存・セーブコード・JSONはv1.6.4と互換性がなく読み込めません。旧データは変換・削除・上書きされません。「最初から」で新しいゲームを開始してください。',
-  legacySaveError: 'v1.6.3以前のセーブデータはv1.6.4で読み込めません。現在の状態は変更されず、元データも保持されます。「最初から」を選択してください。',
-  migrationSaveError: 'v1.6.3以前のSaveはv1.6.4へ移行できないため読み込めません。現在の状態と元データは変更されていません。',
-  migratedSaveNotice: 'v1.6.3以前のSaveはv1.6.4へ移行されません。元データは変更・削除・上書きされません。',
+  legacySaveNotice: 'v1.6.4以前の自動保存・セーブコード・JSONはv1.6.5と互換性がなく読み込めません。旧データは変換・削除・上書きされません。「最初から」で新しいゲームを開始してください。',
+  legacySaveError: 'v1.6.4以前のセーブデータはv1.6.5で読み込めません。現在の状態は変更されず、元データも保持されます。「最初から」を選択してください。',
+  migrationSaveError: 'v1.6.4以前のSaveはv1.6.5へ移行できないため読み込めません。現在の状態と元データは変更されていません。',
+  migratedSaveNotice: 'v1.6.4以前のSaveはv1.6.5へ移行されません。元データは変更・削除・上書きされません。',
   saved: '自動保存しました',
   saveFailed: '保存に失敗しました',
   manualSave: '手動保存',
@@ -791,7 +791,7 @@ const JA: TranslationTable = {
   eventCauseCombatNoise: 'Combat Noise',
   tipNoise: 'Human CombatとHordeの実移動は共通Noise Pulseを発生させます。Police・Riot Police・ReconはMedium、SoldierはLargeを公開し、Horde移動NoiseはRadius 8です。Screamerは人間を初めて発見すると位置非公開の特大Noiseを1回発生させます。通常AI系Zombieは次のZombie Phaseで反応し、Hiddenな反応個体・Target・発生位置・Screamerの正確なRadiusは公開しません。',
   tipCrisis: 'Crisis Summaryは公開Stateから重大度別に危機を整理します。End Turn時はCritical件数、攻撃可能Charge、感染を自動鎮圧できるUnitだけを短く確認できます。',
-  tipSave: 'v1.6.4は新規ゲーム専用で、v1.6.3以前の通常Save・AI Replay・Artifact・Session・Checkpointを読み込みません。旧データは変換・削除・上書きされません。Game Rules 14.0.0／Save Format 21を使用します。新規ゲーム開始時、正常に完了したEnd Turn後、勝利・敗北確定時に自動保存し、任意のタイミングで手動保存できます。',
+  tipSave: 'v1.6.5は新規ゲーム専用で、v1.6.4以前の通常Save・AI Replay・Artifact・Session・Checkpointを読み込みません。旧データは変換・削除・上書きされません。Game Rules 15.0.0／Save Format 22を使用します。新規ゲーム開始時、正常に完了したEnd Turn後、勝利・敗北確定時に自動保存し、任意のタイミングで手動保存できます。',
   tipInfectionEvents: '感染者5人につきNormal Zombie 1体を生成し、1回最大6体です。隣接空き不足分は拠点へ残り、陥落拠点はCombat Noiseで再流出します。連鎖陥落と建設施設の消滅は重要イベント履歴へ記録します。',
   tipTerrain: 'TerrainはPlain／Forest／Mountain／Waterで、RoadとUrbanは重畳表示です。RoadまたはUrbanは実効Cost 1、Forest上のZombieにはForest防御が適用されます。',
   tipVision: 'Human Unit・Player所有施設・稼働CheckpointのVisionが合成されます。Ground VisionはForest／Mountainの最初のHexを表示してその先を遮蔽し、Aerial Vision（Civilian Drone Base）はTerrain LOSを無視します。Zombie Vision、Noise、Attack lineはTerrainに遮られません。',
@@ -1488,10 +1488,10 @@ const EN: TranslationTable = {
   unavailable: 'Unavailable',
   noSave: 'No save data',
   loadError: 'Could not load save data',
-  legacySaveNotice: 'Autosaves, save codes, and JSON from v1.6.3 or earlier are incompatible with v1.6.4. Legacy data is never converted, deleted, or overwritten. Choose New Game to start again.',
-  legacySaveError: 'This save is from v1.6.3 or earlier and cannot be loaded by v1.6.4. Your current state remains unchanged and the source data is retained. Choose New Game.',
-  migrationSaveError: 'v1.6.3-or-earlier saves cannot be migrated to v1.6.4. The current state and source data were not changed.',
-  migratedSaveNotice: 'v1.6.3-or-earlier saves are not migrated to v1.6.4. Source data is never changed, deleted, or overwritten.',
+  legacySaveNotice: 'Autosaves, save codes, and JSON from v1.6.4 or earlier are incompatible with v1.6.5. Legacy data is never converted, deleted, or overwritten. Choose New Game to start again.',
+  legacySaveError: 'This save is from v1.6.4 or earlier and cannot be loaded by v1.6.5. Your current state remains unchanged and the source data is retained. Choose New Game.',
+  migrationSaveError: 'v1.6.4-or-earlier saves cannot be migrated to v1.6.5. The current state and source data were not changed.',
+  migratedSaveNotice: 'v1.6.4-or-earlier saves are not migrated to v1.6.5. Source data is never changed, deleted, or overwritten.',
   saved: 'Autosaved',
   saveFailed: 'Save failed',
   manualSave: 'Manual save',
@@ -1718,7 +1718,7 @@ const EN: TranslationTable = {
   eventCauseCombatNoise: 'Combat Noise',
   tipNoise: 'Human combat and actual Horde movement emit common Noise Pulses. Police, Riot Police, and Recon expose Medium; Soldier exposes Large; and Horde movement uses Radius 8. A Screamer emits one position-hidden extra-large Noise when it first discovers humans. Normal-AI Zombies react at the next Zombie Phase. Hidden responders, targets, source positions, and the exact Screamer radius are never public.',
   tipCrisis: 'Crisis Summary groups threats derived from public state by severity. End Turn confirmation briefly shows the Critical count, Units with attack Charges, and Units able to auto-suppress infection.',
-  tipSave: 'v1.6.4 is for new games only and does not load v1.6.3-or-earlier normal Saves, AI Replays, Artifacts, Sessions, or Checkpoints. Legacy data is never converted, deleted, or overwritten. It uses Game Rules 14.0.0 and Save Format 21. Autosave runs at New Game start, after a successful End Turn, and when victory or defeat is confirmed; manual save remains available.',
+  tipSave: 'v1.6.5 is for new games only and does not load v1.6.4-or-earlier normal Saves, AI Replays, Artifacts, Sessions, or Checkpoints. Legacy data is never converted, deleted, or overwritten. It uses Game Rules 15.0.0 and Save Format 22. Autosave runs at New Game start, after a successful End Turn, and when victory or defeat is confirmed; manual save remains available.',
   tipInfectionEvents: 'One Normal Zombie is requested per 5 infected people, up to 6 per resolution. Missing adjacent space remains infected, and fallen sites can release Zombies again through Combat Noise. Chain falls and Constructible Facility destruction appear in Important Event History.',
   tipTerrain: 'Base Terrain is Plain, Forest, Mountain, or Water; Road and Urban are overlays. Road or Urban costs 1 movement, and Zombies receive Forest defense on Forest tiles.',
   tipVision: 'Visibility is the union of Human Unit, Player-owned Facility, and operational Checkpoint Vision. Ground Vision shows the first Forest/Mountain Hex and hides beyond it; Aerial Vision from Civilian Drone Bases ignores Terrain LOS. Zombie Vision, Noise, and Attack lines are not blocked by Terrain.',
@@ -1888,7 +1888,7 @@ for (const [locale, table] of [['ja', JA], ['en', EN]] as const) {
     internal_infection_risk: ['生活環境による感染リスク', '健康人口 {healthyPopulation}、1人あたり確率 {probability}、期待人数 {expectedInfections}。駐留中も発生し得ます。少人口拠点では初回感染で陥落し得ます。'],
     checkpoint_health_risk: ['検問所の衛生リスク', 'waiting {waiting}、1人あたり確率 {probability}、審査潜伏感染確率 {screeningProbability}。新規間接感染の拡大は翌Turn終了から。'],
     refinery_allowance_runway_risk: ['精製枠がまもなく枯渇', '残量 {remainingAllowance}、予測使用量 {projectedFuelRefined}、Oil Field増分 {oilCredits}、正味消費 {netBurn}、残り約 {estimatedTurnsRemaining} Turn（現条件を維持した場合）。'],
-    nuclear_early_capture_window: ['原発確保の期限', 'Turn20まで残り {turnsRemaining} Turn。期限内の初回確保で特殊部隊が合流。未確保ならTurn21にPack Zombie出現。'],
+    nuclear_early_capture_window: ['原発確保の期限', 'Turn10まで残り {turnsRemaining} Turn。期限内の初回確保で特殊部隊が合流。未確保ならTurn11にPack Zombie出現。'],
     nuclear_power_outage: ['原発の発電停止', '停止原因 {reason}、失う出力 {lostGeneration}、電力不足 {shortage}。Supplyと施設状態を回復してください。'],
   } : {
     capital_resident_minimum: ['Few healthy Capital residents', rules.capital],
@@ -1898,7 +1898,7 @@ for (const [locale, table] of [['ja', JA], ['en', EN]] as const) {
     internal_infection_risk: ['Living-condition infection risk', 'Healthy {healthyPopulation}; per-person probability {probability}; expected count {expectedInfections}. Garrisons do not prevent this draw. A small site can fall on its first infection.'],
     checkpoint_health_risk: ['Checkpoint health risk', 'Waiting {waiting}; per-person probability {probability}; screening probability {screeningProbability}. New indirect infections spread from the next EndTurn.'],
     refinery_allowance_runway_risk: ['Refining allowance running out', 'Remaining {remainingAllowance}; projected use {projectedFuelRefined}; Oil Field credits {oilCredits}; net burn {netBurn}; about {estimatedTurnsRemaining} turns at current operation.'],
-    nuclear_early_capture_window: ['Nuclear capture deadline', '{turnsRemaining} turns until Turn20. First capture in time awards Special Forces; never captured by Turn21 causes a Pack Zombie.'],
+    nuclear_early_capture_window: ['Nuclear capture deadline', '{turnsRemaining} turns until Turn10. First capture in time awards Special Forces; never captured by Turn11 causes a Pack Zombie.'],
     nuclear_power_outage: ['Nuclear generation stopped', 'Reason {reason}; lost output {lostGeneration}; power shortage {shortage}. Restore Supply and operation.'],
   };
   for (const [code,[title,body]] of Object.entries(alerts)) {
@@ -1919,6 +1919,20 @@ const FACILITY_NAMES: Record<string, [string,string]> = {
 for (const [type, names] of Object.entries(FACILITY_NAMES)) {
   JA[`facility.${type}`]=names[0]; EN[`facility.${type}`]=names[1];
 }
+
+const AVIATION_LABELS: Record<string,[string,string]> = {
+  'facility.airBase':['空軍基地','Air Base'], airBase:['空軍基地','Air Base'],multipurposeHelicopter:['多目的ヘリコプター','Multipurpose Helicopter'],produceHelicopter:['ヘリを生産','Produce helicopter'],
+  takeOff:['離陸','Take off'],land:['着陸','Land'],landed:['着陸中','Landed'],airborne:['飛行中','Airborne'],flightState:['飛行状態','Flight state'],cargo:['搭乗部隊','Cargo'],boardAircraft:['搭乗','Board'],disembarkAircraft:['降機','Disembark'],flightRules:['飛行・輸送ルール','Flight and transport rules'],militaryDrone:['軍用ドローン','Military Drone'],selectDroneTarget:['盤面で派遣先を選択','Select target on map'],facilityObjectives:['期限付き施設目標','Timed facility objectives'],remaining:['残りターン','Turns remaining'],distance:['距離','Distance'],transferredFuel:['移した燃料','Transferred fuel'],aircraftFuelAfter:['ヘリの移転後燃料','Aircraft fuel after transfer'],infantryFuelAfter:['歩兵の移転後燃料','Infantry fuel after transfer'],
+  TakeOff:['離陸','Take off'],Land:['着陸','Land'],BoardAircraft:['搭乗','Board'],DisembarkAircraft:['降機','Disembark'],LaunchMilitaryDrone:['軍用ドローン派遣','Launch Military Drone'],
+  'objective.unclaimed':['未確保','Not captured'],'objective.pending':['援軍配置待ち','Reinforcement pending'],'objective.claimed':['援軍獲得済み','Reward claimed'],'objective.expired':['報酬条件終了','Reward expired'],
+  'alert.air_base_early_capture_window.title':['空軍基地確保の期限','Air Base capture deadline'],'alert.air_base_early_capture_window.body':['Turn10まで残り {turnsRemaining} Turn。陥落前・健康生存者ありで確保すると特殊部隊が合流。','{turnsRemaining} turns until Turn10. Capture before a fall with healthy survivors awards Special Forces.'],'crisisReason.air_base_early_capture_window':['空軍基地の早期確保期限','Air Base capture deadline'],
+};
+const AVIATION_REASONS: Record<string,[string,string]> = {
+ aircraft_already_airborne:['すでに飛行中です','Already airborne'],aircraft_not_airborne:['飛行中ではありません','Not airborne'],aircraft_not_landed:['着陸が必要です','Must be landed'],aircraft_landed_this_turn:['着陸したターンは離陸できません','Cannot take off on the landing turn'],aircraft_took_off_this_turn:['離陸したターンは着陸できません','Cannot land on the takeoff turn'],air_layer_occupied:['空中に別の機体がいます','Air layer occupied'],unit_already_acted:['この部隊は行動済みです','Unit has already acted'],insufficient_unit_fuel:['搭載燃料が不足しています','Insufficient carried Fuel'],insufficient_fuel:['国家燃料が不足しています','Insufficient national Fuel'],aircraft_cargo_occupied:['搭乗枠が埋まっています','Cargo slot occupied'],aircraft_has_no_cargo:['搭乗部隊がいません','No cargo'],unit_not_infantry:['歩兵のみ搭乗できます','Only infantry may board'],unit_already_transported:['すでに搭乗中です','Already transported'],boarding_requires_adjacency:['ヘリに隣接してください','Must be adjacent to aircraft'],cargo_boarded_this_turn:['搭乗したターンは降機できません','Cannot disembark on boarding turn'],disembark_requires_adjacency:['隣接Hexへ降機してください','Choose an adjacent Hex'],facility_not_owned:['施設が未確保です','Facility not owned'],facility_not_operational:['施設が正常稼働していません','Facility not operational'],facility_out_of_supply:['施設が補給範囲外です','Facility out of Supply'],facility_not_powered:['施設に電力が割り当てられていません','Facility has no allocated power'],military_drone_active:['軍用ドローンはすでに稼働中です','Military Drone already active'],aircraft_airborne:['飛行中は補給できません','Cannot resupply in flight'],unit_transported:['搭乗中は単独行動できません','Cargo cannot act independently'],lifetime_production_limit_reached:['生涯生産上限に達しています','Lifetime production limit reached'],production_slot_occupied:['生産枠が使用中です','Production slot occupied'],insufficient_population:['徴兵可能な人口が不足しています','Insufficient recruitable population'],insufficient_civilian_goods:['民需品が不足しています','Insufficient Civilian Goods'],insufficient_military_goods:['軍需品が不足しています','Insufficient Military Goods'],
+};
+for(const [key,value] of Object.entries(AVIATION_LABELS)){JA[key]=value[0];EN[key]=value[1];}
+for(const [key,value] of Object.entries(AVIATION_REASONS)){JA['error.'+key]=value[0];EN['error.'+key]=value[1];}
+for(const prefix of ['landing_destination_','disembark_destination_']) for(const [code,names] of Object.entries({out_of_bounds:['マップ外です','Outside the map'],player_occupancy_forbidden:['地上部隊が配置できないHexです','Ground placement forbidden'],impassable:['着地できない地形です','Impassable terrain'],occupied:['地上に味方がいます','Friendly ground unit present'],enemy_occupied:['地上に敵がいます','Enemy ground unit present']})){JA['error.'+prefix+code]=names[0]!;EN['error.'+prefix+code]=names[1]!;}
 
 const TABLES: Record<Locale, TranslationTable> = { ja: JA, en: EN };
 

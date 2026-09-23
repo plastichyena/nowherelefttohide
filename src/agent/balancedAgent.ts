@@ -1,3 +1,4 @@
+import { aviationPolicy } from './aviation-policy';
 import { artilleryActionAssessment } from './artillery-policy';
 import { hexDistance, hexKey } from '../core/hex';
 import { wireBreakCost } from '../core/barbed-wire';
@@ -1140,6 +1141,8 @@ export class BalancedAgent implements GameAgent {
       canRespondToThreat,
       canRespondToInfection,
     ));
+    const aviation=aviationPolicy(observation,legalActions);
+    candidates=candidates.map(candidate=>{const decision=aviation(candidate.action);return decision?{...candidate,score:decision.override?decision.score:candidate.score+decision.score,reasonCodes:[...candidate.reasonCodes,decision.reason]}:candidate;});
     candidates = candidates.map((candidate) => ({
       ...candidate,
       score: candidate.score

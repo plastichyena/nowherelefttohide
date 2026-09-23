@@ -1,3 +1,5 @@
+import { isAirborne, occupiesGroundLayer, canTargetUnit } from './unit-capabilities';
+import { synchronizeCargoPosition } from './aircraft';
 import type { GameState, UnitState, HexCoord, HumanUnitType } from './types';
 import { getPlayerVisibleTileKeys } from './visibility';
 import { hexDistance, hexKey } from './hex';
@@ -9,13 +11,14 @@ import { unitMoveFuelCost, movementFuelCost } from './movement-query';
 import { emit } from './events-internal';
 import { wireAt, damageWire } from './barbed-wire';
 interface MovementHooks {
+  emergencyLand(state: GameState, unit: UnitState, rng: SeededRng): void;
   interceptArmyBase(state: GameState, mover: UnitState, rng: SeededRng): boolean;
   interceptorsAt(state: GameState, mover: UnitState, position: HexCoord): UnitState[];
   resolveCombat(state: GameState, attacker: UnitState, defender: UnitState, kind: 'attack' | 'interception', rng: SeededRng): void;
   tryCapture(state: GameState, unit: UnitState, rng: SeededRng): void;
 }
 /** Enter one hex, resolve interception, stop, then settle fuel and capture in existing order. */
-export function createMovement({ interceptorsAt, resolveCombat, tryCapture, interceptArmyBase }: MovementHooks) {
+export function createMovement({ interceptorsAt, resolveCombat, tryCapture, interceptArmyBase, emergencyLand }: MovementHooks) {
 function applyMovement(
   state: GameState,
   mover: UnitState,
@@ -24,16 +27,18 @@ function applyMovement(
   movementMode: 'normal' | 'emergency' = 'normal',
   rng: SeededRng = SeededRng.fromState(state.rngState),
 ): { reached: HexCoord; interception: UnitState | null } {
+  const flying = isAirborne(mover);
+  const startingFuel = mover.currentFuel;
   let reached = { ...mover.position };
   let interception: UnitState | null = null;
   const traversed: HexCoord[] = [];
   let spent = 0;
-  const pinned = () => !mover.isPlayerUnit && state.units.some(u => u.isPlayerUnit && u.hp > 0 && hexDistance(u.position, mover.position) === 1);
+  const pinned = () => !mover.isPlayerUnit && state.units.some(u => u.isPlayerUnit && u.hp > 0 && canTargetUnit(state,mover,u) && hexDistance(u.position, mover.position) <= 1);
   for (const position of (pinned() ? [] : path.slice(1))) {
-    if (mover.isPlayerUnit && !canPlayerOccupyHex(state.map, position)) break;
-    const cost = effectiveMovementCost(state, position, mover.isPlayerUnit);
+    if (!flying && mover.isPlayerUnit && !canPlayerOccupyHex(state.map, position)) break;
+    const cost = flying ? 1 : effectiveMovementCost(state, position, mover.isPlayerUnit);
     if (cost === null) break;
-    const occupant = getUnitAt(state, position);
+    const occupant = flying ? state.units.find(u=>isAirborne(u) && hexKey(u.position)===hexKey(position)) : getUnitAt(state, position);
     if (occupant && occupant.id !== mover.id) break;
     if (!mover.isPlayerUnit) {
       while (wireAt(state, position) && mover.canAttack && mover.attackChargesRemaining > 0) {
@@ -53,6 +58,11 @@ function applyMovement(
     delete mover.reanimatedOnBarbedWireId;
     reached = { ...position };
     traversed.push(position);
+    synchronizeCargoPosition(state, mover);
+    if (flying) {
+      mover.currentFuel = Math.max(0,mover.currentFuel-state.config.units.multipurposeHelicopter.fuelPerMovementPoint);
+      if (mover.currentFuel===0) { emergencyLand(state,mover,rng); reached={...mover.position}; break; }
+    }
     const enteredTile = getTile(state.map, position);
     if (enteredTile) state.statistics.terrainEntriesByType[enteredTile.terrain] += 1;
     const candidates = interceptorsAt(state, mover, position);
@@ -69,7 +79,7 @@ function applyMovement(
       const fuelUsed = movementMode === 'normal'
         ? movementFuelCost(state, mover, traversed.length, spent)
         : 0;
-      mover.currentFuel = Math.max(0, mover.currentFuel - fuelUsed);
+      if (!flying) mover.currentFuel = Math.max(0, mover.currentFuel - fuelUsed);
       mover.activity.moved = traversed.length > 0;
       mover.canMove = false;
       mover.actionState = 'moved';
@@ -85,7 +95,7 @@ function applyMovement(
       hexesMoved: traversed.length,
       effectiveMovementCost: spent,
       movementMode: isHumanUnit(mover) ? movementMode : 'normal',
-      fuelUsed: isHumanUnit(mover) && movementMode === 'normal'
+      fuelUsed: flying ? startingFuel - mover.currentFuel : isHumanUnit(mover) && movementMode === 'normal'
         ? movementFuelCost(state, mover, traversed.length, spent)
         : 0,
     });

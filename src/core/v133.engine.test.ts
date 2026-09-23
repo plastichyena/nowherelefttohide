@@ -225,6 +225,7 @@ describe('v1.4 Checkpoint Role / Fallback / Supply', () => {
       const config = safeConfig({
         // Keep the branch corridor visible while placing the hidden-only
         // blocker outside the Player Vision.
+        economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } },
         checkpoint: { initialSupplyRadius: 20 },
         vision: { capital: 50, operationalCheckpoint: 0 },
         units: {

@@ -21,6 +21,7 @@ const worseningCases: FactCase[] = [
   ['refinery_allowance_runway_risk', 'netBurn', 1, 2],
   ['refinery_allowance_runway_risk', 'estimatedTurnsRemaining', 3, 2],
   ['nuclear_early_capture_window', 'turnsRemaining', 2, 1],
+  ['air_base_early_capture_window', 'turnsRemaining', 2, 1],
   ['nuclear_power_outage', 'lostGeneration', 500, 1000],
   ['nuclear_power_outage', 'shortage', 1, 2],
   ['overcrowding_forecast', 'penaltyRatio', 0.1, 0.2],
@@ -78,7 +79,7 @@ describe('v1.5.4 public crisis worsening contract', () => {
       'production_outage', 'resource_runway_risk', 'overcrowding_forecast', 'temporary_housing_outage_forecast',
       'military_goods_national_shortage', 'military_goods_supply_disconnected', 'facility_workers_zero',
       'refinery_allowance_exhausted', 'oil_field_allowance_blocked',
-      'capital_resident_minimum', 'public_health_food_stress', 'public_health_civilian_goods_stress', 'food_starvation_risk', 'internal_infection_risk', 'checkpoint_health_risk', 'refinery_allowance_runway_risk', 'nuclear_early_capture_window', 'nuclear_power_outage',
+      'capital_resident_minimum', 'public_health_food_stress', 'public_health_civilian_goods_stress', 'food_starvation_risk', 'internal_infection_risk', 'checkpoint_health_risk', 'refinery_allowance_runway_risk', 'nuclear_early_capture_window', 'air_base_early_capture_window', 'nuclear_power_outage',
     ].sort());
     expect(worseningCases.map(([reason, key]) => `${reason}:${key}`).sort()).toEqual(
       Object.entries(CRISIS_WORSENING_FACTS).flatMap(([reason, facts]) => Object.keys(facts).map(key => `${reason}:${key}`)).sort());

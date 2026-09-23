@@ -129,9 +129,9 @@ describe('v1.6.0 Save Format 17', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 21,
+      formatVersion: 22,
       gameVersion: CURRENT_GAME_VERSION,
-      mapId: 'fixed-51x51-v8',
+      mapId: 'fixed-51x51-v9',
       seed: 77,
     });
     expect(decoded.state).toEqual(state);
@@ -242,10 +242,10 @@ describe('v1.6.0 Save Format 17', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(21);
-    expect(envelope.gameVersion).toBe('14.0.0');
-    expect(config.version).toBe('14.0.0');
-    expect(config.mapId).toBe('fixed-51x51-v8');
+    expect(envelope.formatVersion).toBe(22);
+    expect(envelope.gameVersion).toBe('15.0.0');
+    expect(config.version).toBe('15.0.0');
+    expect(config.mapId).toBe('fixed-51x51-v9');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
     expect(state).toHaveProperty('nextConstructibleFacilityNumber', 1);
@@ -277,9 +277,9 @@ describe('v1.6.0 Save Format 17', () => {
         veteranAttackCharges: 2,
       },
       horde: {
-        specialZombieWeights: { zombie: 65, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5, screamerZombie: 5 },
+        specialZombieWeights: { zombie: 40, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 15, gasZombie: 15, screamerZombie: 5 },
         riotZombieCapPerDirection: 1,
-        hunterZombieCapPerDirection: 1,
+        hunterZombieCapPerDirection: null,
 
         movementNoiseRadius: 8,
       },
@@ -454,7 +454,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(finalHorde.every((unit) => unit.hordeKind === 'final' && state.horde.finalSpawnGroupIds.includes(unit.spawnGroupId!))).toBe(true);
     expect(state.horde).toMatchObject({ finalHordeStatus: 'active', finalSpawnedCount: 3 });
     expect(state.statistics).toHaveProperty('finalHordeSpawned', 3);
-    expect(state.statistics.finalHordeZombiesSpawned).toBe(1);
+    expect(state.statistics.finalHordeZombiesSpawned).toBe(2);
     expect(state.statistics.finalHordeSpawned).toBe(
       state.statistics.finalHordeZombiesSpawned + state.statistics.finalNormalZombiesSpawned + Object.values(state.statistics.finalSpecialZombiesSpawnedByType).reduce((n,v)=>n+v,0),
     );

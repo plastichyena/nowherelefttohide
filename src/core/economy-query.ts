@@ -1,3 +1,4 @@
+import { unitCanReceiveSupply } from './aircraft';
 import { forecastPublicHealth } from './public-health';
 import { populationReceptionCapacity } from './state';
 import type { GameState, FacilityState, EndTurnForecast, MilitaryGoodsForecast, HumanUnitType, NextTurnPenaltyForecast, PowerSupplyReason, ResourceType } from './types';
@@ -93,7 +94,7 @@ interface MilitaryGoodsPlan {
 }
 
 function isNormallyOperatingArmyBase(facility: Readonly<FacilityState>): boolean {
-  return facility.type === 'armyBase' &&
+  return ['armyBase','airBase'].includes(facility.type) &&
     facility.owner === 'player' &&
     facility.status === 'owned' &&
     facility.infected === 0 &&
@@ -132,7 +133,7 @@ function calculateMilitaryGoodsPlan(
     const afterFixed = unit.currentMilitaryGoods - fixedConsumption;
     return {
       unit,
-      inSupply: isHexSupplied(state, unit.position),
+      inSupply: unitCanReceiveSupply(unit) && isHexSupplied(state, unit.position),
       fixedConsumption,
       afterFixed,
       refillDemand: Math.max(0, unit.maxMilitaryGoods - afterFixed),
@@ -177,7 +178,7 @@ function calculateMilitaryGoodsPlan(
   const projectedTotalRefilled = forecastUnits.reduce((sum, unit) => sum + unit.projectedRefillAmount, 0);
   const armyBaseMilitaryGoodsRefills: Array<{ facilityId: string; amount: number }> = [];
   for (const facility of stableFacilities(state as GameState)) {
-    if (facility.type !== 'armyBase' || !facility.armyBase) continue;
+    if (!['armyBase','airBase'].includes(facility.type) || !facility.armyBase) continue;
     const eligibility = armyBaseMilitaryGoodsRefillEligibility(state, facility);
     if (!eligibility.refillEligible || eligibility.refillReason === 'full' || nationalAvailable <= 0) continue;
     const amount = Math.min(
@@ -215,7 +216,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const armyBaseReservations = new Map(
     [...state.pendingUnitProductions]
       .sort((left, right) => left.id.localeCompare(right.id))
-      .filter((order) => facilityById.get(order.cityFacilityId)?.type === 'armyBase')
+      .filter((order) => ['armyBase','airBase'].includes(facilityById.get(order.cityFacilityId)?.type ?? ''))
       .map((order) => [order.cityFacilityId, order] as const),
   );
   const checkpointHealthyConsumers = state.checkpoints.reduce(
@@ -420,7 +421,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   // requires no workers and remains eligible outside Supply, but only while
   // the Base itself is normally operating.
   const armyBaseTargets = facilities.filter(
-    (facility) => isNormallyOperatingArmyBase(facility) && armyBaseReservations.has(facility.id),
+    (facility) => isNormallyOperatingArmyBase(facility) && (facility.type === 'airBase' || armyBaseReservations.has(facility.id)),
   );
   requiredPowerDemand += armyBaseTargets.reduce(
     (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
@@ -440,9 +441,9 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const projections = facilities.map((facility): FacilityProductionProjection => {
     const rule = state.config.facilities[facility.type].production;
     const normalArmyBase = isNormallyOperatingArmyBase(facility);
-    const armyBaseHasReservation = facility.type === 'armyBase' && armyBaseReservations.has(facility.id);
+    const armyBaseHasReservation = ['armyBase','airBase'].includes(facility.type) && armyBaseReservations.has(facility.id);
     const eligible = isOwned(facility) && facility.workers > 0;
-    const eligibleForPower = facility.type === 'armyBase'
+    const eligibleForPower = ['armyBase','airBase'].includes(facility.type)
       ? normalArmyBase
       : facility.type === 'temporaryHousing'
         ? housingCanRequestPower(facility)
@@ -456,7 +457,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     if (facility.type === 'temporaryHousing' && isOwned(facility) && !['building', 'disabled', 'recovering', 'ruined'].includes(facility.operationalStatus) && !isHexSupplied(state, facility.position)) {
       projectedPowerRequested = false;
       projectedPowerReason = 'supply_disconnected';
-    } else if (facility.type === 'armyBase' && armyBaseHasReservation && !normalArmyBase) {
+    } else if (['armyBase','airBase'].includes(facility.type) && armyBaseHasReservation && !normalArmyBase) {
       projectedPowerRequested = false;
       projectedPowerReason = 'not_eligible';
     } else if (powerMode === 'required' && toggleable && !facility.powerSupplyEnabled) projectedPowerReason = 'power_supply_off';
@@ -538,7 +539,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const projectedFuelUsed = Math.max(0, totalPowerAllocated - freePowerAvailable) / 5 * 2;
   const fuelAfterPower = Math.max(0, state.resources.fuel - projectedFuelUsed);
   const refillUnits = state.units
-    .filter((unit) => unit.isPlayerUnit && isHexSupplied(state, unit.position) && unit.currentFuel < unit.maxFuel)
+    .filter((unit) => unit.isPlayerUnit && unitCanReceiveSupply(unit) && isHexSupplied(state, unit.position) && unit.currentFuel < unit.maxFuel)
     .sort((left, right) => left.id.localeCompare(right.id));
   const refillRemaining = new Map(refillUnits.map((unit) => [unit.id, unit.maxFuel - unit.currentFuel]));
   const unitRefillAmounts = new Map(refillUnits.map((unit) => [unit.id, 0]));
@@ -588,7 +589,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   );
   const projectedFacilities = projections.map((projection) => {
     const facility = facilityById.get(projection.facilityId)!;
-    if (facility.type !== 'armyBase' || !facility.armyBase) return projection;
+    if (!['armyBase','airBase'].includes(facility.type) || !facility.armyBase) return projection;
     const refillEligibility = armyBaseMilitaryGoodsRefillEligibility(state, facility);
     const projectedRefillAmount = armyBaseRefillsByFacilityId.get(facility.id) ?? 0;
     const remainingCapacity = Math.max(0, state.config.armyBase.maxMilitaryGoods - facility.armyBase.militaryGoods);
@@ -809,7 +810,7 @@ function projectKnownNextTurnPopulation(state: Readonly<GameState>, targetTurn: 
       facility.recoveryOperationalTurn !== null &&
       facility.recoveryOperationalTurn <= targetTurn
     ) {
-      facility.operationalStatus = facility.type === 'windPowerPlant' || facility.type === 'temporaryHousing' || facility.type === 'armyBase' || facility.workers > 0
+      facility.operationalStatus = facility.type === 'windPowerPlant' || facility.type === 'temporaryHousing' || ['armyBase','airBase'].includes(facility.type) || facility.workers > 0
         ? 'operational'
         : 'stopped';
       facility.populationOperationalTurn = targetTurn;
@@ -895,7 +896,7 @@ export function forecastArmyBaseRecruitmentPower(
   facilityId: string,
 ): ArmyBaseMilitaryGoodsProjection['recruitmentPower'] | null {
   const facility = state.facilities.find((candidate) => candidate.id === facilityId);
-  if (!facility || facility.type !== 'armyBase') return null;
+  if (!facility || !['armyBase','airBase'].includes(facility.type)) return null;
   const hasReservation = state.pendingUnitProductions.some((order) => order.cityFacilityId === facilityId);
   const candidateState: GameState = hasReservation
     ? state as GameState

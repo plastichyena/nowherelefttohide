@@ -53,7 +53,8 @@ export type FacilityType =
   | 'simpleFarm'
   | 'civilianDroneBase'
   | 'temporaryHousing'
-  | 'armyBase';
+  | 'armyBase'
+  | 'airBase';
 
 export type ConstructibleFacilityType = 'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant';
 
@@ -77,6 +78,7 @@ export type UnitType =
   | 'reconTeam'
   | 'specialForces'
   | 'fieldArtillery'
+  | 'multipurposeHelicopter'
   | 'packZombie'
   | 'zombie'
   | 'hordeZombie'
@@ -90,11 +92,18 @@ export type UnitType =
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
 
-export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam' | 'specialForces' | 'fieldArtillery'>;
+export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam' | 'specialForces' | 'fieldArtillery' | 'multipurposeHelicopter'>;
 
 export type UnitMode = 'packed' | 'deployed';
 
-export type MovementDomain = 'ground';
+export type MovementDomain = 'ground' | 'air';
+export type FlightState = 'landed' | 'airborne';
+export interface FacilityObjective {
+  firstCapturedTurn: number | null;
+  fellBeforeCapture: boolean;
+  reward: 'unclaimed' | 'pending' | 'claimed' | 'expired';
+  failureSpawn: 'none' | 'pending' | 'spawned';
+}
 export interface InfectionGrace { count: number; spreadsFromTurn: number }
 
 export type ZombieUnitType = Exclude<UnitType, HumanUnitType>;
@@ -251,6 +260,7 @@ export interface RefineryAllowanceState {
 }
 
 export interface PopulationState {
+  multipurposeHelicopter: number;
   /** Population present at new-game creation, including initial human units. */
   initialPopulation: number;
   cumulativeReinforcements: number;
@@ -298,6 +308,13 @@ export interface CityPopulationSnapshot {
 }
 
 export interface UnitState {
+  flightState?: FlightState;
+  tookOffTurn?: number;
+  landedTurn?: number;
+  cargoUnitId?: string;
+  transportedByUnitId?: string;
+  boardedTurn?: number;
+  disembarkedTurn?: number;
   mode?: UnitMode;
   modeChangedTurn?: number;
   movementDomain: MovementDomain;
@@ -376,6 +393,7 @@ export interface CheckpointState {
 }
 
 export interface CheckpointPositionCandidate {
+  blockingEnemyIds?: string[];
   actionType: 'BuildCheckpoint' | 'RelocateCheckpoint' | 'ActivateCheckpoint';
   branchId: string;
   checkpointId?: string;
@@ -481,6 +499,13 @@ export interface NoisePulse {
 }
 
 export type GameEventType =
+  | 'aircraft_state_changed'
+  | 'aircraft_boarded'
+  | 'aircraft_disembarked'
+  | 'aircraft_emergency_landing'
+  | 'military_drone_launched'
+  | 'military_drone_expired'
+  | 'facility_objective_updated'
   | 'unit_mode_changed'
   | 'artillery_fired'
   | 'artillery_population_damage'
@@ -976,7 +1001,7 @@ export type CrisisReasonCode =
   | 'internal_infection_risk'
   | 'checkpoint_health_risk'
   | 'refinery_allowance_runway_risk'
-  | 'nuclear_early_capture_window'
+  | 'air_base_early_capture_window' | 'nuclear_early_capture_window'
   | 'nuclear_power_outage'
   | 'overcrowding_forecast'
   | 'temporary_housing_outage_forecast'
@@ -1036,6 +1061,9 @@ export interface BarbedWireState {
 }
 
 export interface GameState {
+  airBaseObjective: FacilityObjective;
+  militaryDrone: { sourceFacilityId: string; center: HexCoord; radius: number; startedTurn: number; expiresBeforeTurn: number } | null;
+  pendingReanimations: { humanUnitId: string; humanUnitType: HumanUnitType; zombieUnitType: ZombieUnitType; position: HexCoord; cause: string }[];
   completedProductions: Record<HumanUnitType, number>;
   artilleryRngState: RngState;
   publicHealthStress: { food: number; civilianGoods: number };
@@ -1191,6 +1219,11 @@ export interface LoadSnapshotAction {
 }
 
 export type GameAction =
+  | { type: 'TakeOff'; unitId: string }
+  | { type: 'Land'; unitId: string }
+  | { type: 'BoardAircraft'; unitId: string; aircraftId: string }
+  | { type: 'DisembarkAircraft'; aircraftId: string; destination: HexCoord }
+  | { type: 'LaunchMilitaryDrone'; facilityId: string; target: HexCoord }
   | { type: 'ChangeUnitMode'; unitId: string; mode: UnitMode }
   | { type: 'AttackHex'; attackerId: string; position: HexCoord }
   | { type: 'BuildBarbedWire'; position: HexCoord }
@@ -1238,6 +1271,7 @@ export interface HeadlessGame {
 }
 
 export interface BaseUnitConfig {
+  canTargetAir: boolean;
   movementDomain: MovementDomain;
   hp: number;
   movement: number;
@@ -1254,18 +1288,18 @@ export interface BaseUnitConfig {
 }
 
 export interface HumanUnitConfig extends BaseUnitConfig {
-  capabilities: { capture: boolean; recoverCheckpoint: boolean; suppress: boolean; contain: boolean };
+  capabilities: { capture: boolean; recoverCheckpoint: boolean; suppress: boolean; contain: boolean; infantry: boolean };
   productionFuel: number;
   productionLimitPerGame: number | null;
   regularAttackCharges: number;
   veteranAttackCharges: number;
   recruitAttack: number;
-  recruitmentFacilityTypes: Array<'capital' | 'city' | 'armyBase'>;
+  recruitmentFacilityTypes: Array<'capital' | 'city' | 'armyBase' | 'airBase'>;
   productionCivilianGoods: number;
   productionMilitaryGoods: number;
   fuelCostRule: 'policeLike' | 'nationalGuardLike' | 'perMovementPoint';
   suppressionCivilianDamageRate: number;
-  reanimationUnitType: 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'packZombie';
+  reanimationUnitType: 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'packZombie' | null;
   noiseClass: NoiseClass;
   noiseRadius: number;
 }
@@ -1278,6 +1312,7 @@ export interface ZombieUnitConfig extends BaseUnitConfig {
 export type UnitConfig = HumanUnitConfig | ZombieUnitConfig;
 
 export interface UnitConfigMap {
+  multipurposeHelicopter: HumanUnitConfig & { airborneMovement: number; fuelPerMovementPoint: number; endTurnFuel: number; endTurnNoiseRadius: number; cargoCapacity: number };
   police: HumanUnitConfig;
   nationalGuard: HumanUnitConfig;
   riotPolice: HumanUnitConfig;
@@ -1343,7 +1378,7 @@ export interface HordeConfig {
   waves: HordeWaveConfig[];
   specialZombieWeights: Record<'zombie' | 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'hunterZombie' | 'gasZombie', number> & { screamerZombie?: number };
   riotZombieCapPerDirection: number;
-  hunterZombieCapPerDirection: number;
+  hunterZombieCapPerDirection: number | null;
   movementNoiseRadius: number;
 }
 
@@ -1458,6 +1493,8 @@ export interface NaturalRecoveryConfig {
 }
 
 export interface GameConfig {
+  objectives: Record<'nuclearPowerPlant' | 'airBase', { rewardDeadlineTurn: number; requiresHealthySurvivors: boolean; failureOnUncapturedFall: boolean; rewardUnitType: 'specialForces'; failureUnitType: 'packZombie' }>;
+  militaryDrone: { fuelPerHex: number; visionRadius: number; durationTurns: number };
   windPower: { noiseRadius: number };
   armyBase: { maxMilitaryGoods: number; interceptionCost: number; attack: number; range: number; noiseRadius: number; staffedVision: number; rewardLastTurn: number };
   version: string;

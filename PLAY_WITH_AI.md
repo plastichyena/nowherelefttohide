@@ -1,10 +1,36 @@
 # Play Nowhere Left to Hide with an AI
 
-This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.6.4.
+This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.6.5.
 
 The portable Player packages produced by GitHub Actions contain a bundled Session CLI, a standalone Linux x64 or Windows x64 Node.js runtime, the Session launcher, this guide, build identity, and the required license notices. They deliberately do not contain the repository checkout, `node_modules`, TypeScript, Vite, Vitest, development scripts, or board images. No separate Node.js installation or `npm install` is required after extracting a package.
 
-## v1.6.4 artillery and shared viewers
+## v1.6.5 aviation and candidate queries
+
+Air Base and nuclear first-capture deadlines are Turn10 actions; uncaptured objectives expire at Turn11. Air Base capture awards Food100/Military100, without a free Soldier. Special Forces additionally require a healthy survivor and no pre-capture fall. Empty timely capture avoids the deadline Pack; a prior fall keeps its already committed Pack. Nuclear rewards do not require survivors. Each blocked reward or failure spawn waits independently, with no duplicate population.
+
+An operational, supplied, powered Air Base produces a `multipurposeHelicopter` in one turn for population2, Civilian100, Military140, Fuel500. It arrives Recruit/landed with HP100 and stores40/500. Lifetime limit1 includes reservations and placement wait. Forfeiture releases an uncompleted reservation without refund; death never releases a completed slot. Helicopters cannot capture, recover, suppress or contain. Flying movement50 ignores ground occupancy and terrain; landed movement0. Flying vision10 ignores terrain obstruction. Only Hunter/Pack can target flying aircraft. Flying aircraft ignore Gas/artillery blasts and terrain defense.
+
+Actions: `TakeOff {unitId}`, `Land {unitId}`, `BoardAircraft {unitId,aircraftId}`, `DisembarkAircraft {aircraftId,destination:{q,r}}`, `LaunchMilitaryDrone {facilityId,target:{q,r}}`. Existing `Move`, `Attack`, `ProduceUnit`, and `EndTurn` use the same Core. No normal landing on the takeoff turn or takeoff on the landing turn. Attack forbids subsequent movement but permits landing after an earlier-turn takeoff. Full ammunition is required for every attack: 2 at distance0–1, 4 at distance2; landed aircraft react only. Shared charges are1/1/2. Flight costs5 Fuel/Hex, then1 at EndTurn after radius15 noise. Fuel1–4 permits one step before emergency landing; long paths stop at exhaustion. Emergency landing may select a legal adjacent Hex, or crash with cargo if none exists. Public preview shows candidates/risks, never hidden occupancy or the RNG result.
+
+Board any adjacent eligible Police/Soldier/Riot/Recon/Special Forces into one landed aircraft. Infantry may board after moving, but not after attacking or suppressing. At aircraft Fuel0 only, transfer as much infantry Fuel as capacity permits, retaining the remainder. Cargo retains ID, population, supplies and upkeep, without independent occupancy, vision, supply, actions or recovery. No same-turn disembark. After disembarking, infantry cannot voluntarily act until next Player Turn but may react using remaining charges. Landed supplied aircraft refill only during the normal turn process; landing itself is not an instant refill. Cargo deaths follow normal type-specific reanimation, with pending fallback if blocked; unbridged water prevents reanimation.
+
+Military Drone launch costs national Fuel equal to Hex distance×5 (same Hex0), needs a supplied/powered/operational owned Air Base, and reveals radius10 through terrain. A Turn20 launch lasts through Turn24 and expires before Turn25; base loss does not cancel it. One active drone only. Read public `militaryDrone`, per-unit aviation capabilities/reasons, cargo links, remaining stores and `productionLedger`.
+
+Query `production-candidates` for costs, legality, specific reasons, reservation/readiness, current placement outlook and lifetime slots. Placement outlook is not a future guarantee and does not invalidate an otherwise legal waiting reservation. `attack-candidates` supports all owned units or `unitId`, target-kind and legal-only filters; landed/cargo/inactive units retain concrete reasons. `enemies` contains currently visible enemies only, including charges, movement/attack flags, Wave membership and `canTargetAir`. Checkpoint candidates expose only visible actual `blockingEnemyIds`; an empty list does not guarantee absence of hidden blockers. Worker previews return all `populationMovements` and `facilityResidentDeltas`.
+
+```bash
+./run-session.sh query --session=my-game --target=production-candidates --revision=0
+./run-session.sh query --session=my-game --target=enemies --revision=0
+./run-session.sh preview-batch --session=my-game --revision=0 --input=actions.json
+```
+
+`actions.json` is an array of1–100 action DTOs. Every item is independently previewed from the same current revision; order is preserved and illegal items keep their Core reason. It is not a sequence simulation. State, RNG, revision and event/action sequences stay unchanged; stale revisions reject the whole request. For WebMCP use `nlth_preview_actions({generation:1,baseRevision:0,actions:[...]})`; the same API is `AiSession.previewActions`. Read the current query contract for filters and pagination; no candidate truncation is silent.
+
+Temporary Housing produces0 Civilian Goods at all occupancies/power/supply states; upkeep continues. Positive facility power capacities are doubled, generation unchanged. Military Factory converts2 Civilian Goods into1 Military Good per worker. Wave directions remain unchanged, base totals per direction are9/9/17/14/18 (variant slots4/6/9/9/10), weights Normal40/Police10/Soldier10/Riot5/Hunter15/Gas15/Screamer5. Hunter and Gas are uncapped per direction; Riot remains capped. Balanced AI evaluates actual production, flight combat, landing supply, infantry delivery, drone coverage and stranded-aircraft rescue using public information.
+
+Normal UI, Replay and Live share assets for Air Base, landed/airborne aircraft, cargo and drone vision. ▲ indicates flight; ▣ indicates cargo; D/cyan area indicates drone vision. Normal UI offers separate ground/air selectors on an overlapping Hex. Read Help for rules and Board Legend for appearance.
+
+## v1.6.5 artillery and shared viewers
 
 `fieldArtillery` is produced only at an Army Base in one turn, Recruit/Packed, for population 5, Civilian Goods 100, Military Goods 200 and Fuel 100. Reservation includes its starting ammunition/Fuel 100/100; completion never charges again. The lifetime limit is two including pending reservations/placement. Destruction does not restore a slot; forfeited reservations release the slot without a refund. Public `productionLedger` reports completed, reserved, limit and remaining counts.
 
@@ -20,7 +46,7 @@ Infection-free ruined checkpoints recover after an action resolves when a capabl
 
 Live and Replay use the same public board renderer, mode-specific assets, pan/zoom/fit and entity details. Updates retain viewpoint and selection; missing/non-public entities clear stale selection. Wave public fields are `variantSlotCountPerDirection`, `possibleVariantTypes`, `extraWaveSlots`; old names have no aliases. Soldier is the display name for internal `nationalGuard`.
 
-## v1.6.4 health, expedition and context handoff
+## v1.6.5 health, expedition and context handoff
 
 - Leave one healthy Capital resident when moving people, assigning workers or recruiting. Other eligible cities supply the remainder. Preview returns the before/after Capital population and exact rejection reason.
 - Normal screening takes 2 turns and accepts everyone with a fixed 5% latent infection probability per accepted person. Strict takes 5 turns and has no screening-derived infection. Pass Through starts at 25% and reaches at most 60% with waiting crowding and health stress. Infection is drawn separately for the people actually received at each destination; approved redistribution does not reroll.
@@ -28,15 +54,15 @@ Live and Replay use the same public board renderer, mode-specific assets, pan/zo
 - Food and Civilian Goods deficits update stress to `clamp(0.75 * current + 0.40 * deficit, 0, 1)`. Facility environmental infection is at most 3% per healthy person and also depends on city crowding and occupied Housing outages. Garrisons suppress existing spread but do not prevent these new infections. Strict does not protect later living conditions.
 - Food deficit accumulates to 7. Above 2, starvation rate is `min(0.10, deficit * max(accumulationAfter - 2, 0) * 0.02)`. Full supply stops deaths and reduces accumulation by 0.5. The national fractional carry persists and exact deaths are apportioned across healthy facilities and waiting/screening/approved. CG deficits cause no direct deaths. Tiny production cannot bypass starvation.
 - New indirect infections spread from the next EndTurn, while conversion, interruption and zero-healthy-population falls remain immediate. Direct zombie contacts/attacks and Gas explosions retain their existing behavior. Read `publicHealthForecast` and detailed `forecast` for causes, eligible counts, probabilities, expected infections, starvation allocations and deferred cohorts. Expected infections are conditional estimates, not guaranteed losses.
-- Water blocks all ground units; road-over-water bridges cost 1. Water and bridges prohibit construction. The seed-selected bay has one nuclear plant, initially empty and neutral, outside initial Supply. Owned, staffed, uninfected, operational and supplied nuclear workers each generate 500 electricity without Fuel, up to 2500. First capture by Turn20 gives one ready, fully loaded Regular Special Forces unit even outside Supply. If uncaptured, a Pack appears at Turn21. Blocked rewards stay pending and count five reinforcements only on actual placement.
+- Water blocks all ground units; road-over-water bridges cost 1. Water and bridges prohibit construction. The seed-selected bay has one nuclear plant, initially empty and neutral, outside initial Supply. Owned, staffed, uninfected, operational and supplied nuclear workers each generate 500 electricity without Fuel, up to 2500. First capture by Turn10 gives one ready, fully loaded Regular Special Forces unit even outside Supply. If uncaptured, a Pack appears at Turn11. Blocked rewards stay pending and count five reinforcements only on actual placement.
 - Special Forces cannot be produced. They have HP50, Attack15, Range2, Movement10, Regular3/Veteran4 shared attack charges. Any death reanimates a Pack. Pack has HP50, Attack15, Movement10 and five attacks: unmitigated damage can kill Riot on open ground. Prepare for every kind of threat in the Final Horde; hidden allocations are never public.
 - `refineryAllowance.netBurn` and `estimatedTurnsRemaining` use the next-EndTurn operating plan, including Oil credits. Three or fewer turns warn; next-turn exhaustion is critical; net burn zero clears runway risk.
 
 `status.contextHandoff`, each `play-turn` start, and `query --target=context-handoff --revision=N` reconstruct the latest public truth. Automatic derived checkpoints occur every 5 completed Turns or 128 canonical Decisions since the previous automatic checkpoint. Formal legal rejections count; malformed input, reads, previews and requestId retries do not. Manual queries do not reset the automatic counter. Each bounded collection reports totals, omissions and revision-pinned detail queries. Critical warning groups, lineage, locale and Fair Play are retained. Keep human-facing comments and decisionSummary in preferredCommentLocale throughout the Session. After handoff, use the current state and query only needed details instead of rereading old tool output. Complete history, Replay and Artifact remain canonical and intact. Handoff is public information, not private engine state or private reasoning.
 
-Version boundaries: App1.6.4, Rules14, Save21, Agent/Observation/Bridge19, Artifact18, Session/Checkpoint15, PlayTurn1.2 and AiSession1.1. Older data is rejected without migration, deletion or overwrite; start a new v1.6.4 game.
+Version boundaries: App1.6.5, Rules15, Save22, Agent/Observation/Bridge20, Artifact19, Session/Checkpoint16, PlayTurn1.2 and AiSession1.2. Older data is rejected without migration, deletion or overwrite; start a new v1.6.5 game.
 
-## v1.6.4 decision aids and query discovery
+## v1.6.5 decision aids and query discovery
 
 Read `observation.importantChanges` after an action and on resume. Status retains important changes from the latest accepted EndTurn through the current decision, so an intervening move does not erase a production loss. Summaries are capped at ten entries and inner arrays at ten values; use their count/omission metadata and revision-pinned history hint for the full record. Branches exclude the parent's later decisions. `observation.combatHazards` lists up to five legal lethal Gas attacks that would kill public friendly units or topple owned sites; query units for complete attack previews before choosing an attack.
 
@@ -58,11 +84,11 @@ The CLI input file is the filter object itself. In a play-turn query it goes ins
 {"type":"query","target":"strategic-map","expectedRevision":0,"filters":{"collection":"nodes"},"pageSize":100}
 ```
 
-Unknown filters, invalid types and unsupported enum values are errors, not empty successful queries. CLI failures emit `{ "ok": false, "code": "...", "error": "..." }` to stderr and exit nonzero. `RelocateCheckpoint` requires both `checkpointId` and `position`. v1.6.3 and older Saves, Artifacts, Sessions and Checkpoints are incompatible; start a new v1.6.4 game. Wall HP is 20 and Horde Zombie maximum Attack Charge is 4; other zombie types retain their own configuration.
+Unknown filters, invalid types and unsupported enum values are errors, not empty successful queries. CLI failures emit `{ "ok": false, "code": "...", "error": "..." }` to stderr and exit nonzero. `RelocateCheckpoint` requires both `checkpointId` and `position`. v1.6.4 and older Saves, Artifacts, Sessions and Checkpoints are incompatible; start a new v1.6.5 game. Wall HP is 20 and Horde Zombie maximum Attack Charge is 4; other zombie types retain their own configuration.
 
 ## Playing a Session
 
-### v1.6.4 input and planning rules
+### v1.6.5 input and planning rules
 
 Always check `accepted` as well as `ok`: `ok: true` means the protocol command returned a result. `ok: true, accepted: false` means a structurally valid action was rejected by Core and recorded as a rejected Decision. Malformed actions fail with `invalid_action_input` without consuming a Decision or changing State/RNG. Unknown fields are rejected by Preview, Step, both Play-turn modes, and AiSession. For example, `ProduceUnit` accepts `unitType` and optional `destination`; it does **not** accept `facilityId`.
 
@@ -189,7 +215,7 @@ Use the exact Checkpoint ID returned by `save-checkpoint` or `list-checkpoints`;
 
 Session data defaults to `output/sessions`; pass the same `--root=PATH` to every command to use another root. Active state is committed after each well-formed Decision, so a later `status` continues the same Decision Log and Run Artifact. `artifact --out=PATH` creates a self-contained public Artifact Package directory without placing its full JSON on standard output; the response is a small manifest with the package path, schema, hash, and count. The result is stored in the Artifact stream footer. The directory contains `manifest.json`, streaming `artifact.ndjson`, and deduplicated public payloads. If Active data is reported corrupt or incompatible, do not edit private files and do not expect an automatic rollback: list the valid Checkpoints and explicitly create a new branch with `load-checkpoint`.
 
-The Session directory includes a private Save Format 21 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 15 stores immutable generation data, persistent request IDs, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. v1.6.3 and earlier AI Session, Checkpoint, Artifact, and Replay data are not migrated; start a new v1.6.4 AI Session and retain old data for use with its old release. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, exact neutral-survivor counts, Screamer radius, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 18.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
+The Session directory includes a private Save Format 22 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 16 stores immutable generation data, persistent request IDs, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. v1.6.4 and earlier AI Session, Checkpoint, Artifact, and Replay data are not migrated; start a new v1.6.5 AI Session and retain old data for use with its old release. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, exact neutral-survivor counts, Screamer radius, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 19.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
 
 For a quick built-in-agent smoke test from the repository checkout:
 
@@ -241,7 +267,7 @@ Recommended loop:
 
 `getRunArtifact()` remains the complete public Artifact API. For a bounded read of a large trace, use `getArtifactPage({ target, offset?, pageSize?, expectedRevision? })`. The allowed targets are `manifest`, `observations`, `actions`, `events`, and `invalid-attempts`; it returns the current Revision, target, `count`, `total`, `hasMore`, `nextOffset`, and public `items`. Pages default to 100 items and cannot exceed 500. It is read-only; an old `expectedRevision` is rejected without changing the game.
 
-## v1.6.4 tactical context
+## v1.6.5 tactical context
 
 Use the current `AgentObservation` as the source of truth for conditional forecasts. It does not reveal future random draws or private state.
 
@@ -255,7 +281,7 @@ Use the current `AgentObservation` as the source of truth for conditional foreca
 - A distance-1 attack costs 1 Military Good when available. At 0, Police, Soldier, and Riot Police may still attack at distance 1 for 0 ammunition, with attack reduced to 20%, rounded up with a minimum of 1 (Regular values: 2/3/3). Soldier distance 2 requires and consumes 2; it is not legal with only 0 or 1. Read `attackPreviews` for distance, cost, projected balance, effective attack, and terrain-adjusted damage. The same ammunition rules govern counterattack and interception.
 - Any Unit that attacks cannot move later in that Player Turn, even if its displayed movement allowance was unused. During movement interception, the defender's counterattack consumes one of that defender's Attack Charges; re-read the returned Unit state before planning a second attack.
 - Player Units, the Capital (radius 5), owned facilities, and Active checkpoints provide Ground Vision. Forest and Mountain are visible blockers that hide Hexes beyond them. A powered Civilian Drone Base provides terrain-ignoring Aerial Vision `workers × 3`, up to 15; its observation uses `visionMode: aerial`. Use Core-projected visibility and never reconstruct hidden lines.
-- Standard fixed Waves spawn at Turn 10 (1 direction, 5 Horde + 3 variant slots), Turn 20 (2, 3 + 5), Turn 35 (1, 8 + 7), Turn 50 (3, 5 + 7), and Turn 70 (4, 8 + 8 Final). Variant weights are Horde 65, Police 10, Soldier 10, Riot 5, Hunter 5, Screamer 5 and Gas 5 in every Wave. Every normal result, including rejected-refugee bonus slots, becomes an actual Horde Zombie. Only Riot and Hunter retain one-per-direction caps; Gas is unlimited. Warning Lead is 2 turns and exposes only slot count and possible types; the concrete draw is first public after Spawn. Do not infer pre-warning directions, Spawn Group IDs, exact positions, or hidden counts.
+- Standard fixed Waves occur at Turns10/20/35/50/70 with1/2/1/3/4 directions, fixed Horde5/3/8/5/8, variant slots4/6/9/9/10, and per-direction totals9/9/17/14/18. Weights are Normal40/Police10/Soldier10/Riot5/Hunter15/Gas15/Screamer5. Every normal result, including rejected-refugee bonus slots, becomes Horde. Riot retains its one-per-direction cap; Hunter/Gas are unlimited. Warning Lead is2 turns and exposes only slot counts and possible types. Never infer hidden draws, directions or Spawn IDs.
 - Recon costs 5 population, has HP 25, MP 10, Vision 10, Range 6, Recruit Attack 9 and Regular/Veteran Attack 12. It carries Fuel 44 and Military Goods 40, pays 1 Military Good upkeep and 6 per attack at every range, cannot attack during a Military Goods shortage, emits only medium combat Noise, and reanimates as a Soldier Zombie. Produce it at the capital or Army Base.
 - Screamer Zombie has HP 15, Attack 10, MP 3, Vision 2 and Range 1. The first time it sees Human population—or immediately when a spawned Screamer inherits or receives a visible population target—it emits qualitative `extraLarge` Noise and a public scream event. Exact source, position and radius are private; do not infer them from reactions.
 - Every initially neutral permanent Facility starts with a deterministic 1–10 survivors, capped by capacity and derived independently from gameplay RNG. Capturing it through Turn 10 rescues the displayed count into the player population; the tenth `EndTurn` resolves expiry after refugee processing and before infection. Public observations expose only a visible qualitative `possible` or `lost` status until rescue reveals the count.
@@ -294,7 +320,7 @@ There is no public `SuppressInfection` action. Infection response is resolved by
 
 When using the Session CLI, each `step` response also contains `stateDelta`, a public-only summary of newly infected/ruined sites, newly spotted or publicly lost enemies, Unit HP/supply changes, and Checkpoint role changes since the previous Decision. Ordinary `AgentObservation` and Human UI responses do not contain this Session-only field.
 
-## v1.6.4 Wave and housing decisions
+## v1.6.5 Wave and housing decisions
 
 - Each scheduled Wave freezes its roster on schedule, consumes the participating directions' rejection counters, and starts even with zero free Spawn slots. Each direction has a dedicated 22-Hex zone. Pending Waves spawn oldest first as slots become available; newly spawned Units act from the next Zombie Phase.
 - Read `baseWaveUnitCount`, `committedWaveUnitCount`, `spawnedSoFar`, and `pendingCount`, plus public direction/group/kind. `horde_wave_started` and `horde_spawn_batch` are separate events. Exact type composition, private counters, anchors, and hidden positions remain private.
@@ -308,7 +334,7 @@ When using the Session CLI, each `step` response also contains `stateDelta`, a p
 
 The AI player should not use `GameEngine.getState()`, `AgentGameAdapter.getDebugState()`, save internals, hidden future random values, or other non-public implementation details to make decisions. Those exist for development and diagnostics, not as player-visible information.
 
-The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.6.4` uses Game Rules `14.0.0`, Agent/Observation/Browser Bridge API `19.0.0`, Fixed Map `fixed-51x51-v8`, Save Format `21`, Artifact Schema `18.0.0`, Checkpoint/Session Schema `15.0.0`, Play-turn Protocol `1.2.0`, Balanced Agent `12.0.0`, and Random Agent `7.0.0`. Artifact Schema 18.0.0 packages public Wave/Warning/Site Event, Screamer/Army Base/Oil Field state, production-capacity and support-headroom state, Metrics, a lossless public Decision Log, request identity, and lineage without private Checkpoint state. v1.6.3 and earlier AI Replay, Artifact, Session, Checkpoint, and normal Save data are rejected without conversion or overwrite.
+The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.6.5` uses Game Rules `15.0.0`, Agent/Observation/Browser Bridge API `20.0.0`, Fixed Map `fixed-51x51-v9`, Save Format `22`, Artifact Schema `19.0.0`, Checkpoint/Session Schema `16.0.0`, Play-turn Protocol `1.2.0`, Balanced Agent `13.0.0`, and Random Agent `8.0.0`. Artifact Schema 19.0.0 packages public Wave/Warning/Site Event, Screamer/Army Base/Oil Field state, production-capacity and support-headroom state, Metrics, a lossless public Decision Log, request identity, and lineage without private Checkpoint state. v1.6.4 and earlier AI Replay, Artifact, Session, Checkpoint, and normal Save data are rejected without conversion or overwrite.
 
 ## Package layout
 
@@ -333,7 +359,7 @@ The Player package intentionally has no `package.json`, `node_modules`, source t
 
 The package is tied to a specific Git commit. `BUILD_INFO.txt` records the app version, commit SHA, and bundled Node.js version so a playthrough can be reproduced against the correct source revision.
 
-## v1.6.4 parameter queries and ZIP spectator
+## v1.6.5 parameter queries and ZIP spectator
 
 Read `status.observation.forecastSummary.endTurn.maintenancePopulation` and `maintenanceBreakdown` for healthy city/housing residents, production/base workers, unit personnel, and waiting/screening/approved upkeep. Facility queries expose production, inputs, stopping reasons, and `recovery` conditions separately. Attack previews expose visible Gas chains; they do not estimate hidden entities, reanimation/site-spawn consequences, or the later enemy phase. Turn Away affects waiting people only; its future Wave risk is qualitative.
 
@@ -352,9 +378,9 @@ The list of legal actions is finite and does not enumerate every legal integer. 
 
 `artifact` exports the public directory and sibling ZIP; `replayZipPath` identifies the file. The ZIP includes public ancestry, fixed map and explicit roads, comments, results, and verified payload references; it excludes private checkpoint state. Open **AIリプレイ観戦 / Watch AI replay** from the game title and select this ZIP locally. The viewer starts paused before the first Decision, supports 0.5/1/2/4× playback, previous/next Decision, exact-turn seeking, and stops at the end. Comments use Unicode code points: `min(8, max(3, ceil(length/20)))` seconds; absent comments skip directly to the one-second result phase. Logs retain 100 visited Decisions; older Decisions remain seekable.
 
-The spectator does not resume a Session or touch normal autosave. It supports v1.6.4 public packages with different viewer Build IDs, while executable replay/resume retains strict build checks. v1.6.3 and older versions, unsafe paths, bad hashes, missing payloads, corrupt ZIP entries and incompatible maps are rejected. Use the exported ZIP: its NDJSON stream must be stored, not recompressed. ZIP64/multivolume/encrypted archives are unsupported. Limits are 64 MiB per logical payload, 4 MiB per Decision line, 32 MiB ZIP directory, and one million Decisions; snapshot cache is bounded to 16 MiB. A total ZIP size over 50 MB is not by itself an error. Payload parsing and rendering still require browser working memory; cancel and choose another file if loading cannot complete. Physical phone memory and 512 MiB endurance are separate measurements, not universal guarantees.
+The spectator does not resume a Session or touch normal autosave. It supports v1.6.5 public packages with different viewer Build IDs, while executable replay/resume retains strict build checks. v1.6.4 and older versions, unsafe paths, bad hashes, missing payloads, corrupt ZIP entries and incompatible maps are rejected. Use the exported ZIP: its NDJSON stream must be stored, not recompressed. ZIP64/multivolume/encrypted archives are unsupported. Limits are 64 MiB per logical payload, 4 MiB per Decision line, 32 MiB ZIP directory, and one million Decisions; snapshot cache is bounded to 16 MiB. A total ZIP size over 50 MB is not by itself an error. Payload parsing and rendering still require browser working memory; cancel and choose another file if loading cannot complete. Physical phone memory and 512 MiB endurance are separate measurements, not universal guarantees.
 
-## v1.6.4 decision checklist (Linux and Windows)
+## v1.6.5 decision checklist (Linux and Windows)
 
 Keep the complete Compact response from `status` and every `play-turn` result. Do not print only resources and unit HP: that drops the reasons needed to operate the economy. Review all of these on every decision:
 
@@ -382,7 +408,7 @@ Read the unit's `attackPreviews[].gasExplosion`, including friendly damage and p
 
 `BuildBarbedWire` takes `position: {q,r}` and costs Civilian Goods 5, Military Goods 5 and one action. HP is 20, Human entry costs 5 MP (ordinary per-hex Fuel), and Zombies spend attack charges to breach. Excess normal-combat damage penetrates and then receives Human terrain defense. Gas bypasses walls. Walls give no vision, supply or maintenance and cannot be repaired or removed. Equal-radius lateral lines are allowed; radial pairs one or two hexes apart are forbidden. Construction also requires the neighboring/radial inspection area to be visible. A generic visibility refusal does not imply a hidden enemy or hidden wall.
 
-Only current visible walls are public. Version 1.6.3 and older saves, checkpoints, sessions and artifacts are rejected without migration or rewriting old autosaves.
+Only current visible walls are public. Version 1.6.4 and older saves, checkpoints, sessions and artifacts are rejected without migration or rewriting old autosaves.
 
 A Human killed by Gas or other non-combat damage still reanimates on its original Hex. If wire survives there, only that spawn is allowed inside it (`spawnedInsideBarbedWire`); after leaving, the Zombie cannot re-enter intact wire. Gas does not reduce the wall HP.
 

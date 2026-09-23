@@ -1,3 +1,4 @@
+import { isAirborne } from './unit-capabilities';
 import { detachedQueryValue } from './query-cache';
 import { hexDistance, hexKey, hexLine } from './hex';
 import { deriveCheckpointRole } from './supply';
@@ -112,11 +113,13 @@ function computePlayerVisionCoverage(state: Readonly<GameState>): VisionCoverage
   const groundVisible = new Set<string>();
   const aerialVisible = new Set<string>();
   for (const unit of state.units) {
-    if (unit.isPlayerUnit) addGroundSource(state, groundPotential, groundVisible, unit.position, unit.vision);
+    if (!unit.isPlayerUnit || unit.transportedByUnitId) continue;
+    if (isAirborne(unit)) addRadius(state, aerialVisible, unit.position, unit.vision);
+    else addGroundSource(state, groundPotential, groundVisible, unit.position, unit.vision);
   }
   for (const facility of state.facilities) {
     if (facility.owner !== 'player' || facility.status === 'ruined') continue;
-    if (facility.type === 'armyBase') { addGroundSource(state, groundPotential, groundVisible, facility.position, facility.workers > 0 ? state.config.armyBase.staffedVision : state.config.facilities.armyBase.visionRadius); continue; }
+    if (['armyBase','airBase'].includes(facility.type)) { addGroundSource(state, groundPotential, groundVisible, facility.position, facility.workers > 0 ? state.config.armyBase.staffedVision : state.config.facilities.armyBase.visionRadius); continue; }
     if (['building', 'disabled', 'recovering'].includes(facility.operationalStatus)) continue;
     if (facility.type === 'civilianDroneBase') {
       if (facility.workers > 0 && facility.powerSupplyEnabled && facility.lastPowerSupplied === true) {
@@ -143,6 +146,7 @@ function computePlayerVisionCoverage(state: Readonly<GameState>): VisionCoverage
       );
     }
   }
+  if (state.militaryDrone && state.turn < state.militaryDrone.expiresBeforeTurn) addRadius(state, aerialVisible, state.militaryDrone.center, state.militaryDrone.radius);
   const visible = new Set([...groundVisible, ...aerialVisible]);
   const groundBlocked = new Set([...groundPotential].filter((key) => !groundVisible.has(key)));
   return { visible, groundPotential, groundVisible, groundBlocked, aerialVisible };

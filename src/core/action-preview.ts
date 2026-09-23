@@ -1,3 +1,7 @@
+import { previewMove } from './movement-query';
+import { isAirborne } from './unit-capabilities';
+import { aviationPreview } from './aviation-preview';
+import { productionCandidates } from './action-candidates';
 import { forecastEndTurn } from './economy-query';
 import { previewArtillery, type ArtilleryPreview } from './artillery';
 import { deployedArtillery } from './unit-capabilities';
@@ -28,6 +32,11 @@ export interface EconomyPreviewSnapshot {
 }
 
 export interface CoreActionPreview {
+  populationMovements: {fromFacilityId:string;toFacilityId:string;people:number;reason:string}[];
+  facilityResidentDeltas: {facilityId:string;before:number;after:number;delta:number}[];
+  aviation?: ReturnType<typeof aviationPreview>;
+  movement?: ReturnType<typeof previewMove>;
+  production?: ReturnType<typeof productionCandidates>[number];
   artillery?: ArtilleryPreview;
   capitalResidents: { before: number; after: number };
   capitalMinimum: 1;
@@ -143,7 +152,7 @@ export function previewCoreAction(
     legal = false;
     reasonCode = 'preview_unsupported_action';
     reason = 'Session lifecycle actions are not previewable';
-  } else if (artillery) {
+  } else if (artillery || action.type === 'Move' || action.type === 'Attack' || action.type === 'AttackHex') {
     const validation = validateAction(beforeState,action);
     legal = validation === null; reasonCode=validation?.code??null; reason=validation?.message??null;
     // Never execute a stochastic attack on a clone: that reveals the live stream's future.
@@ -180,7 +189,16 @@ export function previewCoreAction(
     && !beforeState.facilities.some((candidate) => candidate.id === facility.id));
   const recovered = afterState.facilities.find((facility) => facility.recoveryOperationalTurn !== null
     && beforeState.facilities.find((candidate) => candidate.id === facility.id)?.recoveryOperationalTurn !== facility.recoveryOperationalTurn);
+  const facilityResidentDeltas=afterState.facilities.filter(f=>f.owner==='player').map(f=>({facilityId:f.id,before:beforeState.facilities.find(b=>b.id===f.id)?.workers??0,after:f.workers,delta:f.workers-(beforeState.facilities.find(b=>b.id===f.id)?.workers??0)})).filter(d=>d.delta!==0);
+  const populationMovements: CoreActionPreview['populationMovements']=[];
+  if(legal && action.type==='AssignWorkers') for(const delta of facilityResidentDeltas.filter(d=>d.facilityId!==action.facilityId)) populationMovements.push({fromFacilityId:delta.delta>0?action.facilityId:delta.facilityId,toFacilityId:delta.delta>0?delta.facilityId:action.facilityId,people:Math.abs(delta.delta),reason:delta.delta>0?'worker_return':'worker_assignment'});
+  if(legal && action.type==='TransferPopulation') populationMovements.push({fromFacilityId:action.fromFacilityId,toFacilityId:action.toFacilityId,people:action.people,reason:'population_transfer'});
+  const production=action.type==='ProduceUnit'?productionCandidates(state,{unitType:action.unitType,facilityId:state.facilities.find(f=>action.destination && f.position.q===action.destination.q && f.position.r===action.destination.r)?.id})[0]:undefined;
   return {
+    populationMovements,facilityResidentDeltas,
+    aviation:aviationPreview(state,action),
+    ...(action.type==='Move'?{movement:previewMove(state,action.unitId,action.destination)}:{}),
+    ...(production?{production}:{}),
     ...(artillery ? {artillery} : {}),
     capitalResidents: { before: beforeState.facilities.find(f => f.type === 'capital')!.workers, after: afterState.facilities.find(f => f.type === 'capital')!.workers },
     capitalMinimum: 1,

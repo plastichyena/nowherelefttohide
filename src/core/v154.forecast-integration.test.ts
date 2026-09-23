@@ -13,6 +13,7 @@ function forecastEngine(): GameEngine {
       initialGasCount: { min: 0, max: 0 },
     },
     horde: singleFinalWave(50),
+    facilities: { windPowerPlant: { production: { fixedPowerGeneration: 30 } } },
   }));
 }
 

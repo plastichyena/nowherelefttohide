@@ -77,8 +77,9 @@ export function createMovementCostResolver(
 
 export function terrainDefenseAt(
   state: Readonly<TerrainState>,
-  target: Pick<UnitState, 'type' | 'position' | 'isPlayerUnit'>,
+  target: Pick<UnitState, 'type' | 'position' | 'isPlayerUnit' | 'flightState'>,
 ): TerrainDefense {
+  if (target.flightState === 'airborne') return { source: 'none', multiplier: 1 };
   if (isUrbanHex(state, target.position)) {
     return { source: 'urban', multiplier: state.config.terrain.damageMultiplier.urban };
   }
@@ -94,7 +95,7 @@ export function terrainDefenseAt(
 
 export function terrainAdjustedDamage(
   state: Readonly<TerrainState>,
-  target: Pick<UnitState, 'type' | 'position' | 'isPlayerUnit'>,
+  target: Pick<UnitState, 'type' | 'position' | 'isPlayerUnit' | 'flightState'>,
   baseDamage: number,
 ): { baseDamage: number; finalDamage: number; defense: TerrainDefense } {
   const normalizedBase = Math.max(0, Math.floor(baseDamage));

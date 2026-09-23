@@ -1,5 +1,6 @@
+import { isAviationAction, aviationReason, applyAviationAction, emergencyLanding, unitCanReceiveSupply } from './aircraft';
 import { artilleryAttackReason, artilleryImpacts, artilleryBaseDamage, damageArtilleryPopulation } from './artillery';
-import { hasCapability, deployedArtillery, canReact, synchronizeArtilleryStats } from './unit-capabilities';
+import { hasCapability, deployedArtillery, canReact, synchronizeArtilleryStats, isAirborne, occupiesGroundLayer, canTargetUnit } from './unit-capabilities';
 import { populationReceptionCapacity } from './state';
 import { withdrawableResidents } from './economy-query';
 import { addInfectionGrace, binomial, consumeInfected, domainRng, graceCount, internalInfectionRisk, screeningProbability, starvationAllocation, starvationPools, waitingProbability } from './public-health';
@@ -122,8 +123,10 @@ import type {
   ZombieUnitType,
 } from './types';
 
-const { dealDamage, dealAreaDamage } = createUnitLifecycle({ applyGeneratedZombieOccupancy, processSpawnOccupancyQueue, applyGasExplosionSiteInfection, resolveGasExplosionSiteFalls });
-const { applyMovement } = createMovement({ interceptorsAt, resolveCombat, tryCapture, interceptArmyBase });
+const { dealDamage, dealAreaDamage, destroyForCrash, retryPendingReanimations } = createUnitLifecycle({ applyGeneratedZombieOccupancy, processSpawnOccupancyQueue, applyGasExplosionSiteInfection, resolveGasExplosionSiteFalls });
+const { applyMovement } = createMovement({ interceptorsAt, resolveCombat, tryCapture, interceptArmyBase, emergencyLand });
+
+function emergencyLand(state: GameState, unit: UnitState, rng: SeededRng): void { emergencyLanding(state, unit, rng, target=>destroyForCrash(state,target,rng)); }
 
 const RESOURCE_TYPES: readonly ResourceType[] = ['food', 'civilianGoods', 'militaryGoods', 'fuel'];
 const CANONICAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
@@ -157,7 +160,7 @@ function isPlayerPhase(state: GameState): boolean {
 
 function occupiedKeys(state: GameState, exceptUnitId?: string): Set<string> {
   return new Set(
-    state.units.filter((unit) => unit.id !== exceptUnitId).map((unit) => positionKey(unit.position)),
+    state.units.filter((unit) => occupiesGroundLayer(unit) && unit.id !== exceptUnitId).map((unit) => positionKey(unit.position)),
   );
 }
 
@@ -196,7 +199,7 @@ function resolveCombat(
   }
   const attackDistance = hexDistance(attacker.position, defender.position);
   const attackProjection = forecastUnitCombatAtDistance(state, attacker, attackDistance);
-  if (!attackProjection.canAttack) return;
+  if (!attackProjection.canAttack || !canTargetUnit(state,attacker,defender)) return;
   const human = attacker.isPlayerUnit ? attacker : defender.isPlayerUnit ? defender : null;
   const noise = human ? emitCombatNoise(state, human, { ...human.position }) : null;
   recordWireAttackCharge(state, attacker, defender);
@@ -220,7 +223,7 @@ function resolveCombat(
   }
   const counterDistance = hexDistance(defender.position, attacker.position);
   const counterProjection = forecastUnitCombatAtDistance(state, defender, counterDistance);
-  if (canReact(defender) && counterProjection.canAttack) {
+  if (canReact(defender) && canTargetUnit(state,defender,attacker) && counterProjection.canAttack) {
     recordWireAttackCharge(state, defender, attacker);
     markAttacked(state, defender);
     if (defender.isPlayerUnit) defender.currentMilitaryGoods = counterProjection.projectedMilitaryGoodsAfterAttack;
@@ -239,7 +242,7 @@ function resolveCombat(
 }
 
 function settleArmyReward(state: GameState, facility: FacilityState, rng: SeededRng): void {
-  if (!facility.armyBase || facility.armyBase.reward !== 'pending') return;
+  if (facility.type !== 'armyBase' || !facility.armyBase || facility.armyBase.reward !== 'pending') return;
   const position = nearestHumanSpawnPosition(state, facility.position, rng);
   if (!position) return;
   const unit = createUnit(state, nextHumanUnitId(state, 'nationalGuard'), 'nationalGuard', position, 'ready', 'regular');
@@ -250,7 +253,7 @@ function settleArmyReward(state: GameState, facility: FacilityState, rng: Seeded
 }
 function interceptArmyBase(state: GameState, mover: UnitState, rng: SeededRng): boolean {
   let fired=false;
-  for (const base of state.facilities.filter(f=>f.type==='armyBase').sort((a,b)=>a.id.localeCompare(b.id))) {
+  for (const base of state.facilities.filter(f=>['armyBase','airBase'].includes(f.type)).sort((a,b)=>a.id.localeCompare(b.id))) {
     const distance=hexDistance(base.position,mover.position);
     if(distance>state.config.armyBase.range) continue;
     const canDefend = base.owner === 'player'
@@ -285,14 +288,20 @@ const FIRST_CAPTURE_REWARDS: Partial<Record<FacilityState['type'], Partial<Recor
   civilianFactory: { civilianGoods: 100 },
   militaryFactory: { militaryGoods: 100 },
   armyBase: { food: 100, militaryGoods: 100 },
+  airBase: { food: 100, militaryGoods: 100 },
   farm: { food: 100, fuel: 100 },
 };
 
 function claimFirstCaptureReward(state: GameState, facility: FacilityState): Partial<Record<ResourceType, number>> {
   if (facility.type === 'nuclearPowerPlant' && state.nuclearObjective.firstCapturedTurn === null) {
     state.nuclearObjective.firstCapturedTurn = state.turn;
-    if (state.turn <= 20) state.nuclearObjective.reward = 'pending';
+    if (state.turn <= state.config.objectives.nuclearPowerPlant.rewardDeadlineTurn) state.nuclearObjective.reward = 'pending';
     settleNuclearObjective(state);
+  }
+  if (facility.type === 'airBase' && state.airBaseObjective.firstCapturedTurn === null) {
+    const objective=state.airBaseObjective; objective.firstCapturedTurn=state.turn;
+    objective.reward = state.turn <= state.config.objectives.airBase.rewardDeadlineTurn && facility.workers > 0 && !objective.fellBeforeCapture ? 'pending' : 'expired';
+    settleAirBaseObjective(state);
   }
   if (facility.firstCaptureRewardClaimed) return {};
   facility.firstCaptureRewardClaimed = true;
@@ -316,9 +325,9 @@ function settleNuclearObjective(state: GameState): void {
   const objective = state.nuclearObjective;
   const plant = state.facilities.find(f => f.type === 'nuclearPowerPlant');
   if (!plant) return;
-  if (state.turn >= 21 && objective.reward === 'unclaimed') {
+  if (state.turn > state.config.objectives.nuclearPowerPlant.rewardDeadlineTurn && objective.firstCapturedTurn === null && objective.reward === 'unclaimed') {
     objective.reward = 'expired'; objective.failureSpawn = 'pending';
-    emit(state, 'nuclear_objective_updated', { reward: 'expired', deadlineTurn: 20, reason: 'deadline_expired' });
+    emit(state, 'nuclear_objective_updated', { reward: 'expired', deadlineTurn: state.config.objectives.nuclearPowerPlant.rewardDeadlineTurn, reason: 'deadline_expired' });
   }
   const reward = objective.reward === 'pending';
   if (!reward && objective.failureSpawn !== 'pending') return;
@@ -341,6 +350,49 @@ function settleNuclearObjective(state: GameState): void {
   synchronizePopulation(state);
 }
 
+function settleAirBaseObjective(state: GameState): void {
+  const objective = state.airBaseObjective;
+  const base = state.facilities.find(f => f.type === 'airBase');
+  if (!base) return;
+  if (state.turn > state.config.objectives.airBase.rewardDeadlineTurn && objective.firstCapturedTurn === null && objective.failureSpawn === 'none') {
+    objective.reward = 'expired'; objective.failureSpawn = 'pending';
+    emit(state,'facility_objective_updated',{facilityId:base.id,reward:'expired',reason:'deadline_expired',deadlineTurn:state.config.objectives.airBase.rewardDeadlineTurn});
+  }
+  const reward = objective.reward === 'pending';
+  if (!reward && objective.failureSpawn !== 'pending') return;
+  const occupied = occupiedKeys(state);
+  const tile = state.map.tiles.filter(t=>!occupied.has(t.key) && effectiveMovementCost(state,t,false)!==null && (reward ? canPlayerOccupyHex(state.map,t) : !wireAt(state,t)))
+    .sort((a,b)=>hexDistance(base.position,a)-hexDistance(base.position,b)||a.q-b.q||a.r-b.r)[0];
+  if (!tile) return;
+  const unit = createUnit(state,`${reward?'special-forces':'pack-zombie'}-${state.nextUnitNumber++}`,reward?'specialForces':'packZombie',{q:tile.q,r:tile.r},'ready','regular');
+  unit.canMove = true; unit.canAttack = true;
+  if (!reward) unit.firstZombieActionTurn=state.phase==='zombie'?state.turn+1:state.turn;
+  state.units.push(unit);
+  if (reward) {
+    objective.reward='claimed'; state.population.cumulativeReinforcements+=unit.population;
+    emit(state,'facility_objective_updated',{facilityId:base.id,reward:'claimed',unitId:unit.id,reinforcementPopulation:unit.population});
+  } else {
+    objective.failureSpawn='spawned'; state.statistics.packZombiesSpawned++;
+    const queue: SpawnOccupancyEntry[]=[]; const rng=domainRng(state.seed,'air-base-failure-occupancy');
+    applyGeneratedZombieOccupancy(state,unit,rng,queue,'',0); processSpawnOccupancyQueue(state,rng,queue);
+  }
+  synchronizePopulation(state);
+}
+
+function aviationLegalActions(state: GameState): GameAction[] {
+  const actions: GameAction[]=[];
+  for(const unit of state.units.filter(u=>u.isPlayerUnit && u.type==='multipurposeHelicopter')) {
+    actions.push({type:'TakeOff',unitId:unit.id},{type:'Land',unitId:unit.id});
+    for(const cargo of state.units.filter(u=>u.isPlayerUnit && hexDistance(u.position,unit.position)===1)) actions.push({type:'BoardAircraft',unitId:cargo.id,aircraftId:unit.id});
+    for(const destination of hexNeighbors(unit.position)) actions.push({type:'DisembarkAircraft',aircraftId:unit.id,destination});
+  }
+  for(const base of state.facilities.filter(f=>f.type==='airBase' && f.owner==='player')) {
+    const probe: GameAction={type:'LaunchMilitaryDrone',facilityId:base.id,target:base.position};
+    if (!aviationReason(state,probe)) for(const tile of state.map.tiles) if(hexDistance(base.position,tile)*state.config.militaryDrone.fuelPerHex<=state.resources.fuel) actions.push({type:'LaunchMilitaryDrone',facilityId:base.id,target:{q:tile.q,r:tile.r}});
+  }
+  return actions.filter(a=>isAviationAction(a) && !aviationReason(state,a));
+}
+
 function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRng.fromState(state.rngState)): void {
   if (!hasCapability(state, unit, 'capture')) {
     return;
@@ -351,14 +403,14 @@ function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRn
     facility.operationalStatus === 'disabled' &&
     !state.units.some((candidate) => !candidate.isPlayerUnit && hexKey(candidate.position) === hexKey(facility.position))
   ) {
-    if (facility.type === 'armyBase' && facility.owner !== 'player') {
+    if (['armyBase','airBase'].includes(facility.type) && facility.owner !== 'player') {
       facility.owner = 'player';
       facility.status = 'owned';
       facility.securedOrder = state.facilities.reduce((max, item) => Math.max(max, item.securedOrder ?? -1), -1) + 1;
       facility.lastAssignedOrder = state.nextAssignmentOrder++;
       const captureReward = claimFirstCaptureReward(state, facility);
       emit(state, 'facility_captured', { facilityId: facility.id, unitId: unit.id, captureReward });
-      if (facility.armyBase?.reward === 'unclaimed') {
+      if (facility.type === 'armyBase' && facility.armyBase?.reward === 'unclaimed') {
         facility.armyBase.reward = state.turn <= state.config.armyBase.rewardLastTurn ? 'pending' : 'expired';
         settleArmyReward(state, facility, rng);
       }
@@ -378,7 +430,7 @@ function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRn
     facility.populationOperationalTurn = state.turn + 1;
     facility.securedOrder ??= state.facilities.reduce((max, f) => Math.max(max, f.securedOrder ?? -1), -1) + 1;
     facility.lastAssignedOrder = state.nextAssignmentOrder++;
-    if (facility.type === 'nuclearPowerPlant') claimFirstCaptureReward(state, facility);
+    if (['nuclearPowerPlant','airBase'].includes(facility.type)) claimFirstCaptureReward(state, facility);
     emit(state, 'facility_recovered', { facilityId: facility.id, unitId: unit.id, recovering: true });
     return;
   }
@@ -387,7 +439,7 @@ function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRn
   }
   facility.owner = 'player';
   facility.status = 'owned';
-  facility.operationalStatus = facility.infected > 0 ? 'infected' : facility.type === 'armyBase' || facility.workers > 0 ? 'operational' : 'stopped';
+  facility.operationalStatus = facility.infected > 0 ? 'infected' : ['armyBase','airBase'].includes(facility.type) || facility.workers > 0 ? 'operational' : 'stopped';
   const previousOrder = state.facilities.reduce(
     (maximum, candidate) => Math.max(maximum, candidate.securedOrder ?? -1),
     -1,
@@ -401,7 +453,7 @@ function tryCapture(state: GameState, unit: UnitState, rng: SeededRng = SeededRn
     facility.earlyCaptureSurvivorStatus = 'rescued';
     emit(state, 'survivors_rescued', { facilityId: facility.id, rescued: facility.workers });
   }
-  if (facility.armyBase?.reward === 'unclaimed') {
+  if (facility.type === 'armyBase' && facility.armyBase?.reward === 'unclaimed') {
     facility.armyBase.reward = state.turn <= state.config.armyBase.rewardLastTurn && facility.workers > 0
       ? 'pending'
       : 'expired';
@@ -835,7 +887,7 @@ function processEconomy(state: GameState): FacilityProductionProjection[] {
         ? 'ruined'
         : facility.infected > 0
           ? 'infected'
-          : facility.type === 'windPowerPlant' || facility.type === 'armyBase' || facility.type === 'temporaryHousing' || facility.workers > 0
+          : facility.type === 'windPowerPlant' || ['armyBase','airBase'].includes(facility.type) || facility.type === 'temporaryHousing' || facility.workers > 0
             ? 'operational'
             : 'stopped';
     }
@@ -998,7 +1050,7 @@ function chooseHordeSlotType(
 ): Exclude<ZombieUnitType, 'hordeZombie'> {
   const entries = WAVE_NON_HORDE_TYPES
     .filter((type) => type !== 'riotZombie' || riotCount < state.config.horde.riotZombieCapPerDirection)
-    .filter((type) => type !== 'hunterZombie' || hunterCount < state.config.horde.hunterZombieCapPerDirection)
+    .filter((type) => type !== 'hunterZombie' || state.config.horde.hunterZombieCapPerDirection === null || hunterCount < state.config.horde.hunterZombieCapPerDirection)
     .map((type) => ({ type, weight: state.config.horde.specialZombieWeights[type] ?? 0 }))
     .filter((entry) => entry.weight > 0);
   const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
@@ -1207,7 +1259,8 @@ function fallFacility(
     return;
   }
   if (facility.status === 'ruined') return;
-  if (facility.armyBase?.reward === 'unclaimed') facility.armyBase.reward = 'expired';
+  if (facility.type === 'airBase' && state.airBaseObjective.firstCapturedTurn === null) { const objective=state.airBaseObjective; objective.fellBeforeCapture=true; objective.reward='expired'; if(objective.failureSpawn==='none' && state.config.objectives.airBase.failureOnUncapturedFall) objective.failureSpawn='pending'; }
+  if (facility.type === 'armyBase' && facility.armyBase?.reward === 'unclaimed') facility.armyBase.reward = 'expired';
   const infectedAtFall = facility.infected;
   if (facility.constructible) {
     const result = resolveSiteZombieSpawn(
@@ -1237,7 +1290,7 @@ function fallFacility(
     });
     return;
   }
-  if (facility.type === 'armyBase') {
+  if (['armyBase','airBase'].includes(facility.type)) {
     const lost = state.pendingUnitProductions.filter(o=>o.cityFacilityId===facility.id);
     state.pendingUnitProductions=state.pendingUnitProductions.filter(o=>o.cityFacilityId!==facility.id);
     for (const order of lost) { state.population.cumulativeDeaths += order.population; state.statistics.civilianLosses += order.population; emit(state,'production_forfeited',{facilityId:facility.id, people:order.population, cause}); }
@@ -1462,7 +1515,7 @@ function applyGeneratedZombieOccupancy(
       removeEmptyTemporaryHousing(state, facility, zombie.id);
     } else if (facility.type === 'capital' && facility.workers === 0 && facility.infected === 0) {
       fallFacility(state, facility, rng, queue, 'empty_zombie_occupation', chainRootEventId, chainDepth + 1);
-    } else if (facility.type === 'windPowerPlant' || ((facility.constructible || facility.type === 'armyBase') && facility.workers === 0 && facility.infected === 0)) {
+    } else if (facility.type === 'windPowerPlant' || ((facility.constructible || ['armyBase','airBase'].includes(facility.type)) && facility.workers === 0 && facility.infected === 0)) {
       facility.operationalStatus = 'disabled';
       consumeInfected(facility, facility.infected);
       emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type, source: zombie.id, immediateSpawnOccupation: true });
@@ -1560,7 +1613,7 @@ function suppressFacility(state: GameState, facility: FacilityState, unit: UnitS
   if (facility.infected > 0) {
     facility.operationalStatus = facility.status === 'ruined' ? 'ruined' : 'infected';
   }
-  else if (facility.status === 'owned') facility.operationalStatus = facility.type === 'armyBase' || facility.workers > 0 ? 'operational' : 'stopped';
+  else if (facility.status === 'owned') facility.operationalStatus = ['armyBase','airBase'].includes(facility.type) || facility.workers > 0 ? 'operational' : 'stopped';
   if (facility.infected === 0 && facility.status === 'ruined') {
     tryCapture(state, unit);
   }
@@ -1734,7 +1787,7 @@ interface ZombieDecision {
   noiseChanged: 'targeted' | 'reached' | 'overridden_horde' | 'overridden_visible' | null;
 }
 
-function zombieTargets(state: GameState): HumanTarget[] {
+function zombieTargets(state: GameState, zombie?: UnitState): HumanTarget[] {
   const byPosition = new Map<string, HumanTarget>();
   const add = (position: HexCoord, population: number): void => {
     if (population <= 0) return;
@@ -1747,7 +1800,7 @@ function zombieTargets(state: GameState): HumanTarget[] {
     add(facility.position, facilityZombieTargetValue(state, facility));
   }
   for (const unit of state.units) {
-    if (unit.isPlayerUnit) add(unit.position, unit.population);
+    if (unit.isPlayerUnit && !unit.transportedByUnitId && (!isAirborne(unit) || (zombie && canTargetUnit(state,zombie,unit)))) add(unit.position, unit.population);
   }
   for (const checkpoint of state.checkpoints) add(checkpoint.position, totalCheckpointPeople(checkpoint));
   return [...byPosition.values()].sort((left, right) => left.position.q - right.position.q || left.position.r - right.position.r);
@@ -1888,7 +1941,7 @@ function congestionFallback(
 }
 
 function chooseVisiblePopulationTarget(state: GameState, zombie: UnitState, rng: SeededRng): HumanTarget | null {
-  const candidates = zombieTargets(state)
+  const candidates = zombieTargets(state, zombie)
     .filter((target) => canUnitSee(zombie, target.position))
     .map((target) => ({ target, path: targetPath(state, zombie, target) }))
     .filter((candidate): candidate is { target: HumanTarget; path: { path: HexCoord[]; cost: number } } => candidate.path !== null);
@@ -1903,7 +1956,7 @@ function chooseVisiblePopulationTarget(state: GameState, zombie: UnitState, rng:
 }
 
 function hasVisiblePopulationTarget(state: GameState, zombie: UnitState): boolean {
-  return zombieTargets(state).some(
+  return zombieTargets(state, zombie).some(
     (target) => canUnitSee(zombie, target.position) && targetPath(state, zombie, target) !== null,
   );
 }
@@ -2051,7 +2104,7 @@ function resolveFallenSiteNoiseRespawns(
 }
 
 function nearestAttackableHuman(state: GameState, zombie: UnitState, rng?: SeededRng): UnitState | null {
-  const candidates = state.units.filter(u => u.isPlayerUnit && u.hp > 0 && hexDistance(u.position,zombie.position) === 1).sort((a,b) => b.population-a.population || a.id.localeCompare(b.id));
+  const candidates = state.units.filter(u => u.isPlayerUnit && u.hp > 0 && canTargetUnit(state,zombie,u) && hexDistance(u.position,zombie.position) <= 1 && (isAirborne(u) || hexDistance(u.position,zombie.position) === 1)).sort((a,b) => b.population-a.population || a.id.localeCompare(b.id));
   const tied=candidates.filter(u=>u.population===candidates[0]?.population);
   return tied.length > 1 && rng ? rng.pick(tied) : candidates[0] ?? null;
 }
@@ -2356,10 +2409,10 @@ function processZombieInfection(state: GameState, rng: SeededRng): void {
         overrunFacility(state, facility, rng, 'empty_zombie_occupation');
       } else if (
         facility.status !== 'ruined' &&
-        (facility.type === 'windPowerPlant' || ((facility.constructible || facility.type === 'armyBase') && facility.workers === 0 && facility.infected === 0))
+        (facility.type === 'windPowerPlant' || ((facility.constructible || ['armyBase','airBase'].includes(facility.type)) && facility.workers === 0 && facility.infected === 0))
       ) {
         facility.operationalStatus = 'disabled';
-        if (facility.armyBase?.reward === 'unclaimed') facility.armyBase.reward = 'expired';
+        if (facility.type === 'armyBase' && facility.armyBase?.reward === 'unclaimed') facility.armyBase.reward = 'expired';
         consumeInfected(facility, facility.infected);
         emit(state, 'facility_disabled', { facilityId: facility.id, facilityType: facility.type, source: zombie.id });
       } else if (facility.status !== 'ruined') {
@@ -2699,6 +2752,9 @@ function checkImmediateGameEnd(state: GameState): boolean {
 }
 
 function startPlayerTurn(state: GameState, rng: SeededRng): void {
+  if(state.militaryDrone && state.turn>=state.militaryDrone.expiresBeforeTurn) { state.militaryDrone=null; emit(state,'military_drone_expired',{}); }
+  retryPendingReanimations(state,rng);
+  settleAirBaseObjective(state);
   settleNuclearObjective(state);
   beginHordeWarningIfDue(state, rng);
   for(const f of state.facilities) settleArmyReward(state,f,rng);
@@ -2738,7 +2794,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
       facility.recoveryOperationalTurn !== null &&
       facility.recoveryOperationalTurn <= state.turn
     ) {
-      facility.operationalStatus = facility.type === 'windPowerPlant' || facility.type === 'armyBase' || facility.type === 'temporaryHousing' || facility.workers > 0 ? 'operational' : 'stopped';
+      facility.operationalStatus = facility.type === 'windPowerPlant' || ['armyBase','airBase'].includes(facility.type) || facility.type === 'temporaryHousing' || facility.workers > 0 ? 'operational' : 'stopped';
       facility.populationOperationalTurn = state.turn;
       facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
       facility.recoveryOperationalTurn = null;
@@ -2769,8 +2825,9 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
     synchronizeArtilleryStats(state, unit);
     delete unit.modeChangedTurn;
     unit.actionState = 'ready';
-    unit.canMove = !deployedArtillery(unit);
-    unit.canAttack = true;
+    unit.canMove = !unit.transportedByUnitId && !deployedArtillery(unit) && (unit.type !== 'multipurposeHelicopter' || isAirborne(unit));
+    unit.canAttack = !unit.transportedByUnitId;
+    if(unit.transportedByUnitId) unit.actionState='acted';
     unit.attackChargesRemaining = unit.maxAttackCharges;
     unit.activity = { moved: false, attacked: false, intercepted: false, suppressed: false };
   }
@@ -2793,7 +2850,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
       state.pendingUnitProductions.push(order);
       continue;
     }
-    if (city.type === 'armyBase' && (!order.powerReady || city.infected > 0 || city.operationalStatus !== 'operational')) { state.pendingUnitProductions.push(order); continue; }
+    if (['armyBase','airBase'].includes(city.type) && (!order.powerReady || city.infected > 0 || city.operationalStatus !== 'operational')) { state.pendingUnitProductions.push(order); continue; }
     const position = nearestHumanSpawnPosition(state, city.position, rng);
     if (!position) {
       state.pendingUnitProductions.push(order);
@@ -2809,7 +2866,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
       productionProficiency,
     );
     state.completedProductions[order.unitType] += 1;
-    if (order.unitType !== 'fieldArtillery') { unit.currentFuel = 0; commissioned.push(unit); }
+    if (!['fieldArtillery','multipurposeHelicopter'].includes(order.unitType)) { unit.currentFuel = 0; commissioned.push(unit); }
     state.units.push(unit);
     if (productionProficiency === 'recruit') state.statistics.recruitsCommissionedByType[order.unitType] += 1;
     if (order.unitType === 'riotPolice') {
@@ -2861,6 +2918,15 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
 }
 
 function endTurn(state: GameState, rng: SeededRng): ActionError | null {
+  for(const unit of [...state.units].filter(isAirborne).sort((a,b)=>a.id.localeCompare(b.id))) {
+    const radius=state.config.units.multipurposeHelicopter.endTurnNoiseRadius;
+    state.pendingNoisePulses.push({id:`noise-${state.nextEventNumber}`,center:{...unit.position},radius,sourceKind:'humanCombat',sourceUnitType:'multipurposeHelicopter',emittedTurn:state.turn});
+    state.statistics.noisePulsesEmitted++; state.statistics.noisePulsesBySourceType.multipurposeHelicopter++;
+    emit(state,'noise_emitted',{sourceUnitId:unit.id,sourceUnitType:unit.type,noiseClass:'extraLarge',radius});
+    resolveFallenSiteNoiseRespawns(state,'multipurposeHelicopter',unit.position,radius,rng);
+    unit.currentFuel=Math.max(0,unit.currentFuel-state.config.units.multipurposeHelicopter.endTurnFuel);
+    if(unit.currentFuel===0) emergencyLand(state,unit,rng);
+  }
   state.phase = 'economy';
   processEconomy(state);
   if (checkImmediateGameEnd(state)) return null;
@@ -2943,7 +3009,7 @@ function assignWorkers(state: GameState, action: Extract<GameAction, { type: 'As
   const movements = difference > 0 ? withdrawFromSupplyCities(state, difference) : distributeToReceptionCities(state, -difference);
   if (!movements) return error(action, 'population_move_failed', 'Population movement could not be completed');
   facility.workers = action.workers;
-  facility.operationalStatus = facility.type === 'armyBase' || action.workers > 0 ? 'operational' : 'stopped';
+  facility.operationalStatus = ['armyBase','airBase'].includes(facility.type) || action.workers > 0 ? 'operational' : 'stopped';
   if(facility.armyBase) facility.armyBase.interceptionsRemaining=Math.min(facility.armyBase.interceptionsRemaining,facility.workers);
   facility.lastAssignedOrder = state.nextAssignmentOrder++;
   state.actionsTakenThisTurn += 1;
@@ -3099,7 +3165,7 @@ function validateCheckpointDestination(
   if (!tile?.road || state.checkpoints.some(
     (checkpoint) => checkpoint.id !== ignoredCheckpointId && hexKey(checkpoint.position) === hexKey(action.position),
   ) || state.units.some(
-    (unit) => unit.isPlayerUnit && hexKey(unit.position) === hexKey(action.position),
+    (unit) => unit.isPlayerUnit && occupiesGroundLayer(unit) && hexKey(unit.position) === hexKey(action.position),
   )) {
     return error(action, 'invalid_checkpoint_tile', 'A checkpoint requires an empty branch road tile');
   }
@@ -3603,46 +3669,27 @@ function unitProductionCosts(state: Readonly<GameState>, unitType: HumanUnitType
   };
 }
 
-function validateProduceUnit(state: Readonly<GameState>, action: Extract<GameAction, { type: 'ProduceUnit' }>) {
-  const budget = playerActionBudgetError(state, action);
-  if (budget) return budget;
-  if (!HUMAN_UNIT_TYPES.includes(action.unitType)) return error(action, 'invalid_unit_type', 'Only configured human units can be produced');
-  const limit = state.config.units[action.unitType].productionLimitPerGame;
-  if (limit !== null && state.completedProductions[action.unitType] + state.pendingUnitProductions.filter(o => o.unitType === action.unitType).length >= limit) return error(action, 'production_limit_reached', 'Lifetime production limit including reservations reached');
-  const eligibleCities = [...eligibleSnapshotCities(state, 'supply'), ...state.facilities.filter(f => f.type === 'armyBase' && f.owner === 'player' && f.status === 'owned' && f.infected === 0 && f.operationalStatus === 'operational' && f.populationOperationalTurn <= state.turn)].filter(
-    (facility) => state.config.units[action.unitType].recruitmentFacilityTypes.includes(facility.type as 'capital' | 'city' | 'armyBase'),
-  );
-  if (
-    action.destination &&
-    eligibleCities.some((facility) => hexKey(facility.position) === hexKey(action.destination!)) &&
-    !isHexSupplied(state, action.destination)
-  ) {
-    return error(action, 'recruitment_out_of_supply', 'Units cannot be recruited outside the supply network');
+export function validateProduceUnit(state: Readonly<GameState>, action: Extract<GameAction, { type: 'ProduceUnit' }>) {
+  const budget=playerActionBudgetError(state,action); if(budget) return budget;
+  if (!HUMAN_UNIT_TYPES.includes(action.unitType)) return error(action,'invalid_unit_type','A configured human unit is required');
+  const config=state.config.units[action.unitType];
+  const city=action.destination ? state.facilities.find(f=>hexKey(f.position)===hexKey(action.destination!))
+    : [...eligibleSnapshotCities(state,'supply'),...state.facilities.filter(f=>['armyBase','airBase'].includes(f.type))].find(f=>f.owner==='player' && config.recruitmentFacilityTypes.includes(f.type as 'capital'|'city'|'armyBase'|'airBase'));
+  if(!city) return error(action,'invalid_recruitment_hub','Select a known recruitment facility');
+  if(!config.recruitmentFacilityTypes.includes(city.type as 'capital'|'city'|'armyBase'|'airBase')) return error(action,'unit_not_producible_here','This facility cannot produce this unit type');
+  if(city.owner!=='player') return error(action,'facility_not_owned','The facility must be player owned');
+  if(city.status!=='owned' || city.infected>0 || ['building','disabled','recovering','ruined'].includes(city.operationalStatus) || city.populationOperationalTurn>state.turn) return error(action,'facility_not_operational','The facility cannot recruit this turn');
+  if(!isHexSupplied(state,city.position)) return error(action,'recruitment_out_of_supply','Recruitment requires Supply');
+  const limit=config.productionLimitPerGame;
+  if(limit!==null && state.completedProductions[action.unitType]+state.pendingUnitProductions.filter(o=>o.unitType===action.unitType).length>=limit) return error(action,'lifetime_production_limit_reached','Lifetime production limit including reservations reached');
+  if(state.pendingUnitProductions.some(o=>o.cityFacilityId===city.id)) return error(action,'production_slot_occupied','This facility already has a reservation');
+  const costs=unitProductionCosts(state,action.unitType);
+  if(availableSupplyPopulation(state)<costs.population || civilianWorkerCount(state)-costs.population<=0) {
+    const raw=eligibleSnapshotCities(state,'supply').reduce((n,city)=>n+city.workers,0);
+    return error(action,raw>=costs.population?'capital_minimum_resident_required':'insufficient_population','Not enough eligible residents while retaining the Capital minimum');
   }
-  const possibleCities = eligibleCities.filter((facility) => isHexSupplied(state, facility.position));
-  const city = action.destination
-    ? possibleCities.find((facility) => hexKey(facility.position) === hexKey(action.destination!))
-    : possibleCities[0];
-  if (!city) {
-    return error(
-      action,
-      'invalid_recruitment_hub',
-      'This unit type cannot be recruited at the selected facility',
-    );
-  }
-  if (state.pendingUnitProductions.some((order) => order.cityFacilityId === city.id)) return error(action, 'city_busy', 'This city already has a reservation');
-  const costs = unitProductionCosts(state, action.unitType);
-  if (availableSupplyPopulation(state) < costs.population && eligibleSnapshotCities(state, 'supply').reduce((n,c) => n + c.workers, 0) >= costs.population) return error(action, 'capital_minimum_resident_required', 'The Capital must retain one healthy resident');
-  if (
-    availableSupplyPopulation(state) < costs.population ||
-    civilianWorkerCount(state) - costs.population <= 0 ||
-    state.resources.civilianGoods < costs.civilianGoods ||
-    state.resources.militaryGoods < costs.militaryGoods ||
-    state.resources.fuel < costs.fuel
-  ) {
-    return error(action, 'insufficient_production_cost', 'Insufficient eligible city population or supplies, or recruitment would use the last healthy civilian');
-  }
-  return { city, costs };
+  for(const [resource,code] of [['civilianGoods','insufficient_civilian_goods'],['militaryGoods','insufficient_military_goods'],['fuel','insufficient_fuel']] as const) if(state.resources[resource]<costs[resource]) return error(action,code,`Insufficient ${resource}`);
+  return {city,costs};
 }
 
 function produceUnit(state: GameState, action: Extract<GameAction, { type: 'ProduceUnit' }>): ActionError | null {
@@ -3660,7 +3707,7 @@ function produceUnit(state: GameState, action: Extract<GameAction, { type: 'Prod
     unitType: action.unitType,
     population: costs.population,
     readyTurn: state.turn + 1,
-    ...(city.type === 'armyBase' ? { powerReady: false } : {}),
+    ...(['armyBase','airBase'].includes(city.type) ? { powerReady: false } : {}),
   };
   state.pendingUnitProductions.push(order);
   state.actionsTakenThisTurn += 1;
@@ -3696,9 +3743,11 @@ function validateAttack(state: Readonly<GameState>, action: AttackAction) {
   if (!attacker || !attacker.isPlayerUnit || !target || !isAttackable(attacker, target) || !isVisibleToPlayer(state, target.position)) {
     return error(action, 'invalid_target', 'A visible enemy target and player attacker are required');
   }
+  if (attacker.transportedByUnitId) return error(action,'unit_transported','Transported units cannot attack');
+  if (attacker.type === 'multipurposeHelicopter' && !isAirborne(attacker)) return error(action,'aircraft_not_airborne','Landed aircraft can only react');
   const combatProjection = forecastUnitCombatAtDistance(state, attacker, hexDistance(attacker.position, target.position));
   if ((attacker.actionState === 'acted' && !attacker.activity.attacked) || !attacker.canAttack || attacker.attackChargesRemaining <= 0 || !combatProjection.canAttack) {
-    return error(action, 'attack_not_legal', 'Target is outside range or this unit cannot attack');
+    return error(action, combatProjection.reason ?? 'unit_cannot_attack', 'Target is outside range or this unit cannot attack');
   }
   return { attacker, target };
 }
@@ -3742,7 +3791,7 @@ function fireArtillery(state: GameState, action: Extract<GameAction,{type:'Attac
   unit.currentMilitaryGoods-=state.config.units.fieldArtillery.deployed.militaryGoodsCost;
   markAttacked(state,unit);unit.actionState='acted';unit.canMove=false;state.actionsTakenThisTurn++;
   emit(state,'artillery_fired',{unitId:unit.id,aimedHex:{...action.position},hitRoll,scattered:!hit,impactHex:{...impact},militaryGoodsCost:state.config.units.fieldArtillery.deployed.militaryGoodsCost});
-  const hits=state.units.filter(u=>artilleryBaseDamage(unit,impact,u.position)>0 && (state.config.units.fieldArtillery.friendlyFire||!u.isPlayerUnit)).sort((a,b)=>a.id.localeCompare(b.id)).map(u=>({unit:u,damage:artilleryBaseDamage(unit,impact,u.position)}));
+  const hits=state.units.filter(u=>occupiesGroundLayer(u) && artilleryBaseDamage(unit,impact,u.position)>0 && (state.config.units.fieldArtillery.friendlyFire||!u.isPlayerUnit)).sort((a,b)=>a.id.localeCompare(b.id)).map(u=>({unit:u,damage:artilleryBaseDamage(unit,impact,u.position)}));
   const sites=state.config.units.fieldArtillery.facilityPopulationDamage?[...state.facilities,...state.checkpoints].filter(s=>artilleryBaseDamage(unit,impact,s.position)>0).sort((a,b)=>a.id.localeCompare(b.id)):[];
   const occupiedSites = new Set(sites.filter(s=>'workers' in s?s.workers+s.infected>0:totalCheckpointPeople(s)+s.infected>0).map(s=>s.id));
   dealAreaDamage(state,hits,unit.id,lifecycleRng,()=>{
@@ -3770,7 +3819,7 @@ function validateWait(state: Readonly<GameState>, action: Extract<GameAction, { 
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   const unit = getUnit(state, action.unitId);
-  if (!unit || !unit.isPlayerUnit || unit.actionState === 'acted') return error(action, 'cannot_wait', 'Only an uncommitted player unit can wait');
+  if (!unit || !unit.isPlayerUnit || unit.transportedByUnitId || unit.actionState === 'acted') return error(action, 'cannot_wait', 'Only an uncommitted player unit can wait');
   return { unit };
 }
 
@@ -3807,7 +3856,7 @@ function constructibleValidationContext(state: Readonly<GameState>): Constructib
     suppliedKeys: new Set(getSuppliedTileKeys(state)),
     facilityKeys: new Set(state.facilities.map((facility) => hexKey(facility.position))),
     checkpointKeys: new Set(state.checkpoints.map((checkpoint) => hexKey(checkpoint.position))),
-    playerUnitKeys: new Set(state.units.filter((unit) => unit.isPlayerUnit).map((unit) => hexKey(unit.position))),
+    playerUnitKeys: new Set(state.units.filter((unit) => unit.isPlayerUnit && occupiesGroundLayer(unit)).map((unit) => hexKey(unit.position))),
     visibleEnemyKeys: new Set(getVisibleEnemyUnits(state).map((unit) => hexKey(unit.position))),
   };
 }
@@ -3849,7 +3898,7 @@ function validateConstructibleFacilityAction(
   if (context ? context.wallKeys.has(key) : wireAt(state, action.position)) return error(action, 'barbed_wire_occupied', 'Barbed Wire occupies this Hex');
   if (context ? context.facilityKeys.has(key) : getFacilityAt(state as GameState, action.position) !== undefined) return error(action, 'constructible_facility_occupied', 'A facility already occupies this Hex');
   if (context ? context.checkpointKeys.has(key) : getCheckpointAt(state as GameState, action.position) !== undefined) return error(action, 'constructible_checkpoint_occupied', 'A Checkpoint already occupies this Hex');
-  if (context ? context.playerUnitKeys.has(key) : state.units.some((unit) => unit.isPlayerUnit && hexKey(unit.position) === key)) {
+  if (context ? context.playerUnitKeys.has(key) : state.units.some((unit) => unit.isPlayerUnit && occupiesGroundLayer(unit) && hexKey(unit.position) === key)) {
     return error(action, 'constructible_player_unit_occupied', 'A player Unit occupies this Hex');
   }
   if (context ? context.visibleEnemyKeys.has(key) : getVisibleEnemyUnits(state).some((unit) => hexKey(unit.position) === key)) {
@@ -4024,6 +4073,7 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
     return state.phase === 'player' ? null : error(action, 'wrong_phase', 'Turn can only end during the player phase');
   }
   if (state.phase !== 'player') return error(action, 'wrong_phase', 'Actions are only accepted during the player phase');
+  if (isAviationAction(action)) { const reason=aviationReason(state,action); return reason ? error(action,reason,reason) : null; }
   if (action.type === 'SetPowerSupply') return validationError(validateSetPowerSupply(state, action));
   if (state.actionsTakenThisTurn >= state.config.maxActionsPerTurn) return error(action, 'action_limit', 'The action limit for this turn has been reached');
   if (action.type === 'BuildCheckpoint') return validateBuildCheckpointAction(state, action).error;
@@ -4060,7 +4110,7 @@ function staticConstructibleEligibleHexKeys(state: Readonly<GameState>): Set<str
   const visibleTiles = getPlayerVisibleTileKeys(state);
   const visibleWallKeys = new Set(state.barbedWire.filter(w => visibleTiles.has(hexKey(w.position))).map(w => hexKey(w.position)));
   const visibleEnemyKeys = new Set(getVisibleEnemyUnits(state).map((unit) => hexKey(unit.position)));
-  const playerUnitKeys = new Set(state.units.filter((unit) => unit.isPlayerUnit).map((unit) => hexKey(unit.position)));
+  const playerUnitKeys = new Set(state.units.filter((unit) => unit.isPlayerUnit && occupiesGroundLayer(unit)).map((unit) => hexKey(unit.position)));
   const facilityKeys = new Set(state.facilities.map((facility) => hexKey(facility.position)));
   const checkpointKeys = new Set(state.checkpoints.map((checkpoint) => hexKey(checkpoint.position)));
   return new Set(state.map.tiles
@@ -4212,6 +4262,7 @@ export function getCheckpointPositionCandidates(
           position: { ...position },
           legal: reason === null,
           reasonCode: reason?.code ?? null,
+          ...(reason?.code==='checkpoint_supply_zombie_blocked' ? {blockingEnemyIds:getBlockingZombiesForCheckpoint(state,branch.id,position).filter(z=>visibleTileKeys.has(hexKey(z.position))).map(z=>z.id).sort()} : {}),
           civilianGoodsCost: action.type === 'BuildCheckpoint'
             ? getCheckpointBuildCost(state, branch.id)
             : state.config.checkpoint.relocationCivilianGoods,
@@ -4245,6 +4296,7 @@ export function getCheckpointPositionCandidates(
         position: { ...checkpoint.position },
         legal: reason === null,
         reasonCode: reason?.code ?? null,
+        ...(reason?.code==='checkpoint_supply_zombie_blocked' ? {blockingEnemyIds:getBlockingZombiesForCheckpoint(state,branch.id,checkpoint.position).filter(z=>visibleTileKeys.has(hexKey(z.position))).map(z=>z.id).sort()} : {}),
         civilianGoodsCost: 0,
         ...effect,
       });
@@ -4368,6 +4420,7 @@ export class GameEngine implements HeadlessGame {
     const visibleEnemies = getVisibleEnemyUnits(this.state);
     const visibleHexes = getPlayerVisibleTileKeys(this.state);
     for (const unit of this.state.units.filter((candidate) => candidate.isPlayerUnit).sort((a, b) => a.id.localeCompare(b.id))) {
+      if (unit.transportedByUnitId) continue;
       if (unit.type === 'fieldArtillery') {
         const change: GameAction = { type: 'ChangeUnitMode', unitId: unit.id, mode: unit.mode === 'packed' ? 'deployed' : 'packed' };
         if (!('code' in validateChangeUnitMode(this.state,change))) actions.push(change);
@@ -4385,7 +4438,7 @@ export class GameEngine implements HeadlessGame {
       }
       if (unit.canAttack && unit.attackChargesRemaining > 0 && (unit.actionState !== 'acted' || unit.activity.attacked)) {
         for (const target of visibleEnemies) {
-          if (forecastUnitCombatAtDistance(this.state, unit, hexDistance(unit.position, target.position)).canAttack) {
+          if (!validateAttack(this.state, {type:'Attack',attackerId:unit.id,targetId:target.id}).hasOwnProperty('code')) {
             actions.push({ type: 'Attack', attackerId: unit.id, targetId: target.id });
           }
         }
@@ -4469,8 +4522,8 @@ export class GameEngine implements HeadlessGame {
       };
       if (validationError(validateDecommissionConstructibleFacility(this.state, action)) === null) actions.push(action);
     }
-    for (const base of this.state.facilities.filter(f => f.type === 'armyBase')) {
-      for (const unitType of HUMAN_UNIT_TYPES.filter((type) => this.state.config.units[type].recruitmentFacilityTypes.includes('armyBase'))) {
+    for (const base of this.state.facilities.filter(f => ['armyBase','airBase'].includes(f.type))) {
+      for (const unitType of HUMAN_UNIT_TYPES.filter((type) => this.state.config.units[type].recruitmentFacilityTypes.includes(base.type as 'armyBase' | 'airBase'))) {
         const action: GameAction = { type: 'ProduceUnit', unitType, destination: { ...base.position } };
         if (!('code' in validateProduceUnit(this.state, action))) actions.push(action);
       }
@@ -4492,8 +4545,9 @@ export class GameEngine implements HeadlessGame {
         }
       }
     }
+    actions.push(...aviationLegalActions(this.state));
     actions.push({ type: 'EndTurn' });
-    return actions;
+    return actions.filter(action=>action.type!=='ProduceUnit'||validateAction(this.state,action)===null);
   }
 
   public getCheckpointPositionCandidates(): CheckpointPositionCandidate[] {
@@ -4545,7 +4599,8 @@ export class GameEngine implements HeadlessGame {
     if (action.type === 'EndTurn') {
       if (!isPlayerPhase(candidate)) actionError = error(action, 'wrong_phase', 'Turn can only end during the player phase');
       else actionError = endTurn(candidate, rng);
-    } else if (action.type === 'Move') actionError = move(candidate, action, rng);
+    } else if (isAviationAction(action)) { const reason=aviationReason(candidate,action); if(reason) actionError=error(action,reason,reason); else applyAviationAction(candidate,action); }
+    else if (action.type === 'Move') actionError = move(candidate, action, rng);
     else if (action.type === 'ChangeUnitMode') actionError = changeUnitMode(candidate, action);
     else if (action.type === 'AttackHex') actionError = fireArtillery(candidate, action, rng);
     else if (action.type === 'Attack') actionError = attack(candidate, action, rng);
@@ -4579,6 +4634,7 @@ export class GameEngine implements HeadlessGame {
     if (actionError) {
       return { state: this.getState(), events: [], error: actionError, gameOver: this.isGameOver(), result: this.getResult() };
     }
+    settleAirBaseObjective(candidate);
     recoverRuinedCheckpoints(candidate);
     saveRng(candidate, rng);
     synchronizePopulation(candidate);

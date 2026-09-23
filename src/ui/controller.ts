@@ -1,3 +1,7 @@
+import { HELICOPTER_ASSETS, ARTILLERY_ASSETS } from './boardAssets';
+import { renderAviationUnit, renderMilitaryDrone, renderFacilityObjectives } from './aviation';
+import { aviationPreview } from '../core/aviation-preview';
+import { RULES_V165 } from '../core/rules-v165';
 import { previewArtillery, type ArtilleryPreview } from '../core/artillery';
 import { RULES_V164 } from '../core/rules-v164';
 
@@ -782,7 +786,7 @@ export type NoiseClass = 'small' | 'medium' | 'large' | 'extraLarge';
 /** Production-safe class mapping. Exact Core radii never cross this helper. */
 export function noiseClassForUnit(unitType: string): NoiseClass | null {
   if (unitType === 'police' || unitType === 'specialForces') return 'medium';
-  if (unitType === 'nationalGuard') return 'large';
+  if (unitType === 'nationalGuard' || unitType==='multipurposeHelicopter') return 'large';
   return null;
 }
 
@@ -1607,8 +1611,8 @@ export interface BoardLegendViewModel {
 
 const LEGEND_TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const;
 const LEGEND_OVERLAYS = ['road', 'bridge', 'urban'] as const;
-const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
-const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'checkpoint'] as const;
+const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
+const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'airBase', 'checkpoint'] as const;
 const LEGEND_OBSTACLES = ['barbedWire'] as const;
 
 function legendAssetFromRegistry(
@@ -1765,7 +1769,7 @@ function configLegendEntries(
   const earlyWeights = hordeMixedSlotWeightsLabel(config, locale, false);
   const lateWeights = hordeMixedSlotWeightsLabel(config, locale, true);
   add('specialSlotWeights', t('legendSpecialSlotWeights'), `${locale==='ja'?'全Wave':'Every Wave'}: ${lateWeights}`);
-  add('specialSlotCaps', t('legendSpecialSlotCaps'), `${unitLabel('riotZombie', locale)} ${config.horde.riotZombieCapPerDirection} · ${unitLabel('hunterZombie', locale)} ${config.horde.hunterZombieCapPerDirection} · ${unitLabel('gasZombie', locale)} ∞`);
+  add('specialSlotCaps', t('legendSpecialSlotCaps'), `${unitLabel('riotZombie', locale)} ${config.horde.riotZombieCapPerDirection} · ${unitLabel('hunterZombie', locale)} ${config.horde.hunterZombieCapPerDirection??'∞'} · ${unitLabel('gasZombie', locale)} ∞`);
   add('initialHunterCount', t('legendInitialHunterCount'), `${config.economy.initialHunterCount.min}–${config.economy.initialHunterCount.max}`);
   add('initialHunterDistance', t('legendInitialHunterDistance'), String(config.economy.initialHunterMinDistance));
   add('initialGasCount', t('legendInitialGasCount'), `${config.economy.initialGasCount.min}–${config.economy.initialGasCount.max}`);
@@ -1794,49 +1798,16 @@ function configLegendEntries(
 }
 
 function legendDescription(key: string, locale: Locale, t: (key: string, fallback?: string) => string): string {
-  const translated = t(`legendDescription.${key}`);
-  if (translated !== `legendDescription.${key}`) return translated;
-  const fallback: Record<string, [string, string]> = {
-    plain: ['Movement Costは下のConfig数値。特別な防御補正なし。', 'Movement Cost comes from the Config values below. No special defense modifier.'],
-    forest: ['Movement Costは下のConfig数値。Forest上のZombieにはForest防御が適用されます。', 'Movement Cost comes from the Config values below. Zombies receive Forest defense on Forest tiles.'],
-    mountain: ['Movement Costは下のConfig数値。Ground VisionではForestと同じく遮蔽Terrainです。', 'Movement Cost comes from the Config values below. It blocks Ground Vision like Forest.'],
-    road: ['基礎TerrainではないOverlay。実効移動Costは1です。', 'An overlay, not base Terrain. Effective movement Cost is 1.'],
-    urban: ['基礎TerrainではないOverlay。実効移動Costは1で、Urban防御が適用されます。', 'An overlay, not base Terrain. Effective movement Cost is 1 and Urban defense applies.'],
-    police: ['感染鎮圧と治安活動を担います。自動鎮圧時の民間被害はありません。', 'Handles infection suppression and security. Automatic suppression causes no civilian damage.'],
-    nationalGuard: ['射程と火力に優れます。軍需不足時は実効射程が低下し、鎮圧時に民間被害があります（数値はConfig）。', 'Provides range and firepower. Military shortages reduce effective range; suppression can harm civilians (values come from Config).'],
-    riotPolice: ['感染鎮圧の切り札です。高いHPを持ち感染鎮圧時に民間犠牲者を出しません。', 'A decisive unit for infection suppression. It has high HP and causes no civilian casualties during infection suppression.'],
-    reconTeam: ['広い視界と長射程を持ち、遠方のゾンビを比較的静かに攻撃します。', 'Wide vision and long range let Recon attack distant Zombies with relatively little noise.'],
-    zombie: ['HPの低い通常敵Unit。Mixed Horde所属個体には所属Markerが付き、Horde ZombieからTargetを継承できます。', 'A lower-HP normal enemy. Mixed-Horde members carry a group marker and can inherit a Horde Zombie target.'],
-    hordeZombie: ['高HPでCapitalをStrategic TargetにするHorde中核。所属に応じたHorde Markerと併記します。', 'A high-HP Horde core that uses the Capital as a strategic target, shown with its Horde marker.'],
-    policeZombie: ['Police由来の再活性化通常Zombie。Policeの外見を識別できますが、AIとScheduleは通常Zombieです。', 'A reanimated Police-derived normal Zombie. Its Police silhouette is identifiable, but its AI and schedule are normal Zombie behavior.'],
-    soldierZombie: ['Soldier由来の再活性化通常Zombie。兵士の外見を識別できますが、Horde中核ではありません。', 'A reanimated Soldier-derived normal Zombie. Its soldier silhouette is identifiable, but it is not a Horde core.'],
-    riotZombie: ['再活性化したriotpolice由来の通常ゾンビ。生前の防具がそのまま高いHPとして機能しています。', 'A normal Zombie reanimated from a Riot Police unit. The armor it wore in life gives it high HP.'],
-    hunterZombie: ['筋骨隆々で長い爪を持つ高速のNormal AI系Zombie。性能値は表示中のConfigを使用し、専用TargetやCapital常時知識は持ちません。', 'A fast Normal AI Zombie with a powerful build and long claws. Its performance comes from the current Config; it has no special target or permanent Capital knowledge.'],
-    gasZombie: ['死亡時に隣接6 HexへTerrain適用damageと拠点感染を与え、Gas同士でFIFO連鎖するNormal AI系Zombieです。', 'A Normal AI Zombie whose death damages units with Terrain defense and infects sites in the six adjacent Hexes; Gas deaths chain in FIFO order.'],
-    screamerZombie: ['視力は低いですが、人間を発見すると非常に大きな叫び声を上げます。', 'Its eyesight is poor, but it emits an extremely loud scream when it finds Humans.'],
-    barbedWire: ['有刺鉄線。HP20で、同居するHumanとZombieの識別を保ちます。通常Zoomでは実Asset、低ZoomとAsset失敗時は同じ意味のFence fallbackを表示します。', 'Barbed Wire with HP20. Co-located Humans and Zombies remain identifiable. Normal Zoom uses the runtime asset; low Zoom and load failures use a semantic fence fallback.'],
-    periodic: ['Horde ZombieとNormal Zombieが混在できる周期集団。MarkerはUnit Typeではなく所属を示します。', 'A periodic group that may mix Horde and Normal Zombies. Its marker shows membership, not Unit Type.'],
-    final: ['Final Spawn Group所属を示すMarker。Normal Zombieも含め、Group全滅がVictory条件の一つです。', 'Marks Final Spawn Group membership. Every member, including Normal Zombies, must be defeated for Victory.'],
-    capital: ['州都。人口の基点、編成、初期Supply、Capital Ground Visionを担います。', 'The capital anchors population, recruitment, initial Supply, and Capital Ground Vision.'],
-    city: ['地方都市。人口を受け入れ、警察編成と民需品生産を担います。', 'A regional city that receives population, produces Police, and supports civilian goods.'],
-    farm: ['食料を生産する施設。Required電力が不足すると生産が停止します。', 'Produces Food. Production stops when Required power is unavailable.'],
-    civilianFactory: ['民需品を生産する施設。Required電力が不足すると生産が停止します。', 'Produces Civilian Goods. Production stops when Required power is unavailable.'],
-    militaryFactory: ['軍需品を生産する施設。入力とRequired電力が必要です。', 'Produces Military Goods. Inputs and Required power are needed.'],
-    refinery: ['Fuelを生産するRequired電力施設。', 'Produces Fuel and requires Required power.'],
-    powerPlant: ['電力Capacityを発電する施設。Turn-start Fuelの制限を受けます。', 'Generates power Capacity and is limited by Turn-start Fuel.'],
-    armyBase: ['恒久施設。健常Workerによる迎撃、専用軍需品、早期確保報酬、都市人口を使う兵士編成を扱います。', 'A permanent facility with staffed interceptions, dedicated Military Goods, an early-capture reward, and Soldier recruitment from city residents.'],
-    checkpoint: ['道路上の避難民を待機・審査・合格の3プールで管理します。1回の審査枠は20人です。', 'Manages road refugees through waiting, screening, and approved pools. Each batch screens up to 20 people.'],
-    spawnReserve: ['盤面外周392 HexのSpawn Reserve。Player Unit・Facility・Checkpointは配置できませんが、Playerの攻撃とHordeのSpawn・Damageは可能です。', 'The outer 392-Hex Spawn Reserve. Player Units, Facilities, and Checkpoints cannot occupy it; Player attacks and Horde Spawn/damage remain allowed.'],
-    unowned: ['未確保。人口操作や生産はできません。', 'Unsecured. Population actions and production are unavailable.'],
-    owned: ['確保済み。安全と操作可能Turnの条件を満たせば利用できます。', 'Secured. Available when safe and past its operational turn.'],
-    stopped: ['現在停止。状態Markerで停止理由を示します。', 'Currently stopped. The state marker identifies the reason.'],
-    infected: ['感染中。感染と生産停止を別々のMarkerで示します。', 'Infected. Infection and production shutdown are shown separately.'],
-    ruined: ['荒廃。復旧まで生産・供給の対象外です。', 'Ruined. Excluded from production and supply until recovered.'],
-    operational: ['稼働中。避難民方針とSupplyを利用できます。', 'Operational. Refugee policy and Supply are active.'],
-    abandoned: ['放棄。避難民管理は停止し、Supplyを延長しません。', 'Abandoned. Refugee management stops and Supply is not extended.'],
-    remnant: ['跡地／残存拠点。Lifecycleを保ちますがSupplyは延長しません。', 'Remnant. The lifecycle remains, but it does not extend Supply.'],
+  const descriptions: Record<string, [string,string]> = {
+    plain:['草地のHex。','Grassland hex.'], forest:['樹木が集まったHex。','A cluster of trees.'], mountain:['岩山のHex。','Rocky mountain hex.'], water:['水面のHex。','Water hex.'],
+    road:['Hexをつなぐ道路。','Road connecting hexes.'], bridge:['水面を渡る橋。','Bridge across water.'], urban:['建物が並ぶ市街地。','Built-up area with buildings.'],
+    police:['警察制服の歩兵。','Infantry in police uniform.'], nationalGuard:['軍装の歩兵。','Infantry in military uniform.'], riotPolice:['盾と防具を持つ機動隊。','Riot Police with shields and armor.'], reconTeam:['偵察装備の歩兵。','Infantry with reconnaissance gear.'], specialForces:['特殊装備の歩兵。','Infantry with special operations gear.'],
+    zombie:['通常のZombie。','Normal Zombie.'], hordeZombie:['大型のHorde Zombie。','Large Horde Zombie.'], policeZombie:['警察制服が残るZombie。','Zombie in a police uniform.'], soldierZombie:['軍装が残るZombie。','Zombie in military uniform.'], riotZombie:['盾と防具が残るZombie。','Zombie with shields and armor.'], hunterZombie:['筋肉と長い爪が目印。','Recognizable by its muscles and long claws.'], gasZombie:['膨張した体が目印。','Recognizable by its swollen body.'], screamerZombie:['叫ぶ姿勢が目印。','Recognizable by its screaming pose.'], packZombie:['複数個体の集団。','A group of several creatures.'],
+    capital:['中心都市の建物。','Capital city buildings.'], city:['地方都市の建物。','Regional city buildings.'], farm:['畑と農業施設。','Fields and farm buildings.'], civilianFactory:['民需工場の建物。','Civilian factory buildings.'], militaryFactory:['軍需工場の建物。','Military factory buildings.'], oilField:['採油設備。','Oil extraction equipment.'], refinery:['石油精製設備。','Oil refining equipment.'], powerPlant:['火力発電設備。','Thermal power equipment.'], nuclearPowerPlant:['原子力発電設備。','Nuclear power equipment.'], windPowerPlant:['風車。','Wind turbine.'], simpleFarm:['小規模な畑。','Small farm plots.'], civilianDroneBase:['ドローン基地の設備。','Civilian drone equipment.'], temporaryHousing:['仮設住宅の並び。','Rows of temporary homes.'], armyBase:['軍用車両と基地施設。','Military vehicles and base buildings.'], airBase:['滑走路と格納庫。','Runway and hangars.'], checkpoint:['道路上の検問設備。','Checkpoint equipment on a road.'], barbedWire:['Hex上の有刺鉄線。','Barbed wire on the hex.'],
+    periodic:['周期Hordeの所属マーカー。','Periodic Horde membership marker.'], final:['Final Hordeの所属マーカー。','Final Horde membership marker.'], spawnReserve:['盤面外周のR表示。','R markers along the map border.'],
+    unowned:['未確保のマーカー。','Unsecured marker.'], owned:['確保済みのマーカー。','Secured marker.'], stopped:['停止のマーカー。','Stopped marker.'], infected:['感染のマーカー。','Infection marker.'], ruined:['荒廃のマーカー。','Ruined marker.'], operational:['稼働中のマーカー。','Operational marker.'], abandoned:['放棄のマーカー。','Abandoned marker.'], remnant:['跡地のマーカー。','Remnant marker.'],
   };
-  return fallback[key]?.[locale === 'ja' ? 0 : 1] ?? key;
+  return descriptions[key]?.[locale==='ja'?0:1] ?? t(key);
 }
 
 function legendSections(
@@ -1848,8 +1819,15 @@ function legendSections(
   const terrain = LEGEND_TERRAINS.map((key) => legendAssetEntry(registry, 'terrain', key, terrainLabel(key, locale), legendDescription(key, locale, t), key === 'plain' ? '◇' : key === 'forest' ? '♣' : '△'));
   const overlays = LEGEND_OVERLAYS.map((key) => legendAssetEntry(registry, 'overlay', key, key === 'road' ? t('roadOverlay') : key === 'bridge' ? t('bridge') : t('urbanOverlay'), legendDescription(key, locale, t), key === 'road' || key === 'bridge' ? '═' : '▦'));
   const units = LEGEND_UNITS.map((key) => legendAssetEntry(registry, 'unit', key, unitLabel(key, locale), legendDescription(key, locale, t), key === 'specialForces' ? 'SF' : key === 'packZombie' ? 'PK' : key === 'police' ? 'P' : key === 'nationalGuard' ? 'G' : key === 'riotPolice' ? 'RP' : key === 'reconTeam' ? 'RC' : key === 'zombie' ? 'Z' : key === 'hordeZombie' ? 'H' : key === 'policeZombie' ? 'PZ' : key === 'soldierZombie' ? 'SZ' : key === 'riotZombie' ? 'RZ' : key === 'gasZombie' ? 'GZ' : key === 'screamerZombie' ? 'SC' : 'HZ'));
-  const horde = (['periodic', 'final'] as const).map((key) => legendAssetEntry(registry, 'horde', key, key === 'periodic' ? t('periodicHorde') : t('finalHorde'), legendDescription(key, locale, t), key === 'periodic' ? '↝' : '✹'));
+  for(const [key,path,label,description] of [
+    ['helicopterLanded',HELICOPTER_ASSETS.landed,locale==='ja'?'ヘリ：着陸':'Helicopter: landed',locale==='ja'?'静止ローターと接地姿勢。':'Stopped rotor and grounded stance.'],
+    ['helicopterAirborne',HELICOPTER_ASSETS.airborne,locale==='ja'?'ヘリ：飛行':'Helicopter: airborne',locale==='ja'?'回転ローターと▲。▣は搭乗部隊あり。':'Spinning rotor and ▲. ▣ indicates cargo.'],
+    ['artilleryPacked',ARTILLERY_ASSETS.packed,locale==='ja'?'野戦砲：梱包':'Artillery: packed',locale==='ja'?'牽引姿勢。':'Towing configuration.'],
+    ['artilleryDeployed',ARTILLERY_ASSETS.deployed,locale==='ja'?'野戦砲：展開':'Artillery: deployed',locale==='ja'?'脚を開いた発射姿勢。':'Open trails in firing position.'],
+  ])units.push({key:key!,path:path!,label:label!,description:description!,lodPath:null,symbol:'▲'});
+  const horde = (['periodic' , 'final'] as const).map((key) => legendAssetEntry(registry, 'horde', key, key === 'periodic' ? t('periodicHorde') : t('finalHorde'), legendDescription(key, locale, t), key === 'periodic' ? '↝' : '✹'));
   const facilities = LEGEND_FACILITIES.map((key) => legendAssetEntry(registry, 'facility', key, key === 'checkpoint' ? t('checkpoint') : facilityLabel(key, locale), legendDescription(key, locale, t), key === 'capital' ? '★' : key === 'city' ? '⌂' : key === 'checkpoint' ? '⊞' : '▣'));
+  facilities.find(e=>e.key==='airBase')!.description=locale==='ja'?'滑走路・格納庫・管制塔。':'Runway, hangar and control tower.';
   const obstacles = LEGEND_OBSTACLES.map((key) => legendAssetEntry(registry, 'obstacle', key, t(key), legendDescription(key, locale, t), 'W'));
   const facilityStates = ['unowned', 'owned', 'stopped', 'infected', 'ruined'].map((key) => legendAssetEntry(registry, 'facilityState', key, t(key), legendDescription(key, locale, t), key === 'owned' ? '✓' : key === 'infected' ? '☣' : key === 'ruined' ? '×' : '•'));
   facilityStates.push(
@@ -1859,6 +1837,7 @@ function legendSections(
   );
   const checkpointStates = ['operational', 'abandoned', 'remnant', 'ruined', 'infected'].map((key) => legendAssetEntry(registry, 'checkpointState', key, t(key), legendDescription(key, locale, t), key === 'operational' ? '●' : key === 'abandoned' ? '◌' : key === 'remnant' ? '◍' : key === 'infected' ? '☣' : '×'));
   const dynamic = ['selected', 'legalDestination', 'path', 'attackTarget', 'hp', 'infected', 'stopped', 'projected', 'vision', 'visionGround', 'visionBlocked', 'visionAerial', 'fogOfWar', 'supply', 'hordeDirections', 'spawnReserve'].map((key) => legendAssetEntry(registry, 'dynamicOverlay', key, t(`legendOverlay.${key}`), t(`legendOverlayDescription.${key}`), key === 'selected' ? '◎' : key === 'path' ? '→' : key === 'attackTarget' ? '✦' : key === 'hp' ? '▰' : key === 'infected' ? '☣' : key === 'vision' || key === 'visionGround' ? '◌' : key === 'visionBlocked' ? '▒' : key === 'visionAerial' ? '◇' : key === 'fogOfWar' ? '░' : key === 'supply' ? '▧' : key === 'hordeDirections' ? '↝' : key === 'spawnReserve' ? 'R' : '·'));
+  dynamic.push({key:'militaryDrone',label:locale==='ja'?'軍用ドローン視界':'Military Drone vision',description:locale==='ja'?'水色の外周が有効な偵察範囲。Dは中心。':'Cyan border marks active reconnaissance coverage; D marks its center.',path:null,lodPath:null,symbol:'D'});
   const configRows = configLegendEntries(config, locale);
   return [
     { key: 'terrain', title: t('legendTerrain'), entries: terrain },
@@ -1904,9 +1883,8 @@ export function renderBoardLegend(
 ): string {
   const t = createTranslator(locale);
   const view = boardLegendViewModel(config, locale, registry);
-  const source = view.configSource === 'current' ? t('legendConfigCurrent') : t('legendConfigStandard');
-  const sections = view.sections.map((section) => `<section class="board-legend-section" data-legend-section="${escapeHtml(section.key)}"><h4>${escapeHtml(section.title)}</h4><ul class="board-legend-list">${section.entries.map((entry) => `<li class="board-legend-entry" data-legend-key="${escapeHtml(entry.key)}">${legendImage(entry)}<span class="board-legend-copy"><strong>${escapeHtml(entry.label)}</strong><span>${escapeHtml(entry.description)}</span></span>${entry.key === 'config' ? `<b class="board-legend-value">${escapeHtml(entry.description)}</b>` : ''}</li>`).join('')}</ul></section>`).join('');
-  return `<div class="board-legend" data-board-legend="true"><h3 class="board-legend-heading">${escapeHtml(t('legendTitle'))}</h3><p class="board-legend-source"><strong>${escapeHtml(t('legendConfigSource'))}</strong>: ${escapeHtml(source)}</p><p class="muted">${escapeHtml(t('legendIntro'))}</p>${sections}<section class="board-legend-rules"><h4>${escapeHtml(t('legendRules'))}</h4><p>${escapeHtml(t('barbedWireRule'))}</p><p>${escapeHtml(t('legendTerrainRule'))}</p><p>${escapeHtml(t('legendOverlayRule'))}</p><p>${escapeHtml(t('legendUnitRule'))}</p><p>${escapeHtml(t('legendHordeRule'))}</p><p>${escapeHtml(t('legendStateRule'))}</p><p>${escapeHtml(t('legendPowerRule'))}</p><p>${escapeHtml(t('legendFogRule'))}</p><p>${escapeHtml(t('legendDynamicRule'))}</p><p>${escapeHtml(t('legendInfectionRule'))}</p><p>${escapeHtml(t('spawnReserveRule'))}</p><p>${escapeHtml(t('checkpointCapacityRule'))}</p></section></div>`;
+  const sections = view.sections.filter(section=>section.key!=='config').map((section) => `<section class="board-legend-section" data-legend-section="${escapeHtml(section.key)}"><h4>${escapeHtml(section.title)}</h4><ul class="board-legend-list">${section.entries.map((entry) => `<li class="board-legend-entry" data-legend-key="${escapeHtml(entry.key)}">${legendImage(entry)}<span class="board-legend-copy"><strong>${escapeHtml(entry.label)}</strong><span>${escapeHtml(entry.description)}</span></span>${entry.key === 'config' ? `<b class="board-legend-value">${escapeHtml(entry.description)}</b>` : ''}</li>`).join('')}</ul></section>`).join('');
+  return `<div class="board-legend" data-board-legend="true"><h3 class="board-legend-heading">${escapeHtml(t('legendTitle'))}</h3><p class="muted">${locale==='ja'?'盤面の画像・マーカー・表示状態です。ルールはヘルプを参照してください。':'Board images, markers and display states. See Help for the rules.'}</p>${sections}</div>`;
 }
 
 export function loadValidationError(
@@ -2099,6 +2077,7 @@ function facilityLabel(type: string, locale: Locale): string {
     civilianDroneBase: ['民間ドローン基地', 'Civilian Drone Base'],
     temporaryHousing: ['仮設住宅', 'Temporary Housing'],
     armyBase: ['陸軍基地', 'Army Base'],
+    airBase: ['空軍基地', 'Air Base'],
   };
   return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
 }
@@ -2184,6 +2163,7 @@ function unitLabel(type: string, locale: Locale): string {
     police: ['警察', 'Police'],
     nationalGuard: ['兵士', 'Soldier'],
     fieldArtillery: ['野戦砲', 'Field Artillery'],
+    multipurposeHelicopter: ['多目的ヘリコプター', 'Multipurpose Helicopter'],
     riotPolice: ['機動隊', 'Riot Police'],
     reconTeam: ['偵察隊', 'Recon'],
     specialForces: ['特殊部隊', 'Special Forces'],
@@ -2598,7 +2578,7 @@ export function renderUnitMilitaryGoodsDetails(
       : t('none');
   const projectedMilitaryRefill = Math.max(0, unit.projectedMilitaryGoodsAfterRefill - unit.projectedMilitaryGoodsAfterFixedConsumption);
   const guardRangeRule = unit.type === 'nationalGuard' ? ` ${escapeHtml(t('guardRangeTwoMilitaryGoodsRule'))}` : '';
-  return `<section class="unit-military-goods" data-unit-military-goods="true"><h3>${escapeHtml(t('carriedMilitaryGoods'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentMilitaryGoods'))}</dt><dd>${unit.currentMilitaryGoods}/${unit.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('fixedConsumption'))}</dt><dd>-${unit.fixedMilitaryGoodsUpkeepPerTurn}</dd></div><div><dt>${escapeHtml(t('afterFixed'))}</dt><dd>${unit.projectedMilitaryGoodsAfterFixedConsumption}</dd></div><div><dt>${escapeHtml(t('militaryRefillAmount'))}</dt><dd>+${projectedMilitaryRefill}</dd></div><div><dt>${escapeHtml(t('afterRefill'))}</dt><dd>${unit.projectedMilitaryGoodsAfterRefill}</dd></div><div><dt>${escapeHtml(t('suppression'))}</dt><dd>${escapeHtml(suppressionStatus)} · ${escapeHtml(t('cost'))} ${unit.suppressionMilitaryGoodsCost}</dd></div><div><dt>${escapeHtml(t('afterSuppression'))}</dt><dd>${unit.projectedMilitaryGoodsAfterSuppression}</dd></div><div><dt>${escapeHtml(t('emergencyMovementLimit'))}</dt><dd>${unit.emergencyMovementPoints} MP · ${escapeHtml(t(unit.emergencyMovementAvailable ? 'available' : 'unavailable'))}</dd></div></dl><p><strong>${escapeHtml(t('attackCostByDistance'))}</strong>: ${escapeHtml(costs || t('none'))}</p><p class="muted">${deployed ? (locale === 'ja' ? '軍需品50未満では砲撃できません。' : 'Firing requires at least 50 Military Goods.') : `${escapeHtml(t('zeroMilitaryGoodsAttack'))}: ${minimumAttack}.${guardRangeRule}`}</p><p class="muted">${escapeHtml(t('unitStoresLostOnDestruction'))}</p></section>`;
+  return `<section class="unit-military-goods" data-unit-military-goods="true"><h3>${escapeHtml(t('carriedMilitaryGoods'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentMilitaryGoods'))}</dt><dd>${unit.currentMilitaryGoods}/${unit.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('fixedConsumption'))}</dt><dd>-${unit.fixedMilitaryGoodsUpkeepPerTurn}</dd></div><div><dt>${escapeHtml(t('afterFixed'))}</dt><dd>${unit.projectedMilitaryGoodsAfterFixedConsumption}</dd></div><div><dt>${escapeHtml(t('militaryRefillAmount'))}</dt><dd>+${projectedMilitaryRefill}</dd></div><div><dt>${escapeHtml(t('afterRefill'))}</dt><dd>${unit.projectedMilitaryGoodsAfterRefill}</dd></div><div><dt>${escapeHtml(t('suppression'))}</dt><dd>${escapeHtml(suppressionStatus)} · ${escapeHtml(t('cost'))} ${unit.suppressionMilitaryGoodsCost}</dd></div><div><dt>${escapeHtml(t('afterSuppression'))}</dt><dd>${unit.projectedMilitaryGoodsAfterSuppression}</dd></div><div><dt>${escapeHtml(t('emergencyMovementLimit'))}</dt><dd>${unit.emergencyMovementPoints} MP · ${escapeHtml(t(unit.emergencyMovementAvailable ? 'available' : 'unavailable'))}</dd></div></dl><p><strong>${escapeHtml(t('attackCostByDistance'))}</strong>: ${escapeHtml(costs || t('none'))}</p><p class="muted">${unit.type==='multipurposeHelicopter'?(locale==='ja'?'攻撃には全量の軍需品が必要です。':'Every attack requires full ammunition.'):deployed ? (locale === 'ja' ? '軍需品50未満では砲撃できません。' : 'Firing requires at least 50 Military Goods.') : `${escapeHtml(t('zeroMilitaryGoodsAttack'))}: ${minimumAttack}.${guardRangeRule}`}</p><p class="muted">${escapeHtml(t('unitStoresLostOnDestruction'))}</p></section>`;
 }
 
 function recoveryClassLabel(recoveryClass: AgentUnitObservation['recoveryClassIfTurnEndsNow'], locale: Locale): string {
@@ -2765,9 +2745,9 @@ export function recruitmentOptionsForFacility(
   legalActions: readonly GameAction[],
   locale: Locale,
 ): RecruitmentOptionViewModel[] {
-  return (['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'fieldArtillery'] as const)
+  return (['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'fieldArtillery', 'multipurposeHelicopter'] as const)
     .filter((unitType) => state.config.units[unitType].recruitmentFacilityTypes.includes(
-      facility.type as 'capital' | 'city' | 'armyBase',
+      facility.type as 'capital' | 'city' | 'armyBase' | 'airBase',
     ))
     .map((unitType) => {
       const unit = state.config.units[unitType];
@@ -2806,7 +2786,7 @@ export function renderRecruitmentAccordion(
   const options = recruitmentOptionsForFacility(state, facility, legalActions, locale);
   if (options.length === 0) return '';
   const rows = options.map((option) => {
-    const actionName = option.unitType === 'fieldArtillery' ? 'artillery' : option.unitType === 'nationalGuard' ? 'guard' : option.unitType === 'riotPolice' ? 'riot-police' : option.unitType === 'reconTeam' ? 'recon' : 'police';
+    const actionName = option.unitType === 'multipurposeHelicopter' ? 'helicopter' : option.unitType === 'fieldArtillery' ? 'artillery' : option.unitType === 'nationalGuard' ? 'guard' : option.unitType === 'riotPolice' ? 'riot-police' : option.unitType === 'reconTeam' ? 'recon' : 'police';
     const cost = `${t('population')} ${option.populationCost} · ${t('civilianGoods')} ${option.civilianGoodsCost} · ${t('militaryGoods')} ${option.militaryGoodsCost} · ${t('fuel')} ${state.config.units[option.unitType].productionFuel}`;
     const completed=state.completedProductions[option.unitType],reserved=state.pendingUnitProductions.filter(o=>o.unitType===option.unitType).length,limit=state.config.units[option.unitType].productionLimitPerGame;
     const ledger=limit===null?'':`<p>${locale==='ja'?'生涯生産 / 予約 / 残枠':'Lifetime / Reserved / Remaining'}: ${completed} / ${reserved} / ${Math.max(0,limit-completed-reserved)} (${limit})</p>`;
@@ -2818,7 +2798,7 @@ export function renderRecruitmentAccordion(
       [t('range'), String(option.range)],
       [t('vision'), String(option.vision)],
     ].map(([label, value]) => `<div><dt>${escapeHtml(label!)}</dt><dd>${escapeHtml(value!)}</dd></div>`).join('');
-    return `<article class="recruitment-option" data-recruitment-unit="${option.unitType}"><div class="section-heading"><h4>${escapeHtml(option.label)}</h4><span class="status-chip">${escapeHtml(cost)}</span></div><dl class="recruitment-performance">${performance}</dl>${ledger}<button class="secondary-button" data-action="produce-${actionName}" ${option.legal ? '' : 'disabled'}>${escapeHtml(t(option.unitType === 'fieldArtillery' ? 'produceArtillery' : option.unitType === 'police' ? 'producePolice' : option.unitType === 'nationalGuard' ? 'produceGuard' : option.unitType === 'reconTeam' ? 'produceRecon' : 'produceRiotPolice'))}</button>${option.unavailableReason ? `<p class="warning-text" data-recruitment-reason="${option.unitType}">${escapeHtml(option.unavailableReason)}</p>` : `<p class="warning-text" data-recruitment-reason="${option.unitType}" hidden></p>`}</article>`;
+    return `<article class="recruitment-option" data-recruitment-unit="${option.unitType}"><div class="section-heading"><h4>${escapeHtml(option.label)}</h4><span class="status-chip">${escapeHtml(cost)}</span></div><dl class="recruitment-performance">${performance}</dl>${ledger}<button class="secondary-button" data-action="produce-${actionName}" ${option.legal ? '' : 'disabled'}>${escapeHtml(t(option.unitType === 'multipurposeHelicopter' ? 'produceHelicopter' : option.unitType === 'fieldArtillery' ? 'produceArtillery' : option.unitType === 'police' ? 'producePolice' : option.unitType === 'nationalGuard' ? 'produceGuard' : option.unitType === 'reconTeam' ? 'produceRecon' : 'produceRiotPolice'))}</button>${option.unavailableReason ? `<p class="warning-text" data-recruitment-reason="${option.unitType}">${escapeHtml(option.unavailableReason)}</p>` : `<p class="warning-text" data-recruitment-reason="${option.unitType}" hidden></p>`}</article>`;
   }).join('');
   const id = `recruitment-${facility.id}`;
   return `<details class="recruitment-accordion" data-recruitment-accordion="true"><summary id="${escapeHtml(id)}-heading" data-action="toggle-recruitment" aria-expanded="false" aria-controls="${escapeHtml(id)}-panel"><span>${escapeHtml(t('unitRecruitment'))}</span><small>${options.length} ${escapeHtml(t('unitTypes'))}</small></summary><div id="${escapeHtml(id)}-panel" class="recruitment-accordion-panel" role="region" aria-labelledby="${escapeHtml(id)}-heading">${rows}</div></details>`;
@@ -2866,7 +2846,7 @@ export function renderArmyBaseDetails(
     : `<p class="muted">${escapeHtml(t('armyBaseNoPendingRecruitment'))}</p>`;
   const powerReason = reasonLabel(base.recruitmentPowerReason);
   const rewardReason = base.rewardUnavailableReason ? ` · ${reasonLabel(base.rewardUnavailableReason) ?? reward}` : '';
-  return `<section class="army-base-details" data-army-base-details="true"><h3>${escapeHtml(t('armyBaseFunctions'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('dedicatedMilitaryGoods'))}</dt><dd>${base.militaryGoods}/${base.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('interceptionsRemaining'))}</dt><dd>${base.interceptionsRemaining} · ${escapeHtml(t('armyBaseInterceptionRefresh'))}</dd></div><div><dt>${escapeHtml(t('attack'))} / ${escapeHtml(t('range'))}</dt><dd>${base.interceptionAttack} / ${base.interceptionRange}</dd></div><div><dt>${escapeHtml(t('interceptionCost'))}</dt><dd>${base.interceptionCost} ${escapeHtml(t('militaryGoods'))}</dd></div><div><dt>${escapeHtml(t('noiseRadius'))}</dt><dd>${base.interceptionNoiseRadius}</dd></div><div><dt>${escapeHtml(t('interception'))}</dt><dd>${escapeHtml(availability(base.interceptionAvailable, base.interceptionUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('projectedRefill'))}</dt><dd>+${base.projectedMilitaryGoodsRefill} · ${escapeHtml(availability(base.refillAvailable, base.refillUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('earlyCaptureReward'))}</dt><dd>${escapeHtml(reward)} · ${escapeHtml(t('throughTurn'))} ${base.rewardLastTurn}${escapeHtml(rewardReason)}</dd></div><div><dt>${escapeHtml(t('recruitmentPower'))}</dt><dd>${base.recruitmentPowerDemand} · ${escapeHtml(base.recruitmentPowerAllocated ? t('powerSupplied') : t('powerNotSupplied'))}${powerReason ? ` · ${escapeHtml(powerReason)}` : ''}</dd></div></dl>${pendingMarkup}<p class="muted">${escapeHtml(t('armyBaseRewardRule'))}</p><p class="muted">${escapeHtml(t('armyBaseRecruitmentRule'))}</p><p class="muted">${escapeHtml(t('armyBaseForfeitRule'))}</p></section>`;
+  return `<section class="army-base-details" data-army-base-details="true"><h3>${escapeHtml(facility.type==='airBase'?t('facility.airBase'):t('armyBaseFunctions'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('dedicatedMilitaryGoods'))}</dt><dd>${base.militaryGoods}/${base.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('interceptionsRemaining'))}</dt><dd>${base.interceptionsRemaining} · ${escapeHtml(t('armyBaseInterceptionRefresh'))}</dd></div><div><dt>${escapeHtml(t('attack'))} / ${escapeHtml(t('range'))}</dt><dd>${base.interceptionAttack} / ${base.interceptionRange}</dd></div><div><dt>${escapeHtml(t('interceptionCost'))}</dt><dd>${base.interceptionCost} ${escapeHtml(t('militaryGoods'))}</dd></div><div><dt>${escapeHtml(t('noiseRadius'))}</dt><dd>${base.interceptionNoiseRadius}</dd></div><div><dt>${escapeHtml(t('interception'))}</dt><dd>${escapeHtml(availability(base.interceptionAvailable, base.interceptionUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('projectedRefill'))}</dt><dd>+${base.projectedMilitaryGoodsRefill} · ${escapeHtml(availability(base.refillAvailable, base.refillUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('earlyCaptureReward'))}</dt><dd>${escapeHtml(reward)} · ${escapeHtml(t('throughTurn'))} ${base.rewardLastTurn}${escapeHtml(rewardReason)}</dd></div><div><dt>${escapeHtml(t('recruitmentPower'))}</dt><dd>${base.recruitmentPowerDemand} · ${escapeHtml(base.recruitmentPowerAllocated ? t('powerSupplied') : t('powerNotSupplied'))}${powerReason ? ` · ${escapeHtml(powerReason)}` : ''}</dd></div></dl>${pendingMarkup}<p class="muted">${escapeHtml(facility.type==='airBase'?RULES_V165[locale].objectives:t('armyBaseRewardRule'))}</p><p class="muted">${escapeHtml(facility.type==='airBase'?RULES_V165[locale].airBase:t('armyBaseRecruitmentRule'))}</p><p class="muted">${escapeHtml(t('armyBaseForfeitRule'))}</p></section>`;
 }
 
 function gameOverReasonLabel(reason: GameResult['reason'], locale: Locale): string {
@@ -2913,6 +2893,8 @@ export class GameUiController {
   private sheetState: SheetState = 'standard';
   private navMode: NavigationMode = 'map';
   private engine: UiGameEngine | null = null;
+  private droneTargetFacilityId: string | null = null;
+  private pendingAviationAction: GameAction | null = null;
   private state: Readonly<GameState> | null = null;
   private boardGame: Phaser.Game | null = null;
   private boardScene: HexBoardScene | null = null;
@@ -3554,6 +3536,12 @@ export class GameUiController {
       case 'toggle-language': this.locale = toggleLocale(this.locale); document.documentElement.lang = this.locale; persistLocale(this.locale); this.checkpointPlacementMessage = null; this.constructiblePlacementMessage = null; this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
       case 'title': this.showTitle(); break;
       case 'help': this.showHelp(); break;
+      case 'board-legend': this.showBoardLegend(); break;
+      case 'produce-helicopter': this.produce('multipurposeHelicopter'); break;
+      case 'aviation-preview': this.showAviationPreview(JSON.parse(element.dataset.gameAction!)); break;
+      case 'aviation-confirm': if(this.pendingAviationAction){const action=this.pendingAviationAction;this.pendingAviationAction=null;this.dismissModal();this.apply(action);} break;
+      case 'drone-target': this.droneTargetFacilityId=element.dataset.facilityId!; this.sheetState='collapsed';this.updateView(); break;
+      case 'drone-cancel': this.droneTargetFacilityId=null;this.updateView();break;
       case 'focus-important-event': this.focusImportantEvent(element); break;
       case 'focus-crisis-alert': this.focusCrisisAlert(element); break;
       case 'open-crisis': this.openCrisis(); break;
@@ -4041,7 +4029,7 @@ export class GameUiController {
     if (selected.kind === 'unit') {
       const unit = findUnit(this.state, selected.id);
       return unit && unit.isPlayerUnit
-        ? selection(unit.position, unit.vision, 'ground', true)
+        ? selection(unit.position, unit.vision, unit.flightState==='airborne'?'aerial':'ground', unit.flightState!=='airborne')
         : null;
     }
     if (selected.kind === 'facility') {
@@ -4224,6 +4212,7 @@ export class GameUiController {
     const layer = this.root.querySelector<HTMLElement>('[data-unit-context-layer]');
     if (!layer) return;
     layer.innerHTML = '';
+    if(this.droneTargetFacilityId){layer.innerHTML=`<div class="unit-target-confirm"><p>${this.translator()('selectDroneTarget')}</p><button class="secondary-button" data-action="drone-cancel">${this.translator()('cancel')}</button></div>`;return;}
     if (!this.state || this.navMode !== 'map' || this.selection?.kind !== 'unit') return;
     const unit = findUnit(this.state, this.selection.id);
     if (!unit?.isPlayerUnit) return;
@@ -4285,6 +4274,7 @@ export class GameUiController {
 
   private onTileTap(position: HexCoord): void {
     if (!this.state || !this.engine) return;
+    if (this.droneTargetFacilityId) { this.showAviationPreview({type:'LaunchMilitaryDrone',facilityId:this.droneTargetFacilityId,target:position}); return; }
     if (this.constructiblePlacement) {
       const candidate = this.constructibleFacilityCandidates().find((entry) => samePosition(entry.position, position));
       if (!candidate) return;
@@ -4473,7 +4463,9 @@ export class GameUiController {
       projected.push([t('generationFuelWarning'), forecast.fuel.generationFuelShortage]);
     }
     if (forecast.electricity.shortage > 0) projected.push([t('powerShortageWarning'), forecast.electricity.shortage]);
-    const riskConfirmation = shouldConfirmEndTurn(crisis, endTurnRisk);
+    const airborne=this.state.units.filter(u=>u.flightState==='airborne');
+    const aviationNotice=airborne.map(u=>`<p class="${u.currentFuel<=1?'warning-text':'muted'}">${escapeHtml(u.id)} · ${t('fuel')} −1 · ${this.locale==='ja'?'終了時騒音 半径15':'End-turn noise radius15'}${u.currentFuel<=1?` · ${this.locale==='ja'?'緊急着陸の危険':'Emergency landing risk'}`:''}</p>`).join('')+(this.state.militaryDrone?.expiresBeforeTurn===this.state.turn+1?`<p>${this.locale==='ja'?'次ターン開始時に軍用ドローン視界終了':'Military Drone vision expires next turn'}</p>`:'');
+    const riskConfirmation = shouldConfirmEndTurn(crisis, endTurnRisk)||airborne.length>0;
     if (riskConfirmation || projected.length > 0) {
       const details = projected
         .map(([resource, amount]) => `<li>${escapeHtml(resource)}: <b>${amount}</b></li>`)
@@ -4487,7 +4479,7 @@ export class GameUiController {
         : '';
       const title = riskConfirmation ? t('endTurnConfirmation') : t('shortageWarning');
       const body = riskConfirmation ? t('endTurnRiskBody') : t('shortageWarningBody');
-      this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="shortage"><section class="modal-card floating-card" aria-labelledby="shortage-heading"><h2 id="shortage-heading">${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p>${riskItems}${crowdDetails}${details ? `<ul class="warning-list">${details}</ul>` : ''}<div class="modal-actions"><button class="primary-button" data-action="end-turn-confirm">${escapeHtml(t('proceedAnyway'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('back'))}</button></div></section></div>`);
+      this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="shortage"><section class="modal-card floating-card" aria-labelledby="shortage-heading"><h2 id="shortage-heading">${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p>${riskItems}${aviationNotice}${crowdDetails}${details ? `<ul class="warning-list">${details}</ul>` : ''}<div class="modal-actions"><button class="primary-button" data-action="end-turn-confirm">${escapeHtml(t('proceedAnyway'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('back'))}</button></div></section></div>`);
       return;
     }
     this.commitEndTurn();
@@ -4611,9 +4603,9 @@ export class GameUiController {
     if (!this.state || selected?.kind !== 'facility') return undefined;
     const facility = this.state.facilities.find((candidate) => candidate.id === selected.id);
     if (!facility) return undefined;
-    return (['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'fieldArtillery'] as const).some((unitType) =>
+    return (['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'fieldArtillery', 'multipurposeHelicopter'] as const).some((unitType) =>
       this.state!.config.units[unitType].recruitmentFacilityTypes.includes(
-        facility.type as 'capital' | 'city' | 'armyBase',
+        facility.type as 'capital' | 'city' | 'armyBase' | 'airBase',
       )) ? facility : undefined;
   }
 
@@ -5352,13 +5344,39 @@ export class GameUiController {
     this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="guide"><section class="modal-card floating-card guide-card" aria-labelledby="guide-heading"><div class="guide-icon">◇</div><h2 id="guide-heading">${escapeHtml(t('guideTitle'))}</h2><p>${escapeHtml(t('guideBody'))}</p><p>${escapeHtml(t('guideSteps'))}</p><p>${escapeHtml(RULES_V163[this.locale].nuclear)}</p><button class="primary-button" data-action="guide-close">${escapeHtml(t('close'))}</button></section></div>`);
   }
 
+  private showAviationPreview(action: GameAction): void {
+    if(!this.state)return;
+    const preview=aviationPreview(this.state,action); if(!preview)return;
+    const reason=validateAction(this.state,action),t=this.translator();
+    this.pendingAviationAction=action;this.dismissModal();
+    const labels:Record<string,string>={aircraftId:this.locale==='ja'?'輸送機ID':'Aircraft ID',cargoUnitId:this.locale==='ja'?'搭乗者ID':'Cargo unit ID',target:this.locale==='ja'?'派遣先':'Target',destination:this.locale==='ja'?'降機先':'Destination',distance:t('distance'),fuelCost:this.locale==='ja'?'消費燃料':'Fuel cost',currentFuel:action.type==='LaunchMilitaryDrone'?(this.locale==='ja'?'国家備蓄の燃料':'National fuel stock'):t('currentFuel'),resultingFuel:this.locale==='ja'?'実行後の燃料':'Fuel after action',visionRadius:t('vision'),activeThroughTurn:t('throughTurn'),transferredFuel:t('transferredFuel'),aircraftFuelBefore:this.locale==='ja'?'ヘリの移送前燃料':'Aircraft fuel before',infantryFuelBefore:this.locale==='ja'?'歩兵の移送前燃料':'Infantry fuel before',aircraftFuelAfter:t('aircraftFuelAfter'),infantryFuelAfter:t('infantryFuelAfter'),resultingMovement:t('movement'),resultingFlightState:t('flightState')};
+    const rows=Object.entries(preview).filter(([key])=>key in labels).map(([key,value])=>`<p>${escapeHtml(labels[key]!)}: <strong>${escapeHtml(typeof value==='string'?t(value):value&&typeof value==='object'&&'q' in value&&'r' in value?`${value.q},${value.r}`:String(value))}</strong></p>`).join('');
+    const rules=RULES_V165[this.locale];
+    this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="aviation"><section class="modal-card floating-card"><h2>${this.locale==='ja'?'操作の確認':'Action preview'} · ${t(action.type)}</h2>${rows}<p>${escapeHtml(action.type==='LaunchMilitaryDrone'?rules.drone:action.type==='BoardAircraft'||action.type==='DisembarkAircraft'?rules.transport:rules.flight)}</p>${reason?`<p class="warning-text">${escapeHtml(t('error.'+reason.code,reason.code))}</p>`:''}<div class="action-row"><button class="primary-button" data-action="aviation-confirm" ${reason?'disabled':''}>${this.locale==='ja'?'実行':'Confirm'}</button><button class="ghost-button" data-action="dismiss-modal">${t('cancel')}</button></div></section></div>`);
+    if(!reason)this.droneTargetFacilityId=null;
+  }
+
+  private showBoardLegend(): void {
+    this.dismissModal();const t=this.translator();
+    this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="legend"><section class="modal-card floating-card help-modal"><button class="icon-button modal-close" data-action="dismiss-modal" aria-label="${t('close')}">×</button>${renderBoardLegend(this.state?.config,this.locale,BOARD_ASSET_REGISTRY)}</section></div>`);
+  }
+
   private showHelp(): void {
-    const t = this.translator();
-    const tips = ['tipPopulation', 'tipReturn', 'tipOvercrowding', 'tipNextTurn', 'tipRecruitment', 'tipRiotPolice', 'tipZombieEngagement', 'tipGasZombie', 'tipHunterZombie', 'tipArmyBase', 'tipArmyBaseRecruitment', 'tipArmyBaseInterception', 'tipArmyBaseRecovery', 'tipProficiency', 'tipCheckpoint', 'tipCheckpointCapacity', 'tipCheckpointFallback', 'tipRefugeeRejection', 'tipFinalArrivalStop', 'tipCheckpointQueueMaintenance', 'tipRoadBranches', 'tipSupply', 'tipCheckpointMove', 'tipTerrain', 'tipVision', 'tipInfectionEvents', 'tipHorde', 'tipWaveRoster', 'tipHousing', 'tipNextTurnPenaltyForecast', 'tipSpawnReserve', 'tipVictory', 'tipRecovery', 'tipSuppression', 'tipRange', 'tipMilitaryGoods', 'tipEmergencyMovement', 'tipProduction', 'tipPower', 'tipPowerAllocation', 'tipProductionTiming', 'tipFuel', 'tipWind', 'tipBuild', 'tipBarbedWire', 'tipDecommission', 'tipStrategicForecast', 'tipPolicy', 'tipNoise', 'tipCrisis', 'tipSave']
-      .map((key) => `<li>${escapeHtml(t(key))}</li>`)
-      .join('');
-    const legend = renderBoardLegend(this.state?.config, this.locale, BOARD_ASSET_REGISTRY);
-    this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${escapeHtml(t('close'))}" data-action="dismiss-modal">×</button><h2 id="help-heading">${escapeHtml(t('help'))}</h2><p>${escapeHtml(t('helpBody'))}</p>${Object.values(RULES_V164[this.locale]).map(text => `<p>${escapeHtml(text)}</p>`).join('')}${Object.values(RULES_V163[this.locale]).map(text => `<p>${escapeHtml(text)}</p>`).join('')}<h3>${escapeHtml(t('move'))}</h3><p>${escapeHtml(t('guideSteps'))}</p><details class="board-legend-disclosure" data-board-legend-disclosure="true"><summary>${escapeHtml(t('legendTitle'))}</summary>${legend}</details><h3>${escapeHtml(t('tipsTitle'))}</h3><ul class="tips-list">${tips}</ul><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></section></div>`);
+    this.dismissModal();const t=this.translator(),ja=this.locale==='ja',r=RULES_V165[this.locale],old=RULES_V163[this.locale],artillery=RULES_V164[this.locale];
+    const sections:[string,string[]][]=[
+      [ja?'勝敗と基本操作':'Victory, defeat and controls',[t('guideSteps'),t('tipVictory'),r.compatibility]],
+      [ja?'経済と人口':'Economy and population',[r.economy,old.capital,old.health,old.starvation,old.grace,t('tipRecruitment')]],
+      [ja?'電力':'Electricity',[t('tipPowerAllocation'),t('tipFuel')]],
+      [ja?'施設':'Facilities',[r.airBase,r.drone,r.objectives,old.nuclear]],
+      [ja?'人間Unit':'Human units',[t('tipProficiency'),old.specialForces,r.helicopter,r.flight,r.transport,r.emergency,artillery.artillery,artillery.modes,artillery.bombardment,t('tipSuppression')]],
+      [ja?'Zombie':'Zombies',[r.enemies,t('tipGasZombie'),old.packZombie]],
+      [ja?'補給':'Supply',[t('tipSupply'),t('tipFuel')]],
+      [ja?'視界と騒音':'Vision and noise',[t('tipVision'),t('tipNoise')]],
+      [ja?'Horde':'Hordes',[t('tipWaveRoster'),old.finalHorde]],
+      [ja?'建設と検問所':'Construction and checkpoints',[old.water,old.screening,old.waiting,t('tipCheckpointFallback'),t('tipCheckpointMove'),t('tipBuild'),t('tipBarbedWire')]],
+      [ja?'AI / Fair Play':'AI / Fair Play',[ja?'組み込みAIと外部AIは公開Observationと合法Actionを使用します。未発見の敵・未来の乱数・非公開状態は判断に利用できません。Previewは状態を変えず、複数Actionの一括Previewも同じRevisionから独立して評価します。':'Built-in and external AI use public Observations and legal Actions. Hidden enemies, future random outcomes and private state are unavailable. Previews do not change state; every batch item is evaluated independently at the same revision.']],
+    ];
+    this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${t('close')}" data-action="dismiss-modal">×</button><h2 id="help-heading">${t('help')}</h2><button class="secondary-button" data-action="board-legend">${t('legendTitle')}</button>${this.state?renderFacilityObjectives(this.state,this.locale):''}${sections.map(([title,texts])=>`<details class="help-topic"><summary>${escapeHtml(title)}</summary>${texts.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}</details>`).join('')}</section></div>`);
   }
 
   private updateFacilitySupplementalControls(): void {
@@ -5645,10 +5663,10 @@ export class GameUiController {
   private renderSameHexTabs(position: HexCoord, selected: Exclude<Selection, null>): string {
     if (!this.state) return '';
     const targets: Array<{ kind: Exclude<Selection, null>['kind']; id?: string; label: string }> = [];
-    const units = this.state.units.filter((unit) => unit.actionState !== 'destroyed' && samePosition(unit.position, position));
+    const units = this.state.units.filter((unit) => !unit.transportedByUnitId && unit.actionState !== 'destroyed' && samePosition(unit.position, position));
     for (const unit of units) {
-      if (unit.isPlayerUnit) targets.push({ kind: 'unit', id: unit.id, label: unitLabel(unit.type, this.locale) });
-      else targets.push({ kind: 'zombie', id: unit.id, label: unitLabel(unit.type, this.locale) });
+      if (unit.isPlayerUnit) targets.push({ kind: 'unit', id: unit.id, label: unitLabel(unit.type, this.locale)+(unit.flightState==='airborne'?' ▲':'') });
+      else targets.push({ kind: 'zombie', id: unit.id, label: unitLabel(unit.type, this.locale)+(unit.flightState==='airborne'?' ▲':'') });
     }
     const facility = findFacilityAt(this.state, position);
     if (facility) targets.push({ kind: 'facility', id: facility.id, label: facilityLabel(facility.type, this.locale) });
@@ -5861,7 +5879,7 @@ export class GameUiController {
       ? `<section class="decommission-editor" data-decommission-editor="true"><h3>${escapeHtml(t('decommissionFacility'))}</h3><p class="muted">${escapeHtml(t('decommissionConditions'))}</p><p>${escapeHtml(t('decommissionRefund'))}: <strong>${decommissionRefund} ${escapeHtml(t('civilianGoods'))}</strong></p><button class="secondary-button" data-action="decommission-facility" data-facility-id="${escapeHtml(facility.id)}" ${decommissionReason ? 'disabled' : ''}>${escapeHtml(t('decommissionFacility'))}</button>${decommissionReason ? `<p class="warning-text" data-decommission-reason="true">${escapeHtml(decommissionReason)}</p>` : '<p class="muted" data-decommission-reason="true"></p>'}</section>`
       : '';
     body.innerHTML = renderHealthDetails(this.state, this.locale, facility.id) + (facility.type === 'nuclearPowerPlant' ? renderNuclearObjective(this.state,this.locale) : '') + this.renderSameHexTabs(facility.position, selected) + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${housingDetails}${armyBaseDetails}${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
-    body.insertAdjacentHTML('beforeend', this.renderFacilityForecast(publicFacility));
+    body.insertAdjacentHTML('beforeend', (facility.type==='airBase'?renderMilitaryDrone(this.state,facility.id,this.locale)+renderFacilityObjectives(this.state,this.locale):'')+this.renderFacilityForecast(publicFacility));
     this.updateTransferPreview();
     this.updateRecruitmentReasons();
   }
@@ -5978,7 +5996,7 @@ export class GameUiController {
           ? t('selectAttackTarget')
           : t('selectUnitAction');
     const artilleryDetails=unit.type==='fieldArtillery'?`<section class="artillery-details"><h3>${this.locale==='ja'?'野戦砲':'Field Artillery'} · ${unit.mode==='packed'?(this.locale==='ja'?'梱包':'Packed'):(this.locale==='ja'?'展開':'Deployed')}</h3><p>${escapeHtml(RULES_V164[this.locale].modes)}</p><p>${escapeHtml(RULES_V164[this.locale].bombardment)}</p><p>${escapeHtml(RULES_V164[this.locale].artillery)}</p><p>${this.locale==='ja'?'次ターンまで行動不可':'Locked until next turn'}: ${publicUnit?.modeLockedUntilTurn??'—'}</p><p>${this.locale==='ja'?'生涯生産 / 予約 / 残枠':'Lifetime / Reserved / Remaining'}: ${publicUnit?.production?.completed??0} / ${publicUnit?.production?.reserved??0} / ${publicUnit?.production?.remaining??0}</p></section>`:'';
-    return `${artilleryDetails}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${proficiencySection}${fuelSection}${militaryGoodsSection}<section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
+    return `${this.state?renderAviationUnit(this.state,unit,this.locale,this.pendingMove?.destination):''}${artilleryDetails}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${proficiencySection}${fuelSection}${militaryGoodsSection}<section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
   }
 
   /**

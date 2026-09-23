@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultConfig, validateGameConfig } from './config';
 import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { hexDistance, hexKey } from './hex';
-import { ARMY_BASE_CANDIDATES, generateInitialHunterPositions, generateInitialZombiePositions, initialHunterPositionsMatchSeed } from './map';
+import { AIR_BASE_CANDIDATES, ARMY_BASE_CANDIDATES, generateInitialHunterPositions, generateInitialZombiePositions, initialHunterPositionsMatchSeed } from './map';
 import { SeededRng } from './rng';
 import { createInitialState, createUnit } from './state';
 import type { GameState } from './types';
@@ -54,6 +54,7 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
       const rng = new SeededRng(seed);
       // New-game setup consumes the seeded Army Base candidate draw first.
       rng.nextInt(0, ARMY_BASE_CANDIDATES.length - 1);
+      rng.nextInt(0, AIR_BASE_CANDIDATES.length - 1);
       expect(generateInitialZombiePositions(state.map, rng)).toEqual(state.map.initialZombiePositions);
       expect(generateInitialHunterPositions(state.map, rng, state.config.economy)).toEqual(state.initialHunterPositions);
       expect(state.units.filter((unit) => unit.type === 'zombie')).toHaveLength(40);
@@ -149,18 +150,18 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
   it('uses the specified v1.6.1 totals and independent special caps in an atomic four-direction wave', () => {
     const config = createDefaultConfig();
     expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.hordeZombie, 0)).toBe(66);
-    expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.zombie, 0)).toBe(73);
+    expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.zombie, 0)).toBe(92);
     config.horde.waves = [{ ...config.horde.waves[4]!, turn: 1 }];
     config.horde.specialZombieWeights = { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100000, hunterZombie: 100000, gasZombie: 0 };
     const result = new GameEngine(151, config).step({ type: 'EndTurn' });
     expect(result.error?.message ?? null).toBeNull();
     const wave = result.state.units.filter((unit) => unit.hordeKind === 'final');
-    expect(wave).toHaveLength(65);
+    expect(wave).toHaveLength(73);
     expect(wave.filter(unit => unit.type === 'packZombie')).toHaveLength(1);
     for (const group of result.state.horde.finalSpawnGroupIds) {
       const units = wave.filter((unit) => unit.spawnGroupId === group);
       expect(units.filter((unit) => unit.type === 'riotZombie')).toHaveLength(1);
-      expect(units.filter((unit) => unit.type === 'hunterZombie')).toHaveLength(1);
+      expect(units.filter((unit) => unit.type === 'hunterZombie').length).toBeGreaterThan(1);
       expect(units.filter((unit) => unit.type !== 'hordeZombie' && unit.type !== 'packZombie').every((unit) => unit.maxAttackCharges === 1)).toBe(true);
     }
   });

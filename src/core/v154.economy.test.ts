@@ -90,7 +90,7 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     const capital = facility(state, 'capital');
     Object.assign(capital, { workers: 1, operationalStatus: 'operational' });
     const powerPlant = facility(state, 'power-plant-1');
-    Object.assign(powerPlant, { workers: 1, operationalStatus: 'operational' });
+    Object.assign(powerPlant, { workers: 2, operationalStatus: 'operational' });
     const farm = facility(state, 'farm-1');
     Object.assign(farm, { workers: 1, operationalStatus: 'operational', powerSupplyEnabled: true });
     const occupied = addHousing(state, 'housing-occupied', capital.position, 1);
@@ -99,9 +99,9 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     const plan = calculateEconomyPlan(state);
     const byId = new Map(plan.facilities.map((entry) => [entry.facilityId, entry]));
     expect(plan.forecast.electricity).toMatchObject({
-      availableGenerationCapacity: 15,
-      requiredPowerDemand: 25,
-      requiredPowerAllocated: 15,
+      availableGenerationCapacity: 30,
+      requiredPowerDemand: 50,
+      requiredPowerAllocated: 30,
     });
     expect(byId.get(capital.id)?.projectedPowerSupplied).toBe(true);
     expect(byId.get(occupied.id)?.projectedPowerSupplied).toBe(true);
@@ -300,7 +300,7 @@ describe('v1.5.4 housing economy and deterministic penalty forecast', () => {
     const capital = facility(state, 'capital');
     Object.assign(capital, { workers: 1, operationalStatus: 'operational' });
     const powerPlant = facility(state, 'power-plant-1');
-    Object.assign(powerPlant, { workers: 1, operationalStatus: 'operational' });
+    Object.assign(powerPlant, { workers: 2, operationalStatus: 'operational' });
     const farm = facility(state, 'farm-1');
     Object.assign(farm, { workers: 1, operationalStatus: 'operational', powerSupplyEnabled: true });
     const housing = addHousing(state, 'housing-snapshot', capital.position, 0);

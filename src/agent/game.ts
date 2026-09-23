@@ -1,3 +1,4 @@
+import { productionCandidates, attackCandidates } from '../core/action-candidates';
 import { facilityChanges, branchFlowChanges } from './facility-changes';
 import { ObservationHistory, metricObservation } from './history';
 import { assertValidGameConfig, cloneConfig, createDefaultConfig, DEFAULT_MAP_ID } from '../core/config';
@@ -471,6 +472,10 @@ export class AgentGameAdapter implements AgentGame {
     return this.currentLegalActions().map(cloneAction);
   }
 
+  public queryCandidates(target: 'production-candidates' | 'attack-candidates', filters: Record<string, JsonValue> = {}): JsonValue[] {
+    return cloneJson((target==='production-candidates' ? productionCandidates(this.engine.getState(),filters) : attackCandidates(this.engine.getState(),filters)) as unknown as JsonValue[]);
+  }
+
   public previewAction(action: GameAction, baseRevision: number): JsonValue {
     return cloneJson(coreActionPreviewJson(this.engine.getState(), action, baseRevision));
   }
@@ -490,23 +495,13 @@ export class AgentGameAdapter implements AgentGame {
     let matched: GameAction | undefined;
     try {
       matched = matchLegalAction(action,legal);
-      if (action.type === 'TransferPopulation' && !validateAction(this.engine.getState(), action)) matched = cloneAction(action);
+      if (!['StartNewGame','LoadSnapshot'].includes(action.type) && !validateAction(this.engine.getState(), action)) matched = cloneAction(action);
     } catch {
       matched = undefined;
     }
     if (!matched) {
       let error = publicError('action_not_legal', 'Action is not in the current legal action list');
-      if (
-        action.type === 'BuildBarbedWire' ||
-        action.type === 'AssignWorkers' ||
-        action.type === 'TransferPopulation' ||
-        action.type === 'BuildCheckpoint' ||
-        action.type === 'RelocateCheckpoint' ||
-        action.type === 'ActivateCheckpoint' ||
-        action.type === 'BuildConstructibleFacility' ||
-        action.type === 'DecommissionConstructibleFacility' ||
-        action.type === 'TurnAwayCheckpointRefugees'
-      ) {
+      {
         try {
           const coreError = validateAction(this.engine.getState(), action);
           if (coreError) error = publicError(coreError.code, coreError.message);

@@ -1,5 +1,5 @@
 import { previewArtillery, type ArtilleryPreview } from './artillery';
-import { deployedArtillery, hasCapability, canReact } from './unit-capabilities';
+import { deployedArtillery, hasCapability, canReact, isAirborne, canTargetUnit } from './unit-capabilities';
 import { gasAttackPreview, type GasAttackPreview } from './gas-preview';
 import { wireCombatProjection } from './barbed-wire';
 import { hexKey, hexDistance } from './hex';
@@ -33,7 +33,7 @@ export function forecastUnitCombatAtDistance(
   distance: number,
 ): UnitCombatProjection {
   const normalizedDistance = Math.max(0, Math.floor(distance));
-  if (normalizedDistance < (deployedArtillery(unit) ? state.config.units.fieldArtillery.deployed.minRange : 1) || normalizedDistance > unit.range) {
+  if (normalizedDistance < (deployedArtillery(unit) ? state.config.units.fieldArtillery.deployed.minRange : (isAirborne(unit) || state.config.units[unit.type].canTargetAir) ? 0 : 1) || normalizedDistance > unit.range) {
     return {
       distance: normalizedDistance,
       canAttack: false,
@@ -66,7 +66,7 @@ export function forecastUnitCombatAtDistance(
       reason: null,
     };
   }
-  if (normalizedDistance === 1 && unit.type !== 'reconTeam' && unit.currentMilitaryGoods < militaryGoodsCost) {
+  if (normalizedDistance === 1 && unit.type !== 'reconTeam' && unit.type !== 'multipurposeHelicopter' && unit.currentMilitaryGoods < militaryGoodsCost) {
     return {
       distance: normalizedDistance,
       canAttack: true,
@@ -109,7 +109,7 @@ export function getUnitLegalAttackProjections(
   const unit = getUnit(snapshot, unitId);
   if (
     !unit ||
-    !unit.isPlayerUnit ||
+    !unit.isPlayerUnit || unit.transportedByUnitId || (unit.type === 'multipurposeHelicopter' && !isAirborne(unit)) ||
     snapshot.phase !== 'player' ||
     snapshot.gameOver ||
     (unit.actionState === 'acted' && !unit.activity.attacked) ||
@@ -120,12 +120,12 @@ export function getUnitLegalAttackProjections(
     .map((target) => {
       const distance = hexDistance(unit.position, target.position);
       const projection = forecastUnitCombatAtDistance(snapshot, unit, distance);
-      if (!projection.canAttack) return null;
+      if (!projection.canAttack || !canTargetUnit(state,unit,target)) return null;
       const terrainDamage = terrainAdjustedDamage(snapshot, target, projection.effectiveAttack);
       const artillery = deployedArtillery(unit) ? previewArtillery(state, unit, target.position) : undefined;
       return {
         ...(artillery ? {artillery} : {}),
-        conditionalCounterattack: !artillery && terrainDamage.finalDamage < target.hp && canReact(target) && forecastUnitCombatAtDistance(snapshot, target, distance).canAttack ? wireCombatProjection(snapshot, unit, forecastUnitCombatAtDistance(snapshot, target, distance).effectiveAttack) : null,
+        conditionalCounterattack: !artillery && terrainDamage.finalDamage < target.hp && canReact(target) && canTargetUnit(state,target,unit) && forecastUnitCombatAtDistance(snapshot, target, distance).canAttack ? wireCombatProjection(snapshot, unit, forecastUnitCombatAtDistance(snapshot, target, distance).effectiveAttack) : null,
         gasExplosion: artillery ? null : gasAttackPreview(state, target, terrainDamage.finalDamage),
         targetUnitId: target.id,
         distance,
@@ -172,7 +172,7 @@ export function forecastUnitSuppression(
   militaryGoods = unit.currentMilitaryGoods,
 ): SuppressionProjection | null {
   if (
-    !unit.isPlayerUnit ||
+    !unit.isPlayerUnit || unit.transportedByUnitId || (unit.type === 'multipurposeHelicopter' && !isAirborne(unit)) ||
     !unit.canAttack ||
     unit.attackChargesRemaining <= 0
   ) return null;

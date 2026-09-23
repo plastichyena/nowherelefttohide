@@ -14,7 +14,7 @@ import spacing from '../testing/fixtures/v156-spacing.json';
 import { validateInvariants } from './invariants';
 
 const fresh = () => createInitialState(1, createDefaultConfig());
-const movement = (overrides = {}) => createMovement({ interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {}, ...overrides });
+const movement = (overrides = {}) => createMovement({ emergencyLand: () => { throw new Error('Unexpected aircraft in ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {}, ...overrides });
 const addWall = (s: GameState, p = { q: 26, r: 24 }, hp = 10) => s.barbedWire.push({ id: `wall-${s.barbedWire.length}`, position: p, hp, maxHp: 20, builtTurn: 1 });
 
 describe('v1.5.6 obstacle boundaries', () => {

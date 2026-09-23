@@ -16,7 +16,7 @@ export function sameHex(a: HexCoord, b: HexCoord): boolean {
 }
 
 export function findUnitAt(state: Readonly<GameState>, position: HexCoord): UnitState | undefined {
-  return state.units.find((unit) => unit.actionState !== 'destroyed' && sameHex(unit.position, position));
+  return state.units.find((unit) => !unit.transportedByUnitId && unit.actionState !== 'destroyed' && sameHex(unit.position, position));
 }
 
 export function findUnit(state: Readonly<GameState>, unitId: string): UnitState | undefined {

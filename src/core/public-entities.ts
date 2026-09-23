@@ -1,5 +1,7 @@
+import { aviationUnitProjection } from './aviation-preview';
+import { unitCanReceiveSupply, aviationReason } from './aircraft';
 import { artilleryAttackReason, previewArtillery } from './artillery';
-import { hasCapability, deployedArtillery } from './unit-capabilities';
+import { hasCapability, deployedArtillery, isAirborne } from './unit-capabilities';
 import { facilityRecaptureConditions } from './facility-recovery';
 import { isHumanUnitType } from './unit-catalog';
 import { wireAt, wireCombatProjection } from './barbed-wire';
@@ -161,7 +163,7 @@ export function createPublicUnitProjection(
   const killsUntilVeteran = proficiency === 'regular' || veteranPromotionPending
     ? Math.max(0, experience.veteranZombieKillsRequired - regularZombieKills)
     : null;
-  const inSupply = isHexSupplied(state, unit.position);
+  const inSupply = unitCanReceiveSupply(unit) && isHexSupplied(state, unit.position);
   const suppression = forecastUnitSuppression(state, unit);
   const recovery = unit.isPlayerUnit
     ? deriveUnitRecovery(state, unit, { projectedSuppression: suppression !== null })
@@ -178,6 +180,9 @@ export function createPublicUnitProjection(
   return {
     ...(isHumanUnitType(unit.type) ? { capabilities: {...state.config.units[unit.type].capabilities}, production: { completed:state.completedProductions[unit.type],reserved:state.pendingUnitProductions.filter(o=>o.unitType===unit.type).length,limit:state.config.units[unit.type].productionLimitPerGame,remaining:state.config.units[unit.type].productionLimitPerGame === null ? null : Math.max(0,state.config.units[unit.type].productionLimitPerGame! - state.completedProductions[unit.type] - state.pendingUnitProductions.filter(o=>o.unitType===unit.type).length) } } : {}),
     ...(unit.type === 'fieldArtillery' ? { mode:unit.mode,modeLockedUntilTurn:unit.modeChangedTurn===state.turn?state.turn+1:null,artillery:{fuelPerMovementPoint:state.config.units.fieldArtillery.fuelPerMovementPoint,minRange:deployedArtillery(unit)?state.config.units.fieldArtillery.deployed.minRange:1,militaryGoodsCost:deployedArtillery(unit)?state.config.units.fieldArtillery.deployed.militaryGoodsCost:4,hitProbability:state.config.units.fieldArtillery.scatter[unit.proficiency!].hitProbability,scatterRadius:state.config.units.fieldArtillery.scatter[unit.proficiency!].radius,targetPreviews:deployedArtillery(unit)?[...new Map([...state.units.filter(u=>!u.isPlayerUnit&&(context.visibleTileKeys??getPlayerVisibleTileKeys(state)).has(hexKey(u.position))),...state.facilities.filter(f=>f.owner==='player'&&f.infected>0),...state.checkpoints.filter(c=>c.infected>0)].filter(s=>!artilleryAttackReason(state,unit,s.position)).map(s=>[hexKey(s.position),s.position])).values()].map(p=>previewArtillery(state,unit,p)):[],legalTargetHexes:deployedArtillery(unit)?state.map.tiles.filter(t=>!artilleryAttackReason(state,unit,t)).map(t=>({q:t.q,r:t.r})):[]} } : {}),
+    ...(unit.type === 'multipurposeHelicopter' ? aviationUnitProjection(state,unit) : {}),
+    ...(unit.transportedByUnitId ? {transportedByUnitId:unit.transportedByUnitId,boardedTurn:unit.boardedTurn} : {}),
+    canTargetAir:state.config.units[unit.type].canTargetAir,
     id: unit.id,
     ...(unit.reanimatedOnBarbedWireId ? { spawnedInsideBarbedWire: true } : {}),
     ...(unit.isPlayerUnit && wireAt(state, unit.position) ? { conditionalIncomingCombat: state.units
@@ -186,7 +191,7 @@ export function createPublicUnitProjection(
     type: unit.type,
     ...(unit.type === 'gasZombie' ? { deathExplosion: {
       radius:1, excludesCenter:true as const, baseUnitDamage:state.config.units.gasZombie.explosionDamage, baseZombieDamage:state.config.units.gasZombie.explosionZombieDamage, maxSiteInfection:state.config.units.gasZombie.explosionInfection,
-      units:state.units.filter(target=>hexDistance(target.position,unit.position)===1 && (target.isPlayerUnit || (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(target.position)))).map(target=>({unitId:target.id,damage:Math.min(target.hp,terrainAdjustedDamage(state,target,target.isPlayerUnit?state.config.units.gasZombie.explosionDamage:state.config.units.gasZombie.explosionZombieDamage).finalDamage)})),
+      units:state.units.filter(target=>!isAirborne(target) && !target.transportedByUnitId && hexDistance(target.position,unit.position)===1 && (target.isPlayerUnit || (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(target.position)))).map(target=>({unitId:target.id,damage:Math.min(target.hp,terrainAdjustedDamage(state,target,target.isPlayerUnit?state.config.units.gasZombie.explosionDamage:state.config.units.gasZombie.explosionZombieDamage).finalDamage)})),
       sites:[...state.facilities.filter(f=>f.owner==='player' && hexDistance(f.position,unit.position)===1 && (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(f.position))).map(f=>({siteId:f.id,infection:Math.min(f.workers,state.config.units.gasZombie.explosionInfection)})),...state.checkpoints.filter(c=>hexDistance(c.position,unit.position)===1 && (context.visibleTileKeys ?? getPlayerVisibleTileKeys(state)).has(hexKey(c.position))).map(c=>({siteId:c.id,infection:Math.min(c.waiting+c.screening+c.approved,state.config.units.gasZombie.explosionInfection)}))],
     } } : {}),
     unitType: unit.type,
@@ -202,11 +207,11 @@ export function createPublicUnitProjection(
     isScheduledWaveMember: !unit.isPlayerUnit && v15Unit.spawnGroupId !== null && v15Unit.spawnGroupId !== undefined,
     isFinalWaveMember: !unit.isPlayerUnit && v15Unit.hordeKind === 'final',
     position: { ...unit.position },
-    vision: unit.vision,
-    visionMode: 'ground',
-    terrainLosBlocking: unit.isPlayerUnit,
+    vision: unit.transportedByUnitId ? 0 : unit.vision,
+    visionMode: isAirborne(unit) ? 'aerial' : 'ground',
+    terrainLosBlocking: unit.isPlayerUnit && !isAirborne(unit),
     positionTerrain: positionTile?.terrain ?? 'plain',
-    effectiveMovementCostAtPosition: effectiveMovementCost(state, unit.position, unit.isPlayerUnit),
+    effectiveMovementCostAtPosition: isAirborne(unit) ? 1 : effectiveMovementCost(state, unit.position, unit.isPlayerUnit),
     terrainDefenseSource: defense.source,
     terrainDamageMultiplier: defense.multiplier,
     hp: unit.hp,
@@ -306,7 +311,7 @@ export function createPublicFacilityProjection(
   const assignable = isProductionFacility(facility) && facility.owner === 'player' && facility.status === 'owned' && facility.infected === 0 && !unavailableForOperation && facility.populationOperationalTurn <= state.turn;
   const populationIncreaseAvailable = assignable && inSupply && state.population.cityResidents > 0;
   const populationDecreaseAvailable = assignable && facility.workers > 0;
-  const recruitmentAvailable = (isCityFacility(facility) || facility.type === 'armyBase') && facility.owner === 'player' && facility.status === 'owned' && facility.infected === 0 && !unavailableForOperation && facility.populationOperationalTurn <= state.turn && inSupply && !state.pendingUnitProductions.some(order => order.cityFacilityId === facility.id);
+  const recruitmentAvailable = (isCityFacility(facility) || ['armyBase','airBase'].includes(facility.type)) && facility.owner === 'player' && facility.status === 'owned' && facility.infected === 0 && !unavailableForOperation && facility.populationOperationalTurn <= state.turn && inSupply && !state.pendingUnitProductions.some(order => order.cityFacilityId === facility.id);
   const rule = state.config.facilities[facility.type].production;
   const containingUnit = facility.infected > 0 ? containingUnitAt(state, facility.position.q, facility.position.r) : undefined;
   const suppression = containingUnit ? forecastUnitSuppression(state, containingUnit) : null;
@@ -328,6 +333,7 @@ export function createPublicFacilityProjection(
           : undefined;
   return {
     ...(publicEarlyCaptureReward === undefined ? {} : { earlyCaptureSurvivorReward: publicEarlyCaptureReward }),
+    ...(facility.type==='airBase' ? {droneAvailable:!aviationReason(state,{type:'LaunchMilitaryDrone',facilityId:facility.id,target:facility.position}),droneReasonCode:aviationReason(state,{type:'LaunchMilitaryDrone',facilityId:facility.id,target:facility.position})} : {}),
     recovery: facilityRecoveryProjection(state, facility),
     armyBase: armyBaseProjection(state, facility, productionProjection),
     id: facility.id,
@@ -339,7 +345,7 @@ export function createPublicFacilityProjection(
     constructible: facility.constructible,
     builtTurn: facility.builtTurn,
     recoveryOperationalTurn: facility.recoveryOperationalTurn,
-    vision: facility.type === 'armyBase' ? (facility.owner === 'player' && facility.status !== 'ruined' ? (facility.workers > 0 ? state.config.armyBase.staffedVision : state.config.facilities.armyBase.visionRadius) : 0) : facility.owner === 'player' && facility.status !== 'ruined' && !unavailableForOperation
+    vision: ['armyBase','airBase'].includes(facility.type) ? (facility.owner === 'player' && facility.status !== 'ruined' ? (facility.workers > 0 ? state.config.armyBase.staffedVision : state.config.facilities.armyBase.visionRadius) : 0) : facility.owner === 'player' && facility.status !== 'ruined' && !unavailableForOperation
       ? facility.type === 'capital'
         ? state.config.vision.capital
         : facility.type === 'civilianDroneBase'
@@ -359,7 +365,7 @@ export function createPublicFacilityProjection(
     populationIncreaseAvailable,
     populationDecreaseAvailable,
     recruitmentAvailable,
-    recruitmentUnavailableReason: recruitmentAvailable ? null : facility.type === 'armyBase' ? (populationUnavailableReason ?? (!inSupply ? 'recruitment_out_of_supply' : 'city_busy')) : isCityFacility(facility) ? (
+    recruitmentUnavailableReason: recruitmentAvailable ? null : ['armyBase','airBase'].includes(facility.type) ? (populationUnavailableReason ?? (!inSupply ? 'recruitment_out_of_supply' : 'city_busy')) : isCityFacility(facility) ? (
       facility.owner !== 'player' || facility.status !== 'owned' ? 'city_not_owned' : facility.infected > 0 ? 'city_infected' : facility.populationOperationalTurn > state.turn ? 'available_next_turn' : 'city_out_of_supply'
     ) : 'not_recruitment_hub',
     production: {
@@ -505,9 +511,9 @@ function armyBaseProjection(state: Readonly<GameState>, facility: FacilityState,
   const order=state.pendingUnitProductions.find(o=>o.cityFacilityId===facility.id);
   const powerPreview=forecastArmyBaseRecruitmentPower(state,facility.id);
   const refill=projection?.armyBaseMilitaryGoods;
-  const reward=facility.armyBase.reward==='unclaimed' && state.turn>settings.rewardLastTurn?'expired':facility.armyBase.reward;
+  const reward=facility.type==='airBase'?state.airBaseObjective.reward:facility.armyBase.reward==='unclaimed' && state.turn>settings.rewardLastTurn?'expired':facility.armyBase.reward;
   const interceptionReason=operationReason ?? (facility.workers<=0?'no_workers':facility.armyBase.interceptionsRemaining<=0?'no_interceptions':facility.armyBase.militaryGoods<settings.interceptionCost?'insufficient_military_goods':null);
-  return {militaryGoods:facility.armyBase.militaryGoods,maxMilitaryGoods:settings.maxMilitaryGoods,interceptionsRemaining:Math.min(facility.armyBase.interceptionsRemaining,facility.workers),interceptionsRefresh:'zombie_phase_start',interceptionAttack:settings.attack,interceptionRange:settings.range,interceptionCost:settings.interceptionCost,interceptionNoiseRadius:settings.noiseRadius,interceptionAvailable:interceptionReason===null,interceptionUnavailableReason:interceptionReason,projectedMilitaryGoodsRefill:refill?.projectedRefillAmount??0,refillAvailable:refill?.refillEligible??false,refillUnavailableReason:refill?.refillEligible?null:refill?.refillReason??operationReason,rewardStatus:reward,rewardLastTurn:settings.rewardLastTurn,rewardAvailable:reward==='unclaimed'||reward==='pending',rewardUnavailableReason:reward==='claimed'?'claimed':reward==='expired'?'expired':null,pendingRecruitment:order?{unitType:order.unitType,readyTurn:order.readyTurn,powerDemand:projection?.requiredPowerCapacity??0,powerAllocated:order.powerReady===true,status:!normal?'paused':order.powerReady?'ready':'waiting_power',reason:operationReason??(order.powerReady?null:projection?.projectedPowerReason??'not_applicable')}:null,recruitmentPowerDemand:state.config.facilities.armyBase.production.powerCapacity,recruitmentPowerAllocated:powerPreview?.supplied??false,recruitmentPowerReason:powerPreview?.reason??'not_applicable'};
+  return {militaryGoods:facility.armyBase.militaryGoods,maxMilitaryGoods:settings.maxMilitaryGoods,interceptionsRemaining:Math.min(facility.armyBase.interceptionsRemaining,facility.workers),interceptionsRefresh:'zombie_phase_start',interceptionAttack:settings.attack,interceptionRange:settings.range,interceptionCost:settings.interceptionCost,interceptionNoiseRadius:settings.noiseRadius,interceptionAvailable:interceptionReason===null,interceptionUnavailableReason:interceptionReason,projectedMilitaryGoodsRefill:refill?.projectedRefillAmount??0,refillAvailable:refill?.refillEligible??false,refillUnavailableReason:refill?.refillEligible?null:refill?.refillReason??operationReason,rewardStatus:reward,rewardLastTurn:facility.type==='airBase'?state.config.objectives.airBase.rewardDeadlineTurn:settings.rewardLastTurn,rewardAvailable:reward==='unclaimed'||reward==='pending',rewardUnavailableReason:reward==='claimed'?'claimed':reward==='expired'?'expired':null,pendingRecruitment:order?{unitType:order.unitType,readyTurn:order.readyTurn,powerDemand:projection?.requiredPowerCapacity??0,powerAllocated:order.powerReady===true,status:!normal?'paused':order.powerReady?'ready':'waiting_power',reason:operationReason??(order.powerReady?null:projection?.projectedPowerReason??'not_applicable')}:null,recruitmentPowerDemand:state.config.facilities[facility.type].production.powerCapacity,recruitmentPowerAllocated:powerPreview?.supplied??false,recruitmentPowerReason:powerPreview?.reason??'not_applicable'};
 }
 
 export function checkpointRecoveryProjection(state: Readonly<GameState>, checkpoint: CheckpointState) {

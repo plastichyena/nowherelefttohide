@@ -49,7 +49,7 @@ export interface SessionCliDependencies {
 }
 
 const COMMANDS = new Set<SessionCommand>([
-  'new', 'status', 'step', 'preview', 'play-turn', 'save-checkpoint', 'list-checkpoints', 'load-checkpoint', 'query', 'artifact',
+  'new', 'status', 'step', 'preview', 'preview-batch', 'play-turn', 'save-checkpoint', 'list-checkpoints', 'load-checkpoint', 'query', 'artifact',
 ]);
 
 function integer(value: string, name: string, minimum: number): number {
@@ -104,7 +104,7 @@ export function parseSessionCliArgs(argv: readonly string[]): ParsedCli {
     throw new SessionError('invalid_cli_argument', 'load-checkpoint requires --checkpoint and --new-session-id');
   }
   if (command === 'query' && !parsed.queryTarget) throw new SessionError('invalid_cli_argument', 'query requires --target');
-  if (command === 'preview' && parsed.revision === undefined) throw new SessionError('invalid_cli_argument', 'preview requires --revision');
+  if ((command === 'preview' || command === 'preview-batch') && parsed.revision === undefined) throw new SessionError('invalid_cli_argument', 'preview requires --revision');
   if (command !== 'play-turn' && parsed.idleTimeoutMs !== undefined) throw new SessionError('invalid_cli_argument', '--idle-timeout-ms is only valid for play-turn');
   if (parsed.idleTimeoutMs !== undefined && parsed.idleTimeoutMs > 60 * 60 * 1000) throw new SessionError('invalid_cli_argument', '--idle-timeout-ms must be <= 3600000');
   return parsed;
@@ -177,6 +177,7 @@ export function sessionCliHelp(): Record<string, unknown> {
     newSession: {
       preferredCommentLocale: 'Use --preferred-comment-locale=ja or en; default en and fixed for the Session.',
     },
+    batchPreview: {command:'preview-batch',input:'JSON array of 1..100 actions; --revision required. Independent previews in input order, never sequential simulation.'},
     preview: {
       example: './run-session.sh preview --session=my-game --revision=0 --input=action.json',
       input: 'GameAction JSON from --input or standard input; --revision pins the preview.',
@@ -219,6 +220,10 @@ export function executeSessionCommand(
       }
       const result = service.step(parsed.sessionId!, input);
       return { ok: true, command: parsed.command, ...result };
+    }
+    case 'preview-batch': {
+      const actions=readActionInput(parsed,dependencies,'preview');
+      return {ok:true,command:parsed.command,...service.previewBatch(parsed.sessionId!,{actions,expectedRevision:parsed.revision})};
     }
     case 'preview': {
       const action = readActionInput(parsed, dependencies, 'preview');

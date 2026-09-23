@@ -1,7 +1,7 @@
 {
   "date": "2026-09-23",
   "method": "built-in image_gen",
-  "status": "Generated candidates, awaiting user visual selection. No runtime integration.",
+  "status": "All three candidates visually approved by the user on 2026-09-23 and compiled into the shared runtime asset registry.",
   "requirements": "Doc/Nowhere Left to Hide PoC v1.6.5 アップデート要件 確定版.md",
   "styleReferencesInspected": [
     "public/assets/board/facilities/facility_army_base.png",

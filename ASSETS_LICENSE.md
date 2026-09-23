@@ -79,3 +79,7 @@ The water, bridge, nuclear plant, Special Forces and Pack Zombie images were gen
 ## v1.6.4 asset provenance
 
 The packed and deployed Field Artillery images derive from the two originals approved by the project author on 2026-09-21. Sources, exact prompts and approval records are in `Art/reference/v1.6.4-concepts/`; `scripts/build-v164-assets.py` creates the 256px transparent runtime PNGs in `public/assets/board/units/`. They are covered by the same project asset terms above.
+
+## v1.6.5 asset provenance
+
+The Air Base and landed/airborne multipurpose helicopter images derive from the three candidates approved by the project author on 2026-09-23. Approved originals, exact prompts and approval records are in `Art/reference/v1.6.5-concepts/`. `scripts/build-v165-assets.py` creates their 256px transparent runtime PNGs under `public/assets/board/`. They are covered by the same project asset terms above.

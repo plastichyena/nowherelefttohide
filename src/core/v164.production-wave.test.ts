@@ -20,13 +20,13 @@ describe('v1.6.4 production and wave acceptance',()=>{
     expect(reserve.state.population.healthyCivilians).toBe(before.population.healthyCivilians-5);
     expect(createAgentObservation(reserve.state).productionLedger?.fieldArtillery).toEqual({completed:0,reserved:1,limit:2,remaining:1});
     expect(engine.step({type:'EndTurn'}).error).toBeNull();expect(engine.getState().pendingUnitProductions).toHaveLength(1);
-    const ready=engine.getState() as GameState;for(const f of ready.facilities)if(f.owner==='player'&&(f.type==='powerPlant'||f.type==='windPowerPlant'))f.operationalStatus='operational';load(engine,ready);
+    const ready=engine.getState() as GameState;ready.facilities.find(f=>f.id==='power-plant-1')!.workers=15;for(const f of ready.facilities)if(f.owner==='player'&&(f.type==='powerPlant'||f.type==='windPowerPlant'))f.operationalStatus='operational';load(engine,ready);
     const completed=engine.step({type:'EndTurn'});expect(completed.error,completed.error?.message).toBeNull();
     expect(completed.state.units.find(u=>u.type==='fieldArtillery')).toMatchObject({mode:'packed',proficiency:'recruit',hp:25,population:5,currentFuel:100,currentMilitaryGoods:100,maxAttackCharges:1});
     expect(completed.state.pendingUnitProductions).toHaveLength(0);expect(completed.state.completedProductions.fieldArtillery).toBe(1);
     expect(decodeSaveCode(encodeSaveCode(completed.state as GameState)).state).toEqual(completed.state);
     const exhausted=engine.getState() as GameState;exhausted.completedProductions.fieldArtillery=2;load(engine,exhausted);
-    expect(validateAction(engine.getState(),{type:'ProduceUnit',unitType:'fieldArtillery',destination:base.position})?.code).toBe('production_limit_reached');
+    expect(validateAction(engine.getState(),{type:'ProduceUnit',unitType:'fieldArtillery',destination:base.position})?.code).toBe('lifetime_production_limit_reached');
   });
 
   it('counts a pending reservation and never refunds resources after forfeiture',()=>{

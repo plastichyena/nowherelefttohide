@@ -1,3 +1,4 @@
+import { unitCanReceiveSupply } from './aircraft';
 import { isHexSupplied } from './supply';
 import type { GameState, UnitState } from './types';
 
@@ -32,8 +33,8 @@ export function deriveUnitRecovery(
   unit: Readonly<UnitState>,
   options: RecoveryProjectionOptions = {},
 ): UnitRecoveryProjection {
-  const inSupplyNow = unit.isPlayerUnit && isHexSupplied(state, unit.position);
-  const combat = unit.activity.attacked || unit.activity.intercepted || unit.activity.suppressed || options.projectedSuppression === true;
+  const inSupplyNow = unit.isPlayerUnit && unitCanReceiveSupply(unit) && isHexSupplied(state, unit.position);
+  const combat = (unit.type === 'multipurposeHelicopter' && unit.activity.moved) || unit.activity.attacked || unit.activity.intercepted || unit.activity.suppressed || options.projectedSuppression === true;
   const recoveryClass: UnitRecoveryClass = !inSupplyNow ? 'outOfSupply' : combat ? 'combat' : 'rest';
   const rate = recoveryClass === 'combat'
     ? state.config.naturalRecovery.combatRate

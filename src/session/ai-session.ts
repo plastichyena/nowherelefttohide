@@ -363,7 +363,7 @@ export class AiSession implements AiSessionPort {
     const legalActions = this.game.getLegalActions();
     const action = isGameActionInput(input.action) ? cloneAction(input.action) : null;
     if (!action) return this.failure('invalid_action_input', 'action must be one bounded, JSON-compatible GameAction');
-    const legal = !!matchLegalAction(action,legalActions);
+    let legal = !!matchLegalAction(action,legalActions);
     let projection: AiSessionPreviewResult['projection'] = {
       kind: 'legal_action_check_only', reasonCode: 'economy_preview_unavailable', value: null,
     };
@@ -392,12 +392,26 @@ export class AiSession implements AiSessionPort {
         // Keep the explicit unavailable projection if Core cannot calculate it.
       }
     }
+    const core = projection.value && typeof projection.value === 'object' && !Array.isArray(projection.value) ? projection.value : null;
+    if (typeof core?.legal === 'boolean') legal=core.legal;
     return this.success({
       action: cloneAction(action),
       legal,
-      reasonCode: legal ? null : 'action_not_legal',
+      reasonCode: legal ? null : typeof core?.reasonCode === 'string' ? core.reasonCode : 'action_not_legal',
       projection,
     });
+  }
+
+  public previewActions(input: import('./ai-session-contract').AiSessionBatchPreviewInput): import('./ai-session-contract').AiSessionResponse<import('./ai-session-contract').AiSessionBatchPreviewResult> {
+    if (!isPlainObject(input) || !hasOnlyKeys(input,['generation','baseRevision','actions']) || !Array.isArray(input.actions) || input.actions.length<1 || input.actions.length>100 || !input.actions.every(isGameActionInput)) return this.failure('invalid_action_input','Batch Preview requires 1..100 structurally valid actions, generation and baseRevision');
+    const conflict=this.requireCurrentRevision(input.generation,input.baseRevision,true); if(conflict) return conflict;
+    const results: AiSessionPreviewResult[]=[];
+    for(const action of input.actions) {
+      const response=this.previewAction({generation:input.generation,baseRevision:input.baseRevision,action});
+      if(!response.ok) return response;
+      const {ok,generation,revision,...result}=response; results.push(result);
+    }
+    return this.success({baseRevision:this.revision,independent:true,results});
   }
 
   public act(input: AiSessionActInput): AiSessionResponse<AiSessionActResult> {
@@ -570,6 +584,9 @@ export class AiSession implements AiSessionPort {
           case 'route':
             value = cloneJson(queryRoute(observation, filters as unknown as RouteQueryInput)) as unknown as JsonValue;
             break;
+          case 'production-candidates':
+          case 'attack-candidates': items = this.game.queryCandidates?.(target,filters) ?? []; break;
+          case 'enemies': items=observation.zombies as unknown as JsonValue[]; break;
           case 'units': items = cloneJson(observation.units) as unknown as JsonValue[]; break;
           case 'facilities': items = cloneJson(observation.facilities) as unknown as JsonValue[]; break;
           case 'checkpoints':

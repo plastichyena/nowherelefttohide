@@ -128,7 +128,7 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
   it('resolves Power Fuel before Unit refuel, skips Supply-out Units, and uses ID-order Round Robin', () => {
     const config = safeConfig({
       economy: {
-        initialResources: { fuel: 5 },
+        initialResources: { fuel: 9 },
         initialWorkersByFacility: { 'refinery-1': 0 },
       },
     });
@@ -144,9 +144,9 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     const before = engine.getState();
     const forecast = forecastEndTurn(before);
     expect(forecast.fuel).toMatchObject({
-      turnStartFuel: 5,
-      projectedPowerFuelDemand: 12,
-      projectedPowerFuelUsed: 4,
+      turnStartFuel: 9,
+      projectedPowerFuelDemand: 24,
+      projectedPowerFuelUsed: 8,
       fuelAfterPower: 1,
       projectedUnitRefillDemand: 14,
       projectedUnitFuelRefilled: 1,
@@ -166,7 +166,7 @@ describe('v1.4 Unit Fuel and deterministic refuel', () => {
     expect(result.state.units.find((unit) => unit.id === 'national-guard-1')?.currentFuel).toBe(20);
     expect(result.events).toContainEqual(expect.objectContaining({
       type: 'resource_consumed',
-      payload: expect.objectContaining({ resource: 'fuel', amount: 4, reason: 'power_generation' }),
+      payload: expect.objectContaining({ resource: 'fuel', amount: 8, reason: 'power_generation' }),
     }));
   });
 });
@@ -207,9 +207,9 @@ describe('v1.4 Wind Power Plant', () => {
     facilityAt(snapshot, 'capital').workers -= 1;
     loadScenario(engine, snapshot);
     const forecast = forecastEndTurn(engine.getState());
-    expect(forecast.electricity.requiredPowerDemand).toBe(50);
+    expect(forecast.electricity.requiredPowerDemand).toBe(100);
     expect(forecast.fuel.windPowerAvailable).toBe(15);
-    expect(forecast.fuel.projectedPowerFuelDemand).toBe(14);
+    expect(forecast.fuel.projectedPowerFuelDemand).toBe(34);
     expect(forecast.fuel.projectedPowerFuelUsed).toBe(0);
   });
 
@@ -320,6 +320,7 @@ describe('v1.4 Constructible Facility, Simple Farm, and Drone Base', () => {
       units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       vision: { ownedFacility: 0, operationalCheckpoint: 0 },
     });
+    config.facilities.powerPlant.production.powerGeneration = 100;
     const engine = new GameEngine(1423, config);
     const position = firstBuildable(engine, 'civilianDroneBase');
     expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'civilianDroneBase', position }).error).toBeNull();

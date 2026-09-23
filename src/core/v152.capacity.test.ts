@@ -96,25 +96,25 @@ describe('v1.5.2 production capacity and economy plan', () => {
         workers: 5, infected: 0, powerSupplyEnabled: true, securedOrder: 20 + index, populationOperationalTurn: 1 });
     }
     facility(state, 'capital').workers -= 10;
-    Object.assign(facility(state, 'power-plant-1'), { workers: 10, operationalStatus: 'operational' });
+    Object.assign(facility(state, 'power-plant-1'), { workers: 20, operationalStatus: 'operational' });
     state.resources.fuel = 1_000;
     synchronizePopulation(state);
     const noInputStock = forecastEndTurn(state).civilianGoods;
     state.resources.civilianGoods = Math.max(
       0,
       noInputStock.maintenanceRequired - noInputStock.projectedProduction,
-    ) + 7;
+    ) + 14;
     const plan = calculateEconomyPlan(state);
-    expect(plan.facilities.find(f => f.facilityId === 'military-factory-1')!.inputs).toEqual({ civilianGoods: 5 });
-    expect(plan.facilities.find(f => f.facilityId === 'military-factory-2')!.inputs).toEqual({ civilianGoods: 2 });
+    expect(plan.facilities.find(f => f.facilityId === 'military-factory-1')!.inputs).toEqual({ civilianGoods: 10 });
+    expect(plan.facilities.find(f => f.facilityId === 'military-factory-2')!.inputs).toEqual({ civilianGoods: 4 });
     const capacity = forecastProductionCapacity(state);
-    expect(capacity.resources.militaryGoods).toMatchObject({ installedFacilityRatedCapacity: 240,
-      currentFacilityWorkerRatedCapacity: 40, projectedEndTurnOutput: 28, currentPlanPrePowerOutput: 28, ratedGapUpperBound: 212 });
+    expect(capacity.resources.militaryGoods).toMatchObject({ installedFacilityRatedCapacity: 60,
+      currentFacilityWorkerRatedCapacity: 10, projectedEndTurnOutput: 7, currentPlanPrePowerOutput: 7, ratedGapUpperBound: 53 });
     expect(capacity.resources.militaryGoods.blockingReasonCounts.production_input_shortage).toBe(1);
     facility(state, 'military-factory-1').powerSupplyEnabled = false;
     const changed = calculateEconomyPlan(state);
-    expect(changed.facilities.find(f => f.facilityId === 'military-factory-2')!.inputs).toEqual({ civilianGoods: 5 });
-    expect(forecastProductionCapacity(state).resources.militaryGoods.projectedEndTurnOutput).toBe(20);
+    expect(changed.facilities.find(f => f.facilityId === 'military-factory-2')!.inputs).toEqual({ civilianGoods: 10 });
+    expect(forecastProductionCapacity(state).resources.militaryGoods.projectedEndTurnOutput).toBe(5);
   });
 
   it('keeps Fuel generation/refill limited to starting stock and does not pre-spend Refinery output', () => {
@@ -137,6 +137,7 @@ describe('v1.5.2 production capacity and economy plan', () => {
 
   it('does not impose supply on production and reflects reassignment without claiming simultaneous maxima', () => {
     const state = setup();
+    facility(state, 'power-plant-1').workers = 20;
     const remote = facility(state, 'farm-5');
     Object.assign(remote, { owner: 'player', status: 'owned', operationalStatus: 'operational',
       workers: 5, infected: 0, powerSupplyEnabled: true, securedOrder: 20, populationOperationalTurn: 1 });

@@ -1,6 +1,6 @@
 import type { GameAction, JsonValue } from '../core/types';
 
-export const ACTION_SCHEMA_VERSION = '2.0.0';
+export const ACTION_SCHEMA_VERSION = '3.0.0';
 
 export const ACTION_RESPONSE_SEMANTICS = {
   ok: 'The CLI/protocol command was processed successfully; this does not mean the GameAction was accepted.',
@@ -93,6 +93,11 @@ export function isGameActionInput(value: unknown): value is GameAction {
   if (!isPlainObject(value) || jsonLength(value) === null || jsonLength(value)! > MAX_ACTION_JSON_LENGTH) return false;
   try {
     switch (value.type) {
+      case 'TakeOff':
+      case 'Land': return hasOnlyKeys(value,['type','unitId']) && isSafeId(value.unitId);
+      case 'BoardAircraft': return hasOnlyKeys(value,['type','unitId','aircraftId']) && isSafeId(value.unitId) && isSafeId(value.aircraftId);
+      case 'DisembarkAircraft': return hasOnlyKeys(value,['type','aircraftId','destination']) && isSafeId(value.aircraftId) && isCoordinate(value.destination);
+      case 'LaunchMilitaryDrone': return hasOnlyKeys(value,['type','facilityId','target']) && isSafeId(value.facilityId) && isCoordinate(value.target);
       case 'Move':
         return hasOnlyKeys(value, ['type', 'unitId', 'destination']) && isSafeId(value.unitId) && isCoordinate(value.destination);
       case 'AttackHex':
@@ -135,7 +140,7 @@ export function isGameActionInput(value: unknown): value is GameAction {
           && isNonNegativeSafeInteger(value.count) && value.count >= 1;
       case 'ProduceUnit':
         return hasOnlyKeys(value, ['type', 'unitType'], ['destination'])
-          && (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice' || value.unitType === 'reconTeam' || value.unitType === 'fieldArtillery')
+          && (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice' || value.unitType === 'reconTeam' || value.unitType === 'fieldArtillery' || value.unitType === 'specialForces' || value.unitType === 'multipurposeHelicopter')
           && (value.destination === undefined || isCoordinate(value.destination));
       case 'EndTurn':
         return hasOnlyKeys(value, ['type']);

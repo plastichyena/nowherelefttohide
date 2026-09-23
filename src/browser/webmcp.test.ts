@@ -43,14 +43,14 @@ function definitionByName(definitions: RegisteredDefinition[], name: string): Re
 }
 
 describe('v1.6 WebMCP adapter', () => {
-  it('discovers exactly the fixed eight tools and marks only act as writing', () => {
+  it('discovers exactly the fixed nine tools and marks only act as writing', () => {
     const mock = mockDocument({ handles: true });
     const registration = registerWebMcpTools({ getSession: () => createAiSession({ initial: { seed: 61 } }) }, mock.documentLike);
 
     expect(registration.supported).toBe(true);
     expect(mock.definitions.map(({ name }) => name)).toEqual(WEBMCP_TOOL_NAMES);
     expect(registration.registeredToolNames).toEqual(WEBMCP_TOOL_NAMES);
-    expect(mock.definitions).toHaveLength(8);
+    expect(mock.definitions).toHaveLength(9);
     expect(mock.definitions.filter(({ annotations }) => annotations.readOnlyHint === false).map(({ name }) => name)).toEqual(['nlth_act']);
     expect(definitionByName(mock.definitions, 'nlth_act').annotations.idempotentHint).toBe(true);
     expect(mock.definitions.map(({ name }) => name)).not.toEqual(expect.arrayContaining([
@@ -65,6 +65,7 @@ describe('v1.6 WebMCP adapter', () => {
     const query = marker('query');
     const legal = marker('legal');
     const preview = marker('preview');
+    const previews = marker('previews');
     const act = marker('act');
     const request = marker('request');
     const result = marker('result');
@@ -74,6 +75,7 @@ describe('v1.6 WebMCP adapter', () => {
       query: vi.fn(() => query),
       getLegalActions: vi.fn(() => legal),
       previewAction: vi.fn(() => preview),
+      previewActions: vi.fn(() => previews),
       act: vi.fn(() => act),
       getRequestResult: vi.fn(() => request),
       getResult: vi.fn(() => result),
@@ -91,6 +93,9 @@ describe('v1.6 WebMCP adapter', () => {
     expect(definitionByName(mock.definitions, 'nlth_query').execute(queryInput)).toBe(query);
     expect(definitionByName(mock.definitions, 'nlth_legal_actions').execute(legalInput)).toBe(legal);
     expect(definitionByName(mock.definitions, 'nlth_preview_action').execute(previewInput)).toBe(preview);
+    const batchInput = { generation: 1, baseRevision: 0, actions: [previewInput.action] };
+    expect(definitionByName(mock.definitions, 'nlth_preview_actions').execute(batchInput)).toBe(previews);
+    expect(session.previewActions).toHaveBeenCalledWith(batchInput);
     expect(definitionByName(mock.definitions, 'nlth_act').execute(actInput)).toBe(act);
     expect(definitionByName(mock.definitions, 'nlth_get_request_result').execute({ requestId: 'decision-1' })).toBe(request);
     expect(definitionByName(mock.definitions, 'nlth_get_result').execute()).toBe(result);
@@ -100,7 +105,7 @@ describe('v1.6 WebMCP adapter', () => {
     expect(session.previewAction).toHaveBeenCalledWith(previewInput);
     expect(session.act).toHaveBeenCalledWith(actInput);
     expect(session.getRequestResult).toHaveBeenCalledWith('decision-1');
-    expect(getSession).toHaveBeenCalledTimes(8);
+    expect(getSession).toHaveBeenCalledTimes(9);
   });
 
   it('returns unsupported before UI session start and resolves a later Session without re-registration', () => {
@@ -124,7 +129,7 @@ describe('v1.6 WebMCP adapter', () => {
     const handleRegistration = registerWebMcpTools({ getSession: () => null }, withHandles.documentLike);
     handleRegistration.cleanup();
     handleRegistration.cleanup();
-    expect(withHandles.handleUnregisters).toHaveLength(8);
+    expect(withHandles.handleUnregisters).toHaveLength(9);
     for (const unregister of withHandles.handleUnregisters) expect(unregister).toHaveBeenCalledTimes(1);
     expect(withHandles.unregisterTool).not.toHaveBeenCalled();
 

@@ -24,7 +24,7 @@ describe('GameEngine', () => {
     const first = createInitialState(42, config);
     const second = createInitialState(42, config);
     expect(first).toEqual(second);
-    expect(first.facilities).toHaveLength(27);
+    expect(first.facilities).toHaveLength(28);
     expect(first.facilities.filter((facility) => facility.status === 'owned')).toHaveLength(8);
     expect(first.population.healthyCivilians).toBe(110);
     expect(first.facilities.find((facility) => facility.id === 'capital')?.workers).toBe(51);
@@ -174,7 +174,7 @@ describe('GameEngine', () => {
     }));
     expect(engine.getLegalActions().some((action) => action.type === 'ProduceUnit' && action.unitType === 'police')).toBe(false);
     const before = engine.getState();
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 25, r: 25 } }).error?.code).toBe('insufficient_production_cost');
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 25, r: 25 } }).error?.code).toBe('insufficient_population');
     expect(engine.getState()).toEqual(before);
   });
 
@@ -370,17 +370,17 @@ describe('GameEngine', () => {
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
     snapshot.facilities.find((facility) => facility.id === 'wind-power-plant-1')!.operationalStatus = 'disabled';
-    snapshot.resources.fuel = 5;
+    snapshot.resources.fuel = 9;
     synchronizePopulation(snapshot);
     const before = JSON.stringify(snapshot);
     const forecast = forecastEndTurn(snapshot);
     expect(JSON.stringify(snapshot)).toBe(before);
-    // Forty electricity requires sixteen Fuel; five Fuel can supply the capital only.
-    expect(forecast.fuel).toMatchObject({ available: 5, generationFuelDemand: 16, projectedFuelUsed: 4 });
-    expect(forecast.electricity).toMatchObject({ physicalGenerationCapacity: 45, required: 40, shortage: 30 });
+    // Eighty electricity requests 32 Fuel; nine Fuel can supply the capital only.
+    expect(forecast.fuel).toMatchObject({ available: 9, generationFuelDemand: 32, projectedFuelUsed: 8 });
+    expect(forecast.electricity).toMatchObject({ physicalGenerationCapacity: 45, required: 80, shortage: 60 });
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     const result = engine.step({ type: 'EndTurn' });
-    // The capital consumes four Fuel; the remaining Fuel cannot enable production.
+    // The capital consumes eight Fuel; the remaining Fuel cannot enable production.
     expect(result.state.resources.fuel).toBe(1);
     expect(result.events.some((event) => event.type === 'resource_produced' && event.payload.resource === 'food' && event.payload.amount === 230)).toBe(false);
 
@@ -396,7 +396,7 @@ describe('GameEngine', () => {
     createCityPopulationSnapshot(noPower);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: noPower }).error).toBeNull();
     const unpowered = forecastEndTurn(engine.getState());
-    expect(unpowered.electricity).toMatchObject({ capacity: 0, required: 40, shortage: 40 });
+    expect(unpowered.electricity).toMatchObject({ capacity: 0, required: 80, shortage: 80 });
     expect(unpowered.fuel.projectedFuelUsed).toBe(0);
   });
 
@@ -736,7 +736,7 @@ describe('GameEngine', () => {
 
   it('enforces recruitment hubs, supply-order conscription, and the last-civilian guard', () => {
     const engine = new GameEngine(205, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
-    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 23, r: 25 } }).error?.code).toBe('invalid_recruitment_hub');
+    expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 23, r: 25 } }).error?.code).toBe('unit_not_producible_here');
     expect(engine.step({ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 25, r: 25 } }).error).toBeNull();
     expect(engine.getState().facilities.find((facility) => facility.id === 'capital')?.workers).toBe(31);
 

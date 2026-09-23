@@ -1,3 +1,4 @@
+import { occupiesGroundLayer } from './unit-capabilities';
 import { hexKey, hexNeighbors } from './hex';
 import { terrainAdjustedDamage } from './terrain';
 import { getPlayerVisibleTileKeys } from './visibility';
@@ -18,7 +19,7 @@ export function gasAttackPreview(state: Readonly<GameState>, target: Readonly<Un
     limitations: ['unowned_population_not_predicted', 'unobserved_hexes_not_predicted', 'future_enemy_phase_excluded', 'reanimation_and_site_spawn_consequences_not_predicted'], explosions: [], units: [], sites: [] };
   if (result.trigger === 'nonlethal_no_explosion') return result;
   const visible = getPlayerVisibleTileKeys(state);
-  const units = state.units.filter(u => u.id !== target.id && (u.isPlayerUnit || visible.has(hexKey(u.position)))).map(u => ({ unit: u, before: u.hp, hp: u.hp }));
+  const units = state.units.filter(occupiesGroundLayer).filter(u => u.id !== target.id && (u.isPlayerUnit || visible.has(hexKey(u.position)))).map(u => ({ unit: u, before: u.hp, hp: u.hp }));
   const sites = [
     ...state.facilities.filter(f=>f.owner==='player').map(f => ({ id: f.id, kind: 'facility' as const, position: f.position, healthy: f.workers, existingInfected: f.infected })),
     ...state.checkpoints.map(c => ({ id: c.id, kind: 'checkpoint' as const, position: c.position, healthy: c.waiting + c.screening + c.approved, existingInfected: c.infected })),

@@ -19,7 +19,7 @@ import { clearScenarioCheckpoints, prepareTestSnapshot } from './testConfig';
 const setup = () => createInitialState(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: {min:0,max:0}, initialGasCount:{min:0,max:0} } }));
 describe('v1.6.0 housing maintenance balance', () => {
   it.each([0,1,2,9,10,11,25])('does not offset Civilian Goods maintenance with resident output: %s', people => {
-    const s=setup(), f={...s.facilities[0]!,id:'housing-test',type:'temporaryHousing' as const,position:{q:24,r:25},constructible:true,workerCapacity:10,workers:people,infected:0,builtTurn:0,operationalStatus:'operational' as const};s.facilities.push(f);s.resources.fuel=1000;
+    const s=setup(), f={...s.facilities[0]!,id:'housing-test',type:'temporaryHousing' as const,position:{q:24,r:25},constructible:true,workerCapacity:10,workers:people,infected:0,builtTurn:0,operationalStatus:'operational' as const};s.facilities.push(f);s.resources.fuel=1000;s.facilities.find(f=>f.type==='powerPlant')!.workers=10;
     const plan=calculateEconomyPlan(s),p=plan.facilities.find(p=>p.facilityId===f.id)!;
     expect(p.projectedPowerSupplied).toBe(true);expect(p.outputs.civilianGoods??0).toBe(0);
     expect(plan.forecast.maintenancePopulation.residents).toBe(s.facilities.filter(f=>['capital','city','temporaryHousing'].includes(f.type)&&f.owner==='player').reduce((n,f)=>n+f.workers,0));

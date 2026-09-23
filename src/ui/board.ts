@@ -434,7 +434,7 @@ function clampProgress(value: number): number {
 }
 
 function isUnitVisible(unit: UnitState, visibleTileKeys: ReadonlySet<string>): boolean {
-  return unit.actionState !== 'destroyed' && (unit.isPlayerUnit || visibleTileKeys.has(hexKey(unit.position)));
+  return !unit.transportedByUnitId && unit.actionState !== 'destroyed' && (unit.isPlayerUnit || visibleTileKeys.has(hexKey(unit.position)));
 }
 
 function unitColor(unit: UnitState): number {
@@ -1133,7 +1133,7 @@ export class HexBoardScene extends Phaser.Scene {
     const visible = [...visibleTileKeys].sort().join(',');
     const units = state.units
       .filter((unit) => isUnitVisible(unit, visibleTileKeys))
-      .map((unit) => `${unit.id}:${unit.type}:${unit.mode??''}:${unit.hordeKind ?? ''}:${unit.actionState}:${unit.position.q},${unit.position.r}`)
+      .map((unit) => `${unit.id}:${unit.type}:${unit.mode??''}:${unit.flightState??''}:${unit.cargoUnitId??''}:${unit.hordeKind ?? ''}:${unit.actionState}:${unit.position.q},${unit.position.r}`)
       .join('|');
     return `${visible}#${units}`;
   }
@@ -1549,6 +1549,11 @@ export class HexBoardScene extends Phaser.Scene {
     constructibleInvalidPreview: ReadonlySet<string>,
     selectedConstructiblePreview: string | null,
   ): void {
+    if(state.militaryDrone && hexDistance(tile,state.militaryDrone.center)<=state.militaryDrone.radius){
+      this.graphics.fillStyle(0x77ddff,0.06);this.graphics.fillPoints(this.hexPoints(center),true);
+      if(hexDistance(tile,state.militaryDrone.center)===state.militaryDrone.radius){this.graphics.lineStyle(2,0x77ddff,.65);this.graphics.strokePoints(this.hexPoints(center),true);}
+      if(key===hexKey(state.militaryDrone.center))this.addLabel('military-drone','D',center.x,center.y-20,'#77ddff',14,true);
+    }
     if (isSpawnReserve) {
       // Spawn Reserve is public static map information and must remain visible
       // even when Fog of War dims the rest of the tile. The inset hatch keeps
@@ -1785,9 +1790,9 @@ export class HexBoardScene extends Phaser.Scene {
       const proficiencyLabel = proficiency ? t(`proficiency.${proficiency}`) : null;
       const maxCharges = typeof unitRecord.maxAttackCharges === 'number' ? Math.max(1, Math.trunc(unitRecord.maxAttackCharges)) : 1;
       const charges = typeof unitRecord.attackChargesRemaining === 'number' ? Math.max(0, Math.min(maxCharges, Math.trunc(unitRecord.attackChargesRemaining))) : maxCharges;
-      const typeLabel = unit.type === 'fieldArtillery' ? t('fieldArtillery') : unit.type === 'specialForces' ? t('specialForces') : unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
+      const typeLabel = unit.type === 'multipurposeHelicopter' ? t('multipurposeHelicopter') : unit.type === 'fieldArtillery' ? t('fieldArtillery') : unit.type === 'specialForces' ? t('specialForces') : unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
       const supplyLabel = suppliedTiles.has(tileKey) ? t('supplied') : t('outOfSupply');
-      const details = `${typeLabel}${proficiencyLabel ? ` (${proficiencyLabel})` : ''} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
+      const details = `${unit.flightState === 'airborne' ? '▲ ' : ''}${unit.cargoUnitId ? '▣ ' : ''}${typeLabel}${proficiencyLabel ? ` (${proficiencyLabel})` : ''} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
       this.addLabel(`unit:${unit.id}:detail`, details, position.x, position.y + 23, '#f3f7f9', 8, true);
     } else if (isZombie && render.selectedZombieId === unit.id) {
       const typeLabel = unit.type === 'packZombie' ? t('packZombie') : unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : (unit.type as string) === 'hunterZombie' ? t('hunterZombie') : (unit.type as string) === 'gasZombie' ? t('gasZombie') : (unit.type as string) === 'screamerZombie' ? t('screamerZombie') : t('zombie');

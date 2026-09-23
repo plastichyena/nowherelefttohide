@@ -90,8 +90,8 @@ describe('UI action projection', () => {
     expect(projection!.toAfter).toBe(1);
     expect(projection!.forecast.populationConsumers).toBe(currentForecast.populationConsumers);
     // A newly populated City becomes an active required-power consumer. The
-    // v1.5.4 power model therefore adds the City's 10-unit demand here.
-    expect(projection!.forecast.electricity.requiredPowerDemand).toBe(currentForecast.electricity.requiredPowerDemand + 10);
+    // v1.5.4 power model therefore adds the City's 20-unit demand here.
+    expect(projection!.forecast.electricity.requiredPowerDemand).toBe(currentForecast.electricity.requiredPowerDemand + 20);
     expect(JSON.stringify(state)).toBe(before);
   });
 

@@ -20,5 +20,5 @@ export function renderHealthDetails(state: Readonly<GameState>, locale: Locale, 
 }
 export function renderNuclearObjective(state: Readonly<GameState>, locale: Locale): string {
   const status={ja:{unclaimed:'未確保',pending:'援軍配置待ち',claimed:'援軍獲得済み',expired:'期限終了'},en:{unclaimed:'Not captured',pending:'Reinforcement pending',claimed:'Reward claimed',expired:'Deadline expired'}};
-  return `<details data-nuclear-objective="true"><summary>${locale==='ja'?'原発遠征':'Nuclear expedition'} · ${status[locale][state.nuclearObjective.reward]} · Turn20</summary><p>${escape(RULES_V163[locale].nuclear)}</p><p>${escape(RULES_V163[locale].specialForces)}</p><p>${escape(RULES_V163[locale].packZombie)}</p></details>`;
+  return `<details data-nuclear-objective="true"><summary>${locale==='ja'?'原発遠征':'Nuclear expedition'} · ${status[locale][state.nuclearObjective.reward]} · Turn10</summary><p>${escape(RULES_V163[locale].nuclear)}</p><p>${escape(RULES_V163[locale].specialForces)}</p><p>${escape(RULES_V163[locale].packZombie)}</p></details>`;
 }

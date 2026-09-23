@@ -7,7 +7,7 @@ export const RULES_V164 = {
     safety: 'AIは着弾・爆風・公開Gas連鎖による巻き込みを避けます。緊急砲撃は、次敵フェーズの拠点陥落危険、代替対処なし、防衛成功率上昇、次Player Turnまでの期待死者減少、全着弾候補で即時敗北なし、をすべて公開情報から評価できる場合だけ候補になります。人間は危険確認後に発射できます。',
     flavor: '兵器庫で眠っていた旧式の野戦砲。GPS誘導弾には対応しているが、専門的な訓練を受けた砲手が不在なため、多少の誤差は覚悟しなければならない。GPSは説明上の設定であり専用弾種・追加資源ではありません。',
     changes: '簡易農場・仮設住宅は民需50、両方とも建設数無制限。感染0の陥落検問所は同Hexの敵がいなくなり復旧可能な部隊が駐留すると自動復旧します。隣接敵は妨げません。Gasは全Waveで抽選され、同方向複数可。Wave内の通常Zombie枠はHorde Zombieになります。Gas死亡爆発はHuman30／Zombie15を地形補正します。',
-    compatibility: 'v1.6.3以前のSave / Replay / Session / Checkpoint / Artifactは読込できません。旧データは保管したまま、新規v1.6.4ゲームを開始してください。',
+    compatibility: 'v1.6.4以前のSave / Replay / Session / Checkpoint / Artifactは読込できません。旧データは保管したまま、新規v1.6.5ゲームを開始してください。',
   },
   en: {
     checkpoints: 'Automatic recovery requires zero infection, no enemy on the same Hex and a capable Human garrison. Adjacent enemies do not block recovery. Artillery cannot recover checkpoints. A recovered post becomes Active if none exists, otherwise Standby or Dormant according to available slots.',
@@ -17,6 +17,6 @@ export const RULES_V164 = {
     safety: 'AI avoids possible impact, blast and public Gas-chain friendly casualties. Emergency fire requires an imminent next-enemy-phase site fall, no adequate alternative, higher defense success probability, fewer expected deaths by next Player Turn, and no possible immediate defeat across all impacts. All comparisons use public information. Human players can fire after confirming the danger.',
     flavor: 'An old field gun pulled from the arsenal. It supports GPS-guided rounds, but without trained gunners some inaccuracy is inevitable. GPS is flavor only, with no separate ammunition type or resource.',
     changes: 'Simple Farms and Temporary Housing cost 50 Civilian Goods with unlimited counts. Infection-free ruined checkpoints recover with a capable Human garrison and no enemy on the same Hex; adjacent enemies do not block recovery. Gas participates in every Wave without a per-direction cap. Normal Wave slots become Horde Zombies. Gas death explosions deal Human 30 / Zombie 15 before terrain.',
-    compatibility: 'Saves, Replays, Sessions, Checkpoints and Artifacts from v1.6.3 or earlier are rejected. Keep old data and start a new v1.6.4 game.',
+    compatibility: 'Saves, Replays, Sessions, Checkpoints and Artifacts from v1.6.4 or earlier are rejected. Keep old data and start a new v1.6.5 game.',
   },
 } as const;

@@ -36,7 +36,7 @@ describe('v1.5.7 wall and charge accounting', () => {
     const zombie = createUnit(state, 'horde', 'hordeZombie', start);
     state.units.push(zombie);
     state.barbedWire.push({ id: 'wall', position: destination, hp: 20, maxHp: 20, builtTurn: 1 });
-    const movement = createMovement({ interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
+    const movement = createMovement({ emergencyLand: () => { throw new Error('Unexpected aircraft in ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
     expect(zombie.maxAttackCharges).toBe(4);
     expect(wireBreakCost(20, zombie)).toBe(4);
     movement.applyMovement(state, zombie, [start, destination], 20);

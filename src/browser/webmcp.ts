@@ -3,6 +3,7 @@ import type {
   AiSessionLegalActionsInput,
   AiSessionPort,
   AiSessionPreviewInput,
+  AiSessionBatchPreviewInput,
   AiSessionQueryInput,
 } from '../session/ai-session-contract';
 
@@ -42,6 +43,7 @@ export const WEBMCP_TOOL_NAMES = [
   'nlth_query',
   'nlth_legal_actions',
   'nlth_preview_action',
+  'nlth_preview_actions',
   'nlth_act',
   'nlth_get_request_result',
   'nlth_get_result',
@@ -193,6 +195,13 @@ function toolDefinitions(host: WebMcpHost): WebMcpToolDefinition[] {
       inputSchema: PREVIEW_ACTION_SCHEMA,
       annotations: readOnly,
       execute: (input) => withSession(host, (session) => session.previewAction(input as AiSessionPreviewInput)),
+    },
+    {
+      name: 'nlth_preview_actions',
+      description: 'Preview 1..100 GameActions independently from the same baseRevision, in input order. Does not simulate a sequence or mutate State, RNG, Decision or Revision.',
+      inputSchema: {type:'object',required:['generation','baseRevision','actions'],properties:{...REVISION_PROPERTIES,actions:{type:'array',minItems:1,maxItems:100,items:ACTION_SCHEMA}},additionalProperties:false},
+      annotations: readOnly,
+      execute: (input) => withSession(host, (session) => session.previewActions(input as AiSessionBatchPreviewInput)),
     },
     {
       name: 'nlth_act',

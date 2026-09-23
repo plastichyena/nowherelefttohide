@@ -36,17 +36,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6.4 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.6.4';
-export const GAME_RULES_VERSION = '14.0.0';
-export const SAVE_FORMAT_VERSION = '21';
-export const AGENT_API_VERSION = '19.0.0';
-export const OBSERVATION_API_VERSION = '19.0.0';
-export const BRIDGE_API_VERSION = '19.0.0';
-export const BALANCED_AGENT_VERSION = '12.0.0';
-export const RANDOM_AGENT_VERSION = '7.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '18.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '15.0.0';
+/** v1.6.5 rejects all earlier state and public API schemas without migration. */
+export const APP_VERSION = '1.6.5';
+export const GAME_RULES_VERSION = '15.0.0';
+export const SAVE_FORMAT_VERSION = '22';
+export const AGENT_API_VERSION = '20.0.0';
+export const OBSERVATION_API_VERSION = '20.0.0';
+export const BRIDGE_API_VERSION = '20.0.0';
+export const BALANCED_AGENT_VERSION = '13.0.0';
+export const RANDOM_AGENT_VERSION = '8.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '19.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '16.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -54,7 +54,7 @@ export type CrisisSeverity = 'critical' | 'warning' | 'advisory';
 
 /** Stable, public reason codes used by Crisis Summary projections. */
 export const CRISIS_REASON_CODES = [
-  'capital_resident_minimum', 'public_health_food_stress', 'public_health_civilian_goods_stress', 'food_starvation_risk', 'internal_infection_risk', 'checkpoint_health_risk', 'refinery_allowance_runway_risk', 'nuclear_early_capture_window', 'nuclear_power_outage',
+  'capital_resident_minimum', 'public_health_food_stress', 'public_health_civilian_goods_stress', 'food_starvation_risk', 'internal_infection_risk', 'checkpoint_health_risk', 'refinery_allowance_runway_risk', 'air_base_early_capture_window', 'nuclear_early_capture_window', 'nuclear_power_outage',
   'overcrowding_forecast',
   'temporary_housing_outage_forecast',
   'capital_infection_uncontained',
@@ -190,6 +190,7 @@ export interface AgentSupplyObservation {
 }
 
 export interface AgentFacilityObservation {
+  droneAvailable?: boolean; droneReasonCode?: string | null;
   earlyCaptureSurvivorReward?: 'possible' | 'lost' | 'rescued' | 'not_applicable';
   recovery: ReturnType<typeof import('../core/public-entities').facilityRecoveryProjection>;
   armyBase?: null | {
@@ -279,12 +280,26 @@ export interface AgentFacilityObservation {
 }
 
 export interface AgentUnitObservation {
+  flightState?: import('../core/types').FlightState;
+  canTargetAir?: boolean;
+  cargoUnitId?: string | null;
+  cargoUnitType?: HumanUnitType | null;
+  transportedByUnitId?: string;
+  boardedTurn?: number;
+  tookOffTurn?: number | null;
+  landedTurn?: number | null;
+  canTakeOff?: boolean; takeOffReasonCode?: string | null;
+  canLand?: boolean; landReasonCode?: string | null;
+  canBoard?: boolean; canDisembark?: boolean;
+  boardingCandidates?: {unitId:string;reasonCode:string|null}[];
+  disembarkCandidates?: {destination:HexCoord;reasonCode:string|null}[];
+  canRefuel?: boolean; canResupplyMilitaryGoods?: boolean; supplyReasonCode?: string | null;
   mode?: import('../core/types').UnitMode;
   modeLockedUntilTurn?: number | null;
   capabilities?: import('../core/types').HumanUnitConfig['capabilities'];
   production?: { completed: number; reserved: number; limit: number | null; remaining: number | null };
   artillery?: { fuelPerMovementPoint?:number; targetPreviews: ArtilleryPreview[]; minRange: number; militaryGoodsCost: number; hitProbability: number; scatterRadius: number; legalTargetHexes: HexCoord[] };
-  movementDomain: 'ground';
+  movementDomain: 'ground' | 'air';
   spawnedInsideBarbedWire?: boolean;
   /** Independent conditional attacks, not an enemy movement/target prediction. */
   conditionalIncomingCombat?: Array<{ enemyId: string; condition: 'if_this_visible_enemy_attacks' } & ReturnType<typeof import('../core/barbed-wire').wireCombatProjection>>;
@@ -454,11 +469,12 @@ export interface AgentApiInfo {
   };
   prohibited: string[];
   rules: {
+    v165: { explanations: typeof import('../core/rules-v165').RULES_V165; helicopter: GameConfig['units']['multipurposeHelicopter']; airBase: GameConfig['facilities']['airBase']; objectives: GameConfig['objectives']; militaryDrone: GameConfig['militaryDrone'] };
     v164: { explanations: typeof import('../core/rules-v164').RULES_V164; artillery: GameConfig['units']['fieldArtillery']; humanCapabilities: Record<HumanUnitType,GameConfig['units']['police']['capabilities']>; productionLimits: Record<HumanUnitType,number|null> };
     barbedWire: typeof import('../core/barbed-wire').BARBED_WIRE_RULES;
     gasZombie?: { explosionDamage:number; explosionInfection:number; radius:number; excludesCenter:boolean; initialCount:{min:number;max:number}; initialMinDistance:number; allWaves:boolean; capPerDirection:null; explosionZombieDamage:number };
     armyBase?: Omit<GameConfig['armyBase'], 'noiseRadius'> & { interceptionNoiseRadius:number; recruitmentPower:number; cityPopulationOnly:boolean };
-    zombies: Record<import('../core/types').ZombieUnitType, { hp: number; attack: number; movement: number; range: number; vision: number; maxAttackCharges: number; ai: 'normal' | 'horde' }>;
+    zombies: Record<import('../core/types').ZombieUnitType, { hp: number; attack: number; movement: number; range: number; vision: number; maxAttackCharges: number; canTargetAir:boolean; ai: 'normal' | 'horde' }>;
     proficiency: {
       values: UnitProficiency[];
       productionProficiencyByType: Record<string, UnitProficiency>;
@@ -802,6 +818,8 @@ export interface AgentGameResult {
 }
 
 export interface AgentObservation {
+  militaryDrone?: ReturnType<typeof import('../core/aviation-preview').militaryDroneProjection>;
+  facilityObjectives?: {facilityId:string;rewardDeadlineTurn:number;rewardState:string;failureSpawnState:string;rewardUnitType:string;failureUnitType:string;requiresHealthySurvivors:boolean;failureOnUncapturedFall:boolean;firstCapturedTurn:number|null;turnsRemaining:number;severity:'critical'|'warning'|'advisory'}[];
   /** Public Config used to distinguish infection, zombie conversion and actual deaths. */
   siteFallRules?: { zombieSpawnPopulationPerUnit: number; maxZombieSpawnPerResolution: number };
   productionLedger?: Record<HumanUnitType,{completed:number;reserved:number;limit:number|null;remaining:number|null}>;
@@ -1097,6 +1115,7 @@ export interface AgentGame {
   reset(options?: AgentResetOptions): AgentObservation;
   getObservation(): AgentObservation;
   getLegalActions(): GameAction[];
+  queryCandidates?(target: 'production-candidates' | 'attack-candidates', filters?: Record<string, JsonValue>): JsonValue[];
   previewAction?(action: GameAction, baseRevision: number): JsonValue;
   step(action: GameAction): AgentStepResult;
   isGameOver(): boolean;

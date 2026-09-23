@@ -50,8 +50,8 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     const police = state.units.find((unit) => unit.type === 'police')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
 
-    expect(state.gameVersion).toBe('14.0.0');
-    expect(config.version).toBe('14.0.0');
+    expect(state.gameVersion).toBe('15.0.0');
+    expect(config.version).toBe('15.0.0');
     expect(police).toMatchObject({
       proficiency: 'regular', recruitSurvivalTurns: 0, regularZombieKills: 0,
       veteranPromotionPending: false, attack: 8, maxAttackCharges: 1, attackChargesRemaining: 1,
@@ -80,12 +80,12 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
       riotZombie: { hp: 60, attack: 5, movement: 3, range: 1, vision: 5 },
     });
     expect(config.horde).toMatchObject({
-      specialZombieWeights: { zombie: 65, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5, screamerZombie: 5 },
+      specialZombieWeights: { zombie: 40, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 15, gasZombie: 15, screamerZombie: 5 },
       riotZombieCapPerDirection: 1,
       movementNoiseRadius: 8,
     });
     expect(config.horde.waves.map((wave) => [wave.turn, wave.compositionPerDirection.hordeZombie, wave.compositionPerDirection.zombie]))
-      .toEqual([[10, 5, 3], [20, 3, 5], [35, 8, 7], [50, 5, 7], [70, 8, 8]]);
+      .toEqual([[10, 5, 4], [20, 3, 6], [35, 8, 9], [50, 5, 9], [70, 8, 10]]);
   });
 
   it('promotes a surviving Recruit at Player Turn Start with ceiling-rounded Regular attack', () => {

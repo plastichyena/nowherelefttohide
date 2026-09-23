@@ -30,6 +30,7 @@ function adapt(game: SessionCapableAgentGame): SessionGameRuntime {
     getApiInfo: () => game.getApiInfo(),
     getObservation: () => game.getObservation(),
     getLegalActions: () => game.getLegalActions(),
+    queryCandidates: (target, filters) => game.queryCandidates!(target,filters),
     previewAction: (action, baseRevision) => game.previewAction!(action, baseRevision),
     // Session owns decisionSummary validation and persistence. GameEngine still
     // receives exactly one existing GameAction through AgentGame.

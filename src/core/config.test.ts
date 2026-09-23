@@ -8,8 +8,8 @@ import {
 describe('v1.6 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('14.0.0');
-    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v8');
+    expect(DEFAULT_CONFIG.version).toBe('15.0.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v9');
     expect(DEFAULT_CONFIG.economy.initialRefineryAllowance).toBe(2_000);
     expect(DEFAULT_CONFIG.economy.oilFieldAllowancePerWorker).toBe(100);
     expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(40);
@@ -21,16 +21,16 @@ describe('v1.6 GameConfig', () => {
     });
     expect(DEFAULT_CONFIG.facilities.powerPlant.production.powerGeneration).toBe(15);
     expect(DEFAULT_CONFIG.facilities.farm.production).toMatchObject({ inputs: {}, outputs: { food: 10 }, powerMode: 'required' });
-    expect(DEFAULT_CONFIG.facilities.refinery.production).toMatchObject({ outputs: { fuel: 5 }, powerMode: 'required', powerCapacity: 10 });
+    expect(DEFAULT_CONFIG.facilities.refinery.production).toMatchObject({ outputs: { fuel: 5 }, powerMode: 'required', powerCapacity: 20 });
     expect(DEFAULT_CONFIG.facilities.oilField).toMatchObject({ workerCapacity: 5, production: { inputs: {}, outputs: {}, powerMode: 'none' } });
     expect(DEFAULT_CONFIG.facilities.simpleFarm.production).toMatchObject({ outputs: { food: 5 }, powerMode: 'none', powerCapacity: 0 });
     expect(DEFAULT_CONFIG.horde.warningLeadTurns).toBe(2);
     expect(DEFAULT_CONFIG.horde.waves).toEqual([
-      { turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 3 }, final: false },
-      { turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 5 }, final: false },
-      { turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 7 }, final: false },
-      { turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 7 }, final: false },
-      { turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 8 }, final: true },
+      { turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 4 }, final: false },
+      { turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 6 }, final: false },
+      { turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 9 }, final: false },
+      { turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 9 }, final: false },
+      { turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 10 }, final: true },
     ]);
     expect(DEFAULT_CONFIG.terrain).toEqual({
       movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
@@ -52,7 +52,7 @@ describe('v1.6 GameConfig', () => {
       initialSupplyRadius: 5,
     });
     expect(DEFAULT_CONFIG.unitExperience).toEqual({
-      productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit', reconTeam: 'recruit', specialForces: 'regular', fieldArtillery: 'recruit' },
+      productionProficiencyByType: { police: 'recruit', nationalGuard: 'recruit', riotPolice: 'recruit', reconTeam: 'recruit', specialForces: 'regular', fieldArtillery: 'recruit', multipurposeHelicopter: 'recruit' },
       recruitSurvivalTurnsRequired: 5,
       regularAttackMultiplier: 1.25,
       regularAttackRounding: 'ceil',
@@ -73,7 +73,7 @@ describe('v1.6 GameConfig', () => {
     expect(DEFAULT_CONFIG.units.screamerZombie).toMatchObject({ hp: 15, attack: 10, movement: 3, range: 1, vision: 2, screamRadius: 30 });
     expect(DEFAULT_CONFIG.units.riotZombie).toMatchObject({ hp: 60, attack: 5, movement: 3, range: 1, vision: 5 });
     expect(DEFAULT_CONFIG.horde).toMatchObject({
-      specialZombieWeights: { zombie: 65, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 5, gasZombie: 5, screamerZombie: 5 },
+      specialZombieWeights: { zombie: 40, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 15, gasZombie: 15, screamerZombie: 5 },
       riotZombieCapPerDirection: 1,
       movementNoiseRadius: 8,
     });
@@ -106,7 +106,7 @@ describe('v1.6 GameConfig', () => {
     const requiredThree = createDefaultConfig({ facilities: { capital: { production: { powerCapacity: 3 } } } });
     expect(validateGameConfig(requiredThree)).toMatchObject({
       valid: false,
-      errors: expect.arrayContaining(['facilities.capital.production.powerCapacity must be 10']),
+      errors: expect.arrayContaining(['facilities.capital.production.powerCapacity must be 20']),
     });
     const nonConsumerFive = createDefaultConfig({ facilities: { simpleFarm: { production: { powerCapacity: 5 } } } });
     expect(validateGameConfig(nonConsumerFive)).toMatchObject({
@@ -124,7 +124,7 @@ describe('v1.6 GameConfig', () => {
     expect(DEFAULT_CONFIG.economy.initialResources.food).toBe(330);
 
     config.horde.waves[4]!.compositionPerDirection.zombie = 99;
-    expect(DEFAULT_CONFIG.horde.waves[4]!.compositionPerDirection.zombie).toBe(8);
+    expect(DEFAULT_CONFIG.horde.waves[4]!.compositionPerDirection.zombie).toBe(10);
   });
 
   it('accepts zero initial Zombies but rejects more than the 50 fixed-map positions', () => {

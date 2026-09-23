@@ -32,7 +32,7 @@ describe('machine-readable public Query contract', () => {
     expect(contract).toMatchObject({
       schemaFormat: 'JSON Schema',
       schemaVersion: '2020-12',
-      contractVersion: '1.1.0',
+      contractVersion: '1.2.0',
       pagination: {
         cursor: { defaultPageSize: 100, maxPageSize: 500, revisionPinned: true, filtersPinned: true },
         routeRanges: { defaultOffset: 0, defaultLimit: 100, maxLimit: 500, hexPathIncludedByDefault: false },

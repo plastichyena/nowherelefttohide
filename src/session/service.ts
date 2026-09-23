@@ -268,7 +268,9 @@ function compactSnapshot(loaded: LoadedSession, changes = summarizeImportantChan
     resources: clone(observation.resources),
     population: clone(observation.population),
     facilities: observation.facilities.map(({ id, type, position, status, owner, healthyPopulation, infectedPopulation, inSupply, operationalStatus, populationCapacity, populationOperational, populationUnavailableReason, populationIncreaseAvailable, populationDecreaseAvailable, production, recovery }) => ({ id, type, position, status, owner, healthyPopulation, infectedPopulation, inSupply, operationalStatus, populationCapacity, populationOperational, populationUnavailableReason, populationIncreaseAvailable, populationDecreaseAvailable, production: { stoppedReason: production.stoppedReason, projectedPowerReason: production.projectedPowerReason }, recovery: { status: recovery.status, missingConditions: recovery.missingConditions } })),
-    units: observation.units.map(({ id, type, unitType, position, hp, maxHp, proficiency, attackChargesRemaining, maxAttackCharges, canMove, canAttack, inSupply, currentFuel, maxFuel, currentMilitaryGoods, maxMilitaryGoods, fixedMilitaryGoodsUpkeepPerTurn, attack, baseRecruitAttack, effectiveAttack, movement, effectiveMovementCostAtPosition, baseRange, effectiveRange, rangeModifierReason, emergencyMovementPoints, emergencyMovementAvailable }) => ({ id, type, unitType, position, hp, maxHp, proficiency, attackChargesRemaining, maxAttackCharges, canMove, canAttack, inSupply, currentFuel, maxFuel, currentMilitaryGoods, maxMilitaryGoods, fixedMilitaryGoodsUpkeepPerTurn, attack, baseRecruitAttack, effectiveAttack, movement, effectiveMovementCostAtPosition, baseRange, effectiveRange, rangeModifierReason, emergencyMovementPoints, emergencyMovementAvailable })),
+    militaryDrone: observation.militaryDrone,
+    facilityObjectives: observation.facilityObjectives,
+    units: observation.units.map(({ id, type, unitType, position, hp, maxHp, proficiency, attackChargesRemaining, maxAttackCharges, canMove, canAttack, inSupply, currentFuel, maxFuel, currentMilitaryGoods, maxMilitaryGoods, fixedMilitaryGoodsUpkeepPerTurn, attack, baseRecruitAttack, effectiveAttack, movement, effectiveMovementCostAtPosition, baseRange, effectiveRange, rangeModifierReason, emergencyMovementPoints, emergencyMovementAvailable, flightState, movementDomain, cargoUnitId, cargoUnitType, transportedByUnitId, canTakeOff, canLand, canBoard, canDisembark, canRefuel, canResupplyMilitaryGoods, takeOffReasonCode, landReasonCode, supplyReasonCode, production }) => ({ id, type, unitType, position, hp, maxHp, proficiency, attackChargesRemaining, maxAttackCharges, canMove, canAttack, inSupply, currentFuel, maxFuel, currentMilitaryGoods, maxMilitaryGoods, fixedMilitaryGoodsUpkeepPerTurn, attack, baseRecruitAttack, effectiveAttack, movement, effectiveMovementCostAtPosition, baseRange, effectiveRange, rangeModifierReason, emergencyMovementPoints, emergencyMovementAvailable, flightState, movementDomain, cargoUnitId, cargoUnitType, transportedByUnitId, canTakeOff, canLand, canBoard, canDisembark, canRefuel, canResupplyMilitaryGoods, takeOffReasonCode, landReasonCode, supplyReasonCode, production })),
     visibleEnemies: clone(observation.zombies),
     checkpoints: observation.checkpoints.map(({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply }) => ({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply, supplyExplanation: checkpointSupplyExplanation(observation, branchId, loaded.active.revision) })),
     horde: clone(observation.horde),
@@ -927,6 +929,9 @@ export class SessionService {
             catch (error) { if (error instanceof RouteQueryInputError) throw new SessionError('invalid_query', `${error.code}: ${error.message}`); throw error; }
             break;
           }
+          case 'production-candidates':
+          case 'attack-candidates': items = this.restoreAndVerify(loaded,true).queryCandidates?.(rawInput.target,filters) ?? []; break;
+          case 'enemies': items=observation.zombies as unknown as JsonValue[]; break;
           case 'units': items = observation.units as unknown as JsonValue[]; break;
           case 'facilities': items = observation.facilities as unknown as JsonValue[]; break;
           case 'checkpoints': items = observation.checkpoints.map(c => ({ ...c, supplyExplanation: checkpointSupplyExplanation(observation, c.branchId, revision) })) as unknown as JsonValue[]; break;
@@ -1320,6 +1325,22 @@ export class SessionService {
   }
 
   /** Pure Action Preview for Portable/CLI callers; no Decision is recorded. */
+  public previewBatch(sessionId: string, rawInput: unknown): {sessionId:string;revision:number;baseRevision:number;independent:boolean;results:{action:GameAction;preview:JsonValue}[]} {
+    try {
+      if(!isObject(rawInput) || Object.keys(rawInput).some(k=>!['actions','expectedRevision'].includes(k)) || !Array.isArray(rawInput.actions) || rawInput.actions.length<1 || rawInput.actions.length>100) throw new SessionError('invalid_preview_input','Batch Preview requires 1..100 actions and expectedRevision');
+      const actions=rawInput.actions.map(validatedAction);
+      const revision=requireSafeInteger(rawInput.expectedRevision,'expectedRevision',0);
+      const lock=this.store.acquireExistingLock(sessionId);
+      try {
+        const loaded=this.loadCompatible(sessionId,true);
+        if(revision!==loaded.active.revision) throw new SessionError('stale_revision',`Expected revision ${revision}, current revision is ${loaded.active.revision}`);
+        const runtime=this.restoreAndVerify(loaded,true);
+        if(!runtime.previewAction) throw new SessionError('preview_unavailable','Action Preview unavailable');
+        return {sessionId,revision,baseRevision:revision,independent:true,results:actions.map(action=>({action:cloneAction(action),preview:clone(runtime.previewAction!(action,revision))}))};
+      } finally { lock.release(); }
+    } catch(error) { return this.rejectWithDiagnostics(sessionId,'preview',error); }
+  }
+
   public preview(sessionId: string, rawInput: unknown): SessionPreviewResult {
     try {
       if (!isObject(rawInput)

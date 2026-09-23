@@ -1,3 +1,4 @@
+import { militaryDroneProjection } from '../core/aviation-preview';
 import { HUMAN_UNIT_TYPES } from '../core/unit-catalog';
 import { roadConnections } from '../core/roads';
 import { wireCandidates } from '../core/barbed-wire';
@@ -349,7 +350,9 @@ function createAgentObservationInScope(
   return cloneJson({
     siteFallRules: { zombieSpawnPopulationPerUnit: state.config.infection.zombieSpawnPopulationPerUnit, maxZombieSpawnPerResolution: state.config.infection.maxZombieSpawnPerResolution },
     publicHealth: { stress: { ...state.publicHealthStress }, foodShortageAccumulation: state.foodShortageAccumulation, starvationCarry: state.starvationCarry },
-    nuclearObjective: { firstCapturedTurn: state.nuclearObjective.firstCapturedTurn, reward: state.nuclearObjective.reward, deadlineTurn: 20 },
+    militaryDrone: militaryDroneProjection(state),
+    facilityObjectives: (['nuclearPowerPlant','airBase'] as const).map(type=>{const objective=type==='airBase'?state.airBaseObjective:state.nuclearObjective;const config=state.config.objectives[type];return {facilityId:state.facilities.find(f=>f.type===type)!.id,...config,rewardState:objective.reward,failureSpawnState:objective.failureSpawn==='none'?'none':'committed',firstCapturedTurn:objective.firstCapturedTurn,turnsRemaining:Math.max(0,config.rewardDeadlineTurn-state.turn),severity:state.turn>=config.rewardDeadlineTurn?'critical' as const:config.rewardDeadlineTurn-state.turn<=5?'warning' as const:'advisory' as const};}),
+    nuclearObjective: { firstCapturedTurn: state.nuclearObjective.firstCapturedTurn, reward: state.nuclearObjective.reward, deadlineTurn: state.config.objectives.nuclearPowerPlant.rewardDeadlineTurn },
     apiVersion: OBSERVATION_API_VERSION,
     barbedWire: state.barbedWire.filter(w => visibleTileKeys.has(hexKey(w.position))),
     barbedWireCandidates: wireCandidates(state),

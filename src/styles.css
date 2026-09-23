@@ -656,3 +656,5 @@ button.crisis-alert:hover, button.crisis-alert:focus-visible { border-color: #ff
 .artillery-preview p { margin: .35rem 0; }
 .artillery-preview summary { min-height: 44px; cursor: pointer; }
 .artillery-details { border: 1px solid #9f8853; border-radius: .5rem; padding: .65rem; }
+
+.aviation-choices{display:flex;flex-wrap:wrap;gap:8px}.aviation-choice{display:grid;gap:4px;max-width:100%}.aviation-choice button,.help-topic summary{min-height:44px}.aviation-choice small{max-width:15rem}.help-topic{padding:10px 0;border-bottom:1px solid #53615d}.help-topic summary{cursor:pointer;display:flex;align-items:center;font-weight:600}
