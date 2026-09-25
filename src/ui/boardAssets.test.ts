@@ -42,6 +42,7 @@ describe('board asset registry', () => {
       'nuclearPowerPlant',
       'windPowerPlant',
       'simpleFarm',
+      'reliefSupplyCenter',
       'civilianDroneBase',
       'temporaryHousing',
       'armyBase',

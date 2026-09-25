@@ -9,11 +9,11 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** v1.6.5 deliberately rejects every earlier Session/Checkpoint schema. */
-export const CHECKPOINT_SCHEMA_VERSION = '16.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '16.0.0' as const;
+/** v1.6.6 deliberately rejects every earlier Session/Checkpoint schema. */
+export const CHECKPOINT_SCHEMA_VERSION = '17.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '17.0.0' as const;
 export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
-export const SESSION_ARTIFACT_PACKAGE_VERSION = '1.0.0' as const;
+export const SESSION_ARTIFACT_PACKAGE_VERSION = '2.0.0' as const;
 export const PLAY_TURN_PROTOCOL_VERSION = '1.2.0' as const;
 export const DEFAULT_CHECKPOINT_INTERVAL = 5;
 export const PUBLIC_SNAPSHOT_INTERVAL = 50;
@@ -436,9 +436,13 @@ export interface SessionArtifactManifest extends SessionVersionIdentity {
   acceptedActionCount: number;
   invalidActionCount: number;
   payloadCount: number;
-  artifactPath: string;
   streamHash: string;
   manifestHash: string;
+}
+export interface SessionArtifactExport extends SessionArtifactManifest {
+  artifactPath: string;
+  replayZipPath: string;
+  artifactDirectoryPath: string | null;
 }
 /** Explicit compatibility read only; CLI never serializes this whole value. */
 export interface SessionArtifact extends Record<string, unknown> { sessionId: string; lineage: SessionLineage; decisionTrace: PublicDecisionRecord[] }

@@ -75,6 +75,5 @@ export function metricObservation(observation: AgentObservation): AgentObservati
   recorded.constructibleFacilityPositionCandidates = [];
   recorded.barbedWireCandidates = [];
   recorded.workerAssignmentCandidates = [];
-  for (const unit of recorded.units) unit.fuelCostByLegalMove = unit.fuelCostByLegalMove.slice(0, 1);
   return recorded;
 }

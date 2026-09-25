@@ -165,9 +165,8 @@ function assertArtifact(artifactPayload, artifactPath, expectedDecisionCount, la
   const manifest = artifactPayload.artifact;
   assert(manifest.decisionCount === expectedDecisionCount, `${label} Artifact decision count differs from Session`);
   assert(manifest.acceptedActionCount === expectedDecisionCount, `${label} Artifact accepted count differs from Session`);
-  assert(existsSync(join(artifactPath, 'manifest.json')), `${label} Artifact manifest.json is missing`);
-  assert(existsSync(join(artifactPath, 'artifact.ndjson')), `${label} Artifact stream is missing`);
-  assert(existsSync(`${artifactPath}.zip`), `${label} Artifact ZIP is missing`);
+  assert(existsSync(manifest.artifactPath), `${label} Artifact ZIP is missing`);
+  assert(manifest.artifactDirectoryPath === null && !existsSync(artifactPath), `${label} unexpectedly retained a directory`);
   return {
     path: artifactPath,
     manifestHash: manifest.manifestHash,

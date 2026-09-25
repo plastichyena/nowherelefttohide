@@ -1,5 +1,7 @@
+import { movementPlan, type MovementActor } from '../core/move-plan';
+import { publicMoveCandidates, publicMoveDetails } from './public-movement';
 import { isHumanUnitType } from '../core/unit-catalog';
-import { HEX_DIRECTION_ORDER, hexKey, hexNeighbor, hexWithinBounds } from '../core/hex';
+import { HEX_DIRECTION_ORDER, hexDistance, hexKey, hexNeighbor, hexWithinBounds } from '../core/hex';
 import { findShortestPath, pathMovementCost, type MovementCostResolver } from '../core/path';
 import type { RoadRole } from '../core/roads';
 import type { FixedMap, HexCoord, HumanUnitType, UnitActionState, UnitType } from '../core/types';
@@ -40,31 +42,12 @@ export interface RouteQueryInput {
   ranges?: RouteQueryRanges;
 }
 
-export interface RouteQueryUnit {
-  flightState?: 'landed' | 'airborne';
-  transportedByUnitId?: string;
-  artillery?: {fuelPerMovementPoint?:number};
-  id: string;
-  type: UnitType;
-  position: HexCoord;
-  movement: number;
-  actionState: UnitActionState;
-  canMove: boolean;
-  currentFuel: number;
-  emergencyMovementPoints: number;
-  fuelCostByLegalMove: Array<{
-    destination: HexCoord;
-    fuelCost: number;
-    projectedFuelAfterMove: number;
-    movementMode: 'normal' | 'emergency';
-    effectiveMovementCost: number;
-  }>;
-}
+export interface RouteQueryUnit extends MovementActor { position: HexCoord }
 
 export interface RouteQuerySource extends StrategicMapSource {
   phase: string;
   units: ReadonlyArray<RouteQueryUnit>;
-  zombies: ReadonlyArray<{ id: string; position: HexCoord }>;
+  zombies: ReadonlyArray<{ id: string; position: HexCoord; canAttack?: boolean; attackChargesRemaining?: number; canTargetAir?: boolean; effectiveRange?: number }>;
   barbedWire: ReadonlyArray<{ id: string; position: HexCoord; hp: number }>;
   supply: { suppliedTileKeys: readonly string[] };
 }
@@ -127,6 +110,9 @@ export interface RouteQueryResult {
   startsAtStrategicNode: boolean;
   endsAtStrategicNode: boolean;
   currentSingleAction: RouteSingleActionReachability;
+  movementDetail: ReturnType<typeof publicMoveDetails>;
+  alternative: { destination: HexCoord; action: { type: 'Move'; unitId: string; destination: HexCoord }; effectiveMovementCost: number } | null;
+  alternativeReason: string;
   publicMovementConditions: {
     publiclyOccupiedHexesConsidered: number;
     visibleBarbedWireHexesEntered: number;
@@ -334,49 +320,13 @@ function unitSingleAction(
   path: readonly HexCoord[] | null,
   effectiveCost: number | null,
 ): RouteSingleActionReachability {
-  const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
-  const movementBudget = movementMode === 'emergency' ? unit.emergencyMovementPoints : unit.movement;
-  const unavailable = (reason: string, actionRequired = true): RouteSingleActionReachability => ({
-    reachable: false,
-    actionRequired,
-    reason,
-    movementMode,
-    movementBudget,
-    effectiveMovementCost: effectiveCost,
-    fuelCost: path ? (movementMode === 'normal' ? (unit.type==='fieldArtillery'?(effectiveCost??0)*(unit.artillery?.fuelPerMovementPoint??10):unitMoveFuelCost(unit.type as HumanUnitType,path.length-1)) : 0) : null,
-    projectedFuelAfterMove: null,
-  });
-  if (!path || effectiveCost === null) return unavailable('route_unavailable');
-  if (path.length === 1) return {
-    reachable: true,
-    actionRequired: false,
-    reason: 'already_at_destination',
-    movementMode,
-    movementBudget,
-    effectiveMovementCost: 0,
-    fuelCost: 0,
-    projectedFuelAfterMove: unit.currentFuel,
-  };
-  if (source.phase !== 'player') return unavailable('not_player_phase');
-  if (unit.transportedByUnitId) return unavailable('unit_transported');
-  if (unit.actionState === 'acted') return unavailable('unit_already_acted');
-  if (!unit.canMove) return unavailable('unit_cannot_move');
-  if (effectiveCost > movementBudget) return unavailable('out_of_range');
-  const fuelCost = movementMode === 'normal' ? (unit.type==='fieldArtillery'?(effectiveCost??0)*(unit.artillery?.fuelPerMovementPoint??10):unitMoveFuelCost(unit.type as HumanUnitType,path.length-1)) : 0;
-  if (movementMode === 'normal' && unit.currentFuel < fuelCost) return unavailable('insufficient_unit_fuel');
-  const destination = path.at(-1)!;
-  const projection = unit.fuelCostByLegalMove.find((entry) => hexKey(entry.destination) === hexKey(destination));
-  if (!projection) return unavailable('not_in_legal_move_projection');
-  return {
-    reachable: true,
-    actionRequired: true,
-    reason: 'reachable_now',
-    movementMode: projection.movementMode,
-    movementBudget,
-    effectiveMovementCost: projection.effectiveMovementCost,
-    fuelCost: projection.fuelCost,
-    projectedFuelAfterMove: projection.projectedFuelAfterMove,
-  };
+  if (!path || effectiveCost === null) return { ...referenceSingleAction(), reachable: false, actionRequired: true, reason: 'route_unavailable' };
+  if (path.length === 1) return { ...referenceSingleAction(), reachable: true, actionRequired: false, reason: 'already_at_destination', fuelCost: 0, projectedFuelAfterMove: unit.currentFuel, effectiveMovementCost: 0 };
+  const plan = movementPlan(unit, source.phase, path.length - 1, effectiveCost);
+  return { reachable: plan.legal, actionRequired: true, reason: plan.reason ?? 'reachable_now',
+    movementMode: plan.movementMode, movementBudget: plan.movementBudget, effectiveMovementCost: effectiveCost,
+    fuelCost: plan.fuelCost, projectedFuelAfterMove: plan.projectedFuelAfterMove };
+
 }
 
 function referenceSingleAction(): RouteSingleActionReachability {
@@ -464,6 +414,7 @@ export function queryRoute(source: Readonly<RouteQuerySource>, input: Readonly<R
   const terrainCost = terrainPath ? pathMovementCost(terrainPath, terrainResolver) : null;
   const effectiveCost = routePath ? pathMovementCost(routePath, mover ? unitResolver : terrainResolver) : null;
   const singleAction = mover ? unitSingleAction(mutableSource, mover, routePath, effectiveCost) : referenceSingleAction();
+  if (mover && !routePath) singleAction.reason = publiclyOccupied.has(hexKey(resolvedDestination.position)) ? 'occupied_destination' : map.hordeSpawnReserve.some(p => hexKey(p) === hexKey(resolvedDestination.position)) ? 'horde_spawn_reserve' : 'no_path';
   const adjacentCandidates: RouteAdjacentCandidate[] = [];
   if (!routePath && resolvedDestination.kind === 'facility') {
     for (const position of HEX_DIRECTION_ORDER.map((direction) => hexNeighbor(resolvedDestination.position, direction))) {
@@ -485,6 +436,19 @@ export function queryRoute(source: Readonly<RouteQuerySource>, input: Readonly<R
     adjacentCandidates.sort((left, right) => left.effectiveMovementCost - right.effectiveMovementCost || compareCoordinates(left.position, right.position));
   }
 
+  const movementDetail = mover && routePath ? publicMoveDetails(mutableSource, mover.id, resolvedDestination.position, routePath) : null;
+  let alternative: RouteQueryResult['alternative'] = null;
+  if (mover && singleAction.reachable !== true) {
+    const currentDistance = hexDistance(mover.position, resolvedDestination.position);
+    const candidates = publicMoveCandidates(mutableSource, mover.id)
+      .filter(c => hexDistance(c.destination, resolvedDestination.position) < currentDistance)
+      .sort((a,b) => hexDistance(a.destination,resolvedDestination.position) - hexDistance(b.destination,resolvedDestination.position) || a.effectiveMovementCost-b.effectiveMovementCost || a.destination.q-b.destination.q || a.destination.r-b.destination.r);
+    for (const candidate of candidates) {
+      const detail = publicMoveDetails(mutableSource,mover.id,candidate.destination,candidate.path);
+      if (!detail?.preview?.destinationReached || detail.preview.interception || detail.preview.fuelExhaustionHex) continue;
+      alternative = { destination:candidate.destination, action:{type:'Move',unitId:mover.id,destination:candidate.destination}, effectiveMovementCost:candidate.effectiveMovementCost }; break;
+    }
+  }
   const links = buildPublicRoadLinks(mutableSource);
   const road = routePath ? roadSummary(routePath, links) : null;
   const strategic = routePath ? strategicSequence(routePath, graph) : [];
@@ -500,7 +464,7 @@ export function queryRoute(source: Readonly<RouteQuerySource>, input: Readonly<R
     terrainPathExists: terrainPath !== null,
     routeAvailable: routePath !== null,
     unavailableReason: routePath ? null : unavailableReason(resolvedDestination, tiles, mover !== null, publiclyOccupied, terrainPath),
-    destinationCenterReached: routePath !== null,
+    destinationCenterReached: mover ? (singleAction.actionRequired === false && singleAction.reachable === true) || movementDetail?.preview?.destinationReached === true : routePath !== null,
     adjacentCandidates,
     pathLength: routePath ? routePath.length - 1 : null,
     terrainMovementCost: terrainCost,
@@ -513,6 +477,7 @@ export function queryRoute(source: Readonly<RouteQuerySource>, input: Readonly<R
     startsAtStrategicNode: nodeKeys.has(hexKey(resolvedSource.position)),
     endsAtStrategicNode: nodeKeys.has(hexKey(resolvedDestination.position)),
     currentSingleAction: singleAction,
+    movementDetail, alternative, alternativeReason: alternative ? 'closest_safe_public_legal_move' : singleAction.reachable ? 'not_needed' : 'no_closer_uninterrupted_public_move',
     publicMovementConditions: {
       publiclyOccupiedHexesConsidered: publiclyOccupied.size,
       visibleBarbedWireHexesEntered: routePath?.filter((position, index) => index > 0 && visibleWireKeys.has(hexKey(position))).length ?? 0,

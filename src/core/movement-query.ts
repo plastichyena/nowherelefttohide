@@ -1,3 +1,4 @@
+import { movementPlan, summarizeMovement, movementUnavailableReason, infantryMoveFuel, previewMovementPath } from './move-plan';
 import { canOccupyAirHex, emergencyLandingPreview } from './aircraft';
 import { deployedArtillery, canReact, isAirborne, occupiesGroundLayer, canTargetUnit } from './unit-capabilities';
 import type { GameState, UnitState, HexCoord, MoveAction, ActionError, GameAction } from './types';
@@ -16,20 +17,26 @@ import type { HumanUnitType } from './types';
 export function unitMoveFuelCost(unitType: HumanUnitType, distance: number): number {
   if (unitType === 'multipurposeHelicopter') return Math.max(0, Math.floor(distance)) * 5;
   if (unitType === 'fieldArtillery') return Math.max(0, Math.floor(distance)) * 10;
-  const entered = Math.max(0, Math.floor(distance));
-  if (entered === 0) return 0;
-  const base = entered <= 5
-    ? 1
-    : unitType === 'nationalGuard' || unitType === 'reconTeam'
-      ? 1 + 2 * (entered - 5)
-      : 1 + (entered - 5);
-  return base * 2;
+  return infantryMoveFuel(unitType, distance);
 }
 
 
 export function movementFuelCost(state: Readonly<GameState>, unit: UnitState, hexes: number, movementPoints: number): number {
   if (isAirborne(unit)) return Math.min(unit.currentFuel, movementPoints * state.config.units.multipurposeHelicopter.fuelPerMovementPoint);
   return unit.type === 'fieldArtillery' ? movementPoints * state.config.units.fieldArtillery.fuelPerMovementPoint : unitMoveFuelCost(unit.type as HumanUnitType,hexes);
+}
+
+function movementActor(state: Readonly<GameState>, unit: UnitState) {
+  return { ...unit, emergencyMovementPoints: state.config.units[unit.type].emergencyMovementPoints,
+    artillery: { fuelPerMovementPoint: state.config.units.fieldArtillery.fuelPerMovementPoint },
+    movementSummary: { fuelCostPerUnit: unit.type === 'multipurposeHelicopter' ? state.config.units.multipurposeHelicopter.fuelPerMovementPoint : null } };
+}
+
+export function getUnitMovementSummary(state: Readonly<GameState>, unit: UnitState) {
+  const actor = movementActor(state, unit);
+  const phase = state.gameOver ? 'ended' : state.phase;
+  const count = unit.isPlayerUnit && !movementUnavailableReason(actor, phase) ? reachableMovePaths(state as GameState, unit).length : 0;
+  return summarizeMovement(actor, phase, count);
 }
 
 export interface MovePreview {
@@ -72,9 +79,8 @@ export function getMovePath(state: GameState, action: MoveAction): {
   if (unit.transportedByUnitId) return error(action, 'unit_transported', 'Transported units cannot move');
   if (unit.type === 'multipurposeHelicopter' && !isAirborne(unit)) return error(action, 'aircraft_not_airborne', 'Take off before moving');
   if (isAirborne(unit) && unit.currentFuel <= 0) return error(action, 'insufficient_unit_fuel', 'Flight requires fuel');
-  if (!isPlayerPhase(state) || unit.actionState === 'acted' || !unit.canMove || deployedArtillery(unit)) {
-    return error(action, 'unit_cannot_move', 'This unit cannot move now');
-  }
+  const unavailable = movementUnavailableReason(movementActor(state, unit), state.gameOver ? 'ended' : state.phase);
+  if (unavailable) return error(action, unavailable, 'This unit cannot move now; query route with moverUnitId and destination for details.');
   if (!hexWithinBounds(action.destination, state.map.width, state.map.height)) {
     return error(action, 'outside_map', 'Destination is outside the map');
   }
@@ -101,19 +107,11 @@ export function getMovePath(state: GameState, action: MoveAction): {
   if (!path) {
     return error(action, 'no_path', 'No path is available');
   }
-  const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
-  const movementBudget = movementMode === 'emergency'
-    ? state.config.units[unit.type as HumanUnitType].emergencyMovementPoints
-    : unit.movement;
   const effectiveCost = pathMovementCost(path, unitMovementCostResolver(state, unit, visible));
-  if (path.length <= 1 || effectiveCost > movementBudget) {
-    return error(action, 'out_of_range', 'Destination exceeds movement range');
-  }
-  const fuelCost = movementMode === 'normal' ? movementFuelCost(state, unit, path.length - 1, effectiveCost) : 0;
-  if (movementMode === 'normal' && unit.currentFuel < fuelCost) {
-    return error(action, 'insufficient_unit_fuel', 'The unit does not have enough Fuel for this move');
-  }
-  return { unit, path, movementMode, effectiveMovementCost: effectiveCost, fuelCost };
+  const plan = movementPlan(movementActor(state, unit), state.gameOver ? 'ended' : state.phase, path.length - 1, effectiveCost);
+  if (!plan.legal) return error(action, plan.reason!, 'Inspect route with moverUnitId and destination for movement details and a possible alternative.');
+  return { unit, path, movementMode: plan.movementMode, effectiveMovementCost: effectiveCost, fuelCost: plan.fuelCost };
+
 }
 
 function reachableMovePaths(state: GameState, unit: UnitState) {
@@ -156,7 +154,7 @@ export function getUnitLegalMoveFuelProjections(
 }> {
   const snapshot = state as GameState;
   const unit = getUnit(snapshot, unitId);
-  if (!unit || !unit.isPlayerUnit || unit.transportedByUnitId || (unit.type === 'multipurposeHelicopter' && !isAirborne(unit)) || unit.actionState === 'acted' || !unit.canMove || deployedArtillery(unit) || snapshot.phase !== 'player') return [];
+  if (!unit || !unit.isPlayerUnit || state.gameOver || (isAirborne(unit) && unit.currentFuel <= 0) || unit.transportedByUnitId || (unit.type === 'multipurposeHelicopter' && !isAirborne(unit)) || unit.actionState === 'acted' || !unit.canMove || deployedArtillery(unit) || snapshot.phase !== 'player') return [];
   return reachableMovePaths(snapshot, unit).map((entry) => {
     const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
     const fuelCost = movementMode === 'normal' ? movementFuelCost(state, unit, entry.path.length - 1, entry.cost) : 0;
@@ -178,7 +176,7 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
   if ('code' in candidate) {
     return {
       legal: false,
-      reason: candidate.message,
+      reason: candidate.code,
       path: [],
       reached: null,
       interception: null,
@@ -189,46 +187,12 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
     };
   }
   const mover = candidate.unit;
-  const exhaustionIndex = isAirborne(mover) ? Math.ceil(mover.currentFuel / state.config.units.multipurposeHelicopter.fuelPerMovementPoint) : Infinity;
-  for (const [index, position] of candidate.path.slice(1).entries()) {
-    if (index + 1 >= exhaustionIndex) return {
-      legal: true, reason: null, path: candidate.path, reached: {...position}, interception: null,
-      fuelCost: mover.currentFuel, projectedFuelAfterMove: 0, movementMode: 'normal', effectiveMovementCost: index+1,
-      fuelExhaustionHex: {...position}, emergencyLanding: emergencyLandingPreview(state,mover,position),
-    };
-    const interceptors = interceptorsAt(snapshot, mover, position)
-      .filter((interceptor) => initiallyVisible.has(hexKey(interceptor.position)));
-    if (interceptors[0]) {
-      const entered = candidate.path.findIndex((step) => hexKey(step) === hexKey(position));
-      const partialPath = candidate.path.slice(0, entered + 1);
-      const effectiveCost = pathMovementCost(partialPath, unitMovementCostResolver(snapshot, mover, initiallyVisible));
-      const fuelCost = candidate.movementMode === 'normal'
-        ? movementFuelCost(state, mover, entered, effectiveCost)
-        : 0;
-      return {
-        legal: true,
-        reason: null,
-        path: candidate.path,
-        reached: { ...position },
-        interception: { interceptorId: interceptors[0].id, position: { ...position } },
-        fuelCost,
-        projectedFuelAfterMove: mover.currentFuel - fuelCost,
-        movementMode: candidate.movementMode,
-        effectiveMovementCost: effectiveCost,
-      };
-    }
-  }
-  return {
-    legal: true,
-    reason: null,
-    path: candidate.path,
-    reached: { ...destination },
-    interception: null,
-    fuelCost: candidate.fuelCost,
-    projectedFuelAfterMove: mover.currentFuel - candidate.fuelCost,
-    movementMode: candidate.movementMode,
-    effectiveMovementCost: candidate.effectiveMovementCost,
-  };
+  const resolver = unitMovementCostResolver(state, mover, initiallyVisible);
+  const projected = previewMovementPath(movementActor(state, mover), state.phase, candidate.path, p => resolver(p) ?? 0,
+    p => interceptorsAt(snapshot, mover, p).find(i => initiallyVisible.has(hexKey(i.position)))?.id ?? null);
+  return { ...projected, legal: true, reason: null, path: candidate.path,
+    ...(projected.fuelExhaustionHex ? { emergencyLanding: emergencyLandingPreview(state, mover, projected.fuelExhaustionHex) } : {}) };
+
 }
 
 function unitMovementCostResolver(state: Readonly<GameState>, unit: UnitState, visible: ReadonlySet<string>) {

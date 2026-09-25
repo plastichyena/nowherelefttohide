@@ -30,7 +30,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '15.0.0';
+export const GAME_VERSION = '16.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -63,7 +63,7 @@ export function populationReceptionCapacity(facility: Pick<FacilityState, 'type'
 }
 
 export function isProductionFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return ['farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'simpleFarm', 'civilianDroneBase', 'armyBase', 'airBase']
+  return ['farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'simpleFarm', 'reliefSupplyCenter', 'civilianDroneBase', 'armyBase', 'airBase']
     .includes(facility.type);
 }
 
@@ -386,7 +386,7 @@ function facilityStateFromDefinition(
     securedOrder,
     lastAssignedOrder: securedOrder ?? 0,
     populationOperationalTurn: owned ? 1 : Number.MAX_SAFE_INTEGER,
-    powerSupplyEnabled: ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(definition.type),
+    powerSupplyEnabled: ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'reliefSupplyCenter'].includes(definition.type),
     lastPowerSupplied: null,
     constructible: false,
     builtTurn: null,
@@ -755,6 +755,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   };
   state.units.push(...initialGasPositions.map((position, index) => createUnit(state, `gas-zombie-initial-${index+1}`, 'gasZombie', position)));
   state.units.push(...initialScreamerPositions.map((position, index) => createUnit(state, `screamer-zombie-initial-${index+1}`, 'screamerZombie', position)));
+  state.nextUnitNumber = 1 + Math.max(0, ...state.units.map(unit => Number(/-(\d+)$/.exec(unit.id)?.[1] ?? 0)));
   synchronizePopulation(state);
   state.population.initialPopulation = populationLedgerTotal(state);
   const coverage = getPlayerVisionCoverage(state);
@@ -771,9 +772,12 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   return state;
 }
 
+/** One monotonic lifetime counter shared by every runtime spawn; never reset after death. */
+export function allocateUnitId(state: GameState, prefix: string): string {
+  return `${prefix}-${state.nextUnitNumber++}`;
+}
+
 export function nextHumanUnitId(state: GameState, type: HumanUnitType): string {
   const prefix = type === 'multipurposeHelicopter' ? 'multipurpose-helicopter' : type === 'fieldArtillery' ? 'field-artillery' : type === 'specialForces' ? 'special-forces' : type === 'police' ? 'police' : type === 'nationalGuard' ? 'national-guard' : type === 'riotPolice' ? 'riot-police' : 'recon-team';
-  const id = `${prefix}-${state.nextUnitNumber}`;
-  state.nextUnitNumber += 1;
-  return id;
+  return allocateUnitId(state, prefix);
 }

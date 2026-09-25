@@ -32,8 +32,8 @@ export interface QuerySchema {
 }
 
 const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter'] as const satisfies readonly HumanUnitType[];
-const FACILITY_TYPES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'airBase'] as const satisfies readonly FacilityType[];
-const CONSTRUCTIBLE_TYPES = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const satisfies readonly ConstructibleFacilityType[];
+const FACILITY_TYPES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'airBase', 'reliefSupplyCenter'] as const satisfies readonly FacilityType[];
+const CONSTRUCTIBLE_TYPES = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'] as const satisfies readonly ConstructibleFacilityType[];
 const FACILITY_STATUSES = ['unowned', 'owned', 'ruined'] as const satisfies readonly FacilityStatus[];
 const FACILITY_OPERATIONAL_STATUSES = ['building', 'operational', 'stopped', 'infected', 'disabled', 'recovering', 'ruined'] as const satisfies readonly FacilityOperationalStatus[];
 const CHECKPOINT_STATUSES = ['operational', 'remnant', 'ruined', 'abandoned'] as const satisfies readonly CheckpointStatus[];
@@ -191,6 +191,9 @@ const routeValueSchema = object({
   strategicNodes: routeSequencePage(strategicPathItemSchema),
   supplyTransitions: routeSequencePage(supplyTransitionItemSchema),
   hexPath: routeSequencePage(hexPathItemSchema),
+  movementDetail: { oneOf: [opaqueObject('One destination plan: legal/reason, movementMode/budget/effective cost, plannedFuelCost, charged fuelCost and remaining fuel; preview separately gives reached Hex, visible interception, fuelExhaustionHex, destinationReached and arrivalReason.'), { type: 'null' }] },
+  alternative: { oneOf: [object({ destination: position, action: object({ type: { enum: ['Move'] }, unitId: string, destination: position }, ['type', 'unitId', 'destination']), effectiveMovementCost: nonNegativeInteger }, ['destination', 'action', 'effectiveMovementCost']), { type: 'null' }] },
+  alternativeReason: { enum: ['closest_safe_public_legal_move', 'not_needed', 'no_closer_uninterrupted_public_move'] },
 }, ['mode', 'moverUnitId', 'resolvedSource', 'resolvedDestination', 'terrainPathExists', 'routeAvailable', 'unavailableReason', 'destinationCenterReached', 'adjacentCandidates', 'pathLength', 'terrainMovementCost', 'effectiveMovementCost', 'roadDistance', 'roadRoles', 'branchIds', 'hasOffRoadSegments', 'offRoadDistance', 'startsAtStrategicNode', 'endsAtStrategicNode', 'currentSingleAction', 'publicMovementConditions', 'strategicNodes', 'supplyTransitions', 'hexPath']);
 
 const strategicNodeSchema = object({

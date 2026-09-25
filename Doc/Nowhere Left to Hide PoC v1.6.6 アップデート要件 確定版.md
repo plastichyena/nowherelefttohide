@@ -1,12 +1,14 @@
 # Nowhere Left to Hide PoC v1.6.6 アップデート要件 確定版
 
-> Status: Requirements Final（実装・検証は未実施）  
+> Status: Implemented（2026-09-25、ローカル検証済み。長時間workflowの結果確認は依頼者指定で後日）
 > Base: v1.6.5  
 > 作成・要件確定日: 2026-09-24  
 > 追加改訂日: 2026-09-25（AIプレイ出力容量削減・案A／案Cを第15章へ追加）  
 > 主な根拠: v1.6.5 Claude Opus playtest（seed 3 / build 1bd6c411196863683a98ba4b83a1a5264692dcfa）、現行 main 実装確認、ChatGPT Desktop Work / CodexでのWebMCP実機確認、2026-09-24時点のOpenAI Site tools説明およびWebMCP Community Group Draft
 
 ## 0. 文書の位置付けと目的
+
+2026-09-25実装反映: 本文は確定時の要件を保持する。実装後の現行ルールは `Nowhere Left to Hide PoC 現行仕様.md`、検証範囲・制約・容量実測は [`validation/v166-acceptance.md`](../validation/v166-acceptance.md) を参照する。救援物資センター画像は採用承認を受け組込み済み。今回の依頼ではDoc/archiveを変更しないため、反映済み要件をここに保持する。以下の「未実施」「未検証」は要件確定時点の記録であり、現在の検証結果ではない。
 
 本書はドラフトと依頼者との19問の回答を統合した、v1.6.6の実装目標である。未変更部分は `Nowhere Left to Hide PoC 現行仕様.md` のv1.6.5に従う。実装・必須検証完了までは現行仕様をv1.6.5のまま維持する。確定版の作成はゲーム実装、テスト成功、画像の採用を意味しない。
 

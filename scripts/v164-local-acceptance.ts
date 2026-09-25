@@ -33,6 +33,6 @@ const service=new SessionService(new SessionStore(resolve(directory,'sessions'))
 service.newSession({sessionId:'artillery',seed:1});
 for(const [index,action] of actions.entries()){const result=service.step('artillery',{action,expectedRevision:index,decisionSummary:`v1.6.4 公開Action検証 ${index+1}: ${action.type}`});if(!result.decisionRecord.accepted)throw new Error('Session rejected scenario action');}
 const artifactPath=resolve(directory,'artillery.nlth-artifact');service.exportArtifact('artillery',artifactPath);
-const replay=service.replayArtifact(artifactPath);if(!replay.matched)throw new Error('Scenario replay mismatch');
+const replay=service.replayArtifact(`${artifactPath}.zip`);if(!replay.matched)throw new Error('Scenario replay mismatch');
 writeFileSync(resolve(directory,'report.json'),JSON.stringify({actions,preview,replay,versions:game.getApiInfo(),directory},null,2));
 console.log(JSON.stringify({directory,actionCount:actions.length,replay},null,2));

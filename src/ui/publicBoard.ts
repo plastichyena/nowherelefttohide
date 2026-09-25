@@ -103,6 +103,15 @@ export class PublicBoardRenderer {
       if(capabilities)rows.push([label('確保 / 復旧 / 鎮圧 / 封じ込め','Capture / Recover / Suppress / Contain'),['capture','recoverCheckpoint','suppress','contain'].map(k=>capabilities[k]?'✓':'—').join(' / ')]);
     } else if(e.kind==='facility'){
       rows.push([label('所有 / 稼働状態','Owner / Operation'),`${d.owner==='player'?label('自国','Owned'):label('未確保','Unsecured')} / ${t(String(d.operationalStatus),String(d.operationalStatus))}`],[label('健康人口 / 感染者','Healthy / Infected'),d.owner==='player'?`${d.healthyPopulation} / ${d.infectedPopulation}`:label('非公開','Not public')],[label('補給','Supply'),d.inSupply?label('補給内','In supply'):label('補給外','Out of supply')],[label('停止理由','Stopped reason'),(d.production as {stoppedReason?:string})?.stoppedReason]);
+      if(d.type==='reliefSupplyCenter'){
+        const production=d.production as {operatingWorkers:number;inputsPerWorker:{food?:number};outputsPerWorker:{civilianGoods?:number};estimatedInputConsumption:{food?:number};estimatedOutput:{civilianGoods?:number};powerSupplyEnabled:boolean;projectedPowerSupplied:boolean;powerDemand:number};
+        rows.push([label('稼働人数 / 定員','Operating workers / Capacity'),`${production.operatingWorkers} / ${d.populationCapacity}`],
+          [label('1人あたりの変換','Conversion per worker'),`Food ${production.inputsPerWorker.food??0} → CG ${production.outputsPerWorker.civilianGoods??0}`],
+          [label('維持費確保後の変換予測','Conversion after reserving maintenance'),`Food ${production.estimatedInputConsumption.food??0} → CG ${production.estimatedOutput.civilianGoods??0}`],
+          [label('電源 / 給電 / 必要電力','Switch / Supplied / Power'),`${production.powerSupplyEnabled?'ON':'OFF'} / ${production.projectedPowerSupplied?'ON':'OFF'} / ${production.powerDemand}`],
+          [label('空の施設の撤去返還','Refund when empty'),`CG ${d.decommissionRefundCivilianGoods}`],
+          [label('地上視界','Ground vision'),d.vision]);
+      }
       const base=d.armyBase as {militaryGoods:number;interceptionsRemaining:number;rewardStatus:string;pendingRecruitment?:{unitType:string;readyTurn:number;status:string}}|undefined;
       if(base){rows.push([label('基地軍需品 / 迎撃残数','Base ammunition / Interceptions'),`${base.militaryGoods} / ${base.interceptionsRemaining}`],[label('確保報酬','Capture reward'),base.rewardStatus]);if(base.pendingRecruitment)rows.push([label('生産予約','Reservation'),`${t(base.pendingRecruitment.unitType)} · Turn ${base.pendingRecruitment.readyTurn} · ${base.pendingRecruitment.status}`]);}
     } else {

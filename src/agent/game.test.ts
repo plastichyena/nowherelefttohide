@@ -14,7 +14,7 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
 
 describe('AgentGame public boundary', { timeout: 60000 }, () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.6.5');
+    expect(APP_VERSION).toBe('1.6.6');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -121,7 +121,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('22');
+    expect(info.saveFormatVersion).toBe('23');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -182,7 +182,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',
       includesIllegalCandidates: true,
-      fairPlay: { hiddenEnemiesBlock: false, blockerUnitIdsPublic: false },
+      fairPlay: { hiddenEnemiesBlock: false, blockerUnitIdsPublic: true },
     });
     expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('checkpoint_supply_zombie_blocked');
     expect(info.rules.checkpointPositionCandidates.reasonCodes).toHaveProperty('checkpoint_target_not_visible');
@@ -216,7 +216,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       targetPriority: ['visible_population', 'wave_capital', 'inherited_horde', 'noise', 'idle'],
     });
     expect(info.rules.constructibleFacilities).toMatchObject({
-      types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
+      types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'],
       costs: { simpleFarm: 50, civilianDroneBase: 50, temporaryHousing: 50, windPowerPlant: 150 },
       simpleFarm: { playerBuildLimit: 'unlimited' },
       temporaryHousing: { hardCapacity: 10, requiredPower: 10, recruitmentHub: false },
@@ -226,6 +226,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
       'capital_and_cities',
       'occupied_temporary_housing',
       'farm_and_civilian_factory',
+      'input_ready_relief_supply_center',
       'input_ready_military_factory',
       'refinery',
       'civilian_drone_base',

@@ -187,9 +187,9 @@ describe('v1.5.7 resource runway', () => {
     disconnected.position = { q: remote!.q, r: remote!.r };
     const forecast = deriveStrategicForecast(state).resources.militaryGoods;
     expect(forecast.currentlyShort).toBe(false);
-    expect(forecast.currentDemand).toBe(2);
+    expect(forecast.currentDemand).toBe(0);
     expect(forecast.runway.current.nextEndTurnShortage).toBe(false);
-    expect(forecast.runway.current.estimatedShortageTurn).toBeGreaterThan(1);
+    expect(forecast.runway.current.estimatedShortageTurn).toBeNull();
   });
 
   it('separates current runway from virtual largest-contributor loss', () => {

@@ -130,7 +130,7 @@ describe('Session Schema 7 bounded storage and queries', () => {
     expect(stepped.decisionRecord.decision).toBe(3);
     expect(stepped.decisionRecord.previousDecisionHash).toBe(checkpoint.publicTraceHeadHash);
     const out = join(path, 'export.nlth-artifact');
-    const manifest = api.exportArtifact('child', out);
+    const manifest = api.exportArtifact('child', out, { keepDirectory: true });
     expect(manifest).toMatchObject({ decisionCount: 3, acceptedActionCount: 3 });
     expect(api.readArtifact(out).manifestHash).toBe(manifest.manifestHash);
     expect(api.replayArtifact(out)).toMatchObject({ matched: true, decisionCount: 3 });

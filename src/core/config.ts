@@ -15,7 +15,7 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '15.0.0';
+export const CONFIG_VERSION = '16.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v9';
 
 const facilityIds: FacilityId[] = [
@@ -73,7 +73,7 @@ const defaultUnitConfig: UnitConfigMap = {
     ...standardHuman, capabilities: { capture: false, recoverCheckpoint: false, suppress: false, contain: false, infantry: false },
     canTargetAir: true, movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 100, recruitAttack: 13, movement: 0, airborneMovement: 50, range: 2, vision: 10, population: 2,
-    maxFuel: 500, maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
+    maxFuel: 500, maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 0: 2, 1: 2, 2: 4 }, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 0, emergencyMovementPoints: 0, recruitmentFacilityTypes: ['airBase'],
     productionCivilianGoods: 100, productionMilitaryGoods: 140, productionFuel: 500, productionLimitPerGame: 1,
@@ -84,7 +84,7 @@ const defaultUnitConfig: UnitConfigMap = {
     ...standardHuman,
     canTargetAir: false, movementDomain: 'ground', regularAttackCharges: 3, veteranAttackCharges: 4,
     hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 5, maxFuel: 44,
-    maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
+    maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 1: 2, 2: 4 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
     recruitmentFacilityTypes: [], productionCivilianGoods: 0, productionMilitaryGoods: 0,
@@ -95,7 +95,7 @@ const defaultUnitConfig: UnitConfigMap = {
     ...standardHuman, capabilities: { capture: false, recoverCheckpoint: false, suppress: false, contain: false, infantry: false },
     canTargetAir: false, movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 1,
     hp: 25, recruitAttack: 7, movement: 10, range: 1, vision: 5, population: 5, maxFuel: 100, maxMilitaryGoods: 100,
-    fixedMilitaryGoodsUpkeepPerTurn: 1, attackMilitaryGoodsCostByRange: { 1: 4 }, suppressionMilitaryGoodsCost: 0,
+    fixedMilitaryGoodsUpkeepPerTurn: 0, attackMilitaryGoodsCostByRange: { 1: 4 }, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 1, recruitmentFacilityTypes: ['armyBase'],
     productionCivilianGoods: 100, productionMilitaryGoods: 200, productionFuel: 100, productionLimitPerGame: 2,
     fuelCostRule: 'perMovementPoint', fuelPerMovementPoint: 10, suppressionCivilianDamageRate: 0,
@@ -122,7 +122,7 @@ const defaultUnitConfig: UnitConfigMap = {
     ...standardHuman,
     canTargetAir: false, movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 50, recruitAttack: 12, movement: 10, range: 2, vision: 5, population: 10, maxFuel: 44,
-    maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
+    maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 1: 2, 2: 4 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
     recruitmentFacilityTypes: ['capital', 'armyBase', 'airBase'],
@@ -144,7 +144,7 @@ const defaultUnitConfig: UnitConfigMap = {
     ...standardHuman,
     canTargetAir: false, movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
     hp: 25, recruitAttack: 9, movement: 10, range: 6, vision: 10, population: 5, maxFuel: 44,
-    maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
+    maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: { 1: 6, 2: 6, 3: 6, 4: 6, 5: 6, 6: 6 }, suppressionMilitaryGoodsCost: 1,
     militaryGoodsShortageAttackMultiplier: 0.2, emergencyMovementPoints: 2,
     recruitmentFacilityTypes: ['capital', 'armyBase'],
@@ -196,6 +196,7 @@ const defaultUnitConfig: UnitConfigMap = {
 };
 
 const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
+  reliefSupplyCenter: { workerCapacity: 5, production: production({ food: 20 }, { civilianGoods: 5 }, 'required', 5), overrunSpawnCount: 2, buildCivilianGoods: 50, visionRadius: 1, zombieTargetValue: 0 },
   nuclearPowerPlant: { workerCapacity: 5, production: production({}, {}, 'none', 0, 500), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
   temporaryHousing: { workerCapacity: 10, production: production({}, {}, 'required', 10), overrunSpawnCount: 2, buildCivilianGoods: 50, visionRadius: 1, zombieTargetValue: 0 },
   airBase: { workerCapacity: 10, production: production({}, {}, 'required', 10), overrunSpawnCount: 2, buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0 },
@@ -226,7 +227,7 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
   },
   militaryFactory: {
     workerCapacity: 30,
-    production: production({ civilianGoods: 2 }, { militaryGoods: 1 }, 'required', 40),
+    production: production({ civilianGoods: 10 }, { militaryGoods: 4 }, 'required', 40),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
@@ -491,7 +492,9 @@ function mergeObjects(base: unknown, override: unknown): unknown {
 /** Create a complete, independent Config snapshot for a new game. */
 export function createDefaultConfig(overrides: DeepPartial<GameConfig> = {}): GameConfig {
   const merged = mergeObjects(DEFAULT_CONFIG, overrides);
-  return cloneConfig(merged as GameConfig);
+  const config = cloneConfig(merged as GameConfig);
+  for (const type of HUMAN_UNIT_TYPES) config.units[type].fixedMilitaryGoodsUpkeepPerTurn = 0;
+  return config;
 }
 
 export interface ConfigValidationResult {
@@ -660,6 +663,9 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     if (experience.regularAttackRounding !== 'ceil') errors.push('unitExperience.regularAttackRounding must be ceil');
   }
 
+  for (const type of HUMAN_UNIT_TYPES) {
+    if (config.units[type]?.fixedMilitaryGoodsUpkeepPerTurn !== 0) errors.push(`units.${type}.fixedMilitaryGoodsUpkeepPerTurn must be 0`);
+  }
   const facilityTypes: FacilityType[] = [
     'temporaryHousing',
     'armyBase',
@@ -674,6 +680,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     'nuclearPowerPlant',
     'windPowerPlant',
     'simpleFarm',
+    'reliefSupplyCenter',
     'civilianDroneBase',
   ];
   for (const type of facilityTypes) {
@@ -697,7 +704,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     if (!['required', 'none'].includes(facility.production.powerMode)) {
       errors.push(`facilities.${type}.production.powerMode must be required or none`);
     }
-    const expectedPowerMode = ['capital', 'city', 'temporaryHousing', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'armyBase', 'airBase'].includes(type)
+    const expectedPowerMode = ['capital', 'city', 'temporaryHousing', 'farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'armyBase', 'airBase', 'reliefSupplyCenter'].includes(type)
       ? 'required'
       : 'none';
     if (facility.production.powerMode !== expectedPowerMode) {
@@ -705,7 +712,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     }
     const expectedPowerCapacity = expectedPowerMode === 'none' ? 0
       : type === 'capital' || type === 'city' || type === 'refinery' ? 20
-        : type === 'civilianFactory' ? 30 : type === 'militaryFactory' ? 40 : 10;
+        : type === 'reliefSupplyCenter' ? 5 : type === 'civilianFactory' ? 30 : type === 'militaryFactory' ? 40 : 10;
     if (facility.production.powerCapacity !== expectedPowerCapacity) {
       errors.push(`facilities.${type}.production.powerCapacity must be ${expectedPowerCapacity}`);
     }

@@ -36,17 +36,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6.5 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.6.5';
-export const GAME_RULES_VERSION = '15.0.0';
-export const SAVE_FORMAT_VERSION = '22';
-export const AGENT_API_VERSION = '20.0.0';
-export const OBSERVATION_API_VERSION = '20.0.0';
-export const BRIDGE_API_VERSION = '20.0.0';
-export const BALANCED_AGENT_VERSION = '13.0.0';
-export const RANDOM_AGENT_VERSION = '8.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '19.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '16.0.0';
+/** v1.6.6 rejects all earlier state and public API schemas without migration. */
+export const APP_VERSION = '1.6.6';
+export const GAME_RULES_VERSION = '16.0.0';
+export const SAVE_FORMAT_VERSION = '23';
+export const AGENT_API_VERSION = '21.0.0';
+export const OBSERVATION_API_VERSION = '21.0.0';
+export const BRIDGE_API_VERSION = '21.0.0';
+export const BALANCED_AGENT_VERSION = '14.0.0';
+export const RANDOM_AGENT_VERSION = '9.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '20.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '17.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -232,6 +232,10 @@ export interface AgentFacilityObservation {
   recruitmentAvailable: boolean;
   recruitmentUnavailableReason: string | null;
   production: {
+    healthyWorkers: number;
+    operatingWorkers: number;
+    inputRequired: Partial<Record<ResourceType, number>>;
+    inputShortage: Partial<Record<ResourceType, number>>;
     inputsPerWorker: Partial<Record<ResourceType, number>>;
     outputsPerWorker: Partial<Record<ResourceType, number>>;
     requiresPower: boolean;
@@ -355,14 +359,7 @@ export interface AgentUnitObservation {
   suppressionMilitaryGoodsCost: number;
   emergencyMovementPoints: number;
   emergencyMovementAvailable: boolean;
-  /** Exact Core previews for every currently legal Move of this Unit. */
-  fuelCostByLegalMove: Array<{
-    destination: HexCoord;
-    fuelCost: number;
-    projectedFuelAfterMove: number;
-    movementMode: 'normal' | 'emergency';
-    effectiveMovementCost: number;
-  }>;
+  movementSummary: import('../core/move-plan').MovementSummary;
   attackPreviews: Array<{
     artillery?: import('../core/artillery').ArtilleryPreview;
     gasExplosion: import('../core/gas-preview').GasAttackPreview | null;
@@ -630,7 +627,7 @@ export interface AgentApiInfo {
       fairPlay: {
         hiddenEnemiesBlock: false;
         visibleEnemiesCanBlock: true;
-        blockerUnitIdsPublic: false;
+        blockerUnitIdsPublic: true;
         prngStatePublic: false;
         futureRandomOutcomesPublic: false;
       };
@@ -670,10 +667,10 @@ export interface AgentApiInfo {
       destroyedUnitReturnsCarriedGoods: false;
     };
     constructibleFacilities: {
-      types: Array<'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant'>;
+      types: Array<'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant' | 'reliefSupplyCenter'>;
       limitFormula: string;
       buildConditions: string[];
-      costs: Record<'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant', number>;
+      costs: Record<'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant' | 'reliefSupplyCenter', number>;
       stateTransitions: string[];
       simpleFarm: { workerCapacity: number; requiredPower: number; foodPerWorker: number; playerBuildLimit: string };
       civilianDroneBase: { workerCapacity: number; requiredPower: number; visionPerWorker: number };

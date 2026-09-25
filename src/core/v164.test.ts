@@ -1,3 +1,4 @@
+import { publicMoveCandidates } from '../agent/public-movement';
 import { describe, expect, it } from 'vitest';
 import { GameEngine } from './engine';
 import { createDefaultConfig } from './config';
@@ -53,7 +54,7 @@ describe('v1.6.4 reported regressions', () => {
     const engine = new GameEngine(1, quiet164());
     const observation = createAgentObservation(engine.getState());
     const unit = observation.units.find(u => u.type === 'reconTeam')!;
-    const move = unit.fuelCostByLegalMove[0]!;
+    const move = publicMoveCandidates(observation, unit.id)[0]!;
     expect(queryRoute(observation, { moverUnitId: unit.id, destination: { kind: 'coordinate', position: move.destination } }).currentSingleAction.reachable).toBe(true);
   });
 

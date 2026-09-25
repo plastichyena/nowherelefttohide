@@ -347,10 +347,10 @@ function runSeed(options: PortableSessionE2EOptions, seed: number): SeedReport {
   // driver never reads Private State, decision internals, or Session files.
   const identity = resolveSessionIdentity(process.env);
   const verifier = new SessionService(new SessionStore(options.root), createAgentSessionGameFactory(identity.buildId), identity);
-  const readManifest = verifier.readArtifact(artifactPath);
+  const readManifest = verifier.readArtifact(text(exportedManifest.artifactPath, 'ZIP path'));
   if (readManifest.manifestHash !== exportedManifestHash) fail(`Seed ${seed} Artifact read manifest differs from export`);
   if (readManifest.decisionCount !== decisions || readManifest.acceptedActionCount !== decisions) fail(`Seed ${seed} Artifact counts differ from the public step loop`);
-  const replay = verifier.replayArtifact(artifactPath);
+  const replay = verifier.replayArtifact(text(exportedManifest.artifactPath, 'ZIP path'));
   if (replay.matched !== true || replay.decisionCount !== decisions) fail(`Seed ${seed} Artifact Replay did not match`);
   if (sha256Json(replay.result) !== sha256Json(finalFromStatus.result)) fail(`Seed ${seed} Artifact Replay Result differs from final public Result`);
 
@@ -363,7 +363,7 @@ function runSeed(options: PortableSessionE2EOptions, seed: number): SeedReport {
     finalTurn: safeInteger(finalFromStatus.observation.turn, `seed ${seed} final turn`),
     counts: { decisions, playTurnProcesses, playTurnQueryRequests, fullSnapshotQueries, statusCommands: decisions + 2 },
     artifact: {
-      path: artifactPath,
+      path: text(exportedManifest.artifactPath, 'ZIP path'),
       decisionCount: readManifest.decisionCount,
       acceptedActionCount: readManifest.acceptedActionCount,
       readMatched: true,

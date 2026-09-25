@@ -59,9 +59,9 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
       checkpoint: CHECKPOINT_SCHEMA_VERSION,
       map: FIXED_MAP_ID,
     }).toEqual({
-      app: '1.6.5', rules: '15.0.0', save: 22, publicSave: '22',
-      agent: '20.0.0', observation: '20.0.0', bridge: '20.0.0', artifact: '19.0.0',
-      session: '16.0.0', checkpoint: '16.0.0', map: 'fixed-51x51-v9',
+      app: '1.6.6', rules: '16.0.0', save: 23, publicSave: '23',
+      agent: '21.0.0', observation: '21.0.0', bridge: '21.0.0', artifact: '20.0.0',
+      session: '17.0.0', checkpoint: '17.0.0', map: 'fixed-51x51-v9',
     });
   });
 
@@ -92,7 +92,7 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
     const config = state.config.units.reconTeam;
     expect(config).toMatchObject({
       hp: 25, recruitAttack: 9, movement: 10, vision: 10, range: 6, population: 5,
-      maxFuel: 44, maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 1,
+      maxFuel: 44, maxMilitaryGoods: 40, fixedMilitaryGoodsUpkeepPerTurn: 0,
       suppressionMilitaryGoodsCost: 1, suppressionCivilianDamageRate: 0.5,
       noiseClass: 'medium', noiseRadius: 6, reanimationUnitType: 'soldierZombie',
     });

@@ -50,13 +50,14 @@ export type FacilityType =
   | 'powerPlant'
   | 'nuclearPowerPlant'
   | 'windPowerPlant'
+  | 'reliefSupplyCenter'
   | 'simpleFarm'
   | 'civilianDroneBase'
   | 'temporaryHousing'
   | 'armyBase'
   | 'airBase';
 
-export type ConstructibleFacilityType = 'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant';
+export type ConstructibleFacilityType = 'simpleFarm' | 'civilianDroneBase' | 'temporaryHousing' | 'windPowerPlant' | 'reliefSupplyCenter';
 
 export type FacilityId = string;
 
@@ -964,7 +965,7 @@ export interface EndTurnForecast {
     additionalFood: number;
     additionalCivilianGoods: number;
   };
-  food: ForecastResourceRequirement;
+  food: CivilianGoodsForecast;
   civilianGoods: CivilianGoodsForecast;
   militaryGoods: MilitaryGoodsForecast;
   fuel: FuelForecast;

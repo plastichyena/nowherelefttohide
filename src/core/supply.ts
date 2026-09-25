@@ -171,6 +171,11 @@ export function isHexSuppliedByBranch(
     distance <= getBranchSupplyRadius(state, branchId, candidateCheckpointPosition);
 }
 
+/** Fixed capital network, independent of active or proposed checkpoints. */
+export function isInitialSupplyHex(state: Readonly<GameState>, position: HexCoord): boolean {
+  return hexDistance(getCapitalPosition(state.map), position) <= state.config.checkpoint.initialSupplyRadius;
+}
+
 export function isHexSupplied(state: Readonly<GameState>, position: HexCoord): boolean {
   const tile = supplyGeometry(state.map).byKey.get(hexKey(position));
   const distance = tile?.distance ?? hexDistance(getCapitalPosition(state.map), position);
@@ -215,6 +220,7 @@ export function getBlockingZombiesForCheckpoint(
     .filter(
       (unit) =>
         !unit.isPlayerUnit &&
+        !isInitialSupplyHex(state, unit.position) &&
         isHexSuppliedByBranch(state, unit.position, branchId, checkpointPosition),
     )
     .sort((left, right) => left.id.localeCompare(right.id));

@@ -1,3 +1,4 @@
+import { previewMove } from '../core/movement-query';
 import { HELICOPTER_ASSETS, ARTILLERY_ASSETS } from './boardAssets';
 import { renderAviationUnit, renderMilitaryDrone, renderFacilityObjectives } from './aviation';
 import { aviationPreview } from '../core/aviation-preview';
@@ -1612,7 +1613,7 @@ export interface BoardLegendViewModel {
 const LEGEND_TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const;
 const LEGEND_OVERLAYS = ['road', 'bridge', 'urban'] as const;
 const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
-const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'airBase', 'checkpoint'] as const;
+const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'airBase', 'reliefSupplyCenter', 'checkpoint'] as const;
 const LEGEND_OBSTACLES = ['barbedWire'] as const;
 
 function legendAssetFromRegistry(
@@ -1803,7 +1804,7 @@ function legendDescription(key: string, locale: Locale, t: (key: string, fallbac
     road:['Hexをつなぐ道路。','Road connecting hexes.'], bridge:['水面を渡る橋。','Bridge across water.'], urban:['建物が並ぶ市街地。','Built-up area with buildings.'],
     police:['警察制服の歩兵。','Infantry in police uniform.'], nationalGuard:['軍装の歩兵。','Infantry in military uniform.'], riotPolice:['盾と防具を持つ機動隊。','Riot Police with shields and armor.'], reconTeam:['偵察装備の歩兵。','Infantry with reconnaissance gear.'], specialForces:['特殊装備の歩兵。','Infantry with special operations gear.'],
     zombie:['通常のZombie。','Normal Zombie.'], hordeZombie:['大型のHorde Zombie。','Large Horde Zombie.'], policeZombie:['警察制服が残るZombie。','Zombie in a police uniform.'], soldierZombie:['軍装が残るZombie。','Zombie in military uniform.'], riotZombie:['盾と防具が残るZombie。','Zombie with shields and armor.'], hunterZombie:['筋肉と長い爪が目印。','Recognizable by its muscles and long claws.'], gasZombie:['膨張した体が目印。','Recognizable by its swollen body.'], screamerZombie:['叫ぶ姿勢が目印。','Recognizable by its screaming pose.'], packZombie:['複数個体の集団。','A group of several creatures.'],
-    capital:['中心都市の建物。','Capital city buildings.'], city:['地方都市の建物。','Regional city buildings.'], farm:['畑と農業施設。','Fields and farm buildings.'], civilianFactory:['民需工場の建物。','Civilian factory buildings.'], militaryFactory:['軍需工場の建物。','Military factory buildings.'], oilField:['採油設備。','Oil extraction equipment.'], refinery:['石油精製設備。','Oil refining equipment.'], powerPlant:['火力発電設備。','Thermal power equipment.'], nuclearPowerPlant:['原子力発電設備。','Nuclear power equipment.'], windPowerPlant:['風車。','Wind turbine.'], simpleFarm:['小規模な畑。','Small farm plots.'], civilianDroneBase:['ドローン基地の設備。','Civilian drone equipment.'], temporaryHousing:['仮設住宅の並び。','Rows of temporary homes.'], armyBase:['軍用車両と基地施設。','Military vehicles and base buildings.'], airBase:['滑走路と格納庫。','Runway and hangars.'], checkpoint:['道路上の検問設備。','Checkpoint equipment on a road.'], barbedWire:['Hex上の有刺鉄線。','Barbed wire on the hex.'],
+    reliefSupplyCenter:['物資の受付棟と倉庫。','Supply reception and warehouse.'], capital:['中心都市の建物。','Capital city buildings.'], city:['地方都市の建物。','Regional city buildings.'], farm:['畑と農業施設。','Fields and farm buildings.'], civilianFactory:['民需工場の建物。','Civilian factory buildings.'], militaryFactory:['軍需工場の建物。','Military factory buildings.'], oilField:['採油設備。','Oil extraction equipment.'], refinery:['石油精製設備。','Oil refining equipment.'], powerPlant:['火力発電設備。','Thermal power equipment.'], nuclearPowerPlant:['原子力発電設備。','Nuclear power equipment.'], windPowerPlant:['風車。','Wind turbine.'], simpleFarm:['小規模な畑。','Small farm plots.'], civilianDroneBase:['ドローン基地の設備。','Civilian drone equipment.'], temporaryHousing:['仮設住宅の並び。','Rows of temporary homes.'], armyBase:['軍用車両と基地施設。','Military vehicles and base buildings.'], airBase:['滑走路と格納庫。','Runway and hangars.'], checkpoint:['道路上の検問設備。','Checkpoint equipment on a road.'], barbedWire:['Hex上の有刺鉄線。','Barbed wire on the hex.'],
     periodic:['周期Hordeの所属マーカー。','Periodic Horde membership marker.'], final:['Final Hordeの所属マーカー。','Final Horde membership marker.'], spawnReserve:['盤面外周のR表示。','R markers along the map border.'],
     unowned:['未確保のマーカー。','Unsecured marker.'], owned:['確保済みのマーカー。','Secured marker.'], stopped:['停止のマーカー。','Stopped marker.'], infected:['感染のマーカー。','Infection marker.'], ruined:['荒廃のマーカー。','Ruined marker.'], operational:['稼働中のマーカー。','Operational marker.'], abandoned:['放棄のマーカー。','Abandoned marker.'], remnant:['跡地のマーカー。','Remnant marker.'],
   };
@@ -2074,6 +2075,7 @@ function facilityLabel(type: string, locale: Locale): string {
     nuclearPowerPlant: ['原子力発電所', 'Nuclear Power Plant'],
     windPowerPlant: ['風力発電所', 'Wind Power Plant'],
     simpleFarm: ['簡易農場', 'Simple Farm'],
+    reliefSupplyCenter: ['救援物資センター', 'Relief Supply Center'],
     civilianDroneBase: ['民間ドローン基地', 'Civilian Drone Base'],
     temporaryHousing: ['仮設住宅', 'Temporary Housing'],
     armyBase: ['陸軍基地', 'Army Base'],
@@ -2263,7 +2265,7 @@ function renderResourceAccordionPanel(
       const people = forecast.maintenancePopulation;
       if (people) rows.push([locale === 'ja' ? '住民 / 労働者 / 部隊' : 'Residents / workers / units', `${people.residents} / ${people.workers} / ${people.units}`], ['Queue waiting / screening / approved', `${people.queue.waiting} / ${people.queue.screening} / ${people.queue.approved}`]);
     }
-    if (resource === 'civilianGoods') {
+    if (resource === 'food' || resource === 'civilianGoods') {
       rows.push(
         [t('productionInputDemand'), String(detail.productionInputDemand)],
         [t('productionInputAllocated'), String(detail.productionInputAllocated)],
@@ -2315,7 +2317,7 @@ export function selectionShowsSupplyOverlay(
 }
 
 function isPowerSupplyFacility(facility: Pick<FacilityState, 'type'>): boolean {
-  return facility.type === 'farm' || facility.type === 'civilianFactory' || facility.type === 'militaryFactory' || facility.type === 'refinery' || facility.type === 'civilianDroneBase';
+  return facility.type === 'reliefSupplyCenter' || facility.type === 'farm' || facility.type === 'civilianFactory' || facility.type === 'militaryFactory' || facility.type === 'refinery' || facility.type === 'civilianDroneBase';
 }
 
 function formatPercent(value: number, locale: Locale): string {
@@ -2388,7 +2390,7 @@ function forecastResourceCard(
 ): string {
   const t = createTranslator(locale);
   let rows: Array<[string, string]>;
-  if (resource === 'civilianGoods') {
+  if (resource === 'food' || resource === 'civilianGoods') {
     const civilian = detail as EndTurnForecast['civilianGoods'];
     rows = [
       [t('startingStock'), String(civilian.startingStock)],
@@ -4226,7 +4228,7 @@ export class GameUiController {
         ? publicUnit?.attackPreviews.find((candidate) => candidate.targetUnitId === this.pendingAttackTargetId)
         : undefined;
       const movePreview = this.pendingMove
-        ? publicUnit?.fuelCostByLegalMove.find((candidate) => samePosition(candidate.destination, this.pendingMove!.destination))
+        ? previewMove(this.state, unit.id, this.pendingMove.destination)
         : undefined;
       const detail = this.pendingArtilleryTarget ? renderArtilleryPreview(previewArtillery(this.state,unit,this.pendingArtilleryTarget),this.locale) : attackPreview
         ? renderAttackPreview(attackPreview, this.locale, publicUnit?.attack)
@@ -4724,7 +4726,7 @@ export class GameUiController {
    * coordinate list is exposed to the Human UI. */
   private buildConstructibleAtSelectedHex(facilityType: string | undefined): void {
     if (!this.state || !this.engine || this.selection?.kind !== 'hex') return;
-    const constructibleTypes: readonly ConstructibleFacilityType[] = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'];
+    const constructibleTypes: readonly ConstructibleFacilityType[] = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'];
     if (!facilityType || !constructibleTypes.includes(facilityType as ConstructibleFacilityType)) return;
     const buildType = facilityType as ConstructibleFacilityType;
     const position = { ...this.selection.position };
@@ -5499,11 +5501,11 @@ export class GameUiController {
   private renderConstructionOverview(): string {
     if (!this.state) return '';
     const t = this.translator();
-    const types: ConstructibleFacilityType[] = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'];
+    const types: ConstructibleFacilityType[] = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'];
     const rows = types.map((facilityType) => {
       const config = this.state!.config.facilities[facilityType];
       const count = this.state!.facilities.filter((facility) => facility.constructible && facility.type === facilityType).length;
-      const limit = facilityType === 'temporaryHousing' || facilityType === 'simpleFarm'
+      const limit = facilityType === 'temporaryHousing' || facilityType === 'simpleFarm' || facilityType === 'reliefSupplyCenter'
         ? null
         : facilityType === 'windPowerPlant'
           ? this.state!.map.roadBranches.length * 2
@@ -5512,12 +5514,12 @@ export class GameUiController {
         ? t('buildSimpleFarm')
         : facilityType === 'civilianDroneBase'
           ? t('buildCivilianDroneBase')
-          : facilityType === 'temporaryHousing' ? t('buildTemporaryHousing') : t('buildWindPowerPlant');
+          : facilityType === 'temporaryHousing' ? t('buildTemporaryHousing') : facilityType === 'reliefSupplyCenter' ? t('buildReliefSupplyCenter') : t('buildWindPowerPlant');
       const usage = facilityType === 'simpleFarm'
         ? t('simpleFarmUse')
         : facilityType === 'civilianDroneBase'
           ? t('civilianDroneBaseUse')
-          : facilityType === 'temporaryHousing' ? t('temporaryHousingUse') : t('windPowerPlantUse');
+          : facilityType === 'temporaryHousing' ? t('temporaryHousingUse') : facilityType === 'reliefSupplyCenter' ? t('reliefSupplyCenterUse') : t('windPowerPlantUse');
       const limitLabel = limit === null ? t('unlimited') : `${count}/${limit}`;
       const remaining = limit === null ? t('unlimited') : String(Math.max(0, limit - count));
       const selectedPosition = this.selection?.kind === 'hex' ? this.selection.position : null;
@@ -5624,7 +5626,7 @@ export class GameUiController {
     publicTile?: AgentMapTileObservation,
   ): void {
     const t = this.translator();
-    const types: ConstructibleFacilityType[] = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'];
+    const types: ConstructibleFacilityType[] = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'];
     const candidates = types.map((facilityType) => this.constructibleFacilityCandidates(facilityType)
       .find((candidate) => samePosition(candidate.position, position)));
     const legal = candidates.filter((candidate): candidate is ConstructibleFacilityPositionCandidate => Boolean(candidate?.legal));
@@ -5633,7 +5635,7 @@ export class GameUiController {
         ? t('buildSimpleFarm')
         : candidate.facilityType === 'civilianDroneBase'
           ? t('buildCivilianDroneBase')
-          : candidate.facilityType === 'temporaryHousing' ? t('buildTemporaryHousing') : t('buildWindPowerPlant');
+          : candidate.facilityType === 'temporaryHousing' ? t('buildTemporaryHousing') : candidate.facilityType === 'reliefSupplyCenter' ? t('buildReliefSupplyCenter') : t('buildWindPowerPlant');
       const cost = this.state?.config.facilities[candidate.facilityType].buildCivilianGoods ?? 0;
       return `<button type="button" class="secondary-button constructible-build-button" data-action="build-constructible-local" data-facility-type="${escapeHtml(candidate.facilityType)}" data-q="${position.q}" data-r="${position.r}">${escapeHtml(label)} · ${escapeHtml(t('buildCost'))} ${cost}</button>`;
     }).join('');
@@ -5866,8 +5868,8 @@ export class GameUiController {
       : '';
     const recruitment = renderRecruitmentAccordion(this.state, facility, this.legalActions(), this.locale);
     const armyBaseDetails = publicFacility ? renderArmyBaseDetails(publicFacility, this.locale) : '';
-    const isDecommissionableType = facility.constructible && facility.type === 'civilianDroneBase';
-    const decommissionRefund = Math.ceil(this.state.config.facilities.civilianDroneBase.buildCivilianGoods / 2);
+    const isDecommissionableType = facility.constructible && ['civilianDroneBase', 'reliefSupplyCenter'].includes(facility.type);
+    const decommissionRefund = publicFacility?.decommissionRefundCivilianGoods ?? (facility.type === 'reliefSupplyCenter' ? Math.floor(this.state.config.facilities.reliefSupplyCenter.buildCivilianGoods / 2) : Math.ceil(this.state.config.facilities.civilianDroneBase.buildCivilianGoods / 2));
     const decommissionAction: Extract<GameAction, { type: 'DecommissionConstructibleFacility' }> = {
       type: 'DecommissionConstructibleFacility',
       facilityId: facility.id,
@@ -5954,8 +5956,8 @@ export class GameUiController {
       : '';
     const currentFuel = publicUnit?.currentFuel ?? unit.currentFuel;
     const maxFuel = publicUnit?.maxFuel ?? unit.maxFuel;
-    const selectedMove = this.pendingMove && publicUnit
-      ? publicUnit.fuelCostByLegalMove.find((move) => samePosition(move.destination, this.pendingMove!.destination))
+    const selectedMove = this.pendingMove && publicUnit && this.state
+      ? previewMove(this.state, unit.id, this.pendingMove.destination)
       : undefined;
     const refillDemand = publicUnit?.projectedRefillDemandIfTurnEndsNow ?? Math.max(0, maxFuel - currentFuel);
     const refillAmount = publicUnit?.projectedRefillAmountIfTurnEndsNow ?? 0;
@@ -6101,7 +6103,7 @@ export class GameUiController {
     const recoveryText = (keys: string[]) => escapeHtml(keys.map(key => recoveryLabels[key] ?? key).join(' · ') || t('none'));
     const recoveryDetail = recovery ? `<details><summary>${this.locale === 'ja' ? '復旧と生産再開条件' : 'Recovery and production requirements'}</summary><p>${recoveryText([recovery.status])} · ${recoveryText(recovery.missingConditions)}</p><p>${this.locale === 'ja' ? '復旧予定ターン' : 'Scheduled recovery turn'}: ${recovery.scheduledOperationalTurn ?? '—'}</p><p>${recoveryText(recovery.productionRequirements)}</p><p>${this.locale === 'ja' ? '施設ヘックスの都市地形による被ダメージ補正' : 'Facility urban terrain damage multiplier'} ×${recovery.terrainDefense.multiplier}</p></details>` : '';
     const stopped = production.stoppedReason
-      ? `<p class="warning-text"><strong>${escapeHtml(t('stoppedReason'))}</strong>: ${escapeHtml(stoppedReasonLabel(production.stoppedReason, this.locale))}</p>`
+      ? `<p class="warning-text"><strong>${escapeHtml(t('stoppedReason'))}</strong>: ${escapeHtml(stoppedReasonLabel(production.stoppedReason === 'power_unavailable' ? production.projectedPowerReason : production.stoppedReason, this.locale))}</p>`
       : '';
     const powerWarning = powerMode !== 'none' && !production.projectedPowerSupplied
       ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(powerReason || t('powerReason'))}</p>`
@@ -6109,7 +6111,7 @@ export class GameUiController {
     const infection = publicFacility.infectedPopulation > 0
       ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicFacility.infectionContained ? 'is-contained' : 'warning-text'}">${escapeHtml(publicFacility.infectionContained ? t('infectionContained') : t('infectionNotContained'))}</p><p class="muted">${escapeHtml(t('automaticSuppression'))}: ${publicFacility.projectedSuppression > 0 ? publicFacility.projectedSuppression : t('automaticSuppressionUnavailable')}</p>${publicFacility.projectedCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicFacility.projectedCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}</section>`
       : '';
-    const specialRule = type === 'windPowerPlant'
+    const specialRule = type === 'reliefSupplyCenter' ? `<p class="muted">${escapeHtml(t('reliefSupplyCenterUse'))}</p><p>${escapeHtml(t('workers'))}: ${production.healthyWorkers} / ${production.operatingWorkers} · ${escapeHtml(t('productionInputDemand'))}: ${escapeHtml(formatResourceAmounts(production.inputRequired, this.locale, true))} · ${escapeHtml(t('productionInputShortage'))}: ${escapeHtml(formatResourceAmounts(production.inputShortage, this.locale, true))}</p>` : type === 'windPowerPlant'
       ? `<p class="muted">${escapeHtml(t('windPowerGeneration'))}: ${publicFacility.windPower?.generation ?? 15} · ${escapeHtml(t('windFuelCost'))}: 0 · ${escapeHtml(t('windZombieTarget'))}: 0 · ${escapeHtml(t('facilityVision'))}: ${currentVision} · ${escapeHtml(t('powerMode'))}: ${escapeHtml(t('powerModeNone'))}${publicFacility.windPower ? ` · ${escapeHtml(t('windBuildLimit'))}: ${publicFacility.windPower.playerBuiltCount}/${publicFacility.windPower.playerBuildLimit}` : ''}</p>`
       : type === 'simpleFarm'
         ? `<p class="muted">${escapeHtml(t('foodPerWorker'))}: 5 · ${escapeHtml(t('powerMode'))}: ${escapeHtml(t('powerModeNone'))} · ${escapeHtml(t('buildCost'))}: ${buildCost}</p>`

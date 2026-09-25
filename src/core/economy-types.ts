@@ -32,7 +32,10 @@ export interface ArmyBaseMilitaryGoodsProjection {
 
 export interface FacilityProductionProjection {
   facilityId: string;
+  healthyWorkers: number;
   operatingWorkers: number;
+  inputRequired: Partial<Record<ResourceType, number>>;
+  inputShortage: Partial<Record<ResourceType, number>>;
   inputs: Partial<Record<ResourceType, number>>;
   outputs: Partial<Record<ResourceType, number>>;
   powerGeneration: number;

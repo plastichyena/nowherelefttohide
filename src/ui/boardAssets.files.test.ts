@@ -89,7 +89,7 @@ describe('board runtime PNG files', () => {
       'units/unit_recon_team.png',
       'units/unit_screamer_zombie.png',
     ]));
-    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(16);
+    expect(paths.filter((path) => path.startsWith('facilities/'))).toHaveLength(17);
     expect(paths).toEqual(expect.arrayContaining([
       'facilities/facility_army_base.png',
       'facilities/facility_temporary_housing.png',

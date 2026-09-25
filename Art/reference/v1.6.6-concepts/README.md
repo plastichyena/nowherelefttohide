@@ -2,7 +2,7 @@
 
 生成日: 2026-09-24。方式: built-in `image_gen`。
 
-状態: **候補生成・提示済み。依頼者による画像の採用判断とゲームへの組込みは未実施。**
+状態: **2026-09-25に依頼者が採用。原本を保存したまま256pxへ縮小し共通Asset Registryへ組込み済み。**
 
 要件: [v1.6.6アップデート要件 確定版](../../../Doc/Nowhere%20Left%20to%20Hide%20PoC%20v1.6.6%20アップデート要件%20確定版.md)
 
@@ -16,6 +16,6 @@
 
 生成原本から無加工でコピーし、Codex側の原本も保持している。1254×1254、32-bit ARGB、左上alpha=0、完全透過970,764ピクセルを読取検査で確認。小型倉庫・テント・物資箱の構成と、文字・実在ロゴがないことを目視確認した。ゲーム用256px加工、小縮尺・PC/モバイル・3表示経路の確認は実装工程で行う。
 
-採用後のRuntime配置予定: `public/assets/board/facilities/facility_relief_supply_center.png`。本作業では既存のRuntime Asset Registryやゲームコードを変更していない。
+Runtime配置: `public/assets/board/facilities/facility_relief_supply_center.png`。加工スクリプト: `scripts/build-v166-assets.py`。通常プレイ・Replay・Live AIで共通Registryを使用する。
 
 SHA-256: `E1B44793C3C03029C78DE20CD89B76C38615122CDBAC0CE5C7C976A88B052D7C`

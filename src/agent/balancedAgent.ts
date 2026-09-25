@@ -1,3 +1,5 @@
+import { reliefPolicy } from './relief-policy';
+import { withPublicMovementCache, publicMoveDetails } from './public-movement';
 import { aviationPolicy } from './aviation-policy';
 import { artilleryActionAssessment } from './artillery-policy';
 import { hexDistance, hexKey } from '../core/hex';
@@ -563,9 +565,7 @@ function scoreAction(
   } else if (action.type === 'Move') {
     const unit = units.get(action.unitId);
     if (unit) {
-      const fuelPreview = unit.fuelCostByLegalMove.find((move) =>
-        move.destination.q === action.destination.q && move.destination.r === action.destination.r,
-      );
+      const fuelPreview = publicMoveDetails(observation, unit.id, action.destination);
       if (fuelPreview) {
         const distance = hexDistance(unit.position, action.destination);
         const longRangeMultiplier = unit.type === 'nationalGuard' && distance >= 6 ? 2.5 : 1;
@@ -1107,6 +1107,10 @@ export class BalancedAgent implements GameAgent {
   public constructor(private readonly weights: Readonly<BalancedStrategyWeights> = BALANCED_WEIGHTS) {}
 
   public decide(observation: AgentObservation, legalActions: readonly GameAction[]): AgentDecision {
+    return withPublicMovementCache(observation, () => this.decideUncached(observation, legalActions));
+  }
+
+  private decideUncached(observation: AgentObservation, legalActions: readonly GameAction[]): AgentDecision {
     if (legalActions.length === 0) throw new Error('Balanced Agent received no legal actions');
     if (observation.turn !== this.currentTurn) {
       this.currentTurn = observation.turn;
@@ -1141,6 +1145,7 @@ export class BalancedAgent implements GameAgent {
       canRespondToThreat,
       canRespondToInfection,
     ));
+    candidates = candidates.map(candidate => { const relief = reliefPolicy(observation, candidate.action); return relief ? { ...candidate, score: relief.score, reasonCodes: [relief.reason] } : candidate; });
     const aviation=aviationPolicy(observation,legalActions);
     candidates=candidates.map(candidate=>{const decision=aviation(candidate.action);return decision?{...candidate,score:decision.override?decision.score:candidate.score+decision.score,reasonCodes:[...candidate.reasonCodes,decision.reason]}:candidate;});
     candidates = candidates.map((candidate) => ({

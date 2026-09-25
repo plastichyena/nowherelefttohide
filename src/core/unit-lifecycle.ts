@@ -1,3 +1,4 @@
+import { allocateUnitId } from './state';
 import { occupiesGroundLayer, isAirborne } from './unit-capabilities';
 import { effectiveMovementCost, hasMovementRoad } from './terrain';
 import { getTile } from './map-reference';
@@ -121,12 +122,7 @@ function reanimate(state: GameState, unit: UnitState, cause: string, rng: Seeded
     const prefix = reanimatedType === 'policeZombie'
       ? 'police-zombie'
       : reanimatedType === 'soldierZombie' ? 'soldier-zombie' : reanimatedType === 'packZombie' ? 'pack-zombie' : 'riot-zombie';
-    let id = `${prefix}-${state.nextUnitNumber}`;
-    while (state.units.some((candidate) => candidate.id === id)) {
-      state.nextUnitNumber += 1;
-      id = `${prefix}-${state.nextUnitNumber}`;
-    }
-    state.nextUnitNumber += 1;
+    const id = allocateUnitId(state, prefix);
     const reanimated = createUnit(state, id, reanimatedType, spawnPosition);
     const survivingWire = wireAt(state, spawnPosition);
     if (survivingWire) reanimated.reanimatedOnBarbedWireId = survivingWire.id;

@@ -1,3 +1,4 @@
+import { publicMoveCandidates } from './public-movement';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
 import { getCheckpointPositionCandidates } from '../core/engine';
@@ -65,7 +66,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
     expect(publicGuard).toMatchObject({
       currentMilitaryGoods: 4,
       maxMilitaryGoods: 40,
-      fixedMilitaryGoodsUpkeepPerTurn: 1,
+      fixedMilitaryGoodsUpkeepPerTurn: 0,
       attackMilitaryGoodsCostByRange: { 1: 2, 2: 4 },
       suppressionMilitaryGoodsCost: 1,
     });
@@ -106,9 +107,9 @@ describe('Agent Observation 8.0.0 rule projections', () => {
     const publicGuard = observation.units.find((unit) => unit.id === guard.id)!;
     const publicPolice = observation.units.find((unit) => unit.id === police.id)!;
     expect(publicGuard).toMatchObject({
-      projectedMilitaryGoodsAfterFixedConsumption: 39,
-      projectedMilitaryGoodsAfterRefill: 39,
-      projectedMilitaryGoodsAfterSuppression: 39,
+      projectedMilitaryGoodsAfterFixedConsumption: 40,
+      projectedMilitaryGoodsAfterRefill: 40,
+      projectedMilitaryGoodsAfterSuppression: 40,
       suppressionStatusIfTurnEndsNow: 'none',
     });
     expect(publicPolice).toMatchObject({
@@ -121,7 +122,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
     expect(observation.endTurnForecast.militaryGoods).toMatchObject({
       startingStock: 1,
       projectedTotalRefilled: 1,
-      totalUnfilledRefillDemand: 11,
+      totalUnfilledRefillDemand: 9,
       projectedEndingStock: 0,
     });
     expect(observation.endTurnForecast.militaryGoods.units.find((unit) => unit.unitId === police.id)).toMatchObject({
@@ -149,22 +150,22 @@ describe('Agent Observation 8.0.0 rule projections', () => {
       emergencyMovementAvailable: true,
       currentFuel: 0,
     });
-    expect(publicPolice.fuelCostByLegalMove).toContainEqual(expect.objectContaining({
+    expect(publicMoveCandidates(observation, publicPolice.id)).toContainEqual(expect.objectContaining({
       movementMode: 'emergency',
       effectiveMovementCost: 3,
       fuelCost: 0,
       projectedFuelAfterMove: 0,
     }));
-    expect(publicPolice.fuelCostByLegalMove.every((move) =>
+    expect(publicMoveCandidates(observation, publicPolice.id).every((move) =>
       move.movementMode === 'emergency' && move.effectiveMovementCost <= publicPolice.emergencyMovementPoints,
     )).toBe(true);
     expect(publicGuard).toMatchObject({ emergencyMovementPoints: 2, emergencyMovementAvailable: true });
-    expect(publicGuard.fuelCostByLegalMove).toContainEqual(expect.objectContaining({
+    expect(publicMoveCandidates(observation, publicGuard.id)).toContainEqual(expect.objectContaining({
       movementMode: 'emergency',
       effectiveMovementCost: 2,
       fuelCost: 0,
     }));
-    expect(publicGuard.fuelCostByLegalMove.every((move) => move.effectiveMovementCost <= 2)).toBe(true);
+    expect(publicMoveCandidates(observation, publicGuard.id).every((move) => move.effectiveMovementCost <= 2)).toBe(true);
   });
 
   it('returns deterministic detached JSON without private state', () => {
@@ -316,8 +317,8 @@ describe('Agent Observation 8.0.0 rule projections', () => {
     const observation = game.reset({ seed: 140, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const police = observation.units.find((unit) => unit.type === 'police')!;
     expect(police).toMatchObject({ currentFuel: 24, maxFuel: 24, inSupply: true });
-    expect(police.fuelCostByLegalMove.length).toBeGreaterThan(0);
-    expect(police.fuelCostByLegalMove.every((move) => move.fuelCost >= 1 && move.projectedFuelAfterMove >= 0)).toBe(true);
+    expect(publicMoveCandidates(observation, police.id).length).toBeGreaterThan(0);
+    expect(publicMoveCandidates(observation, police.id).every((move) => move.fuelCost >= 1 && move.projectedFuelAfterMove >= 0)).toBe(true);
     const wind = observation.facilities.find((facility) => facility.type === 'windPowerPlant')!;
     expect(wind).toMatchObject({
       healthyPopulation: 0,
@@ -335,7 +336,7 @@ describe('Agent Observation 8.0.0 rule projections', () => {
       inSupply: false,
     });
     expect(observation.strategicForecast.resources.fuel).toHaveProperty('singlePointOfFailure');
-    expect(observation.constructibleFacilityPositionCandidates).toHaveLength(51 * 51 * 4);
+    expect(observation.constructibleFacilityPositionCandidates).toHaveLength(51 * 51 * 5);
     expect(observation.roadBranches.every((branch) => branch.currentPolicyTurns === 2)).toBe(true);
     expect(observation.checkpoints.every((checkpoint) => checkpoint.queuePressureClass === 'none' || checkpoint.queuePeople > 0)).toBe(true);
   });

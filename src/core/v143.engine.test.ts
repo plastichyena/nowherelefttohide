@@ -82,7 +82,7 @@ function movePlayersAway(state: MutableState): void {
 describe('v1.5.1 Core version, map, and initial state', () => {
   it('creates a v11.0.0 state on fixed-51x51-v8 with all 40 initial Normal Zombies', () => {
     const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('15.0.0');
+    expect(state.gameVersion).toBe('16.0.0');
     expect(state.mapId).toBe('fixed-51x51-v9');
     expect(state.map.id).toBe('fixed-51x51-v9');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');
@@ -205,16 +205,16 @@ describe('v1.4.4 infection fall Spawn boundaries', () => {
 });
 
 describe('v1.4.4 constructible and Wind Power Plant overrun behavior', () => {
-  it('removes a constructible facility and counts only unspawned residual infection as deaths', () => {
+  it.each(['simpleFarm', 'reliefSupplyCenter'] as const)('removes %s and counts only unspawned residual infection as deaths', facilityType => {
     const engine = new GameEngine(14330, quietConfig());
-    const candidate = engine.getConstructibleFacilityPositionCandidates('simpleFarm').find((entry) => entry.legal);
+    const candidate = engine.getConstructibleFacilityPositionCandidates(facilityType).find((entry) => entry.legal);
     expect(candidate).toBeDefined();
-    const built = engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: candidate!.position });
+    const built = engine.step({ type: 'BuildConstructibleFacility', facilityType, position: candidate!.position });
     expect(built.error).toBeNull();
     const setup = cloneState(engine.getState());
-    const farm = setup.facilities.find((facility) => facility.constructible && facility.type === 'simpleFarm')!;
+    const farm = setup.facilities.find((facility) => facility.constructible && facility.type === facilityType)!;
     const capital = setup.facilities.find((facility) => facility.id === 'capital')!;
-    const infected = 10;
+    const infected = facilityType === 'reliefSupplyCenter' ? 5 : 10;
     farm.workers = 0;
     farm.infected = infected;
     farm.operationalStatus = 'infected';
@@ -229,9 +229,9 @@ describe('v1.4.4 constructible and Wind Power Plant overrun behavior', () => {
     const fall = result.events.find((event) => event.type === 'site_fallen' && event.payload.siteId === farm.id);
     expect(fall?.payload).toMatchObject({
       siteKind: 'facility',
-      siteType: 'simpleFarm',
+      siteType: facilityType,
       infectedAtFall: infected,
-      requestedSpawnCount: 2,
+      requestedSpawnCount: infected / 5,
       actualSpawnCount: 0,
       remainingInfected: 0,
       constructibleInfectedDeaths: infected,

@@ -30,7 +30,7 @@ it('preserves a wall through Session resume, checkpoint branching, executable re
   expect(api.status('branch').observation.barbedWire).toEqual(built.observation.barbedWire);
   const exported = api.exportArtifact('branch', join(root, 'public'));
   expect(api.replayArtifact(exported.artifactPath).matched).toBe(true);
-  const replay = await new ReplayPackage(new ReplayZip(new Blob([readFileSync(`${exported.artifactPath}.zip`)]), new AbortController().signal)).open();
+  const replay = await new ReplayPackage(new ReplayZip(new Blob([readFileSync(exported.artifactPath)]), new AbortController().signal)).open();
   const decision = await replay.decision(0);
   expect(decision.before.observation.barbedWire).toEqual([]);
   expect(decision.after.observation.barbedWire).toEqual(built.observation.barbedWire);

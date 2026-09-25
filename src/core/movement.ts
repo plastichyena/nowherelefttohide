@@ -41,6 +41,7 @@ function applyMovement(
     const occupant = flying ? state.units.find(u=>isAirborne(u) && hexKey(u.position)===hexKey(position)) : getUnitAt(state, position);
     if (occupant && occupant.id !== mover.id) break;
     if (!mover.isPlayerUnit) {
+      const encounteredWire = Boolean(wireAt(state, position));
       while (wireAt(state, position) && mover.canAttack && mover.attackChargesRemaining > 0) {
         if (getPlayerVisibleTileKeys(state).has(hexKey(position))) {
           state.statistics.barbedWireEmptyAttackCharges += 1;
@@ -50,7 +51,8 @@ function applyMovement(
         mover.canAttack = mover.attackChargesRemaining > 0;
         damageWire(state, position, mover.attack);
       }
-      if (wireAt(state, position)) break;
+      // Breaching ends this individual's movement, even after the last HP is removed.
+      if (encounteredWire) break;
     }
     if (spent + cost > movementBudget) break;
     spent += cost;

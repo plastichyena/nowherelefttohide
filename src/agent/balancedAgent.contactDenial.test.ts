@@ -43,7 +43,7 @@ function visibleZombie(observation: AgentObservation, id: string): AgentUnitObse
     canMove: true,
     currentFuel: 0,
     maxFuel: 0,
-    fuelCostByLegalMove: [],
+    movementSummary: { ...template.movementSummary, legalMoveCount: 0 },
     projectedRefillDemandIfTurnEndsNow: 0,
     projectedRefillAmountIfTurnEndsNow: 0,
   };

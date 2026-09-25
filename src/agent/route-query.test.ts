@@ -1,3 +1,4 @@
+import { publicMoveCandidates } from './public-movement';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from '../core/config';
 import { getPlayerVisibleTileKeys } from '../core/visibility';
@@ -47,8 +48,8 @@ function lineTile(q: number): AgentMapTileObservation {
 describe('public route query', () => {
   it('uses the Core legal-move projection for a player unit and omits raw Hexes by default', () => {
     const observation = createAgentObservation(createInitialState(15711, createDefaultConfig()));
-    const unit = observation.units.find((candidate) => candidate.fuelCostByLegalMove.length > 0)!;
-    const legal = unit.fuelCostByLegalMove[0]!;
+    const unit = observation.units.find((candidate) => candidate.movementSummary.legalMoveCount > 0)!;
+    const legal = publicMoveCandidates(observation, unit.id)[0]!;
     const result = queryRoute(observation, {
       moverUnitId: unit.id,
       destination: { kind: 'coordinate', position: legal.destination },
@@ -145,7 +146,7 @@ describe('public route query', () => {
       destination: { kind: 'coordinate', position: destination },
     });
     expect(acted.routeAvailable).toBe(true);
-    expect(acted.currentSingleAction).toMatchObject({ reachable: false, reason: 'unit_already_acted' });
+    expect(acted.currentSingleAction).toMatchObject({ reachable: false, reason: 'unit_cannot_move' });
 
     const alreadyThere = queryRoute(readyObservation, {
       moverUnitId: unit.id,
@@ -241,8 +242,8 @@ describe('public route query', () => {
     const firstObservation = createAgentObservation(state);
     const secondObservation = createAgentObservation(changed);
     expect(secondObservation.zombies).toEqual(firstObservation.zombies);
-    const unit = firstObservation.units.find((candidate) => candidate.fuelCostByLegalMove.length > 0)!;
-    const destination = unit.fuelCostByLegalMove[0]!.destination;
+    const unit = firstObservation.units.find((candidate) => candidate.movementSummary.legalMoveCount > 0)!;
+    const destination = publicMoveCandidates(firstObservation, unit.id)[0]!.destination;
 
     expect(queryRoute(secondObservation, {
       moverUnitId: unit.id,

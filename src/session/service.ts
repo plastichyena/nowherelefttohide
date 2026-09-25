@@ -8,11 +8,10 @@ import { queryRoute, RouteQueryInputError, type RouteQueryInput } from '../agent
 import { QUERY_FILTER_SCHEMAS, validateQuerySchema, publicQueryContract } from '../agent/query-contract';
 import { checkpointSupplyExplanation, deriveImportantChanges, summarizeImportantChanges, deriveCombatHazards, type ChangeDecision } from '../agent/decision-summary';
 import { facilityChanges, branchFlowChanges } from '../agent/facility-changes';
-import { writeArtifactZip } from './artifact-zip';
+import { ArtifactSource, ArtifactWriter } from './artifact-io';
 import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, readSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { StringDecoder } from 'node:string_decoder';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import type { GameAction, GameConfig, JsonValue } from '../core/types';
 import { comparePublicCrisisAlerts } from '../core/crisis';
@@ -48,6 +47,7 @@ import {
   type PublicDecisionRecord,
   type SessionArtifact,
   type SessionArtifactManifest,
+  type SessionArtifactExport,
   type SessionBranchBase,
   type SessionCheckpointKind,
   type SessionCheckpointMetadata,
@@ -498,39 +498,6 @@ function decodeCursor(value: string): CursorValue {
     if (!isObject(decoded) || typeof decoded.sessionId !== 'string' || typeof decoded.revision !== 'number' || !QUERY_TARGETS.includes(decoded.target) || !Number.isSafeInteger(decoded.offset) || decoded.offset < 0 || typeof decoded.filtersHash !== 'string') throw new Error('shape');
     return decoded;
   } catch { throw new SessionError('invalid_cursor', 'query cursor is malformed'); }
-}
-
-function *readLines(root: SafePathRoot, path: string): Generator<string> {
-  const fd = openSync(assertSafeInputFile(root, path), 'r');
-  const buffer = Buffer.allocUnsafe(64 * 1024);
-  const decoder = new StringDecoder('utf8');
-  let pending = '';
-  try {
-    while (true) {
-      const count = readSync(fd, buffer, 0, buffer.length, null);
-      if (count === 0) break;
-      pending += decoder.write(buffer.subarray(0, count));
-      if (Buffer.byteLength(pending, 'utf8') > 8 * 1024 * 1024 && !pending.includes('\n')) throw new SessionError('artifact_corrupt', 'Artifact contains an oversized stream record');
-      let newline: number;
-      while ((newline = pending.indexOf('\n')) >= 0) {
-        const line = pending.slice(0, newline).replace(/\r$/u, '');
-        pending = pending.slice(newline + 1);
-        if (line) yield line;
-      }
-    }
-    pending += decoder.end();
-    if (pending.replace(/\r$/u, '')) yield pending.replace(/\r$/u, '');
-  } finally { closeSync(fd); }
-}
-
-function safeOutputRoot(targetPath: string): SafePathRoot {
-  let parent = dirname(resolve(targetPath));
-  while (!existsSync(parent)) {
-    const next = dirname(parent);
-    if (next === parent) throw new SessionError('unsafe_path', `No existing safe parent for Artifact output ${targetPath}`);
-    parent = next;
-  }
-  return createSafePathRoot(parent);
 }
 
 function lazyIterableArray<T>(length: number, source: () => Iterable<T>): T[] {
@@ -1008,67 +975,64 @@ export class SessionService {
     return clone(snapshot.document);
   }
 
-  public exportArtifact(sessionId: string, outputPath?: string): SessionArtifactManifest {
+  public exportArtifact(sessionId: string, outputPath?: string, options: { keepDirectory?: boolean; signal?: AbortSignal } = {}): SessionArtifactExport {
+    let writer: ArtifactWriter | undefined;
     try {
       const loaded = this.loadCompatible(sessionId);
       this.restoreAndVerify(loaded);
-      const packagePath = resolve(outputPath ?? join(loaded.directory, 'artifacts', `${sessionId}-d${String(loaded.active.decision).padStart(12, '0')}.nlth-artifact`));
-      if (existsSync(packagePath)) throw new SessionError('artifact_exists', `Refusing to overwrite Artifact package ${packagePath}`);
-      const outputRoot = safeOutputRoot(packagePath);
-      ensureSafeOutputDirectory(outputRoot, packagePath);
-      const packageRoot = createSafePathRoot(packagePath);
-      ensureSafeOutputDirectory(packageRoot, join(packagePath, 'payloads'));
-      const streamPath = join(packagePath, 'artifact.ndjson');
-      const streamFd = openSync(assertSafeOutputPath(packageRoot, streamPath), 'wx');
+      const requested = resolve(outputPath ?? join(loaded.directory, 'artifacts', `${sessionId}-d${String(loaded.active.decision).padStart(12, '0')}.nlth-artifact.zip`));
+      const zipPath = requested.toLowerCase().endsWith('.zip') ? requested : `${requested}.zip`;
+      const directoryPath = options.keepDirectory ? zipPath.slice(0, -4) : null;
+      if (existsSync(zipPath) || existsSync(`${zipPath}.partial`) || (directoryPath && existsSync(directoryPath))) throw new SessionError('artifact_exists', `Refusing to overwrite Artifact output ${zipPath}`);
+      writer = new ArtifactWriter(zipPath, directoryPath, options.signal);
       const streamHash = createHash('sha256');
-      const writeLine = (value: unknown): void => { const bytes = Buffer.from(`${canonicalJson(value)}\n`, 'utf8'); writeSync(streamFd, bytes); streamHash.update(bytes); };
-      let decisionCount = 0;
-      let acceptedActionCount = 0;
-      let invalidActionCount = 0;
-      let payloadCount = 0;
+      let decisionCount = 0, acceptedActionCount = 0, invalidActionCount = 0, payloadCount = 0;
       const fixedMap = this.store.readPayload<AgentMapObservation>(loaded.runBase.fixedMap, 'Fixed Map');
       let metricDocument = this.initialDocument(loaded.runBase);
-      const initialMetricObservation = restoreArtifactObservation(metricDocument.observation, fixedMap);
-      const metrics = createGameMetricsAccumulator(metricsMetadata(loaded.descriptor), initialMetricObservation);
-      try {
-        writeLine({ kind: 'header', descriptor: loaded.descriptor, runBase: loaded.runBase, finalPublicHash: loaded.publicState.documentHash });
-        for (const record of this.store.iterateAllDecisionRecords(sessionId)) {
-          writeLine({ kind: 'decision', record });
-          decisionCount += 1;
-          if (record.accepted) acceptedActionCount += 1; else invalidActionCount += 1;
-          if (this.copyPayloadToPackage(record.publicPayload, packageRoot)) payloadCount += 1;
-          metricDocument = this.applyDecisionPayload(metricDocument, record);
+      const metrics = createGameMetricsAccumulator(metricsMetadata(loaded.descriptor), restoreArtifactObservation(metricDocument.observation, fixedMap));
+      const bytes = (value: unknown): Buffer => { const data = Buffer.from(`${canonicalJson(value)}\n`, 'utf8'); streamHash.update(data); return data; };
+      const self = this;
+      function *stream(): Generator<Buffer> {
+        yield bytes({ kind: 'header', descriptor: loaded.descriptor, runBase: loaded.runBase, finalPublicHash: loaded.publicState.documentHash });
+        for (const record of self.store.iterateAllDecisionRecords(sessionId)) {
+          yield bytes({ kind: 'decision', record });
+          decisionCount++;
+          if (record.accepted) acceptedActionCount++; else invalidActionCount++;
+          metricDocument = self.applyDecisionPayload(metricDocument, record);
           metrics.pushDecision({ record, ...(record.accepted ? { observationAfter: restoreArtifactObservation(metricDocument.observation, fixedMap) } : {}) });
         }
         const gameMetrics = publicMetrics(metrics.finish(restoreArtifactObservation(metricDocument.observation, fixedMap), loaded.publicState.result) as unknown as Record<string, unknown>);
-        writeLine({ kind: 'footer', result: loaded.publicState.result, gameMetrics, sessionMetrics: this.store.readSessionMetrics(sessionId) });
-      } finally { closeSync(streamFd); }
-      if (this.copyPayloadToPackage(loaded.runBase.fixedMap, packageRoot)) payloadCount += 1;
-      if (this.copyPayloadToPackage(loaded.runBase.initialPublicState, packageRoot)) payloadCount += 1;
-      const withoutHash = { ...this.identity, packageVersion: SESSION_ARTIFACT_PACKAGE_VERSION, sessionSchemaVersion: SESSION_SCHEMA_VERSION, sessionId, lineage: { parentSessionId: loaded.descriptor.parentSessionId, parentCheckpointId: loaded.descriptor.parentCheckpointId }, branchBase: loaded.descriptor.branchBase, decisionCount, acceptedActionCount, invalidActionCount, payloadCount, artifactPath: packagePath, streamHash: streamHash.digest('hex') } satisfies Omit<SessionArtifactManifest, 'manifestHash'>;
+        yield bytes({ kind: 'footer', result: loaded.publicState.result, gameMetrics, sessionMetrics: self.store.readSessionMetrics(sessionId) });
+      }
+      writer.add('artifact.ndjson', stream());
+      for (const record of this.store.iterateAllDecisionRecords(sessionId)) if (this.copyPayloadToPackage(record.publicPayload, writer)) payloadCount++;
+      if (this.copyPayloadToPackage(loaded.runBase.fixedMap, writer)) payloadCount++;
+      if (this.copyPayloadToPackage(loaded.runBase.initialPublicState, writer)) payloadCount++;
+      const withoutHash = { ...this.identity, packageVersion: SESSION_ARTIFACT_PACKAGE_VERSION, sessionSchemaVersion: SESSION_SCHEMA_VERSION, sessionId, lineage: { parentSessionId: loaded.descriptor.parentSessionId, parentCheckpointId: loaded.descriptor.parentCheckpointId }, branchBase: loaded.descriptor.branchBase, decisionCount, acceptedActionCount, invalidActionCount, payloadCount, streamHash: streamHash.digest('hex') } satisfies Omit<SessionArtifactManifest, 'manifestHash'>;
       const manifest: SessionArtifactManifest = { ...withoutHash, manifestHash: sha256Json(withoutHash) };
-      writeFileSync(assertSafeOutputPath(packageRoot, join(packagePath, 'manifest.json')), `${canonicalJson(manifest)}\n`, { encoding: 'utf8', flag: 'wx' });
-      writeArtifactZip(packagePath, `${packagePath}.zip`);
-      return manifest;
-    } catch (error) { return this.rejectWithDiagnostics(sessionId, 'artifact', error); }
+      writer.add('manifest.json', [Buffer.from(`${canonicalJson(manifest)}\n`, 'utf8')]);
+      writer.finish(path => this.readArtifact(path, { signal: options.signal }));
+      return { ...manifest, artifactPath: zipPath, replayZipPath: zipPath, artifactDirectoryPath: directoryPath };
+    } catch (error) {
+      writer?.close();
+      if (writer) return this.rejectWithDiagnostics(sessionId, 'artifact', new SessionError('artifact_export_incomplete', `Artifact was not finalized; partial output: ${writer.partialPath}. ${error instanceof Error ? error.message : String(error)}`));
+      return this.rejectWithDiagnostics(sessionId, 'artifact', error);
+    }
   }
 
-  public readArtifact(packagePath: string): SessionArtifactManifest {
-    const root = resolve(packagePath);
-    const safeRoot = createSafePathRoot(root);
-    const manifest = JSON.parse(readFileSync(assertSafeInputFile(safeRoot, join(root, 'manifest.json')), 'utf8')) as SessionArtifactManifest;
+  public readArtifact(packagePath: string, options: { signal?: AbortSignal } = {}): SessionArtifactManifest {
+    const safeRoot = new ArtifactSource(packagePath, options.signal);
+    try {
+    const manifest = JSON.parse(safeRoot.read('manifest.json', 1024 * 1024).toString('utf8')) as SessionArtifactManifest;
     const expected = integrityHash(manifest as unknown as Record<string, unknown>, 'manifestHash');
     if (expected !== manifest.manifestHash || manifest.packageVersion !== SESSION_ARTIFACT_PACKAGE_VERSION || manifest.sessionSchemaVersion !== SESSION_SCHEMA_VERSION) throw new SessionError('artifact_corrupt', 'Artifact manifest is unsupported or corrupt');
     for (const field of ['appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit', 'mapId'] as const) {
       if (manifest[field] !== this.identity[field]) throw new SessionError('artifact_version_mismatch', `Artifact ${field} ${String(manifest[field])} does not match ${String(this.identity[field])}`);
     }
     const hash = createHash('sha256');
-    const streamPath = assertSafeInputFile(safeRoot, join(root, 'artifact.ndjson'));
-    const fd = openSync(streamPath, 'r');
-    const buffer = Buffer.allocUnsafe(64 * 1024);
-    try { while (true) { const count = readSync(fd, buffer, 0, buffer.length, null); if (count === 0) break; hash.update(buffer.subarray(0, count)); } } finally { closeSync(fd); }
+    for (const bytes of safeRoot.stream('artifact.ndjson')) hash.update(bytes);
     if (hash.digest('hex') !== manifest.streamHash) throw new SessionError('artifact_corrupt', 'Artifact stream hash mismatch');
-    const lines = readLines(safeRoot, streamPath);
+    const lines = safeRoot.lines('artifact.ndjson');
     const first = lines.next();
     if (first.done) throw new SessionError('artifact_corrupt', 'Artifact stream is empty');
     const header = JSON.parse(first.value) as { kind: string; descriptor: SessionDescriptor; runBase: SessionRunBase; finalPublicHash: string };
@@ -1121,13 +1085,14 @@ export class SessionService {
     const computedMetrics = publicMetrics(metricAccumulator.finish(restoreArtifactObservation(document.observation, map), document.result) as unknown as Record<string, unknown>);
     if (!footerSeen || !branchBaseSeen || decisionCount !== manifest.decisionCount || acceptedActionCount !== manifest.acceptedActionCount || invalidActionCount !== manifest.invalidActionCount || sha256Json(document) !== header.finalPublicHash || canonicalJson(document.result) !== canonicalJson(footerResult) || canonicalJson(computedMetrics) !== canonicalJson(footerMetrics)) throw new SessionError('artifact_corrupt', 'Artifact stream is incomplete or its final state differs');
     return manifest;
+    } finally { safeRoot.close(); }
   }
 
-  public replayArtifact(packagePath: string): { matched: true; decisionCount: number; result: unknown } {
-    const manifest = this.readArtifact(packagePath);
-    const root = resolve(packagePath);
-    const safeRoot = createSafePathRoot(root);
-    const lines = readLines(safeRoot, join(root, 'artifact.ndjson'));
+  public replayArtifact(packagePath: string, options: { signal?: AbortSignal } = {}): { matched: true; decisionCount: number; result: unknown } {
+    const manifest = this.readArtifact(packagePath, options);
+    const safeRoot = new ArtifactSource(packagePath, options.signal);
+    try {
+    const lines = safeRoot.lines('artifact.ndjson');
     const first = lines.next();
     if (first.done) throw new SessionError('artifact_corrupt', 'Artifact stream is empty');
     const header = JSON.parse(first.value) as { descriptor: SessionDescriptor; finalPublicHash: string };
@@ -1146,6 +1111,7 @@ export class SessionService {
     }
     if (decisionCount !== manifest.decisionCount) throw new SessionError('artifact_replay_mismatch', 'Artifact Replay did not consume every Decision');
     return { matched: true, decisionCount, result: clone(runtime.getResult()) };
+    } finally { safeRoot.close(); }
   }
 
   /** Explicit compatibility view backed by compressed observations and lazy record arrays. */
@@ -1209,30 +1175,27 @@ export class SessionService {
     return after;
   }
 
-  private copyPayloadToPackage(reference: SessionPayloadReference, packageRoot: SafePathRoot): boolean {
-    const packagePath = packageRoot.lexicalPath;
-    const refTarget = join(packagePath, 'payloads', reference.domain, 'refs', reference.contentHash.slice(0, 2), `${reference.contentHash}.json`);
-    if (existsSync(refTarget)) {
-      const existing = readFileSync(assertSafeInputFile(packageRoot, refTarget), 'utf8').trim();
-      if (existing !== canonicalJson(reference)) throw new SessionError('artifact_corrupt', `Artifact payload index ${reference.contentHash} conflicts with an existing reference`);
-      return false;
-    }
-    ensureSafeOutputDirectory(packageRoot, dirname(refTarget));
-    writeFileSync(assertSafeOutputPath(packageRoot, refTarget), `${canonicalJson(reference)}\n`, { encoding: 'utf8', flag: 'wx' });
+  private copyPayloadToPackage(reference: SessionPayloadReference, writer: ArtifactWriter): boolean {
+    this.validateArtifactPayloadReference(reference);
+    const refTarget = `payloads/${reference.domain}/refs/${reference.contentHash.slice(0, 2)}/${reference.contentHash}.json`;
+    if (writer.has(refTarget)) return false;
+    writer.add(refTarget, [Buffer.from(`${canonicalJson(reference)}\n`, 'utf8')]);
     for (const chunk of reference.chunks) {
-      const source = join(this.store.sessionsRoot, 'pool', reference.domain, 'chunks', chunk.hash.slice(0, 2), `${chunk.hash}.gz`);
-      const target = join(packagePath, 'payloads', reference.domain, 'chunks', chunk.hash.slice(0, 2), `${chunk.hash}.gz`);
-      ensureSafeOutputDirectory(packageRoot, dirname(target));
-      if (!existsSync(target)) copyFileSync(assertSafeInputFile(this.store.safeRoot, source), assertSafeOutputPath(packageRoot, target));
-      else assertSafeInputFile(packageRoot, target);
+      const target = `payloads/${reference.domain}/chunks/${chunk.hash.slice(0, 2)}/${chunk.hash}.gz`;
+      if (writer.has(target)) continue;
+      const source = assertSafeInputFile(this.store.safeRoot, join(this.store.sessionsRoot, 'pool', reference.domain, 'chunks', chunk.hash.slice(0, 2), `${chunk.hash}.gz`));
+      function *blocks(): Generator<Buffer> {
+        const fd = openSync(source, 'r');
+        try { const buffer = Buffer.allocUnsafe(64 * 1024); let count: number; while ((count = readSync(fd, buffer)) > 0) yield buffer.subarray(0, count); } finally { closeSync(fd); }
+      }
+      writer.add(target, blocks());
     }
     return true;
   }
 
-  private readPackagePayload<T>(packageRoot: SafePathRoot, reference: SessionPayloadReference): T {
+  private readPackagePayload<T>(packageRoot: ArtifactSource, reference: SessionPayloadReference): T {
     this.validateArtifactPayloadReference(reference);
-    const packagePath = packageRoot.lexicalPath;
-    const indexed = JSON.parse(readFileSync(assertSafeInputFile(packageRoot, join(packagePath, 'payloads', reference.domain, 'refs', reference.contentHash.slice(0, 2), `${reference.contentHash}.json`)), 'utf8')) as SessionPayloadReference;
+    const indexed = JSON.parse(packageRoot.read(`payloads/${reference.domain}/refs/${reference.contentHash.slice(0, 2)}/${reference.contentHash}.json`, 1024 * 1024).toString('utf8')) as SessionPayloadReference;
     this.validateArtifactPayloadReference(indexed);
     if (canonicalJson(indexed) !== canonicalJson(reference)) throw new SessionError('artifact_corrupt', `Artifact payload index ${reference.contentHash} differs from its reference`);
     const logicalHash = createHash('sha256');
@@ -1240,10 +1203,10 @@ export class SessionService {
     let logicalBytes = 0;
     let compressedBytes = 0;
     for (const chunk of reference.chunks) {
-      const compressed = readFileSync(assertSafeInputFile(packageRoot, join(packagePath, 'payloads', reference.domain, 'chunks', chunk.hash.slice(0, 2), `${chunk.hash}.gz`)));
+      const compressed = packageRoot.read(`payloads/${reference.domain}/chunks/${chunk.hash.slice(0, 2)}/${chunk.hash}.gz`, ARTIFACT_CHUNK_BYTES * 2);
       if (compressed.length !== chunk.compressedBytes || !hashesEqual(sha256Bytes(compressed), chunk.hash)) throw new SessionError('artifact_corrupt', `Artifact payload chunk ${chunk.hash} is corrupt`);
       let raw: Buffer;
-      try { raw = gunzipSync(compressed); } catch { throw new SessionError('artifact_corrupt', `Artifact payload chunk ${chunk.hash} is invalid gzip`); }
+      try { raw = gunzipSync(compressed, { maxOutputLength: ARTIFACT_CHUNK_BYTES }); } catch { throw new SessionError('artifact_corrupt', `Artifact payload chunk ${chunk.hash} is invalid gzip`); }
       if (raw.length > ARTIFACT_CHUNK_BYTES) throw new SessionError('artifact_corrupt', `Artifact payload chunk ${chunk.hash} exceeds its decompressed bound`);
       logicalHash.update(raw); rawChunks.push(raw); logicalBytes += raw.length; compressedBytes += compressed.length;
       if (logicalBytes > reference.logicalBytes) throw new SessionError('artifact_corrupt', 'Artifact payload exceeds its declared size');
@@ -1253,11 +1216,11 @@ export class SessionService {
   }
 
   private validateArtifactPayloadReference(reference: SessionPayloadReference): void {
-    if (!isObject(reference) || !['public', 'private'].includes(reference.domain) || reference.encoding !== 'canonical-json+gzip-chunks' || !/^[0-9a-f]{64}$/u.test(reference.contentHash) || !Number.isSafeInteger(reference.logicalBytes) || reference.logicalBytes < 0 || reference.logicalBytes > MAX_ARTIFACT_PAYLOAD_BYTES || !Number.isSafeInteger(reference.compressedBytes) || reference.compressedBytes < 0 || !Array.isArray(reference.chunks) || reference.chunks.length < 1 || reference.chunks.length > Math.ceil(MAX_ARTIFACT_PAYLOAD_BYTES / ARTIFACT_CHUNK_BYTES) + 1) throw new SessionError('artifact_corrupt', 'Artifact payload reference is invalid or oversized');
+    if (!isObject(reference) || reference.domain !== 'public' || reference.encoding !== 'canonical-json+gzip-chunks' || !/^[0-9a-f]{64}$/u.test(reference.contentHash) || !Number.isSafeInteger(reference.logicalBytes) || reference.logicalBytes < 0 || reference.logicalBytes > MAX_ARTIFACT_PAYLOAD_BYTES || !Number.isSafeInteger(reference.compressedBytes) || reference.compressedBytes < 0 || !Array.isArray(reference.chunks) || reference.chunks.length < 1 || reference.chunks.length > Math.ceil(MAX_ARTIFACT_PAYLOAD_BYTES / ARTIFACT_CHUNK_BYTES) + 1) throw new SessionError('artifact_corrupt', 'Artifact payload reference is invalid or oversized');
     for (const chunk of reference.chunks) if (!isObject(chunk) || !/^[0-9a-f]{64}$/u.test(chunk.hash) || !Number.isSafeInteger(chunk.compressedBytes) || chunk.compressedBytes < 1 || chunk.compressedBytes > ARTIFACT_CHUNK_BYTES * 2) throw new SessionError('artifact_corrupt', 'Artifact payload chunk reference is invalid');
   }
 
-  private applyPackageDecisionPayload(root: SafePathRoot, before: SessionPublicDocument, record: PublicDecisionRecord): SessionPublicDocument {
+  private applyPackageDecisionPayload(root: ArtifactSource, before: SessionPublicDocument, record: PublicDecisionRecord): SessionPublicDocument {
     if (sha256Json(before) !== record.beforePublicHash) throw new SessionError('artifact_corrupt', `Artifact Decision ${record.decision} has the wrong public base`);
     if (record.publicPayloadKind === 'snapshot') {
       const snapshot = this.readPackagePayload<SessionPublicSnapshotPayload>(root, record.publicPayload);

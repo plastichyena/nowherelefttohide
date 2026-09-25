@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, statSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { resolveSessionIdentity } from '../session/agent-adapter';
@@ -530,15 +530,15 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
         const packagePath = join(sessionRoot, 'release-branch.nlth-artifact');
         const exported = service.exportArtifact(childSessionId, packagePath);
         assert(exported.decisionCount === revision + 1, 'Artifact has an unexpected decision count');
-        const read = service.readArtifact(packagePath);
-        const replayed = service.replayArtifact(packagePath);
+        const read = service.readArtifact(exported.artifactPath);
+        const replayed = service.replayArtifact(exported.artifactPath);
         assert(
             read.manifestHash === exported.manifestHash && replayed.matched === true,
             'Artifact read or replay did not match',
         );
         return {
-            artifactPath: packagePath,
-            artifact: directoryStats(packagePath),
+            artifactPath: exported.artifactPath,
+            artifact: { bytes: statSync(exported.artifactPath).size, files: 1 },
             manifest: exported,
             readManifest: read,
             replay: replayed,

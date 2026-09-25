@@ -83,3 +83,7 @@ The packed and deployed Field Artillery images derive from the two originals app
 ## v1.6.5 asset provenance
 
 The Air Base and landed/airborne multipurpose helicopter images derive from the three candidates approved by the project author on 2026-09-23. Approved originals, exact prompts and approval records are in `Art/reference/v1.6.5-concepts/`. `scripts/build-v165-assets.py` creates their 256px transparent runtime PNGs under `public/assets/board/`. They are covered by the same project asset terms above.
+
+## v1.6.6 asset provenance
+
+The Relief Supply Center original was approved on 2026-09-25. Its original, prompt and approval record are preserved in `Art/reference/v1.6.6-concepts/`. `scripts/build-v166-assets.py` produces the 256px transparent runtime PNG shared by normal play, Replay and Live AI. The same project asset terms apply.

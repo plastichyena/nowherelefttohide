@@ -1093,7 +1093,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     for (const unit of observation.units) {
       if (!isHumanUnitType(unit.type)) continue;
       if (!unit.inSupply) turnsUnitsEndedOutOfSupplyByType[unit.type] += 1;
-      if (unit.canMove && unit.currentFuel === 0 && unit.fuelCostByLegalMove.length === 0) unitsUnableToMoveForFuel += 1;
+      if (unit.canMove && unit.currentFuel === 0 && unit.movementSummary.legalMoveCount === 0) unitsUnableToMoveForFuel += 1;
     }
     if (observation.endTurnForecast.fuel.totalFuelShortage > 0) fuelShortageTurns += 1;
     if (observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand > 0) militaryGoodsRefillShortageTurns += 1;

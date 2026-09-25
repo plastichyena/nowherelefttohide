@@ -49,6 +49,6 @@ for(const [index,action] of actions.entries()){
   }
 }
 const artifact=resolve(directory,`aviation-${Date.now()}.nlth-artifact`);service.exportArtifact('aviation',artifact);
-const replay=service.replayArtifact(artifact);if(!replay.matched)throw new Error('Aviation replay mismatch');
+const replay=service.replayArtifact(`${artifact}.zip`);if(!replay.matched)throw new Error('Aviation replay mismatch');
 writeFileSync(resolve(directory,'report.json'),JSON.stringify({actions,batch,replay,versions:game.getApiInfo(),directory},null,2));
 console.log(JSON.stringify({directory,actions:actions.length,replay},null,2));

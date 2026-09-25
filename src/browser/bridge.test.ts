@@ -64,7 +64,7 @@ describe('Developer / Browser Bridge', () => {
     expect(info.rules.infection.stationedUnitsContainSpread).toBe(true);
     expect(info.rules.checkpointPositionCandidates).toMatchObject({
       observationField: 'checkpointPositionCandidates',
-      fairPlay: { hiddenEnemiesBlock: false, blockerUnitIdsPublic: false },
+      fairPlay: { hiddenEnemiesBlock: false, blockerUnitIdsPublic: true },
     });
 
     const adapterInfo = createAgentGame({ buildId: 'test-build', bridgeApiVersion: BRIDGE_API_VERSION }).getApiInfo();

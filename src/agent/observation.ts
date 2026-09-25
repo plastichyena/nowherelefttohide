@@ -424,7 +424,7 @@ function createAgentObservationInScope(
     importantSiteEvents: importantSiteEvents(state),
     populationTransferCandidates: populationTransferCandidates(state),
     checkpointPositionCandidates: projectionCache.checkpointPositionCandidates ?? getCheckpointPositionCandidates(state),
-    constructibleFacilityPositionCandidates: (['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const)
+    constructibleFacilityPositionCandidates: (['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'] as const)
       .flatMap((facilityType) => getConstructibleFacilityPositionCandidates(state, facilityType))
       .sort((left, right) =>
         left.facilityType.localeCompare(right.facilityType) ||

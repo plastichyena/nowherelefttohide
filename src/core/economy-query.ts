@@ -49,7 +49,10 @@ function emptyFacilityProjection(
 ): FacilityProductionProjection {
   return {
     facilityId: facility.id,
+    healthyWorkers: facility.workers,
     operatingWorkers: 0,
+    inputRequired: {},
+    inputShortage: {},
     inputs: {},
     outputs: {},
     powerGeneration: 0,
@@ -128,8 +131,7 @@ function calculateMilitaryGoodsPlan(
     .filter((unit) => unit.isPlayerUnit)
     .sort((left, right) => left.id.localeCompare(right.id));
   const working = units.map((unit) => {
-    const fixedRequested = state.config.units[unit.type as HumanUnitType].fixedMilitaryGoodsUpkeepPerTurn;
-    const fixedConsumption = Math.min(unit.currentMilitaryGoods, fixedRequested);
+    const fixedConsumption = 0; // Removed as a game rule, including configuration overrides.
     const afterFixed = unit.currentMilitaryGoods - fixedConsumption;
     return {
       unit,
@@ -211,7 +213,8 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const facilities = stableFacilities(state as GameState);
   const isOwned = (facility: Readonly<FacilityState>) => facility.owner === 'player' && facility.status === 'owned';
   const canProduce = (facility: Readonly<FacilityState>) =>
-    isOwned(facility) && facility.infected === 0 && facility.workers > 0 && facility.operationalStatus === 'operational';
+    isOwned(facility) && facility.infected === 0 && facility.workers > 0 && facility.operationalStatus === 'operational' &&
+    (facility.type !== 'reliefSupplyCenter' || isHexSupplied(state, facility.position));
   const facilityById = new Map(facilities.map((facility) => [facility.id, facility]));
   const armyBaseReservations = new Map(
     [...state.pendingUnitProductions]
@@ -341,36 +344,34 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   const staffed = (facility: FacilityState) => isCityFacility(facility)
     ? Math.min(facility.workers, state.config.facilities[facility.type].workerCapacity)
     : facility.workers;
-  const preliminaryCivilianProduction = facilities.reduce((total, facility) => {
-    if (!canProduce(facility)) return total;
-    const rule = state.config.facilities[facility.type].production;
-    const perWorker = rule.outputs.civilianGoods ?? 0;
-    if (perWorker <= 0 || facility.type === 'militaryFactory') return total;
-    if (rule.powerMode === 'required' && !supplied.has(facility.id)) return total;
-    return total + Math.floor(staffed(facility) * perWorker);
-  }, 0);
-  const maintenanceReservation = Math.max(0, maintenance.civilianGoods - preliminaryCivilianProduction);
-  let civilianInputAvailable = Math.max(0, state.resources.civilianGoods - maintenanceReservation);
-  const militaryInputWorkers = new Map<string, number>();
-  const militaryFacilities = facilities.filter(
-    (facility) => facility.type === 'militaryFactory' && canProduce(facility) && facility.powerSupplyEnabled,
-  );
-  for (const facility of militaryFacilities) {
-    const perWorker = state.config.facilities.militaryFactory.production.inputs.civilianGoods ?? 0;
-    const workers = perWorker > 0
-      ? Math.min(facility.workers, Math.floor(civilianInputAvailable / perWorker))
-      : facility.workers;
-    militaryInputWorkers.set(facility.id, workers);
-    civilianInputAvailable -= workers * perWorker;
+  // Allocate converting facilities in resource dependency order. Only final,
+  // powered output relieves maintenance reservations; input never exceeds the
+  // pre-production stock. Failed power allocation releases input immediately.
+  const inputWorkers = new Map<string, number>();
+  const inputFacilities = facilities.filter(f => Object.values(state.config.facilities[f.type].production.inputs).some(n => n > 0));
+  const inputDemand = { food: 0, civilianGoods: 0 };
+  for (const resource of ['food', 'civilianGoods'] as const) {
+    const feasibleProduction = facilities.reduce((total, f) => {
+      if (!canProduce(f)) return total;
+      const rule = state.config.facilities[f.type].production;
+      if (rule.powerMode === 'required' && !supplied.has(f.id)) return total;
+      const workers = inputFacilities.includes(f) ? inputWorkers.get(f.id) ?? 0 : staffed(f);
+      return total + Math.floor(workers * (rule.outputs[resource] ?? 0));
+    }, 0);
+    let availableInput = Math.max(0, state.resources[resource] - Math.max(0, maintenance[resource] - feasibleProduction));
+    for (const facility of inputFacilities) {
+      const rule = state.config.facilities[facility.type].production;
+      const perWorker = rule.inputs[resource] ?? 0;
+      if (perWorker <= 0 || !canProduce(facility) || !facility.powerSupplyEnabled) continue;
+      inputDemand[resource] += staffed(facility) * perWorker;
+      const workers = Math.min(staffed(facility), Math.floor(availableInput / perWorker));
+      inputWorkers.set(facility.id, workers);
+      if (workers === 0) continue;
+      requiredPowerDemand += rule.powerCapacity;
+      requiredPowerAllocated += allocate([facility]);
+      if (supplied.has(facility.id)) availableInput -= workers * perWorker;
+    }
   }
-  const militaryTargets = militaryFacilities.filter(
-    (facility) => (militaryInputWorkers.get(facility.id) ?? 0) > 0,
-  );
-  requiredPowerDemand += militaryTargets.reduce(
-    (total, facility) => total + state.config.facilities[facility.type].production.powerCapacity,
-    0,
-  );
-  requiredPowerAllocated += allocate(militaryTargets);
 
   const oilCreditsByFacility = new Map<string, number>();
   for (const facility of [...facilities].sort((left, right) => left.id.localeCompare(right.id))) {
@@ -453,8 +454,8 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     const powerMode = facility.type === 'armyBase' && !armyBaseHasReservation
       ? 'none' as const
       : rule.powerMode;
-    const toggleable = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
-    if (facility.type === 'temporaryHousing' && isOwned(facility) && !['building', 'disabled', 'recovering', 'ruined'].includes(facility.operationalStatus) && !isHexSupplied(state, facility.position)) {
+    const toggleable = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'reliefSupplyCenter'].includes(facility.type);
+    if (['temporaryHousing', 'reliefSupplyCenter'].includes(facility.type) && isOwned(facility) && !['building', 'disabled', 'recovering', 'ruined'].includes(facility.operationalStatus) && !isHexSupplied(state, facility.position)) {
       projectedPowerRequested = false;
       projectedPowerReason = 'supply_disconnected';
     } else if (['armyBase','airBase'].includes(facility.type) && armyBaseHasReservation && !normalArmyBase) {
@@ -462,7 +463,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       projectedPowerReason = 'not_eligible';
     } else if (powerMode === 'required' && toggleable && !facility.powerSupplyEnabled) projectedPowerReason = 'power_supply_off';
     else if (!eligibleForPower && powerMode !== 'none') projectedPowerReason = facility.workers <= 0 ? 'no_population' : 'not_eligible';
-    else if (facility.type === 'militaryFactory' && canProduce(facility) && (militaryInputWorkers.get(facility.id) ?? 0) === 0) {
+    else if (inputFacilities.includes(facility) && canProduce(facility) && (inputWorkers.get(facility.id) ?? 0) === 0) {
       projectedPowerReason = 'production_input_unavailable';
       projectedPowerRequested = false;
     }
@@ -470,8 +471,8 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     const productionMultiplier = 1;
     const potentialOperatingWorkers = !canProduce(facility)
       ? 0
-      : facility.type === 'militaryFactory'
-        ? militaryInputWorkers.get(facility.id) ?? 0
+      : inputFacilities.includes(facility)
+        ? inputWorkers.get(facility.id) ?? 0
         : staffed(facility);
     const operatingWorkers = powerMode === 'required' && !projectedPowerSupplied
       ? 0
@@ -487,19 +488,27 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       : Object.fromEntries(
         Object.entries(baseOutputs).map(([resource, amount]) => [resource, (amount ?? 0) * productionMultiplier]),
       ) as Partial<Record<ResourceType, number>>;
-    const inputs = facility.type === 'militaryFactory' && projectedPowerSupplied
-      ? { civilianGoods: (rule.inputs.civilianGoods ?? 0) * operatingWorkers }
-      : {};
-    const stoppedReason = facility.type === 'nuclearPowerPlant' && !isHexSupplied(state, facility.position) ? 'out_of_supply' as const : !canProduce(facility) && !normalArmyBase
+    const inputs = Object.fromEntries(Object.entries(rule.inputs).map(([r, amount]) => [r, amount * operatingWorkers]));
+    const inputRequired = Object.fromEntries(Object.entries(rule.inputs).map(([r, amount]) => [r, amount * staffed(facility)]));
+    // Input sufficiency is independent of whether reserved power was supplied.
+    // OFF/ineligible facilities reserve nothing; distinguish that from missing stock.
+    const inputShortage = Object.fromEntries(Object.entries(inputRequired).map(([r, amount]) => [r,
+      canProduce(facility) && facility.powerSupplyEnabled
+        ? Math.max(0, amount - (rule.inputs[r as ResourceType] ?? 0) * potentialOperatingWorkers) : 0]));
+    const stoppedReason = ['nuclearPowerPlant', 'reliefSupplyCenter'].includes(facility.type) && !isHexSupplied(state, facility.position) ? 'out_of_supply' as const : !canProduce(facility) && !normalArmyBase
       ? facilityStoppedReason(facility)
+      : projectedPowerReason === 'production_input_unavailable' ? 'input_shortage'
       : powerMode === 'required' && !projectedPowerSupplied
         ? 'power_unavailable'
-        : facility.type === 'militaryFactory' && operatingWorkers < facility.workers
+        : inputFacilities.includes(facility) && operatingWorkers < facility.workers
           ? 'input_shortage'
           : null;
     return {
       facilityId: facility.id,
+      healthyWorkers: facility.workers,
       operatingWorkers,
+      inputRequired,
+      inputShortage,
       inputs,
       outputs,
       powerGeneration: (facility.type === 'powerPlant' || (facility.type === 'nuclearPowerPlant' && isHexSupplied(state, facility.position))) && canProduce(facility)
@@ -525,14 +534,9 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     (total, projection) => total + (projection.outputs[resource] ?? 0),
     0,
   );
-  const militaryInputDemand = militaryFacilities.reduce(
-    (total, facility) => total + facility.workers * (state.config.facilities.militaryFactory.production.inputs.civilianGoods ?? 0),
-    0,
-  );
-  const militaryInputAllocated = projections.reduce(
-    (total, projection) => total + (projection.inputs.civilianGoods ?? 0),
-    0,
-  );
+  const militaryInputDemand = inputDemand.civilianGoods;
+  const allocatedInput = (resource: ResourceType) => projections.reduce((n, p) => n + (p.inputs[resource] ?? 0), 0);
+  const militaryInputAllocated = allocatedInput('civilianGoods');
   const totalPowerDemand = requiredPowerDemand;
   const totalPowerAllocated = requiredPowerAllocated;
   const generationFuelDemand = Math.max(0, totalPowerDemand - freePowerAvailable) / 5 * 2;
@@ -564,15 +568,19 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
   ): EndTurnForecast['food'] => {
     const startingStock = state.resources[resource];
     const projectedProduction = production(resource);
-    const shortage = Math.max(0, maintenanceRequired - startingStock - projectedProduction);
+    const shortage = Math.max(0, maintenanceRequired - startingStock + allocatedInput(resource) - projectedProduction);
     return {
       startingStock,
       projectedProduction,
       maintenanceRequired,
-      endingStock: Math.max(0, startingStock + projectedProduction - maintenanceRequired),
+      endingStock: Math.max(0, startingStock + projectedProduction - maintenanceRequired - allocatedInput(resource)),
       available: startingStock,
-      productionInputRequired: 0,
-      required: maintenanceRequired,
+      productionInputDemand: inputDemand[resource],
+      productionInputRequired: inputDemand[resource],
+      productionInputAllocated: allocatedInput(resource),
+      productionInputShortage: Math.max(0, inputDemand[resource] - allocatedInput(resource)),
+      maintenanceShortage: shortage,
+      required: maintenanceRequired + inputDemand[resource],
       shortage,
     };
   };

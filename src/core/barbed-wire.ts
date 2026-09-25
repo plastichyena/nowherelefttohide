@@ -12,7 +12,7 @@ export const BARBED_WIRE_RULES = {
   minimumRadialDistance: 3, repair: false, gasAbsorption: false,
   statisticsScope: 'successful construction and publicly visible combat only; hidden damage and charges are excluded',
   reanimation: 'same-hex spawn exception; cannot re-enter after exit',
-  routeEvaluation: 'terrain MP + attack count + future-charge turns * movement; stable coordinate ties',
+  routeEvaluation: 'terrain MP + attack count + (breach phase + future-charge phases) * movement; breacher stops this phase; stable coordinate ties',
 } as const;
 
 export function wireAt(state: Pick<GameState, 'barbedWire'>, position: HexCoord) {
@@ -83,7 +83,7 @@ export function wireRoutePenalty(state: Readonly<GameState>, zombie: UnitState, 
 
 export function wireBreakCost(hp: number, zombie: Pick<UnitState, 'attack' | 'attackChargesRemaining' | 'maxAttackCharges' | 'movement'>): number {
   const attacks = Math.ceil(hp / Math.max(1, zombie.attack));
-  return attacks + Math.ceil(Math.max(0, attacks - zombie.attackChargesRemaining) / Math.max(1, zombie.maxAttackCharges)) * zombie.movement;
+  return zombie.movement + attacks + Math.ceil(Math.max(0, attacks - zombie.attackChargesRemaining) / Math.max(1, zombie.maxAttackCharges)) * zombie.movement;
 }
 
 export function wireCombatProjection(state: Readonly<GameState>, human: UnitState, attack: number) {

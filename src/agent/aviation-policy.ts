@@ -1,3 +1,4 @@
+import { publicMoveDetails } from './public-movement';
 import type { GameAction, HexCoord } from '../core/types';
 import { hexDistance, hexKey, hexNeighbors } from '../core/hex';
 import type { AgentObservation, AgentUnitObservation } from './types';
@@ -78,7 +79,7 @@ export function aviationPolicy(observation: AgentObservation, actions: readonly 
       return result(2_200+(enemy.canTargetAir?500:200)+(enemy.hp<=unit.attack?200:0)-risk*10,'AIRBORNE_FIRE_WITH_ANTI_AIR_RISK');
     }
     if(action.type==='Move') {
-      const move=unit.fuelCostByLegalMove.find(m=>hexDistance(m.destination,action.destination)===0);
+      const move=publicMoveDetails(observation, unit.id, action.destination);
       if(!move||move.projectedFuelAfterMove<=1)return result(-10_000,'AVOID_FUEL_EXHAUSTION');
       const risk=danger(action.destination,true);if(risk>=unit.hp)return result(-8_000,'AVOID_LETHAL_ANTI_AIR');
       const supplyDistance=distancesToSafeSupply(unit).get(hexKey(action.destination))??Infinity;

@@ -5,7 +5,7 @@ import { ReplayPackage, ReplayZip } from '../replay/package';
 const reportPath = process.argv[2]!;
 const report = JSON.parse(await readFile(reportPath, 'utf8'));
 if (!report.ok) throw new Error('Session fixture did not complete');
-const file = await openAsBlob(`${report.artifact.path}.zip`);
+const file = await openAsBlob(report.artifact.path);
 const signal = new AbortController().signal;
 const start = performance.now();
 const pkg = await new ReplayPackage(new ReplayZip(file, signal)).open();

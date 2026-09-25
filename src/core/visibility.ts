@@ -132,7 +132,7 @@ function computePlayerVisionCoverage(state: Readonly<GameState>): VisionCoverage
       groundPotential,
       groundVisible,
       facility.position,
-      facility.type === 'capital' ? state.config.vision.capital : state.config.vision.ownedFacility,
+      facility.type === 'capital' ? state.config.vision.capital : facility.type === 'reliefSupplyCenter' ? state.config.facilities.reliefSupplyCenter.visionRadius : state.config.vision.ownedFacility,
     );
   }
   for (const checkpoint of state.checkpoints) {

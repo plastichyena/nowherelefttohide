@@ -540,7 +540,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if ((facility.constructible || facility.owner === 'player') && isHordeSpawnReserve(state.map, facility.position)) {
       errors.push(`Player facility ${facility.id} cannot occupy the Horde Spawn Reserve`);
     }
-    if (facility.constructible && !['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'].includes(facility.type)) {
+    if (facility.constructible && !['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'].includes(facility.type)) {
       errors.push(`Facility ${facility.id} has an invalid constructible type`);
     }
     if (typeof facility.firstCaptureRewardClaimed !== 'boolean') errors.push(`Facility ${facility.id} has an invalid first-capture reward ledger`);
@@ -582,7 +582,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (facility.lastPowerSupplied !== null && typeof facility.lastPowerSupplied !== 'boolean') {
       errors.push(`Facility ${facility.id} has an invalid last Power Supply result`);
     }
-    if (!['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type) && facility.powerSupplyEnabled) {
+    if (!['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'reliefSupplyCenter'].includes(facility.type) && facility.powerSupplyEnabled) {
       errors.push(`Facility ${facility.id} cannot request switchable power`);
     }
     if (facility.status === 'unowned' && facility.owner !== 'none') {

@@ -165,7 +165,10 @@ export function createAgentApiInfo(
       'checkpointPositionCandidates contains every road tile or post with the Core-derived legal flag and first ActionError reason code.',
       'BuildCheckpoint and RelocateCheckpoint require the destination and every capital-side branch road tile through it to be in current Player Vision.',
       'TurnAwayCheckpointRefugees may remove only a legal waiting-pool count. Rejected-refugee counters and their future Horde bonus are intentionally never public.',
-      'DecommissionConstructibleFacility is legal only for an eligible player-owned Civilian Drone Base; the Core supplies its deterministic refund and validation.',
+      'Every Human Unit has zero fixed Military Goods upkeep; attacks, suppression and refills still apply. Military Factory converts CG10 into MG4 per operating worker.',
+      'movementSummary has fixed-size mode, MP, fuel basis, legalMoveCount and rangeUpperBound (not a safe-arrival guarantee). Full move arrays are omitted. Choose a destination, then query route with moverUnitId and destination, or preview Move at the same revision. Legal helicopter moves can exhaust Fuel en route; planned values and public interruption preview are distinct.',
+      'Route example: {target: route, filters: {moverUnitId: police-1, destination: {kind: coordinate, position: {q: 25, r: 24}}}}. For all legal Moves, paginate legal-actions. A rejected Move can be followed by the same route query; an optional single closer safe alternative is never executed automatically.',
+      'DecommissionConstructibleFacility is legal for an eligible player-owned Civilian Drone Base, Temporary Housing or Relief Supply Center; the Core supplies its deterministic refund and validation.',
       'Human Units publish current/max Fuel and carried Military Goods, legal Move mode/cost previews, distance-based Attack costs, and same-EndTurn refill/suppression projections.',
       'Facilities publish actual population and separate zombieTargetValue; Wind is a target value 5 but has no civilian population.',
       'strategicForecast is the Core projection for resource dependencies, Guaranteed Defeat, and Checkpoint Queue Pressure.',
@@ -188,7 +191,7 @@ export function createAgentApiInfo(
       'Direction/policy rejected-refugee counters and the calculated extra Horde Zombies are private validation data, not public facts.',
       'Zombie Current Target, Inherited Target, Target Reason, hidden Spawn coordinates, and hidden enemy history are not public.',
       'Zombie Noise Target, exact active Pulse center/radius, and affected hidden Zombie IDs or counts are not public. Static Wind Noise Radius is a public rule.',
-      'Checkpoint candidates never reveal blocker unit IDs; hidden enemies do not block a candidate or change its reason code.',
+      'Checkpoint candidates expose only currently visible blocker unit IDs. Hidden enemies never block a candidate or change its reason code. Candidate supply excludes Initial Supply for relocation blocking, but destination occupation still blocks.',
       'Constructible candidates and actions use only visible Zombies. Hidden Zombies never make an otherwise legal Build candidate illegal.',
       'Before a Horde warning starts, its randomly selected directions are not public. Spawn coordinates, non-visible individual IDs, internal targets, and hidden metrics are never public.',
       'Warning-time special Zombie Type draws are not public; exact active Pulse center/radius and hidden Noise reactions remain private.',
@@ -419,7 +422,7 @@ export function createAgentApiInfo(
         fairPlay: {
           hiddenEnemiesBlock: false,
           visibleEnemiesCanBlock: true,
-          blockerUnitIdsPublic: false,
+          blockerUnitIdsPublic: true,
           prngStatePublic: false,
           futureRandomOutcomesPublic: false,
         },
@@ -458,9 +461,9 @@ export function createAgentApiInfo(
           riotPolice: getNumber(riotPolice, 'maxFuel', 12),
         },
         fuelCostFormulaByType: {
-          police: 'distance 0: 0; 1..5: 1; >=6: 1 + (distance - 5)',
-          nationalGuard: 'distance 0: 0; 1..5: 1; >=6: 1 + 2 * (distance - 5)',
-          riotPolice: 'distance 0: 0; 1..5: 1; >=6: 1 + (distance - 5)',
+          police: 'distance 0: 0; 1..5: 2; >=6: 2 + 2 * (distance - 5)',
+          nationalGuard: 'distance 0: 0; 1..5: 2; >=6: 2 + 4 * (distance - 5)',
+          riotPolice: 'distance 0: 0; 1..5: 2; >=6: 2 + 2 * (distance - 5)',
         },
         refuelTiming: 'after_power_before_production',
         refuelRequiresSupply: true,
@@ -505,8 +508,8 @@ export function createAgentApiInfo(
         destroyedUnitReturnsCarriedGoods: false,
       },
       constructibleFacilities: {
-        types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'],
-        limitFormula: 'Simple Farm: unlimited; Drone: ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor); Temporary Housing: unlimited; Wind: 2 * roadBranchCount',
+        types: ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'],
+        limitFormula: 'Simple Farm: unlimited; Drone: ceil(roadBranchCount / constructibleFacility.limitPerTypeDivisor); Temporary Housing: unlimited; Wind: 2 * roadBranchCount; Relief Supply Center: unlimited',
         buildConditions: [
           'inside_player_supply',
           'currently_visible_hex',
@@ -517,6 +520,7 @@ export function createAgentApiInfo(
           'type_limit_resources_and_action_budget',
         ],
         costs: {
+          reliefSupplyCenter: config.facilities.reliefSupplyCenter.buildCivilianGoods,
           simpleFarm: config.facilities.simpleFarm.buildCivilianGoods,
           civilianDroneBase: config.facilities.civilianDroneBase.buildCivilianGoods,
           temporaryHousing: config.facilities.temporaryHousing.buildCivilianGoods,
@@ -529,6 +533,7 @@ export function createAgentApiInfo(
           'human_recapture: recovering',
           'next_player_turn_after_recovery: operational_empty',
         ],
+        reliefSupplyCenter: { workerCapacity: 5, requiredPower: 5, foodPerWorker: 20, civilianGoodsPerWorker: 5, vision: 1, buildLimit: null, decommissionRefund: Math.floor(config.facilities.reliefSupplyCenter.buildCivilianGoods / 2), inputRule: 'Opening Food stock only, after reserving population maintenance minus feasible higher-priority Food production. No same-turn conversion chains.' },
         simpleFarm: {
           workerCapacity: config.facilities.simpleFarm.workerCapacity,
           requiredPower: 0,
@@ -601,7 +606,7 @@ export function createAgentApiInfo(
         sameTurnProductionCanCoverProductionInputs: false,
         sameTurnCivilianGoodsCannotDirectlyFeedMilitaryFactories: true,
         civilianProductionCanReleaseTurnStartStockFromMaintenanceReservation: true,
-        powerAllocationOrder: ['capital_and_cities', 'occupied_temporary_housing', 'farm_and_civilian_factory', 'input_ready_military_factory', 'refinery', 'civilian_drone_base', 'army_base_reservation', 'empty_temporary_housing'],
+        powerAllocationOrder: ['capital_and_cities', 'occupied_temporary_housing', 'farm_and_civilian_factory', 'input_ready_relief_supply_center', 'input_ready_military_factory', 'refinery', 'civilian_drone_base', 'army_base_reservation', 'empty_temporary_housing'],
       },
     },
     minimalExample: [

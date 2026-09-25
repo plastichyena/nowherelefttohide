@@ -17,7 +17,7 @@ import type { GameAction, JsonValue } from '../core/types';
  * This module deliberately imports only public Agent/Core types.  It does
  * not name a browser, a protocol, an SDK, or a storage implementation.
  */
-export const AI_SESSION_CONTRACT_VERSION = '1.2.0' as const;
+export const AI_SESSION_CONTRACT_VERSION = '1.3.0' as const;
 export const AI_SESSION_DEFAULT_QUERY_PAGE_SIZE = 100;
 export const AI_SESSION_MAX_QUERY_PAGE_SIZE = 500;
 export const AI_SESSION_MAX_COMMENT_CODE_POINTS = 500;

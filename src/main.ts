@@ -53,7 +53,10 @@ const buildId = resolveBuildId(undefined);
 installBrowserBridge({ buildId });
 const liveAiViewer = new LiveAiViewer({ buildId });
 try {
-  registerWebMcpTools({ getSession: liveAiViewer.getSession, act: liveAiViewer.act });
+  let registration = registerWebMcpTools({ getSession: liveAiViewer.getSession, act: liveAiViewer.act }, undefined, { buildId, onChange: liveAiViewer.refreshDiagnostics });
+  liveAiViewer.setRegistration(registration);
+  window.addEventListener('pagehide', () => registration.cleanup());
+  window.addEventListener('pageshow', event => { if (event.persisted) { registration = registerWebMcpTools({ getSession: liveAiViewer.getSession, act: liveAiViewer.act }, undefined, { buildId, onChange: liveAiViewer.refreshDiagnostics }); liveAiViewer.setRegistration(registration); } });
 } catch {
   // A partial or incompatible client implementation must not prevent normal play.
 }

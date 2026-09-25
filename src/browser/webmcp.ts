@@ -1,3 +1,4 @@
+import { APP_VERSION } from '../agent/types';
 import type {
   AiSessionActInput,
   AiSessionLegalActionsInput,
@@ -28,9 +29,13 @@ interface WebMcpRegistrationHandle {
 }
 
 interface WebMcpModelContext {
-  registerTool: (definition: WebMcpToolDefinition) => WebMcpRegistrationHandle | void;
+  registerTool: (definition: WebMcpToolDefinition, options: { signal: AbortSignal }) => Promise<void> | WebMcpRegistrationHandle | void;
+  getTools?: () => Promise<RegisteredTool[]>;
+  executeTool?: (tool: RegisteredTool, input?: object, options?: { signal: AbortSignal }) => Promise<string>;
   unregisterTool?: (name: string) => void;
 }
+
+export interface RegisteredTool { name: string; window?: unknown; origin?: string }
 
 export interface WebMcpDocumentLike {
   modelContext?: WebMcpModelContext;
@@ -61,7 +66,26 @@ export interface WebMcpHost {
 export interface WebMcpRegistration {
   supported: boolean;
   registeredToolNames: readonly WebMcpToolName[];
+  ready: Promise<void>;
+  diagnostics(): WebMcpDiagnostics;
+  smokeTest(): Promise<void>;
   cleanup(): void;
+}
+
+export const WEBMCP_ADAPTER_VERSION = '2.0.0';
+export interface WebMcpDiagnostics {
+  appVersion: string; buildId: string; adapterVersion: string;
+  registration: 'unsupported' | 'registering' | 'registration_failed' | 'registered' | 'cleaned';
+  selfTest: 'unavailable' | 'pending' | 'passed' | 'failed';
+  smokeTest: 'unavailable' | 'not_run' | 'passed' | 'failed';
+  expectedToolCount: number; expectedToolNames: readonly string[];
+  registeredToolCount: number; registeredToolNames: string[]; fulfilledToolCount: number;
+  missingToolNames: string[]; unexpectedToolNames: string[];
+  registrationErrors: Array<{ tool: string; category: string }>;
+  availability: { registerTool: boolean; getTools: boolean; executeTool: boolean };
+  selfTestUnavailableReason: 'get_tools_unavailable' | 'registered_tool_window_unavailable' | null;
+  session: 'inactive' | 'active' | 'paused' | 'ended'; generation: number | null; revision: number | null;
+  ready: boolean; hostDiscovery: 'host_discovery_unverified';
 }
 
 const EMPTY_INPUT_SCHEMA = {
@@ -243,56 +267,114 @@ function isTopLevel(documentLike: WebMcpDocumentLike): boolean {
   }
 }
 
-/**
- * Registers the fixed v1.6 WebMCP surface on the top-level imperative API.
- * Session lifecycle remains UI-owned; registrations resolve the current Session per invocation.
- */
+const registrations = new WeakMap<object, WebMcpRegistration>();
+const errorCategory = (error: unknown): string => error instanceof Error && /^[A-Za-z]+Error$/.test(error.name) ? error.name : 'RegistrationError';
+
+/** Async draft registration is independent of Session and host discovery. */
 export function registerWebMcpTools(
   host: WebMcpHost,
   documentLike: WebMcpDocumentLike | null = currentDocument(),
+  options: { buildId?: string; onChange?: () => void } = {},
 ): WebMcpRegistration {
+  if (documentLike) registrations.get(documentLike)?.cleanup();
   const modelContext = documentLike?.modelContext;
-  if (!documentLike || !isTopLevel(documentLike) || typeof modelContext?.registerTool !== 'function') {
-    return { supported: false, registeredToolNames: [], cleanup: () => undefined };
-  }
-
-  const registered: Array<{ name: WebMcpToolName; handle: WebMcpRegistrationHandle | void }> = [];
+  const supported = !!documentLike && isTopLevel(documentLike) && typeof modelContext?.registerTool === 'function';
+  const controller = new AbortController();
+  const fulfilled: WebMcpToolName[] = [];
+  const legacy: Array<{ name: string; handle: WebMcpRegistrationHandle | void }> = [];
+  let ownTools: RegisteredTool[] = [];
   let cleaned = false;
-  const cleanup = (): void => {
+  let testGeneration = 0;
+  const status: WebMcpDiagnostics = {
+    appVersion: APP_VERSION, buildId: options.buildId ?? 'unknown', adapterVersion: WEBMCP_ADAPTER_VERSION,
+    registration: supported ? 'registering' : 'unsupported',
+    selfTest: typeof modelContext?.getTools === 'function' ? 'pending' : 'unavailable',
+    smokeTest: typeof modelContext?.executeTool === 'function' && typeof modelContext?.getTools === 'function' ? 'not_run' : 'unavailable',
+    expectedToolCount: WEBMCP_TOOL_NAMES.length, expectedToolNames: [...WEBMCP_TOOL_NAMES],
+    registeredToolCount: 0, registeredToolNames: [], fulfilledToolCount: 0,
+    missingToolNames: [...WEBMCP_TOOL_NAMES], unexpectedToolNames: [], registrationErrors: [],
+    availability: { registerTool: supported, getTools: typeof modelContext?.getTools === 'function', executeTool: typeof modelContext?.executeTool === 'function' },
+    selfTestUnavailableReason: typeof modelContext?.getTools === 'function' ? null : 'get_tools_unavailable',
+    session: 'inactive', generation: null, revision: null, ready: false, hostDiscovery: 'host_discovery_unverified',
+  };
+  const notify = () => options.onChange?.();
+  const cleanup = () => {
     if (cleaned) return;
-    cleaned = true;
-    for (const entry of [...registered].reverse()) {
-      let removed = false;
-      if (typeof entry.handle?.unregister === 'function') {
-        try {
-          entry.handle.unregister();
-          removed = true;
-        } catch {
-          // Some implementations expose both forms; use the context fallback below.
-        }
-      }
-      if (!removed && typeof modelContext.unregisterTool === 'function') {
-        try {
-          modelContext.unregisterTool(entry.name);
-        } catch {
-          // Cleanup is best-effort and must continue unregistering the remaining tools.
-        }
-      }
+    cleaned = true; testGeneration++; controller.abort();
+    for (const entry of [...legacy].reverse()) {
+      try { if (entry.handle?.unregister) entry.handle.unregister(); else modelContext?.unregisterTool?.(entry.name); } catch { /* signal is authoritative */ }
     }
+    status.registration = 'cleaned'; status.registeredToolCount = 0; status.registeredToolNames = []; notify();
   };
-
-  try {
-    for (const definition of toolDefinitions(host)) {
-      registered.push({ name: definition.name, handle: modelContext.registerTool(definition) });
+  const diagnostics = (): WebMcpDiagnostics => {
+    const context = host.getSession()?.getContext();
+    return structuredClone({ ...status, session: context?.lifecycle ?? 'inactive', generation: context?.generation ?? null, revision: context?.revision ?? null,
+      ready: status.registration === 'registered' && ['passed','unavailable'].includes(status.selfTest) && status.smokeTest !== 'failed' && context?.lifecycle === 'active' });
+  };
+  const registration: WebMcpRegistration = {
+    supported, get registeredToolNames() { return [...fulfilled]; }, cleanup, diagnostics, ready: Promise.resolve(),
+    async smokeTest() {
+      await registration.ready;
+      const session = host.getSession();
+      if (cleaned || !session || status.registration !== 'registered' || status.smokeTest === 'unavailable' || !modelContext?.executeTool || !modelContext.getTools) return;
+      const token = ++testGeneration;
+      const before = session.getContext();
+      if (before.lifecycle !== 'active') return;
+      try {
+        const tool = ownTools.find(t => t.name === 'nlth_get_context');
+        if (!tool) throw new Error('Missing context tool');
+        const response = JSON.parse(await modelContext.executeTool(tool, {}, { signal: controller.signal }));
+        if (cleaned || token !== testGeneration || host.getSession() !== session) return;
+        const after = session.getContext();
+        status.smokeTest = response && response.ok !== false && response.lifecycle === 'active' && response.generation === before.generation && response.revision === before.revision &&
+          after.generation === before.generation && after.revision === before.revision ? 'passed' : 'failed';
+      } catch { if (!cleaned && token === testGeneration) status.smokeTest = 'failed'; }
+      notify();
+    },
+  };
+  if (documentLike) registrations.set(documentLike, registration);
+  if (!supported || !modelContext) return registration;
+  const pending = toolDefinitions(host).map(definition => {
+    let value: ReturnType<WebMcpModelContext['registerTool']>;
+    try { value = modelContext.registerTool(definition, { signal: controller.signal }); }
+    catch (error) { value = Promise.reject(error); }
+    if (!value || !('then' in value)) legacy.push({ name: definition.name, handle: value as WebMcpRegistrationHandle | void });
+    return Promise.resolve(value).then(() => {
+      if (cleaned) return;
+      fulfilled.push(definition.name); status.fulfilledToolCount = fulfilled.length;
+    }, error => {
+      if (cleaned) return;
+      status.registrationErrors.push({ tool: definition.name, category: errorCategory(error) });
+      status.registration = 'registration_failed'; controller.abort(); notify();
+    });
+  });
+  registration.ready = Promise.all(pending).then(async () => {
+    if (cleaned) return;
+    if (status.registrationErrors.length) { status.registeredToolNames = []; status.registeredToolCount = 0; notify(); return; }
+    fulfilled.sort((a,b) => WEBMCP_TOOL_NAMES.indexOf(a)-WEBMCP_TOOL_NAMES.indexOf(b));
+    status.registration = 'registered'; status.registeredToolNames = [...fulfilled]; status.registeredToolCount = fulfilled.length; status.missingToolNames = [];
+    if (modelContext.getTools) {
+      try {
+        const all = await modelContext.getTools();
+        if (cleaned) return;
+        // Some host shims expose getTools without the Draft's window identity.
+        // Registration fulfillment is still valid; this API cannot verify scope.
+        if (!documentLike?.defaultView || all.some(t => t.name.startsWith('nlth_') && t.window == null)) {
+          status.selfTest = 'unavailable';
+          status.selfTestUnavailableReason = 'registered_tool_window_unavailable';
+          status.smokeTest = 'unavailable';
+          notify();
+          return;
+        }
+        ownTools = all.filter(t => t.window === documentLike?.defaultView && t.name.startsWith('nlth_'));
+        const names = ownTools.map(t => t.name).sort();
+        status.registeredToolNames = names; status.registeredToolCount = names.length;
+        status.missingToolNames = WEBMCP_TOOL_NAMES.filter(n => !names.includes(n));
+        status.unexpectedToolNames = names.filter(n => !WEBMCP_TOOL_NAMES.includes(n as WebMcpToolName));
+        status.selfTest = names.length === WEBMCP_TOOL_NAMES.length && !status.missingToolNames.length && !status.unexpectedToolNames.length ? 'passed' : 'failed';
+      } catch { if (!cleaned) status.selfTest = 'failed'; }
     }
-  } catch (error) {
-    cleanup();
-    throw error;
-  }
-
-  return {
-    supported: true,
-    registeredToolNames: WEBMCP_TOOL_NAMES,
-    cleanup,
-  };
+    if (!cleaned) notify();
+  });
+  return registration;
 }

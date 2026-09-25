@@ -60,7 +60,6 @@ export class TwoUnitScenarioEngine extends GameEngine {
       facility.earlyCaptureSurvivorStatus = facility.workers > 0 ? 'available' : 'lost';
     }
     clearScenarioCheckpoints(state);
-    state.nextUnitNumber = 2;
     prepareTestSnapshot(state, true);
     const result = this.step({ type: 'LoadSnapshot', snapshot: state });
     if (result.error) throw new Error(result.error.message);

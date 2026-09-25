@@ -1,3 +1,4 @@
+import { publicMoveCandidates } from './public-movement';
 import { hexDistance, hexKey, hexNeighbors } from '../core/hex';
 import type { ArtilleryPreview } from '../core/artillery';
 import type { GameAction } from '../core/types';
@@ -45,7 +46,7 @@ function alternativeDefense(observation:AgentObservation,gunId:string,threats:Ag
     if(hp.every(h=>h<=0))return true;
     if(++visits>20000){exhausted=true;return false;}if(index>=humans.length)return false;
     const human=humans[index]!;
-    const positions=[human.position,...(human.canMove?human.fuelCostByLegalMove.map(m=>m.destination):[])];
+    const positions=[human.position,...(human.canMove?publicMoveCandidates(observation, human.id).map(m=>m.destination):[])];
     // Each unit chooses one position for all of its attacks, retaining charge and ammunition constraints.
     const patterns=new Set<string>();
     for(const position of positions){

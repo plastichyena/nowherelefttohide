@@ -7,6 +7,8 @@ import { SeededRng } from './rng';
 import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { createMovement } from './movement';
 import { decodeSaveCode, encodeSaveCode } from '../persistence/save';
+import { prepareTestSnapshot } from './testConfig';
+import type { GameState } from './types';
 
 describe('v1.5.7 wall and charge accounting', () => {
   it.each([5, 20, 25])('absorbs damage %i into a fresh HP20 wall, with no minimum damage at zero penetration', damage => {
@@ -29,7 +31,7 @@ describe('v1.5.7 wall and charge accounting', () => {
     expect(state.events.filter(e => e.type === 'barbed_wire_damaged').map(e => e.payload.hp)).toEqual(damage < 20 ? [20 - damage, 0] : [0]);
   });
 
-  it('uses four ordinary Horde charges to breach HP20 and still move; damaged walls count actual HP loss', () => {
+  it('uses four ordinary Horde charges to breach HP20 and stop for this phase (v1.6.6); damaged walls count actual HP loss', () => {
     const state = createInitialState(1, createDefaultConfig());
     const destination = wireCandidates(state).find(c => c.legal)!.position;
     const start = { q: destination.q - 1, r: destination.r };
@@ -38,9 +40,9 @@ describe('v1.5.7 wall and charge accounting', () => {
     state.barbedWire.push({ id: 'wall', position: destination, hp: 20, maxHp: 20, builtTurn: 1 });
     const movement = createMovement({ emergencyLand: () => { throw new Error('Unexpected aircraft in ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
     expect(zombie.maxAttackCharges).toBe(4);
-    expect(wireBreakCost(20, zombie)).toBe(4);
+    expect(wireBreakCost(20, zombie)).toBe(4 + zombie.movement);
     movement.applyMovement(state, zombie, [start, destination], 20);
-    expect(zombie.position).toEqual(destination);
+    expect(zombie.position).toEqual(start);
     expect(zombie.attackChargesRemaining).toBe(0);
     expect(state.statistics.barbedWireEmptyAttackCharges).toBe(4);
     expect(state.events.filter(e => e.type === 'barbed_wire_damaged').map(e => e.payload.hp)).toEqual([15, 10, 5, 0]);
@@ -64,6 +66,27 @@ describe('v1.5.7 wall and charge accounting', () => {
     expect(state.statistics.barbedWireDamageTaken).toBe(20);
     expect(state.statistics.barbedWireAbsorbedDamage).toBe(20);
     expect(state.statistics.barbedWireEmptyAttackCharges).toBe(0);
+  });
+
+  it('lets a later zombie pass a breached hex in the same phase and the breacher pass next phase without spending its remaining charges', () => {
+    const state = createInitialState(1, createDefaultConfig());
+    const destination = wireCandidates(state).find(c => c.legal)!.position;
+    const start = { q: destination.q - 1, r: destination.r };
+    const breacher = createUnit(state, 'breacher', 'hordeZombie', start);
+    const follower = createUnit(state, 'follower', 'hordeZombie', { q: destination.q, r: destination.r - 1 });
+    state.units = [breacher, follower];
+    state.barbedWire = [{ id: 'one-hit-wire', position: destination, hp: 5, maxHp: 20, builtTurn: 1 }];
+    const movement = createMovement({ emergencyLand: () => { throw new Error('ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
+    movement.applyMovement(state, breacher, [start, destination], 20);
+    expect(breacher.position).toEqual(start); expect(breacher.attackChargesRemaining).toBe(3); expect(breacher.canAttack).toBe(true);
+    expect(state.statistics.barbedWireEmptyAttackCharges).toBe(1);
+    movement.applyMovement(state, follower, [follower.position, destination], 20);
+    expect(follower.position).toEqual(destination); expect(follower.attackChargesRemaining).toBe(4);
+    state.units = [breacher]; state.turn++;
+    breacher.attackChargesRemaining = breacher.maxAttackCharges;
+    movement.applyMovement(state, breacher, [start, destination], 20);
+    expect(breacher.position).toEqual(destination); expect(breacher.attackChargesRemaining).toBe(4);
+    expect(state.statistics.barbedWireEmptyAttackCharges).toBe(1);
   });
 
   it('persists construction statistics and does not count a rejected build or Query', () => {
@@ -110,5 +133,31 @@ describe('v1.5.7 wall and charge accounting', () => {
     expect(state.barbedWire).toHaveLength(0);
     expect(state.statistics).toEqual(statistics);
     expect(state.events).toHaveLength(events);
+  });
+
+  it('retains breach charges for real combat when a legal target is available, without refreshing them', () => {
+    const engine = new GameEngine(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 } } }));
+    const state = engine.getState() as GameState;
+    const human = state.units.find(u => u.type === 'police')!;
+    human.position = { q: 24, r: 24 }; human.attackChargesRemaining = 0; human.canAttack = false;
+    state.units = [human];
+    const start = { q: 21, r: 24 }, approach = { q: 22, r: 24 }, wall = { q: 23, r: 24 };
+    const breacher = createUnit(state, 'a-breacher', 'hordeZombie', start); breacher.hordeKind = 'periodic'; breacher.spawnGroupId = 'wire-test';
+    state.units.push(breacher);
+    state.barbedWire = [{ id: 'wire-combat', position: wall, hp: 5, maxHp: 20, builtTurn: 1 }];
+    const movement = createMovement({ emergencyLand: () => { throw new Error('ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
+    movement.applyMovement(state, breacher, [start, approach, wall], breacher.movement);
+    expect(breacher.position).toEqual(approach);
+    expect(breacher.attackChargesRemaining).toBe(3);
+    // Ordinary movement pins before approaching wire if a Human is already adjacent.
+    // Stage the conditional post-breach combat boundary with a newly available target;
+    // LoadSnapshot and the next combat must not refresh the three remaining charges.
+    human.position = { q: 22, r: 25 };
+    prepareTestSnapshot(state);
+    expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error?.message).toBeUndefined();
+    const result = engine.step({ type: 'EndTurn' }); expect(result.error?.message).toBeUndefined();
+    expect(result.state.units.find(u => u.id === breacher.id)?.position).toEqual(approach);
+    expect(result.state.statistics.barbedWireEmptyAttackCharges).toBe(1);
+    expect(result.events.filter(e => e.type === 'attack' && e.payload.attackerId === breacher.id)).toHaveLength(3);
   });
 });

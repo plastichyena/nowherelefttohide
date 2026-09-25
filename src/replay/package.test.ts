@@ -24,9 +24,9 @@ it('exports and seeks a self-contained public ZIP, preserving rejection and comm
   expect(service.status('replay-test').revision).toBe(revision);
   service.step('replay-test',{action:{type:'Wait',unitId:'missing'},decisionSummary:'<script>not executed</script>'});
   service.step('replay-test',{action:{type:'EndTurn'},decisionSummary:'Maintain defenses.'});
-  const manifest=service.exportArtifact('replay-test',join(root,'package'));
+  const manifest=service.exportArtifact('replay-test',join(root,'package'),{keepDirectory:true});
   expect(service.replayArtifact(manifest.artifactPath).matched).toBe(true);
-  const bytes=readFileSync(`${manifest.artifactPath}.zip`);
+  const bytes=readFileSync(manifest.artifactPath);
   const replay=await new ReplayPackage(new ReplayZip(new Blob([bytes]),new AbortController().signal)).open();
   expect(replay.index.length).toBe(2);
   const rejected=await replay.decision(0);expect(rejected.record.accepted).toBe(false);expect(rejected.after).toEqual(rejected.before);expect(rejected.record.decisionSummary).toContain('<script>');
@@ -36,7 +36,7 @@ it('exports and seeks a self-contained public ZIP, preserving rejection and comm
   service.loadCheckpoint('replay-test',checkpoint.checkpointId,'branch-test');
   service.step('branch-test',{action:{type:'EndTurn'},decisionSummary:'Branch continuation.'});
   const branch=service.exportArtifact('branch-test',join(root,'branch'));
-  const branchView=await new ReplayPackage(new ReplayZip(new Blob([readFileSync(`${branch.artifactPath}.zip`)]),new AbortController().signal)).open();
+  const branchView=await new ReplayPackage(new ReplayZip(new Blob([readFileSync(branch.artifactPath)]),new AbortController().signal)).open();
   expect(branchView.index.length).toBe(3);expect((await branchView.decision(2)).record.decisionSummary).toBe('Branch continuation.');
   // A valid ZIP may contain public supplemental data that seeking never needs.
   // The container's 50 MB target is not an unconditional rejection threshold.

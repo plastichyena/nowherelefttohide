@@ -19,7 +19,7 @@ import {
   getUnitLegalAttackProjections,
 } from './combat-query';
 import { forecastArmyBaseRecruitmentPower, forecastEndTurn, forecastFacilityProduction, forecastUnitRefills } from './economy-query';
-import { getUnitLegalMoveFuelProjections } from './movement-query';
+import { getUnitMovementSummary } from './movement-query';
 import { deriveUnitRecovery } from './recovery';
 import { facilityZombieTargetValue, isCityFacility, isProductionFacility } from './state';
 import { deriveCheckpointRole, isHexSupplied } from './supply';
@@ -174,8 +174,6 @@ export function createPublicUnitProjection(
   const maps = projectionMaps(state, context);
   const refill = maps.refillByUnitId.get(unit.id) ?? { demand: 0, amount: 0 };
   const military = maps.militaryByUnitId.get(unit.id);
-  const fuelCostByLegalMove = (unit.isPlayerUnit ? getUnitLegalMoveFuelProjections(state, unit.id) : [])
-    .sort((left, right) => left.destination.q - right.destination.q || left.destination.r - right.destination.r);
   const attackPreviews = unit.isPlayerUnit ? getUnitLegalAttackProjections(state, unit.id) : [];
   return {
     ...(isHumanUnitType(unit.type) ? { capabilities: {...state.config.units[unit.type].capabilities}, production: { completed:state.completedProductions[unit.type],reserved:state.pendingUnitProductions.filter(o=>o.unitType===unit.type).length,limit:state.config.units[unit.type].productionLimitPerGame,remaining:state.config.units[unit.type].productionLimitPerGame === null ? null : Math.max(0,state.config.units[unit.type].productionLimitPerGame! - state.completedProductions[unit.type] - state.pendingUnitProductions.filter(o=>o.unitType===unit.type).length) } } : {}),
@@ -233,12 +231,12 @@ export function createPublicUnitProjection(
     maxFuel: unit.maxFuel,
     currentMilitaryGoods: unit.currentMilitaryGoods,
     maxMilitaryGoods: unit.maxMilitaryGoods,
-    fixedMilitaryGoodsUpkeepPerTurn: unitConfig.fixedMilitaryGoodsUpkeepPerTurn,
+    fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: deployedArtillery(unit) ? Object.fromEntries(Array.from({length:unit.range-state.config.units.fieldArtillery.deployed.minRange+1},(_,i)=>[i+state.config.units.fieldArtillery.deployed.minRange,state.config.units.fieldArtillery.deployed.militaryGoodsCost])) : cloneJson(unitConfig.attackMilitaryGoodsCostByRange),
     suppressionMilitaryGoodsCost: unitConfig.suppressionMilitaryGoodsCost,
     emergencyMovementPoints: deployedArtillery(unit) ? 0 : unitConfig.emergencyMovementPoints,
     emergencyMovementAvailable: unit.isPlayerUnit && unit.currentFuel === 0 && unit.canMove,
-    fuelCostByLegalMove,
+    movementSummary: getUnitMovementSummary(state, unit),
     attackPreviews: attackPreviews.map((preview) => ({
       ...preview,
       projectedAttackChargesRemaining: Math.max(0, attackChargesRemaining - 1),
@@ -369,6 +367,10 @@ export function createPublicFacilityProjection(
       facility.owner !== 'player' || facility.status !== 'owned' ? 'city_not_owned' : facility.infected > 0 ? 'city_infected' : facility.populationOperationalTurn > state.turn ? 'available_next_turn' : 'city_out_of_supply'
     ) : 'not_recruitment_hub',
     production: {
+      healthyWorkers: facility.workers,
+      operatingWorkers: currentWorkers,
+      inputRequired: cloneJson(productionProjection?.inputRequired ?? {}),
+      inputShortage: cloneJson(productionProjection?.inputShortage ?? {}),
       inputsPerWorker: cloneJson(rule.inputs),
       outputsPerWorker: cloneJson(rule.outputs),
       requiresPower: (productionProjection?.powerMode ?? rule.powerMode) === 'required',
@@ -396,7 +398,7 @@ export function createPublicFacilityProjection(
     containingUnitId: containingUnit?.id ?? null,
     projectedSuppression: suppression?.projectedSuppression ?? 0,
     projectedCivilianDamage: suppression?.projectedCivilianDamage ?? 0,
-    decommissionRefundCivilianGoods: facility.constructible && facility.type === 'civilianDroneBase'
+    decommissionRefundCivilianGoods: facility.constructible && facility.type === 'reliefSupplyCenter' ? Math.floor(state.config.facilities.reliefSupplyCenter.buildCivilianGoods / 2) : facility.constructible && facility.type === 'civilianDroneBase'
       ? Math.ceil(state.config.facilities.civilianDroneBase.buildCivilianGoods / 2)
       : null,
     temporaryHousing: facility.type === 'temporaryHousing'

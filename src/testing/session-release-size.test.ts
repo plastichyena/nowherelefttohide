@@ -27,8 +27,8 @@ it('counts only exported public chunks, including branch history, without privat
   api.loadCheckpoint('size', checkpoint.checkpointId, 'branch');
   const lowerBound = artifactPayloadBytes(store, 'branch');
   expect(lowerBound).toBeGreaterThanOrEqual(before);
-  const exported = api.exportArtifact('branch', join(root, 'export'));
-  expect(diskBytes(join(exported.artifactPath, 'payloads', 'public', 'chunks'))).toBe(lowerBound);
+  const exported = api.exportArtifact('branch', join(root, 'export'), { keepDirectory: true });
+  expect(diskBytes(join(exported.artifactDirectoryPath!, 'payloads', 'public', 'chunks'))).toBe(lowerBound);
   expect(diskBytes(exported.artifactPath)).toBeGreaterThan(lowerBound);
   expect(diskBytes(join(root, 'pool'))).toBeGreaterThan(diskBytes(exported.artifactPath));
 }, 120000);

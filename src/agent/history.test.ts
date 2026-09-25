@@ -65,7 +65,7 @@ describe('bounded public history and artifact access', () => {
     const observation = game.reset({ seed: 1 });
     const unit = observation.units[0]!;
     unit.currentFuel = 0; unit.canMove = true;
-    expect(unit.fuelCostByLegalMove.length).toBeGreaterThan(0);
+    expect(unit.movementSummary.legalMoveCount).toBeGreaterThan(0);
     const candidate = observation.checkpointPositionCandidates.find((entry) => entry.actionType === 'BuildCheckpoint')!;
     candidate.projectedBranchRadius = candidate.currentBranchRadius;
     candidate.suppliedFacilityDelta = 0; candidate.newlyBuildableConstructibleHexCount = 0;

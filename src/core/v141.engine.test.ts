@@ -123,8 +123,8 @@ describe('v1.4.1 carried Military Goods combat', () => {
     expect(counterEvent?.payload).toMatchObject({
       attackerId: counterGuard.id,
       distance: 1,
-      militaryGoodsCost: 1,
-      effectiveAttack: 3,
+      militaryGoodsCost: 2,
+      effectiveAttack: 15,
     });
     expect(counterResult.state.units.find((unit) => unit.id === counterGuard.id)?.currentMilitaryGoods).toBe(0);
 
@@ -146,7 +146,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
       militaryGoodsCost: 4,
       effectiveAttack: 15,
     });
-    expect(interceptionResult.state.units.find((unit) => unit.id === interceptingGuard.id)?.currentMilitaryGoods).toBe(0);
+    expect(interceptionResult.state.units.find((unit) => unit.id === interceptingGuard.id)?.currentMilitaryGoods).toBe(1);
   });
 
   it('does not charge a destroyed defender and reports its carried Military Goods as lost', () => {
@@ -167,7 +167,7 @@ describe('v1.4.1 carried Military Goods combat', () => {
     const result = engine.step({ type: 'EndTurn' });
     const destroyed = result.events.find((event) => event.type === 'unit_destroyed'
       && event.payload.unitId === guard.id);
-    expect(destroyed?.payload).toMatchObject({ lostMilitaryGoods: 4, lostFuel: guard.currentFuel });
+    expect(destroyed?.payload).toMatchObject({ lostMilitaryGoods: 5, lostFuel: guard.currentFuel });
     expect(result.events.some((event) => event.type === 'attack'
       && event.payload.counterattack === true
       && event.payload.attackerId === guard.id)).toBe(false);
@@ -202,8 +202,8 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
       projectedEndingStock: 0,
     });
     expect(forecast.units.find((unit) => unit.unitId === guard.id)).toMatchObject({
-      fixedConsumption: 1,
-      afterFixed: 39,
+      fixedConsumption: 0,
+      afterFixed: 40,
       inSupply: false,
       projectedRefillAmount: 0,
       suppressionStatus: 'none',
@@ -220,7 +220,7 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
     expect(result.state.resources.militaryGoods).toBe(0);
-    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(39);
+    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(40);
     expect(result.state.units.find((unit) => unit.id === police.id)?.currentMilitaryGoods).toBe(0);
     expect(result.state.facilities.find((facility) => facility.id === farm.id)?.infected).toBe(0);
     expect(result.events.some((event) => event.type === 'infection_suppressed' && event.payload.militaryGoodsCost === 1)).toBe(true);
@@ -270,10 +270,10 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
     rebalance(state);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const forecast = forecastEndTurn(engine.getState()).militaryGoods;
-    expect(forecast.projectedProduction).toBe(4);
+    expect(forecast.projectedProduction).toBe(16);
     expect(forecast.units.map((unit) => [unit.unitId, unit.projectedRefillAmount])).toEqual([
-      [guard.id, 2],
-      [police.id, 2],
+      [guard.id, 8],
+      [police.id, 8],
     ]);
     const result = engine.step({ type: 'EndTurn' });
     const producedIndex = result.events.findIndex((event) => event.type === 'resource_produced'
@@ -282,8 +282,8 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
       && event.payload.reason === 'unit_refill');
     expect(producedIndex).toBeGreaterThanOrEqual(0);
     expect(refillIndex).toBeGreaterThan(producedIndex);
-    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(2);
-    expect(result.state.units.find((unit) => unit.id === police.id)?.currentMilitaryGoods).toBe(2);
+    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(8);
+    expect(result.state.units.find((unit) => unit.id === police.id)?.currentMilitaryGoods).toBe(8);
   });
 });
 

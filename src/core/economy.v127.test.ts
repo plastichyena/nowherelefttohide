@@ -74,18 +74,18 @@ describe('v1.4.2 economy and required power grid', () => {
     state.resources.civilianGoods = 0;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const none = forecastEndTurn(engine.getState());
-    expect(none.civilianGoods).toMatchObject({ productionInputDemand: 10, productionInputAllocated: 0, productionInputShortage: 10 });
+    expect(none.civilianGoods).toMatchObject({ productionInputDemand: 50, productionInputAllocated: 0, productionInputShortage: 50 });
     expect(none.militaryGoods.projectedProduction).toBe(0);
 
     const withStock = editableState(engine);
     withStock.resources.civilianGoods = Math.max(
       0,
       none.civilianGoods.maintenanceRequired - none.civilianGoods.projectedProduction,
-    ) + 2;
+    ) + 10;
     expect(engine.step({ type: 'LoadSnapshot', snapshot: withStock }).error).toBeNull();
     const partial = forecastEndTurn(engine.getState());
-    expect(partial.civilianGoods.productionInputAllocated).toBe(2);
-    expect(partial.militaryGoods.projectedProduction).toBe(1);
+    expect(partial.civilianGoods.productionInputAllocated).toBe(10);
+    expect(partial.militaryGoods.projectedProduction).toBe(4);
   });
 
   it('allocates required cities, then Farm/Civilian Factory, then input-ready Military Factory', () => {

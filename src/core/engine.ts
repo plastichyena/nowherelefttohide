@@ -1,3 +1,4 @@
+import { allocateUnitId } from './state';
 import { isAviationAction, aviationReason, applyAviationAction, emergencyLanding, unitCanReceiveSupply } from './aircraft';
 import { artilleryAttackReason, artilleryImpacts, artilleryBaseDamage, damageArtilleryPopulation } from './artillery';
 import { hasCapability, deployedArtillery, canReact, synchronizeArtilleryStats, isAirborne, occupiesGroundLayer, canTargetUnit } from './unit-capabilities';
@@ -56,6 +57,7 @@ import {
 } from './visibility';
 import {
   getBlockingZombiesForCheckpoint,
+  isInitialSupplyHex,
   activeCheckpointForBranch,
   deriveCheckpointRole,
   getBranchIdAt,
@@ -333,7 +335,7 @@ function settleNuclearObjective(state: GameState): void {
   if (!reward && objective.failureSpawn !== 'pending') return;
   const position = nuclearReinforcementPosition(state, reward);
   if (!position) return;
-  const unit = createUnit(state, `${reward ? 'special-forces' : 'pack-zombie'}-${state.nextUnitNumber++}`, reward ? 'specialForces' : 'packZombie', { q: position.q, r: position.r }, 'ready', 'regular');
+  const unit = createUnit(state, allocateUnitId(state, reward ? 'special-forces' : 'pack-zombie'), reward ? 'specialForces' : 'packZombie', { q: position.q, r: position.r }, 'ready', 'regular');
   unit.canMove = true; unit.canAttack = true;
   if (!reward) unit.firstZombieActionTurn = state.turn;
   state.units.push(unit);
@@ -364,7 +366,7 @@ function settleAirBaseObjective(state: GameState): void {
   const tile = state.map.tiles.filter(t=>!occupied.has(t.key) && effectiveMovementCost(state,t,false)!==null && (reward ? canPlayerOccupyHex(state.map,t) : !wireAt(state,t)))
     .sort((a,b)=>hexDistance(base.position,a)-hexDistance(base.position,b)||a.q-b.q||a.r-b.r)[0];
   if (!tile) return;
-  const unit = createUnit(state,`${reward?'special-forces':'pack-zombie'}-${state.nextUnitNumber++}`,reward?'specialForces':'packZombie',{q:tile.q,r:tile.r},'ready','regular');
+  const unit = createUnit(state,allocateUnitId(state, reward ? 'special-forces' : 'pack-zombie'),reward?'specialForces':'packZombie',{q:tile.q,r:tile.r},'ready','regular');
   unit.canMove = true; unit.canAttack = true;
   if (!reward) unit.firstZombieActionTurn=state.phase==='zombie'?state.turn+1:state.turn;
   state.units.push(unit);
@@ -1099,9 +1101,7 @@ function createWaveZombie(
 ): UnitState {
   if (unitType === 'zombie') unitType = 'hordeZombie';
   const prefix = unitType.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
-  let id = `${prefix}-${state.nextUnitNumber}`;
-  while (state.units.some((unit) => unit.id === id)) id = `${prefix}-${++state.nextUnitNumber}`;
-  state.nextUnitNumber += 1;
+  const id = allocateUnitId(state, prefix);
   const unit = createUnit(state, id, unitType, position);
   unit.spawnGroupId = pending.groupId;
   unit.hordeKind = pending.kind;
@@ -1138,12 +1138,7 @@ function eligibleAdjacentZombieSpawnPositions(state: Readonly<GameState>, origin
 
 function createSiteSpawnedZombie(state: GameState, position: HexCoord, type: ZombieUnitType = 'zombie'): UnitState {
   const prefix = type.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
-  let id = `${prefix}-${state.nextUnitNumber}`;
-  while (state.units.some((unit) => unit.id === id)) {
-    state.nextUnitNumber += 1;
-    id = `${prefix}-${state.nextUnitNumber}`;
-  }
-  state.nextUnitNumber += 1;
+  const id = allocateUnitId(state, prefix);
   const unit = createUnit(state, id, type, position);
   unit.canMove = false;
   unit.canAttack = false;
@@ -2788,7 +2783,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
     if (facility.operationalStatus === 'building' && facility.builtTurn !== null && facility.builtTurn < state.turn) {
       facility.operationalStatus = ['temporaryHousing', 'windPowerPlant'].includes(facility.type) || facility.workers > 0 ? 'operational' : 'stopped';
       facility.populationOperationalTurn = state.turn;
-      facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
+      facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'reliefSupplyCenter'].includes(facility.type);
     } else if (
       facility.operationalStatus === 'recovering' &&
       facility.recoveryOperationalTurn !== null &&
@@ -2796,7 +2791,7 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
     ) {
       facility.operationalStatus = facility.type === 'windPowerPlant' || ['armyBase','airBase'].includes(facility.type) || facility.type === 'temporaryHousing' || facility.workers > 0 ? 'operational' : 'stopped';
       facility.populationOperationalTurn = state.turn;
-      facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type);
+      facility.powerSupplyEnabled = ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'reliefSupplyCenter'].includes(facility.type);
       facility.recoveryOperationalTurn = null;
     }
   }
@@ -3124,6 +3119,7 @@ function checkpointForwardBlockers(state: Readonly<GameState>, branchId: string)
     (checkpoint) =>
       (checkpoint.branchId ?? checkpoint.direction) === branchId &&
       ['ruined', 'abandoned'].includes(checkpoint.status) &&
+      !isInitialSupplyHex(state, checkpoint.position) &&
       checkpoint.infected > 0,
   );
 }
@@ -3194,6 +3190,7 @@ function validateCheckpointDestination(
     .filter(isZombieFaction)
     .filter((zombie) => isVisibleToPlayer(state, zombie.position)))
     .filter((zombie) =>
+      hexKey(zombie.position) === hexKey(action.position) ||
       getBlockingZombiesForCheckpoint(state, branchId, action.position).some((candidate) => candidate.id === zombie.id),
     );
   if (zombies.length > 0) {
@@ -3628,7 +3625,7 @@ function turnAwayCheckpointRefugees(
 function validateSetPowerSupply(state: Readonly<GameState>, action: Extract<GameAction, { type: 'SetPowerSupply' }>) {
   if (!isPlayerPhase(state)) return error(action, 'wrong_phase', 'Actions are only accepted during the player phase');
   const facility = getFacilityState(state, action.facilityId);
-  if (!facility || !['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type)) {
+  if (!facility || !['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'reliefSupplyCenter'].includes(facility.type)) {
     return error(action, 'power_supply_not_applicable', 'Power Supply can only be changed for a supported facility');
   }
   if (
@@ -3834,7 +3831,7 @@ function wait(state: GameState, action: Extract<GameAction, { type: 'Wait' }>): 
 }
 
 function constructibleLimit(state: Readonly<GameState>, facilityType: ConstructibleFacilityType): number {
-  if (facilityType === 'temporaryHousing' || facilityType === 'simpleFarm') return Number.MAX_SAFE_INTEGER;
+  if (facilityType === 'temporaryHousing' || facilityType === 'simpleFarm' || facilityType === 'reliefSupplyCenter') return Number.MAX_SAFE_INTEGER;
   if (facilityType === 'windPowerPlant') return state.map.roadBranches.length * 2;
   return Math.ceil(state.map.roadBranches.length / state.config.constructibleFacility.limitPerTypeDivisor);
 }
@@ -3868,7 +3865,7 @@ function validateConstructibleFacilityAction(
 ): ActionError | null {
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
-  if (!['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'].includes(action.facilityType)) {
+  if (!['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'].includes(action.facilityType)) {
     return error(action, 'invalid_constructible_facility_type', 'Unknown constructible facility type');
   }
   if (state.facilities.filter((facility) => facility.constructible && facility.type === action.facilityType).length >= constructibleLimit(state, action.facilityType)) {
@@ -3931,7 +3928,7 @@ function getLegalConstructibleBuildActions(
   const context = constructibleValidationContext(state);
   const actions: Array<Extract<GameAction, { type: 'BuildConstructibleFacility' }>> = [];
   const suppliedTiles = state.map.tiles.filter((tile) => context.suppliedKeys.has(tile.key));
-  for (const facilityType of ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const) {
+  for (const facilityType of ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'] as const) {
     for (const tile of suppliedTiles) {
       const action: Extract<GameAction, { type: 'BuildConstructibleFacility' }> = {
         type: 'BuildConstructibleFacility',
@@ -3952,7 +3949,7 @@ function buildConstructibleFacility(
   if (reason) return reason;
   const config = state.config.facilities[action.facilityType];
   const number = state.nextConstructibleFacilityNumber++;
-  const prefix = action.facilityType === 'simpleFarm' ? 'simple-farm'
+  const prefix = action.facilityType === 'reliefSupplyCenter' ? 'relief-supply-center' : action.facilityType === 'simpleFarm' ? 'simple-farm'
     : action.facilityType === 'civilianDroneBase' ? 'civilian-drone-base'
       : action.facilityType === 'temporaryHousing' ? 'temporary-housing' : 'wind-power-plant-built';
   const securedOrder = state.facilities.reduce((maximum, facility) => Math.max(maximum, facility.securedOrder ?? -1), -1) + 1;
@@ -3973,7 +3970,7 @@ function buildConstructibleFacility(
     securedOrder,
     lastAssignedOrder: state.nextAssignmentOrder++,
     populationOperationalTurn: state.turn + 1,
-    powerSupplyEnabled: action.facilityType === 'civilianDroneBase',
+    powerSupplyEnabled: ['civilianDroneBase', 'reliefSupplyCenter'].includes(action.facilityType),
     lastPowerSupplied: null,
     constructible: true,
     builtTurn: state.turn,
@@ -4003,8 +4000,8 @@ function validateDecommissionConstructibleFacility(
   const budget = playerActionBudgetError(state, action);
   if (budget) return budget;
   const facility = getFacilityState(state, action.facilityId);
-  if (!facility || !facility.constructible || !['civilianDroneBase', 'temporaryHousing'].includes(facility.type)) {
-    return error(action, 'facility_not_decommissionable', 'Only constructed Civilian Drone Bases and Temporary Housing can be decommissioned');
+  if (!facility || !facility.constructible || !['civilianDroneBase', 'temporaryHousing', 'reliefSupplyCenter'].includes(facility.type)) {
+    return error(action, 'facility_not_decommissionable', 'Only constructed Civilian Drone Bases, Temporary Housing and Relief Supply Centers can be decommissioned');
   }
   if (facility.operationalStatus === 'building') {
     return error(action, 'facility_building', 'A facility under construction cannot be decommissioned');
@@ -4027,14 +4024,15 @@ function decommissionConstructibleFacility(
   const { facility } = validation;
   const refund = facility.type === 'temporaryHousing'
     ? 0
-    : Math.ceil(state.config.facilities.civilianDroneBase.buildCivilianGoods / 2);
+    : facility.type === 'reliefSupplyCenter' ? Math.floor(state.config.facilities.reliefSupplyCenter.buildCivilianGoods / 2)
+      : Math.ceil(state.config.facilities.civilianDroneBase.buildCivilianGoods / 2);
   state.facilities.splice(state.facilities.findIndex((candidate) => candidate.id === facility.id), 1);
   state.resources.civilianGoods += refund;
   state.actionsTakenThisTurn += 1;
   if (facility.type === 'civilianDroneBase') {
     state.statistics.civilianDroneBasesDecommissioned += 1;
-    state.statistics.civilianGoodsRefundedFromDecommission += refund;
   }
+  state.statistics.civilianGoodsRefundedFromDecommission += refund;
   emit(state, 'constructible_decommissioned', {
     facilityId: facility.id,
     facilityType: facility.type,
@@ -4405,7 +4403,7 @@ export class GameEngine implements HeadlessGame {
           facility.status === 'owned' &&
           facility.infected === 0 &&
           facility.populationOperationalTurn <= this.state.turn &&
-          ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type) &&
+          ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'reliefSupplyCenter'].includes(facility.type) &&
           !['building', 'disabled', 'recovering'].includes(facility.operationalStatus)
         ) {
           actions.push({ type: 'SetPowerSupply', facilityId: facility.id, enabled: !facility.powerSupplyEnabled });
@@ -4462,7 +4460,7 @@ export class GameEngine implements HeadlessGame {
         ) actions.push({ type: 'AssignWorkers', facilityId: facility.id, workers });
       }
       if (
-        ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase'].includes(facility.type) &&
+        ['farm', 'civilianFactory', 'militaryFactory', 'refinery', 'civilianDroneBase', 'reliefSupplyCenter'].includes(facility.type) &&
         !['building', 'disabled', 'recovering'].includes(facility.operationalStatus)
       ) {
         actions.push({ type: 'SetPowerSupply', facilityId: facility.id, enabled: !facility.powerSupplyEnabled });

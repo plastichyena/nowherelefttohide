@@ -43,10 +43,11 @@ function definitionByName(definitions: RegisteredDefinition[], name: string): Re
 }
 
 describe('v1.6 WebMCP adapter', () => {
-  it('discovers exactly the fixed nine tools and marks only act as writing', () => {
+  it('discovers exactly the fixed nine tools and marks only act as writing', async () => {
     const mock = mockDocument({ handles: true });
     const registration = registerWebMcpTools({ getSession: () => createAiSession({ initial: { seed: 61 } }) }, mock.documentLike);
 
+    await registration.ready;
     expect(registration.supported).toBe(true);
     expect(mock.definitions.map(({ name }) => name)).toEqual(WEBMCP_TOOL_NAMES);
     expect(registration.registeredToolNames).toEqual(WEBMCP_TOOL_NAMES);

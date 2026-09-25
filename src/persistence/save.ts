@@ -18,12 +18,13 @@ import type { GameState, JsonValue } from '../core/types';
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 22;
+export const SAVE_FORMAT_VERSION = 23;
 /** v1.6.5 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v22';
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v23';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v21';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v22';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v21',
   'nowhere-left-to-hide:auto-save:v20',
   'nowhere-left-to-hide:auto-save:v19',
   'nowhere-left-to-hide:auto-save:v18',
@@ -118,12 +119,13 @@ const FACILITY_TYPES = [
   'windPowerPlant',
   'nuclearPowerPlant',
   'simpleFarm',
+  'reliefSupplyCenter',
   'civilianDroneBase',
   'temporaryHousing',
   'armyBase',
   'airBase',
 ] as const;
-const CONSTRUCTIBLE_FACILITY_TYPES = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant'] as const;
+const CONSTRUCTIBLE_FACILITY_TYPES = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'] as const;
 const FACILITY_STATUSES = ['unowned', 'owned', 'ruined'] as const;
 const FACILITY_OPERATIONAL_STATUSES = [
   'building',
@@ -538,7 +540,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.6.4 or earlier; start a new v1.6.5 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.6.5 or earlier; start a new v1.6.6 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -1149,6 +1151,19 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     }
   }
 
+  if (Array.isArray(state.units) && Array.isArray(state.events)) {
+    let highest = Math.max(4, isRecord(state.config) && isRecord(state.config.economy) && typeof state.config.economy.initialZombieCount === 'number' ? state.config.economy.initialZombieCount : 0);
+    const issued = (id: unknown) => { if (typeof id === 'string') highest = Math.max(highest, Number(/-(\d+)$/.exec(id)?.[1] ?? 0)); };
+    for (const unit of state.units) if (isRecord(unit)) issued(unit.id);
+    for (const event of state.events) if (isRecord(event) && isRecord(event.payload)) {
+      for (const [key,value] of Object.entries(event.payload)) if (/(?:unitId|UnitId|zombieId|attackerId|defenderId)$/.test(key) || (key === 'targetId' && typeof value === 'string' && /^(?:police|national-guard|riot-police|recon-team|special-forces|field-artillery|multipurpose-helicopter|zombie|horde|police-zombie|soldier-zombie|riot-zombie|hunter-zombie|gas-zombie|screamer-zombie|pack-zombie)-/.test(value))) issued(value);
+    }
+    if (typeof state.nextUnitNumber === 'number' && state.nextUnitNumber <= highest) errors.push('state.nextUnitNumber must exceed every issued unit number; counters cannot rewind');
+    if (Array.isArray(state.facilities)) {
+      const centers = state.facilities.filter(f => isRecord(f) && f.type === 'reliefSupplyCenter') as Record<string, unknown>[];
+      if (centers.some(f => !isInteger(f.securedOrder, 0)) || new Set(centers.map(f => f.securedOrder)).size !== centers.length) errors.push('Relief Supply Center construction order must be a unique nonnegative integer');
+    }
+  }
   for (const field of ['nextCheckpointNumber', 'nextConstructibleFacilityNumber', 'nextUnitNumber', 'nextEventNumber', 'nextAssignmentOrder'] as const) if (!isInteger(state[field], 1)) errors.push(`state.${field} must be a positive integer`);
 
   const horde = state.horde;

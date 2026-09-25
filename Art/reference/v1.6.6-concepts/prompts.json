@@ -1,7 +1,7 @@
 {
   "assetId": "facility_relief_supply_center",
   "date": "2026-09-24",
-  "status": "candidate_presented_not_yet_approved_or_integrated",
+  "status": "approved_and_integrated",
   "generationMethod": "built-in image_gen",
   "model": "not exposed by tool",
   "candidate": "facility_relief_supply_center_candidate_v1.png",
@@ -21,6 +21,9 @@
     "transparentPixels": 970764,
     "opaqueBrightRedPixels": 0,
     "visualInspection": "Warehouse, tent and crates present; matching isometric painted facility style; no text or logos; original preserved unchanged.",
-    "runtimeSmallScaleTest": "not_run_implementation_pending"
-  }
+    "runtimeSmallScaleTest": "passed_2026-09-25_normal_live_replay_pc_and_390px; see validation/v166-acceptance.md"
+  },
+  "approvalDate": "2026-09-25",
+  "runtimePath": "public/assets/board/facilities/facility_relief_supply_center.png",
+  "runtimeBuildScript": "scripts/build-v166-assets.py"
 }

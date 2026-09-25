@@ -9,8 +9,8 @@ export const RULES_V165 = {
     emergency: '燃料1～4でも次の1Hexへ進み、0になると即時に緊急着陸します。現在地の地上が使えなければ隣接6Hexの合法な着地点から抽選。着地点がなければ墜落し、機体・搭乗部隊・元Hexの敵を失います。元Hexの味方地上部隊は巻き込みません。水上（橋なし）では搭乗者も再アニメーションしません。Previewは実際の抽選先を明かしません。',
     drone: '軍用ドローンは任意のHexへ、空軍基地からのHex距離×燃料5で派遣できます（距離0は無料）。半径10を地形無視で5ターン可視化。Turn20ならTurn24まで有効でTurn25開始に終了。稼働中の重複派遣は不可。基地喪失後も視界は期限まで残ります。',
     enemies: '飛行ヘリを攻撃できる敵はHunter ZombieとPack Zombieだけです。他の敵はヘリ・搭乗者を目標にせず、騒音には反応します。飛行ヘリは砲撃・Gas爆発の被害対象外です。ヘリは再アニメーションせず、搭乗歩兵は通常の変異規則に従います。',
-    economy: '仮設住宅の民需品生産は0（人口受入と維持費は継続）。正の施設電力容量は従来の2倍、軍需工場はWorker1人あたり民需品2→軍需品1。Wave特殊枠の重みはNormal40 / Police10 / Soldier10 / Riot5 / Hunter15 / Gas15 / Screamer5。HunterとGasに方向別上限はありません。',
-    compatibility: 'v1.6.4以前のSave・Replay・Session・Checkpoint・Artifactは読み込み不可です。旧データは残し、v1.6.5で新規ゲームを開始してください。',
+    economy: '仮設住宅の民需品生産は0（人口受入と維持費は継続）。正の施設電力容量は従来の2倍、軍需工場はWorker1人あたり民需品10→軍需品4。Wave特殊枠の重みはNormal40 / Police10 / Soldier10 / Riot5 / Hunter15 / Gas15 / Screamer5。HunterとGasに方向別上限はありません。',
+    compatibility: 'v1.6.5以前のSave・Replay・Session・Checkpoint・Artifactは読み込み不可です。旧データは残し、v1.6.6で新規ゲームを開始してください。',
   },
   en: {
     objectives: 'First capture deadlines for the nuclear plant and Air Base are the end of Turn 10 actions. Nuclear capture awards Special Forces regardless of survivors; no capture causes a Pack Zombie on Turn 11. The Air Base reward requires timely first capture, no earlier fall, and at least one healthy survivor. Timely capture with zero survivors still avoids the deadline Pack. A pre-capture fall commits one Pack, without a duplicate at the deadline. Blocked reinforcements remain pending until placement is possible.',
@@ -21,7 +21,7 @@ export const RULES_V165 = {
     emergency: 'Fuel1–4 still permits the next Hex, then immediate emergency landing at zero. If current ground is unavailable, draw among legal adjacent Hexes. No landing place means a crash, losing the aircraft, cargo and enemies at the original Hex, without harming friendly ground units. Cargo does not reanimate over unbridged water. Preview never reveals the actual random landing.',
     drone: 'Launch to any Hex for distance from the Air Base × 5 national Fuel (zero distance is free). Terrain-ignoring radius10 vision lasts five turns: a Turn20 launch lasts through Turn24 and expires at Turn25 start. Only one active drone; base loss does not cancel existing vision.',
     enemies: 'Only Hunter and Pack Zombies can attack airborne helicopters. Other enemies ignore aircraft and cargo as targets but follow noise. Airborne helicopters ignore artillery and Gas blast damage. Helicopters never reanimate; cargo follows its normal conversion rules.',
-    economy: 'Temporary Housing produces zero Civilian Goods; capacity and upkeep continue. Positive facility power capacities are doubled. Military Factories convert 2 Civilian Goods into 1 Military Good per worker. Wave slot weights: Normal40 / Police10 / Soldier10 / Riot5 / Hunter15 / Gas15 / Screamer5. Hunter and Gas have no per-direction cap.',
-    compatibility: 'Save, Replay, Session, Checkpoint and Artifact data from v1.6.4 or earlier is rejected. Preserve old data and start a new v1.6.5 game.',
+    economy: 'Temporary Housing produces zero Civilian Goods; capacity and upkeep continue. Positive facility power capacities are doubled. Military Factories convert 10 Civilian Goods into 4 Military Goods per worker. Wave slot weights: Normal40 / Police10 / Soldier10 / Riot5 / Hunter15 / Gas15 / Screamer5. Hunter and Gas have no per-direction cap.',
+    compatibility: 'Save, Replay, Session, Checkpoint and Artifact data from v1.6.5 or earlier is rejected. Preserve old data and start a new v1.6.6 game.',
   },
 } as const;

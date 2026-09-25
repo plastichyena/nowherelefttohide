@@ -36,6 +36,7 @@ interface ParsedCli {
   preferredCommentLocale?: SessionCommentLocale;
   inputPath?: string;
   outputPath?: string;
+  keepDirectory?: boolean;
   queryTarget?: string;
   revision?: number;
   cursor?: string;
@@ -91,6 +92,7 @@ export function parseSessionCliArgs(argv: readonly string[]): ParsedCli {
       parsed.preferredCommentLocale = value;
     }
     else if ((value = readOption(argument, '--input', remaining)) !== null) parsed.inputPath = value;
+    else if (argument === '--keep-directory') parsed.keepDirectory = true;
     else if ((value = readOption(argument, '--out', remaining)) !== null) parsed.outputPath = value;
     else if ((value = readOption(argument, '--target', remaining)) !== null) parsed.queryTarget = value;
     else if ((value = readOption(argument, '--revision', remaining)) !== null) parsed.revision = integer(value, '--revision', 0);
@@ -167,6 +169,7 @@ export function sessionCliHelp(): Record<string, unknown> {
     contextHandoff: { guidance: RULES_V163.en.handoff, limits: CONTEXT_HANDOFF_LIMITS, query: 'query --session=my-game --target=context-handoff --revision=N', locale: 'Keep human-facing comments and decisionSummary in preferredCommentLocale for the whole Session.' },
     rulesV163: RULES_V163.en,
     commands: [...COMMANDS],
+    artifact: { default: 'ZIP only', output: '--out=PATH.zip uses the exact path; --out=PATH appends .zip', keepDirectory: '--keep-directory also writes the same entries to the path without final .zip', response: 'artifactPath = replayZipPath = finalized ZIP; artifactDirectoryPath = null unless explicitly retained', failure: 'Never overwrites. Incomplete output stays at .partial and is reported as failure.' },
     playTurn: {
       ...SESSION_PLAY_TURN_CAPABILITIES,
       examples: {
@@ -269,8 +272,8 @@ export function executeSessionCommand(
         nextCursor: result.nextCursor, outputPath };
     }
     case 'artifact': {
-      const artifact = service.exportArtifact(parsed.sessionId!, parsed.outputPath ? resolve(parsed.outputPath) : undefined);
-      return { ok: true, command: parsed.command, artifact, replayZipPath: `${artifact.artifactPath}.zip` };
+      const artifact = service.exportArtifact(parsed.sessionId!, parsed.outputPath ? resolve(parsed.outputPath) : undefined, { keepDirectory: parsed.keepDirectory });
+      return { ok: true, command: parsed.command, artifact, artifactPath: artifact.artifactPath, replayZipPath: artifact.replayZipPath, artifactDirectoryPath: artifact.artifactDirectoryPath };
     }
   }
 }

@@ -79,14 +79,14 @@ describe('v1.5.6 Barbed Wire', () => {
     expect(damageWire(s,p,15)).toBe(5); expect(s.barbedWire).toEqual([]);
     expect(effectiveMovementCost(s,p)).toBe(original);
   });
-  it('empty-wall attacks use charges, preserve MP and allow movement only after destruction', () => {
+  it('empty-wall breach uses charges and stops the breacher for this phase', () => {
     const s=state(); const start={q:25,r:24}, end={q:26,r:24};
     s.units=[]; const z=createUnit(s,'z','hordeZombie',start);s.units=[z];
     z.attack=5;z.attackChargesRemaining=2;z.canAttack=true;
     s.barbedWire=[{id:'wall',position:end,hp:10,maxHp:20,builtTurn:1}];
     const movement=createMovement({ emergencyLand: () => { throw new Error('Unexpected aircraft in ground fixture'); },interceptorsAt:()=>[],interceptArmyBase:()=>false,resolveCombat:()=>{},tryCapture:()=>{}});
     movement.applyMovement(s,z,[start,end],5);
-    expect(s.barbedWire).toEqual([]);expect(z.attackChargesRemaining).toBe(0);expect(z.position).toEqual(end);
+    expect(s.barbedWire).toEqual([]);expect(z.attackChargesRemaining).toBe(0);expect(z.position).toEqual(start);
     expect(s.events.filter(e=>e.type==='noise_emitted')).toEqual([]);
   });
   it('never exposes a hidden wall or its damage through public state', () => {

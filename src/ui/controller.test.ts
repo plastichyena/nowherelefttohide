@@ -61,8 +61,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.6.5');
-    expect(titleVersionLabel('en')).toContain('1.6.5');
+    expect(titleVersionLabel('ja')).toContain('1.6.6');
+    expect(titleVersionLabel('en')).toContain('1.6.6');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -309,26 +309,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.6.4-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.6.5-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.4以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.5');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.5以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.6');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.4 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.5');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.5 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.6');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 15.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 22');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 15.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 22');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 16.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 23');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 16.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 23');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.4以前' : 'v1.6.4 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.4以前' : 'v1.6.4 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.4以前' : 'v1.6.4-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.4以前' : 'v1.6.4-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.4以前' : 'v1.6.4-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5-or-earlier');
     }
   });
 
@@ -524,7 +524,8 @@ describe('controller view models', () => {
   it('localizes v1.5.0 refugee and decommission action errors', () => {
     expect(localizeActionError('checkpoint_not_eligible_for_turn_away', 'ja')).toContain('Active');
     expect(localizeActionError('invalid_refugee_turn_away_count', 'en')).toContain('Waiting');
-    expect(localizeActionError('facility_not_decommissionable', 'ja')).toContain('Civilian Drone Base');
+    expect(localizeActionError('facility_not_decommissionable', 'ja')).toContain('救援物資センター');
+    expect(localizeActionError('facility_not_decommissionable', 'en')).toContain('Relief Supply Center');
     expect(localizeActionError('facility_zombie_occupied', 'en')).toContain('Zombie');
   });
 
@@ -883,7 +884,7 @@ describe('controller view models', () => {
 });
 
 
-it.each(['ja', 'en'] as const)('renders v1.6.4 starvation causes and numbers in %s without internal codes', locale => {
+it.each(['ja', 'en'] as const)('renders v1.6.5 starvation causes and numbers in %s without internal codes', locale => {
   const summary = crisisSummaryViewModel({ crisisSummary: { alerts: [{ id:'starvation',severity:'critical',reasonCode:'food_starvation_risk',entityIds:[],publicFacts:{rate:0.05,populationLost:3,accumulation:4.5,carry:0.25} }] } });
   const html = renderCrisisStrip(summary, locale);
   expect(html).toContain(locale === 'ja' ? '飢餓死亡の危険' : 'Starvation danger');

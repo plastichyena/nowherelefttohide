@@ -575,7 +575,7 @@ describe('GameEngine', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
     expect(engine.step({ type: 'EndTurn' }).error).toBeNull();
     expect(engine.getState().rngState.calls).toBe(callsBefore + 1);
-    expect(engine.getState().units.some((unit) => unit.id === 'police-2' && nearest.some((position) => position.q === unit.position.q && position.r === unit.position.r))).toBe(true);
+    expect(engine.getState().units.some((unit) => unit.id === `police-${snapshot.nextUnitNumber}` && nearest.some((position) => position.q === unit.position.q && position.r === unit.position.r))).toBe(true);
   });
 
   it('spawns increasing periodic Hordes followed by the configured Final Horde', () => {

@@ -1,3 +1,4 @@
+import type { WebMcpRegistration } from './webmcp';
 import { PublicBoardRenderer, publicBoardFrame } from '../ui/publicBoard';
 import type { AgentObservation } from '../agent/types';
 import { createAiSession } from '../session/ai-session';
@@ -42,7 +43,20 @@ function text(value: unknown): string {
   try { return JSON.stringify(value, null, 2); } catch { return String(value); }
 }
 
+/** The viewer shows a bounded receipt; canonical observations stay in Session/Artifact. */
+export function liveAiResultText(response: unknown): string {
+  let value = response;
+  if (response && typeof response === 'object' && 'before' in response && 'after' in response) {
+    const { before: _before, after, ...receipt } = response as Record<string, unknown>;
+    const observation = after as Partial<AgentObservation>;
+    value = { ...receipt, after: { turn: observation.turn, gameOver: observation.gameOver, resources: observation.resources }, observationDetails: 'Use nlth_observe / nlth_query or Export ZIP for full public state.' };
+  }
+  const serialized = text(value);
+  return serialized.length <= 16_384 ? serialized : `${serialized.slice(0, 16_384)}\n… Viewer receipt truncated; canonical Artifact is complete.`;
+}
+
 export class LiveAiViewer {
+  private registration: WebMcpRegistration | null = null;
   private session: AiSessionPort | null = null;
   private latestObservation: AgentObservation | null = null;
   private omittedDecisions = 0;
@@ -75,6 +89,7 @@ export class LiveAiViewer {
           <button type="button" data-live-ai="end">End</button>
           <button type="button" data-live-ai="close">Close</button>
         </div>
+        <details open><summary>WebMCP diagnostics / 接続診断</summary><pre class="live-ai-diagnostics"></pre><button type="button" data-live-ai="smoke">Read-only Self Test</button></details>
         <div class="live-ai-board"><canvas aria-label="Live AI public board"></canvas></div><button type="button" data-live-ai="fit">Fit / 全体</button><section class="public-board-details"></section>
         <section class="live-ai-current" aria-live="polite">WebMCP client can start after Start.</section>
         <pre class="live-ai-result" aria-live="polite"></pre>
@@ -106,6 +121,12 @@ export class LiveAiViewer {
     this.host.addEventListener('click', (event) => this.onClick(event));
     window.addEventListener('resize', () => { if (this.latestObservation) void this.render(this.latestObservation); });
   }
+
+  public setRegistration(registration: WebMcpRegistration): void { this.registration = registration; this.refreshDiagnostics(); }
+  public refreshDiagnostics = (): void => {
+    const node = this.host.querySelector('.live-ai-diagnostics');
+    if (node && this.registration) node.textContent = text(this.registration.diagnostics());
+  };
 
   public getSession = (): AiSessionPort | null => this.session;
 
@@ -142,7 +163,9 @@ export class LiveAiViewer {
       await this.render(this.latestObservation);
     }
     this.state.textContent = `active · ${locale()}`;
-    this.current.textContent = 'Session started. Discover the nine nlth_* WebMCP tools.';
+    this.current.textContent = locale() === 'ja' ? 'セッション開始。接続状態は診断欄で確認できます。' : 'Session started. Connection status is shown in diagnostics.';
+    await this.registration?.smokeTest();
+    this.refreshDiagnostics();
     this.result.textContent = '';
     this.log.replaceChildren();
     this.omittedDecisions = 0;
@@ -154,6 +177,7 @@ export class LiveAiViewer {
     const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-live-ai]');
     if (!button) return;
     switch (button.dataset.liveAi) {
+      case 'smoke': void this.registration?.smokeTest().then(this.refreshDiagnostics); break;
       case 'fit': this.board.fit(); break;
       case 'start': void this.start(); break;
       case 'pause': if (this.session) { this.session.setPaused(true); this.state.textContent = 'paused'; } break;
@@ -162,6 +186,7 @@ export class LiveAiViewer {
       case 'export': void this.exportArtifact(); break;
       case 'close': this.panel.hidden = true; this.launcher.hidden = false; break;
     }
+    this.refreshDiagnostics();
   }
 
   private async exportArtifact(): Promise<void> {
@@ -188,7 +213,8 @@ export class LiveAiViewer {
   }
 
   private showResult(response: unknown, renderError?: unknown): void {
-    this.result.textContent = renderError ? `${text(response)}\nrenderError: ${String(renderError)}` : text(response);
+    this.refreshDiagnostics();
+    this.result.textContent = renderError ? `${liveAiResultText(response)}\nrenderError: ${String(renderError)}` : liveAiResultText(response);
   }
 
   private trimLog(): void {
