@@ -842,3 +842,33 @@ WebMCP / ChatGPT Desktop部分の調査基準日は2026-09-24。
   https://webmachinelearning.github.io/webmcp/
 
 WebMCPはDraftであり、将来APIが変わった場合は「v1.6.6実装時に固定したcontract」と「現在の最新Draft」を混同しない。
+
+---
+
+# 14. 要件確認の回答記録（2026-09-24、確認進行中）
+
+本節は依頼者との一問一答で決定した内容。上記ドラフト本文と異なる箇所は、確定版作成時に本節の決定を本文・受入条件へ統合する。現行仕様の変更や実装完了を意味しない。
+
+| 問 | 決定 |
+| --- | --- |
+| 1 | 空の有刺鉄線を破壊した個体だけが当該Zombie Phaseの移動を終了する。後続個体は通常の移動条件に従ってそのHexへ進入できる。 |
+| 2 | v1.6.5以前のSave / Replay / Session / Artifact等は互換変換せず、理由付きで読み込みを拒否する。旧データを保持する。 |
+| 3 | 救援物資センターのFood inputより人口維持費を優先する。当TurnのFood生産を含めて維持費を確保し、残る既存備蓄だけをinputへ使用する。同Turn生産Foodの直接投入は禁止。維持費不足時は変換しない。 |
+| 4 | 複数センターへのFood配分は建設順。各施設の稼働可能人数（最大5人）まで集中配分し、残りを後続へ回す。 |
+| 5 | 救援物資センターの建設数は上限なし。 |
+| 6 | 救援物資センターを撤去対象へ追加する。返還資源は建設費の半分（標準値Civilian Goods 25）。 |
+| 7 | 人がいるセンターは撤去不可。全員を移動させてから撤去する。 |
+| 8 | 専用アセットは小型倉庫・物資箱・配給テントを組み合わせた救援物資の集積・配給拠点。既存施設と画風・視点を揃え、要件確定後に同じタスクで生成・確認し、採用した素材を使用する。専用アセットを任意とする第8.1節は改訂する。 |
+| 9 | 電力不足で稼働できないセンターのFood予約は解除し、食料を消費せず、給電可能な後続センターへ建設順に再配分する。余りは備蓄に残す。 |
+| 10 | 配電順位はFarm / Civilian Factoryの後、Military Factoryの前。Capital / Cityおよび入居中Temporary Housingの既存優先順位を維持する。 |
+| 11 | 組み込みAIの救援物資センター対応を含める。余剰Food、Civilian Goods不足、人員・電力を考慮し、建設・人員配置・電源切替を判断する。 |
+| 12 | NLTH側検証が成功していれば、ChatGPT側の機能未対応で実機接続を確認できなくてもリリース可能。接続は未確認と記録し、WebMCP接続成功と扱わない。 |
+| 13 | 救援物資センターの建設費Civilian Goods 50、定員5人、電力5、1人あたりFood 20からCivilian Goods 5への変換を確定する。 |
+| 14 | 全Player Unitの固定Military Goods消費を廃止し、Military FactoryはWorker 1人あたりCivilian Goods 10からMilitary Goods 4へ変更。行動による明示消費および通常補給は維持する。 |
+| 15 | Checkpoint移設のSupply内Zombie blockerは、移設後の候補Supply全体からInitial Supply Networkを除いた範囲の可視Zombieを対象とする。移設前からSupply内だった場所も判定に含む。destinationそのもののZombie占有はInitial Supply内でも拒否する。 |
+| 16 | 救援物資センターは人口0・感染者0・建設完了済み・Zombie非占有を条件に、Supply外でも1 Actionで撤去可能。Civilian Goods 25を返還する。 |
+| 17 | 救援物資センターは建設完了後にGround Vision 1を持ち、Power Supply OFF・停電・Supply外でも維持する。通常のGround LOSを適用する。 |
+| 18 | 施設自体のZombie Target Valueは0とし、働く人がいる場合は既存の人口Target判定に含める。Zombie到達時の襲撃・感染は通常規則に従う。 |
+| 19 | 空のBarbed Wireを破壊した個体は移動だけを終了する。残Attack Chargeがあり、現在位置から合法な対象を攻撃できる場合は攻撃可能。 |
+
+未確認事項は引き続き一問ずつ確認し、確認完了後に要件定義の確定版を作成する。

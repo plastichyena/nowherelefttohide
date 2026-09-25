@@ -1,0 +1,26 @@
+{
+  "assetId": "facility_relief_supply_center",
+  "date": "2026-09-24",
+  "status": "candidate_presented_not_yet_approved_or_integrated",
+  "generationMethod": "built-in image_gen",
+  "model": "not exposed by tool",
+  "candidate": "facility_relief_supply_center_candidate_v1.png",
+  "originalSource": "C:/Users/tatuy/.codex/generated_images/01a0d392-ae56-7192-ab0e-87be855ee2d9/exec-9eee9c04-1b92-438b-81b8-5539b1247983.png",
+  "imageInputs": [],
+  "visualStyleReferencesReviewed": [
+    "public/assets/board/facilities/facility_simple_farm.png",
+    "public/assets/board/facilities/facility_civilian_factory.png"
+  ],
+  "prompt": "Use case: stylized-concept.\nAsset type: one original transparent PNG facility icon for the mobile hex strategy game Nowhere Left to Hide, asset_id facility_relief_supply_center.\nPrimary request: a compact relief supply distribution center, made of one small intact warehouse, a clearly visible pale khaki distribution tent or open-front canvas canopy beside it, and orderly stacks of wooden supply crates and a few food sacks between them. This is a functioning civilian relief depot, not a hospital or a military base.\nStyle/medium: match a detailed hand-painted 2D isometric board-game building icon: strong dark ink contours, muted olive / tan / slate colors, warm wood textures, restrained painterly shading. Roof and two building faces visible from a high three-quarter overhead isometric camera. Existing game facilities are compact slightly worn yet intact buildings, crisp silhouettes, strong readable forms.\nComposition: single centered compact facility cluster on a minimal small diamond-shaped ground footprint, transparent around it, all elements fully within the frame with generous clear padding. Readable at 256px and recognizable when much smaller. Warehouse is the largest form; one tent and a few large recognizable crates distinguish the relief center. No background scenery, no multiple views, no contact sheet.\nLighting: soft upper-left daylight, subtle attached ground shadow only.\nOutput: square PNG, preferably 1024x1024, with actual alpha transparency; preserve clean semi-transparent edge pixels. No opaque background, no checkerboard painted into the image.\nConstraints: no text, letters, labels, numbers, logos, red-cross emblem, flags, watermark, people, vehicles, weapons, smokestacks, exaggerated destruction, fire, glow, interface badges, gear symbols, hex outline, or unrelated decorations. Original art for this project.",
+  "sha256": "E1B44793C3C03029C78DE20CD89B76C38615122CDBAC0CE5C7C976A88B052D7C",
+  "validation": {
+    "width": 1254,
+    "height": 1254,
+    "pixelFormat": "Format32bppArgb",
+    "topLeftAlpha": 0,
+    "transparentPixels": 970764,
+    "opaqueBrightRedPixels": 0,
+    "visualInspection": "Warehouse, tent and crates present; matching isometric painted facility style; no text or logos; original preserved unchanged.",
+    "runtimeSmallScaleTest": "not_run_implementation_pending"
+  }
+}
