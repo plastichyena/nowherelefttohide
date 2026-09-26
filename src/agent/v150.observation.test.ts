@@ -75,8 +75,8 @@ describe('v1.5.0 public progression, Horde, and Crisis projections', () => {
     expect(observation.horde.nextWave).toMatchObject({
       spawnTurn: 10,
       directionCount: 1,
-      compositionPerDirection: { hordeZombie: 5, zombie: 4 },
-      variantSlotCountPerDirection: 4,
+      compositionPerDirection: { hordeZombie: 5, zombie: 5 },
+      variantSlotCountPerDirection: 5,
       possibleVariantTypes: ['hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'screamerZombie', 'gasZombie'],
       final: false,
     });

@@ -15,6 +15,7 @@ import { RULES_V163 } from '../core/rules-v163';
 import { roadConnections } from '../core/roads';
 import { showReplay } from '../replay/view';
 import { createDefaultConfig } from '../core/config';
+import { effectiveZombieMovement } from '../core/zombie-movement';
 import {
   forecastEndTurn,
   forecastFacilityProduction,
@@ -2262,6 +2263,7 @@ function renderResourceAccordionPanel(
     if (resource === 'food' || resource === 'civilianGoods') {
       const breakdown = forecast.maintenanceBreakdown?.[resource];
       if (breakdown) rows.push([locale === 'ja' ? '基本維持費 / 過密 / 住宅停電' : 'Base / overcrowding / housing outage', `${breakdown.base} / ${breakdown.overcrowding} / ${breakdown.housingOutage}`]);
+      if (resource === 'food') rows.push([locale === 'ja' ? '民間人Food / 軍人人口Food（予約含む）' : 'Civilian Food / military Food (including reservations)', `${forecast.maintenanceBreakdown.food.civilians} / ${forecast.maintenanceBreakdown.food.military}`]);
       const people = forecast.maintenancePopulation;
       if (people) rows.push([locale === 'ja' ? '住民 / 労働者 / 部隊' : 'Residents / workers / units', `${people.residents} / ${people.workers} / ${people.units}`], ['Queue waiting / screening / approved', `${people.queue.waiting} / ${people.queue.screening} / ${people.queue.approved}`]);
     }
@@ -4300,7 +4302,7 @@ export class GameUiController {
       if (!candidate) return;
       this.checkpointPreviewTarget = { branchId: candidate.branchId, position: { ...candidate.position } };
       if (!candidate.legal) {
-        this.checkpointPlacementMessage = localizeActionError(candidate.reasonCode ?? undefined, this.locale);
+        this.checkpointPlacementMessage = localizeActionError(candidate.reasonCode ?? undefined, this.locale) + (candidate.reasonCode === 'checkpoint_route_not_visible' ? ` ${candidate.routeVisibility?.missingVisibleHexes.map(p => `(${p.q},${p.r})`).join(' ') ?? ''}` : '');
         this.updateView();
         return;
       }
@@ -5365,17 +5367,22 @@ export class GameUiController {
 
   private showHelp(): void {
     this.dismissModal();const t=this.translator(),ja=this.locale==='ja',r=RULES_V165[this.locale],old=RULES_V163[this.locale],artillery=RULES_V164[this.locale];
+    const config=this.state?.config??createDefaultConfig();
+    const factory=config.facilities.militaryFactory.production;
+    const economyRules=r.economy.replace('{factoryInput}',String(factory.inputs.civilianGoods??0)).replace('{factoryOutput}',String(factory.outputs.militaryGoods??0));
+    const foodRules=t('tipMilitaryFood').replace('{civilian}',String(config.economy.populationConsumption.food)).replace('{military}',String(config.economy.unitFoodConsumption));
+    const pursuitRules=t('tipZombiePursuit').replace('{bonus}',String(config.zombiePursuitMovementBonus));
     const sections:[string,string[]][]=[
       [ja?'勝敗と基本操作':'Victory, defeat and controls',[t('guideSteps'),t('tipVictory'),r.compatibility]],
-      [ja?'経済と人口':'Economy and population',[r.economy,old.capital,old.health,old.starvation,old.grace,t('tipRecruitment')]],
+      [ja?'経済と人口':'Economy and population',[economyRules,foodRules,old.capital,old.health,old.starvation,old.grace,t('tipRecruitment')]],
       [ja?'電力':'Electricity',[t('tipPowerAllocation'),t('tipFuel')]],
       [ja?'施設':'Facilities',[r.airBase,r.drone,r.objectives,old.nuclear]],
-      [ja?'人間Unit':'Human units',[t('tipProficiency'),old.specialForces,r.helicopter,r.flight,r.transport,r.emergency,artillery.artillery,artillery.modes,artillery.bombardment,t('tipSuppression')]],
-      [ja?'Zombie':'Zombies',[r.enemies,t('tipGasZombie'),old.packZombie]],
+      [ja?'人間Unit':'Human units',[t('tipProficiency'),t('tipRetreat'),old.specialForces,r.helicopter,r.flight,r.transport,r.emergency,artillery.artillery,artillery.modes,artillery.bombardment,t('tipSuppression')]],
+      [ja?'Zombie':'Zombies',[r.enemies,pursuitRules,t('tipGasZombie'),old.packZombie]],
       [ja?'補給':'Supply',[t('tipSupply'),t('tipFuel')]],
       [ja?'視界と騒音':'Vision and noise',[t('tipVision'),t('tipNoise')]],
       [ja?'Horde':'Hordes',[t('tipWaveRoster'),old.finalHorde]],
-      [ja?'建設と検問所':'Construction and checkpoints',[old.water,old.screening,old.waiting,t('tipCheckpointFallback'),t('tipCheckpointMove'),t('tipBuild'),t('tipBarbedWire')]],
+      [ja?'建設と検問所':'Construction and checkpoints',[old.water,old.screening,old.waiting,t('tipCheckpointFallback'),t('tipCheckpointMove'),t('checkpointRouteNotVisible'),t('tipBuild'),t('tipBarbedWire')]],
       [ja?'AI / Fair Play':'AI / Fair Play',[ja?'組み込みAIと外部AIは公開Observationと合法Actionを使用します。未発見の敵・未来の乱数・非公開状態は判断に利用できません。Previewは状態を変えず、複数Actionの一括Previewも同じRevisionから独立して評価します。':'Built-in and external AI use public Observations and legal Actions. Hidden enemies, future random outcomes and private state are unavailable. Previews do not change state; every batch item is evaluated independently at the same revision.']],
     ];
     this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${t('close')}" data-action="dismiss-modal">×</button><h2 id="help-heading">${t('help')}</h2><button class="secondary-button" data-action="board-legend">${t('legendTitle')}</button>${this.state?renderFacilityObjectives(this.state,this.locale):''}${sections.map(([title,texts])=>`<details class="help-topic"><summary>${escapeHtml(title)}</summary>${texts.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}</details>`).join('')}</section></div>`);
@@ -5759,7 +5766,7 @@ export class GameUiController {
         : zombie.hordeKind === 'periodic'
           ? t('waveMembership')
           : '';
-      summary.textContent = `HP ${zombie.hp}/${zombie.maxHp} · ${t('attack')} ${publicZombie?.attack ?? zombie.attack} · ${t('movement')} ${publicZombie?.movement ?? zombie.movement} · ${t('range')} ${publicZombie?.effectiveRange ?? zombie.range}`;
+      summary.textContent = `HP ${zombie.hp}/${zombie.maxHp} · ${t('attack')} ${publicZombie?.attack ?? zombie.attack} · ${t('movement')} ${publicZombie?.effectiveMovement ?? zombie.movement} · ${t('range')} ${publicZombie?.effectiveRange ?? zombie.range}`;
       body.innerHTML = this.renderSameHexTabs(zombie.position, selected) + this.renderZombieSheet(zombie, publicZombie, publicTile, waveBadge);
       return;
     }
@@ -5894,13 +5901,13 @@ export class GameUiController {
   ): string {
     const t = this.translator();
     const publicAttack = publicZombie?.attack ?? zombie.attack;
-    const publicMovement = publicZombie?.movement ?? zombie.movement;
+    const publicMovement = publicZombie?.effectiveMovement ?? effectiveZombieMovement(zombie);
     const publicRange = publicZombie?.effectiveRange ?? publicZombie?.range ?? zombie.range;
     const publicAttackCharges = publicZombie?.attackChargesRemaining ?? zombie.attackChargesRemaining;
     const publicMaxAttackCharges = publicZombie?.maxAttackCharges ?? zombie.maxAttackCharges;
     const badge = waveBadge ? `<span class="status-chip zombie-wave-badge">${escapeHtml(waveBadge)}</span>` : '';
     const finalBadge = zombie.hordeKind === 'final' ? `<p class="warning-text">${escapeHtml(t('finalWaveMembership'))}</p>` : '';
-    return `<section class="zombie-detail-panel" data-zombie-panel="true"><div class="section-heading"><h3>${escapeHtml(unitLabel(zombie.type, this.locale))}</h3>${badge}</div><dl class="location-grid"><div><dt>${escapeHtml(t('hp'))}</dt><dd>${zombie.hp}/${zombie.maxHp}</dd></div><div><dt>${escapeHtml(t('attack'))}</dt><dd>${publicAttack}</dd></div><div><dt>${escapeHtml(t('attackCharge'))}</dt><dd>${publicAttackCharges}/${publicMaxAttackCharges}</dd></div><div><dt>${escapeHtml(t('movement'))}</dt><dd>${publicMovement}</dd></div><div><dt>${escapeHtml(t('range'))}</dt><dd>${publicRange}</dd></div></dl>${finalBadge}<p class="muted">${escapeHtml(t('visibleEnemyOnly'))}</p></section>`;
+    return `<section class="zombie-detail-panel" data-zombie-panel="true"><div class="section-heading"><h3>${escapeHtml(unitLabel(zombie.type, this.locale))}</h3>${badge}</div><dl class="location-grid"><div><dt>${escapeHtml(t('hp'))}</dt><dd>${zombie.hp}/${zombie.maxHp}</dd></div><div><dt>${escapeHtml(t('attack'))}</dt><dd>${publicAttack}</dd></div><div><dt>${escapeHtml(t('attackCharge'))}</dt><dd>${publicAttackCharges}/${publicMaxAttackCharges}</dd></div><div><dt>${escapeHtml(t('movement'))}</dt><dd>${publicMovement} (${t('baseMovement')} ${publicZombie?.baseMovement ?? zombie.movement} + ${publicZombie?.appliedMovementBonus ?? 0})</dd></div><div><dt>${escapeHtml(t('range'))}</dt><dd>${publicRange}</dd></div></dl>${finalBadge}<p class="muted">${escapeHtml(t('visibleEnemyOnly'))}</p><p class="muted">${escapeHtml(t('tipZombiePursuit').replace('{bonus}',String(this.state!.config.zombiePursuitMovementBonus)))}</p></section>`;
   }
 
   private renderUnitSheet(

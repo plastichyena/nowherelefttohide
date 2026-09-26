@@ -1,3 +1,4 @@
+import { effectiveZombieMovement } from './zombie-movement';
 import { aviationUnitProjection } from './aviation-preview';
 import { unitCanReceiveSupply, aviationReason } from './aircraft';
 import { artilleryAttackReason, previewArtillery } from './artillery';
@@ -216,6 +217,9 @@ export function createPublicUnitProjection(
     maxHp: unit.maxHp,
     attack: unit.attack,
     movement: unit.movement,
+    baseMovement: unit.movement,
+    appliedMovementBonus: unit.isPlayerUnit ? 0 : unit.pursuitMovementBonus,
+    effectiveMovement: unit.isPlayerUnit ? unit.movement : effectiveZombieMovement(unit),
     range: unit.range,
     baseRange: unit.range,
     effectiveRange: currentRange,
@@ -282,7 +286,7 @@ export function facilityRecoveryProjection(state: Readonly<GameState>, facility:
   if (facility.status === 'ruined' && facility.type !== 'windPowerPlant') { needed.splice(0, needed.length, ...recapture.missing); }
   const recoverable = !state.gameOver && !(facility.constructible && facility.status === 'ruined');
   const productionRequirements: string[] = [];
-  if (facility.workers === 0 && facility.type !== 'windPowerPlant') productionRequirements.push('healthy_population');
+  if ((facility.owner !== 'player' || facility.workers === 0) && facility.type !== 'windPowerPlant') productionRequirements.push('healthy_population');
   if (facility.type === 'temporaryHousing' && !isHexSupplied(state, facility.position)) productionRequirements.push('supply');
   if (state.config.facilities[facility.type].production.powerMode === 'required') productionRequirements.push('allocated_power');
   return { recoverable, status: !recoverable ? 'cannot_recover' : needed.length ? 'conditions_required' : 'ready', missingConditions: needed, scheduledOperationalTurn: facility.recoveryOperationalTurn, productionRequirements, terrainDefense: { source: 'urban', multiplier: state.config.terrain.damageMultiplier.urban, reason: 'facility_urban_overlay' } };
@@ -352,7 +356,7 @@ export function createPublicFacilityProjection(
       : 0,
     visionMode: facility.type === 'civilianDroneBase' ? 'aerial' : 'ground',
     terrainLosBlocking: facility.type !== 'civilianDroneBase',
-    healthyPopulation: facility.owner === 'player' ? facility.workers : 0,
+    healthyPopulation: facility.owner === 'player' ? facility.workers : null,
     zombieTargetValue: facility.owner === 'player' ? facilityZombieTargetValue(state, facility) : 0,
     infectedPopulation: facility.owner === 'player' ? facility.infected : 0,
     populationCapacity: facility.workerCapacity,
@@ -367,10 +371,10 @@ export function createPublicFacilityProjection(
       facility.owner !== 'player' || facility.status !== 'owned' ? 'city_not_owned' : facility.infected > 0 ? 'city_infected' : facility.populationOperationalTurn > state.turn ? 'available_next_turn' : 'city_out_of_supply'
     ) : 'not_recruitment_hub',
     production: {
-      healthyWorkers: facility.workers,
+      healthyWorkers: facility.owner === 'player' ? facility.workers : null,
       operatingWorkers: currentWorkers,
-      inputRequired: cloneJson(productionProjection?.inputRequired ?? {}),
-      inputShortage: cloneJson(productionProjection?.inputShortage ?? {}),
+      inputRequired: facility.owner === 'player' ? cloneJson(productionProjection?.inputRequired ?? {}) : {},
+      inputShortage: facility.owner === 'player' ? cloneJson(productionProjection?.inputShortage ?? {}) : {},
       inputsPerWorker: cloneJson(rule.inputs),
       outputsPerWorker: cloneJson(rule.outputs),
       requiresPower: (productionProjection?.powerMode ?? rule.powerMode) === 'required',

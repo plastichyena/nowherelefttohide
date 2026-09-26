@@ -31,7 +31,7 @@ function travelCost(observation:AgentObservation,unit:AgentUnitObservation,site:
   const tiles=new Map(observation.map.tiles.map(t=>[hexKey(t),t]));
   const blocked=new Set(observation.units.map(u=>hexKey(u.position)));
   const pending=[{position:unit.position,cost:0}],best=new Map<string,number>();
-  while(pending.length){pending.sort((a,b)=>a.cost-b.cost);const current=pending.shift()!,key=hexKey(current.position);if(best.has(key))continue;best.set(key,current.cost);if(key===hexKey(site.position))return current.cost;if(current.cost>=unit.movement)continue;
+  while(pending.length){pending.sort((a,b)=>a.cost-b.cost);const current=pending.shift()!,key=hexKey(current.position);if(best.has(key))continue;best.set(key,current.cost);if(key===hexKey(site.position))return current.cost;if(current.cost>=(unit.effectiveMovement ?? unit.movement))continue;
     for(const position of hexNeighbors(current.position)){const tile=tiles.get(hexKey(position));if(!tile||tile.unobstructedMovementCost===null||blocked.has(hexKey(position))||observation.barbedWire.some(w=>hexKey(w.position)===hexKey(position)))continue;pending.push({position,cost:current.cost+(tile.unobstructedMovementCost??tile.effectiveMovementCost??Infinity)});}
   }return Infinity;
 }
@@ -79,22 +79,22 @@ export function assessArtillery(observation:AgentObservation,gun:AgentUnitObserv
   if(!useful)return {...result,reason:'no_public_target'};
   if(!preview.friendlyFirePossible)return {...result,allowed:true,reason:'no_public_friendly_fire'};
   if(preview.populationRisks.some(p=>!p.populationKnown))return {...result,reason:'unknown_population'};
-  if(observation.facilities.some(f=>f.armyBase?.interceptionAvailable&&observation.zombies.some(z=>hexDistance(z.position,f.position)<=f.armyBase!.interceptionRange+z.movement)))return {...result,reason:'base_interception_prediction_unavailable'};
+  if(observation.facilities.some(f=>f.armyBase?.interceptionAvailable&&observation.zombies.some(z=>hexDistance(z.position,f.position)<=f.armyBase!.interceptionRange+(z.effectiveMovement ?? z.movement))))return {...result,reason:'base_interception_prediction_unavailable'};
   // Surviving the shell does not prove survival of the following enemy phase.
   if(preview.unitRisks.some(u=>u.player&&u.maxDamage>0))return {...result,reason:'friendly_unit_future_damage_unresolved'};
   // These effects can change targeting and cause new occupations. Do not claim a quantified safety proof.
   if(preview.knownGasChainHexes.length||preview.unitRisks.some(u=>u.player&&u.maxDamage>=u.hp))return {...result,reason:'chain_or_reanimation_prediction_unavailable'};
-  const sites:Site[]=[...observation.facilities.filter(f=>f.owner==='player'&&f.status==='owned').map(f=>({id:f.id,position:f.position,healthy:f.healthyPopulation,infected:f.infectedPopulation,capital:f.type==='capital',constructible:f.constructible&&f.type!=='windPowerPlant'})),...observation.checkpoints.filter(c=>c.status==='operational'||c.status==='remnant').map(c=>({id:c.id,position:c.position,healthy:c.waiting+c.screening+c.approved,infected:c.infected,capital:false,constructible:false}))];
-  const threats=observation.zombies.filter(z=>sites.some(s=>hexDistance(z.position,s.position)<=z.vision && travelCost(observation,z,s)<=z.movement));
+  const sites:Site[]=[...observation.facilities.filter(f=>f.owner==='player'&&f.status==='owned').map(f=>({id:f.id,position:f.position,healthy:(f.healthyPopulation ?? 0),infected:f.infectedPopulation,capital:f.type==='capital',constructible:f.constructible&&f.type!=='windPowerPlant'})),...observation.checkpoints.filter(c=>c.status==='operational'||c.status==='remnant').map(c=>({id:c.id,position:c.position,healthy:c.waiting+c.screening+c.approved,infected:c.infected,capital:false,constructible:false}))];
+  const threats=observation.zombies.filter(z=>sites.some(s=>hexDistance(z.position,s.position)<=z.vision && travelCost(observation,z,s)<=(z.effectiveMovement ?? z.movement)));
   if(threats.some(z=>!['zombie','policeZombie','soldierZombie','riotZombie'].includes(z.type)))return {...result,reason:'special_enemy_prediction_unavailable'};
   if(threats.some(z=>observation.facilities.some(f=>f.owner!=='player'&&hexDistance(z.position,f.position)<=z.vision)))return {...result,reason:'unknown_population_target'};
   if(threats.some(z=>observation.units.some(u=>hexDistance(z.position,u.position)<=z.vision)))return {...result,reason:'competing_unit_target'};
   // A pinned enemy follows combat rather than the simple occupation model below.
   if(threats.some(z=>observation.units.some(u=>hexDistance(u.position,z.position)===1)))return {...result,reason:'contact_combat_prediction_unavailable'};
-  const targetByEnemy=new Map(threats.map(z=>[z.id,sites.filter(s=>hexDistance(z.position,s.position)<=z.vision&&travelCost(observation,z,s)<=z.movement).sort((a,b)=>travelCost(observation,z,a)-travelCost(observation,z,b)||b.healthy-a.healthy||a.id.localeCompare(b.id))[0]!.id]));
+  const targetByEnemy=new Map(threats.map(z=>[z.id,sites.filter(s=>hexDistance(z.position,s.position)<=z.vision&&travelCost(observation,z,s)<=(z.effectiveMovement ?? z.movement)).sort((a,b)=>travelCost(observation,z,a)-travelCost(observation,z,b)||b.healthy-a.healthy||a.id.localeCompare(b.id))[0]!.id]));
   // Ties can retarget after collateral damage; congestion can stop multiple occupiers.
   // Neither is a quantified emergency proof in this bounded public model.
-  if(threats.some(z=>sites.filter(s=>hexDistance(z.position,s.position)<=z.vision&&travelCost(observation,z,s)<=z.movement).length>1)
+  if(threats.some(z=>sites.filter(s=>hexDistance(z.position,s.position)<=z.vision&&travelCost(observation,z,s)<=(z.effectiveMovement ?? z.movement)).length>1)
     || new Set(targetByEnemy.values()).size<targetByEnemy.size)return {...result,reason:'targeting_or_congestion_unresolved'};
   const pressure=(siteId:string,hp:Map<string,number>)=>threats.filter(z=>targetByEnemy.get(z.id)===siteId&&(hp.get(z.id)??z.hp)>0).reduce((n,z)=>n+z.attack,0);
   const threatened=sites.filter(s=>s.healthy>0&&pressure(s.id,new Map())>=s.healthy);

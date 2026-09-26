@@ -8,7 +8,7 @@ import {
 describe('v1.6 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('16.0.0');
+    expect(DEFAULT_CONFIG.version).toBe('17.0.0');
     expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v9');
     expect(DEFAULT_CONFIG.economy.initialRefineryAllowance).toBe(2_000);
     expect(DEFAULT_CONFIG.economy.oilFieldAllowancePerWorker).toBe(100);
@@ -26,11 +26,11 @@ describe('v1.6 GameConfig', () => {
     expect(DEFAULT_CONFIG.facilities.simpleFarm.production).toMatchObject({ outputs: { food: 5 }, powerMode: 'none', powerCapacity: 0 });
     expect(DEFAULT_CONFIG.horde.warningLeadTurns).toBe(2);
     expect(DEFAULT_CONFIG.horde.waves).toEqual([
-      { turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 4 }, final: false },
-      { turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 6 }, final: false },
-      { turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 9 }, final: false },
-      { turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 9 }, final: false },
-      { turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 10 }, final: true },
+      { turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 5 }, final: false },
+      { turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 8 }, final: false },
+      { turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 11 }, final: false },
+      { turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 11 }, final: false },
+      { turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 12 }, final: true },
     ]);
     expect(DEFAULT_CONFIG.terrain).toEqual({
       movementCost: { plain: 1, forest: 2, mountain: 3, water: null },
@@ -124,7 +124,7 @@ describe('v1.6 GameConfig', () => {
     expect(DEFAULT_CONFIG.economy.initialResources.food).toBe(330);
 
     config.horde.waves[4]!.compositionPerDirection.zombie = 99;
-    expect(DEFAULT_CONFIG.horde.waves[4]!.compositionPerDirection.zombie).toBe(10);
+    expect(DEFAULT_CONFIG.horde.waves[4]!.compositionPerDirection.zombie).toBe(12);
   });
 
   it('accepts zero initial Zombies but rejects more than the 50 fixed-map positions', () => {

@@ -270,10 +270,10 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
     rebalance(state);
     expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
     const forecast = forecastEndTurn(engine.getState()).militaryGoods;
-    expect(forecast.projectedProduction).toBe(16);
+    expect(forecast.projectedProduction).toBe(12);
     expect(forecast.units.map((unit) => [unit.unitId, unit.projectedRefillAmount])).toEqual([
-      [guard.id, 8],
-      [police.id, 8],
+      [guard.id, 6],
+      [police.id, 6],
     ]);
     const result = engine.step({ type: 'EndTurn' });
     const producedIndex = result.events.findIndex((event) => event.type === 'resource_produced'
@@ -282,8 +282,8 @@ describe('v1.4.1 Military Goods economy and suppression', () => {
       && event.payload.reason === 'unit_refill');
     expect(producedIndex).toBeGreaterThanOrEqual(0);
     expect(refillIndex).toBeGreaterThan(producedIndex);
-    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(8);
-    expect(result.state.units.find((unit) => unit.id === police.id)?.currentMilitaryGoods).toBe(8);
+    expect(result.state.units.find((unit) => unit.id === guard.id)?.currentMilitaryGoods).toBe(6);
+    expect(result.state.units.find((unit) => unit.id === police.id)?.currentMilitaryGoods).toBe(6);
   });
 });
 

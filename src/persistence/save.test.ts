@@ -129,7 +129,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 23,
+      formatVersion: 24,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-51x51-v9',
       seed: 77,
@@ -242,9 +242,9 @@ describe('v1.6.0 Save Format 17', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(23);
-    expect(envelope.gameVersion).toBe('16.0.0');
-    expect(config.version).toBe('16.0.0');
+    expect(envelope.formatVersion).toBe(24);
+    expect(envelope.gameVersion).toBe('17.0.0');
+    expect(config.version).toBe('17.0.0');
     expect(config.mapId).toBe('fixed-51x51-v9');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
@@ -600,7 +600,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
     expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.3\.0/i);
-    expect(result.errors.join(' ')).toContain('v1.5.3 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toContain('v1.6.6 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 

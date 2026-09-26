@@ -36,17 +36,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6.6 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.6.6';
-export const GAME_RULES_VERSION = '16.0.0';
-export const SAVE_FORMAT_VERSION = '23';
-export const AGENT_API_VERSION = '21.0.0';
-export const OBSERVATION_API_VERSION = '21.0.0';
-export const BRIDGE_API_VERSION = '21.0.0';
+/** v1.6.7 rejects all earlier state and public API schemas without migration. */
+export const APP_VERSION = '1.6.7';
+export const GAME_RULES_VERSION = '17.0.0';
+export const SAVE_FORMAT_VERSION = '24';
+export const AGENT_API_VERSION = '22.0.0';
+export const OBSERVATION_API_VERSION = '22.0.0';
+export const BRIDGE_API_VERSION = '22.0.0';
 export const BALANCED_AGENT_VERSION = '14.0.0';
 export const RANDOM_AGENT_VERSION = '9.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '20.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '17.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '21.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '18.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -218,7 +218,7 @@ export interface AgentFacilityObservation {
   vision: number;
   visionMode: 'ground' | 'aerial';
   terrainLosBlocking: boolean;
-  healthyPopulation: number;
+  healthyPopulation: number | null;
   /** Zombie targeting value is deliberately distinct from real population. */
   zombieTargetValue: number;
   infectedPopulation: number;
@@ -232,7 +232,7 @@ export interface AgentFacilityObservation {
   recruitmentAvailable: boolean;
   recruitmentUnavailableReason: string | null;
   production: {
-    healthyWorkers: number;
+    healthyWorkers: number | null;
     operatingWorkers: number;
     inputRequired: Partial<Record<ResourceType, number>>;
     inputShortage: Partial<Record<ResourceType, number>>;
@@ -336,6 +336,9 @@ export interface AgentUnitObservation {
   maxHp: number;
   attack: number;
   movement: number;
+  baseMovement: number;
+  appliedMovementBonus: number;
+  effectiveMovement: number;
   /** Deprecated base range alias retained for simple v1.1 consumers. */
   range: number;
   baseRange: number;
@@ -696,6 +699,9 @@ export interface AgentApiInfo {
       targetPriority: string[];
     };
     production: {
+      civilianFoodConsumption: number;
+      unitFoodConsumption: number;
+      militaryFactoryPerWorker: import('../core/types').ProductionRule;
       workerCapacityByFacilityType: Record<FacilityType, number>;
       powerPlantsGenerateCapacityPerWorker: number;
       poweredFacilitiesConsumeFixedCapacityWhenOperating: true;

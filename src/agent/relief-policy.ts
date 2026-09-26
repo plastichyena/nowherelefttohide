@@ -10,10 +10,10 @@ export function reliefPolicy(observation: AgentObservation, action: GameAction):
   const needsGoods = civilian.maintenanceShortage > 0 || civilian.endingStock < civilian.maintenanceRequired * 3 + 100;
   const answer = (score: number, reason: string) => ({ score, reason });
   if (action.type === 'BuildConstructibleFacility' && action.facilityType === 'reliefSupplyCenter') {
-    const staffingAvailable = observation.facilities.some(f => f.owner === 'player' && f.inSupply && ['capital','city','temporaryHousing'].includes(f.type) && f.healthyPopulation >= 6);
+    const staffingAvailable = observation.facilities.some(f => f.owner === 'player' && f.inSupply && ['capital','city','temporaryHousing'].includes(f.type) && (f.healthyPopulation ?? 0) >= 6);
     const powerAvailable = observation.endTurnForecast.electricity.availableGenerationCapacity - observation.endTurnForecast.electricity.requiredPowerAllocated >= 5;
     const ready = staffingAvailable && powerAvailable && needsGoods && inputBudget >= 100 && food.shortage === 0 && observation.resources.civilianGoods >= 50 &&
-      !centers.some(f => f.operationalStatus === 'building' || f.healthyPopulation < f.populationCapacity) &&
+      !centers.some(f => f.operationalStatus === 'building' || (f.healthyPopulation ?? 0) < f.populationCapacity) &&
       inputBudget - food.productionInputAllocated >= 100;
     return answer(ready ? 360 : -10000, ready ? 'BUILD_RELIEF_FOR_GOODS_DEFICIT' : 'RELIEF_BUILD_NOT_SUSTAINABLE');
   }
@@ -24,9 +24,9 @@ export function reliefPolicy(observation: AgentObservation, action: GameAction):
   const target = needsGoods && facility.inSupply && facility.infectedPopulation === 0 && food.shortage === 0
     ? Math.min(5, Math.floor(Math.max(0, inputBudget - otherInput) / 20)) : 0;
   if (action.type === 'AssignWorkers') {
-    const improvement = Math.abs(facility.healthyPopulation - target) - Math.abs(action.workers - target);
+    const improvement = Math.abs((facility.healthyPopulation ?? 0) - target) - Math.abs(action.workers - target);
     return answer(improvement > 0 ? 380 + improvement * 10 : -10000, target > 0 ? 'STAFF_RELIEF_WITH_SURPLUS_FOOD' : 'RELEASE_UNPRODUCTIVE_RELIEF_WORKERS');
   }
-  const shouldEnable = target > 0 && facility.healthyPopulation > 0;
+  const shouldEnable = target > 0 && (facility.healthyPopulation ?? 0) > 0;
   return answer(action.enabled === shouldEnable ? 400 : -10000, shouldEnable ? 'ENABLE_RELIEF_CONVERSION' : 'STOP_RELIEF_TO_PRESERVE_FOOD');
 }

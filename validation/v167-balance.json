@@ -1,0 +1,2469 @@
+{
+  "method": "Same Balanced14 policy and limits; v1.6.6 baseline d7c71b9 and v1.6.7. Private instrumentation never feeds AI decisions. All accepted actions replayed against matching rules.",
+  "timing": "Samples are each requested Turn EndTurn: stocks before/after that action, actual economy resource events, and forecast/worker/military values immediately before it. Null means no such EndTurn before game termination. Terminal contains actual post-action final stocks, population and cumulative losses; latestEndTurn separately records the last settlement, which can precede the final player action or stop mid-phase.",
+  "contact": "First recorded attack/interception/damage involving a scheduled-wave unit, including neutral base combat. Null means no recorded combat before termination. Not an estimate of unseen movement or adjacency.",
+  "losses": "Cumulative infectionLosses and starvationDeaths use distinct Core counters. facilitiesFallen includes neutral sites as well as formerly owned sites; earlyFacilityLosses is the separate owned-loss metric.",
+  "capital": "Minimum is the capital resident count (workers, including infected residents) over every accepted action boundary, including terminal loss. Transfers count accepted TransferPopulation actions into the capital, not automatic refugee admissions.",
+  "artillery": "Shots, actual MG cost, direct impact Hex kills, adjacent blast kills and resulting Gas chain kills are separated. Veteran-attributed kills are not all artillery kills. No shots means this sample cannot assess artillery sustain or late-game proficiency.",
+  "reports": [
+    {
+      "version": "1.6.6",
+      "seed": 1,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 20,
+      "acceptedActionCount": 369,
+      "replayMatched": true,
+      "capitalMinimum": 0,
+      "capitalTransfers": 6,
+      "samples": {
+        "10": {
+          "turn": 10,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 220,
+              "stockAfterEndTurn": 63,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 157,
+              "forecastProduction": 0,
+              "maintenanceRequired": 157,
+              "maintenanceShortage": 0,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 157,
+              "maintenanceShortage": 157,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 107,
+              "stockAfterEndTurn": 93,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 14,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 65,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "not_owned"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 0,
+          "cumulative": {
+            "unitLosses": 2,
+            "infectionLosses": 128,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-2",
+              "farm-3",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-north",
+              "army-base-1"
+            ]
+          }
+        },
+        "20": null,
+        "35": null,
+        "50": null,
+        "70": null
+      },
+      "terminal": {
+        "turn": 20,
+        "resources": {
+          "food": 0,
+          "civilianGoods": 0,
+          "militaryGoods": 0,
+          "fuel": 0,
+          "electricityCapacity": 30,
+          "electricityRequired": 40
+        },
+        "militaryPopulation": 50,
+        "cumulative": {
+          "unitLosses": 4,
+          "infectionLosses": 187,
+          "starvationDeaths": 17,
+          "facilitiesFallen": [
+            "capital",
+            "city-2",
+            "city-3",
+            "city-4",
+            "city-5",
+            "city-6",
+            "city-7",
+            "city-8",
+            "farm-2",
+            "farm-3",
+            "farm-4",
+            "farm-5",
+            "civilian-factory-1",
+            "civilian-factory-2",
+            "civilian-factory-3",
+            "civilian-factory-4",
+            "military-factory-2",
+            "military-factory-3",
+            "oilfield-north",
+            "army-base-1"
+          ]
+        },
+        "latestEndTurn": {
+          "turn": 19,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 30,
+              "actualEconomyConsumption": 30,
+              "forecastProduction": 30,
+              "maintenanceRequired": 142,
+              "maintenanceShortage": 112,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 2,
+              "actualEconomyConsumption": 2,
+              "forecastProduction": 2,
+              "maintenanceRequired": 142,
+              "maintenanceShortage": 140,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 60,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "no_workers"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 69,
+          "cumulative": {
+            "unitLosses": 4,
+            "infectionLosses": 186,
+            "starvationDeaths": 17,
+            "facilitiesFallen": [
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-2",
+              "farm-3",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-1",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-north",
+              "army-base-1"
+            ]
+          }
+        }
+      },
+      "waves": [
+        {
+          "index": 1,
+          "scheduledTurn": 10,
+          "final": false,
+          "directions": [
+            "south"
+          ],
+          "frozenBaseCount": 9,
+          "frozenCommittedCount": 13,
+          "actualSpawned": 13,
+          "firstCombatTurn": 12,
+          "firstCombatByGroup": {
+            "wave-1-south": 12
+          }
+        },
+        {
+          "index": 2,
+          "scheduledTurn": 20,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 3,
+          "scheduledTurn": 35,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 4,
+          "scheduledTurn": 50,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 5,
+          "scheduledTurn": 70,
+          "final": true,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        }
+      ],
+      "artillery": {
+        "attacks": 0,
+        "shellShots": 0,
+        "shellMilitaryGoods": 0,
+        "directKills": 0,
+        "blastKills": 0,
+        "gasChainKills": 0,
+        "regularPromotions": 0,
+        "veteranPromotions": 0,
+        "veteranAttributedKills": 0
+      },
+      "barbedWireBuilt": 0,
+      "earlyFacilityLosses": 11,
+      "totalUnfilledMilitaryGoodsRefill": {
+        "police": 26,
+        "nationalGuard": 63,
+        "riotPolice": 2,
+        "reconTeam": 107,
+        "fieldArtillery": 0,
+        "multipurposeHelicopter": 0,
+        "specialForces": 57
+      }
+    },
+    {
+      "version": "1.6.6",
+      "seed": 2,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 23,
+      "acceptedActionCount": 425,
+      "replayMatched": true,
+      "capitalMinimum": 0,
+      "capitalTransfers": 7,
+      "samples": {
+        "10": {
+          "turn": 10,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 187,
+              "maintenanceShortage": 187,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 50,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 50,
+              "forecastProduction": 0,
+              "maintenanceRequired": 187,
+              "maintenanceShortage": 137,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 401,
+              "stockAfterEndTurn": 387,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 14,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 60,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "input_shortage"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "not_owned"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 0,
+          "cumulative": {
+            "unitLosses": 1,
+            "infectionLosses": 62,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "city-2",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-south",
+              "army-base-1"
+            ]
+          }
+        },
+        "20": {
+          "turn": 20,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 65,
+              "actualEconomyConsumption": 65,
+              "forecastProduction": 65,
+              "maintenanceRequired": 167,
+              "maintenanceShortage": 102,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 167,
+              "maintenanceShortage": 167,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 345,
+              "stockAfterEndTurn": 322,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 23,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 60,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 0,
+          "cumulative": {
+            "unitLosses": 2,
+            "infectionLosses": 104,
+            "starvationDeaths": 46,
+            "facilitiesFallen": [
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-south",
+              "army-base-1",
+              "air-base-1"
+            ]
+          }
+        },
+        "35": null,
+        "50": null,
+        "70": null
+      },
+      "terminal": {
+        "turn": 23,
+        "resources": {
+          "food": 0,
+          "civilianGoods": 0,
+          "militaryGoods": 307,
+          "fuel": 0,
+          "electricityCapacity": 0,
+          "electricityRequired": 0
+        },
+        "militaryPopulation": 25,
+        "cumulative": {
+          "unitLosses": 6,
+          "infectionLosses": 171,
+          "starvationDeaths": 65,
+          "facilitiesFallen": [
+            "capital",
+            "city-2",
+            "city-3",
+            "city-4",
+            "city-5",
+            "city-6",
+            "city-7",
+            "city-8",
+            "farm-1",
+            "farm-2",
+            "farm-3",
+            "farm-4",
+            "farm-5",
+            "civilian-factory-1",
+            "civilian-factory-2",
+            "civilian-factory-3",
+            "civilian-factory-4",
+            "military-factory-1",
+            "military-factory-2",
+            "military-factory-3",
+            "oilfield-south",
+            "army-base-1",
+            "air-base-1"
+          ]
+        },
+        "latestEndTurn": {
+          "turn": 23,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 63,
+              "maintenanceShortage": 63,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 63,
+              "maintenanceShortage": 63,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 317,
+              "stockAfterEndTurn": 307,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 10,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 25,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 0,
+          "cumulative": {
+            "unitLosses": 6,
+            "infectionLosses": 171,
+            "starvationDeaths": 65,
+            "facilitiesFallen": [
+              "capital",
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-1",
+              "farm-2",
+              "farm-3",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-1",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-south",
+              "army-base-1",
+              "air-base-1"
+            ]
+          }
+        }
+      },
+      "waves": [
+        {
+          "index": 1,
+          "scheduledTurn": 10,
+          "final": false,
+          "directions": [
+            "west"
+          ],
+          "frozenBaseCount": 9,
+          "frozenCommittedCount": 13,
+          "actualSpawned": 13,
+          "firstCombatTurn": 19,
+          "firstCombatByGroup": {
+            "wave-1-west": 19
+          }
+        },
+        {
+          "index": 2,
+          "scheduledTurn": 20,
+          "final": false,
+          "directions": [
+            "east",
+            "south"
+          ],
+          "frozenBaseCount": 18,
+          "frozenCommittedCount": 55,
+          "actualSpawned": 55,
+          "firstCombatTurn": 22,
+          "firstCombatByGroup": {
+            "wave-2-east": 22
+          }
+        },
+        {
+          "index": 3,
+          "scheduledTurn": 35,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 4,
+          "scheduledTurn": 50,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 5,
+          "scheduledTurn": 70,
+          "final": true,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        }
+      ],
+      "artillery": {
+        "attacks": 0,
+        "shellShots": 0,
+        "shellMilitaryGoods": 0,
+        "directKills": 0,
+        "blastKills": 0,
+        "gasChainKills": 0,
+        "regularPromotions": 0,
+        "veteranPromotions": 0,
+        "veteranAttributedKills": 0
+      },
+      "barbedWireBuilt": 0,
+      "earlyFacilityLosses": 6,
+      "totalUnfilledMilitaryGoodsRefill": {
+        "police": 113,
+        "nationalGuard": 80,
+        "riotPolice": 0,
+        "reconTeam": 48,
+        "fieldArtillery": 0,
+        "multipurposeHelicopter": 0,
+        "specialForces": 0
+      }
+    },
+    {
+      "version": "1.6.6",
+      "seed": 4,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 24,
+      "acceptedActionCount": 453,
+      "replayMatched": true,
+      "capitalMinimum": 0,
+      "capitalTransfers": 6,
+      "samples": {
+        "10": {
+          "turn": 10,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 1482,
+              "stockAfterEndTurn": 1547,
+              "actualEconomyProduction": 320,
+              "actualEconomyConsumption": 255,
+              "forecastProduction": 320,
+              "maintenanceRequired": 255,
+              "maintenanceShortage": 0,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 25,
+              "stockAfterEndTurn": 160,
+              "actualEconomyProduction": 410,
+              "actualEconomyConsumption": 275,
+              "forecastProduction": 410,
+              "maintenanceRequired": 255,
+              "maintenanceShortage": 0,
+              "inputAllocated": 20
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 201,
+              "stockAfterEndTurn": 203,
+              "actualEconomyProduction": 8,
+              "actualEconomyConsumption": 6,
+              "forecastProduction": 8,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 396,
+              "stockAfterEndTurn": 460,
+              "actualEconomyProduction": 140,
+              "actualEconomyConsumption": 76,
+              "forecastProduction": 140,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 60,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 2,
+              "inputs": {
+                "civilianGoods": 20
+              },
+              "outputs": {
+                "militaryGoods": 8
+              },
+              "stoppedReason": "input_shortage"
+            },
+            {
+              "id": "relief-supply-center-4",
+              "operatingWorkers": 0,
+              "inputs": {
+                "food": 0
+              },
+              "outputs": {},
+              "stoppedReason": "out_of_supply"
+            },
+            {
+              "id": "relief-supply-center-6",
+              "operatingWorkers": 0,
+              "inputs": {
+                "food": 0
+              },
+              "outputs": {},
+              "stoppedReason": "out_of_supply"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "not_owned"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 2,
+          "cumulative": {
+            "unitLosses": 3,
+            "infectionLosses": 54,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-2",
+              "military-factory-3",
+              "army-base-1"
+            ]
+          }
+        },
+        "20": {
+          "turn": 20,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 1267,
+              "stockAfterEndTurn": 992,
+              "actualEconomyProduction": 70,
+              "actualEconomyConsumption": 345,
+              "forecastProduction": 70,
+              "maintenanceRequired": 345,
+              "maintenanceShortage": 0,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 82,
+              "stockAfterEndTurn": 166,
+              "actualEconomyProduction": 429,
+              "actualEconomyConsumption": 345,
+              "forecastProduction": 429,
+              "maintenanceRequired": 345,
+              "maintenanceShortage": 0,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 97,
+              "stockAfterEndTurn": 68,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 29,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 79,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 79,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 95,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "relief-supply-center-4",
+              "operatingWorkers": 0,
+              "inputs": {
+                "food": 0
+              },
+              "outputs": {},
+              "stoppedReason": "out_of_supply"
+            },
+            {
+              "id": "relief-supply-center-6",
+              "operatingWorkers": 0,
+              "inputs": {
+                "food": 0
+              },
+              "outputs": {},
+              "stoppedReason": "out_of_supply"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 2,
+          "cumulative": {
+            "unitLosses": 6,
+            "infectionLosses": 124,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-south",
+              "army-base-1",
+              "air-base-1"
+            ]
+          }
+        },
+        "35": null,
+        "50": null,
+        "70": null
+      },
+      "terminal": {
+        "turn": 24,
+        "resources": {
+          "food": 131,
+          "civilianGoods": 0,
+          "militaryGoods": 24,
+          "fuel": 0,
+          "electricityCapacity": 15,
+          "electricityRequired": 30
+        },
+        "militaryPopulation": 45,
+        "cumulative": {
+          "unitLosses": 14,
+          "infectionLosses": 298,
+          "starvationDeaths": 0,
+          "facilitiesFallen": [
+            "capital",
+            "city-1",
+            "city-2",
+            "city-3",
+            "city-4",
+            "city-6",
+            "city-7",
+            "city-8",
+            "farm-1",
+            "farm-2",
+            "farm-4",
+            "farm-5",
+            "civilian-factory-2",
+            "civilian-factory-3",
+            "civilian-factory-4",
+            "military-factory-1",
+            "military-factory-2",
+            "military-factory-3",
+            "oilfield-south",
+            "refinery-1",
+            "army-base-1",
+            "air-base-1"
+          ]
+        },
+        "latestEndTurn": {
+          "turn": 24,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 274,
+              "stockAfterEndTurn": 131,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 143,
+              "forecastProduction": 0,
+              "maintenanceRequired": 143,
+              "maintenanceShortage": 0,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 143,
+              "maintenanceShortage": 143,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 32,
+              "stockAfterEndTurn": 24,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 8,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 45,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 0,
+          "cumulative": {
+            "unitLosses": 14,
+            "infectionLosses": 298,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "capital",
+              "city-1",
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-1",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-south",
+              "refinery-1",
+              "army-base-1",
+              "air-base-1"
+            ]
+          }
+        }
+      },
+      "waves": [
+        {
+          "index": 1,
+          "scheduledTurn": 10,
+          "final": false,
+          "directions": [
+            "west"
+          ],
+          "frozenBaseCount": 9,
+          "frozenCommittedCount": 12,
+          "actualSpawned": 12,
+          "firstCombatTurn": 17,
+          "firstCombatByGroup": {
+            "wave-1-west": 17
+          }
+        },
+        {
+          "index": 2,
+          "scheduledTurn": 20,
+          "final": false,
+          "directions": [
+            "north",
+            "south"
+          ],
+          "frozenBaseCount": 18,
+          "frozenCommittedCount": 32,
+          "actualSpawned": 32,
+          "firstCombatTurn": 22,
+          "firstCombatByGroup": {
+            "wave-2-north": 22,
+            "wave-2-south": 22
+          }
+        },
+        {
+          "index": 3,
+          "scheduledTurn": 35,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 4,
+          "scheduledTurn": 50,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 5,
+          "scheduledTurn": 70,
+          "final": true,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        }
+      ],
+      "artillery": {
+        "attacks": 0,
+        "shellShots": 0,
+        "shellMilitaryGoods": 0,
+        "directKills": 0,
+        "blastKills": 0,
+        "gasChainKills": 0,
+        "regularPromotions": 0,
+        "veteranPromotions": 0,
+        "veteranAttributedKills": 0
+      },
+      "barbedWireBuilt": 4,
+      "earlyFacilityLosses": 5,
+      "totalUnfilledMilitaryGoodsRefill": {
+        "police": 19,
+        "nationalGuard": 62,
+        "riotPolice": 4,
+        "reconTeam": 48,
+        "fieldArtillery": 0,
+        "multipurposeHelicopter": 0,
+        "specialForces": 16
+      }
+    },
+    {
+      "version": "1.6.7",
+      "seed": 1,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 16,
+      "acceptedActionCount": 294,
+      "replayMatched": true,
+      "capitalMinimum": 0,
+      "capitalTransfers": 5,
+      "samples": {
+        "10": {
+          "turn": 10,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 167,
+              "maintenanceShortage": 167,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 107,
+              "maintenanceShortage": 107,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 88,
+              "stockAfterEndTurn": 79,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 9,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 60,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "not_owned"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 0,
+          "cumulative": {
+            "unitLosses": 6,
+            "infectionLosses": 155,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-1",
+              "farm-2",
+              "farm-3",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-north",
+              "refinery-1",
+              "army-base-1"
+            ]
+          }
+        },
+        "20": null,
+        "35": null,
+        "50": null,
+        "70": null
+      },
+      "terminal": {
+        "turn": 16,
+        "resources": {
+          "food": 0,
+          "civilianGoods": 0,
+          "militaryGoods": 0,
+          "fuel": 0,
+          "electricityCapacity": 15,
+          "electricityRequired": 30
+        },
+        "militaryPopulation": 40,
+        "cumulative": {
+          "unitLosses": 8,
+          "infectionLosses": 186,
+          "starvationDeaths": 21,
+          "facilitiesFallen": [
+            "capital",
+            "city-1",
+            "city-2",
+            "city-3",
+            "city-4",
+            "city-5",
+            "city-6",
+            "city-7",
+            "city-8",
+            "farm-1",
+            "farm-2",
+            "farm-3",
+            "farm-4",
+            "farm-5",
+            "civilian-factory-2",
+            "civilian-factory-3",
+            "civilian-factory-4",
+            "military-factory-1",
+            "military-factory-2",
+            "military-factory-3",
+            "oilfield-north",
+            "refinery-1",
+            "army-base-1"
+          ]
+        },
+        "latestEndTurn": {
+          "turn": 16,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 139,
+              "maintenanceShortage": 139,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 94,
+              "maintenanceShortage": 94,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 45,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 49,
+          "cumulative": {
+            "unitLosses": 8,
+            "infectionLosses": 186,
+            "starvationDeaths": 21,
+            "facilitiesFallen": [
+              "capital",
+              "city-1",
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-1",
+              "farm-2",
+              "farm-3",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-north",
+              "refinery-1",
+              "army-base-1"
+            ]
+          }
+        }
+      },
+      "waves": [
+        {
+          "index": 1,
+          "scheduledTurn": 10,
+          "final": false,
+          "directions": [
+            "west"
+          ],
+          "frozenBaseCount": 10,
+          "frozenCommittedCount": 14,
+          "actualSpawned": 14,
+          "firstCombatTurn": 12,
+          "firstCombatByGroup": {
+            "wave-1-west": 12
+          }
+        },
+        {
+          "index": 2,
+          "scheduledTurn": 20,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 3,
+          "scheduledTurn": 35,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 4,
+          "scheduledTurn": 50,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 5,
+          "scheduledTurn": 70,
+          "final": true,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        }
+      ],
+      "artillery": {
+        "attacks": 0,
+        "shellShots": 0,
+        "shellMilitaryGoods": 0,
+        "directKills": 0,
+        "blastKills": 0,
+        "gasChainKills": 0,
+        "regularPromotions": 0,
+        "veteranPromotions": 0,
+        "veteranAttributedKills": 0
+      },
+      "barbedWireBuilt": 0,
+      "earlyFacilityLosses": 11,
+      "totalUnfilledMilitaryGoodsRefill": {
+        "police": 19,
+        "nationalGuard": 14,
+        "riotPolice": 0,
+        "reconTeam": 43,
+        "fieldArtillery": 0,
+        "multipurposeHelicopter": 0,
+        "specialForces": 45
+      }
+    },
+    {
+      "version": "1.6.7",
+      "seed": 2,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 18,
+      "acceptedActionCount": 339,
+      "replayMatched": true,
+      "capitalMinimum": 0,
+      "capitalTransfers": 4,
+      "samples": {
+        "10": {
+          "turn": 10,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 6,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 230,
+              "actualEconomyConsumption": 236,
+              "forecastProduction": 230,
+              "maintenanceRequired": 267,
+              "maintenanceShortage": 31,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 196,
+              "stockAfterEndTurn": 241,
+              "actualEconomyProduction": 252,
+              "actualEconomyConsumption": 207,
+              "forecastProduction": 252,
+              "maintenanceRequired": 207,
+              "maintenanceShortage": 0,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 316,
+              "stockAfterEndTurn": 315,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 1,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 50,
+              "stockAfterEndTurn": 50,
+              "actualEconomyProduction": 50,
+              "actualEconomyConsumption": 50,
+              "forecastProduction": 50,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 60,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "power_unavailable"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "not_owned"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 0,
+          "cumulative": {
+            "unitLosses": 1,
+            "infectionLosses": 66,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "city-2",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-south",
+              "army-base-1"
+            ]
+          }
+        },
+        "20": null,
+        "35": null,
+        "50": null,
+        "70": null
+      },
+      "terminal": {
+        "turn": 18,
+        "resources": {
+          "food": 0,
+          "civilianGoods": 0,
+          "militaryGoods": 263,
+          "fuel": 0,
+          "electricityCapacity": 0,
+          "electricityRequired": 10
+        },
+        "militaryPopulation": 20,
+        "cumulative": {
+          "unitLosses": 8,
+          "infectionLosses": 180,
+          "starvationDeaths": 0,
+          "facilitiesFallen": [
+            "capital",
+            "city-2",
+            "city-4",
+            "city-5",
+            "city-6",
+            "city-8",
+            "farm-2",
+            "farm-4",
+            "farm-5",
+            "civilian-factory-2",
+            "civilian-factory-3",
+            "civilian-factory-4",
+            "military-factory-1",
+            "military-factory-2",
+            "military-factory-3",
+            "refinery-1"
+          ]
+        },
+        "latestEndTurn": {
+          "turn": 18,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 106,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 20,
+              "actualEconomyConsumption": 126,
+              "forecastProduction": 20,
+              "maintenanceRequired": 161,
+              "maintenanceShortage": 35,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 141,
+              "maintenanceShortage": 141,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 275,
+              "stockAfterEndTurn": 263,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 12,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 20,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 0,
+          "cumulative": {
+            "unitLosses": 8,
+            "infectionLosses": 180,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "capital",
+              "city-2",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-8",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "refinery-1"
+            ]
+          }
+        }
+      },
+      "waves": [
+        {
+          "index": 1,
+          "scheduledTurn": 10,
+          "final": false,
+          "directions": [
+            "north"
+          ],
+          "frozenBaseCount": 10,
+          "frozenCommittedCount": 13,
+          "actualSpawned": 13,
+          "firstCombatTurn": 13,
+          "firstCombatByGroup": {
+            "wave-1-north": 13
+          }
+        },
+        {
+          "index": 2,
+          "scheduledTurn": 20,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 3,
+          "scheduledTurn": 35,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 4,
+          "scheduledTurn": 50,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 5,
+          "scheduledTurn": 70,
+          "final": true,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        }
+      ],
+      "artillery": {
+        "attacks": 0,
+        "shellShots": 0,
+        "shellMilitaryGoods": 0,
+        "directKills": 0,
+        "blastKills": 0,
+        "gasChainKills": 0,
+        "regularPromotions": 0,
+        "veteranPromotions": 0,
+        "veteranAttributedKills": 0
+      },
+      "barbedWireBuilt": 0,
+      "earlyFacilityLosses": 6,
+      "totalUnfilledMilitaryGoodsRefill": {
+        "police": 86,
+        "nationalGuard": 80,
+        "riotPolice": 0,
+        "reconTeam": 48,
+        "fieldArtillery": 0,
+        "multipurposeHelicopter": 0,
+        "specialForces": 2
+      }
+    },
+    {
+      "version": "1.6.7",
+      "seed": 4,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 23,
+      "acceptedActionCount": 415,
+      "replayMatched": true,
+      "capitalMinimum": 0,
+      "capitalTransfers": 10,
+      "samples": {
+        "10": {
+          "turn": 10,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 890,
+              "stockAfterEndTurn": 860,
+              "actualEconomyProduction": 320,
+              "actualEconomyConsumption": 350,
+              "forecastProduction": 320,
+              "maintenanceRequired": 350,
+              "maintenanceShortage": 0,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 9,
+              "stockAfterEndTurn": 116,
+              "actualEconomyProduction": 377,
+              "actualEconomyConsumption": 270,
+              "forecastProduction": 377,
+              "maintenanceRequired": 270,
+              "maintenanceShortage": 0,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 216,
+              "stockAfterEndTurn": 207,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 9,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 106,
+              "stockAfterEndTurn": 172,
+              "actualEconomyProduction": 150,
+              "actualEconomyConsumption": 84,
+              "forecastProduction": 150,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 80,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "input_shortage"
+            },
+            {
+              "id": "relief-supply-center-6",
+              "operatingWorkers": 0,
+              "inputs": {
+                "food": 0
+              },
+              "outputs": {},
+              "stoppedReason": "out_of_supply"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "not_owned"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 2,
+          "cumulative": {
+            "unitLosses": 1,
+            "infectionLosses": 53,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-2",
+              "military-factory-3",
+              "army-base-1"
+            ]
+          }
+        },
+        "20": {
+          "turn": 20,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 218,
+              "maintenanceShortage": 218,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 168,
+              "maintenanceShortage": 168,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 50,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 27,
+          "cumulative": {
+            "unitLosses": 21,
+            "infectionLosses": 183,
+            "starvationDeaths": 0,
+            "facilitiesFallen": [
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-1",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-south",
+              "power-plant-1",
+              "army-base-1",
+              "air-base-1"
+            ]
+          }
+        },
+        "35": null,
+        "50": null,
+        "70": null
+      },
+      "terminal": {
+        "turn": 23,
+        "resources": {
+          "food": 0,
+          "civilianGoods": 0,
+          "militaryGoods": 0,
+          "fuel": 0,
+          "electricityCapacity": 0,
+          "electricityRequired": 10
+        },
+        "militaryPopulation": 0,
+        "cumulative": {
+          "unitLosses": 25,
+          "infectionLosses": 282,
+          "starvationDeaths": 5,
+          "facilitiesFallen": [
+            "capital",
+            "city-2",
+            "city-3",
+            "city-4",
+            "city-5",
+            "city-6",
+            "city-7",
+            "city-8",
+            "farm-1",
+            "farm-2",
+            "farm-4",
+            "farm-5",
+            "civilian-factory-1",
+            "civilian-factory-2",
+            "civilian-factory-3",
+            "civilian-factory-4",
+            "military-factory-1",
+            "military-factory-2",
+            "military-factory-3",
+            "oilfield-south",
+            "refinery-1",
+            "power-plant-1",
+            "army-base-1",
+            "air-base-1"
+          ]
+        },
+        "latestEndTurn": {
+          "turn": 23,
+          "resources": {
+            "food": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 9,
+              "maintenanceShortage": 9,
+              "inputAllocated": 0
+            },
+            "civilianGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 9,
+              "maintenanceShortage": 9,
+              "inputAllocated": 0
+            },
+            "militaryGoods": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": null,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            },
+            "fuel": {
+              "stockBeforeEndTurn": 0,
+              "stockAfterEndTurn": 0,
+              "actualEconomyProduction": 0,
+              "actualEconomyConsumption": 0,
+              "forecastProduction": 0,
+              "maintenanceRequired": 0,
+              "maintenanceShortage": null,
+              "inputAllocated": null
+            }
+          },
+          "militaryPopulationBeforeEndTurn": 0,
+          "factories": [
+            {
+              "id": "military-factory-1",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-2",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            },
+            {
+              "id": "military-factory-3",
+              "operatingWorkers": 0,
+              "inputs": {
+                "civilianGoods": 0
+              },
+              "outputs": {},
+              "stoppedReason": "ruined"
+            }
+          ],
+          "unfilledMilitaryGoodsRefillDemand": 0,
+          "cumulative": {
+            "unitLosses": 25,
+            "infectionLosses": 282,
+            "starvationDeaths": 5,
+            "facilitiesFallen": [
+              "capital",
+              "city-2",
+              "city-3",
+              "city-4",
+              "city-5",
+              "city-6",
+              "city-7",
+              "city-8",
+              "farm-1",
+              "farm-2",
+              "farm-4",
+              "farm-5",
+              "civilian-factory-1",
+              "civilian-factory-2",
+              "civilian-factory-3",
+              "civilian-factory-4",
+              "military-factory-1",
+              "military-factory-2",
+              "military-factory-3",
+              "oilfield-south",
+              "refinery-1",
+              "power-plant-1",
+              "army-base-1",
+              "air-base-1"
+            ]
+          }
+        }
+      },
+      "waves": [
+        {
+          "index": 1,
+          "scheduledTurn": 10,
+          "final": false,
+          "directions": [
+            "west"
+          ],
+          "frozenBaseCount": 10,
+          "frozenCommittedCount": 13,
+          "actualSpawned": 13,
+          "firstCombatTurn": 12,
+          "firstCombatByGroup": {
+            "wave-1-west": 12
+          }
+        },
+        {
+          "index": 2,
+          "scheduledTurn": 20,
+          "final": false,
+          "directions": [
+            "south",
+            "west"
+          ],
+          "frozenBaseCount": 22,
+          "frozenCommittedCount": 34,
+          "actualSpawned": 34,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 3,
+          "scheduledTurn": 35,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 4,
+          "scheduledTurn": 50,
+          "final": false,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        },
+        {
+          "index": 5,
+          "scheduledTurn": 70,
+          "final": true,
+          "directions": [],
+          "frozenBaseCount": 0,
+          "frozenCommittedCount": 0,
+          "actualSpawned": 0,
+          "firstCombatTurn": null,
+          "firstCombatByGroup": {}
+        }
+      ],
+      "artillery": {
+        "attacks": 0,
+        "shellShots": 0,
+        "shellMilitaryGoods": 0,
+        "directKills": 0,
+        "blastKills": 0,
+        "gasChainKills": 0,
+        "regularPromotions": 0,
+        "veteranPromotions": 0,
+        "veteranAttributedKills": 0
+      },
+      "barbedWireBuilt": 16,
+      "earlyFacilityLosses": 6,
+      "totalUnfilledMilitaryGoodsRefill": {
+        "police": 68,
+        "nationalGuard": 42,
+        "riotPolice": 14,
+        "reconTeam": 0,
+        "fieldArtillery": 0,
+        "multipurposeHelicopter": 0,
+        "specialForces": 24
+      }
+    }
+  ]
+}

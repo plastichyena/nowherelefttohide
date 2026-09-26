@@ -50,7 +50,8 @@ export function facilityChanges(before: AgentObservation, after: AgentObservatio
     const old = prior.get(f.id);
     if (!old) return [{ facilityId: f.id, reasons: ['newly_public'], evidence: 'public_state' as const, events: [] as string[] }];
     const reasons: string[] = [];
-    const healthyDelta = f.healthyPopulation - old.healthyPopulation;
+    const knownPopulation = f.healthyPopulation !== null && old.healthyPopulation !== null;
+    const healthyDelta = knownPopulation ? f.healthyPopulation! - old.healthyPopulation! : 0;
     const intentionalDelta = intentionalPopulationDelta(f.id, events);
     const unintendedDelta = healthyDelta - intentionalDelta;
     if (healthyDelta < 0 && unintendedDelta >= 0 && intentionalDelta < 0
@@ -63,7 +64,7 @@ export function facilityChanges(before: AgentObservation, after: AgentObservatio
     if (old.production.projectedPowerReason !== f.production.projectedPowerReason) reasons.push(`power_${f.production.projectedPowerReason}`);
     const matching = events.filter(e => e.payload.facilityId === f.id || e.payload.siteId === f.id).map(e => e.type);
     let populationLoss: FacilityPopulationChange | undefined;
-    if (old.owner === 'player' && f.owner === 'player' && unintendedDelta < 0) {
+    if (knownPopulation && old.owner === 'player' && f.owner === 'player' && unintendedDelta < 0) {
       reasons.push('healthy_population_lost');
       const previous = old.production.projectedProduction;
       const current = f.production.projectedProduction;
@@ -78,7 +79,7 @@ export function facilityChanges(before: AgentObservation, after: AgentObservatio
           delta: f.production.estimatedPowerGeneration - old.production.estimatedPowerGeneration };
       }
       populationLoss = { facilityId: f.id,
-        healthyPopulation: { before: old.healthyPopulation, after: f.healthyPopulation, delta: healthyDelta, unintendedDelta },
+        healthyPopulation: { before: old.healthyPopulation!, after: f.healthyPopulation!, delta: healthyDelta, unintendedDelta },
         infectedPopulation: { before: old.infectedPopulation, after: f.infectedPopulation },
         outputs: Object.keys(outputs).length ? outputs : null, outputReason: Object.keys(outputs).length ? null : 'not_producing', eventTypes: matching };
     }

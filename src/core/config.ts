@@ -15,7 +15,7 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '16.0.0';
+export const CONFIG_VERSION = '17.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v9';
 
 const facilityIds: FacilityId[] = [
@@ -227,7 +227,7 @@ const defaultFacilityConfig: Record<FacilityType, FacilityConfig> = {
   },
   militaryFactory: {
     workerCapacity: 30,
-    production: production({ civilianGoods: 10 }, { militaryGoods: 4 }, 'required', 40),
+    production: production({ civilianGoods: 10 }, { militaryGoods: 3 }, 'required', 40),
     overrunSpawnCount: 2,
     buildCivilianGoods: 0, visionRadius: 1, zombieTargetValue: 0,
   },
@@ -311,6 +311,7 @@ const initialWorkersByFacility: Record<FacilityId, number> = {
 };
 
 const defaultEconomy: EconomyConfig = {
+  unitFoodConsumption: 2,
   populationConsumption: { food: 1, civilianGoods: 1 },
   initialResources,
   initialRefineryAllowance: 2_000,
@@ -347,6 +348,7 @@ const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopula
  * independent copy that can be stored in GameState.
  */
 export const DEFAULT_CONFIG: GameConfig = {
+  zombiePursuitMovementBonus: 3,
   objectives: {
     nuclearPowerPlant: { rewardDeadlineTurn: 10, requiresHealthySurvivors: false, failureOnUncapturedFall: false, rewardUnitType: 'specialForces', failureUnitType: 'packZombie' },
     airBase: { rewardDeadlineTurn: 10, requiresHealthySurvivors: true, failureOnUncapturedFall: true, rewardUnitType: 'specialForces', failureUnitType: 'packZombie' },
@@ -385,11 +387,11 @@ export const DEFAULT_CONFIG: GameConfig = {
   horde: {
     warningLeadTurns: 2,
     waves: [
-      { turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 4 }, final: false },
-      { turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 6 }, final: false },
-      { turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 9 }, final: false },
-      { turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 9 }, final: false },
-      { turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 10 }, final: true },
+      { turn: 10, directionCount: 1, compositionPerDirection: { hordeZombie: 5, zombie: 5 }, final: false },
+      { turn: 20, directionCount: 2, compositionPerDirection: { hordeZombie: 3, zombie: 8 }, final: false },
+      { turn: 35, directionCount: 1, compositionPerDirection: { hordeZombie: 8, zombie: 11 }, final: false },
+      { turn: 50, directionCount: 3, compositionPerDirection: { hordeZombie: 5, zombie: 11 }, final: false },
+      { turn: 70, directionCount: 4, compositionPerDirection: { hordeZombie: 8, zombie: 12 }, final: true },
     ],
     specialZombieWeights: { zombie: 40, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 15, gasZombie: 15, screamerZombie: 5 },
     riotZombieCapPerDirection: 1,
@@ -541,6 +543,8 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     errors.push(`finalHordeTurn is not part of Game Rules ${CONFIG_VERSION}; derive it from the Final Wave`);
   }
   requireInteger(errors, config.maxActionsPerTurn, 'maxActionsPerTurn', 1);
+  requireInteger(errors, config.zombiePursuitMovementBonus, 'zombiePursuitMovementBonus', 0);
+  requireInteger(errors, config.economy?.unitFoodConsumption, 'economy.unitFoodConsumption', 0);
 
   for (const type of Object.keys(config.units ?? {})) {
     if (!isUnitType(type)) errors.push(`units.${type} is not a supported unit type`);

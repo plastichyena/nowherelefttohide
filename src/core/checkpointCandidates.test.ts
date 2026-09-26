@@ -194,7 +194,7 @@ describe('v1.4 position candidates', () => {
     const engine = new GameEngine(501, noInitialZombiesConfig());
     const target = northPosition(15);
     const visibility = getCheckpointRouteVisibility(engine.getState(), 'north', target);
-    expect(visibility).toEqual({ targetVisible: false, routeVisible: false });
+    expect(visibility).toMatchObject({ targetVisible: false, routeVisible: false });
 
     const candidate = checkpointCandidate(engine, 'BuildCheckpoint', target);
     expect(candidate.legal).toBe(false);
@@ -215,13 +215,16 @@ describe('v1.4 position candidates', () => {
     const target = northPosition(15);
     const visible = getPlayerVisibleTileKeys(engine.getState());
     expect(visible.has(hexKey(target))).toBe(true);
-    expect(getCheckpointRouteVisibility(engine.getState(), 'north', target)).toEqual({
+    expect(getCheckpointRouteVisibility(engine.getState(), 'north', target)).toMatchObject({
       targetVisible: true,
       routeVisible: false,
     });
 
     const candidate = checkpointCandidate(engine, 'BuildCheckpoint', target);
     expect(candidate.reasonCode).toBe('checkpoint_route_not_visible');
+    expect(candidate.routeVisibility).toEqual(getCheckpointRouteVisibility(engine.getState(), 'north', target));
+    expect(candidate.routeVisibility!.missingVisibleHexes.length).toBeGreaterThan(0);
+    expect(candidate.routeVisibility!.missingVisibleHexes.every(hex => !visible.has(hexKey(hex)))).toBe(true);
     expectRejectedWithoutMutation(engine, candidate);
   });
 
@@ -233,7 +236,7 @@ describe('v1.4 position candidates', () => {
     const visibleSnapshot = cloneState(visibleEngine.getState());
     visibleSnapshot.units.push(createUnit(visibleSnapshot, 'visible-checkpoint-blocker', 'zombie', target));
     loadSnapshot(visibleEngine, visibleSnapshot);
-    expect(getCheckpointRouteVisibility(visibleEngine.getState(), 'north', target)).toEqual({
+    expect(getCheckpointRouteVisibility(visibleEngine.getState(), 'north', target)).toMatchObject({
       targetVisible: true,
       routeVisible: true,
     });
@@ -410,7 +413,7 @@ describe('v1.4 position candidates', () => {
     routeSnapshot.units.find((unit) => unit.type === 'police')!.position = { q: 24, r: 15 };
     routeSnapshot.units.push(createUnit(routeSnapshot, 'route-priority-blocker', 'zombie', northPosition(15)));
     loadSnapshot(routeEngine, routeSnapshot);
-    expect(getCheckpointRouteVisibility(routeEngine.getState(), 'north', northPosition(15))).toEqual({
+    expect(getCheckpointRouteVisibility(routeEngine.getState(), 'north', northPosition(15))).toMatchObject({
       targetVisible: true,
       routeVisible: false,
     });

@@ -899,23 +899,23 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     .reduce((total, event) => total + eventPayloadNumber(event, 'actualSpawnCount'), 0);
   let maxWorkersInSingleFacility = 0;
   for (const observation of observations) for (const facility of observation.facilities) {
-    if (facility.type !== 'capital' && facility.type !== 'city') maxWorkersInSingleFacility = Math.max(maxWorkersInSingleFacility, facility.healthyPopulation);
+    if (facility.type !== 'capital' && facility.type !== 'city') maxWorkersInSingleFacility = Math.max(maxWorkersInSingleFacility, (facility.healthyPopulation ?? 0));
   }
   const maxTotalProductionWorkers = Math.max(...turnObservations.map((observation) => observation.facilities
     .filter((facility) => facility.type !== 'capital' && facility.type !== 'city')
-    .reduce((total, facility) => total + facility.healthyPopulation, 0)), 0);
+    .reduce((total, facility) => total + (facility.healthyPopulation ?? 0), 0)), 0);
   const highCapacityFacilityTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
-    (facility) => facility.type !== 'capital' && facility.type !== 'city' && facility.healthyPopulation >= 26 && facility.healthyPopulation <= 30,
+    (facility) => facility.type !== 'capital' && facility.type !== 'city' && (facility.healthyPopulation ?? 0) >= 26 && (facility.healthyPopulation ?? 0) <= 30,
   ).length, 0);
   const powerPlantStoppedTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
-    (facility) => facility.type === 'powerPlant' && facility.owner === 'player' && facility.healthyPopulation > 0 && facility.production.stoppedReason !== null,
+    (facility) => facility.type === 'powerPlant' && facility.owner === 'player' && (facility.healthyPopulation ?? 0) > 0 && facility.production.stoppedReason !== null,
   ).length, 0);
   const powerShortageTurns = turnObservations.reduce((total, observation) => total + (observation.endTurnForecast.electricity.shortage > 0 ? 1 : 0), 0);
   const poweredIndustrialFacilityTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
     (facility) => ['farm', 'civilianFactory', 'militaryFactory'].includes(facility.type) && facility.production.projectedPowerSupplied,
   ).length, 0);
   const unpoweredCityTurns = turnObservations.reduce((total, observation) => total + observation.facilities.filter(
-    (facility) => ['capital', 'city'].includes(facility.type) && facility.owner === 'player' && facility.healthyPopulation > 0 && !facility.production.projectedPowerSupplied,
+    (facility) => ['capital', 'city'].includes(facility.type) && facility.owner === 'player' && (facility.healthyPopulation ?? 0) > 0 && !facility.production.projectedPowerSupplied,
   ).length, 0);
   const capturedFacilityTypes = new Map(input.initialObservation.facilities.map((facility) => [facility.id, facility.type]));
   const refineryFacilitiesCaptured = events.filter(
@@ -1570,7 +1570,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     housingResidentTurns: statisticNumber(statistics, 'housingResidentTurns') ?? 0,
     housingCivilianGoodsProduced: statisticNumber(statistics, 'housingCivilianGoodsProduced') ?? 0,
     housingOutageFacilityTurns: statisticNumber(statistics, 'housingOutageFacilityTurns') ?? 0,
-    housingResidentsFinal: finalObservation.facilities.filter(f => f.type === 'temporaryHousing' && f.owner === 'player').reduce((n,f) => n + f.healthyPopulation, 0),
+    housingResidentsFinal: finalObservation.facilities.filter(f => f.type === 'temporaryHousing' && f.owner === 'player').reduce((n,f) => n + (f.healthyPopulation ?? 0), 0),
     facilitiesCaptured: events.filter((event) => event.type === 'facility_captured').length,
     facilitiesLost: events.filter((event) => event.type === 'facility_overrun' && typeof event.payload.facilityId === 'string').length,
     finalSecuredFacilities,

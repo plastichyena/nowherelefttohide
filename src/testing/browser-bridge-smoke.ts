@@ -101,7 +101,7 @@ function run(): void {
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
   for (const marker of [
-    '1.6.6', '16.0.0', '17.0.0', '20.0.0', '21.0.0', 'reliefSupplyCenter', 'movementSummary', 'multipurposeHelicopter', 'airBase', 'LaunchMilitaryDrone', 'BoardAircraft', 'nlth_preview_actions', 'fieldArtillery', 'AttackHex', 'ChangeUnitMode', 'fixed-51x51-v9', 'specialForces', 'packZombie', 'nuclearPowerPlant', 'context-handoff', 'gasZombie', 'screamerZombie', 'reconTeam', 'armyBase', 'oilField', 'SetPowerSupply',
+    '1.6.7', '17.0.0', '18.0.0', '21.0.0', '22.0.0', 'pursuitMovementBonus', 'unitFoodConsumption', 'reliefSupplyCenter', 'movementSummary', 'multipurposeHelicopter', 'airBase', 'LaunchMilitaryDrone', 'BoardAircraft', 'nlth_preview_actions', 'fieldArtillery', 'AttackHex', 'ChangeUnitMode', 'fixed-51x51-v9', 'specialForces', 'packZombie', 'nuclearPowerPlant', 'context-handoff', 'gasZombie', 'screamerZombie', 'reconTeam', 'armyBase', 'oilField', 'SetPowerSupply',
     'temporaryHousing', 'committedWaveUnitCount', 'pendingCount', 'horde_wave_started', 'horde_spawn_batch', 'nextTurnPenalties', 'housingOutage',
     'BuildConstructibleFacility', 'DecommissionConstructibleFacility', 'TurnAwayCheckpointRefugees',
     'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',
@@ -129,7 +129,7 @@ function run(): void {
     'groundVisionBlockedHexes', 'infectedPopulationConvertedToZombies', 'earlyCaptureSurvivorReward',
     'grandfatheredWaiting', 'waitingRiskPercent', 'checkpoint_policy_changed', 'screamer_scream',
   ]) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.6.6 schema marker: ${marker}`);
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.6.7 schema marker: ${marker}`);
   }
   // Compatibility validation may legitimately retain the names of removed
   // fields so an old Config can be rejected with a useful reason. Only flag

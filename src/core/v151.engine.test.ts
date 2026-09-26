@@ -150,13 +150,13 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
   it('uses the specified v1.6.1 totals and independent special caps in an atomic four-direction wave', () => {
     const config = createDefaultConfig();
     expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.hordeZombie, 0)).toBe(66);
-    expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.zombie, 0)).toBe(92);
+    expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.zombie, 0)).toBe(113);
     config.horde.waves = [{ ...config.horde.waves[4]!, turn: 1 }];
     config.horde.specialZombieWeights = { zombie: 1, policeZombie: 0, soldierZombie: 0, riotZombie: 100000, hunterZombie: 100000, gasZombie: 0 };
     const result = new GameEngine(151, config).step({ type: 'EndTurn' });
     expect(result.error?.message ?? null).toBeNull();
     const wave = result.state.units.filter((unit) => unit.hordeKind === 'final');
-    expect(wave).toHaveLength(73);
+    expect(wave).toHaveLength(81);
     expect(wave.filter(unit => unit.type === 'packZombie')).toHaveLength(1);
     for (const group of result.state.horde.finalSpawnGroupIds) {
       const units = wave.filter((unit) => unit.spawnGroupId === group);

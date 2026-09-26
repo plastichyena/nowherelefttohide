@@ -32,7 +32,7 @@ function weightedDistance(observation: AgentObservation, start: HexCoord, target
       if (!tile || tile.effectiveMovementCost === null) continue;
       const wire = observation.barbedWire.find(w => hexKey(w.position) === nextKey);
       const baseCost = wire && zombie ? (tile.unobstructedMovementCost ?? tile.effectiveMovementCost) : tile.effectiveMovementCost;
-      const cost = current.cost + baseCost + (wire && zombie ? wireBreakCost(wire.hp, zombie) : 0);
+      const cost = current.cost + baseCost + (wire && zombie ? wireBreakCost(wire.hp, { ...zombie, movement: zombie.effectiveMovement ?? zombie.movement }) : 0);
       if (cost >= (best.get(nextKey) ?? Number.POSITIVE_INFINITY)) continue;
       best.set(nextKey, cost);
       pending.push({ position: next, cost });
@@ -71,7 +71,7 @@ const PRODUCTION_TYPES: readonly FacilityType[] = [
 
 function ownedOperationalFacilities(observation: AgentObservation) {
   return observation.facilities.filter((facility) =>
-    facility.owner === 'player' && facility.status === 'owned' && facility.healthyPopulation > 0,
+    facility.owner === 'player' && facility.status === 'owned' && (facility.healthyPopulation ?? 0) > 0,
   );
 }
 
@@ -92,16 +92,16 @@ function zombieThreats(observation: AgentObservation): ZombieThreat[] {
     const candidates = facilities.map((facility) => {
       const distance = weightedDistance(observation, zombie.position, facility.position, zombie);
       const contactNow = distance === 0;
-      const contactNextTurn = distance <= zombie.movement;
+      const contactNextTurn = distance <= (zombie.effectiveMovement ?? zombie.movement);
       const threatensCapital = facility.type === 'capital';
       const threatensCriticalFacility = isCriticalFacility(facility.id, observation);
-      let score = Math.max(0, zombie.movement + 2 - distance) * 35;
+      let score = Math.max(0, (zombie.effectiveMovement ?? zombie.movement) + 2 - distance) * 35;
       if (contactNextTurn) score += 320;
       if (contactNow) score += 420;
       if (threatensCriticalFacility) score += 220;
       if (threatensCapital) score += 420;
       if (facility.type === 'militaryFactory') score += 180;
-      score += Math.min(100, facility.healthyPopulation * 2);
+      score += Math.min(100, (facility.healthyPopulation ?? 0) * 2);
       return { facility, contactNow, contactNextTurn, threatensCapital, threatensCriticalFacility, score };
     });
     const imminent = candidates.filter((candidate) => candidate.contactNextTurn);
@@ -335,7 +335,7 @@ function scoreAction(
       reasonCodes.push('DEFEND_CRITICAL_FACILITY');
     }
     if (target && highQueueCheckpoints.some((checkpoint) =>
-      hexDistance(target.position, checkpoint.position) <= target.movement + target.effectiveRange,
+      hexDistance(target.position, checkpoint.position) <= (target.effectiveMovement ?? target.movement) + target.effectiveRange,
     )) {
       score += weights.checkpoint * 3;
       reasonCodes.push('DEFEND_HIGH_QUEUE_PRESSURE');
@@ -395,7 +395,7 @@ function scoreAction(
       }
       const followUpThreats = observation.zombies.filter((zombie) =>
         (!targetWillDie || zombie.id !== target.id) &&
-        hexDistance(attacker.position, zombie.position) <= zombie.movement + zombie.effectiveRange,
+        hexDistance(attacker.position, zombie.position) <= (zombie.effectiveMovement ?? zombie.movement) + zombie.effectiveRange,
       ).length;
       if (followUpThreats > 0) {
         const exposureWeight = attacker.type === 'police' || attacker.type === 'riotPolice'
@@ -412,32 +412,32 @@ function scoreAction(
   } else if (action.type === 'AssignWorkers') {
     const facility = facilities.get(action.facilityId);
     if (facility) {
-      const delta = action.workers - facility.healthyPopulation;
+      const delta = action.workers - (facility.healthyPopulation ?? 0);
       if (delta > 0 && !facility.inSupply) {
         score -= 10_000;
         reasonCodes.push('SUPPLY_OUTSIDE_REJECTS_WORKER_INCREASE');
       } else if (delta < 0 && !facility.inSupply) {
         reasonCodes.push('WORKER_DECREASE_OUTSIDE_SUPPLY');
       }
-      let targetWorkers = facility.healthyPopulation;
+      let targetWorkers = (facility.healthyPopulation ?? 0);
       let need = facilityResourceValue(facility.type, observation);
       if (facility.type === 'farm') {
-        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation === 0 ? 8 : facility.healthyPopulation, facility.healthyPopulation + Math.ceil(observation.endTurnForecast.food.shortage / 4)));
+        targetWorkers = Math.min(facility.populationCapacity, Math.max((facility.healthyPopulation ?? 0) === 0 ? 8 : (facility.healthyPopulation ?? 0), (facility.healthyPopulation ?? 0) + Math.ceil(observation.endTurnForecast.food.shortage / 4)));
       } else if (facility.type === 'civilianFactory') {
-        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation === 0 ? 8 : facility.healthyPopulation, facility.healthyPopulation + Math.ceil(observation.endTurnForecast.civilianGoods.shortage / 4)));
+        targetWorkers = Math.min(facility.populationCapacity, Math.max((facility.healthyPopulation ?? 0) === 0 ? 8 : (facility.healthyPopulation ?? 0), (facility.healthyPopulation ?? 0) + Math.ceil(observation.endTurnForecast.civilianGoods.shortage / 4)));
       } else if (facility.type === 'refinery') {
         const nextTurnFuelDeficit = Math.max(0, observation.endTurnForecast.fuel.generationFuelDemand - observation.endTurnForecast.fuel.endingStock);
-        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation === 0 ? 5 : facility.healthyPopulation, facility.healthyPopulation + Math.ceil(nextTurnFuelDeficit / 5)));
+        targetWorkers = Math.min(facility.populationCapacity, Math.max((facility.healthyPopulation ?? 0) === 0 ? 5 : (facility.healthyPopulation ?? 0), (facility.healthyPopulation ?? 0) + Math.ceil(nextTurnFuelDeficit / 5)));
       } else if (facility.type === 'powerPlant') {
         const generationPerWorker = Math.max(1, facility.production.powerGenerationPerWorker);
         const physicalDeficit = Math.max(0, observation.endTurnForecast.electricity.required - observation.endTurnForecast.electricity.physicalGenerationCapacity);
-        targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation, facility.healthyPopulation + Math.ceil(physicalDeficit / generationPerWorker)));
+        targetWorkers = Math.min(facility.populationCapacity, Math.max((facility.healthyPopulation ?? 0), (facility.healthyPopulation ?? 0) + Math.ceil(physicalDeficit / generationPerWorker)));
       } else if (facility.type === 'militaryFactory' && reserveDeficit > 0) {
         const immediateCivilianShortage = observation.endTurnForecast.food.shortage + observation.endTurnForecast.civilianGoods.shortage;
         if (immediateCivilianShortage === 0 || observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand > 0) {
           const sustainableOutputWorkers = Math.ceil(observation.endTurnForecast.militaryGoods.totalRefillDemand / 2);
           const reserveRecoveryWorkers = Math.min(3, Math.ceil(reserveDeficit / 10));
-          targetWorkers = Math.min(facility.populationCapacity, Math.max(facility.healthyPopulation, sustainableOutputWorkers + reserveRecoveryWorkers));
+          targetWorkers = Math.min(facility.populationCapacity, Math.max((facility.healthyPopulation ?? 0), sustainableOutputWorkers + reserveRecoveryWorkers));
         }
         need = Math.max(need, 5);
       }
@@ -448,11 +448,11 @@ function scoreAction(
         const runway = forecast?.runway.current;
         if (!runway || !output || (runway.estimatedShortageTurn ?? Infinity) > 4 || (runway.netBurn ?? 0) <= 0) continue;
         targetWorkers = Math.max(targetWorkers, Math.min(facility.populationCapacity,
-          facility.healthyPopulation + Math.ceil(runway.netBurn! / output)));
+          (facility.healthyPopulation ?? 0) + Math.ceil(runway.netBurn! / output)));
         need = Math.max(need, 6);
         if (delta > 0) reasonCodes.push('RESTORE_WORKERS_BEFORE_RUNWAY_EXHAUSTION');
       }
-      const beforeGap = Math.abs(facility.healthyPopulation - targetWorkers);
+      const beforeGap = Math.abs((facility.healthyPopulation ?? 0) - targetWorkers);
       const afterGap = Math.abs(action.workers - targetWorkers);
       const capital = observation.facilities.find((candidate) => candidate.type === 'capital' && candidate.owner === 'player');
       const capitalTarget = urgentThreats.some((threat) => threat.threatensCapital)
@@ -462,7 +462,7 @@ function scoreAction(
       score += (beforeGap - afterGap) * weights.economyImprovement * need;
       if (delta > 0) reasonCodes.push(`STAFF_${facility.type.toUpperCase()}`);
       if (delta > 0 && capital) {
-        const projectedCapital = Math.max(0, capital.healthyPopulation - delta);
+        const projectedCapital = Math.max(0, (capital.healthyPopulation ?? 0) - delta);
         const projectedDeficit = Math.max(0, capitalTarget - projectedCapital);
         const addedDeficit = Math.max(0, projectedDeficit - capitalDeficit);
         if (addedDeficit > 0) {
@@ -480,7 +480,7 @@ function scoreAction(
       }
       if (
         delta > 0 &&
-        facility.healthyPopulation === 0 &&
+        (facility.healthyPopulation ?? 0) === 0 &&
         PRODUCTION_TYPES.includes(facility.type) &&
         (shortage(observation) === 0 || facility.type !== 'militaryFactory')
       ) {
@@ -492,7 +492,7 @@ function scoreAction(
         }
       }
       if (facility.type === 'militaryFactory' && delta > 0 && reserveDeficit > 0) {
-        const usefulWorkers = Math.min(delta, Math.max(0, targetWorkers - facility.healthyPopulation));
+        const usefulWorkers = Math.min(delta, Math.max(0, targetWorkers - (facility.healthyPopulation ?? 0)));
         const immediateCivilianShortage = observation.endTurnForecast.food.shortage + observation.endTurnForecast.civilianGoods.shortage;
         const urgencyMultiplier = immediateCivilianShortage > 0 && observation.endTurnForecast.militaryGoods.totalUnfilledRefillDemand === 0 ? 0.2 : 1;
         score += usefulWorkers * weights.militaryReserve * Math.min(12, reserveDeficit) * urgencyMultiplier;
@@ -501,7 +501,7 @@ function scoreAction(
       if (facility.type === 'powerPlant' && observation.endTurnForecast.electricity.shortage > 0 && delta > 0) {
         const affectedFacilities = observation.facilities.filter((candidate) =>
           candidate.owner === 'player' &&
-          candidate.healthyPopulation > 0 &&
+          (candidate.healthyPopulation ?? 0) > 0 &&
           candidate.production.powerMode !== 'none',
         ).length;
         score += 180 + affectedFacilities * 20;
@@ -537,8 +537,8 @@ function scoreAction(
     const from = facilities.get(action.fromFacilityId);
     const to = facilities.get(action.toFacilityId);
     if (from && to) {
-      const fromExcess = Math.max(0, from.healthyPopulation - from.populationCapacity);
-      const toRoom = Math.max(0, to.populationCapacity - to.healthyPopulation - (to.type === 'temporaryHousing' ? to.infectedPopulation : 0));
+      const fromExcess = Math.max(0, (from.healthyPopulation ?? 0) - from.populationCapacity);
+      const toRoom = Math.max(0, to.populationCapacity - (to.healthyPopulation ?? 0) - (to.type === 'temporaryHousing' ? to.infectedPopulation : 0));
       const relief = Math.min(action.people, fromExcess, toRoom);
       score += relief * weights.overcrowdingRelief;
       if (relief > 0) reasonCodes.push('RELIEVE_OVERCROWDING');
@@ -546,7 +546,7 @@ function scoreAction(
         const capitalTarget = urgentThreats.some((threat) => threat.threatensCapital)
           ? BALANCED_THRESHOLDS.capitalPopulationDanger
           : BALANCED_THRESHOLDS.capitalPopulationSafe;
-        const capitalDeficit = Math.max(0, capitalTarget - to.healthyPopulation);
+        const capitalDeficit = Math.max(0, capitalTarget - (to.healthyPopulation ?? 0));
         const buffered = Math.min(action.people, capitalDeficit);
         if (buffered > 0) {
           score += buffered * weights.capitalBuffer;
@@ -614,7 +614,7 @@ function scoreAction(
         })(),
       ).length;
       const zombiesReachingDestination = observation.zombies.filter((zombie) =>
-        hexDistance(action.destination, zombie.position) <= zombie.movement + zombie.effectiveRange,
+        hexDistance(action.destination, zombie.position) <= (zombie.effectiveMovement ?? zombie.movement) + zombie.effectiveRange,
       ).length;
       const followUpExposure = Math.max(0, zombiesReachingDestination - Math.min(1, lethalShotsFromDestination));
       const destinationTile = observation.map.tiles.find((tile) => tile.q === action.destination.q && tile.r === action.destination.r);
@@ -820,7 +820,7 @@ function scoreAction(
       facility.type === 'militaryFactory' &&
       facility.owner === 'player' &&
       facility.status === 'owned' &&
-      facility.healthyPopulation > 0 &&
+      (facility.healthyPopulation ?? 0) > 0 &&
       facility.infectedPopulation === 0,
     );
     score += weights.production + (urgentHorde ? weights.hordeDefense * 2 : 0) + Math.max(0, 3 - unitCount) * 20;
@@ -870,8 +870,8 @@ function scoreAction(
     }
     const capital = observation.facilities.find((facility) => facility.type === 'capital' && facility.owner === 'player');
     const capitalCost = action.unitType === 'police' ? 5 : 10;
-    if (capital && capital.healthyPopulation - capitalCost < BALANCED_THRESHOLDS.capitalPopulationSafe) {
-      score -= weights.capitalBuffer * (BALANCED_THRESHOLDS.capitalPopulationSafe - (capital.healthyPopulation - capitalCost));
+    if (capital && (capital.healthyPopulation ?? 0) - capitalCost < BALANCED_THRESHOLDS.capitalPopulationSafe) {
+      score -= weights.capitalBuffer * (BALANCED_THRESHOLDS.capitalPopulationSafe - ((capital.healthyPopulation ?? 0) - capitalCost));
       reasonCodes.push('PRESERVE_CAPITAL_POPULATION');
     }
     if (observation.population.healthyCivilians <= BALANCED_THRESHOLDS.criticalCivilianBuffer + (action.unitType === 'police' ? 5 : 10)) {
@@ -879,8 +879,8 @@ function scoreAction(
       reasonCodes.push('PRESERVE_CIVILIANS');
     }
   } else if (action.type === 'BuildBarbedWire') {
-    const threats = observation.zombies.filter(z => hexDistance(z.position, action.position) <= z.movement + 2);
-    const protectedSites = observation.facilities.filter(f => f.owner === 'player' && f.healthyPopulation > 0 && hexDistance(f.position, action.position) <= 3);
+    const threats = observation.zombies.filter(z => hexDistance(z.position, action.position) <= (z.effectiveMovement ?? z.movement) + 2);
+    const protectedSites = observation.facilities.filter(f => f.owner === 'player' && (f.healthyPopulation ?? 0) > 0 && hexDistance(f.position, action.position) <= 3);
     score -= 60;
     if (threats.length && protectedSites.length && observation.resources.civilianGoods >= 20 && observation.resources.militaryGoods >= 20) {
       score += Math.min(3, threats.length) * 35;
@@ -1082,7 +1082,7 @@ function scoreAction(
         reasonCodes.push(safeSuppressor ? 'CAPITAL_ZERO_CIVILIAN_DAMAGE_SUPPRESSION' : 'CAPITAL_EMERGENCY_SUPPRESSION');
       }
       for (const site of ownedOperationalFacilities(observation).filter(f => isCriticalFacility(f.id, observation))) {
-        if (!observation.zombies.some(z => hexDistance(z.position, site.position) <= z.movement + 3)) continue;
+        if (!observation.zombies.some(z => hexDistance(z.position, site.position) <= (z.effectiveMovement ?? z.movement) + 3)) continue;
         const defenders = observation.units.filter(u => hexDistance(u.position, site.position) <= 2)
           .sort((a, b) => hexDistance(a.position, site.position) - hexDistance(b.position, site.position) || a.id.localeCompare(b.id));
         if (defenders.length === 1 && defenders[0]!.id === unit.id) {

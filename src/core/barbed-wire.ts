@@ -1,3 +1,4 @@
+import { effectiveZombieMovement } from './zombie-movement';
 import type { GameState, HexCoord, UnitState } from './types';
 import { hexDistance, hexKey, hexNeighbors } from './hex';
 import { canPlayerOccupyHex, getTile } from './map';
@@ -78,7 +79,7 @@ export function damageWire(state: GameState, position: HexCoord, damage: number,
 export function wireRoutePenalty(state: Readonly<GameState>, zombie: UnitState, position: HexCoord): number {
   const wire = wireAt(state, position);
   if (!wire) return 0;
-  return wireBreakCost(wire.hp, zombie);
+  return wireBreakCost(wire.hp, { ...zombie, movement: effectiveZombieMovement(zombie) });
 }
 
 export function wireBreakCost(hp: number, zombie: Pick<UnitState, 'attack' | 'attackChargesRemaining' | 'maxAttackCharges' | 'movement'>): number {

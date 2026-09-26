@@ -54,7 +54,7 @@ describe('Balanced Agent scenario intentions', () => {
   it('prefers a resource improvement over certain shortage defeat', () => {
     const farm = observation.facilities.find((facility) => facility.id === 'farm-1')!;
     const result = decide(
-      [{ type: 'AssignWorkers', facilityId: farm.id, workers: farm.healthyPopulation + 1 }, { type: 'EndTurn' }],
+      [{ type: 'AssignWorkers', facilityId: farm.id, workers: farm.healthyPopulation! + 1 }, { type: 'EndTurn' }],
       (value) => {
         value.population.healthyCivilians = 1;
         value.endTurnForecast.food.shortage = 2;
@@ -69,7 +69,7 @@ describe('Balanced Agent scenario intentions', () => {
   it('improves food or civilian-goods shortage', () => {
     const farm = observation.facilities.find((facility) => facility.id === 'farm-1')!;
     const result = decide(
-      [{ type: 'AssignWorkers', facilityId: farm.id, workers: farm.healthyPopulation + 1 }, { type: 'EndTurn' }],
+      [{ type: 'AssignWorkers', facilityId: farm.id, workers: farm.healthyPopulation! + 1 }, { type: 'EndTurn' }],
       (value) => { value.endTurnForecast.food.shortage = 5; },
     );
     expect(result.action.type).toBe('AssignWorkers');
@@ -78,7 +78,7 @@ describe('Balanced Agent scenario intentions', () => {
   it('staffs a power plant during electricity shortage', () => {
     const plant = observation.facilities.find((facility) => facility.type === 'powerPlant' && facility.owner === 'player')!;
     const result = decide(
-      [{ type: 'AssignWorkers', facilityId: plant.id, workers: plant.healthyPopulation + 1 }, { type: 'EndTurn' }],
+      [{ type: 'AssignWorkers', facilityId: plant.id, workers: plant.healthyPopulation! + 1 }, { type: 'EndTurn' }],
       (value) => { value.endTurnForecast.electricity.shortage = 5; },
     );
     expect(result.trace?.reasonCodes).toContain('RESTORE_POWER');
@@ -163,7 +163,7 @@ describe('Balanced Agent scenario intentions', () => {
     const unit = observation.units[0]!;
     const entrance = observation.map.tiles.find((tile) => tile.hordeEntranceDirections.length > 0)!;
     const frontline = observation.facilities
-      .filter((facility) => facility.owner === 'player' && facility.healthyPopulation > 0)
+      .filter((facility) => facility.owner === 'player' && facility.healthyPopulation! > 0)
       .sort((left, right) =>
         hexDistance(left.position, entrance) - hexDistance(right.position, entrance) || left.id.localeCompare(right.id),
       )[0]!;
@@ -354,7 +354,7 @@ describe('Balanced Agent scenario intentions', () => {
     const facility = observation.facilities.find((candidate) => candidate.type === 'farm' && candidate.owner === 'player')!;
     const unit = observation.units.find((candidate) => candidate.hp === candidate.maxHp)!;
     const assign = decide([
-      { type: 'AssignWorkers', facilityId: facility.id, workers: facility.healthyPopulation + 1 },
+      { type: 'AssignWorkers', facilityId: facility.id, workers: facility.healthyPopulation! + 1 },
       { type: 'EndTurn' },
     ], (value) => {
       value.facilities.find((candidate) => candidate.id === facility.id)!.inSupply = false;

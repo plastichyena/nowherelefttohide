@@ -79,7 +79,7 @@ describe('Balanced Agent facility-contact denial', () => {
   ] as const)('attacks a zombie that can contact %s during the next zombie turn', (_label, facilityId, threatPosition) => {
     const observation = stabilize(freshObservation());
     const targetFacility = facilityById(observation, facilityId);
-    targetFacility.healthyPopulation = Math.max(targetFacility.healthyPopulation, 10);
+    targetFacility.healthyPopulation = Math.max(targetFacility.healthyPopulation!, 10);
 
     const threat = visibleZombie(observation, 'zombie-threat');
     const decoy = visibleZombie(observation, 'zombie-a');

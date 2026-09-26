@@ -1,3 +1,4 @@
+import { effectiveZombieMovement, updateZombiePursuit } from './zombie-movement';
 import { allocateUnitId } from './state';
 import { isAviationAction, aviationReason, applyAviationAction, emergencyLanding, unitCanReceiveSupply } from './aircraft';
 import { artilleryAttackReason, artilleryImpacts, artilleryBaseDamage, damageArtilleryPopulation } from './artillery';
@@ -1914,7 +1915,7 @@ function congestionFallback(
   const candidates = findReachablePaths(
     state.map,
     zombie.position,
-    zombie.movement,
+    effectiveZombieMovement(zombie),
     occupied,
     (position) => effectiveMovementCost(state, position, false),
   )
@@ -2269,6 +2270,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
       noiseTarget: null,
       noiseChanged: null,
     };
+    updateZombiePursuit(zombie, decision.reason, state.config.zombiePursuitMovementBonus);
     if (
       zombie.type === 'screamerZombie' &&
       (decision.reason === 'visible_population' || decision.reason === 'inherited_horde' || decision.reason === 'wave_capital')
@@ -2324,13 +2326,13 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
     const route = targetPath(state, zombie, target);
     const beforeMove = { ...zombie.position };
     if (route?.path && route.path.length > 1) {
-      applyMovement(state, zombie, route.path, zombie.movement, 'normal', rng);
+      applyMovement(state, zombie, route.path, effectiveZombieMovement(zombie), 'normal', rng);
       if (hexKey(zombie.position) !== hexKey(beforeMove)) {
         zombie.previousFallbackPosition = null;
         zombie.fallbackTarget = null;
       }
     } else if (!route) {
-      const key = `${hexKey(decision.target)}:${zombie.attack}:${zombie.attackChargesRemaining}:${zombie.maxAttackCharges}:${zombie.movement}:${state.barbedWire.map(w => `${w.id}:${w.hp}`).join(',')}`;
+      const key = `${hexKey(decision.target)}:${zombie.attack}:${zombie.attackChargesRemaining}:${zombie.maxAttackCharges}:${effectiveZombieMovement(zombie)}:${state.barbedWire.map(w => `${w.id}:${w.hp}`).join(',')}`;
       let distances = terrainDistances.get(key);
       if (!distances) {
         distances = terrainDistanceMap(state, decision.target, zombie);
@@ -2338,7 +2340,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
       }
       const fallback = congestionFallback(state, zombie, decision.target, distances);
       if (fallback) {
-        applyMovement(state, zombie, fallback.path, zombie.movement, 'normal', rng);
+        applyMovement(state, zombie, fallback.path, effectiveZombieMovement(zombie), 'normal', rng);
         if (hexKey(zombie.position) !== hexKey(beforeMove)) {
           const startDistance = distances.get(hexKey(beforeMove)) ?? Number.POSITIVE_INFINITY;
           const reachedDistance = distances.get(hexKey(zombie.position)) ?? Number.POSITIVE_INFINITY;
@@ -3064,10 +3066,10 @@ export function workerAssignmentCandidates(state: Readonly<GameState>) {
       : facility.infected > 0 ? 'infected' : facility.populationOperationalTurn > state.turn ? 'next_turn_wait'
       : ['building', 'disabled', 'recovering'].includes(facility.operationalStatus) ? 'facility_not_operational'
       : facility.workers >= facility.workerCapacity ? 'capacity_reached' : !isHexSupplied(state, facility.position) ? 'facility_out_of_supply' : null;
-    return { facilityId: facility.id, availablePopulation, currentWorkers: facility.workers, targetReason,
+    return { facilityId: facility.id, availablePopulation, currentWorkers: facility.owner === 'player' ? facility.workers : null, targetReason,
       populationReason: availablePopulation <= 0 ? 'insufficient_city_population' : null,
       actionBudgetReason: playerActionBudgetError(state, { type: 'AssignWorkers', facilityId: facility.id, workers: facility.workers + 1 })?.code ?? null,
-      reason: 'code' in result ? result.code : null, populationSources: state.facilities.filter(isCityFacility).map(city => ({ facilityId: city.id, healthyPopulation: city.workers, reason: populationCityReason(state, city), availablePopulation: populationCityReason(state, city) === null ? withdrawableResidents(city) : 0 })) };
+      reason: 'code' in result ? result.code : null, populationSources: state.facilities.filter(isCityFacility).map(city => ({ facilityId: city.id, healthyPopulation: city.owner === 'player' ? city.workers : null, reason: populationCityReason(state, city), availablePopulation: populationCityReason(state, city) === null ? withdrawableResidents(city) : 0 })) };
   });
 }
 
@@ -4258,6 +4260,7 @@ export function getCheckpointPositionCandidates(
           branchId: branch.id,
           ...(action.type === 'RelocateCheckpoint' ? { checkpointId: action.checkpointId } : {}),
           position: { ...position },
+          ...(includeProjectedEffects ? { routeVisibility: getCheckpointRouteVisibility(state, branch.id, position, visibleTileKeys) } : {}),
           legal: reason === null,
           reasonCode: reason?.code ?? null,
           ...(reason?.code==='checkpoint_supply_zombie_blocked' ? {blockingEnemyIds:getBlockingZombiesForCheckpoint(state,branch.id,position).filter(z=>visibleTileKeys.has(hexKey(z.position))).map(z=>z.id).sort()} : {}),

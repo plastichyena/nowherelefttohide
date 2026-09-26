@@ -1,0 +1,2200 @@
+{
+  "source": "output/claude-playtest-20260925-v166-seed4",
+  "method": "Lossless reconstruction of recorded public document; no old State loaded into v1.6.7.",
+  "reports": [
+    {
+      "revision": 153,
+      "turn": 11,
+      "roadTiles": [
+        {
+          "q": 26,
+          "r": 25
+        },
+        {
+          "q": 27,
+          "r": 25
+        },
+        {
+          "q": 28,
+          "r": 25
+        },
+        {
+          "q": 29,
+          "r": 25
+        },
+        {
+          "q": 30,
+          "r": 25
+        },
+        {
+          "q": 31,
+          "r": 25
+        },
+        {
+          "q": 32,
+          "r": 25
+        },
+        {
+          "q": 33,
+          "r": 25
+        },
+        {
+          "q": 34,
+          "r": 25
+        },
+        {
+          "q": 35,
+          "r": 25
+        },
+        {
+          "q": 36,
+          "r": 25
+        },
+        {
+          "q": 37,
+          "r": 25
+        },
+        {
+          "q": 38,
+          "r": 25
+        },
+        {
+          "q": 39,
+          "r": 25
+        },
+        {
+          "q": 40,
+          "r": 25
+        },
+        {
+          "q": 41,
+          "r": 25
+        },
+        {
+          "q": 42,
+          "r": 25
+        },
+        {
+          "q": 43,
+          "r": 25
+        },
+        {
+          "q": 44,
+          "r": 25
+        },
+        {
+          "q": 45,
+          "r": 25
+        },
+        {
+          "q": 46,
+          "r": 25
+        },
+        {
+          "q": 47,
+          "r": 25
+        },
+        {
+          "q": 48,
+          "r": 25
+        },
+        {
+          "q": 49,
+          "r": 25
+        },
+        {
+          "q": 50,
+          "r": 25
+        }
+      ],
+      "candidates": [
+        {
+          "position": {
+            "q": 35,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 36,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 37,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 38,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 39,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 40,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 41,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 42,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        }
+      ],
+      "recordedPreview": [],
+      "nextDecision": {
+        "accepted": true,
+        "afterPublicHash": "8ce1ca3645f93e27c30d5d591e96722f1cd6e3a428daf3a3d3f2668756758ebc",
+        "beforePublicHash": "d76ebf19b970e4c54b2ac148af0b4aaa24168987bcce6e89b50cd02c57223fe1",
+        "decision": 154,
+        "decisionHash": "2f644ccc4c497d7cf24888357bc89e601532ff5a13ee73c8818fcff68071d84a",
+        "decisionSummary": "zombie-9を射程2へ。",
+        "error": null,
+        "events": [
+          {
+            "id": "event-1557",
+            "payload": {
+              "effectiveMovementCost": 2,
+              "fuelUsed": 2,
+              "hexesMoved": 2,
+              "movementMode": "normal",
+              "q": 20,
+              "r": 18,
+              "unitId": "special-forces-42",
+              "unitType": "specialForces"
+            },
+            "phase": "player",
+            "turn": 11,
+            "type": "unit_moved"
+          },
+          {
+            "id": "event-1558",
+            "payload": {
+              "q": 16,
+              "r": 18,
+              "unitId": "gas-zombie-initial-1",
+              "unitType": "gasZombie"
+            },
+            "phase": "player",
+            "turn": 11,
+            "type": "enemy_spotted"
+          },
+          {
+            "id": "event-1559",
+            "payload": {
+              "q": 16,
+              "r": 19,
+              "unitId": "zombie-10",
+              "unitType": "zombie"
+            },
+            "phase": "player",
+            "turn": 11,
+            "type": "enemy_spotted"
+          },
+          {
+            "id": "event-1560",
+            "payload": {
+              "q": 16,
+              "r": 20,
+              "unitId": "zombie-4",
+              "unitType": "zombie"
+            },
+            "phase": "player",
+            "turn": 11,
+            "type": "enemy_spotted"
+          }
+        ],
+        "importantChanges": [
+          {
+            "category": "enemy",
+            "consequences": [],
+            "entityIds": [
+              "gas-zombie-initial-1"
+            ],
+            "id": "enemy:gas-zombie-initial-1",
+            "reasonCodes": [
+              "enemy_spotted"
+            ],
+            "relatedEventIds": [
+              "event-1558"
+            ],
+            "relatedEventTypes": [
+              "enemy_spotted"
+            ],
+            "severity": "warning"
+          },
+          {
+            "category": "enemy",
+            "consequences": [],
+            "entityIds": [
+              "zombie-10"
+            ],
+            "id": "enemy:zombie-10",
+            "reasonCodes": [
+              "enemy_spotted"
+            ],
+            "relatedEventIds": [
+              "event-1559"
+            ],
+            "relatedEventTypes": [
+              "enemy_spotted"
+            ],
+            "severity": "warning"
+          },
+          {
+            "category": "enemy",
+            "consequences": [],
+            "entityIds": [
+              "zombie-4"
+            ],
+            "id": "enemy:zombie-4",
+            "reasonCodes": [
+              "enemy_spotted"
+            ],
+            "relatedEventIds": [
+              "event-1560"
+            ],
+            "relatedEventTypes": [
+              "enemy_spotted"
+            ],
+            "severity": "warning"
+          }
+        ],
+        "inputAction": {
+          "destination": {
+            "q": 20,
+            "r": 18
+          },
+          "type": "Move",
+          "unitId": "special-forces-42"
+        },
+        "phase": "player",
+        "playTurnStopDetails": {
+          "enemyIds": [
+            "gas-zombie-initial-1",
+            "zombie-10",
+            "zombie-4"
+          ]
+        },
+        "playTurnStopReason": "new_enemy_spotted",
+        "previousDecisionHash": "25fe9650d9d410dcf73b82f54b72095f8964fb12a21461b013edab3081a3e7ec",
+        "publicPayload": {
+          "chunks": [
+            {
+              "compressedBytes": 36537,
+              "hash": "fc60f44d213324263f446e0c3c9744beec172497cf363a607c002e43545abcf0"
+            }
+          ],
+          "compressedBytes": 36537,
+          "contentHash": "8f0cb8852e42d555b5942ad8e7499bd15e0763da40063a1bbd4da67e4672d851",
+          "domain": "public",
+          "encoding": "canonical-json+gzip-chunks",
+          "logicalBytes": 861247
+        },
+        "publicPayloadKind": "diff",
+        "requestedCommentLocale": "ja",
+        "requestHash": "7c9b743a23f6baa558719e779868a3f9bbefd87b60eaebb9283075cef78191de",
+        "requestId": "t11-mv-sf42",
+        "stateDelta": {
+          "afterTurn": 11,
+          "beforeTurn": 11,
+          "branchFlowChanges": [],
+          "checkpointRoleChanges": [],
+          "facilityChanges": [],
+          "lostEnemies": [],
+          "newlyInfectedSites": [],
+          "newlyRuinedSites": [],
+          "newlySpottedEnemies": [
+            "gas-zombie-initial-1",
+            "zombie-10",
+            "zombie-4"
+          ],
+          "unitHpChanges": [],
+          "unitSupplyChanges": [
+            {
+              "afterFuel": 42,
+              "afterMilitaryGoods": 36,
+              "beforeFuel": 44,
+              "beforeMilitaryGoods": 36,
+              "unitId": "special-forces-42"
+            }
+          ]
+        },
+        "turn": 11
+      }
+    },
+    {
+      "revision": 169,
+      "turn": 12,
+      "roadTiles": [
+        {
+          "q": 26,
+          "r": 25
+        },
+        {
+          "q": 27,
+          "r": 25
+        },
+        {
+          "q": 28,
+          "r": 25
+        },
+        {
+          "q": 29,
+          "r": 25
+        },
+        {
+          "q": 30,
+          "r": 25
+        },
+        {
+          "q": 31,
+          "r": 25
+        },
+        {
+          "q": 32,
+          "r": 25
+        },
+        {
+          "q": 33,
+          "r": 25
+        },
+        {
+          "q": 34,
+          "r": 25
+        },
+        {
+          "q": 35,
+          "r": 25
+        },
+        {
+          "q": 36,
+          "r": 25
+        },
+        {
+          "q": 37,
+          "r": 25
+        },
+        {
+          "q": 38,
+          "r": 25
+        },
+        {
+          "q": 39,
+          "r": 25
+        },
+        {
+          "q": 40,
+          "r": 25
+        },
+        {
+          "q": 41,
+          "r": 25
+        },
+        {
+          "q": 42,
+          "r": 25
+        },
+        {
+          "q": 43,
+          "r": 25
+        },
+        {
+          "q": 44,
+          "r": 25
+        },
+        {
+          "q": 45,
+          "r": 25
+        },
+        {
+          "q": 46,
+          "r": 25
+        },
+        {
+          "q": 47,
+          "r": 25
+        },
+        {
+          "q": 48,
+          "r": 25
+        },
+        {
+          "q": 49,
+          "r": 25
+        },
+        {
+          "q": 50,
+          "r": 25
+        }
+      ],
+      "candidates": [
+        {
+          "position": {
+            "q": 35,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 36,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 37,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 38,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 39,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 40,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 41,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        },
+        {
+          "position": {
+            "q": 42,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [
+            {
+              "q": 31,
+              "r": 25
+            }
+          ],
+          "reason": "checkpoint_route_not_visible"
+        }
+      ],
+      "recordedPreview": [],
+      "nextDecision": {
+        "accepted": true,
+        "afterPublicHash": "387a58d6d0d922ea7d3d4754dcff5b2e963648896585ea8a2436cba44ddd19f3",
+        "beforePublicHash": "8a3d33cb36ec263c82c64daac3d3b494fc98cd5388e7f0b2cb3beedd714eb0ab",
+        "decision": 170,
+        "decisionHash": "30db338c829d5f99da28c76f2594c0d7098174f899d5fb26dc6b3368e361d919",
+        "decisionSummary": "廃墟の東前哨に駐留し感染鎮圧→自動回復を狙う。",
+        "error": null,
+        "events": [
+          {
+            "id": "event-1722",
+            "payload": {
+              "effectiveMovementCost": 3,
+              "fuelUsed": 2,
+              "hexesMoved": 3,
+              "movementMode": "normal",
+              "q": 39,
+              "r": 25,
+              "unitId": "national-guard-50",
+              "unitType": "nationalGuard"
+            },
+            "phase": "player",
+            "turn": 12,
+            "type": "unit_moved"
+          }
+        ],
+        "importantChanges": [],
+        "inputAction": {
+          "destination": {
+            "q": 39,
+            "r": 25
+          },
+          "type": "Move",
+          "unitId": "national-guard-50"
+        },
+        "phase": "player",
+        "playTurnStopDetails": {
+          "alertIds": [
+            "unit_out_of_supply_risk:national-guard-50"
+          ]
+        },
+        "playTurnStopReason": "crisis_worsened",
+        "previousDecisionHash": "507a939622249350b924cdcabb434c1c681a69120b6e4dfd0d8b4b790302993f",
+        "publicPayload": {
+          "chunks": [
+            {
+              "compressedBytes": 30533,
+              "hash": "b83ca50c0945950f648e1710484b8b35b27043b55b2602f2a7bc5b448e08d576"
+            }
+          ],
+          "compressedBytes": 30533,
+          "contentHash": "6da044f4fdf98c66816fb2d60e743d5bbf48072a873293e64140ddd86687ccc9",
+          "domain": "public",
+          "encoding": "canonical-json+gzip-chunks",
+          "logicalBytes": 741818
+        },
+        "publicPayloadKind": "diff",
+        "requestedCommentLocale": "ja",
+        "requestHash": "a1d5ea23a34f2afaca576795774b173c1a7966c0a6ec2b0634624fdeabcf29ac",
+        "requestId": "t12-mv-ng50",
+        "stateDelta": {
+          "afterTurn": 12,
+          "beforeTurn": 12,
+          "branchFlowChanges": [],
+          "checkpointRoleChanges": [],
+          "facilityChanges": [],
+          "lostEnemies": [],
+          "newlyInfectedSites": [],
+          "newlyRuinedSites": [],
+          "newlySpottedEnemies": [],
+          "unitHpChanges": [],
+          "unitSupplyChanges": [
+            {
+              "afterFuel": 42,
+              "afterMilitaryGoods": 36,
+              "beforeFuel": 44,
+              "beforeMilitaryGoods": 36,
+              "unitId": "national-guard-50"
+            }
+          ]
+        },
+        "turn": 12
+      }
+    },
+    {
+      "revision": 202,
+      "turn": 15,
+      "roadTiles": [
+        {
+          "q": 26,
+          "r": 25
+        },
+        {
+          "q": 27,
+          "r": 25
+        },
+        {
+          "q": 28,
+          "r": 25
+        },
+        {
+          "q": 29,
+          "r": 25
+        },
+        {
+          "q": 30,
+          "r": 25
+        },
+        {
+          "q": 31,
+          "r": 25
+        },
+        {
+          "q": 32,
+          "r": 25
+        },
+        {
+          "q": 33,
+          "r": 25
+        },
+        {
+          "q": 34,
+          "r": 25
+        },
+        {
+          "q": 35,
+          "r": 25
+        },
+        {
+          "q": 36,
+          "r": 25
+        },
+        {
+          "q": 37,
+          "r": 25
+        },
+        {
+          "q": 38,
+          "r": 25
+        },
+        {
+          "q": 39,
+          "r": 25
+        },
+        {
+          "q": 40,
+          "r": 25
+        },
+        {
+          "q": 41,
+          "r": 25
+        },
+        {
+          "q": 42,
+          "r": 25
+        },
+        {
+          "q": 43,
+          "r": 25
+        },
+        {
+          "q": 44,
+          "r": 25
+        },
+        {
+          "q": 45,
+          "r": 25
+        },
+        {
+          "q": 46,
+          "r": 25
+        },
+        {
+          "q": 47,
+          "r": 25
+        },
+        {
+          "q": 48,
+          "r": 25
+        },
+        {
+          "q": 49,
+          "r": 25
+        },
+        {
+          "q": 50,
+          "r": 25
+        }
+      ],
+      "candidates": [
+        {
+          "position": {
+            "q": 35,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [],
+          "reason": null
+        },
+        {
+          "position": {
+            "q": 36,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [],
+          "reason": null
+        },
+        {
+          "position": {
+            "q": 37,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [],
+          "reason": null
+        },
+        {
+          "position": {
+            "q": 38,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [],
+          "reason": null
+        },
+        {
+          "position": {
+            "q": 39,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [],
+          "reason": "invalid_checkpoint_tile"
+        },
+        {
+          "position": {
+            "q": 40,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [],
+          "reason": null
+        },
+        {
+          "position": {
+            "q": 41,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [],
+          "reason": null
+        },
+        {
+          "position": {
+            "q": 42,
+            "r": 25
+          },
+          "targetVisible": true,
+          "missingVisibleHexes": [],
+          "reason": null
+        }
+      ],
+      "recordedPreview": [],
+      "nextDecision": {
+        "accepted": true,
+        "afterPublicHash": "13cc40ce1a2f0c5e739a4177df82f2f84a76fe400d309768e9e616ad36bb8154",
+        "beforePublicHash": "45b9881e4d4afc5a124a83c6ae0c48b55c4b0a461f907bdbb73460fe9a4fa791",
+        "decision": 203,
+        "decisionHash": "2ecd58e82ab7dddf2abd958759a2587dc53e843b9e7b82a5f03a96c816ebd442",
+        "decisionSummary": "東の有効検問所を40,25(R15)へ前進し農場3を補給圏に回復。",
+        "error": null,
+        "events": [
+          {
+            "id": "event-2130",
+            "payload": {
+              "branchId": "east",
+              "checkpointId": "checkpoint-east-6",
+              "replacementId": "checkpoint-east-13"
+            },
+            "phase": "player",
+            "turn": 15,
+            "type": "checkpoint_remnant_created"
+          },
+          {
+            "id": "event-2131",
+            "payload": {
+              "branchId": "east",
+              "checkpointId": "checkpoint-east-13",
+              "civilianGoods": 25,
+              "sourceCheckpointId": "checkpoint-east-6",
+              "sourceRole": "remnant"
+            },
+            "phase": "player",
+            "turn": 15,
+            "type": "checkpoint_relocated"
+          },
+          {
+            "id": "event-2132",
+            "payload": {
+              "afterTileCount": 782,
+              "beforeTileCount": 673,
+              "branchId": "east",
+              "radius": 15,
+              "reason": "checkpoint_relocated"
+            },
+            "phase": "player",
+            "turn": 15,
+            "type": "supply_changed"
+          }
+        ],
+        "importantChanges": [
+          {
+            "category": "checkpoint",
+            "consequences": [
+              "branch_supply_radius:9->15",
+              "newly_supplied_hexes:109",
+              "newly_unsupplied_hexes:0",
+              "newly_supplied_facilities:1",
+              "newly_unsupplied_facilities:0"
+            ],
+            "entityIds": [
+              "checkpoint-east-13"
+            ],
+            "id": "checkpoint:checkpoint-east-13",
+            "reasonCodes": [
+              "checkpoint_role_changed"
+            ],
+            "relatedEventIds": [
+              "event-2130",
+              "event-2131"
+            ],
+            "relatedEventTypes": [
+              "checkpoint_relocated",
+              "checkpoint_remnant_created"
+            ],
+            "severity": "warning"
+          },
+          {
+            "category": "checkpoint",
+            "consequences": [
+              "branch_supply_radius:9->15",
+              "newly_supplied_hexes:109",
+              "newly_unsupplied_hexes:0",
+              "newly_supplied_facilities:1",
+              "newly_unsupplied_facilities:0"
+            ],
+            "entityIds": [
+              "checkpoint-east-6"
+            ],
+            "id": "checkpoint:checkpoint-east-6",
+            "reasonCodes": [
+              "checkpoint_role_changed"
+            ],
+            "relatedEventIds": [
+              "event-2130",
+              "event-2131"
+            ],
+            "relatedEventTypes": [
+              "checkpoint_relocated",
+              "checkpoint_remnant_created"
+            ],
+            "severity": "warning"
+          },
+          {
+            "category": "unit",
+            "consequences": [],
+            "entityIds": [
+              "national-guard-51"
+            ],
+            "id": "unit:national-guard-51",
+            "reasonCodes": [
+              "supply_restored"
+            ],
+            "relatedEventIds": [],
+            "relatedEventTypes": [],
+            "severity": "warning"
+          }
+        ],
+        "inputAction": {
+          "checkpointId": "checkpoint-east-6",
+          "position": {
+            "q": 40,
+            "r": 25
+          },
+          "type": "RelocateCheckpoint"
+        },
+        "phase": "player",
+        "playTurnStopDetails": {
+          "alertIds": [
+            "military_goods_supply_disconnected:national-guard-1,national-guard-43,police-4,recon-team-1"
+          ]
+        },
+        "playTurnStopReason": "new_crisis",
+        "previousDecisionHash": "1a6ed9b84bbe999722ae69340177536db287430de5a67e7a8faad91e31fa1ebd",
+        "publicPayload": {
+          "chunks": [
+            {
+              "compressedBytes": 42156,
+              "hash": "6f3999eb877cb0e42d6272fa9ea9c3b6bab233eaafc17dc2f3711a815eb34179"
+            },
+            {
+              "compressedBytes": 3916,
+              "hash": "b64b21456b2d4cbf34ce5238cbbd5c8f5aef5c565befbe2bd49566716bcdb43a"
+            }
+          ],
+          "compressedBytes": 46072,
+          "contentHash": "9a851085b5990b6a2a917b8c13b19db3add00fbf758ff0bfd0f50357c13b7f93",
+          "domain": "public",
+          "encoding": "canonical-json+gzip-chunks",
+          "logicalBytes": 1114853
+        },
+        "publicPayloadKind": "diff",
+        "requestedCommentLocale": "ja",
+        "requestHash": "e3e371abae2201595610cf243b2d277b238806d112350b03c096ad00d92cd685",
+        "requestId": "t15-ck-e",
+        "stateDelta": {
+          "afterTurn": 15,
+          "beforeTurn": 15,
+          "branchFlowChanges": [],
+          "checkpointRoleChanges": [
+            {
+              "after": "active",
+              "before": "unknown",
+              "checkpointId": "checkpoint-east-13"
+            },
+            {
+              "after": "remnant",
+              "before": "active",
+              "checkpointId": "checkpoint-east-6"
+            }
+          ],
+          "facilityChanges": [],
+          "lostEnemies": [],
+          "newlyInfectedSites": [],
+          "newlyRuinedSites": [],
+          "newlySpottedEnemies": [],
+          "unitHpChanges": [],
+          "unitSupplyChanges": []
+        },
+        "turn": 15
+      }
+    }
+  ],
+  "rejectedMoves": [
+    {
+      "decision": 276,
+      "turn": 24,
+      "action": {
+        "destination": {
+          "q": 39,
+          "r": 27
+        },
+        "type": "Move",
+        "unitId": "national-guard-74"
+      },
+      "error": {
+        "code": "out_of_range",
+        "message": "Inspect route with moverUnitId and destination for movement details and a possible alternative."
+      },
+      "positionBefore": {
+        "q": 32,
+        "r": 23
+      },
+      "alreadyAtDestination": false,
+      "recordedRouteQueries": []
+    },
+    {
+      "decision": 623,
+      "turn": 69,
+      "action": {
+        "destination": {
+          "q": 26,
+          "r": 35
+        },
+        "type": "Move",
+        "unitId": "national-guard-179"
+      },
+      "error": {
+        "code": "occupied_destination",
+        "message": "Destination is occupied"
+      },
+      "positionBefore": {
+        "q": 26,
+        "r": 35
+      },
+      "alreadyAtDestination": true,
+      "recordedRouteQueries": [
+        {
+          "ok": true,
+          "command": "play-turn",
+          "kind": "query-result",
+          "protocolVersion": "1.2.0",
+          "sessionId": "claude-0925-v166s4",
+          "revision": 622,
+          "target": "route",
+          "count": 1,
+          "total": 1,
+          "hasMore": false,
+          "nextCursor": null,
+          "value": {
+            "mode": "unit",
+            "moverUnitId": "national-guard-179",
+            "resolvedSource": {
+              "kind": "unit",
+              "id": "national-guard-179",
+              "position": {
+                "q": 26,
+                "r": 35
+              }
+            },
+            "resolvedDestination": {
+              "kind": "coordinate",
+              "id": null,
+              "position": {
+                "q": 26,
+                "r": 35
+              }
+            },
+            "terrainPathExists": true,
+            "routeAvailable": true,
+            "unavailableReason": null,
+            "destinationCenterReached": true,
+            "adjacentCandidates": [],
+            "pathLength": 0,
+            "terrainMovementCost": 0,
+            "effectiveMovementCost": 0,
+            "roadDistance": 0,
+            "roadRoles": [],
+            "branchIds": [],
+            "hasOffRoadSegments": false,
+            "offRoadDistance": 0,
+            "startsAtStrategicNode": false,
+            "endsAtStrategicNode": false,
+            "currentSingleAction": {
+              "reachable": true,
+              "actionRequired": false,
+              "reason": "already_at_destination",
+              "movementMode": null,
+              "movementBudget": null,
+              "effectiveMovementCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44
+            },
+            "movementDetail": {
+              "legal": false,
+              "reason": "out_of_range",
+              "movementMode": "normal",
+              "movementBudget": 10,
+              "effectiveMovementCost": 0,
+              "plannedFuelCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44,
+              "destination": {
+                "q": 26,
+                "r": 35
+              },
+              "preview": null
+            },
+            "alternative": null,
+            "alternativeReason": "not_needed",
+            "publicMovementConditions": {
+              "publiclyOccupiedHexesConsidered": 72,
+              "visibleBarbedWireHexesEntered": 0
+            },
+            "strategicNodes": {
+              "included": true,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "supplyTransitions": {
+              "included": true,
+              "items": [
+                {
+                  "pathIndex": 0,
+                  "position": {
+                    "q": 26,
+                    "r": 35
+                  },
+                  "inSupply": true
+                }
+              ],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "hexPath": {
+              "included": false,
+              "items": [],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 1,
+              "omittedBefore": 0,
+              "omittedAfter": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "decision": 632,
+      "turn": 69,
+      "action": {
+        "destination": {
+          "q": 26,
+          "r": 12
+        },
+        "type": "Move",
+        "unitId": "national-guard-189"
+      },
+      "error": {
+        "code": "occupied_destination",
+        "message": "Destination is occupied"
+      },
+      "positionBefore": {
+        "q": 26,
+        "r": 12
+      },
+      "alreadyAtDestination": true,
+      "recordedRouteQueries": [
+        {
+          "ok": true,
+          "command": "play-turn",
+          "kind": "query-result",
+          "protocolVersion": "1.2.0",
+          "sessionId": "claude-0925-v166s4",
+          "revision": 631,
+          "target": "route",
+          "count": 1,
+          "total": 1,
+          "hasMore": false,
+          "nextCursor": null,
+          "value": {
+            "mode": "unit",
+            "moverUnitId": "national-guard-189",
+            "resolvedSource": {
+              "kind": "unit",
+              "id": "national-guard-189",
+              "position": {
+                "q": 26,
+                "r": 12
+              }
+            },
+            "resolvedDestination": {
+              "kind": "coordinate",
+              "id": null,
+              "position": {
+                "q": 26,
+                "r": 12
+              }
+            },
+            "terrainPathExists": true,
+            "routeAvailable": true,
+            "unavailableReason": null,
+            "destinationCenterReached": true,
+            "adjacentCandidates": [],
+            "pathLength": 0,
+            "terrainMovementCost": 0,
+            "effectiveMovementCost": 0,
+            "roadDistance": 0,
+            "roadRoles": [],
+            "branchIds": [],
+            "hasOffRoadSegments": false,
+            "offRoadDistance": 0,
+            "startsAtStrategicNode": false,
+            "endsAtStrategicNode": false,
+            "currentSingleAction": {
+              "reachable": true,
+              "actionRequired": false,
+              "reason": "already_at_destination",
+              "movementMode": null,
+              "movementBudget": null,
+              "effectiveMovementCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44
+            },
+            "movementDetail": {
+              "legal": false,
+              "reason": "out_of_range",
+              "movementMode": "normal",
+              "movementBudget": 10,
+              "effectiveMovementCost": 0,
+              "plannedFuelCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44,
+              "destination": {
+                "q": 26,
+                "r": 12
+              },
+              "preview": null
+            },
+            "alternative": null,
+            "alternativeReason": "not_needed",
+            "publicMovementConditions": {
+              "publiclyOccupiedHexesConsidered": 72,
+              "visibleBarbedWireHexesEntered": 0
+            },
+            "strategicNodes": {
+              "included": true,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "supplyTransitions": {
+              "included": true,
+              "items": [
+                {
+                  "pathIndex": 0,
+                  "position": {
+                    "q": 26,
+                    "r": 12
+                  },
+                  "inSupply": true
+                }
+              ],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "hexPath": {
+              "included": false,
+              "items": [],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 1,
+              "omittedBefore": 0,
+              "omittedAfter": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "decision": 636,
+      "turn": 69,
+      "action": {
+        "destination": {
+          "q": 24,
+          "r": 13
+        },
+        "type": "Move",
+        "unitId": "national-guard-193"
+      },
+      "error": {
+        "code": "occupied_destination",
+        "message": "Destination is occupied"
+      },
+      "positionBefore": {
+        "q": 24,
+        "r": 13
+      },
+      "alreadyAtDestination": true,
+      "recordedRouteQueries": [
+        {
+          "ok": true,
+          "command": "play-turn",
+          "kind": "query-result",
+          "protocolVersion": "1.2.0",
+          "sessionId": "claude-0925-v166s4",
+          "revision": 635,
+          "target": "route",
+          "count": 1,
+          "total": 1,
+          "hasMore": false,
+          "nextCursor": null,
+          "value": {
+            "mode": "unit",
+            "moverUnitId": "national-guard-193",
+            "resolvedSource": {
+              "kind": "unit",
+              "id": "national-guard-193",
+              "position": {
+                "q": 24,
+                "r": 13
+              }
+            },
+            "resolvedDestination": {
+              "kind": "coordinate",
+              "id": null,
+              "position": {
+                "q": 24,
+                "r": 13
+              }
+            },
+            "terrainPathExists": true,
+            "routeAvailable": true,
+            "unavailableReason": null,
+            "destinationCenterReached": true,
+            "adjacentCandidates": [],
+            "pathLength": 0,
+            "terrainMovementCost": 0,
+            "effectiveMovementCost": 0,
+            "roadDistance": 0,
+            "roadRoles": [],
+            "branchIds": [],
+            "hasOffRoadSegments": false,
+            "offRoadDistance": 0,
+            "startsAtStrategicNode": false,
+            "endsAtStrategicNode": false,
+            "currentSingleAction": {
+              "reachable": true,
+              "actionRequired": false,
+              "reason": "already_at_destination",
+              "movementMode": null,
+              "movementBudget": null,
+              "effectiveMovementCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44
+            },
+            "movementDetail": {
+              "legal": false,
+              "reason": "out_of_range",
+              "movementMode": "normal",
+              "movementBudget": 10,
+              "effectiveMovementCost": 0,
+              "plannedFuelCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44,
+              "destination": {
+                "q": 24,
+                "r": 13
+              },
+              "preview": null
+            },
+            "alternative": null,
+            "alternativeReason": "not_needed",
+            "publicMovementConditions": {
+              "publiclyOccupiedHexesConsidered": 72,
+              "visibleBarbedWireHexesEntered": 0
+            },
+            "strategicNodes": {
+              "included": true,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "supplyTransitions": {
+              "included": true,
+              "items": [
+                {
+                  "pathIndex": 0,
+                  "position": {
+                    "q": 24,
+                    "r": 13
+                  },
+                  "inSupply": true
+                }
+              ],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "hexPath": {
+              "included": false,
+              "items": [],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 1,
+              "omittedBefore": 0,
+              "omittedAfter": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "decision": 638,
+      "turn": 69,
+      "action": {
+        "destination": {
+          "q": 24,
+          "r": 35
+        },
+        "type": "Move",
+        "unitId": "national-guard-195"
+      },
+      "error": {
+        "code": "occupied_destination",
+        "message": "Destination is occupied"
+      },
+      "positionBefore": {
+        "q": 24,
+        "r": 35
+      },
+      "alreadyAtDestination": true,
+      "recordedRouteQueries": [
+        {
+          "ok": true,
+          "command": "play-turn",
+          "kind": "query-result",
+          "protocolVersion": "1.2.0",
+          "sessionId": "claude-0925-v166s4",
+          "revision": 637,
+          "target": "route",
+          "count": 1,
+          "total": 1,
+          "hasMore": false,
+          "nextCursor": null,
+          "value": {
+            "mode": "unit",
+            "moverUnitId": "national-guard-195",
+            "resolvedSource": {
+              "kind": "unit",
+              "id": "national-guard-195",
+              "position": {
+                "q": 24,
+                "r": 35
+              }
+            },
+            "resolvedDestination": {
+              "kind": "coordinate",
+              "id": null,
+              "position": {
+                "q": 24,
+                "r": 35
+              }
+            },
+            "terrainPathExists": true,
+            "routeAvailable": true,
+            "unavailableReason": null,
+            "destinationCenterReached": true,
+            "adjacentCandidates": [],
+            "pathLength": 0,
+            "terrainMovementCost": 0,
+            "effectiveMovementCost": 0,
+            "roadDistance": 0,
+            "roadRoles": [],
+            "branchIds": [],
+            "hasOffRoadSegments": false,
+            "offRoadDistance": 0,
+            "startsAtStrategicNode": false,
+            "endsAtStrategicNode": false,
+            "currentSingleAction": {
+              "reachable": true,
+              "actionRequired": false,
+              "reason": "already_at_destination",
+              "movementMode": null,
+              "movementBudget": null,
+              "effectiveMovementCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44
+            },
+            "movementDetail": {
+              "legal": false,
+              "reason": "out_of_range",
+              "movementMode": "normal",
+              "movementBudget": 10,
+              "effectiveMovementCost": 0,
+              "plannedFuelCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44,
+              "destination": {
+                "q": 24,
+                "r": 35
+              },
+              "preview": null
+            },
+            "alternative": null,
+            "alternativeReason": "not_needed",
+            "publicMovementConditions": {
+              "publiclyOccupiedHexesConsidered": 72,
+              "visibleBarbedWireHexesEntered": 0
+            },
+            "strategicNodes": {
+              "included": true,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "supplyTransitions": {
+              "included": true,
+              "items": [
+                {
+                  "pathIndex": 0,
+                  "position": {
+                    "q": 24,
+                    "r": 35
+                  },
+                  "inSupply": true
+                }
+              ],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "hexPath": {
+              "included": false,
+              "items": [],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 1,
+              "omittedBefore": 0,
+              "omittedAfter": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "decision": 640,
+      "turn": 69,
+      "action": {
+        "destination": {
+          "q": 36,
+          "r": 24
+        },
+        "type": "Move",
+        "unitId": "national-guard-198"
+      },
+      "error": {
+        "code": "occupied_destination",
+        "message": "Destination is occupied"
+      },
+      "positionBefore": {
+        "q": 36,
+        "r": 24
+      },
+      "alreadyAtDestination": true,
+      "recordedRouteQueries": [
+        {
+          "ok": true,
+          "command": "play-turn",
+          "kind": "query-result",
+          "protocolVersion": "1.2.0",
+          "sessionId": "claude-0925-v166s4",
+          "revision": 639,
+          "target": "route",
+          "count": 1,
+          "total": 1,
+          "hasMore": false,
+          "nextCursor": null,
+          "value": {
+            "mode": "unit",
+            "moverUnitId": "national-guard-197",
+            "resolvedSource": {
+              "kind": "unit",
+              "id": "national-guard-197",
+              "position": {
+                "q": 25,
+                "r": 13
+              }
+            },
+            "resolvedDestination": {
+              "kind": "coordinate",
+              "id": null,
+              "position": {
+                "q": 25,
+                "r": 12
+              }
+            },
+            "terrainPathExists": true,
+            "routeAvailable": false,
+            "unavailableReason": "destination_publicly_occupied",
+            "destinationCenterReached": false,
+            "adjacentCandidates": [],
+            "pathLength": null,
+            "terrainMovementCost": 1,
+            "effectiveMovementCost": null,
+            "roadDistance": null,
+            "roadRoles": [],
+            "branchIds": [],
+            "hasOffRoadSegments": false,
+            "offRoadDistance": null,
+            "startsAtStrategicNode": true,
+            "endsAtStrategicNode": false,
+            "currentSingleAction": {
+              "reachable": false,
+              "actionRequired": true,
+              "reason": "occupied_destination",
+              "movementMode": null,
+              "movementBudget": null,
+              "effectiveMovementCost": null,
+              "fuelCost": null,
+              "projectedFuelAfterMove": null
+            },
+            "movementDetail": null,
+            "alternative": null,
+            "alternativeReason": "no_closer_uninterrupted_public_move",
+            "publicMovementConditions": {
+              "publiclyOccupiedHexesConsidered": 72,
+              "visibleBarbedWireHexesEntered": 0
+            },
+            "strategicNodes": {
+              "included": true,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "supplyTransitions": {
+              "included": true,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "hexPath": {
+              "included": false,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            }
+          }
+        },
+        {
+          "ok": true,
+          "command": "play-turn",
+          "kind": "query-result",
+          "protocolVersion": "1.2.0",
+          "sessionId": "claude-0925-v166s4",
+          "revision": 639,
+          "target": "route",
+          "count": 1,
+          "total": 1,
+          "hasMore": false,
+          "nextCursor": null,
+          "value": {
+            "mode": "unit",
+            "moverUnitId": "national-guard-198",
+            "resolvedSource": {
+              "kind": "unit",
+              "id": "national-guard-198",
+              "position": {
+                "q": 36,
+                "r": 24
+              }
+            },
+            "resolvedDestination": {
+              "kind": "coordinate",
+              "id": null,
+              "position": {
+                "q": 36,
+                "r": 24
+              }
+            },
+            "terrainPathExists": true,
+            "routeAvailable": true,
+            "unavailableReason": null,
+            "destinationCenterReached": true,
+            "adjacentCandidates": [],
+            "pathLength": 0,
+            "terrainMovementCost": 0,
+            "effectiveMovementCost": 0,
+            "roadDistance": 0,
+            "roadRoles": [],
+            "branchIds": [],
+            "hasOffRoadSegments": false,
+            "offRoadDistance": 0,
+            "startsAtStrategicNode": false,
+            "endsAtStrategicNode": false,
+            "currentSingleAction": {
+              "reachable": true,
+              "actionRequired": false,
+              "reason": "already_at_destination",
+              "movementMode": null,
+              "movementBudget": null,
+              "effectiveMovementCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44
+            },
+            "movementDetail": {
+              "legal": false,
+              "reason": "out_of_range",
+              "movementMode": "normal",
+              "movementBudget": 10,
+              "effectiveMovementCost": 0,
+              "plannedFuelCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44,
+              "destination": {
+                "q": 36,
+                "r": 24
+              },
+              "preview": null
+            },
+            "alternative": null,
+            "alternativeReason": "not_needed",
+            "publicMovementConditions": {
+              "publiclyOccupiedHexesConsidered": 72,
+              "visibleBarbedWireHexesEntered": 0
+            },
+            "strategicNodes": {
+              "included": true,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "supplyTransitions": {
+              "included": true,
+              "items": [
+                {
+                  "pathIndex": 0,
+                  "position": {
+                    "q": 36,
+                    "r": 24
+                  },
+                  "inSupply": true
+                }
+              ],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "hexPath": {
+              "included": false,
+              "items": [],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 1,
+              "omittedBefore": 0,
+              "omittedAfter": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "decision": 643,
+      "turn": 69,
+      "action": {
+        "destination": {
+          "q": 27,
+          "r": 13
+        },
+        "type": "Move",
+        "unitId": "national-guard-201"
+      },
+      "error": {
+        "code": "occupied_destination",
+        "message": "Destination is occupied"
+      },
+      "positionBefore": {
+        "q": 27,
+        "r": 13
+      },
+      "alreadyAtDestination": true,
+      "recordedRouteQueries": [
+        {
+          "ok": true,
+          "command": "play-turn",
+          "kind": "query-result",
+          "protocolVersion": "1.2.0",
+          "sessionId": "claude-0925-v166s4",
+          "revision": 642,
+          "target": "route",
+          "count": 1,
+          "total": 1,
+          "hasMore": false,
+          "nextCursor": null,
+          "value": {
+            "mode": "unit",
+            "moverUnitId": "national-guard-201",
+            "resolvedSource": {
+              "kind": "unit",
+              "id": "national-guard-201",
+              "position": {
+                "q": 27,
+                "r": 13
+              }
+            },
+            "resolvedDestination": {
+              "kind": "coordinate",
+              "id": null,
+              "position": {
+                "q": 27,
+                "r": 13
+              }
+            },
+            "terrainPathExists": true,
+            "routeAvailable": true,
+            "unavailableReason": null,
+            "destinationCenterReached": true,
+            "adjacentCandidates": [],
+            "pathLength": 0,
+            "terrainMovementCost": 0,
+            "effectiveMovementCost": 0,
+            "roadDistance": 0,
+            "roadRoles": [],
+            "branchIds": [],
+            "hasOffRoadSegments": false,
+            "offRoadDistance": 0,
+            "startsAtStrategicNode": false,
+            "endsAtStrategicNode": false,
+            "currentSingleAction": {
+              "reachable": true,
+              "actionRequired": false,
+              "reason": "already_at_destination",
+              "movementMode": null,
+              "movementBudget": null,
+              "effectiveMovementCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44
+            },
+            "movementDetail": {
+              "legal": false,
+              "reason": "out_of_range",
+              "movementMode": "normal",
+              "movementBudget": 10,
+              "effectiveMovementCost": 0,
+              "plannedFuelCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44,
+              "destination": {
+                "q": 27,
+                "r": 13
+              },
+              "preview": null
+            },
+            "alternative": null,
+            "alternativeReason": "not_needed",
+            "publicMovementConditions": {
+              "publiclyOccupiedHexesConsidered": 72,
+              "visibleBarbedWireHexesEntered": 0
+            },
+            "strategicNodes": {
+              "included": true,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "supplyTransitions": {
+              "included": true,
+              "items": [
+                {
+                  "pathIndex": 0,
+                  "position": {
+                    "q": 27,
+                    "r": 13
+                  },
+                  "inSupply": true
+                }
+              ],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "hexPath": {
+              "included": false,
+              "items": [],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 1,
+              "omittedBefore": 0,
+              "omittedAfter": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "decision": 646,
+      "turn": 69,
+      "action": {
+        "destination": {
+          "q": 17,
+          "r": 25
+        },
+        "type": "Move",
+        "unitId": "national-guard-204"
+      },
+      "error": {
+        "code": "occupied_destination",
+        "message": "Destination is occupied"
+      },
+      "positionBefore": {
+        "q": 17,
+        "r": 25
+      },
+      "alreadyAtDestination": true,
+      "recordedRouteQueries": [
+        {
+          "ok": true,
+          "command": "play-turn",
+          "kind": "query-result",
+          "protocolVersion": "1.2.0",
+          "sessionId": "claude-0925-v166s4",
+          "revision": 645,
+          "target": "route",
+          "count": 1,
+          "total": 1,
+          "hasMore": false,
+          "nextCursor": null,
+          "value": {
+            "mode": "unit",
+            "moverUnitId": "national-guard-204",
+            "resolvedSource": {
+              "kind": "unit",
+              "id": "national-guard-204",
+              "position": {
+                "q": 17,
+                "r": 25
+              }
+            },
+            "resolvedDestination": {
+              "kind": "coordinate",
+              "id": null,
+              "position": {
+                "q": 17,
+                "r": 25
+              }
+            },
+            "terrainPathExists": true,
+            "routeAvailable": true,
+            "unavailableReason": null,
+            "destinationCenterReached": true,
+            "adjacentCandidates": [],
+            "pathLength": 0,
+            "terrainMovementCost": 0,
+            "effectiveMovementCost": 0,
+            "roadDistance": 0,
+            "roadRoles": [],
+            "branchIds": [],
+            "hasOffRoadSegments": false,
+            "offRoadDistance": 0,
+            "startsAtStrategicNode": false,
+            "endsAtStrategicNode": false,
+            "currentSingleAction": {
+              "reachable": true,
+              "actionRequired": false,
+              "reason": "already_at_destination",
+              "movementMode": null,
+              "movementBudget": null,
+              "effectiveMovementCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44
+            },
+            "movementDetail": {
+              "legal": false,
+              "reason": "out_of_range",
+              "movementMode": "normal",
+              "movementBudget": 10,
+              "effectiveMovementCost": 0,
+              "plannedFuelCost": 0,
+              "fuelCost": 0,
+              "projectedFuelAfterMove": 44,
+              "destination": {
+                "q": 17,
+                "r": 25
+              },
+              "preview": null
+            },
+            "alternative": null,
+            "alternativeReason": "not_needed",
+            "publicMovementConditions": {
+              "publiclyOccupiedHexesConsidered": 72,
+              "visibleBarbedWireHexesEntered": 0
+            },
+            "strategicNodes": {
+              "included": true,
+              "items": [],
+              "totalCount": 0,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "supplyTransitions": {
+              "included": true,
+              "items": [
+                {
+                  "pathIndex": 0,
+                  "position": {
+                    "q": 17,
+                    "r": 25
+                  },
+                  "inSupply": true
+                }
+              ],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 0,
+              "omittedBefore": 0,
+              "omittedAfter": 0
+            },
+            "hexPath": {
+              "included": false,
+              "items": [],
+              "totalCount": 1,
+              "offset": 0,
+              "limit": 100,
+              "hasMore": false,
+              "omittedCount": 1,
+              "omittedBefore": 0,
+              "omittedAfter": 1
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

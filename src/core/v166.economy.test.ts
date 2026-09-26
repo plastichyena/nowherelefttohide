@@ -39,11 +39,11 @@ describe('v1.6.6 production allocation', () => {
   it.each([[100, 80, 0, 20], [0, 0, 100, 0], [100, 80, 80, 100], [79, 80, 0, 0]])(
     'reserves maintenance F=%i M=%i P=%i, allowing %i input', (food, maintenance, produced, input) => {
       const { state, center } = fixture(); state.resources.food = food;
-      state.population.unitPopulation = maintenance - 5;
+      state.population.unitPopulation = 0; // This reservation fixture uses civilians; military Food2 is covered in v167.core.
       state.config.economy.populationConsumption.food = 1;
       const farm = state.facilities.find(f => f.type === 'farm')!;
       farm.workers = produced / 10; farm.powerSupplyEnabled = true;
-      state.population.unitPopulation -= farm.workers;
+      state.facilities.find(f => f.type === 'capital')!.workers = Math.max(0, maintenance - center.workers - farm.workers);
       expect(projection(state, center.id).inputs.food ?? 0).toBe(input);
     });
 
@@ -73,7 +73,7 @@ describe('v1.6.6 production allocation', () => {
     expect(projection(state, military.id).operatingWorkers).toBe(0);
     state.resources.civilianGoods = 300;
     expect(projection(state, military.id).inputs.civilianGoods).toBe(300);
-    expect(projection(state, military.id).outputs.militaryGoods).toBe(120);
+    expect(projection(state, military.id).outputs.militaryGoods).toBe(90);
     for (const [stock, workers] of [[9, 0], [10, 1], [29, 2], [30, 3]]) {
       state.resources.civilianGoods = stock;
       expect(projection(state, military.id).operatingWorkers).toBe(workers);

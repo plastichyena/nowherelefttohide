@@ -50,8 +50,8 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     const police = state.units.find((unit) => unit.type === 'police')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
 
-    expect(state.gameVersion).toBe('16.0.0');
-    expect(config.version).toBe('16.0.0');
+    expect(state.gameVersion).toBe('17.0.0');
+    expect(config.version).toBe('17.0.0');
     expect(police).toMatchObject({
       proficiency: 'regular', recruitSurvivalTurns: 0, regularZombieKills: 0,
       veteranPromotionPending: false, attack: 8, maxAttackCharges: 1, attackChargesRemaining: 1,
@@ -85,7 +85,7 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
       movementNoiseRadius: 8,
     });
     expect(config.horde.waves.map((wave) => [wave.turn, wave.compositionPerDirection.hordeZombie, wave.compositionPerDirection.zombie]))
-      .toEqual([[10, 5, 4], [20, 3, 6], [35, 8, 9], [50, 5, 9], [70, 8, 10]]);
+      .toEqual([[10, 5, 5], [20, 3, 8], [35, 8, 11], [50, 5, 11], [70, 8, 12]]);
   });
 
   it('promotes a surviving Recruit at Player Turn Start with ceiling-rounded Regular attack', () => {

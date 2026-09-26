@@ -55,6 +55,14 @@ export function validateInvariants(state: GameState): InvariantResult {
   if (!Array.isArray(state.pendingUnitProductions)) {
     errors.push('State pending queues must be arrays');
   }
+  for (const unit of state.units) {
+    if (typeof unit.pursuitTargetLastPhase !== 'boolean'
+      || ![0, state.config.zombiePursuitMovementBonus].includes(unit.pursuitMovementBonus)
+      || (!unit.pursuitTargetLastPhase && unit.pursuitMovementBonus !== 0)
+      || (unit.isPlayerUnit && (unit.pursuitTargetLastPhase || unit.pursuitMovementBonus !== 0))) {
+      errors.push(`Invalid zombie pursuit state: ${unit.id}`);
+    }
+  }
   const config = validateGameConfig(state.config);
   for (const type of HUMAN_UNIT_TYPES) {
     const completed = state.completedProductions?.[type];

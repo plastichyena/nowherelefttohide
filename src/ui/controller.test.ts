@@ -61,8 +61,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.6.6');
-    expect(titleVersionLabel('en')).toContain('1.6.6');
+    expect(titleVersionLabel('ja')).toContain('1.6.7');
+    expect(titleVersionLabel('en')).toContain('1.6.7');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -309,26 +309,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.6.5-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.6.6-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.5以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.6');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.6以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.7');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.5 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.6');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.6 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.7');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 16.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 23');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 16.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 23');
+    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 17.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('Save Format 24');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 17.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 24');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.5以前' : 'v1.6.5-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6-or-earlier');
     }
   });
 

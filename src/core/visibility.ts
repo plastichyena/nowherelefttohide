@@ -167,13 +167,14 @@ export function getCheckpointRouteVisibility(
   branchId: string,
   target: HexCoord,
   visibleTileKeys: ReadonlySet<string> = getPlayerVisibleTileKeys(state),
-): { targetVisible: boolean; routeVisible: boolean } {
+): { targetVisible: boolean; routeVisible: boolean; missingVisibleHexes: HexCoord[] } {
   const branch = state.map.roadBranches.find((candidate) => candidate.id === branchId);
   const targetIndex = branch?.roadTiles.findIndex((tile) => hexKey(tile) === hexKey(target)) ?? -1;
-  if (!branch || targetIndex < 0) return { targetVisible: false, routeVisible: false };
+  if (!branch || targetIndex < 0) return { targetVisible: false, routeVisible: false, missingVisibleHexes: [] };
   const targetVisible = visibleTileKeys.has(hexKey(target));
   return {
     targetVisible,
+    missingVisibleHexes: branch.roadTiles.slice(0, targetIndex + 1).filter(tile => !visibleTileKeys.has(hexKey(tile))).map(({ q, r }) => ({ q, r })),
     routeVisible: targetVisible && branch.roadTiles
       .slice(0, targetIndex + 1)
       .every((tile) => visibleTileKeys.has(hexKey(tile))),

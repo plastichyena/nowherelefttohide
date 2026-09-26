@@ -108,13 +108,13 @@ describe('v1.5.2 production capacity and economy plan', () => {
     expect(plan.facilities.find(f => f.facilityId === 'military-factory-1')!.inputs).toEqual({ civilianGoods: 50 });
     expect(plan.facilities.find(f => f.facilityId === 'military-factory-2')!.inputs).toEqual({ civilianGoods: 20 });
     const capacity = forecastProductionCapacity(state);
-    expect(capacity.resources.militaryGoods).toMatchObject({ installedFacilityRatedCapacity: 240,
-      currentFacilityWorkerRatedCapacity: 40, projectedEndTurnOutput: 28, currentPlanPrePowerOutput: 28, ratedGapUpperBound: 212 });
+    expect(capacity.resources.militaryGoods).toMatchObject({ installedFacilityRatedCapacity: 180,
+      currentFacilityWorkerRatedCapacity: 30, projectedEndTurnOutput: 21, currentPlanPrePowerOutput: 21, ratedGapUpperBound: 159 });
     expect(capacity.resources.militaryGoods.blockingReasonCounts.production_input_shortage).toBe(1);
     facility(state, 'military-factory-1').powerSupplyEnabled = false;
     const changed = calculateEconomyPlan(state);
     expect(changed.facilities.find(f => f.facilityId === 'military-factory-2')!.inputs).toEqual({ civilianGoods: 50 });
-    expect(forecastProductionCapacity(state).resources.militaryGoods.projectedEndTurnOutput).toBe(20);
+    expect(forecastProductionCapacity(state).resources.militaryGoods.projectedEndTurnOutput).toBe(15);
   });
 
   it('keeps Fuel generation/refill limited to starting stock and does not pre-spend Refinery output', () => {

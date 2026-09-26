@@ -231,7 +231,9 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
     state.population.unitPopulation,
   ) + checkpointHealthyConsumers;
   const overcrowding = overcrowdingTerms(state);
-  const normalFood = consumers * state.config.economy.populationConsumption.food;
+  const civilianFood = (consumers - state.population.unitPopulation) * state.config.economy.populationConsumption.food;
+  const militaryFood = state.population.unitPopulation * state.config.economy.unitFoodConsumption;
+  const normalFood = civilianFood + militaryFood;
   const normalCivilian = consumers * state.config.economy.populationConsumption.civilianGoods;
   const overcrowdingFood = overcrowding.reduce((n, t) => n + Math.ceil(t.excess * state.config.economy.populationConsumption.food * 0.50), 0);
   const overcrowdingCivilian = overcrowding.reduce((n, t) => n + Math.ceil(t.excess * state.config.economy.populationConsumption.civilianGoods * (1 + t.excess / t.softCap)), 0);
@@ -462,7 +464,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
       projectedPowerRequested = false;
       projectedPowerReason = 'not_eligible';
     } else if (powerMode === 'required' && toggleable && !facility.powerSupplyEnabled) projectedPowerReason = 'power_supply_off';
-    else if (!eligibleForPower && powerMode !== 'none') projectedPowerReason = facility.workers <= 0 ? 'no_population' : 'not_eligible';
+    else if (!eligibleForPower && powerMode !== 'none') projectedPowerReason = facility.owner === 'player' && facility.workers <= 0 ? 'no_population' : 'not_eligible';
     else if (inputFacilities.includes(facility) && canProduce(facility) && (inputWorkers.get(facility.id) ?? 0) === 0) {
       projectedPowerReason = 'production_input_unavailable';
       projectedPowerRequested = false;
@@ -645,7 +647,7 @@ function computeEconomyPlan(state: Readonly<GameState>): EconomyPlan {
         queue: { waiting: state.checkpoints.reduce((n, c) => n + c.waiting, 0), screening: state.checkpoints.reduce((n, c) => n + c.screening, 0), approved: state.checkpoints.reduce((n, c) => n + c.approved, 0) },
       },
       maintenanceBreakdown: {
-        food: { base: normalFood, overcrowding: overcrowdingFood, housingOutage: housingOutageFood, total: maintenance.food },
+        food: { civilians: civilianFood, military: militaryFood, base: normalFood, overcrowding: overcrowdingFood, housingOutage: housingOutageFood, total: maintenance.food },
         civilianGoods: { base: normalCivilian, overcrowding: overcrowdingCivilian, housingOutage: housingOutageCivilian, total: maintenance.civilianGoods },
       },
       housingOutage: {

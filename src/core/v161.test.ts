@@ -59,9 +59,9 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
       checkpoint: CHECKPOINT_SCHEMA_VERSION,
       map: FIXED_MAP_ID,
     }).toEqual({
-      app: '1.6.6', rules: '16.0.0', save: 23, publicSave: '23',
-      agent: '21.0.0', observation: '21.0.0', bridge: '21.0.0', artifact: '20.0.0',
-      session: '17.0.0', checkpoint: '17.0.0', map: 'fixed-51x51-v9',
+      app: '1.6.7', rules: '17.0.0', save: 24, publicSave: '24',
+      agent: '22.0.0', observation: '22.0.0', bridge: '22.0.0', artifact: '21.0.0',
+      session: '18.0.0', checkpoint: '18.0.0', map: 'fixed-51x51-v9',
     });
   });
 

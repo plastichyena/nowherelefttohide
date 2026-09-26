@@ -30,7 +30,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '16.0.0';
+export const GAME_VERSION = '17.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -172,6 +172,8 @@ export function createUnit(
     fallbackTarget: null,
     waveCapitalAnchor: null,
     noiseTarget: null,
+    pursuitTargetLastPhase: false,
+    pursuitMovementBonus: 0,
     spawnGroupId: null,
     hordeKind: null,
     hasScreamed: false,

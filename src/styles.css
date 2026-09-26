@@ -635,6 +635,7 @@ button.crisis-alert:hover, button.crisis-alert:focus-visible { border-color: #ff
 .live-ai-board canvas { display: block; width: 100%; height: 100%; touch-action: pan-x pan-y pinch-zoom; }
 .live-ai-current, .live-ai-result, .live-ai-panel details { margin-top: .5rem; padding: .5rem; border-radius: .35rem; background: #0b1220; overflow-wrap: anywhere; }
 .live-ai-result { max-height: 11rem; overflow: auto; white-space: pre-wrap; font-size: 11px; }
+.live-ai-diagnostics { white-space: pre-wrap; overflow-wrap: anywhere; }
 .live-ai-log { padding-inline-start: 1.5rem; }
 .live-ai-decision { margin-block: .4rem; }
 .live-ai-decision p { margin: .2rem 0; white-space: pre-wrap; }

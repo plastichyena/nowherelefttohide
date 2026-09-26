@@ -34,7 +34,7 @@ describe('v1.4.2 economy and required power grid', () => {
     });
     // Five electricity requires two Fuel and only actually allocated capacity burns it.
     expect(forecast.fuel).toMatchObject({ generationFuelDemand: 32, projectedFuelUsed: 12 });
-    expect(forecast.food).toMatchObject({ projectedProduction: 230, maintenanceRequired: 115, shortage: 0 });
+    expect(forecast.food).toMatchObject({ projectedProduction: 230, maintenanceRequired: 130, shortage: 0 });
     expect(forecast.civilianGoods.projectedProduction).toBe(41);
   });
 
@@ -85,7 +85,7 @@ describe('v1.4.2 economy and required power grid', () => {
     expect(engine.step({ type: 'LoadSnapshot', snapshot: withStock }).error).toBeNull();
     const partial = forecastEndTurn(engine.getState());
     expect(partial.civilianGoods.productionInputAllocated).toBe(10);
-    expect(partial.militaryGoods.projectedProduction).toBe(4);
+    expect(partial.militaryGoods.projectedProduction).toBe(3);
   });
 
   it('allocates required cities, then Farm/Civilian Factory, then input-ready Military Factory', () => {

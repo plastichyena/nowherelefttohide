@@ -358,6 +358,10 @@ export interface UnitState {
   waveCapitalAnchor: HexCoord | null;
   /** Internal-only remembered combat-noise coordinate for a normal Zombie. */
   noiseTarget: HexCoord | null;
+  /** Private continuity memory. */
+  pursuitTargetLastPhase: boolean;
+  /** Applied bonus in the latest eligible Zombie Phase, not a prediction. */
+  pursuitMovementBonus: number;
   /** Identifies periodic/final Horde membership without exposing it through public APIs. */
   spawnGroupId: string | null;
   hordeKind: 'periodic' | 'final' | null;
@@ -394,6 +398,7 @@ export interface CheckpointState {
 }
 
 export interface CheckpointPositionCandidate {
+  routeVisibility?: { targetVisible: boolean; routeVisible: boolean; missingVisibleHexes: HexCoord[] };
   blockingEnemyIds?: string[];
   actionType: 'BuildCheckpoint' | 'RelocateCheckpoint' | 'ActivateCheckpoint';
   branchId: string;
@@ -957,7 +962,7 @@ export interface EndTurnForecast {
   housingOutage: HousingOutageForecast;
   populationConsumers: number;
   maintenancePopulation: { residents: number; workers: number; units: number; queue: { waiting: number; screening: number; approved: number } };
-  maintenanceBreakdown: { food: { base: number; overcrowding: number; housingOutage: number; total: number }; civilianGoods: { base: number; overcrowding: number; housingOutage: number; total: number } };
+  maintenanceBreakdown: { food: { civilians: number; military: number; base: number; overcrowding: number; housingOutage: number; total: number }; civilianGoods: { base: number; overcrowding: number; housingOutage: number; total: number } };
 
   overcrowding: {
     /** Exact sum represented as per-city rational terms. */
@@ -1449,6 +1454,7 @@ export interface CheckpointConfig {
 }
 
 export interface EconomyConfig {
+  unitFoodConsumption: number;
   initialHunterCount: { min: number; max: number };
   initialHunterMinDistance: number;
   initialGasCount: { min: number; max: number };
@@ -1494,6 +1500,7 @@ export interface NaturalRecoveryConfig {
 }
 
 export interface GameConfig {
+  zombiePursuitMovementBonus: number;
   objectives: Record<'nuclearPowerPlant' | 'airBase', { rewardDeadlineTurn: number; requiresHealthySurvivors: boolean; failureOnUncapturedFall: boolean; rewardUnitType: 'specialForces'; failureUnitType: 'packZombie' }>;
   militaryDrone: { fuelPerHex: number; visionRadius: number; durationTurns: number };
   windPower: { noiseRadius: number };
