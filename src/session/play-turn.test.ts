@@ -91,6 +91,24 @@ function factory(counter?: { restores: number }): SessionGameFactory {
 function service(path: string, counter?: { restores: number }): SessionService { return new SessionService(new SessionStore(path), factory(counter), identity); }
 
 describe('play-turn protocol', () => {
+  it('answers resident status without a decision and invalidates cache after an independent writer',()=>{
+    const path=root('status-generation');service(path).newSession({sessionId:'game'});
+    const counter={restores:0},api=service(path,counter);
+    expect(api.playTurnStatus('game',0)).toMatchObject({revision:0,active:{decision:0}});
+    expect(api.playTurnStatus('game',0)).toMatchObject({revision:0,active:{decision:0}});expect(counter.restores).toBe(1);
+    service(path).step('game',{action:{type:'Wait',unitId:'damage'},expectedRevision:0});
+    expect(api.playTurnStatus('game',1)).toMatchObject({revision:1,active:{decision:1}});expect(counter.restores).toBe(2);
+    expect(()=>api.playTurnStatus('game',0)).toThrow(/revision/i);
+  });
+  it('supports status JSONL, preserves action count and returns revision mismatches as errors',async()=>{
+    const api=service(root('status-jsonl'));api.newSession({sessionId:'game'});
+    async function* input(){for(const message of [{type:'status',expectedRevision:0},{type:'status',expectedRevision:1},{type:'action',requestId:'end',action:{type:'EndTurn'},expectedRevision:0}])yield JSON.stringify(message)+'\n';}
+    const chunks:Buffer[]=[];const sink=new Writable({write(chunk,_encoding,callback){chunks.push(Buffer.from(chunk));callback();}});
+    await runInteractivePlayTurn(api,'game',input(),sink,10000);
+    const output=Buffer.concat(chunks).toString('utf8').trim().split('\n').map(line=>JSON.parse(line));
+    expect(output[1]).toMatchObject({kind:'status-result'});expect(output[1].revision??output[1].status?.revision).toBe(0);
+    expect(JSON.stringify(output[2])).toContain('stale_revision');expect(api.status('game').active.decision).toBe(1);
+  });
   it.each([
     [undefined, [0], 'crisis_worsened'],
     ['facility_workers_zero', [0], 'crisis_worsened'],
@@ -130,7 +148,7 @@ describe('play-turn protocol', () => {
     try {
       expect(api.query('game', { target: 'api', expectedRevision: 0 }).value).toMatchObject({
         unavailable: true,
-        sessionPlayTurn: { protocolVersion: '1.2.0', portableLauncher: './run-session.sh', portableLauncherWindows: '.\\run-session.cmd', limits: { maxPlanBytes: 8 * 1024 * 1024 } },
+        sessionPlayTurn: { protocolVersion: '1.3.0', portableLauncher: './run-session.sh', portableLauncherWindows: '.\\run-session.cmd', limits: { maxPlanBytes: 8 * 1024 * 1024 } },
       });
       expect(api.query('game', { target: 'legal-actions', expectedRevision: 0 }).revision).toBe(0);
       expect(api.playTurnAction('game', { type: 'action', requestId: 'interactive-runtime-1', action: { type: 'Wait', unitId: 'safe' }, decisionSummary: 'Use the retained runtime.', expectedRevision: 0 })).toMatchObject({ accepted: true, currentRevision: 1 });

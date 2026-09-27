@@ -23,6 +23,7 @@ import {
   asJsonValue,
   assertSafeIdentifier,
   canonicalJson,
+  createJsonTreeHasher,
   decisionHash,
   hashesEqual,
   integrityHash,
@@ -348,34 +349,62 @@ export class SessionStore {
   }
 
   public validatePayload(reference: SessionPayloadReference): void {
+    this.readVerifiedPayloadBuffers(reference, false);
+  }
+
+  // Scoped to one locked load, never trusted across a status/action boundary.
+  // Shared immutable chunks are verified once per load, with bounded retained bytes.
+  private verifiedReadScope: Map<string, { raw: Buffer; compressedBytes: number }> | null = null;
+  private verifiedReadBytes = 0;
+
+  /** Verify and decompress once. Keep all shape, compressed and logical hash checks. */
+  private readVerifiedPayloadBuffers(reference: SessionPayloadReference, retain: boolean): Buffer[] {
     this.validateReferenceShape(reference);
     const logicalLimit = reference.encoding === 'utf8+gzip-chunks' ? MAX_STREAM_PAYLOAD_BYTES : MAX_PAYLOAD_BYTES;
     const logicalHash = createHash('sha256');
     let logicalBytes = 0;
     let compressedBytes = 0;
+    const buffers: Buffer[] = [];
     for (const chunk of reference.chunks) {
-      const path = this.chunkPath(reference.domain, chunk.hash);
-      if (!existsSync(path) || !statSync(assertSafeInputFile(this.safeRoot, path)).isFile()) throw new SessionError('payload_missing', `Payload chunk ${chunk.hash} is missing`);
-      const compressed = readFileSync(assertSafeInputFile(this.safeRoot, path));
-      if (compressed.length !== chunk.compressedBytes || !hashesEqual(sha256Bytes(compressed), chunk.hash)) throw new SessionError('payload_hash_mismatch', `Payload chunk ${chunk.hash} hash mismatch`);
+      const cacheKey = `${reference.domain}:${chunk.hash}`;
+      const cached = this.verifiedReadScope?.get(cacheKey);
       let raw: Buffer;
-      try { raw = gunzipSync(compressed); }
-      catch { throw new SessionError('payload_corrupt', `Payload chunk ${chunk.hash} is not valid gzip`); }
-      if (raw.length > CHUNK_BYTES) throw new SessionError('payload_too_large', 'Decompressed payload chunk exceeds its bound');
+      let compressedLength: number;
+      if (cached) {
+        if (cached.compressedBytes !== chunk.compressedBytes) throw new SessionError('payload_hash_mismatch', `Payload chunk ${chunk.hash} length mismatch`);
+        raw = cached.raw;
+        compressedLength = cached.compressedBytes;
+      } else {
+        const path = this.chunkPath(reference.domain, chunk.hash);
+        if (!existsSync(path)) throw new SessionError('payload_missing', `Payload chunk ${chunk.hash} is missing`);
+        // This checks every ancestor and the regular-file target. Repeating the
+        // same whole path walk before readFileSync added no independent check.
+        const compressed = readFileSync(assertSafeInputFile(this.safeRoot, path));
+        if (compressed.length !== chunk.compressedBytes || !hashesEqual(sha256Bytes(compressed), chunk.hash)) throw new SessionError('payload_hash_mismatch', `Payload chunk ${chunk.hash} hash mismatch`);
+        try { raw = gunzipSync(compressed); }
+        catch { throw new SessionError('payload_corrupt', `Payload chunk ${chunk.hash} is not valid gzip`); }
+        if (raw.length > CHUNK_BYTES) throw new SessionError('payload_too_large', 'Decompressed payload chunk exceeds its bound');
+        compressedLength = compressed.length;
+        if (this.verifiedReadScope && this.verifiedReadBytes + raw.length <= 64 * 1024 * 1024) {
+          this.verifiedReadScope.set(cacheKey, { raw, compressedBytes: compressed.length });
+          this.verifiedReadBytes += raw.length;
+        }
+      }
       logicalHash.update(raw);
+      if (retain) buffers.push(raw);
       logicalBytes += raw.length;
-      compressedBytes += compressed.length;
+      compressedBytes += compressedLength;
       if (logicalBytes > logicalLimit) throw new SessionError('payload_too_large', 'Payload exceeds its logical size bound');
     }
     if (logicalBytes !== reference.logicalBytes || compressedBytes !== reference.compressedBytes || !hashesEqual(logicalHash.digest('hex'), reference.contentHash)) {
       throw new SessionError('payload_hash_mismatch', `Payload ${reference.contentHash} logical hash mismatch`);
     }
+    return buffers;
   }
 
   public readPayload<T>(reference: SessionPayloadReference, subject = 'Session payload'): T {
     if (reference.encoding !== 'canonical-json+gzip-chunks') throw new SessionError('payload_reference_invalid', `${subject} is not a canonical JSON payload`);
-    this.validatePayload(reference);
-    const buffers = reference.chunks.map((chunk) => gunzipSync(readFileSync(assertSafeInputFile(this.safeRoot, this.chunkPath(reference.domain, chunk.hash)))));
+    const buffers = this.readVerifiedPayloadBuffers(reference, true);
     return parseJson<T>(Buffer.concat(buffers, reference.logicalBytes).toString('utf8'), subject);
   }
 
@@ -461,6 +490,13 @@ export class SessionStore {
   }
 
   public load(sessionId: string, onDecision?: (record: PublicDecisionRecord, descriptor: SessionDescriptor) => void): LoadedSession {
+    this.verifiedReadScope = new Map();
+    this.verifiedReadBytes = 0;
+    try { return this.loadVerified(sessionId, onDecision); }
+    finally { this.verifiedReadScope = null; this.verifiedReadBytes = 0; }
+  }
+
+  private loadVerified(sessionId: string, onDecision?: (record: PublicDecisionRecord, descriptor: SessionDescriptor) => void): LoadedSession {
     const directory = this.sessionDirectory(sessionId);
     const descriptor = this.readDescriptor(directory);
     this.validateBranchBase(descriptor, onDecision);
@@ -626,18 +662,19 @@ export class SessionStore {
   }
 
   private readPublicState(reference: SessionPayloadReference, active?: ActiveCommit): SessionPublicState {
+    const hashDocument = createJsonTreeHasher();
     const head = this.readPayload<SessionPublicHead>(reference, 'Public State head');
     ensureObject(head, 'Public State head');
     if (head.kind !== 'head' || !Array.isArray(head.diffs) || head.diffs.length >= PUBLIC_SNAPSHOT_INTERVAL) throw new SessionError('public_snapshot_invalid', 'Public State head is invalid');
     const snapshot = this.readPayload<SessionPublicSnapshotPayload>(head.snapshot, 'Public Snapshot');
-    if (snapshot.kind !== 'snapshot' || sha256Json(snapshot.document) !== snapshot.documentHash) throw new SessionError('public_snapshot_invalid', 'Public Snapshot hash mismatch');
-    let document = clone(snapshot.document) as unknown as JsonValue;
+    if (snapshot.kind !== 'snapshot' || hashDocument(snapshot.document as unknown as JsonValue) !== snapshot.documentHash) throw new SessionError('public_snapshot_invalid', 'Public Snapshot hash mismatch');
+    let document = snapshot.document as unknown as JsonValue;
     let documentHash = snapshot.documentHash;
     for (const diffReference of head.diffs) {
       const diff = this.readPayload<SessionPublicDiffPayload>(diffReference, 'Public diff');
       if (diff.kind !== 'diff' || diff.beforeDocumentHash !== documentHash) throw new SessionError('public_diff_invalid', 'Public diff chain has the wrong base');
-      document = applyLosslessJsonDiff(document, diff.operations);
-      documentHash = sha256Json(document);
+      document = applyLosslessJsonDiff(document, diff.operations, true);
+      documentHash = hashDocument(document);
       if (documentHash !== diff.afterDocumentHash) throw new SessionError('public_diff_invalid', 'Public diff reconstructed the wrong hash');
     }
     if (documentHash !== head.documentHash) throw new SessionError('public_diff_invalid', 'Public head hash does not match reconstructed state');

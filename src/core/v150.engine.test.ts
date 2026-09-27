@@ -50,8 +50,8 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     const police = state.units.find((unit) => unit.type === 'police')!;
     const guard = state.units.find((unit) => unit.type === 'nationalGuard')!;
 
-    expect(state.gameVersion).toBe('17.0.0');
-    expect(config.version).toBe('17.0.0');
+    expect(state.gameVersion).toBe('18.0.0');
+    expect(config.version).toBe('18.0.0');
     expect(police).toMatchObject({
       proficiency: 'regular', recruitSurvivalTurns: 0, regularZombieKills: 0,
       veteranPromotionPending: false, attack: 8, maxAttackCharges: 1, attackChargesRemaining: 1,
@@ -77,7 +77,7 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
         recruitmentFacilityTypes: ['capital', 'city'],
         reanimationUnitType: 'riotZombie', noiseClass: 'medium', noiseRadius: 5,
       },
-      riotZombie: { hp: 60, attack: 5, movement: 3, range: 1, vision: 5 },
+      riotZombie: { hp: 75, attack: 5, movement: 3, range: 1, vision: 5 },
     });
     expect(config.horde).toMatchObject({
       specialZombieWeights: { zombie: 40, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 15, gasZombie: 15, screamerZombie: 5 },
@@ -265,7 +265,7 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     expect(result.error, result.error?.message).toBeNull();
     expect(result.state.units.some((unit) => unit.id === riot.id)).toBe(false);
     expect(result.state.units.find((unit) => unit.type === 'riotZombie')).toMatchObject({
-      position: riot.position, hp: 60, maxHp: 60, canMove: false, canAttack: false,
+      position: riot.position, hp: 75, maxHp: 75, canMove: false, canAttack: false,
       currentFuel: 0, currentMilitaryGoods: 0, proficiency: null,
       spawnGroupId: null, hordeKind: null,
     });
@@ -301,6 +301,7 @@ describe('v1.5.1 Human Unit progression and Riot defaults', () => {
     expect(scheduled.filter(unit => unit.type === 'packZombie')).toHaveLength(1);
     expect(scheduled.filter((unit) => unit.type === 'hordeZombie')).toHaveLength(3);
     expect(scheduled.filter((unit) => unit.type === 'riotZombie')).toHaveLength(1);
+    expect(first.state.units.find(unit=>unit.type==='riotZombie'&&unit.spawnGroupId!==null)).toMatchObject({hp:75,maxHp:75});
     expect(scheduled.filter((unit) => unit.type === 'zombie')).toHaveLength(0);
     expect(scheduled.every((unit) => unit.hordeKind === 'final')).toBe(true);
   });

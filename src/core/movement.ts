@@ -10,6 +10,7 @@ import { effectiveMovementCost } from './terrain';
 import { unitMoveFuelCost, movementFuelCost } from './movement-query';
 import { emit } from './events-internal';
 import { wireAt, damageWire } from './barbed-wire';
+import { capturePresentation } from './presentation';
 interface MovementHooks {
   emergencyLand(state: GameState, unit: UnitState, rng: SeededRng): void;
   interceptArmyBase(state: GameState, mover: UnitState, rng: SeededRng): boolean;
@@ -61,6 +62,7 @@ function applyMovement(
     reached = { ...position };
     traversed.push(position);
     synchronizeCargoPosition(state, mover);
+    capturePresentation(state);
     if (flying) {
       mover.currentFuel = Math.max(0,mover.currentFuel-state.config.units.multipurposeHelicopter.fuelPerMovementPoint);
       if (mover.currentFuel===0) { emergencyLand(state,mover,rng); reached={...mover.position}; break; }

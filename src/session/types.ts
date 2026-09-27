@@ -9,12 +9,12 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** v1.6.7 deliberately rejects every earlier Session/Checkpoint schema. */
-export const CHECKPOINT_SCHEMA_VERSION = '18.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '18.0.0' as const;
+/** v1.6.8 deliberately rejects every earlier Session/Checkpoint continuation schema. */
+export const CHECKPOINT_SCHEMA_VERSION = '19.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '19.0.0' as const;
 export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
 export const SESSION_ARTIFACT_PACKAGE_VERSION = '2.0.0' as const;
-export const PLAY_TURN_PROTOCOL_VERSION = '1.2.0' as const;
+export const PLAY_TURN_PROTOCOL_VERSION = '1.3.0' as const;
 export const DEFAULT_CHECKPOINT_INTERVAL = 5;
 export const PUBLIC_SNAPSHOT_INTERVAL = 50;
 export const DEFAULT_QUERY_PAGE_SIZE = 100;
@@ -146,7 +146,8 @@ export interface SessionPlayTurnPreviewInput {
   expectedRevision: number;
 }
 export interface SessionPlayTurnCloseInput { type: 'close' }
-export type SessionPlayTurnRequest = SessionPlayTurnActionInput | SessionPlayTurnQueryInput | SessionPlayTurnPreviewInput | SessionPlayTurnCloseInput;
+export interface SessionPlayTurnStatusInput { type: 'status'; expectedRevision?: number }
+export type SessionPlayTurnRequest = SessionPlayTurnActionInput | SessionPlayTurnQueryInput | SessionPlayTurnPreviewInput | SessionPlayTurnCloseInput | SessionPlayTurnStatusInput;
 export interface SessionPlayTurnPlanAction extends Omit<SessionPlayTurnActionInput, 'type' | 'expectedRevision'> {}
 export interface SessionPlayTurnPlanInput { expectedRevision: number; actions: SessionPlayTurnPlanAction[] }
 

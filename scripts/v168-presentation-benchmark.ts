@@ -1,0 +1,30 @@
+import { mkdirSync,writeFileSync } from 'node:fs';
+import { performance } from 'node:perf_hooks';
+import { GameEngine } from '../src/core/engine';
+import { createDefaultConfig } from '../src/core/config';
+import { createInitialState,createUnit } from '../src/core/state';
+import { prepareTestSnapshot,singleFinalWave } from '../src/core/testConfig';
+import { effectiveMovementCost } from '../src/core/terrain';
+import { hexDistance,hexKey } from '../src/core/hex';
+import { exportSaveJson } from '../src/persistence/save';
+import { beginTurnPresentation,presentationActor,capturePresentation,finishTurnPresentation,applyPresentationFrame } from '../src/core/presentation';
+import { TurnPlayback } from '../src/ui/turnPlayback';
+
+const out='output/v168-presentation';mkdirSync(out,{recursive:true});
+const config=createDefaultConfig({militaryDrone:{visionRadius:100},economy:{initialZombieCount:0,initialScreamerCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0}},horde:singleFinalWave(200)});
+const state=createInitialState(168,config);
+state.militaryDrone={sourceFacilityId:'air-base',center:{q:25,r:25},radius:100,startedTurn:1,expiresBeforeTurn:6};
+const occupied=new Set(state.units.map(u=>hexKey(u.position)));
+const tiles=state.map.tiles.filter(t=>hexDistance(t,{q:25,r:25})>=7&&hexDistance(t,{q:25,r:25})<=13&&effectiveMovementCost(state,t,false)!==null&&!occupied.has(hexKey(t))&&!state.facilities.some(f=>hexKey(f.position)===hexKey(t))).slice(0,100);
+for(let i=0;i<tiles.length;i++){const z=createUnit(state,`scale-${String(i).padStart(3,'0')}`,'hordeZombie',tiles[i]!);z.hordeKind='periodic';z.spawnGroupId='scale-wave';state.units.push(z);}
+state.nextUnitNumber=1000;prepareTestSnapshot(state);state.militaryDrone!.sourceFacilityId=state.facilities.find(f=>f.type==='airBase')!.id;
+const engine=new GameEngine(168,config),loaded=engine.step({type:'LoadSnapshot',snapshot:state});if(loaded.error)throw Error(loaded.error.message);
+writeFileSync(`${out}/100-zombies-before.json`,exportSaveJson(state));
+const start=performance.now(),heap=process.memoryUsage().heapUsed,result=engine.step({type:'EndTurn'});if(result.error)throw Error(result.error.message);
+const presentation=result.events.find(e=>e.type==='zombie_presentation')!.payload as any;
+const coreMs=performance.now()-start,heapDelta=process.memoryUsage().heapUsed-heap;
+const reduced=presentation.frames.reduce(applyPresentationFrame,presentation.base);
+const clock=new TurnPlayback();let completed=0;clock.play(presentation,()=>{},()=>completed++);
+const skipStart=performance.now();clock.skip();const skipMs=performance.now()-skipStart;clock.skip();
+const report={enemyCount:100,publicActors:new Set(presentation.frames.map((f:any)=>f.actorId).filter(Boolean)).size,frames:presentation.frames.length,baseBytes:Buffer.byteLength(JSON.stringify(presentation.base)),deltaBytes:Buffer.byteLength(JSON.stringify(presentation.frames)),coreMs,heapDelta,skipMs,completed,finalPublicUnits:reduced.units.length,finalTurn:result.state.turn};
+writeFileSync(`${out}/report.json`,JSON.stringify(report,null,2));writeFileSync(`${out}/presentation.json`,JSON.stringify(presentation));writeFileSync(`${out}/100-zombies-after.json`,exportSaveJson(result.state));console.log(report);

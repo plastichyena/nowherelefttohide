@@ -14,7 +14,7 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
 
 describe('AgentGame public boundary', { timeout: 60000 }, () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.6.7');
+    expect(APP_VERSION).toBe('1.6.8');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -121,7 +121,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('24');
+    expect(info.saveFormatVersion).toBe('25');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -141,7 +141,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.rules.crisis.reasonCodes).toHaveProperty('horde_warning_active');
     expect(info.rules.riot).toMatchObject({
       police: { recruitAttack: 9, hp: 75, movement: 10, range: 1, vision: 5, population: 10 },
-      zombie: { hp: 60, attack: 5, movement: 3, range: 1, vision: 5 },
+      zombie: { hp: 75, attack: 5, movement: 3, range: 1, vision: 5 },
       productionFacilities: ['capital', 'city'],
       productionCost: { population: 10, civilianGoods: 25, militaryGoods: 25 },
     });

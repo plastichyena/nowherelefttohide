@@ -1,3 +1,4 @@
+import { refugeeArrivalProjection } from '../core/refugees';
 import { militaryDroneProjection } from '../core/aviation-preview';
 import { HUMAN_UNIT_TYPES } from '../core/unit-catalog';
 import { roadConnections } from '../core/roads';
@@ -238,6 +239,7 @@ function createAgentObservationInScope(
         nextArrivalTurn,
         turnsUntilArrival: nextArrivalTurn === null ? null : Math.max(0, nextArrivalTurn - state.turn),
         arrivalsEnded: state.horde.finalHordeStatus !== 'notStarted',
+        arrivalRange: refugeeArrivalProjection(state.config.refugees, state.turn, branchState?.nextArrivalTurn ?? null),
         checkpointBuildCost: branchState?.hasBuiltCheckpoint
           ? state.config.checkpoint.subsequentConstructionCivilianGoods
           : state.config.checkpoint.constructionCivilianGoods,

@@ -36,17 +36,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6.7 rejects all earlier state and public API schemas without migration. */
-export const APP_VERSION = '1.6.7';
-export const GAME_RULES_VERSION = '17.0.0';
-export const SAVE_FORMAT_VERSION = '24';
-export const AGENT_API_VERSION = '22.0.0';
-export const OBSERVATION_API_VERSION = '22.0.0';
-export const BRIDGE_API_VERSION = '22.0.0';
+/** v1.6.8 versions continued state and public APIs; legacy public Replay is read-only. */
+export const APP_VERSION = '1.6.8';
+export const GAME_RULES_VERSION = '18.0.0';
+export const SAVE_FORMAT_VERSION = '25';
+export const AGENT_API_VERSION = '23.0.0';
+export const OBSERVATION_API_VERSION = '23.0.0';
+export const BRIDGE_API_VERSION = '23.0.0';
 export const BALANCED_AGENT_VERSION = '14.0.0';
 export const RANDOM_AGENT_VERSION = '9.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '21.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '18.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '22.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '19.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -164,6 +164,7 @@ export interface AgentRoadBranchObservation {
   turnsUntilArrival: number | null;
   /** Final Wave commit permanently stops new natural arrivals. */
   arrivalsEnded: boolean;
+  arrivalRange: ReturnType<typeof import("../core/refugees").refugeeArrivalProjection>;
   /** Current branch-specific cost; the first ever Build is discounted. */
   checkpointBuildCost: number;
   checkpointRelocateCost: number;
@@ -427,6 +428,8 @@ export interface AgentCheckpointObservation {
   arrivalIntervalMax: number;
   arrivalPeopleMin: number;
   arrivalPeopleMax: number;
+  arrivalRange: ReturnType<typeof import("../core/refugees").refugeeArrivalProjection>;
+  waitingCrowdingThreshold: number;
   queuePressureClass: 'none' | 'low' | 'medium' | 'high';
   healthyQueueConsumesMaintenance: true;
   queueMaintenanceFood: number;
@@ -640,6 +643,8 @@ export interface AgentApiInfo {
       activePerBranchLimit: 1;
       preparedPostLimit: number;
       screeningCapacity: number;
+      waitingCrowdingThreshold: number;
+      arrivalGrowth: { initialUpper: number; intervalTurns: number; peoplePerInterval: number };
       estimatedScreeningThroughputByPolicy: Record<CheckpointPolicy, number>;
       queuePressureThresholds: Record<'none' | 'low' | 'medium' | 'high', { min: number; max: number | null }>;
       policyOwner: 'road_branch';
@@ -933,6 +938,7 @@ export interface AgentPublicEvent {
 }
 
 export interface AgentActionError {
+  details?: import('../core/types').JsonObject;
   code: string;
   message: string;
 }

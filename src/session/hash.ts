@@ -40,6 +40,32 @@ export function sha256Json(value: unknown): string {
   return sha256Text(canonicalJson(value));
 }
 
+/** Hash JSON trees that share immutable subtrees, retaining at most maxBytes. */
+export function createJsonTreeHasher(maxBytes = 64 * 1024 * 1024): (value: JsonValue) => string {
+  const encoded = new WeakMap<object, string>();
+  let retainedBytes = 0;
+  const arrayIndex = (key: string): number | null => {
+    const index = Number(key);
+    return Number.isInteger(index) && index >= 0 && index < 0xffff_ffff && String(index) === key ? index : null;
+  };
+  const encode = (value: JsonValue): string => {
+    if (value === null || typeof value !== 'object') return JSON.stringify(value);
+    const cached = encoded.get(value);
+    if (cached !== undefined) return cached;
+    // JSON.stringify enumerates integer object keys first, even after canonicalize sorts them.
+    const text = Array.isArray(value)
+      ? `[${value.map(encode).join(',')}]`
+      : `{${Object.keys(value).sort((left, right) => {
+        const a = arrayIndex(left), b = arrayIndex(right);
+        return a !== null ? (b !== null ? a - b : -1) : b !== null ? 1 : left.localeCompare(right);
+      }).map((key) => `${JSON.stringify(key)}:${encode(value[key]!)}`).join(',')}}`;
+    const bytes = Buffer.byteLength(text, 'utf8');
+    if (retainedBytes + bytes <= maxBytes) { encoded.set(value, text); retainedBytes += bytes; }
+    return text;
+  };
+  return (value) => sha256Text(encode(value));
+}
+
 export function isSha256(value: unknown): value is string {
   return typeof value === 'string' && SHA256_PATTERN.test(value);
 }

@@ -348,10 +348,14 @@ export async function runInteractivePlayTurn(
         if (typed.filters !== undefined && (typed.filters === null || typeof typed.filters !== 'object' || Array.isArray(typed.filters))) throw new SessionError('invalid_play_turn_input', 'query filters must be an object');
         const result = service.query(sessionId, { target: typed.target, expectedRevision: typed.expectedRevision, cursor: typed.cursor, pageSize: typed.pageSize, filters: typed.filters });
         await writeJsonToWritable(output, { ok: true, command: 'play-turn', kind: 'query-result', protocolVersion: PLAY_TURN_PROTOCOL_VERSION, ...result });
+      } else if (typed.type === 'status') {
+        if (Object.keys(typed).some(key => !['type', 'expectedRevision'].includes(key))) throw new SessionError('invalid_play_turn_input', 'status request contains an unknown field');
+        const result = service.playTurnStatus(sessionId, typed.expectedRevision);
+        await writeJsonToWritable(output, { ok: true, command: 'play-turn', kind: 'status-result', protocolVersion: PLAY_TURN_PROTOCOL_VERSION, ...result });
       } else if (typed.type === 'close') {
         if (Object.keys(typed as unknown as Record<string, unknown>).length !== 1) throw new SessionError('invalid_play_turn_input', 'close request may contain only type');
         exitReason = 'explicit_close';
-      } else throw new SessionError('invalid_play_turn_input', 'play-turn request type must be action, preview, query, or close');
+      } else throw new SessionError('invalid_play_turn_input', 'play-turn request type must be action, preview, query, status, or close');
     } catch (error) {
       await writeJsonToWritable(output, publicError(error));
     }

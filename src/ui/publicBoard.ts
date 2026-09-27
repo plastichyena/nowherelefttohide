@@ -1,3 +1,4 @@
+import type { PresentationEffect } from '../core/presentation';
 import type { AgentMapObservation, AgentObservation } from '../agent/types';
 import type { SessionPublicDocument } from '../session/types';
 import type { HexCoord } from '../core/types';
@@ -5,8 +6,20 @@ import { hexDistance, hexKey } from '../core/hex';
 import { roadEdges } from '../core/roads';
 import { BOARD_ASSET_REGISTRY, resolveBoardAssetUrl, resolveUnitAssetPath, mapFacilityAssetLayers, mapCheckpointAssetLayers, mapUnitAssetLayers } from './boardAssets';
 import { createTranslator, type Locale } from './i18n';
+import type { PresentationSnapshot } from '../core/presentation';
+
+/** Paint recorded public values over a public document, without rebuilding game rules. */
+export function presentationBoardFrame(base:PublicBoardFrame,visual:PresentationSnapshot,effects:PresentationEffect[] = []):PublicBoardFrame {
+  const merge=(old:readonly {id:string}[],items:readonly {id:string}[])=>items.map(item=>({...old.find(o=>o.id===item.id),...item}));
+  return { map:base.map,effects,observation:{...base.observation,visibleTileKeys:visual.visibleTileKeys,
+    units:merge(base.observation.units,visual.units.filter(u=>u.isPlayerUnit)),
+    zombies:merge(base.observation.zombies,visual.units.filter(u=>!u.isPlayerUnit).map(u=>({...u,isFinalHordeMember:u.hordeKind==='final'}))),
+    facilities:merge(base.observation.facilities,visual.facilities),checkpoints:merge(base.observation.checkpoints,visual.checkpoints),barbedWire:visual.walls,
+  } as PublicBoardFrame['observation'] };
+}
 
 export interface PublicBoardFrame {
+  effects?: PresentationEffect[];
   map: AgentMapObservation;
   observation: SessionPublicDocument['observation'];
 }
@@ -95,7 +108,7 @@ export class PublicBoardRenderer {
     const t=createTranslator(this.locale);
     if(this.frame?.observation.militaryDrone?.active){const drone=this.frame.observation.militaryDrone;rows.push([label('軍用ドローン','Military Drone'),`${drone.center?.q},${drone.center?.r} · ${label('半径','Radius')} ${drone.radius} · Turn ${(drone.expiresBeforeTurn??0)-1}`]);}
     if(e.kind==='unit'){
-      rows.push([label('移動力（直前Phase）','Movement (last phase)'), `${d.baseMovement ?? d.movement} + ${d.appliedMovementBonus ?? 0} = ${d.effectiveMovement ?? d.movement}`]);
+      rows.push([label('移動力（直前フェーズ）','Movement (last phase)'), `${d.baseMovement ?? d.movement} + ${d.appliedMovementBonus ?? 0} = ${d.effectiveMovement ?? d.movement}`]);
       rows.push(['HP',`${d.hp} / ${d.maxHp}`],[label('状態','Mode'),d.mode==='packed'?label('梱包','Packed'):d.mode==='deployed'?label('展開','Deployed'):undefined],[label('熟練度','Proficiency'),d.proficiency? t(`proficiency.${d.proficiency}`,String(d.proficiency)):undefined],[label('攻撃 / 射程','Attack / Range'),`${d.attack} / ${d.artillery?(d.artillery as {minRange:number}).minRange+'–':''}${d.range}`],[label('燃料','Fuel'),`${d.currentFuel} / ${d.maxFuel}`],[label('軍需品','Military Goods'),`${d.currentMilitaryGoods} / ${d.maxMilitaryGoods}`],[label('攻撃回数','Charges'),`${d.attackChargesRemaining} / ${d.maxAttackCharges}`],[label('補給','Supply'),d.inSupply?label('補給内','In supply'):label('補給外','Out of supply')],[label('行動解禁ターン','Unlock turn'),d.modeLockedUntilTurn]);
       rows.push([label('飛行状態','Flight'),d.flightState?label(d.flightState==='airborne'?'飛行中':'着陸中',String(d.flightState)):undefined],[label('搭乗部隊','Cargo'),d.cargoUnitId],[label('対空攻撃','Anti-air'),d.canTargetAir?label('可能','Yes'):label('不可','No')]);
       const production=d.production as {completed:number;reserved:number;remaining:number|null}|undefined;
@@ -118,7 +131,7 @@ export class PublicBoardRenderer {
     } else {
       rows.push([label('役割 / 状態','Role / Status'),`${t(String(d.role),String(d.role))} / ${t(String(d.status),String(d.status))}`],[label('待機 / 審査 / 承認済み','Waiting / Screening / Approved'),`${d.waiting} / ${d.screening} / ${d.approved}`],[label('感染者','Infected'),d.infected]);
       const recovery=d.recovery as {ready:boolean;missing:string[]}|undefined;
-      if(recovery)rows.push([label('自動復旧','Automatic recovery'),recovery.ready?label('条件成立','Ready'):recovery.missing.map(k=>({not_ruined:label('陥落していません','Not ruined'),suppress_infection:label('感染者あり','Infection'),clear_visible_enemy:label('同Hexに敵','Enemy on Hex'),station_recovery_capable_unit:label('復旧可能な部隊が必要','Capable garrison required')}[k]??k)).join(' / ')]);
+      if(recovery)rows.push([label('自動復旧','Automatic recovery'),recovery.ready?label('条件成立','Ready'):recovery.missing.map(k=>({not_ruined:label('陥落していません','Not ruined'),suppress_infection:label('感染者あり','Infection'),clear_visible_enemy:label('同ヘックスに敵','Enemy on Hex'),station_recovery_capable_unit:label('復旧可能な部隊が必要','Capable garrison required')}[k]??k)).join(' / ')]);
     }
     const dl=document.createElement('dl');for(const [name,value] of rows){if(value===undefined||value===null)continue;const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=String(value);dl.append(dt,dd);}this.details.append(dl);
   }
@@ -141,5 +154,6 @@ export class PublicBoardRenderer {
       const overlays=e.kind==='facility'?mapFacilityAssetLayers({type:d.type as never,owner:d.owner as never,status:d.status as never,operationalStatus:d.operationalStatus as never,infected:Number(d.infectedPopulation??0)}).overlays:e.kind==='checkpoint'?mapCheckpointAssetLayers({status:d.status as never,infected:Number(d.infected??0)}).overlays:mapUnitAssetLayers({type:d.type as never,mode:d.mode as never,flightState:d.flightState as never,hordeKind:d.isFinalWaveMember?'final':d.isScheduledWaveMember?'periodic':null}).overlays;
       for(const overlay of overlays)this.sprite(ctx,overlay,p.x,p.y,size);
     }if(d.flightState==='airborne'||d.cargoUnitId){ctx.fillStyle='#efffff';ctx.font=`${Math.max(10,g.scale*.65)}px sans-serif`;ctx.fillText(`${d.flightState==='airborne'?'▲':''}${d.cargoUnitId?'▣':''}`,p.x,p.y-g.scale*.7);}if(this.selected===e.key){ctx.strokeStyle='#ffe28a';ctx.lineWidth=2;ctx.strokeRect(p.x-g.scale,p.y-g.scale,g.scale*2,g.scale*2);}}
+    for(const effect of this.frame.effects??[]) {const p=g.transform(effect.position);ctx.strokeStyle=effect.kind==='gas_explosion'?'#b8e66a':effect.kind==='appear'?'#72e0c2':'#ff8b63';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(6,g.scale*(effect.kind==='gas_explosion'?1.5:.7)),0,Math.PI*2);ctx.stroke();}
   }
 }

@@ -36,7 +36,7 @@ function load(engine: GameEngine, state: GameState) {
 describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
   it('keeps all seven zombie configurations separate and derives human ranks', () => {
     const state = createInitialState(1, createDefaultConfig());
-    const expected = { zombie: [15, 5, 3, 1], hordeZombie: [40, 5, 3, 4], policeZombie: [10, 5, 3, 1], soldierZombie: [20, 10, 5, 1], riotZombie: [60, 5, 3, 1], hunterZombie: [20, 15, 15, 1], gasZombie: [35, 5, 3, 1] };
+    const expected = { zombie: [15, 5, 3, 1], hordeZombie: [40, 5, 3, 4], policeZombie: [10, 5, 3, 1], soldierZombie: [20, 10, 5, 1], riotZombie: [75, 5, 3, 1], hunterZombie: [20, 15, 15, 1], gasZombie: [35, 5, 3, 1] };
     for (const type of Object.keys(expected) as Array<keyof typeof expected>) {
       const unit = createUnit(state, type, type, { q: 20, r: 20 });
       expect([unit.hp, unit.attack, unit.movement, unit.maxAttackCharges]).toEqual(expected[type]);

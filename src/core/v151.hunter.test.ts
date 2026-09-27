@@ -136,7 +136,7 @@ describe('v1.5.1 Hunter and shared-charge rule coverage', () => {
     expect(result.events.some((event) => event.type === 'zombie_idle' && event.payload.zombieId === hunter.id)).toBe(false);
   });
 
-  it('acquires and retains a distant Noise target while using the 15 MP weighted path budget', () => {
+  it('acquires and retains distant Noise, choosing fewest hexes and spending the actual 15 MP terrain budget', () => {
     const { engine, state } = emptyEngine();
     const blocked = new Set(state.units.map((unit) => hexKey(unit.position)));
     const hunterPosition = openTile(state, blocked);
@@ -151,15 +151,18 @@ describe('v1.5.1 Hunter and shared-charge rule coverage', () => {
     const resolveCost = (position: HexCoord): number | null => effectiveMovementCost(state, position);
     const candidates = findReachablePaths(state.map, hunter.position, 31, movementBlocked, resolveCost)
       .map((entry) => {
+        // v1.6.8 WIRE-01: choose by hex count, then spend terrain MP along that route.
+        const path = findShortestPath(state.map, hunter.position, entry.position, movementBlocked,
+          position => resolveCost(position) === null ? null : 1)!;
         let spent = 0;
         let moved = 0;
-        for (const position of entry.path.slice(1)) {
+        for (const position of path.slice(1)) {
           const cost = resolveCost(position);
           if (cost === null || spent + cost > hunter.movement) break;
           spent += cost;
           moved += 1;
         }
-        return { target: entry.position, path: entry.path, spent, moved };
+        return { target: entry.position, path, spent, moved };
       })
       .filter((candidate) =>
         candidate.moved > 0

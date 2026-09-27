@@ -61,8 +61,21 @@ export function createLosslessJsonDiff(before: JsonValue, after: JsonValue): Jso
   return operations;
 }
 
-export function applyLosslessJsonDiff(before: JsonValue, operations: readonly JsonPatchOperation[]): JsonValue {
-  let root = cloneJson(before);
+export function applyLosslessJsonDiff(before: JsonValue, operations: readonly JsonPatchOperation[], shareUnchanged = false): JsonValue {
+  // Store reconstruction owns the whole chain and can share untouched JSON subtrees.
+  // Other callers retain the existing independent deep-copy contract.
+  const owned = new WeakSet<object>();
+  const writable = (value: JsonValue): JsonValue => {
+    if (value === null || typeof value !== 'object' || owned.has(value)) return value;
+    const copy = Array.isArray(value) ? [...value] : { ...value };
+    owned.add(copy);
+    return copy;
+  };
+  let root = shareUnchanged ? writable(before) : cloneJson(before);
+  const descend = (parent: Record<string | number, JsonValue>, segment: string | number): JsonValue => {
+    if (shareUnchanged) parent[segment] = writable(parent[segment]!);
+    return parent[segment]!;
+  };
   for (const operation of operations) {
     validateLosslessJsonDiffOperations([operation]);
     if (operation.op === 'splice') {
@@ -73,7 +86,7 @@ export function applyLosslessJsonDiff(before: JsonValue, operations: readonly Js
         if (Array.isArray(target)) {
           if (typeof segment !== 'number' || segment >= target.length) throw new SessionError('public_diff_invalid', 'Patch splice array path is out of bounds');
         } else if (typeof segment !== 'string' || !Object.prototype.hasOwnProperty.call(target, segment)) throw new SessionError('public_diff_invalid', 'Patch splice object path does not exist');
-        target = (target as Record<string | number, unknown>)[segment];
+        target = descend(target as Record<string | number, JsonValue>, segment);
       }
       if (!Array.isArray(target) || operation.index > target.length || operation.index + operation.deleteCount > target.length) throw new SessionError('public_diff_invalid', 'Patch splice range is out of bounds');
       target.splice(operation.index, operation.deleteCount, ...cloneJson(operation.values));
@@ -92,7 +105,7 @@ export function applyLosslessJsonDiff(before: JsonValue, operations: readonly Js
       } else if (typeof segment !== 'string' || !Object.prototype.hasOwnProperty.call(parent, segment)) {
         throw new SessionError('public_diff_invalid', 'Patch object path does not exist');
       }
-      parent = (parent as Record<string | number, unknown>)[segment];
+      parent = descend(parent as Record<string | number, JsonValue>, segment);
     }
     if (parent === null || typeof parent !== 'object') throw new SessionError('public_diff_invalid', 'Patch parent is not a container');
     const key = operation.path.at(-1)!;

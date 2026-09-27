@@ -1,3 +1,4 @@
+import { wireRoutePenalty } from './barbed-wire';
 import { effectiveZombieMovement, updateZombiePursuit } from './zombie-movement';
 import { allocateUnitId } from './state';
 import { isAviationAction, aviationReason, applyAviationAction, emergencyLanding, unitCanReceiveSupply } from './aircraft';
@@ -46,7 +47,9 @@ import { findNearestOpenTiles, findReachablePaths, findShortestPath, pathMovemen
 import { SeededRng } from './rng';
 import { deriveUnitRecovery } from './recovery';
 import { facilityRecaptureConditions } from './facility-recovery';
-import { BARBED_WIRE_RULES, recordWireAttackCharge, wireAt, wireBuildReason, wireCandidates, wireRoutePenalty } from './barbed-wire';
+import { BARBED_WIRE_RULES, recordWireAttackCharge, wireAt, wireBuildReason, wireCandidates } from './barbed-wire';
+import { refugeeArrivalRange } from './refugees';
+import { beginTurnPresentation, finishTurnPresentation, presentationActor } from './presentation';
 import { createMovementCostResolver, effectiveMovementCost, terrainAdjustedDamage } from './terrain';
 import {
   canUnitSee,
@@ -590,7 +593,7 @@ function placeApprovedRefugees(state: GameState): void {
 function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rng: SeededRng): void {
   const screened = checkpoint.screening;
   if (screened <= 0) return;
-  const probability = screeningProbability(checkpoint.screeningPolicy, checkpoint.waiting, state.config.refugees.screeningCapacity, state.publicHealthStress);
+  const probability = screeningProbability(checkpoint.screeningPolicy, checkpoint.waiting, state.config.refugees.waitingCrowdingThreshold, state.publicHealthStress);
   checkpoint.screening = 0; checkpoint.remainingTurns = 0;
   state.statistics.refugeesScreenedByPolicy[checkpoint.screeningPolicy] += screened;
   state.statistics.refugeesAccepted += screened;
@@ -691,7 +694,7 @@ function processUnmanagedArrival(
       reason: 'unmanaged_pass_through',
     });
   }
-  infectAcceptedRefugees(state, 'road-' + branchId, placements, screeningProbability('passThrough', 0, state.config.refugees.screeningCapacity, state.publicHealthStress), rng);
+  infectAcceptedRefugees(state, 'road-' + branchId, placements, screeningProbability('passThrough', 0, state.config.refugees.waitingCrowdingThreshold, state.publicHealthStress), rng);
 }
 
 function processRefugees(state: GameState, rng: SeededRng): void {
@@ -736,7 +739,8 @@ function processRefugees(state: GameState, rng: SeededRng): void {
       continue;
     }
     if (branch.nextArrivalTurn === state.turn) {
-      const people = rng.nextInt(state.config.refugees.arrivalPeopleMin, state.config.refugees.arrivalPeopleMax);
+      const range = refugeeArrivalRange(state.config.refugees, state.turn);
+      const people = rng.nextInt(range.min, range.max);
       state.population.cumulativeArrivals += people;
       state.statistics.refugeeArrivalsByBranch[branch.branchId] =
         (state.statistics.refugeeArrivalsByBranch[branch.branchId] ?? 0) + people;
@@ -768,7 +772,7 @@ function processRefugees(state: GameState, rng: SeededRng): void {
   }
   for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!['operational', 'remnant'].includes(checkpoint.status)) continue;
-    const probability = waitingProbability(checkpoint.waiting, state.config.refugees.screeningCapacity, state.publicHealthStress);
+    const probability = waitingProbability(checkpoint.waiting, state.config.refugees.waitingCrowdingThreshold, state.publicHealthStress);
     const converted = binomial(checkpoint.waiting, probability, domainRng(state.seed, 'waiting:' + state.turn + ':' + checkpoint.id));
     checkpoint.waitingRiskPercent = probability * 100;
     removeWaitingPeople(checkpoint, converted); checkpoint.infected += converted; addInfectionGrace(checkpoint, converted, state.turn);
@@ -1802,10 +1806,11 @@ function zombieTargets(state: GameState, zombie?: UnitState): HumanTarget[] {
   return [...byPosition.values()].sort((left, right) => left.position.q - right.position.q || left.position.r - right.position.r);
 }
 
-function targetPath(
+export function findZombieTargetPath(
   state: GameState,
   zombie: UnitState,
   target: HumanTarget,
+  purpose: 'movement'|'target_selection' = 'movement',
 ): { path: HexCoord[]; cost: number } | null {
   const occupied = occupiedKeys(state, zombie.id);
   const destinations = getUnitAt(state, target.position)
@@ -1818,7 +1823,9 @@ function targetPath(
   const terrainCost = queryValue(state, 'zombieMovementCostResolver', () => createMovementCostResolver(state));
   const resolveCost = (position: HexCoord) => {
     const cost = terrainCost(position);
-    return cost === null ? null : cost + (state.barbedWire.length ? wireRoutePenalty(state, zombie, position) : 0);
+    // Target priorities retain their old distance/population rules; only the
+    // route to the chosen target changes to the fewest traversable hexes.
+    return cost === null ? null : purpose==='movement'?1:cost+(state.barbedWire.length?wireRoutePenalty(state,zombie,position):0);
   };
   const candidates = destinations
     .map((destination) => {
@@ -1887,7 +1894,7 @@ function terrainDistanceMap(state: Readonly<GameState>, target: HexCoord, zombie
     if (distances.get(hexKey(current.position)) !== current.distance) continue;
     const enteredTile = getTile(state.map, current.position);
     const terrainCost = enteredTile ? effectiveMovementCost(state, current.position, false) : null;
-    const enteredCost = terrainCost === null ? null : terrainCost + wireRoutePenalty(state, zombie, current.position);
+    const enteredCost = terrainCost === null ? null : 1;
     if (enteredCost === null) continue;
     for (const predecessor of hexNeighbors(current.position)) {
       if (!hexWithinBounds(predecessor, state.map.width, state.map.height)) continue;
@@ -1917,7 +1924,7 @@ function congestionFallback(
     zombie.position,
     effectiveZombieMovement(zombie),
     occupied,
-    (position) => effectiveMovementCost(state, position, false),
+    (position) => effectiveMovementCost(state, position, false) === null ? null : 1,
   )
     .map((reachable) => ({
       ...reachable,
@@ -1930,7 +1937,7 @@ function congestionFallback(
   const closer = candidates.filter((candidate) => candidate.targetDistance < currentDistance);
   const pool = closer.length > 0 ? closer : candidates.filter((candidate) => candidate.targetDistance === currentDistance);
   const selected = pool.sort((left, right) =>
-    left.targetDistance - right.targetDistance || left.movementCost - right.movementCost
+    left.targetDistance - right.targetDistance || left.cost - right.cost
       || left.position.q - right.position.q || left.position.r - right.position.r,
   )[0];
   return selected ? { path: selected.path } : null;
@@ -1939,7 +1946,7 @@ function congestionFallback(
 function chooseVisiblePopulationTarget(state: GameState, zombie: UnitState, rng: SeededRng): HumanTarget | null {
   const candidates = zombieTargets(state, zombie)
     .filter((target) => canUnitSee(zombie, target.position))
-    .map((target) => ({ target, path: targetPath(state, zombie, target) }))
+    .map((target) => ({ target, path: findZombieTargetPath(state, zombie, target, 'target_selection') }))
     .filter((candidate): candidate is { target: HumanTarget; path: { path: HexCoord[]; cost: number } } => candidate.path !== null);
   if (candidates.length === 0) return null;
   const minimumCost = Math.min(...candidates.map((candidate) => candidate.path.cost));
@@ -1953,7 +1960,7 @@ function chooseVisiblePopulationTarget(state: GameState, zombie: UnitState, rng:
 
 function hasVisiblePopulationTarget(state: GameState, zombie: UnitState): boolean {
   return zombieTargets(state, zombie).some(
-    (target) => canUnitSee(zombie, target.position) && targetPath(state, zombie, target) !== null,
+    (target) => canUnitSee(zombie, target.position) && findZombieTargetPath(state, zombie, target) !== null,
   );
 }
 
@@ -2249,6 +2256,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
     .map((unit) => unit.id)
     .sort();
   for (const zombieId of zombieIds) {
+    presentationActor(state, zombieId);
     const zombie = getUnit(state, zombieId);
     if (!zombie || (zombie.firstZombieActionTurn ?? 0) > state.turn) continue;
     const occupiedCapital = getFacilityAt(state, zombie.position);
@@ -2323,7 +2331,7 @@ function processZombieTurn(state: GameState, rng: SeededRng): void {
       zombie.previousFallbackPosition = null;
       zombie.fallbackTarget = null;
     }
-    const route = targetPath(state, zombie, target);
+    const route = findZombieTargetPath(state, zombie, target);
     const beforeMove = { ...zombie.position };
     if (route?.path && route.path.length > 1) {
       applyMovement(state, zombie, route.path, effectiveZombieMovement(zombie), 'normal', rng);
@@ -2937,6 +2945,7 @@ function endTurn(state: GameState, rng: SeededRng): ActionError | null {
   if (checkImmediateGameEnd(state)) return null;
   state.phase = 'zombie';
   processZombieTurn(state, rng);
+  presentationActor(state, null);
   if (checkImmediateGameEnd(state)) return null;
   processZombieInfection(state, rng);
   if (checkImmediateGameEnd(state)) return null;
@@ -3266,7 +3275,10 @@ function validateRelocateCheckpointAction(
     return {
       source: null,
       branchId: null,
-      error: error(action, 'unknown_operational_checkpoint', 'Relocation requires an operational checkpoint'),
+      error: { ...error(action, 'unknown_operational_checkpoint', 'Relocation requires the operational active Post on its branch; query checkpoints and roadBranches.activeCheckpointId before retrying.'),
+        details: { reason: source ? 'checkpoint_not_active' : 'checkpoint_id_unknown', branchId: sourceBranchId ?? action.branchId ?? null,
+          activeCheckpointId: (sourceBranch ?? state.roadBranches.find(b => b.branchId === action.branchId))?.activeCheckpointId ?? null,
+          query: { target: 'checkpoints' } } },
     };
   }
   if (hexKey(source.position) === hexKey(action.position)) {
@@ -4599,7 +4611,12 @@ export class GameEngine implements HeadlessGame {
     let actionError: ActionError | null = null;
     if (action.type === 'EndTurn') {
       if (!isPlayerPhase(candidate)) actionError = error(action, 'wrong_phase', 'Turn can only end during the player phase');
-      else actionError = endTurn(candidate, rng);
+      else {
+        beginTurnPresentation(candidate);
+        actionError = endTurn(candidate, rng);
+        const presentation = finishTurnPresentation(candidate);
+        if (!actionError && presentation) emit(candidate, 'zombie_presentation', JSON.parse(JSON.stringify(presentation)));
+      }
     } else if (isAviationAction(action)) { const reason=aviationReason(candidate,action); if(reason) actionError=error(action,reason,reason); else applyAviationAction(candidate,action); }
     else if (action.type === 'Move') actionError = move(candidate, action, rng);
     else if (action.type === 'ChangeUnitMode') actionError = changeUnitMode(candidate, action);

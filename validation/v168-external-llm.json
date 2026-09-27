@@ -1,0 +1,656 @@
+{
+  "version": "1.6.8",
+  "seed": 4,
+  "policy": "External LLM (Codex root), manually chosen actions using only public AiSession context, queries, previews and observations",
+  "result": "lost",
+  "reason": "capitalLost",
+  "finalTurn": 20,
+  "decisions": 56,
+  "accepted": 55,
+  "rejections": [
+    {
+      "decision": 38,
+      "action": {
+        "type": "BuildBarbedWire",
+        "position": {
+          "q": 25,
+          "r": 24
+        }
+      },
+      "error": {
+        "code": "occupied",
+        "message": "occupied"
+      }
+    }
+  ],
+  "metrics": {
+    "infectionLosses": 466,
+    "resourceShortageLosses": 26,
+    "refugeesAccepted": 185,
+    "refugeeArrivalsByBranch": {
+      "east": 97,
+      "north": 140,
+      "south": 124,
+      "west": 119
+    },
+    "totalRefugeeArrivals": 480,
+    "refugeesDeparted": 21,
+    "barbedWireBuilt": 0,
+    "finalFood": 0,
+    "finalCivilianGoods": 242,
+    "simpleFarmsBuilt": 2,
+    "simpleFarmFoodProduced": 800
+  },
+  "statistics": {
+    "waitingInfections": 0,
+    "screeningInfections": 15,
+    "enemyKills": 9,
+    "unitLosses": 7
+  },
+  "finalDecisionHash": "5d9dedf81bb434140e644464e9c1af42960f294e8e4a9d39016891ea570d80d9",
+  "decisionsAndComments": [
+    {
+      "decision": 1,
+      "turn": 1,
+      "action": {
+        "type": "SetCheckpointPolicy",
+        "branchId": "north",
+        "policy": "strict"
+      },
+      "accepted": true,
+      "comment": "食料と民需品は現状で黒字です。四支線を厳格審査にして潜伏感染を防ぎ、初期守備を維持して敵の接近を確認します。"
+    },
+    {
+      "decision": 2,
+      "turn": 1,
+      "action": {
+        "type": "SetCheckpointPolicy",
+        "branchId": "east",
+        "policy": "strict"
+      },
+      "accepted": true,
+      "comment": "食料と民需品は現状で黒字です。四支線を厳格審査にして潜伏感染を防ぎ、初期守備を維持して敵の接近を確認します。"
+    },
+    {
+      "decision": 3,
+      "turn": 1,
+      "action": {
+        "type": "SetCheckpointPolicy",
+        "branchId": "south",
+        "policy": "strict"
+      },
+      "accepted": true,
+      "comment": "食料と民需品は現状で黒字です。四支線を厳格審査にして潜伏感染を防ぎ、初期守備を維持して敵の接近を確認します。"
+    },
+    {
+      "decision": 4,
+      "turn": 1,
+      "action": {
+        "type": "SetCheckpointPolicy",
+        "branchId": "west",
+        "policy": "strict"
+      },
+      "accepted": true,
+      "comment": "食料と民需品は現状で黒字です。四支線を厳格審査にして潜伏感染を防ぎ、初期守備を維持して敵の接近を確認します。"
+    },
+    {
+      "decision": 5,
+      "turn": 1,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "食料と民需品は現状で黒字です。四支線を厳格審査にして潜伏感染を防ぎ、初期守備を維持して敵の接近を確認します。"
+    },
+    {
+      "decision": 6,
+      "turn": 2,
+      "action": {
+        "type": "Move",
+        "unitId": "recon-team-1",
+        "destination": {
+          "q": 26,
+          "r": 27
+        }
+      },
+      "accepted": true,
+      "comment": "偵察隊の前進プレビューは可視敵1体の接触可能性を示しています。州都守備の近くで射撃し、次の公開結果から退避か追撃を判断します。"
+    },
+    {
+      "decision": 7,
+      "turn": 2,
+      "action": {
+        "type": "Attack",
+        "attackerId": "recon-team-1",
+        "targetId": "zombie-17"
+      },
+      "accepted": true,
+      "comment": "偵察隊の前進プレビューは可視敵1体の接触可能性を示しています。州都守備の近くで射撃し、次の公開結果から退避か追撃を判断します。"
+    },
+    {
+      "decision": 8,
+      "turn": 2,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "偵察隊の前進プレビューは可視敵1体の接触可能性を示しています。州都守備の近くで射撃し、次の公開結果から退避か追撃を判断します。"
+    },
+    {
+      "decision": 9,
+      "turn": 3,
+      "action": {
+        "type": "Attack",
+        "attackerId": "recon-team-1",
+        "targetId": "zombie-17"
+      },
+      "accepted": true,
+      "comment": "可視のゾンビは残HP3で射程内です。偵察隊で倒し、追跡移動を受ける前に南東の脅威を減らします。"
+    },
+    {
+      "decision": 10,
+      "turn": 3,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "可視のゾンビは残HP3で射程内です。偵察隊で倒し、追跡移動を受ける前に南東の脅威を減らします。"
+    },
+    {
+      "decision": 11,
+      "turn": 4,
+      "action": {
+        "type": "BuildConstructibleFacility",
+        "facilityType": "simpleFarm",
+        "position": {
+          "q": 20,
+          "r": 26
+        }
+      },
+      "accepted": true,
+      "comment": "食料の赤字を補う農場を設置し、防御隊形を維持して次ターンへ進む。"
+    },
+    {
+      "decision": 12,
+      "turn": 4,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "食料の赤字を補う農場を設置し、防御隊形を維持して次ターンへ進む。"
+    },
+    {
+      "decision": 13,
+      "turn": 5,
+      "action": {
+        "type": "AssignWorkers",
+        "facilityId": "simple-farm-1",
+        "workers": 10
+      },
+      "accepted": true,
+      "comment": "公開プレビューで州都41人を維持でき、食料生産が50増えることを確認した。農場に10人を配置する。"
+    },
+    {
+      "decision": 14,
+      "turn": 5,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "公開プレビューで州都41人を維持でき、食料生産が50増えることを確認した。農場に10人を配置する。"
+    },
+    {
+      "decision": 15,
+      "turn": 6,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "食料と民需は当面維持でき、近接する可視敵がいない。厳格審査の完了を待ちつつ防御位置を保つ。"
+    },
+    {
+      "decision": 16,
+      "turn": 7,
+      "action": {
+        "type": "AssignWorkers",
+        "facilityId": "farm-1",
+        "workers": 30
+      },
+      "accepted": true,
+      "comment": "州都に34人残せる農場増員を実行。燃料が減っているため発電所も5人に増やし、製油所へ電力を回せるか次の資源状態を確認する。"
+    },
+    {
+      "decision": 17,
+      "turn": 7,
+      "action": {
+        "type": "AssignWorkers",
+        "facilityId": "power-plant-1",
+        "workers": 5
+      },
+      "accepted": true,
+      "comment": "州都に34人残せる農場増員を実行。燃料が減っているため発電所も5人に増やし、製油所へ電力を回せるか次の資源状態を確認する。"
+    },
+    {
+      "decision": 18,
+      "turn": 7,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "州都に34人残せる農場増員を実行。燃料が減っているため発電所も5人に増やし、製油所へ電力を回せるか次の資源状態を確認する。"
+    },
+    {
+      "decision": 19,
+      "turn": 8,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "発電増員で燃料が82から106へ増え、食料も黒字へ戻った。敵は接近していないため隊形を維持し、次の襲撃に備える。"
+    },
+    {
+      "decision": 20,
+      "turn": 9,
+      "action": {
+        "type": "AssignWorkers",
+        "facilityId": "civilian-factory-1",
+        "workers": 30
+      },
+      "accepted": true,
+      "comment": "待機列を含めた民需消費が生産を上回り始めた。州都人口を25人残して民需工場を30人に増やし、審査完了後の人口増にも備える。"
+    },
+    {
+      "decision": 21,
+      "turn": 9,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "待機列を含めた民需消費が生産を上回り始めた。州都人口を25人残して民需工場を30人に増やし、審査完了後の人口増にも備える。"
+    },
+    {
+      "decision": 22,
+      "turn": 10,
+      "action": {
+        "type": "BuildConstructibleFacility",
+        "facilityType": "simpleFarm",
+        "position": {
+          "q": 20,
+          "r": 27
+        }
+      },
+      "accepted": true,
+      "comment": "受入人口が増え食料が赤字に戻ったため、2棟目の簡易農場を建設する。襲撃予告の時期に入り、兵力は州都付近に保つ。"
+    },
+    {
+      "decision": 23,
+      "turn": 10,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "受入人口が増え食料が赤字に戻ったため、2棟目の簡易農場を建設する。襲撃予告の時期に入り、兵力は州都付近に保つ。"
+    },
+    {
+      "decision": 24,
+      "turn": 11,
+      "action": {
+        "type": "AssignWorkers",
+        "facilityId": "simple-farm-2",
+        "workers": 10
+      },
+      "accepted": true,
+      "comment": "前進先にはパックを含む3体の接触可能性があるため偵察隊は前進させない。2棟目に10人を配置し、州都周辺で敵を迎え撃つ。"
+    },
+    {
+      "decision": 25,
+      "turn": 11,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "前進先にはパックを含む3体の接触可能性があるため偵察隊は前進させない。2棟目に10人を配置し、州都周辺で敵を迎え撃つ。"
+    },
+    {
+      "decision": 26,
+      "turn": 12,
+      "action": {
+        "type": "Move",
+        "unitId": "recon-team-1",
+        "destination": {
+          "q": 26,
+          "r": 24
+        }
+      },
+      "accepted": true,
+      "comment": "感染した地方都市の敵を射程内から攻撃する。偵察隊は警察隊に隣接する位置へ移動し、敵接近のリスクを承知で射撃する。電力需要増加には発電所6人で対応する。"
+    },
+    {
+      "decision": 27,
+      "turn": 12,
+      "action": {
+        "type": "Attack",
+        "attackerId": "recon-team-1",
+        "targetId": "zombie-46"
+      },
+      "accepted": true,
+      "comment": "最新の合法行動一覧の形式に合わせて、地方都市上のゾンビを攻撃する。発電所を増員して燃料供給を回復する。"
+    },
+    {
+      "decision": 28,
+      "turn": 12,
+      "action": {
+        "type": "AssignWorkers",
+        "facilityId": "power-plant-1",
+        "workers": 6
+      },
+      "accepted": true,
+      "comment": "最新の合法行動一覧の形式に合わせて、地方都市上のゾンビを攻撃する。発電所を増員して燃料供給を回復する。"
+    },
+    {
+      "decision": 29,
+      "turn": 12,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "最新の合法行動一覧の形式に合わせて、地方都市上のゾンビを攻撃する。発電所を増員して燃料供給を回復する。"
+    },
+    {
+      "decision": 30,
+      "turn": 13,
+      "action": {
+        "type": "Attack",
+        "attackerId": "recon-team-1",
+        "targetId": "hunter-zombie-63"
+      },
+      "accepted": true,
+      "comment": "HP16のハンターが警察に接近したため、偵察隊と機動隊の集中攻撃で優先排除する。主農場の感染で食料生産が急減しており、次に鎮圧の手段を確認する。"
+    },
+    {
+      "decision": 31,
+      "turn": 13,
+      "action": {
+        "type": "Attack",
+        "attackerId": "riot-police-1",
+        "targetId": "hunter-zombie-63"
+      },
+      "accepted": true,
+      "comment": "HP16のハンターが警察に接近したため、偵察隊と機動隊の集中攻撃で優先排除する。主農場の感染で食料生産が急減しており、次に鎮圧の手段を確認する。"
+    },
+    {
+      "decision": 32,
+      "turn": 13,
+      "action": {
+        "type": "Attack",
+        "attackerId": "police-1",
+        "targetId": "hunter-zombie-63"
+      },
+      "accepted": true,
+      "comment": "残りHP4のハンターを警察の攻撃で仕留める。農場感染により食料備蓄を取り崩す局面となったが、目の前の敵を減らして州都防衛を維持する。"
+    },
+    {
+      "decision": 33,
+      "turn": 13,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "残りHP4のハンターを警察の攻撃で仕留める。農場感染により食料備蓄を取り崩す局面となったが、目の前の敵を減らして州都防衛を維持する。"
+    },
+    {
+      "decision": 34,
+      "turn": 14,
+      "action": {
+        "type": "Attack",
+        "attackerId": "police-1",
+        "targetId": "zombie-66"
+      },
+      "accepted": true,
+      "comment": "農場と北検問所が崩れ敵が増えた。隣接する敵を警察2隊で集中攻撃し、北側の警察には有刺鉄線を設けて州都への侵入を遅らせる。"
+    },
+    {
+      "decision": 35,
+      "turn": 14,
+      "action": {
+        "type": "Attack",
+        "attackerId": "police-4",
+        "targetId": "zombie-66"
+      },
+      "accepted": true,
+      "comment": "農場と北検問所が崩れ敵が増えた。隣接する敵を警察2隊で集中攻撃し、北側の警察には有刺鉄線を設けて州都への侵入を遅らせる。"
+    },
+    {
+      "decision": 36,
+      "turn": 14,
+      "action": {
+        "type": "Attack",
+        "attackerId": "recon-team-1",
+        "targetId": "zombie-46"
+      },
+      "accepted": true,
+      "comment": "農場と北検問所が崩れ敵が増えた。隣接する敵を警察2隊で集中攻撃し、北側の警察には有刺鉄線を設けて州都への侵入を遅らせる。"
+    },
+    {
+      "decision": 37,
+      "turn": 14,
+      "action": {
+        "type": "Attack",
+        "attackerId": "riot-police-1",
+        "targetId": "zombie-68"
+      },
+      "accepted": true,
+      "comment": "農場と北検問所が崩れ敵が増えた。隣接する敵を警察2隊で集中攻撃し、北側の警察には有刺鉄線を設けて州都への侵入を遅らせる。"
+    },
+    {
+      "decision": 38,
+      "turn": 14,
+      "action": {
+        "type": "BuildBarbedWire",
+        "position": {
+          "q": 25,
+          "r": 24
+        }
+      },
+      "accepted": false,
+      "comment": "農場と北検問所が崩れ敵が増えた。隣接する敵を警察2隊で集中攻撃し、北側の警察には有刺鉄線を設けて州都への侵入を遅らせる。"
+    },
+    {
+      "decision": 39,
+      "turn": 14,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "農場と北検問所が崩れ敵が増えた。隣接する敵を警察2隊で集中攻撃し、北側の警察には有刺鉄線を設けて州都への侵入を遅らせる。"
+    },
+    {
+      "decision": 40,
+      "turn": 15,
+      "action": {
+        "type": "Move",
+        "unitId": "police-3",
+        "destination": {
+          "q": 25,
+          "r": 25
+        }
+      },
+      "accepted": true,
+      "comment": "州都に感染4人が出たため警察を州都に駐留させ、拡大を抑える。HP3の敵と南西の隣接敵を優先して減らす。食料不足は主農場の喪失に起因しており、防衛と感染抑制を先に行う。"
+    },
+    {
+      "decision": 41,
+      "turn": 15,
+      "action": {
+        "type": "Attack",
+        "attackerId": "recon-team-1",
+        "targetId": "zombie-68"
+      },
+      "accepted": true,
+      "comment": "州都に感染4人が出たため警察を州都に駐留させ、拡大を抑える。HP3の敵と南西の隣接敵を優先して減らす。食料不足は主農場の喪失に起因しており、防衛と感染抑制を先に行う。"
+    },
+    {
+      "decision": 42,
+      "turn": 15,
+      "action": {
+        "type": "Attack",
+        "attackerId": "police-1",
+        "targetId": "zombie-75"
+      },
+      "accepted": true,
+      "comment": "州都に感染4人が出たため警察を州都に駐留させ、拡大を抑える。HP3の敵と南西の隣接敵を優先して減らす。食料不足は主農場の喪失に起因しており、防衛と感染抑制を先に行う。"
+    },
+    {
+      "decision": 43,
+      "turn": 15,
+      "action": {
+        "type": "Attack",
+        "attackerId": "police-4",
+        "targetId": "zombie-75"
+      },
+      "accepted": true,
+      "comment": "州都に感染4人が出たため警察を州都に駐留させ、拡大を抑える。HP3の敵と南西の隣接敵を優先して減らす。食料不足は主農場の喪失に起因しており、防衛と感染抑制を先に行う。"
+    },
+    {
+      "decision": 44,
+      "turn": 15,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "州都に感染4人が出たため警察を州都に駐留させ、拡大を抑える。HP3の敵と南西の隣接敵を優先して減らす。食料不足は主農場の喪失に起因しており、防衛と感染抑制を先に行う。"
+    },
+    {
+      "decision": 45,
+      "turn": 16,
+      "action": {
+        "type": "Attack",
+        "attackerId": "recon-team-1",
+        "targetId": "police-zombie-87"
+      },
+      "accepted": true,
+      "comment": "倒れた警察がゾンビ化して州都に隣接している。北側の警察ゾンビを偵察隊、西側を警察2隊で攻撃し、州都駐留による感染封じ込めを続ける。ガスは味方に隣接しているため、今回は先に通常敵を減らす。"
+    },
+    {
+      "decision": 46,
+      "turn": 16,
+      "action": {
+        "type": "Attack",
+        "attackerId": "police-4",
+        "targetId": "police-zombie-86"
+      },
+      "accepted": true,
+      "comment": "倒れた警察がゾンビ化して州都に隣接している。北側の警察ゾンビを偵察隊、西側を警察2隊で攻撃し、州都駐留による感染封じ込めを続ける。ガスは味方に隣接しているため、今回は先に通常敵を減らす。"
+    },
+    {
+      "decision": 47,
+      "turn": 16,
+      "action": {
+        "type": "Attack",
+        "attackerId": "police-3",
+        "targetId": "police-zombie-86"
+      },
+      "accepted": true,
+      "comment": "倒れた警察がゾンビ化して州都に隣接している。北側の警察ゾンビを偵察隊、西側を警察2隊で攻撃し、州都駐留による感染封じ込めを続ける。ガスは味方に隣接しているため、今回は先に通常敵を減らす。"
+    },
+    {
+      "decision": 48,
+      "turn": 16,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "倒れた警察がゾンビ化して州都に隣接している。北側の警察ゾンビを偵察隊、西側を警察2隊で攻撃し、州都駐留による感染封じ込めを続ける。ガスは味方に隣接しているため、今回は先に通常敵を減らす。"
+    },
+    {
+      "decision": 49,
+      "turn": 17,
+      "action": {
+        "type": "Attack",
+        "attackerId": "national-guard-1",
+        "targetId": "pack-zombie-65"
+      },
+      "accepted": true,
+      "comment": "州都に近いガス2体は温存しても感染を広げるため、公開プレビューを確認したうえで削る。南のパックには兵士の射撃を集中し、州都の警察は駐留を継続する。"
+    },
+    {
+      "decision": 50,
+      "turn": 17,
+      "action": {
+        "type": "Attack",
+        "attackerId": "recon-team-1",
+        "targetId": "gas-zombie-91"
+      },
+      "accepted": true,
+      "comment": "州都に近いガス2体は温存しても感染を広げるため、公開プレビューを確認したうえで削る。南のパックには兵士の射撃を集中し、州都の警察は駐留を継続する。"
+    },
+    {
+      "decision": 51,
+      "turn": 17,
+      "action": {
+        "type": "Attack",
+        "attackerId": "police-3",
+        "targetId": "gas-zombie-91"
+      },
+      "accepted": true,
+      "comment": "州都に近いガス2体は温存しても感染を広げるため、公開プレビューを確認したうえで削る。南のパックには兵士の射撃を集中し、州都の警察は駐留を継続する。"
+    },
+    {
+      "decision": 52,
+      "turn": 17,
+      "action": {
+        "type": "Attack",
+        "attackerId": "police-4",
+        "targetId": "gas-zombie-81"
+      },
+      "accepted": true,
+      "comment": "州都に近いガス2体は温存しても感染を広げるため、公開プレビューを確認したうえで削る。南のパックには兵士の射撃を集中し、州都の警察は駐留を継続する。"
+    },
+    {
+      "decision": 53,
+      "turn": 17,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "州都に近いガス2体は温存しても感染を広げるため、公開プレビューを確認したうえで削る。南のパックには兵士の射撃を集中し、州都の警察は駐留を継続する。"
+    },
+    {
+      "decision": 54,
+      "turn": 18,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "防衛部隊が全滅し、州都には敵と感染者が残っている。感染中の編成もできず、攻撃できる部隊がないためターンを進め、敗北処理まで公開状態を確認する。"
+    },
+    {
+      "decision": 55,
+      "turn": 19,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "州都の感染が50人まで増加し、全防衛部隊を失っている。利用できる戦闘・鎮圧手段がないため、公開APIで次の結果を確認する。"
+    },
+    {
+      "decision": 56,
+      "turn": 20,
+      "action": {
+        "type": "EndTurn"
+      },
+      "accepted": true,
+      "comment": "州都は健康な住民7人、感染者105人となった。部隊・生産とも失われ、合法な反撃手段がないため、最終結果を確認する。"
+    }
+  ],
+  "assessment": {
+    "agentDecisions": [
+      "Economic expansion and combat response were too late to retain farms and checkpoints.",
+      "A proposed advance at turn 11 was declined after public contact-risk query showed 3 visible threats, including a pack with maximum next movement 13.",
+      "An occupied wall build was correctly rejected. Input-format mistakes were corrected before entering the decision chain."
+    ],
+    "gameBugsObserved": [],
+    "outcomeIsNotWinRateEvidence": true
+  },
+  "fullPublicZip": "output/v168-external-llm/public-play.zip"
+}

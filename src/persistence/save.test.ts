@@ -129,7 +129,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 24,
+      formatVersion: 25,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-51x51-v9',
       seed: 77,
@@ -242,9 +242,9 @@ describe('v1.6.0 Save Format 17', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(24);
-    expect(envelope.gameVersion).toBe('17.0.0');
-    expect(config.version).toBe('17.0.0');
+    expect(envelope.formatVersion).toBe(25);
+    expect(envelope.gameVersion).toBe('18.0.0');
+    expect(config.version).toBe('18.0.0');
     expect(config.mapId).toBe('fixed-51x51-v9');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
@@ -288,7 +288,7 @@ describe('v1.6.0 Save Format 17', () => {
       units: {
         police: { recruitAttack: 6, noiseClass: 'medium', noiseRadius: 4 },
         riotPolice: { hp: 75, recruitAttack: 9, reanimationUnitType: 'riotZombie', noiseRadius: 5 },
-        riotZombie: { hp: 60, attack: 5 },
+        riotZombie: { hp: 75, attack: 5 },
         hunterZombie: { hp: 20, attack: 15, movement: 15, range: 1, vision: 5 },
         gasZombie: { hp: 35, attack: 5, explosionDamage: 30, explosionInfection: 30 },
         screamerZombie: { hp: 15, attack: 10, movement: 3, range: 1, vision: 2, screamRadius: 30 },

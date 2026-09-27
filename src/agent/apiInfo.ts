@@ -129,8 +129,8 @@ export function createAgentApiInfo(
     actionContracts: {
       AttackHex: { required:['attackerId','position'],example:{type:'AttackHex',attackerId:'fieldArtillery-1',position:{q:25,r:25}},conditions:['deployed and unlocked; one charge and 50 carried Military Goods','visible Hex at distance 10..200, including empty or water; no LOS','preview returns a probability distribution without execution RNG','re-preview after revision changes; human collateral requires confirmation; AI must evaluate all emergency conditions'] },
       ChangeUnitMode: { required:['unitId','mode'],example:{type:'ChangeUnitMode',unitId:'fieldArtillery-1',mode:'deployed'},conditions:['unused artillery this turn, packed/deployed only','no resource payment; all actions and reactions locked until next player turn'] },
-      RelocateCheckpoint: { required: ['checkpointId', 'position'], example: { type: 'RelocateCheckpoint', checkpointId: 'checkpoint-1', position: { q: 25, r: 21 } }, conditions: ['known operational checkpoint', 'same branch', 'visible capital-side road route', 'query construction for current legal destinations'] },
-      BuildBarbedWire: { required: ['position'], example: { type: 'BuildBarbedWire', position: { q: 21, r: 26 } }, conditions: ['query construction facilityType=barbedWire', 'visible supplied empty passable hex', 'visible adjacent and radial inspection area', 'no adjacent enemy', 'radial separation at least 3', 'Civilian Goods 5 + Military Goods 5; one action'] },
+      RelocateCheckpoint: { required: ['checkpointId', 'position'], example: { type: 'RelocateCheckpoint', checkpointId: 'checkpoint-1', position: { q: 25, r: 21 } }, conditions: ['use the current road branch activeCheckpointId; other operational posts are not relocation sources', 'same branch', 'visible capital-side road route', 'query checkpoints and construction at the current revision', 'preview keeps all four queue pools at the old physical post; read actual new IDs from the accepted result'] },
+      BuildBarbedWire: { required: ['position'], example: { type: 'BuildBarbedWire', position: { q: 21, r: 26 } }, conditions: ['query construction facilityType=barbedWire', 'visible supplied empty passable hex', 'reveal the destination, its six neighbors, and all neighbors of each adjacent living wall before validation', 'no adjacent enemy', 'new and existing living walls each have at most two adjacent living walls; closed rings are allowed', 'Civilian Goods 5 + Military Goods 5; one action'] },
       Move: { required: ['unitId', 'destination'], example: { type: 'Move', unitId: 'police-1', destination: { q: 24, r: 25 } }, conditions: ['legal destination', 'move budget', 'supply/fuel projection'] },
       Attack: { required: ['attackerId', 'targetId'], example: { type: 'Attack', attackerId: 'police-1', targetId: 'zombie-1' }, conditions: ['visible enemy', 'range', 'charge', 'military goods'] },
       AssignWorkers: { required: ['facilityId', 'workers'], example: { type: 'AssignWorkers', facilityId: 'farm-1', workers: 20 }, conditions: ['absolute worker count', 'safe eligible facility', 'city population snapshot'] },
@@ -157,6 +157,12 @@ export function createAgentApiInfo(
       details: 'Session compact responses retain resource bounds, gaps, utilization and reasons. query forecast returns intermediate stages, per-facility inactive reasons and residentSoftCapRatedCeiling/residentSoftCapGap at its revision.',
     },
     publicInformation: [
+      'Preview Move.contactRisk lists visible enemies, distance, base/latest/max-next movement including the possible pursuit bonus, attack range and public terrain/obstacle conditions. It is advisory, never a safety guarantee or an additional Move restriction.',
+      'Preview recruitment and worker withdrawal before committing. Read capitalResidentDelta and capitalResidents; removing city residents reduces their Food/Civilian Goods output and can exceed the new unit upkeep.',
+      'Field Artillery has minimum range 10. Enemies closer than 10 hexes cannot be targeted with its area attack.',
+      'Human deaths can reanimate: Riot Police becomes Riot Zombie, soldiers become Soldier Zombie, Special Forces becomes Pack. Inspect the actual public events and new IDs.',
+      'A Gas Zombie explosion can spawn ordinary zombies. Destroying the gas carrier does not necessarily clear its Final Horde group; use victoryProgress and group completion.',
+      'For a lost response, retry the identical action with the same requestId and expectedRevision. For stale_revision, refresh status/query and choose a new requestId at the new revision. Never blindly replay a mutation with a new requestId.',
       'Use getObservation() for current public facts and getLegalActions() for currently legal operations.',
       'Call step() with one listed action at a time until isGameOver() is true.',
       'All returned values are detached JSON-compatible copies.',
@@ -248,7 +254,7 @@ export function createAgentApiInfo(
           population: getNumber(riotPolice, 'population', 10),
         },
         zombie: {
-          hp: getNumber(riotZombie, 'hp', 60),
+          hp: getNumber(riotZombie, 'hp', 75),
           attack: getNumber(riotZombie, 'attack', 5),
           movement: getNumber(riotZombie, 'movement', 3),
           range: getNumber(riotZombie, 'range', 1),
@@ -438,6 +444,8 @@ export function createAgentApiInfo(
         activePerBranchLimit: 1,
         preparedPostLimit: config.checkpoint.maxPreparedPostsPerDirection,
         screeningCapacity: config.refugees.screeningCapacity,
+        waitingCrowdingThreshold: config.refugees.waitingCrowdingThreshold,
+        arrivalGrowth: { initialUpper: config.refugees.arrivalPeopleMax, intervalTurns: config.refugees.arrivalGrowthInterval, peoplePerInterval: config.refugees.arrivalGrowthPeople },
         estimatedScreeningThroughputByPolicy: {
           passThrough: config.refugees.screeningCapacity / Math.max(1, policies.passThrough.turns),
           normal: config.refugees.screeningCapacity / Math.max(1, policies.normal.turns),

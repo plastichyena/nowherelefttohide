@@ -8,12 +8,15 @@ import { RULES_V164 } from '../core/rules-v164';
 
 export function renderArtilleryPreview(preview: ArtilleryPreview, locale: Locale): string {
   const ja=locale==='ja';
-  return `<div class="artillery-preview"><strong>${ja?'砲撃照準':'Artillery aim'} ${preview.aimedHex.q},${preview.aimedHex.r} · ${ja?'命中率':'Hit'} ${preview.hitProbability*100}%</strong><p>${ja?'軍需品':'Military Goods'} −${preview.militaryGoodsCost} · ${ja?'爆風が届き得るHex':'Possible blast Hexes'} ${preview.possibleBlastHexes.length}</p>${preview.immediateDefeatPossible?`<p class="warning-text">${ja?'即時敗北の可能性があります。':'Immediate defeat is possible.'}</p>`:''}${preview.friendlyFirePossible?`<p class="warning-text">${ja?'味方・健康人口への被害の可能性':'Friendly units / healthy people at risk'}: ${preview.friendlyUnitIdsAtRisk.map(escapeHtml).join(', ')} ${preview.populationRisks.filter(p=>p.healthyPeoplePossible).map(p=>`${escapeHtml(p.siteId)} (${p.healthyPopulation??(ja?'人数非公開':'unknown population')})`).join(', ')}</p>`:''}<details><summary>${ja?'着弾候補・確率と人口被害':'Impact probabilities and population damage'}</summary><p>${preview.possibleImpactHexes.map(i=>`${i.position.q},${i.position.r}: ${(i.probability*100).toFixed(2)}%`).join(' · ')}</p><p>${ja?'各対象へ地形補正。直撃100%／隣接50%。以下は直接被害の期待値、連鎖は別途危険範囲で表示。':'Terrain applies per target: impact 100%, adjacent 50%. Expectations below are direct damage; chains are shown as additional risk.'}</p>${preview.populationRisks.map(p=>`<p>${escapeHtml(p.siteId)} · ${ja?'地形':'Terrain'} ×${p.terrainDamageMultiplier}: ${ja?'最大 / 期待死者':'Max / expected deaths'} ${p.maxDirectDeaths} / ${p.expectedDirectDeaths?.toFixed(2)??'?'}</p>`).join('')}${preview.unitRisks.map(u=>`<p>${escapeHtml(u.unitId)} · ${ja?'地形':'Terrain'} ×${u.terrainDamageMultiplier} · ${ja?'直接被害期待値':'Expected direct damage'} ${u.expectedDamage.toFixed(2)} · ${ja?'最大被害（連鎖含む）':'Max damage including chains'} ${u.maxDamage}</p>`).join('')}<p>${ja?'公開Gas連鎖が届き得るHex':'Known Gas-chain Hexes'}: ${preview.knownGasChainHexes.length}</p></details></div>`;
+  return `<div class="artillery-preview"><strong>${ja?'砲撃照準':'Artillery aim'} ${preview.aimedHex.q},${preview.aimedHex.r} · ${ja?'命中率':'Hit'} ${preview.hitProbability*100}%</strong><p>${ja?'軍需品':'Military Goods'} −${preview.militaryGoodsCost} · ${ja?'爆風が届き得るヘックス':'Possible blast Hexes'} ${preview.possibleBlastHexes.length}</p>${preview.immediateDefeatPossible?`<p class="warning-text">${ja?'即時敗北の可能性があります。':'Immediate defeat is possible.'}</p>`:''}${preview.friendlyFirePossible?`<p class="warning-text">${ja?'味方・健康人口への被害の可能性':'Friendly units / healthy people at risk'}: ${preview.friendlyUnitIdsAtRisk.map(escapeHtml).join(', ')} ${preview.populationRisks.filter(p=>p.healthyPeoplePossible).map(p=>`${escapeHtml(p.siteId)} (${p.healthyPopulation??(ja?'人数非公開':'unknown population')})`).join(', ')}</p>`:''}<details><summary>${ja?'着弾候補・確率と人口被害':'Impact probabilities and population damage'}</summary><p>${preview.possibleImpactHexes.map(i=>`${i.position.q},${i.position.r}: ${(i.probability*100).toFixed(2)}%`).join(' · ')}</p><p>${ja?'各対象へ地形補正。直撃100%／隣接50%。以下は直接被害の期待値、連鎖は別途危険範囲で表示。':'Terrain applies per target: impact 100%, adjacent 50%. Expectations below are direct damage; chains are shown as additional risk.'}</p>${preview.populationRisks.map(p=>`<p>${escapeHtml(p.siteId)} · ${ja?'地形':'Terrain'} ×${p.terrainDamageMultiplier}: ${ja?'最大 / 期待死者':'Max / expected deaths'} ${p.maxDirectDeaths} / ${p.expectedDirectDeaths?.toFixed(2)??'?'}</p>`).join('')}${preview.unitRisks.map(u=>`<p>${escapeHtml(u.unitId)} · ${ja?'地形':'Terrain'} ×${u.terrainDamageMultiplier} · ${ja?'直接被害期待値':'Expected direct damage'} ${u.expectedDamage.toFixed(2)} · ${ja?'最大被害（連鎖含む）':'Max damage including chains'} ${u.maxDamage}</p>`).join('')}<p>${ja?'公開ガス連鎖が届き得るヘックス':'Known Gas-chain Hexes'}: ${preview.knownGasChainHexes.length}</p></details></div>`;
 }
 import { renderHealthDetails, renderNuclearObjective } from './publicHealth';
 import { RULES_V163 } from '../core/rules-v163';
 import { roadConnections } from '../core/roads';
 import { showReplay } from '../replay/view';
+import { TurnPlayback, turnPresentation, createPlaybackControls } from './turnPlayback';
+import { presentationState } from './presentationState';
+import { refugeeArrivalProjection } from '../core/refugees';
 import { createDefaultConfig } from '../core/config';
 import { effectiveZombieMovement } from '../core/zombie-movement';
 import {
@@ -1363,7 +1366,7 @@ export function resolveTileSelection(
 
 function unselectedPrompt(mode: NavigationMode, locale: Locale): string {
   const t = createTranslator(locale);
-  if (mode === 'domestic') return locale === 'ja' ? '施設または幹線道路Hexを選択してください' : 'Select a facility or trunk-road Hex';
+  if (mode === 'domestic') return locale === 'ja' ? '施設または幹線道路ヘックスを選択してください' : 'Select a facility or trunk-road Hex';
   return t('selectUnit');
 }
 
@@ -1770,7 +1773,7 @@ function configLegendEntries(
   });
   const earlyWeights = hordeMixedSlotWeightsLabel(config, locale, false);
   const lateWeights = hordeMixedSlotWeightsLabel(config, locale, true);
-  add('specialSlotWeights', t('legendSpecialSlotWeights'), `${locale==='ja'?'全Wave':'Every Wave'}: ${lateWeights}`);
+  add('specialSlotWeights', t('legendSpecialSlotWeights'), `${locale==='ja'?'全襲撃':'Every Wave'}: ${lateWeights}`);
   add('specialSlotCaps', t('legendSpecialSlotCaps'), `${unitLabel('riotZombie', locale)} ${config.horde.riotZombieCapPerDirection} · ${unitLabel('hunterZombie', locale)} ${config.horde.hunterZombieCapPerDirection??'∞'} · ${unitLabel('gasZombie', locale)} ∞`);
   add('initialHunterCount', t('legendInitialHunterCount'), `${config.economy.initialHunterCount.min}–${config.economy.initialHunterCount.max}`);
   add('initialHunterDistance', t('legendInitialHunterDistance'), String(config.economy.initialHunterMinDistance));
@@ -1801,12 +1804,12 @@ function configLegendEntries(
 
 function legendDescription(key: string, locale: Locale, t: (key: string, fallback?: string) => string): string {
   const descriptions: Record<string, [string,string]> = {
-    plain:['草地のHex。','Grassland hex.'], forest:['樹木が集まったHex。','A cluster of trees.'], mountain:['岩山のHex。','Rocky mountain hex.'], water:['水面のHex。','Water hex.'],
-    road:['Hexをつなぐ道路。','Road connecting hexes.'], bridge:['水面を渡る橋。','Bridge across water.'], urban:['建物が並ぶ市街地。','Built-up area with buildings.'],
+    plain:['草地のヘックス。','Grassland hex.'], forest:['樹木が集まったヘックス。','A cluster of trees.'], mountain:['岩山のヘックス。','Rocky mountain hex.'], water:['水面のヘックス。','Water hex.'],
+    road:['ヘックスをつなぐ道路。','Road connecting hexes.'], bridge:['水面を渡る橋。','Bridge across water.'], urban:['建物が並ぶ市街地。','Built-up area with buildings.'],
     police:['警察制服の歩兵。','Infantry in police uniform.'], nationalGuard:['軍装の歩兵。','Infantry in military uniform.'], riotPolice:['盾と防具を持つ機動隊。','Riot Police with shields and armor.'], reconTeam:['偵察装備の歩兵。','Infantry with reconnaissance gear.'], specialForces:['特殊装備の歩兵。','Infantry with special operations gear.'],
-    zombie:['通常のZombie。','Normal Zombie.'], hordeZombie:['大型のHorde Zombie。','Large Horde Zombie.'], policeZombie:['警察制服が残るZombie。','Zombie in a police uniform.'], soldierZombie:['軍装が残るZombie。','Zombie in military uniform.'], riotZombie:['盾と防具が残るZombie。','Zombie with shields and armor.'], hunterZombie:['筋肉と長い爪が目印。','Recognizable by its muscles and long claws.'], gasZombie:['膨張した体が目印。','Recognizable by its swollen body.'], screamerZombie:['叫ぶ姿勢が目印。','Recognizable by its screaming pose.'], packZombie:['複数個体の集団。','A group of several creatures.'],
-    reliefSupplyCenter:['物資の受付棟と倉庫。','Supply reception and warehouse.'], capital:['中心都市の建物。','Capital city buildings.'], city:['地方都市の建物。','Regional city buildings.'], farm:['畑と農業施設。','Fields and farm buildings.'], civilianFactory:['民需工場の建物。','Civilian factory buildings.'], militaryFactory:['軍需工場の建物。','Military factory buildings.'], oilField:['採油設備。','Oil extraction equipment.'], refinery:['石油精製設備。','Oil refining equipment.'], powerPlant:['火力発電設備。','Thermal power equipment.'], nuclearPowerPlant:['原子力発電設備。','Nuclear power equipment.'], windPowerPlant:['風車。','Wind turbine.'], simpleFarm:['小規模な畑。','Small farm plots.'], civilianDroneBase:['ドローン基地の設備。','Civilian drone equipment.'], temporaryHousing:['仮設住宅の並び。','Rows of temporary homes.'], armyBase:['軍用車両と基地施設。','Military vehicles and base buildings.'], airBase:['滑走路と格納庫。','Runway and hangars.'], checkpoint:['道路上の検問設備。','Checkpoint equipment on a road.'], barbedWire:['Hex上の有刺鉄線。','Barbed wire on the hex.'],
-    periodic:['周期Hordeの所属マーカー。','Periodic Horde membership marker.'], final:['Final Hordeの所属マーカー。','Final Horde membership marker.'], spawnReserve:['盤面外周のR表示。','R markers along the map border.'],
+    zombie:['通常のゾンビ。','Normal Zombie.'], hordeZombie:['大型のゾンビの大群。','Large Horde Zombie.'], policeZombie:['警察制服が残るゾンビ。','Zombie in a police uniform.'], soldierZombie:['軍装が残るゾンビ。','Zombie in military uniform.'], riotZombie:['盾と防具が残るゾンビ。','Zombie with shields and armor.'], hunterZombie:['筋肉と長い爪が目印。','Recognizable by its muscles and long claws.'], gasZombie:['膨張した体が目印。','Recognizable by its swollen body.'], screamerZombie:['叫ぶ姿勢が目印。','Recognizable by its screaming pose.'], packZombie:['複数個体の集団。','A group of several creatures.'],
+    reliefSupplyCenter:['物資の受付棟と倉庫。','Supply reception and warehouse.'], capital:['中心都市の建物。','Capital city buildings.'], city:['地方都市の建物。','Regional city buildings.'], farm:['畑と農業施設。','Fields and farm buildings.'], civilianFactory:['民需工場の建物。','Civilian factory buildings.'], militaryFactory:['軍需工場の建物。','Military factory buildings.'], oilField:['採油設備。','Oil extraction equipment.'], refinery:['石油精製設備。','Oil refining equipment.'], powerPlant:['火力発電設備。','Thermal power equipment.'], nuclearPowerPlant:['原子力発電設備。','Nuclear power equipment.'], windPowerPlant:['風車。','Wind turbine.'], simpleFarm:['小規模な畑。','Small farm plots.'], civilianDroneBase:['ドローン基地の設備。','Civilian drone equipment.'], temporaryHousing:['仮設住宅の並び。','Rows of temporary homes.'], armyBase:['軍用車両と基地施設。','Military vehicles and base buildings.'], airBase:['滑走路と格納庫。','Runway and hangars.'], checkpoint:['道路上の検問設備。','Checkpoint equipment on a road.'], barbedWire:['ヘックス上の有刺鉄線。','Barbed wire on the hex.'],
+    periodic:['周期襲撃の所属マーカー。','Periodic Horde membership marker.'], final:['最終襲撃の所属マーカー。','Final Horde membership marker.'], spawnReserve:['盤面外周のR表示。','R markers along the map border.'],
     unowned:['未確保のマーカー。','Unsecured marker.'], owned:['確保済みのマーカー。','Secured marker.'], stopped:['停止のマーカー。','Stopped marker.'], infected:['感染のマーカー。','Infection marker.'], ruined:['荒廃のマーカー。','Ruined marker.'], operational:['稼働中のマーカー。','Operational marker.'], abandoned:['放棄のマーカー。','Abandoned marker.'], remnant:['跡地のマーカー。','Remnant marker.'],
   };
   return descriptions[key]?.[locale==='ja'?0:1] ?? t(key);
@@ -2172,7 +2175,7 @@ function unitLabel(type: string, locale: Locale): string {
     specialForces: ['特殊部隊', 'Special Forces'],
     packZombie: ['Pack Zombie', 'Pack Zombie'],
     zombie: ['ゾンビ', 'Zombie'],
-    hordeZombie: ['Hordeゾンビ', 'Horde Zombie'],
+    hordeZombie: ['襲撃ゾンビ', 'Horde Zombie'],
     policeZombie: ['警察ゾンビ', 'Police Zombie'],
     soldierZombie: ['兵士ゾンビ', 'Soldier Zombie'],
     riotZombie: ['機動隊ゾンビ', 'Riot Zombie'],
@@ -2263,7 +2266,7 @@ function renderResourceAccordionPanel(
     if (resource === 'food' || resource === 'civilianGoods') {
       const breakdown = forecast.maintenanceBreakdown?.[resource];
       if (breakdown) rows.push([locale === 'ja' ? '基本維持費 / 過密 / 住宅停電' : 'Base / overcrowding / housing outage', `${breakdown.base} / ${breakdown.overcrowding} / ${breakdown.housingOutage}`]);
-      if (resource === 'food') rows.push([locale === 'ja' ? '民間人Food / 軍人人口Food（予約含む）' : 'Civilian Food / military Food (including reservations)', `${forecast.maintenanceBreakdown.food.civilians} / ${forecast.maintenanceBreakdown.food.military}`]);
+      if (resource === 'food') rows.push([locale === 'ja' ? '民間人食料 / 軍人人口食料（予約含む）' : 'Civilian Food / military Food (including reservations)', `${forecast.maintenanceBreakdown.food.civilians} / ${forecast.maintenanceBreakdown.food.military}`]);
       const people = forecast.maintenancePopulation;
       if (people) rows.push([locale === 'ja' ? '住民 / 労働者 / 部隊' : 'Residents / workers / units', `${people.residents} / ${people.workers} / ${people.units}`], ['Queue waiting / screening / approved', `${people.queue.waiting} / ${people.queue.screening} / ${people.queue.approved}`]);
     }
@@ -2556,7 +2559,7 @@ export function renderAttackPreview(preview: AgentAttackPreview, locale: Locale,
   const t = createTranslator(locale);
   const shortage = baseAttack !== undefined && preview.effectiveAttack < baseAttack;
   const gas = preview.gasExplosion;
-  const gasDetail = !gas ? '' : `<details class="gas-preview"><summary>${locale === 'ja' ? 'Gas死亡爆発' : 'Gas death explosion'}: ${gas.trigger === 'nonlethal_no_explosion' ? (locale === 'ja' ? '非致死・即時爆発なし' : 'Nonlethal: no immediate explosion') : gas.explosions.length}</summary><p>${locale === 'ja' ? '現在公開されている対象のみ。隠蔽範囲、再蘇生・拠点Spawnの二次効果、将来の敵行動は予測しません。' : 'Currently public entities only. Unobserved entities, reanimation/site-spawn consequences and future enemy actions are not predicted.'}</p>${gas.units.map(u => `<p>${escapeHtml(u.unitId)} (${escapeHtml(u.side)}): HP ${u.hpBefore} → ${u.hpAfter}${u.lethal ? ' ×' : ''}</p>`).join('')}${gas.sites.map(f => `<p>${escapeHtml(f.siteId)}: ${locale === 'ja' ? '感染' : 'Infection'} +${f.infected}, ${f.healthyBefore} → ${f.healthyAfter}${f.falls ? (locale === 'ja' ? ' / 陥落' : ' / Falls') : ''}</p>`).join('')}</details>`;
+  const gasDetail = !gas ? '' : `<details class="gas-preview"><summary>${locale === 'ja' ? 'ガス死亡爆発' : 'Gas death explosion'}: ${gas.trigger === 'nonlethal_no_explosion' ? (locale === 'ja' ? '非致死・即時爆発なし' : 'Nonlethal: no immediate explosion') : gas.explosions.length}</summary><p>${locale === 'ja' ? '現在公開されている対象のみ。隠蔽範囲、再蘇生・拠点Spawnの二次効果、将来の敵行動は予測しません。' : 'Currently public entities only. Unobserved entities, reanimation/site-spawn consequences and future enemy actions are not predicted.'}</p>${gas.units.map(u => `<p>${escapeHtml(u.unitId)} (${escapeHtml(u.side)}): HP ${u.hpBefore} → ${u.hpAfter}${u.lethal ? ' ×' : ''}</p>`).join('')}${gas.sites.map(f => `<p>${escapeHtml(f.siteId)}: ${locale === 'ja' ? '感染' : 'Infection'} +${f.infected}, ${f.healthyBefore} → ${f.healthyAfter}${f.falls ? (locale === 'ja' ? ' / 陥落' : ' / Falls') : ''}</p>`).join('')}</details>`;
 
   return `<div class="attack-preview-detail" data-attack-preview="${escapeHtml(preview.targetUnitId)}"><span>${escapeHtml(t('distance'))} <b>${preview.distance}</b></span><span>${escapeHtml(t('attackMilitaryGoodsCost'))} <b>${preview.militaryGoodsCost}</b></span><span>${escapeHtml(t('militaryGoodsAfterAttack'))} <b>${preview.projectedMilitaryGoodsAfterAttack}</b></span><span>${escapeHtml(t('effectiveAttack'))} <b>${preview.effectiveAttack}</b></span><span>${escapeHtml(t('damageBeforeTerrain'))} <b>${preview.projectedDamageBeforeTerrain}</b> → ${escapeHtml(t('damageAfterTerrain'))} <b>${preview.projectedDamageAfterTerrain}</b></span>${shortage ? `<strong class="warning-text">${escapeHtml(t('militaryGoodsWeakAttackWarning'))}</strong>` : ''}${gasDetail}</div>`;
 }
@@ -2663,7 +2666,7 @@ export function localizeActionError(code: string | undefined, locale: Locale): s
     insufficient_civilian_goods: locale === 'ja' ? '民需品が不足しています。' : 'Civilian goods are insufficient.',
     insufficient_military_goods: locale === 'ja' ? '軍需品が不足しています。' : 'Military goods are insufficient.',
     invalid_unit_type: locale === 'ja' ? 'このユニットは編成できません。' : 'This unit type cannot be produced.',
-    invalid_recruitment_hub: locale === 'ja' ? 'このUnitは選択中の編成拠点では編成できません。兵士は州都または陸軍基地、警察と機動隊は州都または地方都市が対象です。' : 'This unit cannot be recruited at the selected hub. Soldier uses the capital or Army Base; Police and Riot Police use the capital or a city.',
+    invalid_recruitment_hub: locale === 'ja' ? 'この部隊は選択中の編成拠点では編成できません。兵士は州都または陸軍基地、警察と機動隊は州都または地方都市が対象です。' : 'This unit cannot be recruited at the selected hub. Soldier uses the capital or Army Base; Police and Riot Police use the capital or a city.',
     insufficient_production_cost: locale === 'ja' ? '都市住民または資源が不足しています。最後の健全民間人口を使う編成もできません。' : 'Eligible city residents or supplies are insufficient; recruitment cannot use the last healthy civilian.',
     city_busy: locale === 'ja' ? 'この拠点には既に編成予約があります。' : 'This hub already has a recruitment reservation.',
     no_production_city: locale === 'ja' ? '編成できる拠点がありません。' : 'No eligible recruitment hub can produce this unit.',
@@ -2691,19 +2694,19 @@ export function localizeActionError(code: string | undefined, locale: Locale): s
     checkpoint_same_position: locale === 'ja' ? '別の道路タイルを選択してください。' : 'Choose a different road tile.',
     unknown_operational_checkpoint: locale === 'ja' ? '移設できる稼働中の検問所を選択してください。' : 'Select an operational checkpoint to relocate.',
     checkpoint_abandoned_forward_block: t('abandonedForwardBlock'),
-    power_supply_not_applicable: locale === 'ja' ? '電力供給を変更できるのはFarm・民需工場・軍需工場・Refinery・Civilian Drone Baseです。' : 'Power Supply can only be changed for Farms, Civilian Factories, Military Factories, Refineries, and Civilian Drone Bases.',
+    power_supply_not_applicable: locale === 'ja' ? '電力供給を変更できるのはFarm・民需工場・軍需工場・Refinery・民間ドローン基地です。' : 'Power Supply can only be changed for Farms, Civilian Factories, Military Factories, Refineries, and Civilian Drone Bases.',
     power_supply_unavailable: locale === 'ja' ? '所有中で安全かつ操作可能な産業施設だけ変更できます。' : 'Only an owned, safe, and available industrial facility can change Power Supply.',
-    invalid_power_supply: locale === 'ja' ? 'Power SupplyはONまたはOFFで指定してください。' : 'Power Supply must be ON or OFF.',
-    insufficient_unit_fuel: locale === 'ja' ? '移動Fuelが不足しています。' : 'The Unit does not have enough Fuel for this move.',
+    invalid_power_supply: locale === 'ja' ? 'Power 補給圏はONまたはOFFで指定してください。' : 'Power Supply must be ON or OFF.',
+    insufficient_unit_fuel: locale === 'ja' ? '移動燃料が不足しています。' : 'The Unit does not have enough Fuel for this move.',
     constructible_out_of_supply: t('buildSupplyRequired'),
-    constructible_not_visible: locale === 'ja' ? '建設先Hexを現在の視界に入れてください。' : 'Bring the construction Hex into current vision.',
+    constructible_not_visible: locale === 'ja' ? '建設先ヘックスを現在の視界に入れてください。' : 'Bring the construction Hex into current vision.',
     constructible_invalid_terrain: locale === 'ja' ? '建設にはPlainが必要です。' : 'Only Plain terrain can be built on.',
-    constructible_road_blocked: locale === 'ja' ? 'Road Hexには建設できません。' : 'Road Hexes cannot be built on.',
-    constructible_entrance_blocked: locale === 'ja' ? 'Horde Entranceには建設できません。' : 'Horde Entrances cannot be built on.',
-    constructible_facility_occupied: locale === 'ja' ? '既存FacilityがあるHexには建設できません。' : 'A facility already occupies this Hex.',
-    constructible_checkpoint_occupied: locale === 'ja' ? 'CheckpointがあるHexには建設できません。' : 'A Checkpoint already occupies this Hex.',
-    constructible_player_unit_occupied: locale === 'ja' ? 'Player UnitがいるHexには建設できません。' : 'A player Unit occupies this Hex.',
-    constructible_visible_zombie_occupied: locale === 'ja' ? '視認中ZombieがいるHexには建設できません。' : 'A visible Zombie occupies this Hex.',
+    constructible_road_blocked: locale === 'ja' ? 'Road ヘックスには建設できません。' : 'Road Hexes cannot be built on.',
+    constructible_entrance_blocked: locale === 'ja' ? '襲撃 Entranceには建設できません。' : 'Horde Entrances cannot be built on.',
+    constructible_facility_occupied: locale === 'ja' ? '既存Facilityがあるヘックスには建設できません。' : 'A facility already occupies this Hex.',
+    constructible_checkpoint_occupied: locale === 'ja' ? 'Checkpointがあるヘックスには建設できません。' : 'A Checkpoint already occupies this Hex.',
+    constructible_player_unit_occupied: locale === 'ja' ? 'Player 部隊がいるヘックスには建設できません。' : 'A player Unit occupies this Hex.',
+    constructible_visible_zombie_occupied: locale === 'ja' ? '視認中Zombieがいるヘックスには建設できません。' : 'A visible Zombie occupies this Hex.',
     horde_spawn_reserve: t('spawnReserveReason'),
     player_occupancy_forbidden: t('spawnReserveReason'),
     constructible_facility_limit_reached: locale === 'ja' ? 'このFacility Typeの建設上限に達しています。' : 'The per-type constructible facility limit has been reached.',
@@ -2888,6 +2891,8 @@ function asPreview(value: unknown, fallback: { unit: UnitState; destination: Hex
 }
 
 export class GameUiController {
+  private readonly turnPlayback = new TurnPlayback();
+  private playbackControls: HTMLElement | null = null;
   private readonly root: HTMLElement;
   private readonly createEngine: EngineFactory;
   private readonly store: AutoSaveStore;
@@ -2902,6 +2907,7 @@ export class GameUiController {
   private state: Readonly<GameState> | null = null;
   private boardGame: Phaser.Game | null = null;
   private boardScene: HexBoardScene | null = null;
+  private lastBoardRender: BoardRenderState | null = null;
   /** Query Context is reused for every read in one committed UI state. */
   private queryContext: UiQueryContext | null = null;
   private queryEngine: UiGameEngine | null = null;
@@ -3456,7 +3462,11 @@ export class GameUiController {
   }
 
   private destroyBoard(): void {
+    this.turnPlayback.cancel();
+    this.playbackControls?.remove();this.playbackControls=null;
+    for(const child of this.root.children)if(child instanceof HTMLElement)child.inert=false;
     this.boardScene = null;
+    this.lastBoardRender = null;
     if (this.boardGame) {
       this.boardGame.destroy(true);
       this.boardGame = null;
@@ -3721,6 +3731,7 @@ export class GameUiController {
   }
 
   private updateView(): void {
+    if(this.turnPlayback.active)return;
     if (!this.state || !this.engine || this.screen !== 'game') return;
     this.updateHud();
     this.renderSheetBody();
@@ -3941,6 +3952,7 @@ export class GameUiController {
       constructibleFacilityInvalidPreviewPositions: constructiblePreview.invalidPositions,
       constructibleFacilityPreviewSelected: this.constructiblePreviewTarget,
     };
+    this.lastBoardRender=render;
     this.boardScene.updateState(render);
   }
 
@@ -4277,6 +4289,7 @@ export class GameUiController {
   }
 
   private onTileTap(position: HexCoord): void {
+    if(this.turnPlayback.active)return;
     if (!this.state || !this.engine) return;
     if (this.droneTargetFacilityId) { this.showAviationPreview({type:'LaunchMilitaryDrone',facilityId:this.droneTargetFacilityId,target:position}); return; }
     if (this.constructiblePlacement) {
@@ -4498,7 +4511,7 @@ export class GameUiController {
       this.pendingAttackTargetId = null;
     this.pendingArtilleryTarget = null;
       this.updateView();
-      if (this.state?.gameOver) this.showStatistics(this.state.result);
+      if (this.state?.gameOver && !this.turnPlayback.active) this.showStatistics(this.state.result);
     }
   }
 
@@ -5055,6 +5068,7 @@ export class GameUiController {
   }
 
   private apply(action: GameAction): boolean {
+    if(this.turnPlayback.active)return false;
     if (!this.engine || !this.state) return false;
     const listed = isLegalAction(this.legalActions(), action);
     const reason = actionReasonFor(this.state, action, this.locale);
@@ -5075,15 +5089,35 @@ export class GameUiController {
     this.invalidateQueryContext();
     this.hasUnsavedChanges = true;
     this.saveStatus = 'none';
-    this.notifyImportantEvents(result.events ?? [], previousState);
     this.checkpointPlacementMessage = null;
     // v1.5.2 keeps one human autosave checkpoint per meaningful boundary:
     // new game, successful EndTurn at the next player turn, and final game
     // over. Other accepted actions remain dirty until that boundary or an
     // explicit Save action.
     if (result.gameOver || (action.type === 'EndTurn' && this.state.phase === 'player')) this.autosave();
-    this.updateView();
-    if (result.gameOver && result.result) this.showStatistics(result.result);
+    let preparedBoard:BoardRenderState|null=null;
+    const finish = () => {
+      this.playbackControls?.remove();this.playbackControls=null;
+      for(const child of this.root.children)if(child instanceof HTMLElement)child.inert=false;
+      this.notifyImportantEvents(result.events ?? [], previousState);
+      if(preparedBoard)this.boardScene?.updateState(preparedBoard);else this.updateView();
+      if (result.gameOver && result.result) this.showStatistics(result.result);
+    };
+    const presentation=action.type==='EndTurn'?turnPresentation(result.events??[]):null;
+    if(presentation&&this.boardScene) {
+      // Resolve final UI projections once before playback. Skip must not run
+      // economy/legality queries or rebuild every panel on its input handler.
+      this.selection=null;this.unitActionMode=null;this.pendingMove=null;this.pendingAttackTargetId=null;this.pendingArtilleryTarget=null;
+      this.updateView();preparedBoard=this.lastBoardRender;
+      for(const child of this.root.children)if(child instanceof HTMLElement)child.inert=true;
+      this.playbackControls=createPlaybackControls(this.root,this.locale==='ja',()=>this.turnPlayback.skip());
+      this.playbackControls.hidden=false;
+      this.turnPlayback.play(presentation,(visual,presentationEffects)=>{
+        const visible=new Set(visual.visibleTileKeys);
+        this.boardScene?.updateState({state:presentationState(previousState,result.state,visual),presentationEffects,locale:this.locale,visibilityOverlay:true,
+          visionCoverage:{visible,groundVisible:visible,groundPotential:visible,groundBlocked:new Set(),aerialVisible:new Set()},facilityProduction:[],suppliedTileKeys:[]});
+      },finish);
+    } else finish();
     return true;
   }
 
@@ -5372,18 +5406,20 @@ export class GameUiController {
     const economyRules=r.economy.replace('{factoryInput}',String(factory.inputs.civilianGoods??0)).replace('{factoryOutput}',String(factory.outputs.militaryGoods??0));
     const foodRules=t('tipMilitaryFood').replace('{civilian}',String(config.economy.populationConsumption.food)).replace('{military}',String(config.economy.unitFoodConsumption));
     const pursuitRules=t('tipZombiePursuit').replace('{bonus}',String(config.zombiePursuitMovementBonus));
+    const zombieTypes=['zombie','hordeZombie','policeZombie','soldierZombie','riotZombie','hunterZombie','gasZombie','screamerZombie','packZombie'] as const;
+    const zombiePerformance=zombieTypes.map(type=>{const unit=config.units[type];return `${t(type)} · HP ${unit.hp} · ${t('attack')} ${unit.attack} · ${t('movement')} ${unit.movement} · ${t('range')} ${unit.range} · ${t('attackCharge')} ${unit.maxAttackCharges}`;});
     const sections:[string,string[]][]=[
-      [ja?'勝敗と基本操作':'Victory, defeat and controls',[t('guideSteps'),t('tipVictory'),r.compatibility]],
+      [ja?'勝敗と基本操作':'Victory, defeat and controls',[t('guideSteps'),ja?'移動力（MP）は1ターンに移動できる量です。地形ごとに必要な移動力を消費します。':'Movement points (MP) are the movement budget for one turn. Each entered terrain consumes its movement cost.',t('tipVictory'),r.compatibility]],
       [ja?'経済と人口':'Economy and population',[economyRules,foodRules,old.capital,old.health,old.starvation,old.grace,t('tipRecruitment')]],
       [ja?'電力':'Electricity',[t('tipPowerAllocation'),t('tipFuel')]],
       [ja?'施設':'Facilities',[r.airBase,r.drone,r.objectives,old.nuclear]],
-      [ja?'人間Unit':'Human units',[t('tipProficiency'),t('tipRetreat'),old.specialForces,r.helicopter,r.flight,r.transport,r.emergency,artillery.artillery,artillery.modes,artillery.bombardment,t('tipSuppression')]],
-      [ja?'Zombie':'Zombies',[r.enemies,pursuitRules,t('tipGasZombie'),old.packZombie]],
+      [ja?'人間部隊':'Human units',[t('tipProficiency'),t('tipRetreat'),old.specialForces,r.helicopter,r.flight,r.transport,r.emergency,artillery.artillery,artillery.modes,artillery.bombardment,t('tipSuppression')]],
+      [ja?'ゾンビ':'Zombies',[r.enemies,pursuitRules,t('tipGasZombie'),old.packZombie,...zombiePerformance]],
       [ja?'補給':'Supply',[t('tipSupply'),t('tipFuel')]],
       [ja?'視界と騒音':'Vision and noise',[t('tipVision'),t('tipNoise')]],
-      [ja?'Horde':'Hordes',[t('tipWaveRoster'),old.finalHorde]],
-      [ja?'建設と検問所':'Construction and checkpoints',[old.water,old.screening,old.waiting,t('tipCheckpointFallback'),t('tipCheckpointMove'),t('checkpointRouteNotVisible'),t('tipBuild'),t('tipBarbedWire')]],
-      [ja?'AI / Fair Play':'AI / Fair Play',[ja?'組み込みAIと外部AIは公開Observationと合法Actionを使用します。未発見の敵・未来の乱数・非公開状態は判断に利用できません。Previewは状態を変えず、複数Actionの一括Previewも同じRevisionから独立して評価します。':'Built-in and external AI use public Observations and legal Actions. Hidden enemies, future random outcomes and private state are unavailable. Previews do not change state; every batch item is evaluated independently at the same revision.']],
+      [ja?'襲撃':'Hordes',[t('tipWaveRoster'),old.finalHorde]],
+      [ja?'建設と検問所':'Construction and checkpoints',[old.water,t('tipRefugeeRejection'),t('tipCheckpoint'),old.screening,old.waiting,t('tipCheckpointFallback'),t('tipCheckpointMove'),t('checkpointRouteNotVisible'),t('tipBuild'),t('barbedWireRule')]],
+      [ja?'AIと公開情報のルール':'AI / Fair Play',[ja?'組み込みAIと外部AIは公開された観測情報と合法な行動を使用します。未発見の敵・未来の乱数・非公開状態は判断に利用できません。プレビューは状態を変えず、複数行動の一括プレビューも同じ状態の版から独立して評価します。':'Built-in and external AI use public Observations and legal Actions. Hidden enemies, future random outcomes and private state are unavailable. Previews do not change state; every batch item is evaluated independently at the same revision.']],
     ];
     this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${t('close')}" data-action="dismiss-modal">×</button><h2 id="help-heading">${t('help')}</h2><button class="secondary-button" data-action="board-legend">${t('legendTitle')}</button>${this.state?renderFacilityObjectives(this.state,this.locale):''}${sections.map(([title,texts])=>`<details class="help-topic"><summary>${escapeHtml(title)}</summary>${texts.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}</details>`).join('')}</section></div>`);
   }
@@ -5468,7 +5504,8 @@ export class GameUiController {
       const remaining = !refugeeArrivalsStopped && branchState?.nextArrivalTurn !== null && branchState?.nextArrivalTurn !== undefined
         ? Math.max(0, branchState.nextArrivalTurn - this.state!.turn)
         : null;
-      const range = String(this.state!.config.refugees.arrivalPeopleMin) + '–' + String(this.state!.config.refugees.arrivalPeopleMax);
+      const arrival=refugeeArrivalProjection(this.state!.config.refugees,this.state!.turn,branchState?.nextArrivalTurn??null);
+      const range = `${arrival.current.min}–${arrival.current.max} · ${this.locale==='ja'?'上限':'Upper'} +${arrival.growth.peoplePerInterval}/${arrival.growth.intervalTurns}${this.locale==='ja'?'ターン':' turns'}${arrival.next?` · ${this.locale==='ja'?'次回':'Next'} ${arrival.next.min}–${arrival.next.max}`:''}`;
       const destination = checkpoint ? t('checkpoint') + ' · ' + checkpoint.id : t('noCheckpoint');
       const policyText = formatPercent(policy.workerRate, this.locale) + ' / ' + formatPercent(policy.infectionRate, this.locale);
       const radius = getBranchSupplyRadius(this.state!, branch.id);
@@ -5664,8 +5701,16 @@ export class GameUiController {
     const wireName = t('barbedWire');
     const wireControl = this.navMode === 'domestic' ? `<button class="secondary-button" data-action="build-barbed-wire" data-q="${position.q}" data-r="${position.r}" ${wireCandidate?.legal ? '' : 'disabled'}>${escapeHtml(wireName)} · 5/5</button><p>${escapeHtml(wireBuildReasonLabel(wireCandidate?.reason ?? (publicTile?.visibleToPlayer ? null : 'visibility_required'), this.locale))}</p>` : '';
     const runtimeAsset = escapeHtml(resolveBoardAssetUrl(BOARD_ASSET_REGISTRY.obstacles.barbedWire));
-    const spacingAsset = escapeHtml(new URL('../testing/fixtures/v156-spacing.svg', import.meta.url).href);
-    return `<section data-wire-panel><h3>${escapeHtml(wireName)}${wire ? ` HP ${wire.hp}/${wire.maxHp}` : ''}</h3><img class="wire-panel-icon" src="${runtimeAsset}" alt="${escapeHtml(wireName)}" loading="lazy" />${wireControl}<details><summary>${escapeHtml(t('barbedWireRule'))}</summary><p>${escapeHtml(t('barbedWireRule'))}</p><img style="width:100%" alt="${escapeHtml(wireName)} spacing" src="${spacingAsset}" /></details></section>`;
+    const diagram = (coords: Array<[number, number]>, color: string, label: string) => {
+      const cells = coords.map(([q,r]) => {
+        const x=60+Math.sqrt(3)*16*(q+r/2),y=50+24*r;
+        const points=Array.from({length:6},(_,i)=>{const a=(60*i-30)*Math.PI/180;return `${x+15*Math.cos(a)},${y+15*Math.sin(a)}`;}).join(' ');
+        return `<polygon points="${points}" fill="${color}" fill-opacity=".3" stroke="${color}" stroke-width="2" />`;
+      }).join('');
+      return `<figure style="margin:0"><svg viewBox="0 0 120 100" width="120" role="img" aria-label="${escapeHtml(label)}">${cells}</svg><figcaption>${escapeHtml(label)}</figcaption></figure>`;
+    };
+    const placementExamples = '<div style="display:flex;gap:1rem;flex-wrap:wrap">'+diagram([[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]],'#6bddb5',this.locale==='ja'?'○ 閉じた輪：各壁2隣接':'Allowed ring: two neighbors each')+diagram([[0,0],[1,0],[0,1],[-1,1]],'#ff8b8b',this.locale==='ja'?'× 3隣接になる壁がある':'Rejected: three adjacent walls')+'</div>';
+    return `<section data-wire-panel><h3>${escapeHtml(wireName)}${wire ? ` HP ${wire.hp}/${wire.maxHp}` : ''}</h3><img class="wire-panel-icon" src="${runtimeAsset}" alt="${escapeHtml(wireName)}" loading="lazy" />${wireControl}<details><summary>${escapeHtml(t('barbedWireRule'))}</summary><p>${escapeHtml(t('barbedWireRule'))}</p>${placementExamples}</details></section>`;
   }
 
   /** Same-Hex tabs expose alternate public targets without changing Core. */
@@ -6203,7 +6248,7 @@ export class GameUiController {
     const grandfatheredWaiting = publicCheckpoint?.grandfatheredWaiting ?? checkpoint.grandfatheredWaiting ?? 0;
     const grandfatheredPolicy = publicCheckpoint?.grandfatheredPolicy ?? checkpoint.grandfatheredPolicy ?? null;
     const waitingRiskPercent = (forecastEndTurn(this.state!).publicHealth.checkpoints.find(c => c.checkpointId === checkpoint.id)?.probability ?? 0) * 100;
-    const queueMaintenance = `<section class="checkpoint-queue-maintenance" data-checkpoint-queue-maintenance="true"><h3>${escapeHtml(t('checkpointQueueMaintenance'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('checkpointMaintenanceHealthy'))}</dt><dd>${queuePeople}</dd></div><div><dt>${this.locale === 'ja' ? '切替前waiting' : 'Grandfathered waiting'}</dt><dd>${grandfatheredWaiting}${grandfatheredPolicy ? ` · ${escapeHtml(t(grandfatheredPolicy))}` : ''}</dd></div><div><dt>${this.locale === 'ja' ? '待機1人あたりの感染確率' : 'Infection probability per waiting person'}</dt><dd>${waitingRiskPercent}%</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceFood'))}</dt><dd>${queueFoodMaintenance}</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceCivilianGoods'))}</dt><dd>${queueCivilianGoodsMaintenance}</dd></div></dl><p class="muted">${escapeHtml(t('infected'))}: ${checkpoint.infected} · ${escapeHtml(t('checkpointMaintenanceHealthy'))} ${escapeHtml(t('checkpointMaintenanceHealthyHint'))}</p>${branchPolicy === 'deny' ? `<p class="muted" data-deny-policy-help="true">${this.locale === 'ja' ? '切替後の新規Arrivalだけを自動拒否します。切替前waitingは保存された旧Policyで審査を続け、既存screening / approvedは維持されます。' : 'Only arrivals after the switch are denied automatically. Grandfathered waiting continues under its saved prior policy; existing screening and approved groups remain.'}</p>` : ''}</section>`;
+    const queueMaintenance = `<section class="checkpoint-queue-maintenance" data-checkpoint-queue-maintenance="true"><h3>${escapeHtml(t('checkpointQueueMaintenance'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('checkpointMaintenanceHealthy'))}</dt><dd>${queuePeople}</dd></div><div><dt>${this.locale === 'ja' ? '切替前待機中' : 'Grandfathered waiting'}</dt><dd>${grandfatheredWaiting}${grandfatheredPolicy ? ` · ${escapeHtml(t(grandfatheredPolicy))}` : ''}</dd></div><div><dt>${this.locale === 'ja' ? '待機1人あたりの感染確率' : 'Infection probability per waiting person'}</dt><dd>${waitingRiskPercent}%</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceFood'))}</dt><dd>${queueFoodMaintenance}</dd></div><div><dt>${escapeHtml(t('checkpointMaintenanceCivilianGoods'))}</dt><dd>${queueCivilianGoodsMaintenance}</dd></div></dl><p class="muted">${escapeHtml(t('infected'))}: ${checkpoint.infected} · ${escapeHtml(t('checkpointMaintenanceHealthy'))} ${escapeHtml(t('checkpointMaintenanceHealthyHint'))}</p>${branchPolicy === 'deny' ? `<p class="muted" data-deny-policy-help="true">${this.locale === 'ja' ? '切替後の新規Arrivalだけを自動拒否します。切替前待機中は保存された旧Policyで審査を続け、既存審査中 / 受入先待ちは維持されます。' : 'Only arrivals after the switch are denied automatically. Grandfathered waiting continues under its saved prior policy; existing screening and approved groups remain.'}</p>` : ''}</section>`;
     const arrivalStopNotice = arrivalsStopped ? `<p class="warning-text refugee-arrivals-stopped" data-refugee-arrivals-stopped="true">${escapeHtml(t('refugeeArrivalsStopped'))}</p>` : '';
     const newPolicies: CheckpointPolicy[] = ['passThrough', 'normal', 'strict', 'deny'];
     const newPolicyOptions = newPolicies.map((policy) => '<option value="' + policy + '" ' + (branchPolicy === policy ? 'selected' : '') + '>' + escapeHtml(t(policy)) + '</option>').join('');
@@ -6212,7 +6257,7 @@ export class GameUiController {
       ? '<section class="infection-forecast"><h3>' + escapeHtml(t('infectionForecast')) + '</h3><p class="' + (publicCheckpoint?.infectionContained ? 'is-contained' : 'warning-text') + '">' + escapeHtml(publicCheckpoint?.infectionContained ? t('infectionContained') : t('infectionNotContained')) + '</p><p class="muted">' + escapeHtml(t('automaticSuppression')) + ': ' + String(publicCheckpoint?.projectedSuppression ?? 0) + '</p>' + ((publicCheckpoint?.projectedCivilianDamage ?? 0) > 0 ? '<p class="warning-text">' + escapeHtml(t('projectedCivilianDamage')) + ': ' + String(publicCheckpoint?.projectedCivilianDamage) + '</p>' : '<p class="muted">' + escapeHtml(t('noCivilianDamage')) + '</p>') + '</section>'
       : '';
     const recoveryLabels: Record<string,string> = this.locale==='ja'
-      ? {not_ruined:'陥落していません',suppress_infection:'感染者を0にする',clear_visible_enemy:'同じHexの敵を排除する',station_recovery_capable_unit:'復旧可能な部隊を駐留させる'}
+      ? {not_ruined:'陥落していません',suppress_infection:'感染者を0にする',clear_visible_enemy:'同じヘックスの敵を排除する',station_recovery_capable_unit:'復旧可能な部隊を駐留させる'}
       : {not_ruined:'Not ruined',suppress_infection:'Clear the infection',clear_visible_enemy:'Clear the enemy on this Hex',station_recovery_capable_unit:'Station a recovery-capable unit'};
     const recoveryDetails = checkpoint.status==='ruined' && publicCheckpoint?.recovery
       ? `<section><h3>${this.locale==='ja'?'自動復旧条件':'Automatic recovery'}</h3><p>${escapeHtml(RULES_V164[this.locale].checkpoints)}</p><p>${publicCheckpoint.recovery.missing.map(reason=>escapeHtml(recoveryLabels[reason]??reason)).join(' / ')}</p></section>` : '';
@@ -6271,11 +6316,11 @@ function wireBuildReasonLabel(reason: string | null, locale: Locale): string {
     action_limit: ['内政Action枠が残っていません。', 'No action budget remains.'],
     insufficient_resources: ['民需品5と軍需品5が必要です。', 'Requires Civilian Goods 5 and Military Goods 5.'],
     impassable: ['通行禁止地形・出現用外周には建設できません。', 'Cannot build on impassable terrain or the Spawn Reserve.'],
-    visibility_required: ['周囲と前後2Hexの必要範囲を視認してください。', 'Reveal the neighboring and radial inspection area.'],
+    visibility_required: ['建設先・隣接6ヘックス・隣接する壁の周囲を視認してください。', 'Reveal the destination, its neighbors and the neighbors of adjacent walls.'],
     out_of_supply: ['補給圏内で建設してください。', 'Build inside supply.'],
-    occupied: ['施設・検問所跡・部隊・壁のないHexが必要です。', 'Requires a Hex without a facility, checkpoint site, unit or wall.'],
+    occupied: ['施設・検問所跡・部隊・壁のないヘックスが必要です。', 'Requires a Hex without a facility, checkpoint site, unit or wall.'],
     enemy_adjacent: ['敵に隣接する場所には建設できません。', 'Cannot build next to an enemy.'],
-    radial_spacing: ['州都へ向かう前後の壁は間に2Hex必要です。', 'Radial wall layers require two intervening hexes.'],
+    too_many_adjacent_walls: ['新設・既存の各壁に隣接する生存壁は2枚までです。', 'Each living wall can have at most two adjacent living walls.'],
   };
   return reasons[reason]?.[locale === 'ja' ? 0 : 1] ?? reason;
 }

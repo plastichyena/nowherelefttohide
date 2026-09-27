@@ -54,7 +54,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('22.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('23.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -160,7 +160,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
       arrivalIntervalMin: 2,
       arrivalIntervalMax: 4,
       arrivalPeopleMin: 5,
-      arrivalPeopleMax: 10,
+      arrivalPeopleMax: 10, waitingCrowdingThreshold: 60, arrivalRange: { current: { min: 10, max: 10 }, next: null, growth: { initialUpper: 10, intervalTurns: 2, peoplePerInterval: 0, firstTurn: 1 } },
       queuePressureClass: 'none' as const,
       infected: 0,
       remainingTurns: 0,

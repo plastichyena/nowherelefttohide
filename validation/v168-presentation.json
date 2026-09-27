@@ -1,0 +1,94 @@
+{
+  "enemyCount": 100,
+  "publicActors": 88,
+  "frames": 197,
+  "baseBytes": 83105,
+  "deltaBytes": 133351,
+  "coreMs": 1953.4229999999998,
+  "heapDelta": 2298840,
+  "skipMs": 0.05789999999979045,
+  "completed": 1,
+  "finalPublicUnits": 107,
+  "finalTurn": 2,
+  "browser": {
+    "environment": "Desktop Chrome, headless, 390x844 mobile viewport; physical phone not tested",
+    "skipSamples": [
+      {
+        "rect": {
+          "x": 172.0390625,
+          "y": 773,
+          "width": 128,
+          "height": 44
+        },
+        "skip": {
+          "ms": 62,
+          "remaining": 1,
+          "locked": 0,
+          "turn": "2"
+        },
+        "errors": []
+      },
+      {
+        "rect": {
+          "x": 172.0390625,
+          "y": 773,
+          "width": 128,
+          "height": 44
+        },
+        "skip": {
+          "ms": 60.399999998509884,
+          "remaining": 1,
+          "locked": 0,
+          "turn": "2"
+        },
+        "errors": []
+      },
+      {
+        "rect": {
+          "x": 172.0390625,
+          "y": 773,
+          "width": 128,
+          "height": 44
+        },
+        "skip": {
+          "ms": 61.5,
+          "remaining": 1,
+          "locked": 0,
+          "turn": "2"
+        },
+        "errors": []
+      }
+    ],
+    "publicLive": {
+      "actions": [
+        {
+          "ms": 809.7999999988824,
+          "ok": true,
+          "revision": 1,
+          "turn": 2
+        },
+        {
+          "ms": 1321.5,
+          "ok": true,
+          "revision": 2,
+          "turn": 3
+        }
+      ],
+      "skipped": {
+        "ms": 46.59999999962747,
+        "visible": true
+      },
+      "pauseFinalCanvasStable": true,
+      "errors": []
+    },
+    "replay": {
+      "seek": "T2 decision2 before",
+      "oldTimersDidNotOverwrite": true,
+      "legacyV167Loaded": true,
+      "builtInPauseResume": true,
+      "overflow": false,
+      "pageErrors": []
+    },
+    "discardedWarmup": "121.1ms sample was taken before Phaser board assets were ready; it is not a valid rendered-board acceptance sample."
+  }
+}

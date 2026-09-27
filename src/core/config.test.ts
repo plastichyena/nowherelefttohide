@@ -8,7 +8,7 @@ import {
 describe('v1.6 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('17.0.0');
+    expect(DEFAULT_CONFIG.version).toBe('18.0.0');
     expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v9');
     expect(DEFAULT_CONFIG.economy.initialRefineryAllowance).toBe(2_000);
     expect(DEFAULT_CONFIG.economy.oilFieldAllowancePerWorker).toBe(100);
@@ -71,7 +71,7 @@ describe('v1.6 GameConfig', () => {
     expect(DEFAULT_CONFIG.units.riotPolice).toMatchObject({ hp: 75, recruitAttack: 9, movement: 10, range: 1, vision: 5, population: 10, maxFuel: 24, maxMilitaryGoods: 10, noiseClass: 'medium', noiseRadius: 5 });
     expect(DEFAULT_CONFIG.units.reconTeam).toMatchObject({ hp: 25, recruitAttack: 9, movement: 10, range: 6, vision: 10, population: 5, maxFuel: 44, maxMilitaryGoods: 40, noiseClass: 'medium', noiseRadius: 6 });
     expect(DEFAULT_CONFIG.units.screamerZombie).toMatchObject({ hp: 15, attack: 10, movement: 3, range: 1, vision: 2, screamRadius: 30 });
-    expect(DEFAULT_CONFIG.units.riotZombie).toMatchObject({ hp: 60, attack: 5, movement: 3, range: 1, vision: 5 });
+    expect(DEFAULT_CONFIG.units.riotZombie).toMatchObject({ hp: 75, attack: 5, movement: 3, range: 1, vision: 5 });
     expect(DEFAULT_CONFIG.horde).toMatchObject({
       specialZombieWeights: { zombie: 40, policeZombie: 10, soldierZombie: 10, riotZombie: 5, hunterZombie: 15, gasZombie: 15, screamerZombie: 5 },
       riotZombieCapPerDirection: 1,

@@ -15,7 +15,7 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '17.0.0';
+export const CONFIG_VERSION = '18.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v9';
 
 const facilityIds: FacilityId[] = [
@@ -181,7 +181,7 @@ const defaultUnitConfig: UnitConfigMap = {
   },
   riotZombie: {
     canTargetAir: false, movementDomain: 'ground', maxAttackCharges: 1,
-    hp: 60, attack: 5, movement: 3, range: 1, vision: 5, population: 0, maxFuel: 0,
+    hp: 75, attack: 5, movement: 3, range: 1, vision: 5, population: 0, maxFuel: 0,
     maxMilitaryGoods: 0, fixedMilitaryGoodsUpkeepPerTurn: 0,
     attackMilitaryGoodsCostByRange: {}, suppressionMilitaryGoodsCost: 0,
     militaryGoodsShortageAttackMultiplier: 1, emergencyMovementPoints: 0,
@@ -403,6 +403,9 @@ export const DEFAULT_CONFIG: GameConfig = {
     arrivalIntervalMax: 4,
     arrivalPeopleMin: 10,
     arrivalPeopleMax: 20,
+    arrivalGrowthInterval: 2,
+    arrivalGrowthPeople: 1,
+    waitingCrowdingThreshold: 60,
     screeningCapacity: 20,
     policies: {
       passThrough: {
@@ -980,6 +983,9 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     requireInteger(errors, refugees.arrivalIntervalMax, 'refugees.arrivalIntervalMax', 1);
     requireInteger(errors, refugees.arrivalPeopleMin, 'refugees.arrivalPeopleMin', 1);
     requireInteger(errors, refugees.arrivalPeopleMax, 'refugees.arrivalPeopleMax', 1);
+    requireInteger(errors, refugees.arrivalGrowthInterval, 'refugees.arrivalGrowthInterval', 1);
+    requireInteger(errors, refugees.arrivalGrowthPeople, 'refugees.arrivalGrowthPeople', 0);
+    requireInteger(errors, refugees.waitingCrowdingThreshold, 'refugees.waitingCrowdingThreshold', 1);
     if (refugees.arrivalIntervalMin > refugees.arrivalIntervalMax) {
       errors.push('refugees arrival interval minimum cannot exceed maximum');
     }

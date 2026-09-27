@@ -61,8 +61,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.6.7');
-    expect(titleVersionLabel('en')).toContain('1.6.7');
+    expect(titleVersionLabel('ja')).toContain('1.6.8');
+    expect(titleVersionLabel('en')).toContain('1.6.8');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -141,7 +141,7 @@ describe('controller view models', () => {
     const markup = renderArmyBaseDetails(facility, 'ja');
 
     expect(markup).toContain('18/40');
-    expect(markup).toContain('3 · Zombie Phase開始時');
+    expect(markup).toContain('3 · ゾンビターン開始時');
     expect(markup).toContain('10 / 2');
     expect(markup).toContain('給電待ち');
     expect(markup).toContain('給電不足');
@@ -309,26 +309,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.6.6-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.6.7-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.6以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.7');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.7以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.8');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.6 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.7');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.7 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.8');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('Game Rules 17.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('Save Format 24');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 17.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 24');
+    expect(createTranslator('ja')('tipSave')).toContain('ルール版 18.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('保存形式 25');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 18.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 25');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.6以前' : 'v1.6.6-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7-or-earlier');
     }
   });
 
@@ -624,7 +624,7 @@ describe('controller view models', () => {
 
   it('includes the target Turn in the collapsed independent penalty summary', () => {
     expect(nextTurnPenaltyForecastSummary({ nextTurnPenalties: { targetTurn: 12 } }, 'en')).toBe('Target turn 12');
-    expect(nextTurnPenaltyForecastSummary({ nextTurnPenalties: { targetTurn: 12 } }, 'ja')).toBe('対象Turn 12');
+    expect(nextTurnPenaltyForecastSummary({ nextTurnPenalties: { targetTurn: 12 } }, 'ja')).toBe('対象ターン 12');
     expect(nextTurnPenaltyForecastSummary({ nextTurnPenalties: {} }, 'en')).toBe('Target turn —');
   });
 
@@ -756,7 +756,7 @@ describe('controller view models', () => {
       expect(createTranslator('ja')(key)).not.toBe(key);
       expect(createTranslator('en')(key)).not.toBe(key);
     }
-    expect(createTranslator('ja')('finalWaveTurn')).toContain('Final Wave');
+    expect(createTranslator('ja')('finalWaveTurn')).toContain('最終襲撃');
     expect(createTranslator('en')('finalHordeWarning')).toContain('FINAL HORDE');
   });
 
@@ -764,7 +764,7 @@ describe('controller view models', () => {
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
       const production = t('tipProduction');
-      for (const value of ['Capital 10', 'City 10', 'Farm 5', '15', '20', 'Refinery 10', 'Civilian Drone Base 5', 'Temporary Housing 5']) {
+      for (const value of locale === 'ja' ? ['州都 10', '都市 10', '農場 5', '15', '20', '精製所 10', '民間ドローン基地 5', '仮設住宅 5'] : ['Capital 10', 'City 10', 'Farm 5', '15', '20', 'Refinery 10', 'Civilian Drone Base 5', 'Temporary Housing 5']) {
         expect(production).toContain(value);
       }
       expect(production).not.toContain(locale === 'ja'
@@ -778,10 +778,10 @@ describe('controller view models', () => {
       expect(t('legendOverlayDescription.spawnReserve')).not.toContain('200');
       expect(t('legendDescription.soldierZombie')).toContain('10');
       expect(t('tipArmyBaseRecruitment')).toContain('10');
-      expect(t('tipArmyBaseRecruitment')).toContain(locale === 'ja' ? 'empty Housing' : 'empty Housing');
-      expect(t('armyBaseRecruitmentRule')).toContain(locale === 'ja' ? 'empty Housing' : 'empty Housing');
+      expect(t('tipArmyBaseRecruitment')).toContain(locale === 'ja' ? '無人の仮設住宅' : 'empty Housing');
+      expect(t('armyBaseRecruitmentRule')).toContain(locale === 'ja' ? '無人の仮設住宅' : 'empty Housing');
       expect(t('windPowerPlantUse')).toContain('15');
-      expect(t('windPowerPlantUse')).toContain('Noise');
+      expect(t('windPowerPlantUse')).toContain(locale === 'ja' ? '騒音' : 'Noise');
       expect(t('windPowerPlantUse')).not.toMatch(locale === 'ja' ? /静音/ : /silent/i);
     }
   });

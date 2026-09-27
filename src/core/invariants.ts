@@ -2,11 +2,11 @@ import { validateAviationState } from './aviation-invariants';
 import { humanAttack, isAirborne, occupiesGroundLayer } from './unit-capabilities';
 import { isHumanUnitType, HUMAN_UNIT_TYPES, isZombieUnitType } from './unit-catalog';
 import { validateGameConfig } from './config';
-import { hexKey, hexWithinBounds } from './hex';
+import { hexDistance, hexKey, hexWithinBounds } from './hex';
 import { initialArmyBaseMatchesSeed, initialAirBaseMatchesSeed, isHordeSpawnReserve, isRoad, validateFixedMap } from './map';
 import { civilianWorkerCount, effectiveAttackForProficiency, isCityFacility, populationLedgerTotal, resourceConsumerPopulation } from './state';
 import type { GameState } from './types';
-import { BARBED_WIRE_RULES, radialConflict } from './barbed-wire';
+import { BARBED_WIRE_RULES } from './barbed-wire';
 import { getCapitalPosition } from './supply';
 import { getTile } from './map-reference';
 
@@ -108,7 +108,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     if (wire.id.length === 0 || (/^barbed-wire-\d+$/.test(wire.id) && Number(wire.id.slice(12)) >= state.nextBarbedWireNumber)) errors.push('Invalid Barbed Wire ID counter');
     const tile = getTile(state.map, wire.position);
     if (!tile || state.config.terrain.movementCost[tile.terrain] === null) errors.push('Barbed Wire on impassable terrain');
-    if (state.barbedWire.some(other => other !== wire && other?.position && radialConflict(getCapitalPosition(state.map), wire.position, other.position))) errors.push('Barbed Wire radial spacing violation');
+    if (state.barbedWire.filter(other => other?.hp > 0 && other.position && hexDistance(wire.position, other.position) === 1).length > 2) errors.push('Barbed Wire adjacency limit exceeded');
     if (isHordeSpawnReserve(state.map, wire.position) || state.facilities.some(f => hexKey(f.position) === key) || state.checkpoints.some(c => hexKey(c.position) === key)) errors.push('Barbed Wire overlaps a forbidden site');
     if (state.units.some(u => !u.isPlayerUnit && hexKey(u.position) === key && u.reanimatedOnBarbedWireId !== wire.id)) errors.push('Zombie cannot occupy intact Barbed Wire');
   }

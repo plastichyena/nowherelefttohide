@@ -79,7 +79,7 @@ describe('v1.5.4 Zombie congestion fallback', () => {
     expect(result.state.units.find((unit) => unit.id === moverId)?.position).toEqual(openFallback);
   });
 
-  it('orders every reachable fallback endpoint by terrain-only weighted distance and stable coordinate', () => {
+  it('orders reachable fallback endpoints by traversable hex count and stable coordinate', () => {
     const engine = new GameEngine(1548, config());
     const state = engine.getState() as GameState;
     const moverPosition = { q: 14, r: 10 };
@@ -90,8 +90,8 @@ describe('v1.5.4 Zombie congestion fallback', () => {
       return tile ? state.config.terrain.movementCost[tile.terrain] : null;
     };
     const distance = (from: { q: number; r: number }, target: { q: number; r: number }) => {
-      const path = findShortestPath(state.map, from, target, new Set(), terrainCost);
-      return path ? pathMovementCost(path, terrainCost) : Number.POSITIVE_INFINITY;
+      const path = findShortestPath(state.map, from, target, new Set(), position => terrainCost(position) === null ? null : 1);
+      return path ? path.length - 1 : Number.POSITIVE_INFINITY;
     };
     const mover = createUnit(state, 'a-weighted-fallback', 'zombie', moverPosition);
     mover.noiseTarget = target;
@@ -100,7 +100,7 @@ describe('v1.5.4 Zombie congestion fallback', () => {
     const occupied = new Set(state.units.filter((unit) => unit.id !== mover.id).map((unit) => hexKey(unit.position)));
     const currentDistance = distance(moverPosition, target);
     const reachable = findReachablePaths(
-      state.map, moverPosition, mover.movement, occupied, (position) => effectiveMovementCost(state, position),
+      state.map, moverPosition, mover.movement, occupied, (position) => effectiveMovementCost(state, position) === null ? null : 1,
     ).map((entry) => ({
       ...entry,
       targetDistance: distance(entry.position, target),
@@ -108,16 +108,22 @@ describe('v1.5.4 Zombie congestion fallback', () => {
     }));
     const closer = reachable.filter((entry) => entry.targetDistance < currentDistance);
     const pool = closer.length > 0 ? closer : reachable.filter((entry) => entry.targetDistance === currentDistance);
-    const expected = pool.sort((left, right) => left.targetDistance - right.targetDistance || left.movementCost - right.movementCost
+    const expected = pool.sort((left, right) => left.targetDistance - right.targetDistance || left.cost - right.cost
       || left.position.q - right.position.q || left.position.r - right.position.r)[0]!;
-    expect(currentDistance).toBe(5);
-    expect(pool.some((entry) => entry.targetDistance === 4)).toBe(true);
-    expect(expected).toMatchObject({ position: { q: 11, r: 11 }, targetDistance: 3, movementCost: 1, cost: 3 });
+    expect(currentDistance).toBe(4);
+    expect(pool.some((entry) => entry.targetDistance === 3)).toBe(true);
+    let remaining=mover.movement, reached=moverPosition;
+    for(const position of expected.path.slice(1)) {
+      const cost=effectiveMovementCost(state,position)!;
+      if(cost>remaining)break;
+      remaining-=cost;reached=position;
+    }
+    expect(reached).toEqual({q:12,r:11});
     load(engine, state);
 
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
-    expect(result.state.units.find((unit) => unit.id === mover.id)?.position).toEqual(expected.position);
+    expect(result.state.units.find((unit) => unit.id === mover.id)?.position).toEqual(reached);
   });
 
   it('does not choose the only open neighbor when its terrain distance is farther from the target', () => {

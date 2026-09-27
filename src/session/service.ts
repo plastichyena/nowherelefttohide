@@ -110,6 +110,7 @@ export const SESSION_PLAY_TURN_CAPABILITIES: SessionPlayTurnCapabilities = {
       preview: { type: 'preview', action: 'GameAction', expectedRevision: 'non-negative integer' },
       query: { type: 'query', target: 'SessionQueryTarget', expectedRevision: 'optional non-negative integer', cursor: 'optional string', pageSize: 'optional 1-500 integer', filters: 'optional object' },
       close: { type: 'close' },
+      status: { type: 'status', expectedRevision: 'optional non-negative integer; stale values are rejected; read-only, no Action/Decision/RNG budget consumed' },
     },
     finitePlan: { expectedRevision: 'non-negative integer', actions: [{ action: 'GameAction', decisionSummary: 'optional; null/empty means no comment; non-empty 1-500 Unicode code points', requestId: 'unique 1-128 code points', expectations: 'optional action-specific public bounds' }] },
   },
@@ -780,8 +781,10 @@ export class SessionService {
     this.guidance.delete(sessionId);
   }
 
-  public playTurnStatus(sessionId: string): SessionStatusResult {
+  public playTurnStatus(sessionId: string, expectedRevision?: number): SessionStatusResult {
+    if (expectedRevision !== undefined && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) throw new SessionError('invalid_play_turn_input', 'status expectedRevision must be a non-negative integer');
     const loaded = this.loadCompatible(sessionId, true);
+    if (expectedRevision !== undefined && expectedRevision !== loaded.active.revision) throw new SessionError('stale_revision', `Expected revision ${expectedRevision}; current revision is ${loaded.active.revision}`);
     this.restoreAndVerify(loaded, true);
     return this.statusResult(loaded);
   }

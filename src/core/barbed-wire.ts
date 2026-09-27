@@ -2,18 +2,19 @@ import { effectiveZombieMovement } from './zombie-movement';
 import type { GameState, HexCoord, UnitState } from './types';
 import { hexDistance, hexKey, hexNeighbors } from './hex';
 import { canPlayerOccupyHex, getTile } from './map';
-import { getCapitalPosition, isHexSupplied } from './supply';
+import { isHexSupplied } from './supply';
 import { getPlayerVisibleTileKeys } from './visibility';
 import { terrainAdjustedDamage } from './terrain';
 import { createMapReference } from './map-reference';
 import { getSuppliedTileKeys } from './supply';
+import { capturePresentation } from './presentation';
 
 export const BARBED_WIRE_RULES = {
   maxHp: 20, civilianGoods: 5, militaryGoods: 5, humanEntryMP: 5,
-  minimumRadialDistance: 3, repair: false, gasAbsorption: false,
+  maximumAdjacentWalls: 2, repair: false, gasAbsorption: false,
   statisticsScope: 'successful construction and publicly visible combat only; hidden damage and charges are excluded',
   reanimation: 'same-hex spawn exception; cannot re-enter after exit',
-  routeEvaluation: 'terrain MP + attack count + (breach phase + future-charge phases) * movement; breacher stops this phase; stable coordinate ties',
+  routeEvaluation: 'fewest traversable hexes including walls; stable coordinate ties; actual terrain MP paid; attack adjacent wall regardless of remaining MP; breacher stops this phase',
 } as const;
 
 export function wireAt(state: Pick<GameState, 'barbedWire'>, position: HexCoord) {
@@ -34,20 +35,19 @@ export function wireBuildReason(state: Readonly<GameState>, position: HexCoord, 
   const tile = tileAt(position);
   if (!(context ? context.map.canPlayerOccupyHex(position) : canPlayerOccupyHex(state.map, position)) || !tile || state.config.terrain.movementCost[tile.terrain] === null) return 'impassable';
   const visible = context?.visible ?? getPlayerVisibleTileKeys(state);
-  const capital = getCapitalPosition(state.map);
   const inspect = new Map([[hexKey(position), position]]);
   for (const adjacent of hexNeighbors(position)) {
     if (tileAt(adjacent)) inspect.set(hexKey(adjacent), adjacent);
-    for (const distant of hexNeighbors(adjacent)) {
-      if (tileAt(distant) && radialConflict(capital, position, distant)) inspect.set(hexKey(distant), distant);
-    }
   }
   if ([...inspect.keys()].some(key => !visible.has(key))) return 'visibility_required';
+  // Only inspect second-ring hexes around an already visible adjacent wall.
+  const adjacentWalls = state.barbedWire.filter(w => w.hp > 0 && hexDistance(w.position, position) === 1);
+  if (adjacentWalls.some(w => hexNeighbors(w.position).some(p => tileAt(p) && !visible.has(hexKey(p))))) return 'visibility_required';
   if (!(context ? context.supplied.has(hexKey(position)) : isHexSupplied(state, position))) return 'out_of_supply';
   const key = hexKey(position);
   if (state.facilities.some(f => hexKey(f.position) === key) || state.checkpoints.some(c => hexKey(c.position) === key) || wireAt(state, position) || state.units.some(u => hexKey(u.position) === key)) return 'occupied';
   if (state.units.some(u => !u.isPlayerUnit && hexDistance(u.position, position) === 1)) return 'enemy_adjacent';
-  if (state.barbedWire.some(w => radialConflict(capital, position, w.position))) return 'radial_spacing';
+  if (adjacentWalls.length > 2 || adjacentWalls.some(w => state.barbedWire.filter(other => other.hp > 0 && hexDistance(w.position, other.position) === 1).length >= 2)) return 'too_many_adjacent_walls';
   return null;
 }
 
@@ -73,6 +73,7 @@ export function damageWire(state: GameState, position: HexCoord, damage: number,
     state.barbedWire.splice(state.barbedWire.indexOf(wire), 1);
     for (const unit of state.units) if (unit.reanimatedOnBarbedWireId === wire.id) delete unit.reanimatedOnBarbedWireId;
   }
+  capturePresentation(state);
   return absorbed;
 }
 

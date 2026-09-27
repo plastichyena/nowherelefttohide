@@ -91,7 +91,9 @@ export class ReplayPackage {
     await this.zip.open();this.manifest=await this.zip.json('manifest.json',MiB);
     checkHash(this.manifest as unknown as Record<string,unknown>,'manifestHash');
     const m=this.manifest;
-    if(m.gameRulesVersion!==GAME_RULES_VERSION || String(m.saveFormatVersion)!==SAVE_FORMAT_VERSION || m.agentApiVersion!==AGENT_API_VERSION || m.bridgeApiVersion!==BRIDGE_API_VERSION || m.appVersion!==APP_VERSION || m.artifactSchemaVersion!==ARTIFACT_SCHEMA_VERSION || m.observationApiVersion!==OBSERVATION_API_VERSION || m.mapId!==FIXED_MAP_ID || m.packageVersion!==SESSION_ARTIFACT_PACKAGE_VERSION || m.sessionSchemaVersion!==SESSION_SCHEMA_VERSION) fail('Unsupported replay version: v1.6.6 public Artifact required; start a new v1.6.6 game/Session (旧Replay非対応、新規v1.6.6 Sessionを開始してください)');
+    const current=m.gameRulesVersion===GAME_RULES_VERSION && String(m.saveFormatVersion)===SAVE_FORMAT_VERSION && m.agentApiVersion===AGENT_API_VERSION && m.bridgeApiVersion===BRIDGE_API_VERSION && m.appVersion===APP_VERSION && m.artifactSchemaVersion===ARTIFACT_SCHEMA_VERSION && m.observationApiVersion===OBSERVATION_API_VERSION && m.sessionSchemaVersion===SESSION_SCHEMA_VERSION;
+    const legacy=m.appVersion==='1.6.7' && m.gameRulesVersion==='17.0.0' && String(m.saveFormatVersion)==='24' && m.agentApiVersion==='22.0.0' && m.bridgeApiVersion==='22.0.0' && m.observationApiVersion==='22.0.0' && m.artifactSchemaVersion==='21.0.0' && String(m.sessionSchemaVersion)==='18.0.0';
+    if((!current&&!legacy)||m.mapId!==FIXED_MAP_ID||m.packageVersion!==SESSION_ARTIFACT_PACKAGE_VERSION)fail('Unsupported replay version: supported public Artifacts are v1.6.7 and v1.6.8. Replay never migrates recorded rules or performance.');
     // Exported streams are stored, permitting random byte-range access without extracting history.
     const stream=this.zip.entries.get('artifact.ndjson');if(!stream || stream.method!==0)fail('Replay requires a stored artifact.ndjson entry; use the Portable ZIP export');
     const digest=new Digest();let pending=new Uint8Array(), accepted=0, offset=0, previous='0'.repeat(64), snapshot=-1, footer=false, document:SessionPublicDocument|undefined;
@@ -117,7 +119,7 @@ export class ReplayPackage {
           this.initial=initial.document;document=initial.document;
           if (m.branchBase && (!Number.isSafeInteger(m.branchBase.baseDecision) || m.branchBase.baseDecision < 0 || m.branchBase.baseDecision > m.decisionCount)) fail('Invalid branch base Decision');
           if(m.branchBase?.baseDecision===0 && (m.branchBase.basePublicSnapshotHash!==initial.documentHash || m.branchBase.baseTraceHeadHash!==previous)) fail('Invalid empty branch base');
-          if(initial.document.observation.apiVersion!==OBSERVATION_API_VERSION || initial.document.observation.gameRulesVersion!==GAME_RULES_VERSION) fail('Initial public version mismatch');
+          if(initial.document.observation.apiVersion!==m.observationApiVersion || initial.document.observation.gameRulesVersion!==m.gameRulesVersion) fail('Initial public version mismatch');
         }else if(entry.kind==='decision'){
           const r=entry.record as PublicDecisionRecord;checkHash(r as unknown as Record<string,unknown>,'decisionHash');
           if(typeof r.accepted!=='boolean' || !Number.isSafeInteger(r.turn) || r.turn<1 || (r.decisionSummary!=null && typeof r.decisionSummary!=='string') || !Array.isArray(r.events))fail('Invalid Decision shape');

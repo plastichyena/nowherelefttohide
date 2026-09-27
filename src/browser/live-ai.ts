@@ -1,5 +1,6 @@
 import type { WebMcpRegistration } from './webmcp';
-import { PublicBoardRenderer, publicBoardFrame } from '../ui/publicBoard';
+import { PublicBoardRenderer, publicBoardFrame, presentationBoardFrame } from '../ui/publicBoard';
+import { TurnPlayback, turnPresentation, createPlaybackControls } from '../ui/turnPlayback';
 import type { AgentObservation } from '../agent/types';
 import { createAiSession } from '../session/ai-session';
 import type { AiSessionActInput, AiSessionActResult, AiSessionPort, AiSessionResponse } from '../session/ai-session-contract';
@@ -56,6 +57,12 @@ export function liveAiResultText(response: unknown): string {
 }
 
 export class LiveAiViewer {
+  private builtInGeneration=0;
+  private builtInRunning=false;
+  private readonly playback = new TurnPlayback();
+  private playbackControls: HTMLElement;
+  private displayQueue: Array<{ input: AiSessionActInput; response: AiSessionActResult }> = [];
+  private displayBusy = false;
   private registration: WebMcpRegistration | null = null;
   private session: AiSessionPort | null = null;
   private latestObservation: AgentObservation | null = null;
@@ -75,37 +82,41 @@ export class LiveAiViewer {
 
   public constructor(options: LiveAiViewerOptions = {}) {
     this.options = options;
+    const ja=locale()==='ja';
     this.host = document.createElement('aside');
     this.host.className = 'live-ai-host';
     this.host.innerHTML = `
-      <button type="button" class="live-ai-launcher">AI Play / Watch</button>
-      <section class="live-ai-panel" hidden aria-label="AI Play / Watch">
-        <header><strong>AI Play / Watch</strong><span class="live-ai-state">not started</span></header>
+      <button type="button" class="live-ai-launcher">${ja?'AIプレイ・観戦':'AI Play / Watch'}</button>
+      <section class="live-ai-panel" hidden aria-label="${ja?'AIプレイ・観戦':'AI Play / Watch'}">
+        <header><strong>${ja?'AIプレイ・観戦':'AI Play / Watch'}</strong><span class="live-ai-state">${ja?'開始前':'not started'}</span></header>
         <div class="live-ai-controls">
-          <button type="button" data-live-ai="start">Start</button>
-          <button type="button" data-live-ai="pause">Pause</button>
-          <button type="button" data-live-ai="resume">Resume</button>
-          <button type="button" data-live-ai="export">Export ZIP</button>
-          <button type="button" data-live-ai="end">End</button>
-          <button type="button" data-live-ai="close">Close</button>
+          <button type="button" data-live-ai="start">${ja?'開始':'Start'}</button>
+          <button type="button" data-live-ai="balanced">${ja?'内蔵AIを観戦':'Balanced AI'}</button>
+          <button type="button" data-live-ai="pause">${ja?'一時停止':'Pause'}</button>
+          <button type="button" data-live-ai="resume">${ja?'再開':'Resume'}</button>
+          <button type="button" data-live-ai="export">${ja?'ZIPを書き出す':'Export ZIP'}</button>
+          <button type="button" data-live-ai="end">${ja?'終了':'End'}</button>
+          <button type="button" data-live-ai="close">${ja?'閉じる':'Close'}</button>
         </div>
-        <details open><summary>WebMCP diagnostics / 接続診断</summary><pre class="live-ai-diagnostics"></pre><button type="button" data-live-ai="smoke">Read-only Self Test</button></details>
-        <div class="live-ai-board"><canvas aria-label="Live AI public board"></canvas></div><button type="button" data-live-ai="fit">Fit / 全体</button><section class="public-board-details"></section>
-        <section class="live-ai-current" aria-live="polite">WebMCP client can start after Start.</section>
+        <details><summary>${ja?'WebMCP接続診断':'WebMCP diagnostics'}</summary><pre class="live-ai-diagnostics"></pre><button type="button" data-live-ai="smoke">${ja?'読み取り専用の接続テスト':'Read-only Self Test'}</button></details>
+        <div class="live-ai-board"><canvas aria-label="${ja?'AIに公開された盤面':'Live AI public board'}"></canvas></div><button type="button" data-live-ai="fit">${ja?'全体':'Fit'}</button><section class="public-board-details"></section>
+        <section class="live-ai-current" aria-live="polite">${ja?'「開始」後にWebMCPから操作できます。':'WebMCP client can start after Start.'}</section>
         <pre class="live-ai-result" aria-live="polite"></pre>
         <p class="live-ai-omitted" hidden></p>
-        <details><summary>Decision log</summary><ol class="live-ai-log"></ol></details>
+        <details><summary>${ja?'判断ログ':'Decision log'}</summary><ol class="live-ai-log"></ol></details>
       </section>`;
     document.body.append(this.host);
     this.launcher = this.host.querySelector('.live-ai-launcher')!;
     this.panel = this.host.querySelector('.live-ai-panel')!;
     this.canvas = this.host.querySelector('canvas')!;
     this.board = new PublicBoardRenderer(this.canvas, this.host.querySelector('.public-board-details')!, locale());
+    this.playbackControls=createPlaybackControls(this.panel,locale()==='ja',()=>this.playback.skip());
     this.current = this.host.querySelector('.live-ai-current')!;
     this.result = this.host.querySelector('.live-ai-result')!;
     this.log = this.host.querySelector('.live-ai-log')!;
     this.omitted = this.host.querySelector('.live-ai-omitted')!;
     this.state = this.host.querySelector('.live-ai-state')!;
+    new MutationObserver(()=>this.refreshLocale()).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
     const appRoot = document.querySelector<HTMLElement>('#app');
     const syncTitleVisibility = (): void => {
       const titleVisible = appRoot?.classList.contains('title-screen') ?? false;
@@ -119,10 +130,24 @@ export class LiveAiViewer {
     if (appRoot) new MutationObserver(syncTitleVisibility).observe(appRoot, { attributes: true, attributeFilter: ['class'] });
     this.launcher.addEventListener('click', () => { this.panel.hidden = false; this.launcher.hidden = true; });
     this.host.addEventListener('click', (event) => this.onClick(event));
-    window.addEventListener('resize', () => { if (this.latestObservation) void this.render(this.latestObservation); });
+    window.addEventListener('resize', () => { if (this.latestObservation && !this.playback.active) void this.render(this.latestObservation); });
   }
 
   public setRegistration(registration: WebMcpRegistration): void { this.registration = registration; this.refreshDiagnostics(); }
+  private refreshLocale():void {
+    const ja=locale()==='ja', title=ja?'AIプレイ・観戦':'AI Play / Watch';
+    this.launcher.textContent=title;this.panel.setAttribute('aria-label',title);
+    this.panel.querySelector('header strong')!.textContent=title;
+    const labels:Record<string,[string,string]>={start:['開始','Start'],balanced:['内蔵AIを観戦','Balanced AI'],pause:['一時停止','Pause'],resume:['再開','Resume'],export:['ZIPを書き出す','Export ZIP'],end:['終了','End'],close:['閉じる','Close'],smoke:['読み取り専用の接続テスト','Read-only Self Test'],fit:['全体','Fit']};
+    for(const [key,pair] of Object.entries(labels))this.panel.querySelector(`[data-live-ai="${key}"]`)!.textContent=pair[ja?0:1];
+    const summaries=this.panel.querySelectorAll('details > summary');
+    summaries[0]!.textContent=ja?'WebMCP接続診断':'WebMCP diagnostics';summaries[1]!.textContent=ja?'判断ログ':'Decision log';
+    this.playbackControls.querySelector('strong')!.textContent=ja?'ゾンビターン':'Zombie turn';
+    this.playbackControls.querySelector('button')!.textContent=ja?'演出をスキップ':'Skip animation';
+    this.board.setLocale(locale());
+    if(!this.session){this.state.textContent=ja?'開始前':'not started';this.current.textContent=ja?'「開始」後にWebMCPから操作できます。':'WebMCP client can start after Start.';}
+    this.updateOmitted();
+  }
   public refreshDiagnostics = (): void => {
     const node = this.host.querySelector('.live-ai-diagnostics');
     if (node && this.registration) node.textContent = text(this.registration.diagnostics());
@@ -132,37 +157,48 @@ export class LiveAiViewer {
 
   public act = async (input: AiSessionActInput): Promise<AiSessionResponse<AiSessionActResult> | { ok: false; generation: 0; revision: 0; error: { code: 'unsupported'; message: string } }> => {
     if (!this.session) return { ok: false, generation: 0, revision: 0, error: { code: 'unsupported', message: 'AI play/watch session is not active' } };
-    this.showIncomingDecision(input);
     const response = this.session.act(input);
     if (!response.ok) {
       this.showResult(response);
       return response;
     }
     this.latestObservation = response.after;
-    try {
-      await this.renderWithWatchdog(response.after);
-    } catch (error) {
-      this.session.setPaused(true);
-      this.state.textContent = 'paused: render sync failure';
-      this.current.textContent = 'render sync failure — Core action remains committed; resume after redraw.';
-      await this.render(response.after);
-      this.showResult(response, error);
-      return response;
-    }
-    this.showResult(response);
-    await new Promise<void>((resolve) => window.setTimeout(resolve, 500));
+    if(!response.replayed) { this.displayQueue.push({input,response});this.consumeDisplayQueue(); }
     if (response.after.gameOver) await this.exportArtifact();
     return response;
   };
 
+  private consumeDisplayQueue():void {
+    if(this.displayBusy)return;
+    const next=this.displayQueue.shift();if(!next)return;
+    this.displayBusy=true;this.showIncomingDecision(next.input);
+    const finish=()=>{
+      this.playbackControls.hidden=true;
+      this.board.setFrame(publicBoardFrame(next.response.after));this.showResult(next.response);
+      this.displayBusy=false;this.consumeDisplayQueue();
+    };
+    const presentation=turnPresentation(next.response.record.events);
+    if(presentation&&!this.panel.hidden){
+      this.playbackControls.hidden=false;const base=publicBoardFrame(next.response.before);
+      this.playback.play(presentation,(visual,effects)=>this.board.setFrame(presentationBoardFrame(base,visual,effects)),finish);
+    }else finish();
+  }
+
+  private cancelPlayback():void {
+    this.playback.cancel();this.playbackControls.hidden=true;this.displayQueue=[];this.displayBusy=false;
+    if(this.latestObservation)this.board.setFrame(publicBoardFrame(this.latestObservation));
+  }
+
   private async start(): Promise<void> {
+    this.builtInGeneration++;this.builtInRunning=false;
+    this.cancelPlayback();
     this.session = createAiSession(liveAiSessionOptions(this.options, locale()));
     const artifact = this.session.buildPublicArtifact();
     if (artifact.ok) {
       this.latestObservation = artifact.artifact.finalObservation;
       await this.render(this.latestObservation);
     }
-    this.state.textContent = `active · ${locale()}`;
+    this.state.textContent = locale()==='ja'?'プレイ中':'active';
     this.current.textContent = locale() === 'ja' ? 'セッション開始。接続状態は診断欄で確認できます。' : 'Session started. Connection status is shown in diagnostics.';
     await this.registration?.smokeTest();
     this.refreshDiagnostics();
@@ -173,6 +209,25 @@ export class LiveAiViewer {
     this.updateOmitted();
   }
 
+  /** Built-in policy consumes the same public session and display queue as WebMCP. */
+  private async startBalanced():Promise<void> {
+    await this.start();
+    const token=++this.builtInGeneration;this.builtInRunning=true;
+    const {BalancedAgent}=await import('../agent/balancedAgent');const agent=new BalancedAgent();
+    let decision=0;
+    while(token===this.builtInGeneration&&this.session) {
+      if(this.session.getContext().lifecycle!=='active'||this.displayBusy) {await new Promise(resolve=>setTimeout(resolve,50));continue;}
+      const observed=this.session.observe();if(!observed.ok||observed.observation.gameOver)break;
+      const actions:import('../core/types').GameAction[]=[];let cursor:string|undefined;
+      do {const page=this.session.getLegalActions({generation:observed.generation,baseRevision:observed.revision,pageSize:500,...(cursor?{cursor}:{})});if(!page.ok)return;actions.push(...page.actions);cursor=page.nextCursor??undefined;}while(cursor);
+      if(!actions.length)break;
+      const selected=agent.decide(this.latestObservation!,actions);
+      await this.act({generation:observed.generation,baseRevision:observed.revision,requestId:`balanced-${token}-${decision++}`,action:selected.action,decisionSummary:locale()==='ja'?'公開情報に基づき内蔵Balanced AIが行動します。':'Built-in Balanced AI acts on public information.'});
+      await new Promise(resolve=>setTimeout(resolve,50));
+    }
+    if(token===this.builtInGeneration)this.builtInRunning=false;
+  }
+
   private onClick(event: Event): void {
     const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-live-ai]');
     if (!button) return;
@@ -180,11 +235,12 @@ export class LiveAiViewer {
       case 'smoke': void this.registration?.smokeTest().then(this.refreshDiagnostics); break;
       case 'fit': this.board.fit(); break;
       case 'start': void this.start(); break;
-      case 'pause': if (this.session) { this.session.setPaused(true); this.state.textContent = 'paused'; } break;
-      case 'resume': if (this.session) { this.session.setPaused(false); this.state.textContent = 'active'; } break;
-      case 'end': if (this.session) { this.session.end(); this.state.textContent = 'ended'; void this.exportArtifact(); } break;
+      case 'balanced': void this.startBalanced(); break;
+      case 'pause': this.cancelPlayback(); if (this.session) { this.session.setPaused(true); this.state.textContent = locale()==='ja'?'一時停止中':'paused'; } break;
+      case 'resume': if (this.session) { this.session.setPaused(false); this.state.textContent = locale()==='ja'?'プレイ中':'active'; } break;
+      case 'end': this.builtInGeneration++;this.builtInRunning=false;this.cancelPlayback(); if (this.session) { this.session.end(); this.state.textContent = locale()==='ja'?'終了':'ended'; void this.exportArtifact(); } break;
       case 'export': void this.exportArtifact(); break;
-      case 'close': this.panel.hidden = true; this.launcher.hidden = false; break;
+      case 'close': if(this.builtInRunning)this.session?.setPaused(true);this.cancelPlayback(); this.panel.hidden = true; this.launcher.hidden = false; break;
     }
     this.refreshDiagnostics();
   }
@@ -200,9 +256,9 @@ export class LiveAiViewer {
     const item = document.createElement('li');
     item.className = 'live-ai-decision';
     const heading = document.createElement('strong');
-    heading.textContent = `Decision · ${input.requestId} · ${String((input.action as { type?: unknown }).type ?? 'Action')}`;
+    heading.textContent = `${locale()==='ja'?'判断':'Decision'} · ${input.requestId} · ${String((input.action as { type?: unknown }).type ?? 'Action')}`;
     const comment = document.createElement('p');
-    comment.textContent = typeof input.decisionSummary === 'string' && input.decisionSummary.length > 0 ? input.decisionSummary : '(no comment)';
+    comment.textContent = typeof input.decisionSummary === 'string' && input.decisionSummary.length > 0 ? input.decisionSummary : (locale()==='ja'?'（コメントなし）':'(no comment)');
     item.append(heading, comment);
     const bytes = new TextEncoder().encode(item.textContent ?? '').byteLength;
     item.dataset.bytes = String(bytes);
@@ -230,7 +286,7 @@ export class LiveAiViewer {
 
   private updateOmitted(): void {
     this.omitted.hidden = this.omittedDecisions === 0;
-    this.omitted.textContent = this.omittedDecisions === 0 ? '' : `${this.omittedDecisions} older Decision details omitted by the 100 Decisions / 2 MiB viewer limit. Canonical Artifact remains complete.`;
+    this.omitted.textContent = this.omittedDecisions === 0 ? '' : locale()==='ja'?`表示上限（100判断・2 MiB）のため、過去${this.omittedDecisions}件を省略しています。書き出す記録には全判断が含まれます。`:`${this.omittedDecisions} older Decision details omitted by the 100 Decisions / 2 MiB viewer limit. Canonical Artifact remains complete.`;
   }
 
   private renderWithWatchdog(observation: AgentObservation): Promise<void> {

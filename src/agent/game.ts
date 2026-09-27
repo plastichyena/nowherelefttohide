@@ -412,10 +412,14 @@ export class AgentGameAdapter implements AgentGame {
     this.buildId = options.buildId ?? 'local-unknown';
     this.bridgeApiVersion = options.bridgeApiVersion ?? BRIDGE_API_VERSION;
     this.recordHistory = options.recordHistory ?? true;
-    const observation = this.getObservation();
-    this.initialObservation = this.recordHistory ? cloneJson(observation) : null;
     this.observations = new ObservationHistory();
-    if (this.recordHistory) this.observations.push(observation);
+    // Session immediately restores or resets this adapter. Do not construct a
+    // full throwaway observation and thousands of legal moves for the default game.
+    if (this.recordHistory) {
+      const observation = this.getObservation();
+      this.initialObservation = cloneJson(observation);
+      this.observations.push(observation);
+    }
   }
 
   public getApiInfo() {
@@ -504,7 +508,7 @@ export class AgentGameAdapter implements AgentGame {
       {
         try {
           const coreError = validateAction(this.engine.getState(), action);
-          if (coreError) error = publicError(coreError.code, coreError.message);
+          if (coreError) error = { ...publicError(coreError.code, coreError.message), ...(coreError.details ? { details: cloneJson(coreError.details) } : {}) };
         } catch {
           // Direct TypeScript callers can still bypass the declared GameAction
           // shape at runtime. Keep malformed values at the generic boundary;
@@ -525,7 +529,7 @@ export class AgentGameAdapter implements AgentGame {
     const before = this.engine.getState();
     const result = this.engine.step(matched);
     if (result.error) {
-      const error = publicError(result.error.code, result.error.message);
+      const error = { ...publicError(result.error.code, result.error.message), ...(result.error.details ? { details: cloneJson(result.error.details) } : {}) };
       if (this.recordHistory) this.invalidAttempts.push({ decision: this.decisionCount + 1, action: cloneAction(matched), error });
       this.decisionCount += 1;
       const observation = this.getObservation();

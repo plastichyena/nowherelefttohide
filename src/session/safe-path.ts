@@ -86,15 +86,17 @@ export function createSafePathRoot(rootPath: string): SafePathRoot {
 export function assertSafeInputFile(root: SafePathRoot, candidatePath: string): string {
   const candidate = resolveCandidate(root, candidatePath, 'Session input');
   let current = root.lexicalPath;
+  let target: Stats | undefined;
   for (const component of relativeComponents(root, candidate, 'Session input')) {
     current = resolve(current, component);
     const node = assertOrdinaryNode(current, 'Session input');
     assertPhysicalContainment(root, current, 'Session input');
     if (current !== candidate && !node.isDirectory()) fail('Session input', 'parent is not a directory');
+    target = node;
   }
-  const target = assertOrdinaryNode(candidate, 'Session input');
-  assertPhysicalContainment(root, candidate, 'Session input');
-  if (!target.isFile()) fail('Session input', 'input must be a regular file');
+  // The final loop iteration already checked this target and its real path.
+  // A root itself is a directory and cannot be read as an input file.
+  if (!target?.isFile()) fail('Session input', 'input must be a regular file');
   return candidate;
 }
 

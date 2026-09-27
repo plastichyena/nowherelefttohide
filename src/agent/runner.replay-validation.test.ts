@@ -3,7 +3,7 @@ import { createDefaultConfig } from '../core/config';
 import { replayArtifact, runAgentGame } from './runner';
 
 describe('Agent replay version boundaries', () => {
-  it('accepts release-only App metadata changes and rejects missing App metadata', () => {
+  it('accepts release-only App metadata changes and rejects missing App metadata', async () => {
     const config = createDefaultConfig({
       maxActionsPerTurn: 4,
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
@@ -24,6 +24,8 @@ describe('Agent replay version boundaries', () => {
       limits: { maxTurns: 8, maxDecisionsPerTurn: 4, maxDecisionsPerGame: 100 },
     });
 
+    // Let worker reporting finish between the two synchronous full-game runs.
+    await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
     const previousAppReplay = replayArtifact({ ...run.artifact, appVersion: '1.3.1' });
     expect(previousAppReplay.reproduced).toBe(true);
     expect(previousAppReplay.error).toBeNull();

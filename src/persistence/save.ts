@@ -14,16 +14,17 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.6.7 saves. */
+/** The sole game-rules version accepted by v1.6.8 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 24;
-/** v1.6.7 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v24';
+export const SAVE_FORMAT_VERSION = 25;
+/** v1.6.8 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v25';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v23';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v24';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v23',
   'nowhere-left-to-hide:auto-save:v22',
   'nowhere-left-to-hide:auto-save:v21',
   'nowhere-left-to-hide:auto-save:v20',
@@ -227,6 +228,7 @@ const GAME_EVENT_TYPES = [
   'constructible_decommissioned',
   'human_unit_reanimated',
   'game_over',
+  'zombie_presentation',
 ] as const;
 const HORDE_KINDS = ['periodic', 'final'] as const;
 const HORDE_WARNING_TYPES = ['periodic', 'final', 'none'] as const;
@@ -541,7 +543,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.6.7; v1.6.6 or earlier data requires a new v1.6.7 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.6.8; v1.6.7 or earlier data requires a new v1.6.8 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -1618,7 +1620,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the current v1.6.7/v24 key; legacy data is deliberately preserved. */
+  /** Clears only the current v1.6.8/v25 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

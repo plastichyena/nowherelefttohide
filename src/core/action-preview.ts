@@ -1,4 +1,6 @@
 import { previewMove } from './movement-query';
+import { destinationContactRisk } from './contact-risk';
+import { deriveCheckpointRole } from './supply';
 import { isAirborne } from './unit-capabilities';
 import { aviationPreview } from './aviation-preview';
 import { productionCandidates } from './action-candidates';
@@ -32,6 +34,8 @@ export interface EconomyPreviewSnapshot {
 }
 
 export interface CoreActionPreview {
+  contactRisk?: ReturnType<typeof destinationContactRisk>;
+  checkpointRelocation?: { oldCheckpointId: string; branchId: string; remaining: { waiting: number; screening: number; approved: number; infected: number }; oldRoleAfter: string; newActive: { position: { q: number; r: number }; id: null }; reason: string };
   populationMovements: {fromFacilityId:string;toFacilityId:string;people:number;reason:string}[];
   facilityResidentDeltas: {facilityId:string;before:number;after:number;delta:number}[];
   aviation?: ReturnType<typeof aviationPreview>;
@@ -196,6 +200,15 @@ export function previewCoreAction(
   const production=action.type==='ProduceUnit'?productionCandidates(state,{unitType:action.unitType,facilityId:state.facilities.find(f=>action.destination && f.position.q===action.destination.q && f.position.r===action.destination.r)?.id})[0]:undefined;
   return {
     populationMovements,facilityResidentDeltas,
+    ...(action.type === 'Move' ? { contactRisk: destinationContactRisk(state, action.unitId, action.destination) } : {}),
+    ...(action.type === 'RelocateCheckpoint' && beforeState.checkpoints.some(c => c.id === action.checkpointId) ? { checkpointRelocation: (() => {
+      const old = beforeState.checkpoints.find(c => c.id === action.checkpointId)!;
+      const after = afterState.checkpoints.find(c => c.id === old.id)!;
+      return { oldCheckpointId: old.id, branchId: old.branchId ?? old.direction,
+        remaining: { waiting: old.waiting, screening: old.screening, approved: old.approved, infected: old.infected },
+        oldRoleAfter: deriveCheckpointRole(afterState, after), newActive: { position: { ...action.position }, id: null },
+        reason: 'All queues remain at the old physical Post and drain through normal screening/placement. Relocation does not transport refugees. Read the actual new activeCheckpointId from the accepted result.' };
+    })() } : {}),
     aviation:aviationPreview(state,action),
     ...(action.type==='Move'?{movement:previewMove(state,action.unitId,action.destination)}:{}),
     ...(production?{production}:{}),

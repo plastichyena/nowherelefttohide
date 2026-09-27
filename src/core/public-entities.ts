@@ -1,3 +1,4 @@
+import { refugeeArrivalProjection, refugeeArrivalRange } from './refugees';
 import { effectiveZombieMovement } from './zombie-movement';
 import { aviationUnitProjection } from './aviation-preview';
 import { unitCanReceiveSupply, aviationReason } from './aircraft';
@@ -469,7 +470,9 @@ export function createPublicCheckpointProjection(
     arrivalIntervalMin: state.config.refugees.arrivalIntervalMin,
     arrivalIntervalMax: state.config.refugees.arrivalIntervalMax,
     arrivalPeopleMin: state.config.refugees.arrivalPeopleMin,
-    arrivalPeopleMax: state.config.refugees.arrivalPeopleMax,
+    arrivalPeopleMax: refugeeArrivalRange(state.config.refugees, state.turn).max,
+    arrivalRange: refugeeArrivalProjection(state.config.refugees, state.turn, branch?.nextArrivalTurn ?? null),
+    waitingCrowdingThreshold: state.config.refugees.waitingCrowdingThreshold,
     queuePressureClass: getQueuePressureClass(queuePeople, state.config.refugees.screeningCapacity),
     healthyQueueConsumesMaintenance: true,
     queueMaintenanceFood: queuePeople * state.config.economy.populationConsumption.food,

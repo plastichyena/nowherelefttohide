@@ -1,0 +1,3264 @@
+{
+  "scenario": "Standard configuration, identical Balanced Agent v14 policy and seeds. Maximum waiting observed at every Core event during an exact accepted-action replay; all EndTurn Statistics matched original reports.",
+  "records": [
+    {
+      "version": "1.6.7",
+      "seed": 1,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 16,
+      "technicalFailure": null,
+      "totalRefugeeArrivals": 305,
+      "arrivalsByBranch": {
+        "east": 91,
+        "north": 74,
+        "south": 71,
+        "west": 69
+      },
+      "maximumWaiting": 20,
+      "waitingInfections": 0,
+      "accepted": 0,
+      "departed": 202,
+      "finalFood": 0,
+      "finalCivilianGoods": 0,
+      "simpleFarmsBuilt": 0,
+      "barbedWireBuilt": 0,
+      "barbedWireDestroyed": 0,
+      "barbedWireDamageTaken": 0,
+      "perTurn": [
+        {
+          "turn": 1,
+          "before": {
+            "food": 330,
+            "civilianGoods": 10,
+            "militaryGoods": 150,
+            "fuel": 192,
+            "electricityCapacity": 0,
+            "electricityRequired": 0
+          },
+          "after": {
+            "food": 350,
+            "civilianGoods": 108,
+            "militaryGoods": 147,
+            "fuel": 134,
+            "electricityCapacity": 120,
+            "electricityRequired": 120
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 2,
+          "before": {
+            "food": 350,
+            "civilianGoods": 33,
+            "militaryGoods": 147,
+            "fuel": 134,
+            "electricityCapacity": 120,
+            "electricityRequired": 120
+          },
+          "after": {
+            "food": 365,
+            "civilianGoods": 88,
+            "militaryGoods": 146,
+            "fuel": 130,
+            "electricityCapacity": 135,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 3,
+          "before": {
+            "food": 465,
+            "civilianGoods": 38,
+            "militaryGoods": 246,
+            "fuel": 130,
+            "electricityCapacity": 135,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 391,
+            "civilianGoods": 39,
+            "militaryGoods": 241,
+            "fuel": 0,
+            "electricityCapacity": 135,
+            "electricityRequired": 125
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 12,
+            "north": 16,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 28
+        },
+        {
+          "turn": 4,
+          "before": {
+            "food": 391,
+            "civilianGoods": 44,
+            "militaryGoods": 221,
+            "fuel": 0,
+            "electricityCapacity": 135,
+            "electricityRequired": 125
+          },
+          "after": {
+            "food": 347,
+            "civilianGoods": 0,
+            "militaryGoods": 219,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 75
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 12,
+            "north": 16,
+            "south": 15,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 43
+        },
+        {
+          "turn": 5,
+          "before": {
+            "food": 347,
+            "civilianGoods": 0,
+            "militaryGoods": 219,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 75
+          },
+          "after": {
+            "food": 308,
+            "civilianGoods": 0,
+            "militaryGoods": 179,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 75
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 29,
+            "north": 16,
+            "south": 15,
+            "west": 19
+          },
+          "accepted": 0,
+          "departed": 79
+        },
+        {
+          "turn": 6,
+          "before": {
+            "food": 308,
+            "civilianGoods": 5,
+            "militaryGoods": 159,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 75
+          },
+          "after": {
+            "food": 220,
+            "civilianGoods": 0,
+            "militaryGoods": 151,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 70
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 29,
+            "north": 36,
+            "south": 15,
+            "west": 19
+          },
+          "accepted": 0,
+          "departed": 79
+        },
+        {
+          "turn": 7,
+          "before": {
+            "food": 220,
+            "civilianGoods": 0,
+            "militaryGoods": 151,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 70
+          },
+          "after": {
+            "food": 12,
+            "civilianGoods": 0,
+            "militaryGoods": 133,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 30
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 29,
+            "north": 36,
+            "south": 15,
+            "west": 19
+          },
+          "accepted": 0,
+          "departed": 80
+        },
+        {
+          "turn": 8,
+          "before": {
+            "food": 12,
+            "civilianGoods": 0,
+            "militaryGoods": 133,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 30
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 114,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 60
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 29,
+            "north": 36,
+            "south": 26,
+            "west": 19
+          },
+          "accepted": 0,
+          "departed": 91
+        },
+        {
+          "turn": 9,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 114,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 60
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 88,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 10
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 45,
+            "north": 52,
+            "south": 26,
+            "west": 35
+          },
+          "accepted": 0,
+          "departed": 123
+        },
+        {
+          "turn": 10,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 88,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 10
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 79,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 40
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 45,
+            "north": 52,
+            "south": 46,
+            "west": 35
+          },
+          "accepted": 0,
+          "departed": 144
+        },
+        {
+          "turn": 11,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 79,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 40
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 66,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 10
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 45,
+            "north": 63,
+            "south": 46,
+            "west": 51
+          },
+          "accepted": 0,
+          "departed": 155
+        },
+        {
+          "turn": 12,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 66,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 10
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 47,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 30
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 63,
+            "north": 63,
+            "south": 59,
+            "west": 51
+          },
+          "accepted": 0,
+          "departed": 169
+        },
+        {
+          "turn": 13,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 47,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 30
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 21,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 30
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 63,
+            "north": 63,
+            "south": 59,
+            "west": 51
+          },
+          "accepted": 0,
+          "departed": 170
+        },
+        {
+          "turn": 14,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 21,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 30
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 0,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 10
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 75,
+            "north": 74,
+            "south": 59,
+            "west": 69
+          },
+          "accepted": 0,
+          "departed": 188
+        },
+        {
+          "turn": 15,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 0,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 10
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 0,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 10
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 75,
+            "north": 74,
+            "south": 59,
+            "west": 69
+          },
+          "accepted": 0,
+          "departed": 190
+        },
+        {
+          "turn": 16,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 0,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 10
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 0,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 30
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 91,
+            "north": 74,
+            "south": 71,
+            "west": 69
+          },
+          "accepted": 0,
+          "departed": 202
+        }
+      ],
+      "rejectedByDirection": {
+        "north": 45,
+        "east": 47,
+        "south": 71,
+        "west": 21
+      },
+      "rejected": 184
+    },
+    {
+      "version": "1.6.7",
+      "seed": 5,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 19,
+      "technicalFailure": null,
+      "totalRefugeeArrivals": 337,
+      "arrivalsByBranch": {
+        "east": 77,
+        "north": 89,
+        "south": 79,
+        "west": 92
+      },
+      "maximumWaiting": 17,
+      "waitingInfections": 0,
+      "accepted": 88,
+      "departed": 186,
+      "finalFood": 0,
+      "finalCivilianGoods": 0,
+      "simpleFarmsBuilt": 1,
+      "barbedWireBuilt": 4,
+      "barbedWireDestroyed": 0,
+      "barbedWireDamageTaken": 0,
+      "perTurn": [
+        {
+          "turn": 1,
+          "before": {
+            "food": 430,
+            "civilianGoods": 85,
+            "militaryGoods": 150,
+            "fuel": 292,
+            "electricityCapacity": 0,
+            "electricityRequired": 0
+          },
+          "after": {
+            "food": 479,
+            "civilianGoods": 252,
+            "militaryGoods": 144,
+            "fuel": 234,
+            "electricityCapacity": 120,
+            "electricityRequired": 160
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 2,
+          "before": {
+            "food": 579,
+            "civilianGoods": 202,
+            "militaryGoods": 244,
+            "fuel": 234,
+            "electricityCapacity": 120,
+            "electricityRequired": 160
+          },
+          "after": {
+            "food": 590,
+            "civilianGoods": 292,
+            "militaryGoods": 256,
+            "fuel": 203,
+            "electricityCapacity": 180,
+            "electricityRequired": 160
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 3,
+          "before": {
+            "food": 590,
+            "civilianGoods": 242,
+            "militaryGoods": 256,
+            "fuel": 203,
+            "electricityCapacity": 180,
+            "electricityRequired": 160
+          },
+          "after": {
+            "food": 601,
+            "civilianGoods": 273,
+            "militaryGoods": 268,
+            "fuel": 158,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 14,
+            "south": 12,
+            "west": 15
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 4,
+          "before": {
+            "food": 701,
+            "civilianGoods": 23,
+            "militaryGoods": 368,
+            "fuel": 158,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "after": {
+            "food": 662,
+            "civilianGoods": 29,
+            "militaryGoods": 374,
+            "fuel": 207,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 14,
+            "north": 14,
+            "south": 12,
+            "west": 15
+          },
+          "accepted": 0,
+          "departed": 14
+        },
+        {
+          "turn": 5,
+          "before": {
+            "food": 662,
+            "civilianGoods": 4,
+            "militaryGoods": 374,
+            "fuel": 207,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "after": {
+            "food": 658,
+            "civilianGoods": 0,
+            "militaryGoods": 362,
+            "fuel": 184,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 14,
+            "north": 25,
+            "south": 12,
+            "west": 15
+          },
+          "accepted": 0,
+          "departed": 14
+        },
+        {
+          "turn": 6,
+          "before": {
+            "food": 658,
+            "civilianGoods": 0,
+            "militaryGoods": 362,
+            "fuel": 184,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 646,
+            "civilianGoods": 0,
+            "militaryGoods": 358,
+            "fuel": 189,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 26,
+            "north": 25,
+            "south": 12,
+            "west": 15
+          },
+          "accepted": 41,
+          "departed": 27
+        },
+        {
+          "turn": 7,
+          "before": {
+            "food": 646,
+            "civilianGoods": 0,
+            "militaryGoods": 358,
+            "fuel": 189,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 647,
+            "civilianGoods": 0,
+            "militaryGoods": 334,
+            "fuel": 158,
+            "electricityCapacity": 180,
+            "electricityRequired": 100
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 26,
+            "north": 42,
+            "south": 24,
+            "west": 32
+          },
+          "accepted": 41,
+          "departed": 56
+        },
+        {
+          "turn": 8,
+          "before": {
+            "food": 647,
+            "civilianGoods": 25,
+            "militaryGoods": 334,
+            "fuel": 158,
+            "electricityCapacity": 180,
+            "electricityRequired": 100
+          },
+          "after": {
+            "food": 632,
+            "civilianGoods": 8,
+            "militaryGoods": 329,
+            "fuel": 205,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 26,
+            "north": 42,
+            "south": 24,
+            "west": 32
+          },
+          "accepted": 41,
+          "departed": 57
+        },
+        {
+          "turn": 9,
+          "before": {
+            "food": 632,
+            "civilianGoods": 8,
+            "militaryGoods": 329,
+            "fuel": 205,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "after": {
+            "food": 607,
+            "civilianGoods": 1,
+            "militaryGoods": 321,
+            "fuel": 268,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 41,
+            "north": 42,
+            "south": 38,
+            "west": 32
+          },
+          "accepted": 41,
+          "departed": 71
+        },
+        {
+          "turn": 10,
+          "before": {
+            "food": 607,
+            "civilianGoods": 1,
+            "militaryGoods": 321,
+            "fuel": 268,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 558,
+            "civilianGoods": 0,
+            "militaryGoods": 321,
+            "fuel": 331,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 41,
+            "north": 59,
+            "south": 38,
+            "west": 32
+          },
+          "accepted": 41,
+          "departed": 89
+        },
+        {
+          "turn": 11,
+          "before": {
+            "food": 558,
+            "civilianGoods": 0,
+            "militaryGoods": 321,
+            "fuel": 331,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 510,
+            "civilianGoods": 0,
+            "militaryGoods": 317,
+            "fuel": 392,
+            "electricityCapacity": 180,
+            "electricityRequired": 100
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 51,
+            "north": 59,
+            "south": 38,
+            "west": 51
+          },
+          "accepted": 51,
+          "departed": 108
+        },
+        {
+          "turn": 12,
+          "before": {
+            "food": 510,
+            "civilianGoods": 0,
+            "militaryGoods": 317,
+            "fuel": 392,
+            "electricityCapacity": 180,
+            "electricityRequired": 100
+          },
+          "after": {
+            "food": 463,
+            "civilianGoods": 0,
+            "militaryGoods": 316,
+            "fuel": 457,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 51,
+            "north": 59,
+            "south": 50,
+            "west": 51
+          },
+          "accepted": 51,
+          "departed": 118
+        },
+        {
+          "turn": 13,
+          "before": {
+            "food": 463,
+            "civilianGoods": 0,
+            "militaryGoods": 316,
+            "fuel": 457,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 424,
+            "civilianGoods": 23,
+            "militaryGoods": 315,
+            "fuel": 522,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 51,
+            "north": 59,
+            "south": 50,
+            "west": 63
+          },
+          "accepted": 67,
+          "departed": 130
+        },
+        {
+          "turn": 14,
+          "before": {
+            "food": 424,
+            "civilianGoods": 3,
+            "militaryGoods": 290,
+            "fuel": 522,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 395,
+            "civilianGoods": 87,
+            "militaryGoods": 290,
+            "fuel": 543,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 61,
+            "north": 73,
+            "south": 50,
+            "west": 63
+          },
+          "accepted": 67,
+          "departed": 154
+        },
+        {
+          "turn": 15,
+          "before": {
+            "food": 395,
+            "civilianGoods": 7,
+            "militaryGoods": 255,
+            "fuel": 543,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 360,
+            "civilianGoods": 85,
+            "militaryGoods": 243,
+            "fuel": 540,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 61,
+            "north": 73,
+            "south": 50,
+            "west": 63
+          },
+          "accepted": 81,
+          "departed": 154
+        },
+        {
+          "turn": 16,
+          "before": {
+            "food": 360,
+            "civilianGoods": 15,
+            "militaryGoods": 223,
+            "fuel": 540,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 112,
+            "civilianGoods": 104,
+            "militaryGoods": 213,
+            "fuel": 565,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 61,
+            "north": 73,
+            "south": 61,
+            "west": 63
+          },
+          "accepted": 81,
+          "departed": 165
+        },
+        {
+          "turn": 17,
+          "before": {
+            "food": 112,
+            "civilianGoods": 29,
+            "militaryGoods": 158,
+            "fuel": 565,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 146,
+            "fuel": 497,
+            "electricityCapacity": 30,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 77,
+            "north": 89,
+            "south": 61,
+            "west": 79
+          },
+          "accepted": 81,
+          "departed": 165
+        },
+        {
+          "turn": 18,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 146,
+            "fuel": 497,
+            "electricityCapacity": 30,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 132,
+            "fuel": 497,
+            "electricityCapacity": 30,
+            "electricityRequired": 60
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 77,
+            "north": 89,
+            "south": 61,
+            "west": 79
+          },
+          "accepted": 88,
+          "departed": 168
+        },
+        {
+          "turn": 19,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 132,
+            "fuel": 497,
+            "electricityCapacity": 30,
+            "electricityRequired": 60
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 110,
+            "fuel": 497,
+            "electricityCapacity": 30,
+            "electricityRequired": 90
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 77,
+            "north": 89,
+            "south": 79,
+            "west": 92
+          },
+          "accepted": 88,
+          "departed": 186
+        }
+      ],
+      "rejectedByDirection": {
+        "north": 34,
+        "east": 48,
+        "south": 55,
+        "west": 49
+      },
+      "rejected": 186
+    },
+    {
+      "version": "1.6.7",
+      "seed": 7,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 20,
+      "technicalFailure": null,
+      "totalRefugeeArrivals": 357,
+      "arrivalsByBranch": {
+        "east": 104,
+        "north": 84,
+        "south": 88,
+        "west": 81
+      },
+      "maximumWaiting": 19,
+      "waitingInfections": 0,
+      "accepted": 60,
+      "departed": 232,
+      "finalFood": 0,
+      "finalCivilianGoods": 0,
+      "simpleFarmsBuilt": 5,
+      "barbedWireBuilt": 0,
+      "barbedWireDestroyed": 0,
+      "barbedWireDamageTaken": 0,
+      "perTurn": [
+        {
+          "turn": 1,
+          "before": {
+            "food": 430,
+            "civilianGoods": 0,
+            "militaryGoods": 140,
+            "fuel": 292,
+            "electricityCapacity": 0,
+            "electricityRequired": 0
+          },
+          "after": {
+            "food": 526,
+            "civilianGoods": 92,
+            "militaryGoods": 140,
+            "fuel": 244,
+            "electricityCapacity": 135,
+            "electricityRequired": 90
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 2,
+          "before": {
+            "food": 526,
+            "civilianGoods": 42,
+            "militaryGoods": 340,
+            "fuel": 244,
+            "electricityCapacity": 135,
+            "electricityRequired": 90
+          },
+          "after": {
+            "food": 462,
+            "civilianGoods": 98,
+            "militaryGoods": 342,
+            "fuel": 209,
+            "electricityCapacity": 150,
+            "electricityRequired": 145
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 3,
+          "before": {
+            "food": 562,
+            "civilianGoods": 23,
+            "militaryGoods": 442,
+            "fuel": 209,
+            "electricityCapacity": 150,
+            "electricityRequired": 145
+          },
+          "after": {
+            "food": 435,
+            "civilianGoods": 91,
+            "militaryGoods": 448,
+            "fuel": 268,
+            "electricityCapacity": 150,
+            "electricityRequired": 155
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 11,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 11
+        },
+        {
+          "turn": 4,
+          "before": {
+            "food": 435,
+            "civilianGoods": 41,
+            "militaryGoods": 448,
+            "fuel": 268,
+            "electricityCapacity": 150,
+            "electricityRequired": 155
+          },
+          "after": {
+            "food": 198,
+            "civilianGoods": 109,
+            "militaryGoods": 450,
+            "fuel": 237,
+            "electricityCapacity": 150,
+            "electricityRequired": 160
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 16,
+            "north": 0,
+            "south": 11,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 27
+        },
+        {
+          "turn": 5,
+          "before": {
+            "food": 198,
+            "civilianGoods": 34,
+            "militaryGoods": 450,
+            "fuel": 237,
+            "electricityCapacity": 150,
+            "electricityRequired": 160
+          },
+          "after": {
+            "food": 1,
+            "civilianGoods": 102,
+            "militaryGoods": 459,
+            "fuel": 258,
+            "electricityCapacity": 150,
+            "electricityRequired": 160
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 16,
+            "north": 17,
+            "south": 11,
+            "west": 16
+          },
+          "accepted": 0,
+          "departed": 60
+        },
+        {
+          "turn": 6,
+          "before": {
+            "food": 1,
+            "civilianGoods": 27,
+            "militaryGoods": 459,
+            "fuel": 258,
+            "electricityCapacity": 150,
+            "electricityRequired": 160
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 67,
+            "militaryGoods": 458,
+            "fuel": 171,
+            "electricityCapacity": 150,
+            "electricityRequired": 170
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 35,
+            "north": 17,
+            "south": 30,
+            "west": 16
+          },
+          "accepted": 0,
+          "departed": 98
+        },
+        {
+          "turn": 7,
+          "before": {
+            "food": 0,
+            "civilianGoods": 192,
+            "militaryGoods": 458,
+            "fuel": 171,
+            "electricityCapacity": 150,
+            "electricityRequired": 170
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 323,
+            "militaryGoods": 440,
+            "fuel": 79,
+            "electricityCapacity": 150,
+            "electricityRequired": 290
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 35,
+            "north": 17,
+            "south": 30,
+            "west": 16
+          },
+          "accepted": 0,
+          "departed": 98
+        },
+        {
+          "turn": 8,
+          "before": {
+            "food": 0,
+            "civilianGoods": 273,
+            "militaryGoods": 440,
+            "fuel": 79,
+            "electricityCapacity": 150,
+            "electricityRequired": 290
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 386,
+            "militaryGoods": 440,
+            "fuel": 0,
+            "electricityCapacity": 150,
+            "electricityRequired": 210
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 49,
+            "north": 17,
+            "south": 30,
+            "west": 27
+          },
+          "accepted": 0,
+          "departed": 98
+        },
+        {
+          "turn": 9,
+          "before": {
+            "food": 100,
+            "civilianGoods": 336,
+            "militaryGoods": 540,
+            "fuel": 0,
+            "electricityCapacity": 150,
+            "electricityRequired": 210
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 120,
+            "militaryGoods": 540,
+            "fuel": 0,
+            "electricityCapacity": 150,
+            "electricityRequired": 290
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 49,
+            "north": 34,
+            "south": 41,
+            "west": 27
+          },
+          "accepted": 0,
+          "departed": 128
+        },
+        {
+          "turn": 10,
+          "before": {
+            "food": 0,
+            "civilianGoods": 45,
+            "militaryGoods": 540,
+            "fuel": 0,
+            "electricityCapacity": 150,
+            "electricityRequired": 290
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 540,
+            "fuel": 0,
+            "electricityCapacity": 105,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 60,
+            "north": 34,
+            "south": 41,
+            "west": 39
+          },
+          "accepted": 0,
+          "departed": 128
+        },
+        {
+          "turn": 11,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 540,
+            "fuel": 0,
+            "electricityCapacity": 105,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 534,
+            "fuel": 0,
+            "electricityCapacity": 105,
+            "electricityRequired": 120
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 60,
+            "north": 34,
+            "south": 41,
+            "west": 39
+          },
+          "accepted": 0,
+          "departed": 128
+        },
+        {
+          "turn": 12,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 534,
+            "fuel": 0,
+            "electricityCapacity": 105,
+            "electricityRequired": 120
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 524,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 100
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 60,
+            "north": 34,
+            "south": 59,
+            "west": 52
+          },
+          "accepted": 0,
+          "departed": 141
+        },
+        {
+          "turn": 13,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 524,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 100
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 522,
+            "fuel": 0,
+            "electricityCapacity": 90,
+            "electricityRequired": 150
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 72,
+            "north": 48,
+            "south": 59,
+            "west": 52
+          },
+          "accepted": 0,
+          "departed": 168
+        },
+        {
+          "turn": 14,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 522,
+            "fuel": 0,
+            "electricityCapacity": 90,
+            "electricityRequired": 150
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 498,
+            "fuel": 0,
+            "electricityCapacity": 75,
+            "electricityRequired": 60
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 72,
+            "north": 48,
+            "south": 59,
+            "west": 52
+          },
+          "accepted": 23,
+          "departed": 168
+        },
+        {
+          "turn": 15,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 498,
+            "fuel": 0,
+            "electricityCapacity": 75,
+            "electricityRequired": 60
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 498,
+            "fuel": 0,
+            "electricityCapacity": 75,
+            "electricityRequired": 100
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 87,
+            "north": 58,
+            "south": 59,
+            "west": 52
+          },
+          "accepted": 23,
+          "departed": 193
+        },
+        {
+          "turn": 16,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 498,
+            "fuel": 0,
+            "electricityCapacity": 75,
+            "electricityRequired": 100
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 497,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 40
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 87,
+            "north": 58,
+            "south": 78,
+            "west": 64
+          },
+          "accepted": 46,
+          "departed": 193
+        },
+        {
+          "turn": 17,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 497,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 40
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 491,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 80
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 87,
+            "north": 58,
+            "south": 78,
+            "west": 64
+          },
+          "accepted": 46,
+          "departed": 195
+        },
+        {
+          "turn": 18,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 491,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 80
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 483,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 20
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 87,
+            "north": 70,
+            "south": 88,
+            "west": 64
+          },
+          "accepted": 60,
+          "departed": 195
+        },
+        {
+          "turn": 19,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 483,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 20
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 465,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 50
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 104,
+            "north": 70,
+            "south": 88,
+            "west": 81
+          },
+          "accepted": 60,
+          "departed": 231
+        },
+        {
+          "turn": 20,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 465,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 50
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 447,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 20
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 104,
+            "north": 84,
+            "south": 88,
+            "west": 81
+          },
+          "accepted": 60,
+          "departed": 232
+        }
+      ],
+      "rejectedByDirection": {
+        "north": 59,
+        "east": 80,
+        "south": 45,
+        "west": 48
+      },
+      "rejected": 232
+    },
+    {
+      "version": "1.6.8",
+      "seed": 1,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 16,
+      "technicalFailure": null,
+      "totalRefugeeArrivals": 326,
+      "arrivalsByBranch": {
+        "east": 119,
+        "north": 70,
+        "south": 69,
+        "west": 68
+      },
+      "maximumWaiting": 22,
+      "waitingInfections": 0,
+      "accepted": 0,
+      "departed": 275,
+      "finalFood": 0,
+      "finalCivilianGoods": 0,
+      "simpleFarmsBuilt": 0,
+      "barbedWireBuilt": 0,
+      "barbedWireDestroyed": 0,
+      "barbedWireDamageTaken": 0,
+      "perTurn": [
+        {
+          "turn": 1,
+          "before": {
+            "food": 330,
+            "civilianGoods": 10,
+            "militaryGoods": 150,
+            "fuel": 192,
+            "electricityCapacity": 0,
+            "electricityRequired": 0
+          },
+          "after": {
+            "food": 350,
+            "civilianGoods": 108,
+            "militaryGoods": 147,
+            "fuel": 134,
+            "electricityCapacity": 120,
+            "electricityRequired": 120
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 2,
+          "before": {
+            "food": 350,
+            "civilianGoods": 33,
+            "militaryGoods": 147,
+            "fuel": 134,
+            "electricityCapacity": 120,
+            "electricityRequired": 120
+          },
+          "after": {
+            "food": 365,
+            "civilianGoods": 88,
+            "militaryGoods": 146,
+            "fuel": 130,
+            "electricityCapacity": 135,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 3,
+          "before": {
+            "food": 465,
+            "civilianGoods": 38,
+            "militaryGoods": 246,
+            "fuel": 130,
+            "electricityCapacity": 135,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 391,
+            "civilianGoods": 39,
+            "militaryGoods": 241,
+            "fuel": 0,
+            "electricityCapacity": 135,
+            "electricityRequired": 125
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 20,
+            "north": 17,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 37
+        },
+        {
+          "turn": 4,
+          "before": {
+            "food": 391,
+            "civilianGoods": 44,
+            "militaryGoods": 221,
+            "fuel": 0,
+            "electricityCapacity": 135,
+            "electricityRequired": 125
+          },
+          "after": {
+            "food": 347,
+            "civilianGoods": 0,
+            "militaryGoods": 219,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 75
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 20,
+            "north": 17,
+            "south": 10,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 47
+        },
+        {
+          "turn": 5,
+          "before": {
+            "food": 347,
+            "civilianGoods": 0,
+            "militaryGoods": 219,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 75
+          },
+          "after": {
+            "food": 308,
+            "civilianGoods": 0,
+            "militaryGoods": 179,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 75
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 39,
+            "north": 17,
+            "south": 10,
+            "west": 19
+          },
+          "accepted": 0,
+          "departed": 85
+        },
+        {
+          "turn": 6,
+          "before": {
+            "food": 308,
+            "civilianGoods": 5,
+            "militaryGoods": 159,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 75
+          },
+          "after": {
+            "food": 220,
+            "civilianGoods": 0,
+            "militaryGoods": 149,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 70
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 39,
+            "north": 37,
+            "south": 10,
+            "west": 19
+          },
+          "accepted": 0,
+          "departed": 85
+        },
+        {
+          "turn": 7,
+          "before": {
+            "food": 220,
+            "civilianGoods": 0,
+            "militaryGoods": 149,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 70
+          },
+          "after": {
+            "food": 7,
+            "civilianGoods": 0,
+            "militaryGoods": 133,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 30
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 39,
+            "north": 37,
+            "south": 10,
+            "west": 19
+          },
+          "accepted": 0,
+          "departed": 86
+        },
+        {
+          "turn": 8,
+          "before": {
+            "food": 7,
+            "civilianGoods": 0,
+            "militaryGoods": 133,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 30
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 120,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 60
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 39,
+            "north": 37,
+            "south": 26,
+            "west": 19
+          },
+          "accepted": 0,
+          "departed": 102
+        },
+        {
+          "turn": 9,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 120,
+            "fuel": 0,
+            "electricityCapacity": 60,
+            "electricityRequired": 60
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 100,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 10
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 57,
+            "north": 54,
+            "south": 26,
+            "west": 41
+          },
+          "accepted": 0,
+          "departed": 137
+        },
+        {
+          "turn": 10,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 100,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 10
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 81,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 40
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 57,
+            "north": 54,
+            "south": 48,
+            "west": 41
+          },
+          "accepted": 0,
+          "departed": 160
+        },
+        {
+          "turn": 11,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 81,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 40
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 62,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 10
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 69,
+            "north": 54,
+            "south": 48,
+            "west": 41
+          },
+          "accepted": 0,
+          "departed": 172
+        },
+        {
+          "turn": 12,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 62,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 10
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 47,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 30
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 69,
+            "north": 54,
+            "south": 48,
+            "west": 57
+          },
+          "accepted": 0,
+          "departed": 188
+        },
+        {
+          "turn": 13,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 47,
+            "fuel": 0,
+            "electricityCapacity": 30,
+            "electricityRequired": 30
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 31,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 30
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 95,
+            "north": 70,
+            "south": 48,
+            "west": 57
+          },
+          "accepted": 0,
+          "departed": 230
+        },
+        {
+          "turn": 14,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 31,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 30
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 17,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 10
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 95,
+            "north": 70,
+            "south": 69,
+            "west": 57
+          },
+          "accepted": 0,
+          "departed": 251
+        },
+        {
+          "turn": 15,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 17,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 10
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 0,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 10
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 119,
+            "north": 70,
+            "south": 69,
+            "west": 68
+          },
+          "accepted": 0,
+          "departed": 275
+        }
+      ],
+      "rejectedByDirection": {
+        "north": 51,
+        "east": 119,
+        "south": 69,
+        "west": 36
+      },
+      "rejected": 275
+    },
+    {
+      "version": "1.6.8",
+      "seed": 5,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 19,
+      "technicalFailure": null,
+      "totalRefugeeArrivals": 342,
+      "arrivalsByBranch": {
+        "east": 94,
+        "north": 86,
+        "south": 75,
+        "west": 87
+      },
+      "maximumWaiting": 28,
+      "waitingInfections": 0,
+      "accepted": 116,
+      "departed": 175,
+      "finalFood": 0,
+      "finalCivilianGoods": 0,
+      "simpleFarmsBuilt": 4,
+      "barbedWireBuilt": 6,
+      "barbedWireDestroyed": 4,
+      "barbedWireDamageTaken": 90,
+      "perTurn": [
+        {
+          "turn": 1,
+          "before": {
+            "food": 430,
+            "civilianGoods": 85,
+            "militaryGoods": 150,
+            "fuel": 292,
+            "electricityCapacity": 0,
+            "electricityRequired": 0
+          },
+          "after": {
+            "food": 479,
+            "civilianGoods": 252,
+            "militaryGoods": 144,
+            "fuel": 234,
+            "electricityCapacity": 120,
+            "electricityRequired": 160
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 2,
+          "before": {
+            "food": 579,
+            "civilianGoods": 202,
+            "militaryGoods": 244,
+            "fuel": 234,
+            "electricityCapacity": 120,
+            "electricityRequired": 160
+          },
+          "after": {
+            "food": 590,
+            "civilianGoods": 292,
+            "militaryGoods": 256,
+            "fuel": 203,
+            "electricityCapacity": 180,
+            "electricityRequired": 160
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 3,
+          "before": {
+            "food": 590,
+            "civilianGoods": 242,
+            "militaryGoods": 256,
+            "fuel": 203,
+            "electricityCapacity": 180,
+            "electricityRequired": 160
+          },
+          "after": {
+            "food": 601,
+            "civilianGoods": 273,
+            "militaryGoods": 268,
+            "fuel": 158,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 15,
+            "south": 20,
+            "west": 10
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 4,
+          "before": {
+            "food": 701,
+            "civilianGoods": 23,
+            "militaryGoods": 368,
+            "fuel": 158,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "after": {
+            "food": 658,
+            "civilianGoods": 25,
+            "militaryGoods": 374,
+            "fuel": 207,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 16,
+            "north": 15,
+            "south": 20,
+            "west": 10
+          },
+          "accepted": 0,
+          "departed": 16
+        },
+        {
+          "turn": 5,
+          "before": {
+            "food": 658,
+            "civilianGoods": 0,
+            "militaryGoods": 374,
+            "fuel": 207,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "after": {
+            "food": 650,
+            "civilianGoods": 0,
+            "militaryGoods": 362,
+            "fuel": 184,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 16,
+            "north": 33,
+            "south": 20,
+            "west": 10
+          },
+          "accepted": 0,
+          "departed": 16
+        },
+        {
+          "turn": 6,
+          "before": {
+            "food": 650,
+            "civilianGoods": 0,
+            "militaryGoods": 362,
+            "fuel": 184,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 627,
+            "civilianGoods": 0,
+            "militaryGoods": 358,
+            "fuel": 189,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 29,
+            "north": 33,
+            "south": 20,
+            "west": 10
+          },
+          "accepted": 45,
+          "departed": 30
+        },
+        {
+          "turn": 7,
+          "before": {
+            "food": 627,
+            "civilianGoods": 0,
+            "militaryGoods": 358,
+            "fuel": 189,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 616,
+            "civilianGoods": 0,
+            "militaryGoods": 334,
+            "fuel": 158,
+            "electricityCapacity": 180,
+            "electricityRequired": 100
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 29,
+            "north": 50,
+            "south": 40,
+            "west": 27
+          },
+          "accepted": 45,
+          "departed": 67
+        },
+        {
+          "turn": 8,
+          "before": {
+            "food": 616,
+            "civilianGoods": 25,
+            "militaryGoods": 334,
+            "fuel": 158,
+            "electricityCapacity": 180,
+            "electricityRequired": 100
+          },
+          "after": {
+            "food": 589,
+            "civilianGoods": 1,
+            "militaryGoods": 329,
+            "fuel": 205,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 29,
+            "north": 50,
+            "south": 40,
+            "west": 27
+          },
+          "accepted": 45,
+          "departed": 68
+        },
+        {
+          "turn": 9,
+          "before": {
+            "food": 589,
+            "civilianGoods": 1,
+            "militaryGoods": 329,
+            "fuel": 205,
+            "electricityCapacity": 180,
+            "electricityRequired": 170
+          },
+          "after": {
+            "food": 552,
+            "civilianGoods": 0,
+            "militaryGoods": 321,
+            "fuel": 268,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 42,
+            "north": 50,
+            "south": 50,
+            "west": 27
+          },
+          "accepted": 45,
+          "departed": 78
+        },
+        {
+          "turn": 10,
+          "before": {
+            "food": 552,
+            "civilianGoods": 0,
+            "militaryGoods": 321,
+            "fuel": 268,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 493,
+            "civilianGoods": 0,
+            "militaryGoods": 321,
+            "fuel": 331,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 42,
+            "north": 64,
+            "south": 50,
+            "west": 27
+          },
+          "accepted": 45,
+          "departed": 93
+        },
+        {
+          "turn": 11,
+          "before": {
+            "food": 493,
+            "civilianGoods": 0,
+            "militaryGoods": 321,
+            "fuel": 331,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 435,
+            "civilianGoods": 0,
+            "militaryGoods": 317,
+            "fuel": 392,
+            "electricityCapacity": 180,
+            "electricityRequired": 100
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 54,
+            "north": 64,
+            "south": 50,
+            "west": 44
+          },
+          "accepted": 62,
+          "departed": 110
+        },
+        {
+          "turn": 12,
+          "before": {
+            "food": 435,
+            "civilianGoods": 0,
+            "militaryGoods": 317,
+            "fuel": 392,
+            "electricityCapacity": 180,
+            "electricityRequired": 100
+          },
+          "after": {
+            "food": 366,
+            "civilianGoods": 36,
+            "militaryGoods": 316,
+            "fuel": 457,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 54,
+            "north": 64,
+            "south": 64,
+            "west": 44
+          },
+          "accepted": 62,
+          "departed": 110
+        },
+        {
+          "turn": 13,
+          "before": {
+            "food": 366,
+            "civilianGoods": 1,
+            "militaryGoods": 306,
+            "fuel": 457,
+            "electricityCapacity": 180,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 298,
+            "civilianGoods": 70,
+            "militaryGoods": 305,
+            "fuel": 498,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 54,
+            "north": 64,
+            "south": 64,
+            "west": 59
+          },
+          "accepted": 78,
+          "departed": 125
+        },
+        {
+          "turn": 14,
+          "before": {
+            "food": 298,
+            "civilianGoods": 0,
+            "militaryGoods": 280,
+            "fuel": 498,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 240,
+            "civilianGoods": 94,
+            "militaryGoods": 280,
+            "fuel": 519,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 77,
+            "north": 75,
+            "south": 64,
+            "west": 59
+          },
+          "accepted": 78,
+          "departed": 159
+        },
+        {
+          "turn": 15,
+          "before": {
+            "food": 240,
+            "civilianGoods": 14,
+            "militaryGoods": 245,
+            "fuel": 519,
+            "electricityCapacity": 180,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 176,
+            "civilianGoods": 85,
+            "militaryGoods": 233,
+            "fuel": 510,
+            "electricityCapacity": 150,
+            "electricityRequired": 120
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 77,
+            "north": 75,
+            "south": 64,
+            "west": 59
+          },
+          "accepted": 90,
+          "departed": 159
+        },
+        {
+          "turn": 16,
+          "before": {
+            "food": 176,
+            "civilianGoods": 15,
+            "militaryGoods": 188,
+            "fuel": 510,
+            "electricityCapacity": 150,
+            "electricityRequired": 120
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 98,
+            "militaryGoods": 178,
+            "fuel": 525,
+            "electricityCapacity": 150,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 77,
+            "north": 75,
+            "south": 75,
+            "west": 59
+          },
+          "accepted": 90,
+          "departed": 170
+        },
+        {
+          "turn": 17,
+          "before": {
+            "food": 0,
+            "civilianGoods": 3,
+            "militaryGoods": 158,
+            "fuel": 525,
+            "electricityCapacity": 150,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 83,
+            "militaryGoods": 138,
+            "fuel": 540,
+            "electricityCapacity": 150,
+            "electricityRequired": 110
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 94,
+            "north": 86,
+            "south": 75,
+            "west": 87
+          },
+          "accepted": 102,
+          "departed": 170
+        },
+        {
+          "turn": 18,
+          "before": {
+            "food": 0,
+            "civilianGoods": 3,
+            "militaryGoods": 108,
+            "fuel": 540,
+            "electricityCapacity": 150,
+            "electricityRequired": 110
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 98,
+            "fuel": 587,
+            "electricityCapacity": 150,
+            "electricityRequired": 90
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 94,
+            "north": 86,
+            "south": 75,
+            "west": 87
+          },
+          "accepted": 116,
+          "departed": 173
+        },
+        {
+          "turn": 19,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 98,
+            "fuel": 587,
+            "electricityCapacity": 150,
+            "electricityRequired": 90
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 88,
+            "fuel": 587,
+            "electricityCapacity": 30,
+            "electricityRequired": 40
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 94,
+            "north": 86,
+            "south": 75,
+            "west": 87
+          },
+          "accepted": 116,
+          "departed": 175
+        }
+      ],
+      "rejectedByDirection": {
+        "north": 28,
+        "east": 54,
+        "south": 41,
+        "west": 52
+      },
+      "rejected": 175
+    },
+    {
+      "version": "1.6.8",
+      "seed": 7,
+      "policy": "balanced",
+      "limits": {
+        "maxDecisionsPerTurn": 100,
+        "maxDecisionsPerGame": 3100,
+        "maxTurns": 100
+      },
+      "outcome": "lost",
+      "finalTurn": 19,
+      "technicalFailure": null,
+      "totalRefugeeArrivals": 406,
+      "arrivalsByBranch": {
+        "east": 120,
+        "north": 92,
+        "south": 84,
+        "west": 110
+      },
+      "maximumWaiting": 22,
+      "waitingInfections": 0,
+      "accepted": 87,
+      "departed": 282,
+      "finalFood": 0,
+      "finalCivilianGoods": 0,
+      "simpleFarmsBuilt": 10,
+      "barbedWireBuilt": 6,
+      "barbedWireDestroyed": 5,
+      "barbedWireDamageTaken": 110,
+      "perTurn": [
+        {
+          "turn": 1,
+          "before": {
+            "food": 430,
+            "civilianGoods": 0,
+            "militaryGoods": 140,
+            "fuel": 292,
+            "electricityCapacity": 0,
+            "electricityRequired": 0
+          },
+          "after": {
+            "food": 526,
+            "civilianGoods": 92,
+            "militaryGoods": 140,
+            "fuel": 244,
+            "electricityCapacity": 135,
+            "electricityRequired": 90
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 2,
+          "before": {
+            "food": 526,
+            "civilianGoods": 42,
+            "militaryGoods": 340,
+            "fuel": 244,
+            "electricityCapacity": 135,
+            "electricityRequired": 90
+          },
+          "after": {
+            "food": 462,
+            "civilianGoods": 98,
+            "militaryGoods": 342,
+            "fuel": 209,
+            "electricityCapacity": 150,
+            "electricityRequired": 145
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 0,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 0
+        },
+        {
+          "turn": 3,
+          "before": {
+            "food": 562,
+            "civilianGoods": 23,
+            "militaryGoods": 442,
+            "fuel": 209,
+            "electricityCapacity": 150,
+            "electricityRequired": 145
+          },
+          "after": {
+            "food": 435,
+            "civilianGoods": 91,
+            "militaryGoods": 448,
+            "fuel": 268,
+            "electricityCapacity": 150,
+            "electricityRequired": 155
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 0,
+            "north": 0,
+            "south": 12,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 12
+        },
+        {
+          "turn": 4,
+          "before": {
+            "food": 435,
+            "civilianGoods": 41,
+            "militaryGoods": 448,
+            "fuel": 268,
+            "electricityCapacity": 150,
+            "electricityRequired": 155
+          },
+          "after": {
+            "food": 198,
+            "civilianGoods": 109,
+            "militaryGoods": 450,
+            "fuel": 237,
+            "electricityCapacity": 150,
+            "electricityRequired": 160
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 12,
+            "north": 0,
+            "south": 12,
+            "west": 0
+          },
+          "accepted": 0,
+          "departed": 24
+        },
+        {
+          "turn": 5,
+          "before": {
+            "food": 198,
+            "civilianGoods": 34,
+            "militaryGoods": 450,
+            "fuel": 237,
+            "electricityCapacity": 150,
+            "electricityRequired": 160
+          },
+          "after": {
+            "food": 1,
+            "civilianGoods": 102,
+            "militaryGoods": 459,
+            "fuel": 258,
+            "electricityCapacity": 150,
+            "electricityRequired": 160
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 12,
+            "north": 20,
+            "south": 12,
+            "west": 22
+          },
+          "accepted": 0,
+          "departed": 66
+        },
+        {
+          "turn": 6,
+          "before": {
+            "food": 1,
+            "civilianGoods": 77,
+            "militaryGoods": 459,
+            "fuel": 258,
+            "electricityCapacity": 150,
+            "electricityRequired": 160
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 95,
+            "militaryGoods": 468,
+            "fuel": 135,
+            "electricityCapacity": 150,
+            "electricityRequired": 250
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 31,
+            "north": 20,
+            "south": 32,
+            "west": 22
+          },
+          "accepted": 0,
+          "departed": 105
+        },
+        {
+          "turn": 7,
+          "before": {
+            "food": 0,
+            "civilianGoods": 220,
+            "militaryGoods": 468,
+            "fuel": 135,
+            "electricityCapacity": 150,
+            "electricityRequired": 250
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 351,
+            "militaryGoods": 444,
+            "fuel": 120,
+            "electricityCapacity": 150,
+            "electricityRequired": 270
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 31,
+            "north": 20,
+            "south": 32,
+            "west": 22
+          },
+          "accepted": 0,
+          "departed": 105
+        },
+        {
+          "turn": 8,
+          "before": {
+            "food": 0,
+            "civilianGoods": 301,
+            "militaryGoods": 444,
+            "fuel": 120,
+            "electricityCapacity": 150,
+            "electricityRequired": 270
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 386,
+            "militaryGoods": 459,
+            "fuel": 44,
+            "electricityCapacity": 165,
+            "electricityRequired": 190
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 49,
+            "north": 20,
+            "south": 32,
+            "west": 39
+          },
+          "accepted": 0,
+          "departed": 105
+        },
+        {
+          "turn": 9,
+          "before": {
+            "food": 0,
+            "civilianGoods": 336,
+            "militaryGoods": 459,
+            "fuel": 44,
+            "electricityCapacity": 165,
+            "electricityRequired": 190
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 437,
+            "militaryGoods": 459,
+            "fuel": 105,
+            "electricityCapacity": 180,
+            "electricityRequired": 270
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 49,
+            "north": 40,
+            "south": 44,
+            "west": 39
+          },
+          "accepted": 0,
+          "departed": 139
+        },
+        {
+          "turn": 10,
+          "before": {
+            "food": 0,
+            "civilianGoods": 387,
+            "militaryGoods": 459,
+            "fuel": 105,
+            "electricityCapacity": 180,
+            "electricityRequired": 270
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 420,
+            "militaryGoods": 466,
+            "fuel": 133,
+            "electricityCapacity": 195,
+            "electricityRequired": 230
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 63,
+            "north": 40,
+            "south": 44,
+            "west": 53
+          },
+          "accepted": 0,
+          "departed": 139
+        },
+        {
+          "turn": 11,
+          "before": {
+            "food": 0,
+            "civilianGoods": 370,
+            "militaryGoods": 466,
+            "fuel": 133,
+            "electricityCapacity": 195,
+            "electricityRequired": 230
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 377,
+            "militaryGoods": 481,
+            "fuel": 169,
+            "electricityCapacity": 195,
+            "electricityRequired": 270
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 63,
+            "north": 53,
+            "south": 54,
+            "west": 53
+          },
+          "accepted": 0,
+          "departed": 164
+        },
+        {
+          "turn": 12,
+          "before": {
+            "food": 0,
+            "civilianGoods": 287,
+            "militaryGoods": 466,
+            "fuel": 169,
+            "electricityCapacity": 195,
+            "electricityRequired": 270
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 248,
+            "militaryGoods": 479,
+            "fuel": 156,
+            "electricityCapacity": 195,
+            "electricityRequired": 230
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 63,
+            "north": 53,
+            "south": 54,
+            "west": 53
+          },
+          "accepted": 0,
+          "departed": 164
+        },
+        {
+          "turn": 13,
+          "before": {
+            "food": 0,
+            "civilianGoods": 188,
+            "militaryGoods": 469,
+            "fuel": 156,
+            "electricityCapacity": 195,
+            "electricityRequired": 230
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 204,
+            "militaryGoods": 469,
+            "fuel": 96,
+            "electricityCapacity": 120,
+            "electricityRequired": 210
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 87,
+            "north": 53,
+            "south": 54,
+            "west": 71
+          },
+          "accepted": 0,
+          "departed": 206
+        },
+        {
+          "turn": 14,
+          "before": {
+            "food": 0,
+            "civilianGoods": 119,
+            "militaryGoods": 434,
+            "fuel": 96,
+            "electricityCapacity": 120,
+            "electricityRequired": 210
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 1,
+            "militaryGoods": 458,
+            "fuel": 36,
+            "electricityCapacity": 120,
+            "electricityRequired": 140
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 87,
+            "north": 53,
+            "south": 54,
+            "west": 71
+          },
+          "accepted": 33,
+          "departed": 206
+        },
+        {
+          "turn": 15,
+          "before": {
+            "food": 0,
+            "civilianGoods": 1,
+            "militaryGoods": 458,
+            "fuel": 36,
+            "electricityCapacity": 120,
+            "electricityRequired": 140
+          },
+          "after": {
+            "food": 50,
+            "civilianGoods": 111,
+            "militaryGoods": 458,
+            "fuel": 87,
+            "electricityCapacity": 120,
+            "electricityRequired": 90
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 98,
+            "north": 66,
+            "south": 67,
+            "west": 82
+          },
+          "accepted": 33,
+          "departed": 254
+        },
+        {
+          "turn": 16,
+          "before": {
+            "food": 50,
+            "civilianGoods": 41,
+            "militaryGoods": 438,
+            "fuel": 87,
+            "electricityCapacity": 120,
+            "electricityRequired": 90
+          },
+          "after": {
+            "food": 25,
+            "civilianGoods": 71,
+            "militaryGoods": 450,
+            "fuel": 7,
+            "electricityCapacity": 120,
+            "electricityRequired": 130
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 98,
+            "north": 66,
+            "south": 67,
+            "west": 82
+          },
+          "accepted": 59,
+          "departed": 254
+        },
+        {
+          "turn": 17,
+          "before": {
+            "food": 25,
+            "civilianGoods": 1,
+            "militaryGoods": 430,
+            "fuel": 7,
+            "electricityCapacity": 120,
+            "electricityRequired": 130
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 428,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 60
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 98,
+            "north": 92,
+            "south": 67,
+            "west": 82
+          },
+          "accepted": 59,
+          "departed": 280
+        },
+        {
+          "turn": 18,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 428,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 60
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 426,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 70
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 120,
+            "north": 92,
+            "south": 84,
+            "west": 82
+          },
+          "accepted": 59,
+          "departed": 280
+        },
+        {
+          "turn": 19,
+          "before": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 426,
+            "fuel": 0,
+            "electricityCapacity": 45,
+            "electricityRequired": 70
+          },
+          "after": {
+            "food": 0,
+            "civilianGoods": 0,
+            "militaryGoods": 426,
+            "fuel": 0,
+            "electricityCapacity": 15,
+            "electricityRequired": 30
+          },
+          "waitingInfections": 0,
+          "arrivalsByBranch": {
+            "east": 120,
+            "north": 92,
+            "south": 84,
+            "west": 110
+          },
+          "accepted": 87,
+          "departed": 282
+        }
+      ],
+      "rejectedByDirection": {
+        "north": 92,
+        "east": 69,
+        "south": 68,
+        "west": 53
+      },
+      "rejected": 282
+    }
+  ],
+  "rejectionSource": "Post-game Core Statistics refugeesTurnedAwayByDirection (deny and explicit TurnAway); distinct from refugeesDeparted which also includes unmanaged arrivals without destinations. These private counters were not used by either AI to choose actions."
+}

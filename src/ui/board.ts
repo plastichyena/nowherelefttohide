@@ -1,5 +1,6 @@
 import { roadConnections } from '../core/roads';
 import Phaser from 'phaser';
+import type { PresentationEffect } from '../core/presentation';
 import { forecastFacilityProduction } from '../core/engine';
 import { HEX_DIRECTION_ORDER, hexDistance, hexKey, hexNeighbor } from '../core/hex';
 import { deriveCheckpointRole, getSectorBranchIds } from '../core/supply';
@@ -44,6 +45,7 @@ export { BOARD_MIN_ZOOM, BOARD_MAX_ZOOM } from './boardAssets';
  * the controller; all state changes still travel through GameAction/Core.
  */
 export interface BoardRenderState {
+  presentationEffects?: PresentationEffect[];
   state: Readonly<GameState>;
   locale?: Locale;
   selectedPosition?: HexCoord | null;
@@ -1353,6 +1355,11 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.moveTo(points[0]!.x, points[0]!.y);
       for (const point of points.slice(1)) this.graphics.lineTo(point.x, point.y);
       this.graphics.strokePath();
+    }
+    for(const effect of render.presentationEffects??[]) {
+      const at=this.hexToWorld(state,effect.position);
+      this.graphics.lineStyle(4,effect.kind==='gas_explosion'?0xb8e66a:effect.kind==='appear'?0x72e0c2:0xff8b63,.95);
+      this.graphics.strokeCircle(at.x,at.y,HEX_SIZE*(effect.kind==='gas_explosion'?1.5:.65));
     }
     for (const [key, label] of this.labels) if (!this.activeLabelKeys.has(key)) label.setVisible(false);
   }

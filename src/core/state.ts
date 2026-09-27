@@ -30,7 +30,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '17.0.0';
+export const GAME_VERSION = '18.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 

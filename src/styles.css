@@ -659,3 +659,8 @@ button.crisis-alert:hover, button.crisis-alert:focus-visible { border-color: #ff
 .artillery-details { border: 1px solid #9f8853; border-radius: .5rem; padding: .65rem; }
 
 .aviation-choices{display:flex;flex-wrap:wrap;gap:8px}.aviation-choice{display:grid;gap:4px;max-width:100%}.aviation-choice button,.help-topic summary{min-height:44px}.aviation-choice small{max-width:15rem}.help-topic{padding:10px 0;border-bottom:1px solid #53615d}.help-topic summary{cursor:pointer;display:flex;align-items:center;font-weight:600}
+/* Always within the viewport, including a portrait phone's safe area. */
+.zombie-playback-controls { position:fixed; z-index:10000; bottom:calc(16px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid #d7a14d; border-radius:12px; background:#17201ff2; color:#fff; max-width:calc(100vw - 24px); }
+.zombie-playback-controls[hidden] { display:none; }
+.zombie-playback-controls strong { flex-shrink:0; white-space:nowrap; }
+.zombie-playback-controls button { min-height:44px; min-width:128px; }

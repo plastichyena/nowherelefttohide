@@ -598,7 +598,8 @@ export type GameEventType =
   | 'checkpoint_policy_changed'
   | 'screamer_scream'
   | 'unsecured_army_base_interception'
-  | 'game_over';
+  | 'game_over'
+  | 'zombie_presentation';
 
 export interface GameEvent {
   id: string;
@@ -1252,6 +1253,7 @@ export type GameAction =
   | LoadSnapshotAction;
 
 export interface ActionError {
+  details?: JsonObject;
   code: string;
   message: string;
   action: GameAction | null;
@@ -1423,6 +1425,9 @@ export interface RefugeeConfig {
   arrivalIntervalMax: number;
   arrivalPeopleMin: number;
   arrivalPeopleMax: number;
+  arrivalGrowthInterval: number;
+  arrivalGrowthPeople: number;
+  waitingCrowdingThreshold: number;
   screeningCapacity: number;
   policies: Record<CheckpointPolicy, RefugeePolicyConfig>;
   waitingRiskThreshold: number;
