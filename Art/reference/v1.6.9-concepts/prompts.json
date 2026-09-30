@@ -1,0 +1,13 @@
+{
+  "assets": [
+    {
+      "prompt": "undefined",
+      "file": "unit_ifv_candidate_v1.png",
+      "transparent_background": true
+    }
+  ],
+  "date": "2026-10-01",
+  "method": "built-in image_gen",
+  "status": "Generated source candidate; not runtime integrated",
+  "requirements": "Doc/Nowhere Left to Hide PoC v1.6.9 アップデート要件 確定版.md"
+}
