@@ -1,4 +1,4 @@
-name: AI Portable Player Package v1.6.8
+name: AI Portable Player Package v1.6.9
 
 on:
   workflow_run:
@@ -95,7 +95,7 @@ jobs:
             PLAY_WITH_AI.md LICENSE ADDITIONAL_PERMISSIONS.md THIRD_PARTY_NOTICES ASSETS_LICENSE.md \
             licenses/node-LICENSE.txt licenses/fflate-LICENSE.txt \
             BUILD_INFO.txt PORTABLE_PACKAGE.json runtime/identity.env \
-            runtime/node/node run-session.sh session-cli.mjs; do
+            runtime/node/node run-session.sh session-cli.mjs examples/v169-portable-turn.mjs scripts/extract-public-evidence.mjs validation/play-report-template.md; do
             test -f "${ROOT}/${FILE}"
           done
           test -x "${ROOT}/runtime/node/node"

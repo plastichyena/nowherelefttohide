@@ -180,8 +180,9 @@ export function createPublicUnitProjection(
   return {
     ...(isHumanUnitType(unit.type) ? { capabilities: {...state.config.units[unit.type].capabilities}, production: { completed:state.completedProductions[unit.type],reserved:state.pendingUnitProductions.filter(o=>o.unitType===unit.type).length,limit:state.config.units[unit.type].productionLimitPerGame,remaining:state.config.units[unit.type].productionLimitPerGame === null ? null : Math.max(0,state.config.units[unit.type].productionLimitPerGame! - state.completedProductions[unit.type] - state.pendingUnitProductions.filter(o=>o.unitType===unit.type).length) } } : {}),
     ...(unit.type === 'fieldArtillery' ? { mode:unit.mode,modeLockedUntilTurn:unit.modeChangedTurn===state.turn?state.turn+1:null,artillery:{fuelPerMovementPoint:state.config.units.fieldArtillery.fuelPerMovementPoint,minRange:deployedArtillery(unit)?state.config.units.fieldArtillery.deployed.minRange:1,militaryGoodsCost:deployedArtillery(unit)?state.config.units.fieldArtillery.deployed.militaryGoodsCost:4,hitProbability:state.config.units.fieldArtillery.scatter[unit.proficiency!].hitProbability,scatterRadius:state.config.units.fieldArtillery.scatter[unit.proficiency!].radius,targetPreviews:deployedArtillery(unit)?[...new Map([...state.units.filter(u=>!u.isPlayerUnit&&(context.visibleTileKeys??getPlayerVisibleTileKeys(state)).has(hexKey(u.position))),...state.facilities.filter(f=>f.owner==='player'&&f.infected>0),...state.checkpoints.filter(c=>c.infected>0)].filter(s=>!artilleryAttackReason(state,unit,s.position)).map(s=>[hexKey(s.position),s.position])).values()].map(p=>previewArtillery(state,unit,p)):[],legalTargetHexes:deployedArtillery(unit)?state.map.tiles.filter(t=>!artilleryAttackReason(state,unit,t)).map(t=>({q:t.q,r:t.r})):[]} } : {}),
-    ...(unit.type === 'multipurposeHelicopter' ? aviationUnitProjection(state,unit) : {}),
+    ...(['ifv', 'multipurposeHelicopter'].includes(unit.type) ? aviationUnitProjection(state,unit) : {}),
     ...(unit.transportedByUnitId ? {transportedByUnitId:unit.transportedByUnitId,boardedTurn:unit.boardedTurn} : {}),
+    ...(unit.type === 'ifv' ? { ifv: { fuelPerHex: state.config.units.ifv.fuelPerHex, gasDamage: state.config.units.gasZombie.explosionDamage, zombieGasDamage: state.config.units.gasZombie.explosionZombieDamage } } : {}),
     canTargetAir:state.config.units[unit.type].canTargetAir,
     id: unit.id,
     ...(unit.reanimatedOnBarbedWireId ? { spawnedInsideBarbedWire: true } : {}),
@@ -240,7 +241,7 @@ export function createPublicUnitProjection(
     attackMilitaryGoodsCostByRange: deployedArtillery(unit) ? Object.fromEntries(Array.from({length:unit.range-state.config.units.fieldArtillery.deployed.minRange+1},(_,i)=>[i+state.config.units.fieldArtillery.deployed.minRange,state.config.units.fieldArtillery.deployed.militaryGoodsCost])) : cloneJson(unitConfig.attackMilitaryGoodsCostByRange),
     suppressionMilitaryGoodsCost: unitConfig.suppressionMilitaryGoodsCost,
     emergencyMovementPoints: deployedArtillery(unit) ? 0 : unitConfig.emergencyMovementPoints,
-    emergencyMovementAvailable: unit.isPlayerUnit && unit.currentFuel === 0 && unit.canMove,
+    emergencyMovementAvailable: unit.isPlayerUnit && unitConfig.emergencyMovementPoints > 0 && unit.currentFuel === 0 && unit.canMove,
     movementSummary: getUnitMovementSummary(state, unit),
     attackPreviews: attackPreviews.map((preview) => ({
       ...preview,
@@ -290,7 +291,21 @@ export function facilityRecoveryProjection(state: Readonly<GameState>, facility:
   if ((facility.owner !== 'player' || facility.workers === 0) && facility.type !== 'windPowerPlant') productionRequirements.push('healthy_population');
   if (facility.type === 'temporaryHousing' && !isHexSupplied(state, facility.position)) productionRequirements.push('supply');
   if (state.config.facilities[facility.type].production.powerMode === 'required') productionRequirements.push('allocated_power');
-  return { recoverable, status: !recoverable ? 'cannot_recover' : needed.length ? 'conditions_required' : 'ready', missingConditions: needed, scheduledOperationalTurn: facility.recoveryOperationalTurn, productionRequirements, terrainDefense: { source: 'urban', multiplier: state.config.terrain.damageMultiplier.urban, reason: 'facility_urban_overlay' } };
+  const garrison = state.units.find(u => u.isPlayerUnit && !u.transportedByUnitId && !isAirborne(u) && hexKey(u.position) === hexKey(facility.position));
+  const capable = !!garrison && hasCapability(state, garrison, 'suppress');
+  const suppression = garrison ? forecastUnitSuppression(state, garrison) : null;
+  return { recoverable, status: !recoverable ? 'cannot_recover' : needed.length ? 'conditions_required' : 'ready', missingConditions: needed, scheduledOperationalTurn: facility.recoveryOperationalTurn,
+    infectionKnowledge: facility.owner === 'player' ? 'known' as const : 'unknown' as const,
+    containmentIsNotClearance: true as const,
+    garrison: garrison ? { unitId: garrison.id, containmentCapable: hasCapability(state,garrison,'contain'), suppressionCapable: capable,
+      attackChargesRemaining: garrison.attackChargesRemaining, currentMilitaryGoods: garrison.currentMilitaryGoods,
+      suppressionCost: state.config.units[garrison.type].suppressionMilitaryGoodsCost,
+      suppressionReadyNow: capable && garrison.canAttack && garrison.disembarkedTurn !== state.turn && garrison.attackChargesRemaining > 0 && garrison.currentMilitaryGoods >= state.config.units[garrison.type].suppressionMilitaryGoodsCost,
+      suppressionPower: capable ? garrison.attack : 0 } : null,
+    endTurnPrediction: { conditional: true as const, conditions: ['garrison_survives', 'remaining_attack_charges', 'sufficient_ammunition_after_refill'],
+      suppressionAlreadyPublic: suppression?.projectedSuppression ?? null, nextOperationalTurnIfRecovered: state.turn + 1,
+      limitations: ['enemy_actions_and_hidden_infection_not_guaranteed', 'contained_does_not_mean_cleared'] },
+    productionRequirements, terrainDefense: { source: 'urban', multiplier: state.config.terrain.damageMultiplier.urban, reason: 'facility_urban_overlay' } };
 }
 
 /** Project one public facility using the shared facility forecast map. */
@@ -359,7 +374,7 @@ export function createPublicFacilityProjection(
     terrainLosBlocking: facility.type !== 'civilianDroneBase',
     healthyPopulation: facility.owner === 'player' ? facility.workers : null,
     zombieTargetValue: facility.owner === 'player' ? facilityZombieTargetValue(state, facility) : 0,
-    infectedPopulation: facility.owner === 'player' ? facility.infected : 0,
+    infectedPopulation: facility.owner === 'player' ? facility.infected : null,
     populationCapacity: facility.workerCapacity,
     populationLimitKind: facility.type === 'capital' || facility.type === 'city' ? 'soft' : 'hard',
     populationOperational,

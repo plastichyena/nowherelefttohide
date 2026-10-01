@@ -2,6 +2,7 @@ import type { HexCoord, UnitType } from './types';
 
 /** Minimal public movement contract, shared by Core, route queries and agents. */
 export interface MovementActor {
+  hp?: number; cargoUnitId?: string | null; ifv?: { fuelPerHex: number; gasDamage: number; zombieGasDamage: number };
   id: string; type: UnitType; currentFuel: number; movement: number;
   canMove: boolean; actionState: string; emergencyMovementPoints: number;
   transportedByUnitId?: string; flightState?: 'landed' | 'airborne'; mode?: string;
@@ -13,7 +14,7 @@ export interface MovementSummary {
   legalMoveCount: number;
   movementMode: 'normal' | 'emergency';
   availableMovementPoints: number;
-  fuelCostBasis: 'entered_hex_tiers' | 'effective_movement_points';
+  fuelCostBasis: 'entered_hex_tiers' | 'entered_hexes' | 'effective_movement_points';
   fuelCostPerUnit: number | null;
   rangeUpperBound: number | null;
   rangeEstimateReason: string;
@@ -26,6 +27,7 @@ export function movementUnavailableReason(unit: MovementActor, phase: string): s
   if (unit.transportedByUnitId) return 'unit_transported';
   if (unit.type === 'multipurposeHelicopter' && unit.flightState !== 'airborne') return 'aircraft_not_airborne';
   if (unit.type === 'multipurposeHelicopter' && unit.currentFuel <= 0) return 'insufficient_unit_fuel';
+  if (unit.type === 'ifv' && unit.currentFuel <= 0) return 'insufficient_unit_fuel';
   if (unit.mode === 'deployed') return 'artillery_deployed';
   if (unit.actionState === 'acted') return 'unit_cannot_move';
   if (!unit.canMove) return 'unit_cannot_move';
@@ -41,9 +43,9 @@ export function movementPlan(unit: MovementActor, phase: string, hexes: number, 
   const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
   const movementBudget = movementMode === 'emergency' ? unit.emergencyMovementPoints : unit.movement;
   const perPoint = unit.movementSummary?.fuelCostPerUnit ?? unit.artillery?.fuelPerMovementPoint ?? (unit.type === 'multipurposeHelicopter' ? 5 : 10);
-  const plannedFuelCost = movementMode === 'emergency' ? 0 : ['fieldArtillery', 'multipurposeHelicopter'].includes(unit.type)
+  const plannedFuelCost = movementMode === 'emergency' ? 0 : unit.type === 'ifv' ? hexes * perPoint : ['fieldArtillery', 'multipurposeHelicopter'].includes(unit.type)
     ? effectiveCost * perPoint : infantryMoveFuel(unit.type, hexes);
-  const fuelCost = unit.type === 'multipurposeHelicopter' ? Math.min(unit.currentFuel, plannedFuelCost) : plannedFuelCost;
+  const fuelCost = ['multipurposeHelicopter', 'ifv'].includes(unit.type) ? Math.min(unit.currentFuel, plannedFuelCost) : plannedFuelCost;
   const reason = movementUnavailableReason(unit, phase) ?? (hexes <= 0 || effectiveCost > movementBudget ? 'out_of_range'
     : fuelCost > unit.currentFuel ? 'insufficient_unit_fuel' : null);
   return { legal: reason === null, reason, movementMode, movementBudget, effectiveMovementCost: effectiveCost,
@@ -54,12 +56,12 @@ export function summarizeMovement(unit: MovementActor, phase: string, legalMoveC
   const reason = movementUnavailableReason(unit, phase);
   const mode = unit.currentFuel === 0 ? 'emergency' : 'normal';
   const points = reason ? 0 : mode === 'emergency' ? unit.emergencyMovementPoints : unit.movement;
-  const perPoint = unit.type === 'fieldArtillery' ? unit.artillery?.fuelPerMovementPoint ?? 10 : unit.type === 'multipurposeHelicopter' ? unit.movementSummary?.fuelCostPerUnit ?? 5 : null;
+  const perPoint = unit.type === 'ifv' ? unit.movementSummary?.fuelCostPerUnit ?? 10 : unit.type === 'fieldArtillery' ? unit.artillery?.fuelPerMovementPoint ?? 10 : unit.type === 'multipurposeHelicopter' ? unit.movementSummary?.fuelCostPerUnit ?? 5 : null;
   const fuelRange = mode === 'emergency' ? points : perPoint !== null
-    ? unit.type === 'multipurposeHelicopter' ? Math.max(0, Math.ceil(unit.currentFuel / perPoint) - 1) : Math.floor(unit.currentFuel / perPoint)
+    ? unit.type === 'ifv' ? Math.ceil(unit.currentFuel / perPoint) : unit.type === 'multipurposeHelicopter' ? Math.max(0, Math.ceil(unit.currentFuel / perPoint) - 1) : Math.floor(unit.currentFuel / perPoint)
     : unit.currentFuel < 2 ? 0 : 5 + Math.floor((unit.currentFuel - 2) / (['nationalGuard', 'reconTeam'].includes(unit.type) ? 4 : 2));
   return { legalMoveCount, movementMode: mode, availableMovementPoints: points,
-    fuelCostBasis: perPoint === null ? 'entered_hex_tiers' : 'effective_movement_points', fuelCostPerUnit: perPoint,
+    fuelCostBasis: unit.type === 'ifv' ? 'entered_hexes' : perPoint === null ? 'entered_hex_tiers' : 'effective_movement_points', fuelCostPerUnit: perPoint,
     rangeUpperBound: Math.min(points, fuelRange), rangeEstimateReason: reason ?? (mode === 'emergency' ? 'emergency_mp_upper_bound_not_guaranteed' : 'mp_and_fuel_upper_bound_not_guaranteed'),
     movementUnavailableReason: reason,
     detailQuery: { target: 'route', moverUnitId: unit.id, destination: { kind: 'coordinate', position: 'supply q and r' } } };

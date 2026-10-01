@@ -1,0 +1,26 @@
+{
+  "scenario": "custom deterministic fixture; not standard UNA balance",
+  "seed": 7,
+  "initial": {
+    "hp": 200,
+    "fuel": 100,
+    "ammo": 120,
+    "charges": 3
+  },
+  "result": {
+    "overruns": 1,
+    "hp": 180,
+    "damage": 20,
+    "fuel": 80,
+    "ammo": 120,
+    "charges": 3,
+    "survived": true,
+    "cargoSurvived": true,
+    "position": {
+      "q": 27,
+      "r": 25
+    }
+  },
+  "production": "Lifetime cost/reservation/completion/destruction are verified separately by v169.ifv.test.ts; this fixture places one completed IFV.",
+  "balanceConclusion": "No win-rate or standard-seed survival improvement is inferred. Standard 200-game workflow results remain unconfirmed."
+}

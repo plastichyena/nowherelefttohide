@@ -38,7 +38,7 @@ describe('v1.5.7 wall and charge accounting', () => {
     const zombie = createUnit(state, 'horde', 'hordeZombie', start);
     state.units.push(zombie);
     state.barbedWire.push({ id: 'wall', position: destination, hp: 20, maxHp: 20, builtTurn: 1 });
-    const movement = createMovement({ emergencyLand: () => { throw new Error('Unexpected aircraft in ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
+    const movement = createMovement({ resolveOverrun: () => { throw new Error("Unexpected IFV"); }, emitMoveNoise: () => { throw new Error("Unexpected IFV"); }, emergencyLand: () => { throw new Error('Unexpected aircraft in ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
     expect(zombie.maxAttackCharges).toBe(4);
     expect(wireBreakCost(20, zombie)).toBe(4 + zombie.movement);
     movement.applyMovement(state, zombie, [start, destination], 20);
@@ -76,7 +76,7 @@ describe('v1.5.7 wall and charge accounting', () => {
     const follower = createUnit(state, 'follower', 'hordeZombie', { q: destination.q, r: destination.r - 1 });
     state.units = [breacher, follower];
     state.barbedWire = [{ id: 'one-hit-wire', position: destination, hp: 5, maxHp: 20, builtTurn: 1 }];
-    const movement = createMovement({ emergencyLand: () => { throw new Error('ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
+    const movement = createMovement({ resolveOverrun: () => { throw new Error("Unexpected IFV"); }, emitMoveNoise: () => { throw new Error("Unexpected IFV"); }, emergencyLand: () => { throw new Error('ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
     movement.applyMovement(state, breacher, [start, destination], 20);
     expect(breacher.position).toEqual(start); expect(breacher.attackChargesRemaining).toBe(3); expect(breacher.canAttack).toBe(true);
     expect(state.statistics.barbedWireEmptyAttackCharges).toBe(1);
@@ -145,7 +145,7 @@ describe('v1.5.7 wall and charge accounting', () => {
     const breacher = createUnit(state, 'a-breacher', 'hordeZombie', start); breacher.hordeKind = 'periodic'; breacher.spawnGroupId = 'wire-test';
     state.units.push(breacher);
     state.barbedWire = [{ id: 'wire-combat', position: wall, hp: 5, maxHp: 20, builtTurn: 1 }];
-    const movement = createMovement({ emergencyLand: () => { throw new Error('ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
+    const movement = createMovement({ resolveOverrun: () => { throw new Error("Unexpected IFV"); }, emitMoveNoise: () => { throw new Error("Unexpected IFV"); }, emergencyLand: () => { throw new Error('ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {} });
     movement.applyMovement(state, breacher, [start, approach, wall], breacher.movement);
     expect(breacher.position).toEqual(approach);
     expect(breacher.attackChargesRemaining).toBe(3);

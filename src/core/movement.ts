@@ -1,3 +1,4 @@
+import { overrunDamage } from './ifv';
 import { isAirborne, occupiesGroundLayer, canTargetUnit } from './unit-capabilities';
 import { synchronizeCargoPosition } from './aircraft';
 import type { GameState, UnitState, HexCoord, HumanUnitType } from './types';
@@ -12,6 +13,8 @@ import { emit } from './events-internal';
 import { wireAt, damageWire } from './barbed-wire';
 import { capturePresentation } from './presentation';
 interface MovementHooks {
+  resolveOverrun(state: GameState, mover: UnitState, target: UnitState, damage: number, rng: SeededRng): void;
+  emitMoveNoise(state: GameState, mover: UnitState, rng: SeededRng): void;
   emergencyLand(state: GameState, unit: UnitState, rng: SeededRng): void;
   interceptArmyBase(state: GameState, mover: UnitState, rng: SeededRng): boolean;
   interceptorsAt(state: GameState, mover: UnitState, position: HexCoord): UnitState[];
@@ -19,7 +22,7 @@ interface MovementHooks {
   tryCapture(state: GameState, unit: UnitState, rng: SeededRng): void;
 }
 /** Enter one hex, resolve interception, stop, then settle fuel and capture in existing order. */
-export function createMovement({ interceptorsAt, resolveCombat, tryCapture, interceptArmyBase, emergencyLand }: MovementHooks) {
+export function createMovement({ resolveOverrun, emitMoveNoise, interceptorsAt, resolveCombat, tryCapture, interceptArmyBase, emergencyLand }: MovementHooks) {
 function applyMovement(
   state: GameState,
   mover: UnitState,
@@ -40,7 +43,10 @@ function applyMovement(
     const cost = flying ? 1 : effectiveMovementCost(state, position, mover.isPlayerUnit);
     if (cost === null) break;
     const occupant = flying ? state.units.find(u=>isAirborne(u) && hexKey(u.position)===hexKey(position)) : getUnitAt(state, position);
-    if (occupant && occupant.id !== mover.id) break;
+    if (occupant && occupant.id !== mover.id && (mover.type !== 'ifv' || occupant.isPlayerUnit)) break;
+    if (mover.type === 'ifv' && mover.currentFuel <= 0) break;
+    const overrun = mover.type === 'ifv' && occupant && !occupant.isPlayerUnit ? overrunDamage(state, mover, occupant, position) : null;
+    if (overrun && !overrun.survivesEntry) { emit(state, 'unit_movement_stopped', { unitId: mover.id, reason: 'overrun_insufficient_hp', q: reached.q, r: reached.r }); break; }
     if (!mover.isPlayerUnit) {
       const encounteredWire = Boolean(wireAt(state, position));
       while (wireAt(state, position) && mover.canAttack && mover.attackChargesRemaining > 0) {
@@ -62,7 +68,13 @@ function applyMovement(
     reached = { ...position };
     traversed.push(position);
     synchronizeCargoPosition(state, mover);
+    if (mover.type === 'ifv') {
+      mover.currentFuel -= Math.min(mover.currentFuel, state.config.units.ifv.fuelPerHex);
+      if (overrun && occupant) resolveOverrun(state, mover, occupant, overrun.impactDamage, rng);
+      emitMoveNoise(state, mover, rng);
+    }
     capturePresentation(state);
+    if (!state.units.includes(mover) || state.gameOver) break;
     if (flying) {
       mover.currentFuel = Math.max(0,mover.currentFuel-state.config.units.multipurposeHelicopter.fuelPerMovementPoint);
       if (mover.currentFuel===0) { emergencyLand(state,mover,rng); reached={...mover.position}; break; }
@@ -83,7 +95,7 @@ function applyMovement(
       const fuelUsed = movementMode === 'normal'
         ? movementFuelCost(state, mover, traversed.length, spent)
         : 0;
-      if (!flying) mover.currentFuel = Math.max(0, mover.currentFuel - fuelUsed);
+      if (!flying && mover.type !== 'ifv') mover.currentFuel = Math.max(0, mover.currentFuel - fuelUsed);
       mover.activity.moved = traversed.length > 0;
       mover.canMove = false;
       mover.actionState = 'moved';
@@ -99,7 +111,7 @@ function applyMovement(
       hexesMoved: traversed.length,
       effectiveMovementCost: spent,
       movementMode: isHumanUnit(mover) ? movementMode : 'normal',
-      fuelUsed: flying ? startingFuel - mover.currentFuel : isHumanUnit(mover) && movementMode === 'normal'
+      fuelUsed: flying || mover.type === 'ifv' ? startingFuel - mover.currentFuel : isHumanUnit(mover) && movementMode === 'normal'
         ? movementFuelCost(state, mover, traversed.length, spent)
         : 0,
     });

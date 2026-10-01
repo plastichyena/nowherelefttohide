@@ -399,7 +399,7 @@ export function queryRoute(source: Readonly<RouteQuerySource>, input: Readonly<R
   const flying = mover?.flightState === 'airborne';
   const publiclyOccupied = new Set([
     ...mutableSource.units.filter((unit) => unit.id !== mover?.id && !unit.transportedByUnitId && (flying ? unit.flightState === 'airborne' : unit.flightState !== 'airborne')).map((unit) => hexKey(unit.position)),
-    ...(flying ? [] : mutableSource.zombies.map((unit) => hexKey(unit.position))),
+    ...(flying || mover?.type === 'ifv' ? [] : mutableSource.zombies.map((unit) => hexKey(unit.position))),
   ]);
   const unitResolver: MovementCostResolver = (position) => {
     const tile = tiles.get(hexKey(position));

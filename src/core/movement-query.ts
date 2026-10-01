@@ -1,3 +1,4 @@
+import { previewIfvPath, type OverrunProjection } from './ifv';
 import { movementPlan, summarizeMovement, movementUnavailableReason, infantryMoveFuel, previewMovementPath } from './move-plan';
 import { canOccupyAirHex, emergencyLandingPreview } from './aircraft';
 import { deployedArtillery, canReact, isAirborne, occupiesGroundLayer, canTargetUnit } from './unit-capabilities';
@@ -16,12 +17,14 @@ import type { HumanUnitType } from './types';
 
 export function unitMoveFuelCost(unitType: HumanUnitType, distance: number): number {
   if (unitType === 'multipurposeHelicopter') return Math.max(0, Math.floor(distance)) * 5;
+  if (unitType === 'ifv') return Math.max(0, Math.floor(distance)) * 10;
   if (unitType === 'fieldArtillery') return Math.max(0, Math.floor(distance)) * 10;
   return infantryMoveFuel(unitType, distance);
 }
 
 
 export function movementFuelCost(state: Readonly<GameState>, unit: UnitState, hexes: number, movementPoints: number): number {
+  if (unit.type === 'ifv') return Math.min(unit.currentFuel, hexes * state.config.units.ifv.fuelPerHex);
   if (isAirborne(unit)) return Math.min(unit.currentFuel, movementPoints * state.config.units.multipurposeHelicopter.fuelPerMovementPoint);
   return unit.type === 'fieldArtillery' ? movementPoints * state.config.units.fieldArtillery.fuelPerMovementPoint : unitMoveFuelCost(unit.type as HumanUnitType,hexes);
 }
@@ -29,7 +32,7 @@ export function movementFuelCost(state: Readonly<GameState>, unit: UnitState, he
 function movementActor(state: Readonly<GameState>, unit: UnitState) {
   return { ...unit, emergencyMovementPoints: state.config.units[unit.type].emergencyMovementPoints,
     artillery: { fuelPerMovementPoint: state.config.units.fieldArtillery.fuelPerMovementPoint },
-    movementSummary: { fuelCostPerUnit: unit.type === 'multipurposeHelicopter' ? state.config.units.multipurposeHelicopter.fuelPerMovementPoint : null } };
+    movementSummary: { fuelCostPerUnit: unit.type === 'ifv' ? state.config.units.ifv.fuelPerHex : unit.type === 'multipurposeHelicopter' ? state.config.units.multipurposeHelicopter.fuelPerMovementPoint : null } };
 }
 
 export function getUnitMovementSummary(state: Readonly<GameState>, unit: UnitState) {
@@ -40,6 +43,14 @@ export function getUnitMovementSummary(state: Readonly<GameState>, unit: UnitSta
 }
 
 export interface MovePreview {
+  destinationReached?: boolean;
+  arrivalReason?: string;
+  projectedHpAfterMove?: number;
+  overruns?: OverrunProjection[];
+  gasExplosions?: { sourceId: string; position: HexCoord }[];
+  cargoDeathRisk?: boolean;
+  hiddenEffectsMayDiffer?: boolean;
+  limitations?: string[];
   legal: boolean;
   reason: string | null;
   emergencyLanding?: ReturnType<typeof emergencyLandingPreview>;
@@ -54,6 +65,7 @@ export interface MovePreview {
 }
 
 export function interceptorsAt(state: GameState, mover: UnitState, position: HexCoord): UnitState[] {
+  if (mover.type === 'ifv') return [];
   return state.units
     .filter(
       (candidate) =>
@@ -89,12 +101,12 @@ export function getMovePath(state: GameState, action: MoveAction): {
   }
   const visible = getPlayerVisibleTileKeys(state);
   const destinationUnit = isAirborne(unit) ? state.units.find(u=>u.id!==unit.id && isAirborne(u) && hexKey(u.position)===hexKey(action.destination)) : getUnitAt(state, action.destination);
-  if (destinationUnit && (destinationUnit.isPlayerUnit || visible.has(hexKey(destinationUnit.position)))) {
+  if (destinationUnit && (unit.type !== 'ifv' || destinationUnit.isPlayerUnit) && (destinationUnit.isPlayerUnit || visible.has(hexKey(destinationUnit.position)))) {
     return error(action, 'occupied_destination', 'Destination is occupied');
   }
   const publicBlocked = new Set(
     state.units
-      .filter((candidate) => candidate.id !== unit.id && (isAirborne(unit) ? isAirborne(candidate) : occupiesGroundLayer(candidate)) && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
+      .filter((candidate) => candidate.id !== unit.id && (unit.type !== 'ifv' || candidate.isPlayerUnit) && (isAirborne(unit) ? isAirborne(candidate) : occupiesGroundLayer(candidate)) && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
       .map((candidate) => hexKey(candidate.position)),
   );
   const path = findShortestPath(
@@ -122,7 +134,7 @@ function computeReachableMovePaths(state: GameState, unit: UnitState) {
   const visible = getPlayerVisibleTileKeys(state);
   const blocked = new Set(
     state.units
-      .filter((candidate) => candidate.id !== unit.id && (isAirborne(unit) ? isAirborne(candidate) : occupiesGroundLayer(candidate)) && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
+      .filter((candidate) => candidate.id !== unit.id && (unit.type !== 'ifv' || candidate.isPlayerUnit) && (isAirborne(unit) ? isAirborne(candidate) : occupiesGroundLayer(candidate)) && (candidate.isPlayerUnit || visible.has(hexKey(candidate.position))))
       .map((candidate) => hexKey(candidate.position)),
   );
   const movementMode = unit.currentFuel === 0 ? 'emergency' as const : 'normal' as const;
@@ -187,6 +199,7 @@ export function previewMove(state: Readonly<GameState>, unitId: string, destinat
     };
   }
   const mover = candidate.unit;
+  if (mover.type === 'ifv') return previewIfvPath(state, mover, candidate.path);
   const resolver = unitMovementCostResolver(state, mover, initiallyVisible);
   const projected = previewMovementPath(movementActor(state, mover), state.phase, candidate.path, p => resolver(p) ?? 0,
     p => interceptorsAt(snapshot, mover, p).find(i => initiallyVisible.has(hexKey(i.position)))?.id ?? null);

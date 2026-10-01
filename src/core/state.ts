@@ -30,7 +30,7 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '18.0.0';
+export const GAME_VERSION = '19.0.0';
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -217,6 +217,7 @@ export function synchronizePopulation(state: GameState): void {
       .reduce((total, order) => total + order.population, 0);
   const fieldArtillery = state.units.filter(u => u.type === 'fieldArtillery').reduce((n,u) => n + u.population, 0) + state.pendingUnitProductions.filter(o => o.unitType === 'fieldArtillery').reduce((n,o) => n + o.population, 0);
   state.population.fieldArtillery = fieldArtillery;
+  state.population.ifv = state.units.filter(u => u.type === 'ifv').reduce((n,u) => n + u.population, 0) + state.pendingUnitProductions.filter(o => o.unitType === 'ifv').reduce((n,o) => n + o.population, 0);
   state.population.multipurposeHelicopter = state.units.filter(u=>u.type==='multipurposeHelicopter').reduce((n,u)=>n+u.population,0) + state.pendingUnitProductions.filter(o=>o.unitType==='multipurposeHelicopter').reduce((n,o)=>n+o.population,0);
   const specialForces = state.units.filter(unit => unit.type === 'specialForces').reduce((n, unit) => n + unit.population, 0);
   const waiting = state.checkpoints.reduce((total, checkpoint) => total + checkpoint.waiting, 0);
@@ -232,7 +233,7 @@ export function synchronizePopulation(state: GameState): void {
   state.population.riotPolice = riotPolice;
   state.population.reconTeam = reconTeam;
   state.population.specialForces = specialForces;
-  state.population.unitPopulation = police + nationalGuard + riotPolice + reconTeam + specialForces + fieldArtillery + state.units.filter(u => u.type === 'multipurposeHelicopter').reduce((n,u)=>n+u.population,0) + state.pendingUnitProductions.filter(o=>o.unitType === 'multipurposeHelicopter').reduce((n,o)=>n+o.population,0);
+  state.population.unitPopulation = state.population.ifv + police + nationalGuard + riotPolice + reconTeam + specialForces + fieldArtillery + state.units.filter(u => u.type === 'multipurposeHelicopter').reduce((n,u)=>n+u.population,0) + state.pendingUnitProductions.filter(o=>o.unitType === 'multipurposeHelicopter').reduce((n,o)=>n+o.population,0);
   state.population.waitingRefugees = waiting;
   state.population.screeningRefugees = screening;
   state.population.approvedRefugees = approved;
@@ -245,7 +246,7 @@ export function synchronizePopulation(state: GameState): void {
 
   state.statistics.maxPopulation = Math.max(
     state.statistics.maxPopulation,
-    cityResidents + productionWorkers + waiting + screening + approved + police + nationalGuard + riotPolice + reconTeam + specialForces + fieldArtillery,
+    cityResidents + productionWorkers + waiting + screening + approved + state.population.unitPopulation,
   );
   state.statistics.maxSecuredFacilities = Math.max(
     state.statistics.maxSecuredFacilities,
@@ -537,7 +538,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       nationalGuard: 0,
       riotPolice: 0,
       reconTeam: 0,
-      fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0,
+      ifv: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0,
       unitPopulation: 0,
       facilityWorkers: [],
       waitingRefugees: 0,
@@ -729,10 +730,10 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       civilianDroneBasesDecommissioned: 0,
       civilianGoodsRefundedFromDecommission: 0,
       policeLongRangeMoves: 0,
-      recruitsCommissionedByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
-      regularPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
-      veteranPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
-      veteranZombieKillsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
+      recruitsCommissionedByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, ifv: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
+      regularPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, ifv: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
+      veteranPromotionsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, ifv: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
+      veteranZombieKillsByType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, ifv: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 },
       riotPoliceProduced: 0,
       riotPoliceLost: 0,
       riotZombiesSpawned: 0,
@@ -748,7 +749,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       riotPoliceReanimations: 0,
       hordeSpecialSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0, packZombie: 0 },
       finalSpecialZombiesSpawnedByType: { policeZombie: 0, soldierZombie: 0, riotZombie: 0, hunterZombie: 0, gasZombie: 0, screamerZombie: 0, packZombie: 0 },
-      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0, hordeZombie: 0, screamerZombie: 0, armyBase: 0, windPowerPlant: 0 },
+      noisePulsesBySourceType: { police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, ifv: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0, hordeZombie: 0, screamerZombie: 0, armyBase: 0, windPowerPlant: 0 },
       hordeMovementNoisePulses: 0,
       hordeNoiseRespawnedByType: { zombie: 0, policeZombie: 0, soldierZombie: 0, riotZombie: 0 },
     },
@@ -780,6 +781,6 @@ export function allocateUnitId(state: GameState, prefix: string): string {
 }
 
 export function nextHumanUnitId(state: GameState, type: HumanUnitType): string {
-  const prefix = type === 'multipurposeHelicopter' ? 'multipurpose-helicopter' : type === 'fieldArtillery' ? 'field-artillery' : type === 'specialForces' ? 'special-forces' : type === 'police' ? 'police' : type === 'nationalGuard' ? 'national-guard' : type === 'riotPolice' ? 'riot-police' : 'recon-team';
+  const prefix = type === 'ifv' ? 'ifv' : type === 'multipurposeHelicopter' ? 'multipurpose-helicopter' : type === 'fieldArtillery' ? 'field-artillery' : type === 'specialForces' ? 'special-forces' : type === 'police' ? 'police' : type === 'nationalGuard' ? 'national-guard' : type === 'riotPolice' ? 'riot-police' : 'recon-team';
   return allocateUnitId(state, prefix);
 }

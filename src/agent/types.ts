@@ -36,17 +36,17 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6.8 versions continued state and public APIs; legacy public Replay is read-only. */
-export const APP_VERSION = '1.6.8';
-export const GAME_RULES_VERSION = '18.0.0';
-export const SAVE_FORMAT_VERSION = '25';
-export const AGENT_API_VERSION = '23.0.0';
-export const OBSERVATION_API_VERSION = '23.0.0';
-export const BRIDGE_API_VERSION = '23.0.0';
-export const BALANCED_AGENT_VERSION = '14.0.0';
-export const RANDOM_AGENT_VERSION = '9.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '22.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '19.0.0';
+/** v1.6.9 is a new rules, save, session and public-artifact boundary. */
+export const APP_VERSION = '1.6.9';
+export const GAME_RULES_VERSION = '19.0.0';
+export const SAVE_FORMAT_VERSION = '26';
+export const AGENT_API_VERSION = '24.0.0';
+export const OBSERVATION_API_VERSION = '24.0.0';
+export const BRIDGE_API_VERSION = '24.0.0';
+export const BALANCED_AGENT_VERSION = '15.0.0';
+export const RANDOM_AGENT_VERSION = '10.0.0';
+export const ARTIFACT_SCHEMA_VERSION = '23.0.0';
+export const CHECKPOINT_SCHEMA_VERSION = '20.0.0';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -59,6 +59,7 @@ export const CRISIS_REASON_CODES = [
   'temporary_housing_outage_forecast',
   'capital_infection_uncontained',
   'critical_site_infection_uncontained',
+  'checkpoint_active_missing',
   'checkpoint_defense_degraded',
   'unit_out_of_supply_risk',
   'horde_warning_active',
@@ -222,7 +223,7 @@ export interface AgentFacilityObservation {
   healthyPopulation: number | null;
   /** Zombie targeting value is deliberately distinct from real population. */
   zombieTargetValue: number;
-  infectedPopulation: number;
+  infectedPopulation: number | null;
   populationCapacity: number;
   populationLimitKind: 'soft' | 'hard';
   populationOperational: boolean;
@@ -448,6 +449,8 @@ export interface AgentCheckpointObservation {
 }
 
 export interface AgentApiInfo {
+  actionSummarySchema?: typeof import('../core/action-summary').ACTION_SUMMARY_SCHEMA;
+  scenarios?: { selected: string; choices: typeof import('../core/scenarios').SCENARIOS; unaOptions: string[]; defaultSeed: number; seedRange: string; configOverrides: string };
   actionSchemaVersion: string;
   queryContract: ReturnType<typeof import('./query-contract').publicQueryContract>;
   actionContracts: Record<string, { required: string[]; example: import('../core/types').GameAction; conditions: string[] }>;
@@ -472,6 +475,8 @@ export interface AgentApiInfo {
   };
   prohibited: string[];
   rules: {
+    v169: typeof import('../core/rules-v169').RULES_V169;
+    ifv: GameConfig['units']['ifv'];
     v165: { explanations: typeof import('../core/rules-v165').RULES_V165; helicopter: GameConfig['units']['multipurposeHelicopter']; airBase: GameConfig['facilities']['airBase']; objectives: GameConfig['objectives']; militaryDrone: GameConfig['militaryDrone'] };
     v164: { explanations: typeof import('../core/rules-v164').RULES_V164; artillery: GameConfig['units']['fieldArtillery']; humanCapabilities: Record<HumanUnitType,GameConfig['units']['police']['capabilities']>; productionLimits: Record<HumanUnitType,number|null> };
     barbedWire: typeof import('../core/barbed-wire').BARBED_WIRE_RULES;
@@ -944,6 +949,7 @@ export interface AgentActionError {
 }
 
 export interface AgentStepResult {
+  summary?: import('../core/action-summary').ActionSummary;
   facilityChanges?: ReturnType<typeof import('./facility-changes').facilityChanges>;
   branchFlowChanges?: ReturnType<typeof import('./facility-changes').branchFlowChanges>;
   observation: AgentObservation;
@@ -954,6 +960,7 @@ export interface AgentStepResult {
 }
 
 export interface AgentResetOptions {
+  scenarioId?: string;
   seed?: number;
   configOverrides?: DeepPartial<GameConfig>;
   agent?: { id: string };

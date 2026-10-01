@@ -51,7 +51,7 @@ export function deriveImportantChanges(before: AgentObservation, after: AgentObs
         }
       }
     }
-    add(`facility:${change.facilityId}`, 'facility', lost ? 'critical' : current && current.infectedPopulation > (old?.infectedPopulation ?? 0) ? 'warning' : 'advisory', [change.facilityId], reasons, consequences);
+    add(`facility:${change.facilityId}`, 'facility', lost ? 'critical' : current && current.infectedPopulation !== null && old?.infectedPopulation != null && current.infectedPopulation > old.infectedPopulation ? 'warning' : 'advisory', [change.facilityId], reasons, consequences);
     if (change.populationLoss) {
       changes.at(-1)!.facilityPopulationChange = change.populationLoss;
       changes.at(-1)!.severity = lost ? 'critical' : 'warning';

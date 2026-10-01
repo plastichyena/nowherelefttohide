@@ -1,3 +1,6 @@
+import { RULES_V169 } from '../core/rules-v169';
+import { SCENARIOS, resolveScenario } from '../core/scenarios';
+import { UNA_INTRO, renderSynopsis } from './story';
 import { previewMove } from '../core/movement-query';
 import { HELICOPTER_ASSETS, ARTILLERY_ASSETS } from './boardAssets';
 import { renderAviationUnit, renderMilitaryDrone, renderFacilityObjectives } from './aviation';
@@ -226,7 +229,7 @@ export function unitProficiencyViewModel(
   unit: { type: string },
   config?: unknown,
 ): UnitProficiencyViewModel | null {
-  if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery'].includes(String(unit.type))) return null;
+  if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'ifv', 'fieldArtillery'].includes(String(unit.type))) return null;
   const source = unit as unknown as UnknownRecord;
   const configRecord = unknownRecord(config);
   const experience = configRecord.unitExperience && typeof configRecord.unitExperience === 'object'
@@ -791,7 +794,7 @@ export type NoiseClass = 'small' | 'medium' | 'large' | 'extraLarge';
 /** Production-safe class mapping. Exact Core radii never cross this helper. */
 export function noiseClassForUnit(unitType: string): NoiseClass | null {
   if (unitType === 'police' || unitType === 'specialForces') return 'medium';
-  if (unitType === 'nationalGuard' || unitType==='multipurposeHelicopter') return 'large';
+  if (unitType === 'ifv' || unitType === 'nationalGuard' || unitType==='multipurposeHelicopter') return 'large';
   return null;
 }
 
@@ -1616,7 +1619,7 @@ export interface BoardLegendViewModel {
 
 const LEGEND_TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const;
 const LEGEND_OVERLAYS = ['road', 'bridge', 'urban'] as const;
-const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
+const LEGEND_UNITS = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'ifv', 'fieldArtillery', 'multipurposeHelicopter', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
 const LEGEND_FACILITIES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'airBase', 'reliefSupplyCenter', 'checkpoint'] as const;
 const LEGEND_OBSTACLES = ['barbedWire'] as const;
 
@@ -1751,7 +1754,7 @@ function configLegendEntries(
     add(`facility.${key}`, facilityLabel(key, locale), `${t('legendWorkers')} ${facility.workerCapacity} · ${t('legendMode')} ${powerModeLabel(production.powerMode, locale)} · ${t('legendPowerCapacity')} ${production.powerCapacity} · ${t('legendPowerGeneration')} ${generation} · ${t('legendInputs')} ${formatResourceAmounts(production.inputs, locale, true)} · ${t('legendOutputs')} ${formatResourceAmounts(production.outputs, locale, true)}${build}${target}`);
   }
   add('populationConsumption', t('legendPopulationConsumption'), `${t('food')} ${config.economy.populationConsumption.food} · ${t('civilianGoods')} ${config.economy.populationConsumption.civilianGoods}`);
-  for (const key of ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery'] as const) {
+  for (const key of ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'ifv', 'fieldArtillery'] as const) {
     const unit = unknownRecord((config.units as unknown as UnknownRecord)[key]);
     if (Object.keys(unit).length === 0) continue;
     const attackCosts = Object.entries(unknownRecord(unit.attackMilitaryGoodsCostByRange))
@@ -2168,6 +2171,7 @@ function unitLabel(type: string, locale: Locale): string {
   const names: Record<string, [string, string]> = {
     police: ['警察', 'Police'],
     nationalGuard: ['兵士', 'Soldier'],
+    ifv: ['IFV（歩兵戦闘車）', 'IFV (Infantry Fighting Vehicle)'],
     fieldArtillery: ['野戦砲', 'Field Artillery'],
     multipurposeHelicopter: ['多目的ヘリコプター', 'Multipurpose Helicopter'],
     riotPolice: ['機動隊', 'Riot Police'],
@@ -2585,7 +2589,7 @@ export function renderUnitMilitaryGoodsDetails(
       : t('none');
   const projectedMilitaryRefill = Math.max(0, unit.projectedMilitaryGoodsAfterRefill - unit.projectedMilitaryGoodsAfterFixedConsumption);
   const guardRangeRule = unit.type === 'nationalGuard' ? ` ${escapeHtml(t('guardRangeTwoMilitaryGoodsRule'))}` : '';
-  return `<section class="unit-military-goods" data-unit-military-goods="true"><h3>${escapeHtml(t('carriedMilitaryGoods'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentMilitaryGoods'))}</dt><dd>${unit.currentMilitaryGoods}/${unit.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('fixedConsumption'))}</dt><dd>-${unit.fixedMilitaryGoodsUpkeepPerTurn}</dd></div><div><dt>${escapeHtml(t('afterFixed'))}</dt><dd>${unit.projectedMilitaryGoodsAfterFixedConsumption}</dd></div><div><dt>${escapeHtml(t('militaryRefillAmount'))}</dt><dd>+${projectedMilitaryRefill}</dd></div><div><dt>${escapeHtml(t('afterRefill'))}</dt><dd>${unit.projectedMilitaryGoodsAfterRefill}</dd></div><div><dt>${escapeHtml(t('suppression'))}</dt><dd>${escapeHtml(suppressionStatus)} · ${escapeHtml(t('cost'))} ${unit.suppressionMilitaryGoodsCost}</dd></div><div><dt>${escapeHtml(t('afterSuppression'))}</dt><dd>${unit.projectedMilitaryGoodsAfterSuppression}</dd></div><div><dt>${escapeHtml(t('emergencyMovementLimit'))}</dt><dd>${unit.emergencyMovementPoints} MP · ${escapeHtml(t(unit.emergencyMovementAvailable ? 'available' : 'unavailable'))}</dd></div></dl><p><strong>${escapeHtml(t('attackCostByDistance'))}</strong>: ${escapeHtml(costs || t('none'))}</p><p class="muted">${unit.type==='multipurposeHelicopter'?(locale==='ja'?'攻撃には全量の軍需品が必要です。':'Every attack requires full ammunition.'):deployed ? (locale === 'ja' ? '軍需品50未満では砲撃できません。' : 'Firing requires at least 50 Military Goods.') : `${escapeHtml(t('zeroMilitaryGoodsAttack'))}: ${minimumAttack}.${guardRangeRule}`}</p><p class="muted">${escapeHtml(t('unitStoresLostOnDestruction'))}</p></section>`;
+  return `<section class="unit-military-goods" data-unit-military-goods="true"><h3>${escapeHtml(t('carriedMilitaryGoods'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentMilitaryGoods'))}</dt><dd>${unit.currentMilitaryGoods}/${unit.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('fixedConsumption'))}</dt><dd>-${unit.fixedMilitaryGoodsUpkeepPerTurn}</dd></div><div><dt>${escapeHtml(t('afterFixed'))}</dt><dd>${unit.projectedMilitaryGoodsAfterFixedConsumption}</dd></div><div><dt>${escapeHtml(t('militaryRefillAmount'))}</dt><dd>+${projectedMilitaryRefill}</dd></div><div><dt>${escapeHtml(t('afterRefill'))}</dt><dd>${unit.projectedMilitaryGoodsAfterRefill}</dd></div><div><dt>${escapeHtml(t('suppression'))}</dt><dd>${escapeHtml(suppressionStatus)} · ${escapeHtml(t('cost'))} ${unit.suppressionMilitaryGoodsCost}</dd></div><div><dt>${escapeHtml(t('afterSuppression'))}</dt><dd>${unit.projectedMilitaryGoodsAfterSuppression}</dd></div><div><dt>${escapeHtml(t('emergencyMovementLimit'))}</dt><dd>${unit.emergencyMovementPoints} MP · ${escapeHtml(t(unit.emergencyMovementAvailable ? 'available' : 'unavailable'))}</dd></div></dl><p><strong>${escapeHtml(t('attackCostByDistance'))}</strong>: ${escapeHtml(costs || t('none'))}</p><p class="muted">${['ifv','multipurposeHelicopter'].includes(unit.type)?(locale==='ja'?'攻撃には全量の軍需品が必要です。':'Every attack requires full ammunition.'):deployed ? (locale === 'ja' ? '軍需品50未満では砲撃できません。' : 'Firing requires at least 50 Military Goods.') : `${escapeHtml(t('zeroMilitaryGoodsAttack'))}: ${minimumAttack}.${guardRangeRule}`}</p><p class="muted">${escapeHtml(t('unitStoresLostOnDestruction'))}</p></section>`;
 }
 
 function recoveryClassLabel(recoveryClass: AgentUnitObservation['recoveryClassIfTurnEndsNow'], locale: Locale): string {
@@ -2752,7 +2756,7 @@ export function recruitmentOptionsForFacility(
   legalActions: readonly GameAction[],
   locale: Locale,
 ): RecruitmentOptionViewModel[] {
-  return (['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'fieldArtillery', 'multipurposeHelicopter'] as const)
+  return (['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'ifv', 'fieldArtillery', 'multipurposeHelicopter'] as const)
     .filter((unitType) => state.config.units[unitType].recruitmentFacilityTypes.includes(
       facility.type as 'capital' | 'city' | 'armyBase' | 'airBase',
     ))
@@ -2793,8 +2797,8 @@ export function renderRecruitmentAccordion(
   const options = recruitmentOptionsForFacility(state, facility, legalActions, locale);
   if (options.length === 0) return '';
   const rows = options.map((option) => {
-    const actionName = option.unitType === 'multipurposeHelicopter' ? 'helicopter' : option.unitType === 'fieldArtillery' ? 'artillery' : option.unitType === 'nationalGuard' ? 'guard' : option.unitType === 'riotPolice' ? 'riot-police' : option.unitType === 'reconTeam' ? 'recon' : 'police';
-    const cost = `${t('population')} ${option.populationCost} · ${t('civilianGoods')} ${option.civilianGoodsCost} · ${t('militaryGoods')} ${option.militaryGoodsCost} · ${t('fuel')} ${state.config.units[option.unitType].productionFuel}`;
+    const actionName = option.unitType === 'ifv' ? 'ifv' : option.unitType === 'multipurposeHelicopter' ? 'helicopter' : option.unitType === 'fieldArtillery' ? 'artillery' : option.unitType === 'nationalGuard' ? 'guard' : option.unitType === 'riotPolice' ? 'riot-police' : option.unitType === 'reconTeam' ? 'recon' : 'police';
+    const cost = `${t('population')} ${option.populationCost} · ${t('food')} ${state.config.units[option.unitType].productionFood} · ${t('civilianGoods')} ${option.civilianGoodsCost} · ${t('militaryGoods')} ${option.militaryGoodsCost} · ${t('fuel')} ${state.config.units[option.unitType].productionFuel}`;
     const completed=state.completedProductions[option.unitType],reserved=state.pendingUnitProductions.filter(o=>o.unitType===option.unitType).length,limit=state.config.units[option.unitType].productionLimitPerGame;
     const ledger=limit===null?'':`<p>${locale==='ja'?'生涯生産 / 予約 / 残枠':'Lifetime / Reserved / Remaining'}: ${completed} / ${reserved} / ${Math.max(0,limit-completed-reserved)} (${limit})</p>`;
     const performance = [
@@ -2805,7 +2809,7 @@ export function renderRecruitmentAccordion(
       [t('range'), String(option.range)],
       [t('vision'), String(option.vision)],
     ].map(([label, value]) => `<div><dt>${escapeHtml(label!)}</dt><dd>${escapeHtml(value!)}</dd></div>`).join('');
-    return `<article class="recruitment-option" data-recruitment-unit="${option.unitType}"><div class="section-heading"><h4>${escapeHtml(option.label)}</h4><span class="status-chip">${escapeHtml(cost)}</span></div><dl class="recruitment-performance">${performance}</dl>${ledger}<button class="secondary-button" data-action="produce-${actionName}" ${option.legal ? '' : 'disabled'}>${escapeHtml(t(option.unitType === 'multipurposeHelicopter' ? 'produceHelicopter' : option.unitType === 'fieldArtillery' ? 'produceArtillery' : option.unitType === 'police' ? 'producePolice' : option.unitType === 'nationalGuard' ? 'produceGuard' : option.unitType === 'reconTeam' ? 'produceRecon' : 'produceRiotPolice'))}</button>${option.unavailableReason ? `<p class="warning-text" data-recruitment-reason="${option.unitType}">${escapeHtml(option.unavailableReason)}</p>` : `<p class="warning-text" data-recruitment-reason="${option.unitType}" hidden></p>`}</article>`;
+    return `<article class="recruitment-option" data-recruitment-unit="${option.unitType}"><div class="section-heading"><h4>${escapeHtml(option.label)}</h4><span class="status-chip">${escapeHtml(cost)}</span></div><dl class="recruitment-performance">${performance}</dl>${ledger}<button class="secondary-button" data-action="produce-${actionName}" ${option.legal ? '' : 'disabled'}>${escapeHtml(t(option.unitType === 'ifv' ? 'produceIfv' : option.unitType === 'multipurposeHelicopter' ? 'produceHelicopter' : option.unitType === 'fieldArtillery' ? 'produceArtillery' : option.unitType === 'police' ? 'producePolice' : option.unitType === 'nationalGuard' ? 'produceGuard' : option.unitType === 'reconTeam' ? 'produceRecon' : 'produceRiotPolice'))}</button>${option.unavailableReason ? `<p class="warning-text" data-recruitment-reason="${option.unitType}">${escapeHtml(option.unavailableReason)}</p>` : `<p class="warning-text" data-recruitment-reason="${option.unitType}" hidden></p>`}</article>`;
   }).join('');
   const id = `recruitment-${facility.id}`;
   return `<details class="recruitment-accordion" data-recruitment-accordion="true"><summary id="${escapeHtml(id)}-heading" data-action="toggle-recruitment" aria-expanded="false" aria-controls="${escapeHtml(id)}-panel"><span>${escapeHtml(t('unitRecruitment'))}</span><small>${options.length} ${escapeHtml(t('unitTypes'))}</small></summary><div id="${escapeHtml(id)}-panel" class="recruitment-accordion-panel" role="region" aria-labelledby="${escapeHtml(id)}-heading">${rows}</div></details>`;
@@ -3263,6 +3267,35 @@ export class GameUiController {
   }
 
   private beginNewGame(): void {
+    const ja = this.locale === 'ja';
+    this.root.className = 'app-shell modal-screen';
+    this.root.innerHTML = `<section class="modal-card scenario-select"><h2>${ja ? 'シナリオ選択' : 'Choose a scenario'}</h2>${SCENARIOS.map(s => `<div><button class="secondary-button large-button" data-scenario="${s.id}" ${s.available ? '' : 'disabled'}>${escapeHtml(s.name)}</button>${s.available ? '' : '<p>currently unavailable</p>'}</div>`).join('')}<button class="ghost-button large-button" data-action="custom-game">${ja ? 'カスタムゲーム' : 'Custom game'}</button><button class="ghost-button" data-action="title">${ja ? '戻る' : 'Back'}</button></section>`;
+    this.bindRootEvents();
+    this.root.querySelector('[data-scenario="una"]')?.addEventListener('click', () => this.showScenarioSeed());
+  }
+
+  private showScenarioSeed(): void {
+    const ja = this.locale === 'ja';
+    this.root.innerHTML = `<section class="modal-card"><h2>${escapeHtml(SCENARIOS[0].name)}</h2><form data-form="scenario" class="settings-form"><label>Seed<input name="seed" type="number" step="1" min="${Number.MIN_SAFE_INTEGER}" max="${Number.MAX_SAFE_INTEGER}" required value="${Date.now() % 2147483647}"></label><p>${ja ? 'ゲーム設定は標準値で固定です。' : 'All game settings use the default values.'}</p><button type="submit" class="primary-button">${ja ? '開始' : 'Start'}</button><p data-scenario-error role="alert"></p></form><button data-action="new-game" class="ghost-button">${ja ? '戻る' : 'Back'}</button></section>`;
+    this.bindRootEvents();
+    const form = this.root.querySelector<HTMLFormElement>('[data-form="scenario"]')!;
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      try {
+        const value = String(new FormData(form).get('seed'));
+        if (!value.trim()) throw new Error('Seed is required');
+        const resolved = resolveScenario({ scenarioId: 'una', seed: Number(value) });
+        this.showScenarioIntro(resolved.seed, resolved.config);
+      } catch (error) { this.root.querySelector('[data-scenario-error]')!.textContent = String(error); }
+    });
+  }
+
+  private showScenarioIntro(seed: number, config: GameConfig): void {
+    this.root.innerHTML = `<section class="modal-card scenario-intro"><h2>UNA</h2><div class="intro-text">${escapeHtml(UNA_INTRO[this.locale])}</div><button class="primary-button large-button" data-intro-start>${this.locale === 'ja' ? '開始' : 'Start'}</button></section>`;
+    this.root.querySelector('[data-intro-start]')!.addEventListener('click', () => this.startGame(seed, config), { once: true });
+  }
+
+  private beginCustomGame(): void {
     const t = this.translator();
     const defaults = createDefaultConfig();
     const refugeeDefaults = newGameRefugeeDefaults(defaults);
@@ -3549,8 +3582,10 @@ export class GameUiController {
       case 'options': this.beginNewGame(); break;
       case 'toggle-language': this.locale = toggleLocale(this.locale); document.documentElement.lang = this.locale; persistLocale(this.locale); this.checkpointPlacementMessage = null; this.constructiblePlacementMessage = null; this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
       case 'title': this.showTitle(); break;
+      case 'custom-game': this.beginCustomGame(); break;
       case 'help': this.showHelp(); break;
       case 'board-legend': this.showBoardLegend(); break;
+      case 'produce-ifv': this.produce('ifv'); break;
       case 'produce-helicopter': this.produce('multipurposeHelicopter'); break;
       case 'aviation-preview': this.showAviationPreview(JSON.parse(element.dataset.gameAction!)); break;
       case 'aviation-confirm': if(this.pendingAviationAction){const action=this.pendingAviationAction;this.pendingAviationAction=null;this.dismissModal();this.apply(action);} break;
@@ -4247,7 +4282,7 @@ export class GameUiController {
       const detail = this.pendingArtilleryTarget ? renderArtilleryPreview(previewArtillery(this.state,unit,this.pendingArtilleryTarget),this.locale) : attackPreview
         ? renderAttackPreview(attackPreview, this.locale, publicUnit?.attack)
         : movePreview
-          ? `<div class="move-preview-detail" data-move-mode="${movePreview.movementMode}"><strong>${escapeHtml(t(movePreview.movementMode === 'emergency' ? 'emergencyMovement' : 'normalMovement'))}</strong><span>${escapeHtml(t('effectiveMovementCost'))} ${movePreview.effectiveMovementCost}</span><span>${escapeHtml(t('fuelCost'))} ${movePreview.fuelCost} · ${escapeHtml(t('fuelAfterMove'))} ${movePreview.projectedFuelAfterMove}</span></div>`
+          ? `<div class="move-preview-detail" data-move-mode="${movePreview.movementMode}"><strong>${escapeHtml(t(movePreview.movementMode === 'emergency' ? 'emergencyMovement' : 'normalMovement'))}</strong><span>${escapeHtml(t('effectiveMovementCost'))} ${movePreview.effectiveMovementCost}</span><span>${escapeHtml(t('fuelCost'))} ${movePreview.fuelCost} · ${escapeHtml(t('fuelAfterMove'))} ${movePreview.projectedFuelAfterMove}</span>${movePreview.overruns?`<span>HP ${movePreview.projectedHpAfterMove} · ${escapeHtml(movePreview.arrivalReason ?? '')}</span><span>${movePreview.overruns.map(o=>`${escapeHtml(o.targetId)} −${o.impactDamage+o.gasDamage} HP${o.executed?'':' (stop)'}`).join(' · ')}</span>${movePreview.cargoDeathRisk?'<strong class="warning-text">Cargo: Gas chain risk</strong>':''}`:''}</div>`
           : '';
       layer.innerHTML = `<div class="unit-target-confirm" data-unit-context-ui role="group" aria-label="${escapeHtml(confirmLabel)}"><button type="button" class="unit-context-button unit-context-cancel" data-action="unit-target-cancel" data-unit-action="cancel" aria-label="${escapeHtml(t('cancelTarget'))}"><span aria-hidden="true">×</span><small>${escapeHtml(t('cancel'))}</small></button>${detail}<button type="button" class="unit-context-button unit-context-confirm" data-action="${confirmAction}" data-unit-action="confirm" aria-label="${escapeHtml(confirmLabel)}"><span aria-hidden="true">✓</span><small>${escapeHtml(confirmLabel)}</small></button></div>`;
       this.positionUnitContextUi();
@@ -4620,7 +4655,7 @@ export class GameUiController {
     if (!this.state || selected?.kind !== 'facility') return undefined;
     const facility = this.state.facilities.find((candidate) => candidate.id === selected.id);
     if (!facility) return undefined;
-    return (['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'fieldArtillery', 'multipurposeHelicopter'] as const).some((unitType) =>
+    return (['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'ifv', 'fieldArtillery', 'multipurposeHelicopter'] as const).some((unitType) =>
       this.state!.config.units[unitType].recruitmentFacilityTypes.includes(
         facility.type as 'capital' | 'city' | 'armyBase' | 'airBase',
       )) ? facility : undefined;
@@ -5409,19 +5444,19 @@ export class GameUiController {
     const zombieTypes=['zombie','hordeZombie','policeZombie','soldierZombie','riotZombie','hunterZombie','gasZombie','screamerZombie','packZombie'] as const;
     const zombiePerformance=zombieTypes.map(type=>{const unit=config.units[type];return `${t(type)} · HP ${unit.hp} · ${t('attack')} ${unit.attack} · ${t('movement')} ${unit.movement} · ${t('range')} ${unit.range} · ${t('attackCharge')} ${unit.maxAttackCharges}`;});
     const sections:[string,string[]][]=[
-      [ja?'勝敗と基本操作':'Victory, defeat and controls',[t('guideSteps'),ja?'移動力（MP）は1ターンに移動できる量です。地形ごとに必要な移動力を消費します。':'Movement points (MP) are the movement budget for one turn. Each entered terrain consumes its movement cost.',t('tipVictory'),r.compatibility]],
+      [ja?'勝敗と基本操作':'Victory, defeat and controls',[t('guideSteps'),ja?'移動力（MP）は1ターンに移動できる量です。地形ごとに必要な移動力を消費します。':'Movement points (MP) are the movement budget for one turn. Each entered terrain consumes its movement cost.',t('tipVictory'),RULES_V169[this.locale].compatibility]],
       [ja?'経済と人口':'Economy and population',[economyRules,foodRules,old.capital,old.health,old.starvation,old.grace,t('tipRecruitment')]],
       [ja?'電力':'Electricity',[t('tipPowerAllocation'),t('tipFuel')]],
       [ja?'施設':'Facilities',[r.airBase,r.drone,r.objectives,old.nuclear]],
-      [ja?'人間部隊':'Human units',[t('tipProficiency'),t('tipRetreat'),old.specialForces,r.helicopter,r.flight,r.transport,r.emergency,artillery.artillery,artillery.modes,artillery.bombardment,t('tipSuppression')]],
+      [ja?'人間部隊':'Human units',[t('tipProficiency'),t('tipRetreat'),old.specialForces,RULES_V169[this.locale].ifv,RULES_V169[this.locale].movement,RULES_V169[this.locale].transport,RULES_V169[this.locale].production,r.helicopter,r.flight,r.transport,r.emergency,artillery.artillery,artillery.modes,artillery.bombardment,t('tipSuppression')]],
       [ja?'ゾンビ':'Zombies',[r.enemies,pursuitRules,t('tipGasZombie'),old.packZombie,...zombiePerformance]],
       [ja?'補給':'Supply',[t('tipSupply'),t('tipFuel')]],
       [ja?'視界と騒音':'Vision and noise',[t('tipVision'),t('tipNoise')]],
       [ja?'襲撃':'Hordes',[t('tipWaveRoster'),old.finalHorde]],
       [ja?'建設と検問所':'Construction and checkpoints',[old.water,t('tipRefugeeRejection'),t('tipCheckpoint'),old.screening,old.waiting,t('tipCheckpointFallback'),t('tipCheckpointMove'),t('checkpointRouteNotVisible'),t('tipBuild'),t('barbedWireRule')]],
-      [ja?'AIと公開情報のルール':'AI / Fair Play',[ja?'組み込みAIと外部AIは公開された観測情報と合法な行動を使用します。未発見の敵・未来の乱数・非公開状態は判断に利用できません。プレビューは状態を変えず、複数行動の一括プレビューも同じ状態の版から独立して評価します。':'Built-in and external AI use public Observations and legal Actions. Hidden enemies, future random outcomes and private state are unavailable. Previews do not change state; every batch item is evaluated independently at the same revision.']],
+      [ja?'AIと公開情報のルール':'AI / Fair Play',[RULES_V169[this.locale].public,ja?'組み込みAIと外部AIは公開された観測情報と合法な行動を使用します。未発見の敵・未来の乱数・非公開状態は判断に利用できません。プレビューは状態を変えず、複数行動の一括プレビューも同じ状態の版から独立して評価します。':'Built-in and external AI use public Observations and legal Actions. Hidden enemies, future random outcomes and private state are unavailable. Previews do not change state; every batch item is evaluated independently at the same revision.']],
     ];
-    this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${t('close')}" data-action="dismiss-modal">×</button><h2 id="help-heading">${t('help')}</h2><button class="secondary-button" data-action="board-legend">${t('legendTitle')}</button>${this.state?renderFacilityObjectives(this.state,this.locale):''}${sections.map(([title,texts])=>`<details class="help-topic"><summary>${escapeHtml(title)}</summary>${texts.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}</details>`).join('')}</section></div>`);
+    this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${t('close')}" data-action="dismiss-modal">×</button><h2 id="help-heading">${t('help')}</h2><button class="secondary-button" data-action="board-legend">${t('legendTitle')}</button>${this.state?renderFacilityObjectives(this.state,this.locale):''}<details class="help-topic synopsis"><summary>${ja?'あらすじ':'Synopsis'}</summary>${renderSynopsis(this.locale)}</details>${sections.map(([title,texts])=>`<details class="help-topic"><summary>${escapeHtml(title)}</summary>${texts.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}</details>`).join('')}</section></div>`);
   }
 
   private updateFacilitySupplementalControls(): void {
@@ -5876,7 +5911,7 @@ export class GameUiController {
         ? t('housingOutageSupplyReason')
         : t('none');
     const housingDetails = facility.type === 'temporaryHousing'
-      ? `<section class="housing-detail" data-housing-detail="true"><div class="section-heading"><h3>${escapeHtml(t('temporaryHousing'))}</h3><span class="status-chip ${housingProjection?.outageReason ? 'is-warning' : 'is-clear'}">${escapeHtml(housingOutageLabel)}</span></div><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('housingCapacity'))}</dt><dd>${facility.workerCapacity}</dd></div><div><dt>${escapeHtml(t('housingPopulation'))}</dt><dd>${facility.workers + facility.infected}</dd></div><div><dt>${escapeHtml(t('housingWorkers'))}</dt><dd>${facility.workers}</dd></div><div><dt>${escapeHtml(t('housingInfected'))}</dt><dd>${facility.infected}</dd></div><div><dt>${escapeHtml(t('facilitySupply'))}</dt><dd>${escapeHtml(facilityInSupply ? t('supplied') : t('outOfSupply'))}</dd></div></dl><p class="muted">${escapeHtml(t('temporaryHousingUse'))}</p>${housingOutageForecast ? `<p class="warning-text" data-housing-next-outage="true">${escapeHtml(t('housingOutageForecast'))}: ${escapeHtml(housingOutageForecast.reason === 'power_shortage' ? t('housingOutagePowerReason') : t('housingOutageSupplyReason'))}</p>` : ''}</section>`
+      ? `<section class="housing-detail" data-housing-detail="true"><div class="section-heading"><h3>${escapeHtml(t('temporaryHousing'))}</h3><span class="status-chip ${housingProjection?.outageReason ? 'is-warning' : 'is-clear'}">${escapeHtml(housingOutageLabel)}</span></div><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('housingCapacity'))}</dt><dd>${facility.workerCapacity}</dd></div><div><dt>${escapeHtml(t('housingPopulation'))}</dt><dd>${facility.workers + facility.infected}</dd></div><div><dt>${escapeHtml(t('housingWorkers'))}</dt><dd>${facility.workers}</dd></div><div><dt>${escapeHtml(t('housingInfected'))}</dt><dd>${facility.owner === 'player' ? facility.infected : escapeHtml(t('unknown'))}</dd></div><div><dt>${escapeHtml(t('facilitySupply'))}</dt><dd>${escapeHtml(facilityInSupply ? t('supplied') : t('outOfSupply'))}</dd></div></dl><p class="muted">${escapeHtml(t('temporaryHousingUse'))}</p>${housingOutageForecast ? `<p class="warning-text" data-housing-next-outage="true">${escapeHtml(t('housingOutageForecast'))}: ${escapeHtml(housingOutageForecast.reason === 'power_shortage' ? t('housingOutagePowerReason') : t('housingOutageSupplyReason'))}</p>` : ''}</section>`
       : '';
     const powerSupplyEditor = isPowerSupplyFacility(facility)
       ? (() => {
@@ -5932,7 +5967,7 @@ export class GameUiController {
     const decommissionControl = isDecommissionableType
       ? `<section class="decommission-editor" data-decommission-editor="true"><h3>${escapeHtml(t('decommissionFacility'))}</h3><p class="muted">${escapeHtml(t('decommissionConditions'))}</p><p>${escapeHtml(t('decommissionRefund'))}: <strong>${decommissionRefund} ${escapeHtml(t('civilianGoods'))}</strong></p><button class="secondary-button" data-action="decommission-facility" data-facility-id="${escapeHtml(facility.id)}" ${decommissionReason ? 'disabled' : ''}>${escapeHtml(t('decommissionFacility'))}</button>${decommissionReason ? `<p class="warning-text" data-decommission-reason="true">${escapeHtml(decommissionReason)}</p>` : '<p class="muted" data-decommission-reason="true"></p>'}</section>`
       : '';
-    body.innerHTML = renderHealthDetails(this.state, this.locale, facility.id) + (facility.type === 'nuclearPowerPlant' ? renderNuclearObjective(this.state,this.locale) : '') + this.renderSameHexTabs(facility.position, selected) + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.workers}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.infected}</dd></div></dl>${facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${housingDetails}${armyBaseDetails}${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
+    body.innerHTML = renderHealthDetails(this.state, this.locale, facility.id) + (facility.type === 'nuclearPowerPlant' ? renderNuclearObjective(this.state,this.locale) : '') + this.renderSameHexTabs(facility.position, selected) + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.owner === 'player' ? facility.workers : escapeHtml(t('unknown'))}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.owner === 'player' ? facility.infected : escapeHtml(t('unknown'))}</dd></div></dl>${facility.owner === 'player' && facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${housingDetails}${armyBaseDetails}${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
     body.insertAdjacentHTML('beforeend', (facility.type==='airBase'?renderMilitaryDrone(this.state,facility.id,this.locale)+renderFacilityObjectives(this.state,this.locale):'')+this.renderFacilityForecast(publicFacility));
     this.updateTransferPreview();
     this.updateRecruitmentReasons();
@@ -6004,7 +6039,7 @@ export class GameUiController {
     const infectedTarget = infectedFacility ?? infectedCheckpoint;
     const noiseClass = noiseClassForUnit(unit.type);
     const noiseSection = noiseClass
-      ? `<section class="noise-forecast" data-noise-class="${escapeHtml(noiseClass)}"><h3>${escapeHtml(t('noise'))}</h3><p><strong>${escapeHtml(t('noiseClass'))}</strong>: ${escapeHtml(t(`noiseClass${noiseClass[0]!.toUpperCase()}${noiseClass.slice(1)}`))}</p><p class="muted">${escapeHtml(t('noiseCombatHint'))}</p></section>`
+      ? `<section class="noise-forecast" data-noise-class="${escapeHtml(noiseClass)}"><h3>${escapeHtml(t('noise'))}</h3><p><strong>${escapeHtml(t('noiseClass'))}</strong>: ${escapeHtml(t(`noiseClass${noiseClass[0]!.toUpperCase()}${noiseClass.slice(1)}`))}</p><p class="muted">${escapeHtml(unit.type==='ifv' ? (this.locale==='ja' ? `射撃・進入した各ヘックスから半径${this.state!.config.units.ifv.noiseRadius}の騒音を発生させます。` : `Firing and each entered hex emit noise with radius ${this.state!.config.units.ifv.noiseRadius}.`) : t('noiseCombatHint'))}</p></section>`
       : '';
     const currentFuel = publicUnit?.currentFuel ?? unit.currentFuel;
     const maxFuel = publicUnit?.maxFuel ?? unit.maxFuel;
@@ -6153,14 +6188,17 @@ export class GameUiController {
       wait_until_operational: '稼働開始ターンを待つ', healthy_population: '健康な人口を配置', supply: '供給網へ接続', allocated_power: '必要電力を確保',
     } : { cannot_recover: 'Cannot recover', conditions_required: 'Recovery conditions missing', ready: 'Recovery conditions met', suppress_infection: 'Suppress infection', clear_visible_enemy: 'Clear the visible enemy', station_human_unit: 'Station a human unit', wait_until_operational: 'Wait for the operational turn', healthy_population: 'Assign healthy population', supply: 'Connect supply', allocated_power: 'Secure allocated power' };
     const recoveryText = (keys: string[]) => escapeHtml(keys.map(key => recoveryLabels[key] ?? key).join(' · ') || t('none'));
-    const recoveryDetail = recovery ? `<details><summary>${this.locale === 'ja' ? '復旧と生産再開条件' : 'Recovery and production requirements'}</summary><p>${recoveryText([recovery.status])} · ${recoveryText(recovery.missingConditions)}</p><p>${this.locale === 'ja' ? '復旧予定ターン' : 'Scheduled recovery turn'}: ${recovery.scheduledOperationalTurn ?? '—'}</p><p>${recoveryText(recovery.productionRequirements)}</p><p>${this.locale === 'ja' ? '施設ヘックスの都市地形による被ダメージ補正' : 'Facility urban terrain damage multiplier'} ×${recovery.terrainDefense.multiplier}</p></details>` : '';
+    const garrison = recovery?.garrison;
+    const garrisonDetail = garrison ? `<p>${this.locale==='ja'?'駐留部隊':'Garrison'}: ${escapeHtml(garrison.unitId)} · ${this.locale==='ja'?'鎮圧力':'Suppression power'} ${garrison.suppressionPower} · ${t('attackCharges')} ${garrison.attackChargesRemaining} · ${t('militaryGoods')} ${garrison.currentMilitaryGoods}/${garrison.suppressionCost} · ${this.locale==='ja'?(garrison.suppressionReadyNow?'現在の鎮圧実行条件を充足':'現在の鎮圧実行条件が不足'):(garrison.suppressionReadyNow?'Current suppression requirements met':'Current suppression requirements missing')}</p>` : `<p>${this.locale==='ja'?'鎮圧可能な駐留部隊の配置が必要です。':'A suppression-capable garrison is required.'}</p>`;
+    const recoveryExplanation = recovery ? `<p>${this.locale==='ja'?'駐留による感染の封じ込めは、鎮圧完了・奪還成功を意味しません。':'Containment by a garrison does not mean infection is cleared or recovery has succeeded.'}</p>${garrisonDetail}<p>${this.locale==='ja'?'ターン終了時の公開鎮圧予測':'Public End Turn suppression prediction'}: ${recovery.endTurnPrediction.suppressionAlreadyPublic??t('unknown')} · ${this.locale==='ja'?'復旧した場合の稼働可能ターン':'Operational turn if recovered'} ${recovery.endTurnPrediction.nextOperationalTurnIfRecovered}</p><p class="muted">${this.locale==='ja'?'駐留部隊の生存、残攻撃回数、補給後の軍需品、人口・給電条件に依存します。敵の行動や非公開の感染によって結果が変わり、成功は保証されません。':'Depends on garrison survival, remaining charges, ammunition after resupply, population and power. Enemy actions and hidden infection may change the outcome; success is not guaranteed.'}</p>` : '';
+    const recoveryDetail = recovery ? `<details><summary>${this.locale === 'ja' ? '復旧と生産再開条件' : 'Recovery and production requirements'}</summary><p>${recoveryText([recovery.status])} · ${recoveryText(recovery.missingConditions)}</p><p>${this.locale === 'ja' ? '復旧予定ターン' : 'Scheduled recovery turn'}: ${recovery.scheduledOperationalTurn ?? '—'}</p><p>${recoveryText(recovery.productionRequirements)}</p>${recoveryExplanation}<p>${this.locale === 'ja' ? '施設ヘックスの都市地形による被ダメージ補正' : 'Facility urban terrain damage multiplier'} ×${recovery.terrainDefense.multiplier}</p></details>` : '';
     const stopped = production.stoppedReason
       ? `<p class="warning-text"><strong>${escapeHtml(t('stoppedReason'))}</strong>: ${escapeHtml(stoppedReasonLabel(production.stoppedReason === 'power_unavailable' ? production.projectedPowerReason : production.stoppedReason, this.locale))}</p>`
       : '';
     const powerWarning = powerMode !== 'none' && !production.projectedPowerSupplied
       ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(powerReason || t('powerReason'))}</p>`
       : '';
-    const infection = publicFacility.infectedPopulation > 0
+    const infection = publicFacility.infectedPopulation === null ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p>${escapeHtml(t('infected'))}: ${escapeHtml(t('unknown'))}</p></section>` : publicFacility.infectedPopulation > 0
       ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicFacility.infectionContained ? 'is-contained' : 'warning-text'}">${escapeHtml(publicFacility.infectionContained ? t('infectionContained') : t('infectionNotContained'))}</p><p class="muted">${escapeHtml(t('automaticSuppression'))}: ${publicFacility.projectedSuppression > 0 ? publicFacility.projectedSuppression : t('automaticSuppressionUnavailable')}</p>${publicFacility.projectedCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicFacility.projectedCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}</section>`
       : '';
     const specialRule = type === 'reliefSupplyCenter' ? `<p class="muted">${escapeHtml(t('reliefSupplyCenterUse'))}</p><p>${escapeHtml(t('workers'))}: ${production.healthyWorkers} / ${production.operatingWorkers} · ${escapeHtml(t('productionInputDemand'))}: ${escapeHtml(formatResourceAmounts(production.inputRequired, this.locale, true))} · ${escapeHtml(t('productionInputShortage'))}: ${escapeHtml(formatResourceAmounts(production.inputShortage, this.locale, true))}</p>` : type === 'windPowerPlant'

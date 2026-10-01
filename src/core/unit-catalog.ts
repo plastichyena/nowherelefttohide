@@ -8,6 +8,7 @@ export const UNIT_CATALOG = {
   reconTeam: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
   fieldArtillery: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
   specialForces: { faction: 'human', ai: null, waveSlot: null, reanimation: 'packZombie' },
+  ifv: { faction: 'human', ai: null, waveSlot: null, reanimation: 'soldierZombie' },
   multipurposeHelicopter: { faction: 'human', ai: null, waveSlot: null, reanimation: null },
   packZombie: { faction: 'zombie', ai: 'normal', waveSlot: null, reanimation: null },
   zombie: { faction: 'zombie', ai: 'normal', waveSlot: 'nonHorde', reanimation: null },

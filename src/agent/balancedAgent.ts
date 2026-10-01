@@ -1,3 +1,4 @@
+import { ifvPolicy } from './ifv-policy';
 import { reliefPolicy } from './relief-policy';
 import { withPublicMovementCache, publicMoveDetails } from './public-movement';
 import { aviationPolicy } from './aviation-policy';
@@ -147,7 +148,7 @@ function primaryGoal(
   if (observation.crisisSummary?.alerts.some((alert) =>
     alert.severity === 'critical' && alert.category === 'infection',
   )) return 'rescue_critical_infection';
-  if (observation.facilities.some((facility) => facility.infectedPopulation > 0 && isCriticalFacility(facility.id, observation))) {
+  if (observation.facilities.some((facility) => facility.infectedPopulation !== null && facility.infectedPopulation > 0 && isCriticalFacility(facility.id, observation))) {
     return 'rescue_critical_infection';
   }
   if (observation.population.infected > 0) return 'suppress_infection';
@@ -373,7 +374,7 @@ function scoreAction(
         reasonCodes.push(attacker.type === 'nationalGuard' ? 'PUBLIC_LARGE_NOISE_RISK' : 'PUBLIC_MEDIUM_NOISE_RISK');
       }
       const fallenInfectedSites = observation.facilities.filter((facility) =>
-        facility.status === 'ruined' && facility.infectedPopulation >= 5,
+        facility.status === 'ruined' && facility.infectedPopulation !== null && facility.infectedPopulation >= 5,
       ).length + observation.checkpoints.filter((checkpoint) =>
         (checkpoint.status === 'ruined' || checkpoint.status === 'remnant') && checkpoint.infected >= 5,
       ).length;
@@ -538,7 +539,7 @@ function scoreAction(
     const to = facilities.get(action.toFacilityId);
     if (from && to) {
       const fromExcess = Math.max(0, (from.healthyPopulation ?? 0) - from.populationCapacity);
-      const toRoom = Math.max(0, to.populationCapacity - (to.healthyPopulation ?? 0) - (to.type === 'temporaryHousing' ? to.infectedPopulation : 0));
+      const toRoom = Math.max(0, to.populationCapacity - (to.healthyPopulation ?? 0) - (to.type === 'temporaryHousing' ? (to.infectedPopulation ?? 0) : 0));
       const relief = Math.min(action.people, fromExcess, toRoom);
       score += relief * weights.overcrowdingRelief;
       if (relief > 0) reasonCodes.push('RELIEVE_OVERCROWDING');
@@ -589,7 +590,7 @@ function scoreAction(
       }
       const infected = [
         ...observation.facilities
-          .filter((facility) => facility.infectedPopulation > 0)
+          .filter((facility) => facility.infectedPopulation !== null && facility.infectedPopulation > 0)
           .map((facility) => facility.position),
         ...observation.checkpoints
           .filter((checkpoint) => checkpoint.infected > 0)
@@ -1075,7 +1076,7 @@ function scoreAction(
     if (unit) {
       const destination = action.type === 'Move' ? action.destination : unit.position;
       const capital = observation.facilities.find(f => f.type === 'capital' && f.owner === 'player');
-      if (capital && capital.infectedPopulation > 0 && hexDistance(destination, capital.position) === 0
+      if (capital && capital.infectedPopulation !== null && capital.infectedPopulation > 0 && hexDistance(destination, capital.position) === 0
         && unit.attackChargesRemaining > 0 && unit.currentMilitaryGoods > 0) {
         const safeSuppressor = unit.type === 'police' || unit.type === 'riotPolice';
         score += safeSuppressor ? 6_000 : 800;
@@ -1147,7 +1148,8 @@ export class BalancedAgent implements GameAgent {
     ));
     candidates = candidates.map(candidate => { const relief = reliefPolicy(observation, candidate.action); return relief ? { ...candidate, score: relief.score, reasonCodes: [relief.reason] } : candidate; });
     const aviation=aviationPolicy(observation,legalActions);
-    candidates=candidates.map(candidate=>{const decision=aviation(candidate.action);return decision?{...candidate,score:decision.override?decision.score:candidate.score+decision.score,reasonCodes:[...candidate.reasonCodes,decision.reason]}:candidate;});
+    const ifv=ifvPolicy(observation);
+    candidates=candidates.map(candidate=>{const decision=ifv(candidate.action) ?? aviation(candidate.action);return decision?{...candidate,score:decision.override?decision.score:candidate.score+decision.score,reasonCodes:[...candidate.reasonCodes,decision.reason]}:candidate;});
     candidates = candidates.map((candidate) => ({
       ...candidate,
       score: candidate.score

@@ -115,6 +115,7 @@ export const BOARD_UNIT_TYPES = [
   'riotPolice',
   'reconTeam',
   'specialForces',
+  'ifv',
   'fieldArtillery',
   'multipurposeHelicopter',
   'packZombie',
@@ -198,6 +199,7 @@ export const BOARD_ASSET_REGISTRY = {
     barbedWire: 'obstacles/obstacle_barbed_wire.png',
   },
   units: {
+    ifv: 'units/unit_ifv.png',
     fieldArtillery: 'units/unit_field_artillery_packed.png',
     multipurposeHelicopter: HELICOPTER_ASSETS.landed,
     police: 'units/unit_police.png',

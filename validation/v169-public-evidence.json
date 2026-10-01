@@ -1,0 +1,144 @@
+[
+  {
+    "source": "output/claude-playtest-20260927-v168-seed6/logs/transcript.jsonl",
+    "lineNumber": 1624,
+    "revision": 325,
+    "requestId": "T30-end",
+    "kind": "observed-execution",
+    "executed": true,
+    "turn": 30,
+    "eventId": "event-3968",
+    "type": "infection_suppressed",
+    "payload": {
+      "facilityId": "oilfield-north",
+      "unitId": "special-forces-42",
+      "unitType": "specialForces",
+      "remaining": 0,
+      "militaryGoodsCost": 1,
+      "militaryGoodsRemaining": 19,
+      "attackChargesRemaining": 3
+    }
+  },
+  {
+    "source": "output/claude-playtest-20260927-v168-seed6/logs/transcript.jsonl",
+    "lineNumber": 1624,
+    "revision": 325,
+    "requestId": "T30-end",
+    "kind": "observed-execution",
+    "executed": true,
+    "turn": 30,
+    "eventId": "event-3969",
+    "type": "facility_recovered",
+    "payload": {
+      "facilityId": "oilfield-north",
+      "unitId": "special-forces-42",
+      "recovering": true
+    }
+  },
+  {
+    "source": "output/claude-playtest-20260927-v168-seed6/logs/transcript.jsonl",
+    "lineNumber": 3042,
+    "revision": 533,
+    "requestId": "t54-f4-0",
+    "kind": "observed-execution",
+    "executed": true,
+    "turn": 54,
+    "eventId": "event-6423",
+    "type": "workers_assigned",
+    "payload": {
+      "facilityId": "farm-4",
+      "workers": 0,
+      "difference": -30,
+      "movements": [
+        {
+          "facilityId": "city-4",
+          "people": 30
+        }
+      ]
+    }
+  },
+  {
+    "source": "output/claude-playtest-20260927-v168-seed6/logs/transcript.jsonl",
+    "lineNumber": 3044,
+    "revision": 533,
+    "requestId": null,
+    "kind": "query-legality",
+    "executed": false,
+    "turn": null,
+    "eventId": null,
+    "fromFacilityId": "city-4",
+    "toFacilityId": "capital",
+    "min": 1,
+    "max": 30
+  },
+  {
+    "source": "output/claude-playtest-20260927-v168-seed6/logs/transcript.jsonl",
+    "lineNumber": 3044,
+    "revision": 533,
+    "requestId": null,
+    "kind": "query-legality",
+    "executed": false,
+    "turn": null,
+    "eventId": null,
+    "fromFacilityId": "city-4",
+    "toFacilityId": "city-1",
+    "min": 1,
+    "max": 30
+  },
+  {
+    "source": "output/claude-playtest-20260927-v168-seed6/logs/transcript.jsonl",
+    "lineNumber": 3044,
+    "revision": 533,
+    "requestId": null,
+    "kind": "query-legality",
+    "executed": false,
+    "turn": null,
+    "eventId": null,
+    "fromFacilityId": "city-4",
+    "toFacilityId": "city-2",
+    "min": 1,
+    "max": 30
+  },
+  {
+    "source": "output/claude-playtest-20260927-v168-seed6/logs/transcript.jsonl",
+    "lineNumber": 3044,
+    "revision": 533,
+    "requestId": null,
+    "kind": "query-legality",
+    "executed": false,
+    "turn": null,
+    "eventId": null,
+    "fromFacilityId": "city-4",
+    "toFacilityId": "city-3",
+    "min": 1,
+    "max": 30
+  },
+  {
+    "source": "output/claude-playtest-20260927-v168-seed6/logs/transcript.jsonl",
+    "lineNumber": 3044,
+    "revision": 533,
+    "requestId": null,
+    "kind": "query-legality",
+    "executed": false,
+    "turn": null,
+    "eventId": null,
+    "fromFacilityId": "city-4",
+    "toFacilityId": "city-5",
+    "min": 1,
+    "max": 30
+  },
+  {
+    "source": "output/claude-playtest-20260927-v168-seed6/logs/transcript.jsonl",
+    "lineNumber": 3044,
+    "revision": 533,
+    "requestId": null,
+    "kind": "query-legality",
+    "executed": false,
+    "turn": null,
+    "eventId": null,
+    "fromFacilityId": "city-4",
+    "toFacilityId": "city-7",
+    "min": 1,
+    "max": 30
+  }
+]

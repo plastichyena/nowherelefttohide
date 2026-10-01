@@ -31,7 +31,7 @@ export interface QuerySchema {
   description?: string;
 }
 
-const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter'] as const satisfies readonly HumanUnitType[];
+const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'ifv', 'fieldArtillery', 'multipurposeHelicopter'] as const satisfies readonly HumanUnitType[];
 const FACILITY_TYPES = ['capital', 'city', 'farm', 'civilianFactory', 'militaryFactory', 'oilField', 'refinery', 'powerPlant', 'nuclearPowerPlant', 'windPowerPlant', 'simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'armyBase', 'airBase', 'reliefSupplyCenter'] as const satisfies readonly FacilityType[];
 const CONSTRUCTIBLE_TYPES = ['simpleFarm', 'civilianDroneBase', 'temporaryHousing', 'windPowerPlant', 'reliefSupplyCenter'] as const satisfies readonly ConstructibleFacilityType[];
 const FACILITY_STATUSES = ['unowned', 'owned', 'ruined'] as const satisfies readonly FacilityStatus[];
@@ -42,7 +42,7 @@ const CHECKPOINT_POLICIES = ['passThrough', 'normal', 'strict', 'deny'] as const
 const UNIT_ACTION_STATES = ['ready', 'moved', 'acted', 'destroyed'] as const satisfies readonly UnitActionState[];
 const UNIT_PROFICIENCIES = ['recruit', 'regular', 'veteran'] as const satisfies readonly UnitProficiency[];
 const TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const satisfies readonly BaseTerrain[];
-const QUERYABLE_ACTION_TYPES = ['TakeOff','Land','BoardAircraft','DisembarkAircraft','LaunchMilitaryDrone','ChangeUnitMode', 'AttackHex', 'BuildBarbedWire', 'Move', 'Attack', 'Wait', 'AssignWorkers', 'TransferPopulation', 'SetCheckpointPolicy', 'SetPowerSupply', 'BuildConstructibleFacility', 'BuildCheckpoint', 'RelocateCheckpoint', 'ActivateCheckpoint', 'TurnAwayCheckpointRefugees', 'DecommissionConstructibleFacility', 'ProduceUnit', 'EndTurn'] as const satisfies readonly GameAction['type'][];
+const QUERYABLE_ACTION_TYPES = ['BoardTransport','DisembarkTransport','TakeOff','Land','BoardAircraft','DisembarkAircraft','LaunchMilitaryDrone','ChangeUnitMode', 'AttackHex', 'BuildBarbedWire', 'Move', 'Attack', 'Wait', 'AssignWorkers', 'TransferPopulation', 'SetCheckpointPolicy', 'SetPowerSupply', 'BuildConstructibleFacility', 'BuildCheckpoint', 'RelocateCheckpoint', 'ActivateCheckpoint', 'TurnAwayCheckpointRefugees', 'DecommissionConstructibleFacility', 'ProduceUnit', 'EndTurn'] as const satisfies readonly GameAction['type'][];
 
 const string: QuerySchema = { type: 'string', minLength: 1 };
 const nullableString: QuerySchema = { type: ['string', 'null'], minLength: 1 };
@@ -116,7 +116,7 @@ export function validateQuerySchema(value: unknown, schema: QuerySchema, path = 
     const obj = value as Record<string, unknown>;
     return [
       ...(schema.required ?? []).filter(k => obj[k] === undefined).map(k => `${path}.${k} is required`),
-      ...Object.entries(obj).flatMap(([k, v]) => schema.properties?.[k] ? validateQuerySchema(v, schema.properties[k], `${path}.${k}`) : schema.additionalProperties === false ? [`${path}.${k} is not supported`] : []),
+      ...Object.entries(obj).flatMap(([k, v]) => schema.properties?.[k] ? validateQuerySchema(v, schema.properties[k], `${path}.${k}`) : schema.additionalProperties === false ? [`${path}.${k} is not supported${schema.properties?.id && ['unitId','facilityId'].includes(k) ? '; use filters.id, for example {"id":"' + String(v) + '"}; query again at the current revision' : '; supported keys: '+Object.keys(schema.properties ?? {}).join(', ')}`] : []),
     ];
   }
   if (valueType === 'array' && types.includes('array') && schema.items) {

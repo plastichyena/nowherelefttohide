@@ -6,6 +6,8 @@ export function cloneJson<T>(value: T): T {
 
 export function actionKey(action: GameAction): string {
   if(action.type==='TakeOff' || action.type==='Land') return `${action.type}|${action.unitId}`;
+  if(action.type==='BoardTransport') return `BoardTransport|${action.transportId}|${action.unitId}`;
+  if(action.type==='DisembarkTransport') return `DisembarkTransport|${action.transportId}|${action.destination.q},${action.destination.r}`;
   if(action.type==='BoardAircraft') return `BoardAircraft|${action.aircraftId}|${action.unitId}`;
   if(action.type==='DisembarkAircraft') return `DisembarkAircraft|${action.aircraftId}|${action.destination.q},${action.destination.r}`;
   if(action.type==='LaunchMilitaryDrone') return `LaunchMilitaryDrone|${action.facilityId}|${action.target.q},${action.target.r}`;

@@ -9,9 +9,15 @@ import { getPlayerVisibleTileKeys } from './visibility';
 import { emit } from './events-internal';
 import type { SeededRng } from './rng';
 
-export type AviationAction = Extract<GameAction, { type: 'TakeOff' | 'Land' | 'BoardAircraft' | 'DisembarkAircraft' | 'LaunchMilitaryDrone' }>;
+type LegacyAviationAction = Extract<GameAction, { type: 'TakeOff' | 'Land' | 'BoardAircraft' | 'DisembarkAircraft' | 'LaunchMilitaryDrone' }>;
+export type AviationAction = LegacyAviationAction | Extract<GameAction, { type: 'BoardTransport' | 'DisembarkTransport' }>;
+export function normalizeTransportAction(action: AviationAction): LegacyAviationAction {
+  if (action.type === 'BoardTransport') return { type: 'BoardAircraft', aircraftId: action.transportId, unitId: action.unitId };
+  if (action.type === 'DisembarkTransport') return { type: 'DisembarkAircraft', aircraftId: action.transportId, destination: action.destination };
+  return action;
+}
 export function isAviationAction(action: GameAction): action is AviationAction {
-  return ['TakeOff', 'Land', 'BoardAircraft', 'DisembarkAircraft', 'LaunchMilitaryDrone'].includes(action.type);
+  return ['TakeOff', 'Land', 'BoardAircraft', 'DisembarkAircraft', 'BoardTransport', 'DisembarkTransport', 'LaunchMilitaryDrone'].includes(action.type);
 }
 export function canOccupyAirHex(state: Readonly<GameState>, position: HexCoord, exceptId?: string): boolean {
   return hexWithinBounds(position, state.map.width, state.map.height) && !state.units.some(u => u.id !== exceptId && isAirborne(u) && hexKey(u.position) === hexKey(position));
@@ -26,7 +32,11 @@ export function groundPlacementReason(state: Readonly<GameState>, position: HexC
 }
 export function canOccupyGroundHex(state: Readonly<GameState>, position: HexCoord, exceptId?: string): boolean { return groundPlacementReason(state, position, exceptId) === null; }
 export function unitCanReceiveSupply(unit: Pick<UnitState, 'flightState' | 'transportedByUnitId'>): boolean { return !isAirborne(unit) && !unit.transportedByUnitId; }
-export function aviationReason(state: Readonly<GameState>, action: AviationAction): string | null {
+export function aviationReason(state: Readonly<GameState>, input: AviationAction): string | null {
+  if ('transportId' in input) {
+    if (!state.units.some(u => u.id === input.transportId && u.isPlayerUnit && ['ifv', 'multipurposeHelicopter'].includes(u.type))) return 'unknown_transport';
+  } else if ('aircraftId' in input && !state.units.some(u => u.id === input.aircraftId && u.type === 'multipurposeHelicopter')) return 'unknown_aircraft';
+  const action = normalizeTransportAction(input);
   if (state.gameOver) return 'game_over';
   if (state.phase !== 'player') return 'wrong_phase';
   if (state.actionsTakenThisTurn >= state.config.maxActionsPerTurn) return 'action_limit';
@@ -43,7 +53,7 @@ export function aviationReason(state: Readonly<GameState>, action: AviationActio
     return null;
   }
   const aircraftId = 'aircraftId' in action ? action.aircraftId : action.unitId;
-  const aircraft = state.units.find(u => u.id === aircraftId && u.isPlayerUnit && u.type === 'multipurposeHelicopter');
+  const aircraft = state.units.find(u => u.id === aircraftId && u.isPlayerUnit && (u.type === 'multipurposeHelicopter' || ('transportId' in input && u.type === 'ifv')));
   if (!aircraft) return 'unknown_aircraft';
   if (action.type === 'TakeOff') {
     if (isAirborne(aircraft)) return 'aircraft_already_airborne';
@@ -84,7 +94,8 @@ export function setFlightState(state: GameState, unit: UnitState, airborne: bool
   unit.activity.moved = true;
   emit(state, 'aircraft_state_changed', { unitId: unit.id, flightState: unit.flightState });
 }
-export function applyAviationAction(state: GameState, action: AviationAction): void {
+export function applyAviationAction(state: GameState, input: AviationAction): void {
+  const action = normalizeTransportAction(input);
   state.actionsTakenThisTurn++;
   if (action.type === 'LaunchMilitaryDrone') {
     const base = state.facilities.find(f => f.id === action.facilityId)!;
@@ -102,13 +113,13 @@ export function applyAviationAction(state: GameState, action: AviationAction): v
     aircraft.currentFuel += transferredFuel; cargo.currentFuel -= transferredFuel;
     aircraft.cargoUnitId = cargo.id; cargo.transportedByUnitId = aircraft.id; cargo.boardedTurn = state.turn;
     cargo.position = { ...aircraft.position }; cargo.canMove = false; cargo.canAttack = false; cargo.actionState = 'acted'; cargo.activity.moved = true;
-    emit(state, 'aircraft_boarded', { aircraftId: aircraft.id, unitId: cargo.id, transferredFuel });
+    emit(state, 'aircraft_boarded', { transportId: aircraft.id, transportType: aircraft.type, aircraftId: aircraft.id, unitId: cargo.id, transferredFuel });
   } else {
     const cargo = state.units.find(u => u.id === aircraft.cargoUnitId)!;
     delete aircraft.cargoUnitId; delete cargo.transportedByUnitId;
     cargo.position = { ...action.destination }; cargo.disembarkedTurn = state.turn;
     cargo.actionState = 'acted'; cargo.canMove = false; cargo.canAttack = cargo.attackChargesRemaining > 0; cargo.activity.moved = true;
-    emit(state, 'aircraft_disembarked', { aircraftId: aircraft.id, unitId: cargo.id, q: cargo.position.q, r: cargo.position.r });
+    emit(state, 'aircraft_disembarked', { transportId: aircraft.id, transportType: aircraft.type, aircraftId: aircraft.id, unitId: cargo.id, q: cargo.position.q, r: cargo.position.r });
   }
 }
 export function synchronizeCargoPosition(state: GameState, aircraft: UnitState): void {

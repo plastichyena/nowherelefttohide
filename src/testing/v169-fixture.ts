@@ -1,0 +1,23 @@
+/** Deterministic acceptance fixture; custom data, not a standard-seed balance run. */
+import { mkdirSync,writeFileSync } from 'node:fs';
+import { GameEngine } from '../core/engine';
+import { createDefaultConfig } from '../core/config';
+import { createUnit } from '../core/state';
+import { prepareTestSnapshot } from '../core/testConfig';
+import { exportSaveJson } from '../persistence/save';
+import type { GameState } from '../core/types';
+const engine=new GameEngine(7,createDefaultConfig({economy:{initialZombieCount:0,initialScreamerCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0}}}));
+const state=engine.getState() as GameState;
+const oil=state.facilities.find(f=>f.type==='oilField')!;
+state.units=[createUnit(state,'vehicle','ifv',{q:25,r:25}),createUnit(state,'cargo','police',{q:24,r:25}),createUnit(state,'observer','specialForces',{q:oil.position.q-1,r:oil.position.r}),createUnit(state,'target','hordeZombie',{q:26,r:25})];
+state.units[3]!.hordeKind='periodic';state.units[3]!.spawnGroupId='fixture';
+state.completedProductions.ifv=1;
+const cp=state.checkpoints.find(c=>c.branchId==='west')!;cp.status='ruined';cp.overrunProcessed=true;
+state.roadBranches.find(b=>b.branchId==='west')!.activeCheckpointId=null;
+prepareTestSnapshot(state);
+let r=engine.step({type:'LoadSnapshot',snapshot:state});if(r.error)throw Error(r.error.message);
+r=engine.step({type:'BoardTransport',unitId:'cargo',transportId:'vehicle'});if(r.error)throw Error(r.error.message);
+mkdirSync('output/v169',{recursive:true});writeFileSync('output/v169/ui-fixture.json',exportSaveJson(engine.getState() as GameState));
+r=engine.step({type:'Move',unitId:'vehicle',destination:{q:27,r:25}});if(r.error)throw Error(r.error.message);
+const vehicle=r.state.units.find(u=>u.id==='vehicle')!;
+writeFileSync('validation/v169-ifv-fixture.json',JSON.stringify({scenario:'custom deterministic fixture; not standard UNA balance',seed:7,initial:{hp:200,fuel:100,ammo:120,charges:3},result:{overruns:r.events.filter(e=>e.type==='unit_overrun').length,hp:vehicle.hp,damage:200-vehicle.hp,fuel:vehicle.currentFuel,ammo:vehicle.currentMilitaryGoods,charges:vehicle.attackChargesRemaining,survived:true,cargoSurvived:r.state.units.some(u=>u.id==='cargo'),position:vehicle.position},production:'Lifetime cost/reservation/completion/destruction are verified separately by v169.ifv.test.ts; this fixture places one completed IFV.',balanceConclusion:'No win-rate or standard-seed survival improvement is inferred. Standard 200-game workflow results remain unconfirmed.'},null,2)+'\n');

@@ -3,12 +3,12 @@
 ## PoC 現行仕様
 
 - ステータス: 現行正本
-- 現行Version: v1.6.8
-- 基準日: 2026-09-27
-- 実装照合日: 2026-09-27（本文・詳細節をv1.6.8実装と照合）
-- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.6.8 アップデート要件 確定版.md`（今回の指示に従いDoc直下へ保持。archive内は変更しない）
+- 現行Version: v1.6.9
+- 基準日: 2026-10-01
+- 実装照合日: 2026-10-01（ローカル実装・検証を反映。GitHub Actionsの結果は未確認）
+- 直近の反映済み変更要件: `Nowhere Left to Hide PoC v1.6.9 アップデート要件 確定版.md`（今回の指示に従いDoc直下へ保持。archive内は変更しない）
 
-本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。第1〜17章と18.13〜18.18のルール説明はv1.6.8の現行仕様として整合させる。18.1〜18.12は過去版の検証履歴であり、そこに記載された旧Version・件数・性能値を現行ルールへ適用しない。現行Version境界は18.15.16、v1.6.8の検証範囲と未確認事項は18.18.6を参照する。過去版の検証記録は当時の履歴である。過去の資料は現行判断には使用しない。
+本書は現在の実装が従う唯一の正本である。実装、テスト、ヘルプ、保存形式が本書と矛盾する場合は本書を優先する。第1〜17章と18.13〜18.19のルール説明はv1.6.9の現行仕様として整合させる。18.1〜18.12は過去版の検証履歴であり、そこに記載された旧Version・件数・性能値を現行ルールへ適用しない。現行Version境界は18.15.16、v1.6.9の検証範囲と未確認事項は18.19.8を参照する。過去版の検証記録は当時の履歴である。過去の資料は現行判断には使用しない。
 
 ---
 
@@ -123,6 +123,10 @@ UI / Phaser / Test Agent
 
 # 5. UI・操作
 
+## 5.0 開始・シナリオ
+
+タイトルのゲームスタートからシナリオ選択へ進む。UNAはSeedだけを指定し、固定の標準Configで開始する。PRHとACはcurrently unavailableと表示して無効化する。従来の調整画面はカスタムゲームとして残す。人間のUNA新規開始だけで導入文を表示する（18.19）。
+
 ## 5.1 レイアウト
 
 - スマートフォン縦向きを基準に、盤面を上部、選択情報と操作を下部へ配置する。
@@ -177,7 +181,7 @@ UI / Phaser / Test Agent
 
 - 初回ガイドで移動、攻撃、人口配置、ターン終了を説明する。
 - 日本語・英語の常設ヘルプを提供する。
-- 人口は盤面上の所在地から消せないこと、施設撤収時の帰還、都市過密、Army Base Workerの都市住民・避難民・徴用対象外、編成拠点制限、v1.6.6以前の通常SaveおよびAI Replay／Artifact／Session／Checkpointの非互換を説明する。
+- 人口は盤面上の所在地から消せないこと、施設撤収時の帰還、都市過密、Army Base Workerの都市住民・避難民・徴用対象外、編成拠点制限、v1.6.8以前の通常SaveおよびAI Replay／Artifact／Session／Checkpointの非互換を説明する。
 - 道路別の次回到着（Final Wave Spawn後は新規到着停止）、未管理時の素通りリスク、都市のソフトキャップ超過受入を表示する。
 - 補給オーバーレイは常設切替を持ち、新設・移設、検問所選択、労働者配置で自動表示する。補給範囲、セクター境界、検問所半径、候補の将来範囲、建設を妨げるZombieを盤面上で識別できる。
 - Farm、Civilian Factory、Military Factory、Refinery、Civilian Drone Base、Relief Supply CenterはBottom SheetからPower Supply ON/OFFを切り替え、現在配置とTurn-start Fuelに基づく次回EndTurnの予測要求・給電、基本出力、予測出力、停止理由、直前EndTurnの実績給電を区別して表示する。Army Baseは通常兵士予約を持つ正常稼働Turnだけ、Worker 0でも編成専用の電力10を要求する。Air Baseは正常稼働中、予約の有無によらず電力10を要求する。Required施設は未給電またはOFFなら対象生産・機能を停止する。
@@ -197,7 +201,7 @@ UI / Phaser / Test Agent
 - 支線パネルはActive／Standby／Dormant、Fallback可否、支線Policy、準備済みPost数を表示する。Active失陥時には州都側のStandby、次にDormantへ即時Fallbackし、前線とSupplyが後退することを説明する。
 - Unit詳細、Help、Combat LogはPolice／Riot Police／Reconを公開Noise Class `medium`、Soldierを`large`、Army Base迎撃を`armyBase`、Screamerを`extraLarge`とする。Human Combat、Horde実移動、基地迎撃、Screamの共通NoiseはScreamer／Gasを含む8種Normal AI系Zombieと条件を満たす陥落拠点へ作用する。基地迎撃Radius 8は公開するが、ScreamerのRadius、反応数、対象ID、発生位置、ZombieのNoise TargetはProduction UIへ出さない。
 - Coreが公開Stateだけから返す`Crisis Summary`はCritical／Warning／Advisoryの全件をHuman UIとAgentで共有する。Human UIは上部Stripと未選択Accordionへ段階表示する。EndTurnは合法性を変えず、Criticalがあるか未使用Attack Charge／自動鎮圧がある場合だけ短い確認を出す。
-- HelpはGround LOS、Forest／Mountainの最初の遮蔽Hex、Aerial Vision、実感染者5人ごとの隣接Spawn、最大6体、即時占有、FIFO連鎖、Noise再Spawnを現在Configから日英で説明する。詳細ルールは11カテゴリのHelpへまとめ、Board Legendへ重複掲載しない。
+- HelpはGround LOS、Forest／Mountainの最初の遮蔽Hex、Aerial Vision、実感染者5人ごとの隣接Spawn、最大6体、即時占有、FIFO連鎖、Noise再Spawnを現在Configから日英で説明する。詳細ルールは12カテゴリのHelpへまとめ、Board Legendへ重複掲載しない。
 - UIはCore Eventから最新50件の重要イベント履歴を再構築し、陥落拠点ID／Type／座標、感染者数、Requested／Actual Spawn、残存感染者、原因、連鎖起点を表示する。新規イベントはToast表示し、複数拠点Chainだけを集約する。Load直後に過去Toastを再表示しない。
 - 開発BuildだけはCoreが提供する読み取り専用診断を使い、Noise Center、正確なRadius、範囲Hex、反応したNormal Zombie、内部Noise Targetをオーバーレイで確認できる。Production Build、Save、Replay、Agent API、Browser Bridgeには含めず、表示がState、RNG、Action列へ影響してはならない。
 
@@ -253,8 +257,8 @@ UI / Phaser / Test Agent
 
 ### 5.7.4 読込・互換性・性能
 
-- v1.6.8の公開Artifactと、記録済みの旧性能を保ったv1.6.7公開Artifactの観戦に対応する。
-- v1.6.6以前のArtifactは観戦でも非対応とし、理由付きで拒否する。変換・移行しない。
+- v1.6.9の公開Artifactの観戦に対応する。v1.6.8以前は変換せず理由付きで非破壊拒否する。
+- v1.6.8以前のArtifactは観戦でも非対応とし、理由付きで拒否する。変換・移行しない。
 - 公開Artifact Packageを単一ZIPにまとめて出力する。AIプレイ終了後に取得でき、既存の途中記録exportも維持する。Manifest、固定Map、公開Decision / Event、必要な差分・Snapshot・Payload・lineageを自己完結させる。Private Stateや外部Sessionへの依存を含めない。
 - ZIPは端末内で読み込む。サーバーアップロード、GitHub Pages上の記録保存・配信基盤は追加しない。Pagesはゲーム本体を配信し、展開・再生はブラウザ側で行う。
 - 圧縮済み観戦ZIPの対応容量は50 MB（50,000,000 bytes）を暫定目標とする。強制的な上限ではなく、超過だけを理由に拒否しない。標準50ターン10 MB以下、圧縮1 GiB・展開4 GiBは必須要件にしない。
@@ -367,8 +371,8 @@ interface HeadlessGame {
 
 ## 6.5 Version境界
 
-- 現行の全Version値は18.15.16の一覧を正本とする。Appは1.6.8、Rules / State / Configは18.0.0、Mapは`fixed-51x51-v9`、Save Formatは25。
-- v1.6.6以前の通常SaveおよびAIデータは移行せず、現在状態・旧データを変更せずにVersion mismatchとして拒否する。Map IDとSave Formatを独立に検証し、必須metadataを旧値で補わない。
+- 現行の全Version値は18.15.16の一覧を正本とする。Appは1.6.9、Rules / State / Configは19.0.0、Mapは`fixed-51x51-v9`、Save Formatは26。
+- v1.6.8以前の通常SaveおよびAIデータは移行せず、現在状態・旧データを変更せずにVersion mismatchとして拒否する。Map IDとSave Formatを独立に検証し、必須metadataを旧値で補わない。
 - Build IDはCIではcommit SHA、ローカルではSHAとdirty状態またはlocal-unknown。乱数やゲーム結果には影響しない。Session / CheckpointはBuildを含む完全な境界を照合する。
 
 ## 6.6 Agent ObservationとAgentGame
@@ -450,6 +454,10 @@ interface AgentGame {
 ## 6.9. AI向け情報開示
 
 ### 6.9.1 共通原則
+
+- 支線のactive不在は状態から毎回criticalの`checkpoint_active_missing`として検出する。復旧時に解消し、現在revisionのbranches/checkpoints/construction照会先を持つ。
+- 未所有施設の`infectedPopulation`は`null`（UIは「不明」）。所有時だけ確定数値を公開する。駐留封じ込めと鎮圧完了、復旧・稼働時点を区別する。
+- 全Actionのpreviewと実行結果に共通型`ActionSummary`を追加する。予測と実績、revision、合法・受理・理由、移動到達、資源・人口・生産・建設・ターンの主要変化を返す（18.19.2）。
 
 - 公開Observationから導出できる情報を、判断する対象と同じ場所へまとめる。
 - Compactは反復判断に必要な小さな要約を持ち、施設別・Action別の詳細はQueryで取得する。
@@ -733,6 +741,7 @@ RoadSegmentの隣接Hex列を正本とし、無向辺・六方向接続を導出
 | Special Forces | 50 | 12 | 10 | 2 | 5 | 5 |
 | Field Artillery（収納／展開） | 25 | 7 / 40 | 10 / 0 | 1 / 10..200 | 5 | 5 |
 | Multipurpose Helicopter（着陸／航空） | 100 | 13 | 0 / 50 | 2 | 10 | 2 |
+| IFV | 200 | 16 | 10 | 5 | 5 | 4 |
 | 通常Zombie | 15 | 5 | 3 | 1 | 3 | — |
 | Horde Zombie | 40 | 5 | 3 | 1 | 3 | — |
 | Police Zombie | 10 | 5 | 3 | 1 | 5 | — |
@@ -743,7 +752,7 @@ RoadSegmentの隣接Hex列を正本とし、無向辺・六方向接続を導出
 | Screamer Zombie | 15 | 10 | 3 | 1 | 2 | — |
 | Pack Zombie | 50 | 15 | 10 | 1 | 3 | — |
 
-すべてConfig化する。HumanのRegular／Veteran AttackはRecruit Attackへ`ceil(recruitAttack × 1.25)`を適用する。Police8、Soldier15、Riot Police12、Recon12、Special Forces15、収納砲兵9／展開砲兵50、ヘリ17となる。Enemyの最大ChargeはHorde4、Pack5、その他1。Waveの通常Zombie抽選は確定RosterでHorde Zombieへ変換するためCharge4となり、それ以外の特殊Typeは元のChargeを維持する。
+すべてConfig化する。HumanのRegular／Veteran AttackはRecruit Attackへ`ceil(recruitAttack × 1.25)`を適用する。Police8、Soldier15、Riot Police12、Recon12、Special Forces15、収納砲兵9／展開砲兵50、ヘリ17、IFV20となる。Enemyの最大ChargeはHorde4、Pack5、その他1。Waveの通常Zombie抽選は確定RosterでHorde Zombieへ変換するためCharge4となり、それ以外の特殊Typeは元のChargeを維持する。
 
 Humanの携行上限と固定軍需消費は次のとおり。初期部隊は満載で開始し、国家備蓄を追加消費しない。
 
@@ -753,13 +762,14 @@ Humanの携行上限と固定軍需消費は次のとおり。初期部隊は満
 | Soldier / Recon / Special Forces | 44 | 40 | 0 |
 | Field Artillery | 100 | 100 | 0 |
 | Multipurpose Helicopter | 500 | 40 | 0 |
+| IFV | 100 | 120 | 0 |
 
 ## 8.2 熟練度とAttack Charge
 
 - Human Unitは`recruit / regular / veteran`の熟練度を持つ。初期Police／SoldierはRegular、新規完成UnitはConfigの`productionProficiencyByType`に従い標準Recruitとなる。
 - Recruitとして完成・配置されたPlayer Turnを0とし、以後5回のPlayer Turn Startを生存して迎えると、回復・補給・Action開始前にRegularへ昇格する。Recruit時代のKillは持ち越さない。
 - Regular昇格後、通常攻撃、Counterattack、Interceptionの直接Combat DamageでZombie Unitを5体撃破すると`veteranPromotionPending`になり、次Player Turn StartにVeteranへ昇格する。施設内感染者の鎮圧や二次効果はKill Creditへ含めない。
-- 通常Humanの最大Attack ChargeはRecruit／Regular1、Veteran2。Special Forcesは3／4、Field Artilleryは全熟練度1。通常Attack、Counterattack、Interception、自動鎮圧は対象UnitのChargeを共有する。5体目撃破のTurn中にChargeを追加しない。航空機の搭乗中Unitは行動できず、自動鎮圧にも参加しない。
+- 通常Humanの最大Attack ChargeはRecruit／Regular1、Veteran2。Special Forces／IFVは3／4、Field Artilleryは全熟練度1。通常Attack、Counterattack、Interception、自動鎮圧は対象UnitのChargeを共有する。5体目撃破のTurn中にChargeを追加しない。輸送機・IFVの搭乗中Unitは行動できず、自動鎮圧にも参加しない。
 - Player Turn Startに生存Human UnitのChargeを熟練度上限へ補充する。Waitは残Chargeを保持し、移動後にChargeが残ればAttack可能、1回Attack後は移動不能だがVeteranは残Chargeで再Attackできる。
 
 ## 8.3 行動
@@ -771,39 +781,40 @@ Humanの携行上限と固定軍需消費は次のとおり。初期部隊は満
 
 ## 8.4 移動Fuel
 
-- 地上の通常MPはPolice15、Soldier／Riot Police／Recon／Special Forces／収納砲兵10。進入Terrain Costの累積で経路合法性を判定する。
+- 地上の通常MPはPolice15、Soldier／Riot Police／Recon／Special Forces／収納砲兵／IFV10。進入Terrain Costの累積で経路合法性を判定する。
 - 歩兵Fuelは実際に進入したHex数dを使う。d=0は0。Police／Riot Police／Special Forcesは`2 × (d <= 5 ? 1 : 1 + d - 5)`、Soldier／Reconは`2 × (d <= 5 ? 1 : 1 + 2 × (d - 5))`。
 - 収納砲兵は実消費MP×10 Fuel。展開中は移動不可。ヘリは着陸中に地上移動できず、航空中は1 Hex=1 MP、最大50 MP、1 MPあたりFuel5。航空移動中のFuel枯渇は18.15.10の緊急着陸へ接続する。
-- 地上Move開始時に予定経路のFuelを保有しないActionは拒否する。Hidden Enemyで途中停止した場合は実移動分から再計算する。
+- IFVは進入1HexごとにFuel10を消費し、残1〜9でも全残量で1Hex進み停止する。Fuel0からの緊急移動はない。
+- IFV以外の地上Move開始時に予定経路のFuelを保有しないActionは拒否する。Hidden Enemyで途中停止した場合は実移動分から再計算する。
 - Attack、Wait、Counterattack、Interception、自動鎮圧はFuelを消費しない。死亡Unitの残Fuelは国家備蓄へ戻さない。航空中ヘリのEndTurn固定Fuel消費は1。
-- Fuel0の地上歩兵だけはEmergency Movementを利用でき、Police3 MP、Soldier／Riot Police／Recon／Special Forces2 MP。収納砲兵は1 MP。Fuel消費なしで通常の地形Costを累積し、Fuelが1以上ならEmergency候補を出さない。ヘリにこの地上Emergency Movementは適用しない。
+- Fuel0の地上歩兵だけはEmergency Movementを利用でき、Police3 MP、Soldier／Riot Police／Recon／Special Forces2 MP。収納砲兵は1 MP。Fuel消費なしで通常の地形Costを累積し、Fuelが1以上ならEmergency候補を出さない。ヘリ・IFVにこの地上Emergency Movementは適用しない。
 
 ## 8.5 戦闘・迎撃
 
 - 攻撃側が先にAttack分のダメージを与える。
 - 生存した防御側が、射程内かつAttack Chargeありの場合だけ反撃する。
 - 通常攻撃、反撃、迎撃は実行UnitのAttack Chargeを1消費する。
-- 移動経路で初めて敵射程へ入った地点で迎撃し、その地点で移動を終了する。
+- IFV以外は移動経路で初めて敵射程へ入った地点で迎撃し、その地点で移動を終了する。IFVの移動中は通常迎撃・迎撃中断を受けず、18.19の轢殺規則を使う。
 - 生存していれば攻撃または待機できる。
 - HPを0未満にせず、死亡ユニットを盤面と合法手から除外する。
 - 防御側HexのTerrain防御を攻撃、反撃、迎撃へ適用し、軽減前後Damageと防御源をEvent／Metricsへ残す。
-- Humanの通常攻撃・反撃・迎撃は直前に距離別の携行Military Goodsを確認・消費する。Police／Riot Police／Soldier／Special Forcesの距離1は2、収納砲兵の距離1は4。不足時は残量を消費して`max(1, ceil(attack × 0.2))`へ弱体化する。Soldier／Special Forcesの距離2は4、Reconは全距離1..6で6、展開砲兵は距離10..200へ50、ヘリは距離0..1で2・距離2で4を全量必要とし、不足時の弱体攻撃はない。着陸ヘリは能動Attack不可だが反撃・迎撃可能。死亡Unitの残軍需は国家備蓄へ戻さない。砲撃・航空対象の詳細は18.14／18.15に従う。
+- Humanの通常攻撃・反撃・迎撃は直前に距離別の携行Military Goodsを確認・消費する。Police／Riot Police／Soldier／Special Forcesの距離1は2、収納砲兵の距離1は4。不足時は残量を消費して`max(1, ceil(attack × 0.2))`へ弱体化する。Soldier／Special Forcesの距離2は4、Reconは全距離1..6で6、展開砲兵は距離10..200へ50、ヘリは距離0..1で2・距離2で4を全量必要とし、不足時の弱体攻撃はない。IFVは距離0〜5の射撃・反撃・迎撃が各20全量必須で対空可能。着陸ヘリは能動Attack不可だが反撃・迎撃可能。死亡Unitの残軍需は国家備蓄へ戻さない。砲撃・航空対象の詳細は18.14／18.15に従う。
 
 ## 8.6 自然回復
 
-Human Unitは次Player Turn Start、補給圏内で生存し回復資格を持つ場合に1回だけ自然回復する。通常攻撃・反撃・迎撃・自動鎮圧を行った場合は最大HPの5%、移動のみ・待機・移動後待機・未行動なら10%、補給圏外は0%。航空中ヘリと搭乗中Unitは回復しない。各Unit個別に切り上げ、HP上限を超えない。移動だけでは休養回復を妨げず、判定時点の補給・状態を使う。Zombieは回復しない。
+Human Unitは次Player Turn Start、補給圏内で生存し回復資格を持つ場合に1回だけ自然回復する。通常攻撃・反撃・迎撃・自動鎮圧・IFVの轢殺を行った場合は最大HPの5%、移動のみ・待機・移動後待機・未行動なら10%、補給圏外は0%。航空中ヘリと搭乗中Unitは回復しない。各Unit個別に切り上げ、HP上限を超えない。移動だけでは休養回復を妨げず、判定時点の補給・状態を使う。Zombieは回復しない。
 
 ## 8.7 追加編成
 
-- Police／Riot Policeは州都・地方都市、Soldierは州都・Army Base・Air Base、Recon／Field ArtilleryはArmy Base、Multipurpose HelicopterはAir Baseで予約できる。Special Forcesは確保報酬専用で生産できない。拠点は安全で操作可能でなければならない。
+- Police／Riot Policeは州都・地方都市、Soldierは州都・Army Base・Air Base、Recon／Field Artillery／IFVはArmy Base、Multipurpose HelicopterはAir Baseで予約できる。Special Forcesは確保報酬専用で生産できない。拠点は安全で操作可能でなければならない。
 - 編成拠点は予約時に補給圏内でなければならない。予約後の補給切断だけでは取り消さない。基地の給電・感染・稼働条件と配置先が未充足なら支払い済み予約を保持して待つ。
 - 条件が揃えば次の自ターン開始時に完成し、そのターンからType・状態に応じた行動が可能となる。
 - 完成拠点が埋まっていれば最寄り空きヘックスへ置き、同距離はSeed付き乱数で決める。
 - 人口はターン開始時の供給順位で都市から徴用する。
 - 最後の健全民間人口を使う編成は拒否する。
-- 編成コストはPoliceが人口5・民需品10・軍需品10、Soldierが人口10・民需品20・軍需品25、Riot Policeが人口10・民需品25・軍需品25、Reconが人口5・民需品20・軍需品25。砲兵は人口5・民需品100・軍需品200・Fuel100、ヘリは人口2・民需品100・軍需品140・Fuel500。砲兵の生涯上限2、ヘリの生涯上限1は予約を含む。
+- 編成コストはPoliceが人口5・民需品10・軍需品10、Soldierが人口10・民需品20・軍需品25、Riot Policeが人口10・民需品25・軍需品25、Reconが人口5・民需品20・軍需品25。砲兵は人口5・民需品100・軍需品200・Fuel100、ヘリは人口2・民需品100・軍需品140・Fuel500。IFVは人口4・食料80・民需品50・軍需品170・Fuel150。砲兵の生涯上限2、ヘリ・IFVの生涯上限1は予約を含み、破壊・没収でも枠は戻らない。
 - 通常歩兵の完成Unitは`currentFuel = 0`で生成し、直後にState Fuelから同時完成UnitのID昇順1 Fuel単位Round Robinで有償補給する。不足時は部分補給とし、そのPlayer Turnから保有Fuelで支払えるMoveを実行できる。
-- 砲兵・ヘリは予約時にFuelを支払い、完成時に最大Fuelで生成する。砲兵は収納、ヘリは着陸状態。基地予約の給電待ち・陥落没収は18.14／18.15に従う。
+- 砲兵・ヘリ・IFVは予約時にFuelを支払い、完成時に最大Fuelで生成する。砲兵は収納、ヘリは着陸状態。基地予約の給電待ち・陥落没収は18.14／18.15に従う。
 - 完成UnitはConfig指定熟練度（標準Recruit）で、編成Cost以外に国家備蓄を消費せず、`currentMilitaryGoods = maxMilitaryGoods`の満載で生成する。
 
 ## 8.8 全Zombieの足止め・隣接攻撃
@@ -1745,9 +1756,9 @@ ZOMBIE TURN / INFECTION
 - 各Decisionは前Decision hashを含むcanonical JSONのSHA-256でchain化する。参照先Payload、Snapshot、commit、Version、Build ID、Map、公開Configの不一致・破損を状態不変で拒否し、Active破損時に暗黙の巻き戻しをしない。大きなTrace、Snapshot、Artifactはstreamと上限付き作業バッファで処理し、全履歴を単一文字列化または一括JSON化しない。
 - `corruptionRejections`は保存済みSession／Payload／Artifactの構造・整合性破損だけを数える。通常の`invalid_query`、`invalid_cursor`、`invalid_page_size`、不正Action入力等は破損として加算しない。
 - 更新は新しいimmutable generationへPrivate／Public StateとDecisionを書き、最後にActive commitを確定する。Session単位の排他lockを使い、同時更新は状態不変で拒否し、同一hostで終了済みPIDのlockだけをstaleとして回収する。
-- 既定で5完了Turnごと、手動要求時、Game Over時にCheckpointを作る。Checkpoint／Session Schemaは`18.0.0`で、immutableな`branchBase`を必須とする。Rootはnull、子は`rootSessionId`、`parentSessionId`、`parentCheckpointId`、`baseDecision`、`baseTraceHeadHash`、`basePublicSnapshotHash`、`ancestorManifestHash`を持つ。`load-checkpoint`は新Session IDへ分岐し、親Sessionと親Checkpointを変更しない。
+- 既定で5完了Turnごと、手動要求時、Game Over時にCheckpointを作る。Checkpoint／Session Schemaは`19.0.0`で、immutableな`branchBase`を必須とする。Rootはnull、子は`rootSessionId`、`parentSessionId`、`parentCheckpointId`、`baseDecision`、`baseTraceHeadHash`、`basePublicSnapshotHash`、`ancestorManifestHash`を持つ。`load-checkpoint`は新Session IDへ分岐し、親Sessionと親Checkpointを変更しない。
 - RootのDecision chainはDecision 0／ZERO_HASHから始め、子のlocal chainは`baseDecision + 1`と`baseTraceHeadHash`から始める。RootのStore Manifestは共有Payload Poolと祖先履歴範囲を定義し、子へ祖先の展開済みObservation／Decision全文を複製しない。完全Artifactは分岐点までの祖先履歴と子の履歴を必要なPayload各1回で梱包する。
-- `.git`を含まないPortable PackageでもWorkflowから注入したfull commit SHAをBuild IDとGit Commitとして固定し、別Buildまたはv1.6.6以前のSession／Checkpointを拒否する。Portable PackageはLinux／Windows x64のBundled Nodeだけで全11コマンドとJSONL `play-turn`内PreviewのSmokeを行い、公開Observation／Legal Actionsだけを使う外部AI Seed 1／7 Game Over・Artifact・Replay一致を確認する。
+- `.git`を含まないPortable PackageでもWorkflowから注入したfull commit SHAをBuild IDとGit Commitとして固定し、別Buildまたはv1.6.8以前のSession／Checkpointを拒否する。Portable PackageはLinux／Windows x64のBundled Nodeだけで全11コマンドとJSONL `play-turn`内PreviewのSmokeを行い、公開Observation／Legal Actionsだけを使う外部AI Seed 1／7 Game Over・Artifact・Replay一致を確認する。
 
 ---
 
@@ -1783,8 +1794,8 @@ Linux/Windows x64のPlayer ZIPにはBundled Node、bundle化Session CLI、launch
 - 同内容をJSONファイルで入出力できる。
 - Version不一致、破損、不正Config、不変条件違反を検出し、現在状態へ適用しない。
 - ロード後は保存時Configを使う。
-- v1.6.8はGame Rules / GameState / Config `18.0.0`、Fixed Map `fixed-51x51-v9`、Save Format `25`を使う。その他のVersionは18.15.16に従う。
-- v1.6.7以前の自動保存、セーブコード、JSON Save、実行Replay、Session、Checkpointは変換・移行しない。Version不一致は現在Stateを変えず日英の理由付きで拒否する。旧autosave keyは読み取り確認だけを行い上書き・削除せず、新規ゲームは`nowhere-left-to-hide:auto-save:v25`を使う。v1.6.7公開Artifact ZIPの観戦だけは旧記録のまま対応する。
+- v1.6.9はGame Rules / GameState / Config `19.0.0`、Fixed Map `fixed-51x51-v9`、Save Format `26`を使う。その他のVersionは18.15.16に従う。
+- v1.6.8以前の自動保存、セーブコード、JSON Save、実行Replay、Session、Checkpointは変換・移行しない。Version不一致は現在Stateを変えず日英の理由付きで拒否する。旧autosave keyは読み取り確認だけを行い上書き・削除せず、新規ゲームは`nowhere-left-to-hide:auto-save:v26`を使う。v1.6.8以前の公開Artifact ZIPも非破壊拒否する。
 - Save24は6.1の全Stateを検証する。28恒久施設、湾・橋、Survivor、Refinery Allowance、報酬台帳、人口衛生・飢餓・感染猶予、Objective／Pack Pending、基地軍需・予約・生涯生産数、砲兵モード、航空状態・搭乗関係・軍用ドローン、Checkpoint、Wave Roster／Pending、Noise、RNG、Event、Statisticsを保持する。Forecast／Crisis／Supply／Visibility／Preview等の導出値は再計算する。新metadataを旧値で黙って補わない。
 - Artifact Schema `21.0.0`は固定Map情報をゲーム単位で1回だけ保存し、Turn Observation Traceでは`mapId`から参照する。Public Decision Log、受理Action列、不正試行、公開Observation／Event、Metrics、Seed、公開Config、Version、Build ID、Session lineageを欠落させず、保存用lossless diffから各Decisionの前後情報を完全に読み出せるようにする。Artifactはstreamでファイル／Packageへ書き、標準出力には小さなManifestだけを返す。Player-facing Artifact／ReplayはWaveの公開人数とPending、公開Scream／Survivor救出／Checkpoint Risk等を保持するが、Rejected Counter、未確保Survivor正値、拒絶人数の由来、正確なBonus Type内訳、Hidden Noise情報を残さない。
 - Player-facing ReplayにはFoWを適用し、Browser BridgeのArtifactへ内部情報を含めない。Browser Bridge ArtifactのConfigは公開情報だけを含む。ローカル／CI Runnerの完全な検証Artifactだけが`verificationEvents`、完全Config、Internal Event列を保持し、Replay時に一致確認する。Live Observation、`query`のFull Snapshot、Browser Bridgeは完全な公開情報へ明示的にアクセスでき、公開情報を参照差分だけに制限しない。
@@ -1881,7 +1892,7 @@ Session Metricsはゲーム成績と分離し、Active Session復帰、手動／
 - Combat Noiseによる陥落拠点のID安定順再Spawn、未生成感染者保持、後続Pulse再試行、即時感染／連鎖、Hidden Spawn個体情報の非公開、最新50件の重要イベント履歴とToast集約を試験する。
 - Production UI／Agent／公開Event／ArtifactがNoiseの公開Classと公開契約で許可した静的情報だけを使い、反応Hidden EnemyのID・数・Targetを漏らさないこと。診断用の内部Pulse情報はDevelopmentだけで確認できること。
 - Scheduled Waveの規模・Timing・22 Hex Direction Zone、roster freeze、oldest-first Pending、batch分散、Spawn次Turn行動、特殊Type provenance、Turn 50後の継続、Final Pending 0かつMap上Final所属Zombie 0のVictory、非Final Zombie／感染の非ゲート化、Defeat優先、Runner 100 Turn到達の`limit_reached`分類
-- 勝利・即時敗北、v1.6.8 Save Format 25の保存・復元、v1.6.7以前の通常Saveおよび実行Replay／Session／Checkpointの状態不変な拒否、v1.6.7公開Artifactの観戦
+- 勝利・即時敗北、v1.6.9 Save Format 26の保存・復元、v1.6.8以前の通常Saveおよび実行Replay／Session／Checkpointの状態不変な拒否、v1.6.8以前の公開Artifactの非破壊拒否
 - UI数値入力とスライダー同期
 - 51×51固定Map `fixed-51x51-v9`、Reserve392 Hex、方向別22 Hex Zone、固定24施設＋Oil Field・Army Base・原発・Air Base各1基、固定湾候補・橋、選択Oil Field spur、初期Human7隊、Zombie40＋Hunter4＋Gas4＋Screamer2の決定配置・非重複・Capital距離・両基地への実LOS除外、Terrain生成順、4支線距離25を試験する。
 - Police Movement Budget 15／Soldier・Riot Police・Recon 10、Police／Riot Fuel 24・Soldier／Recon 44、通常移動Fuel 2倍、Fuel不足拒否、Hidden Enemy途中停止、発電後Round Robin補給、新Unit有償補給、死亡時Fuel喪失
@@ -1894,7 +1905,7 @@ Session Metricsはゲーム成績と分離し、Active Session復帰、手動／
 - 一般施設とCheckpointの複合状態、現在停止と停止予測、Scheduled／Final Horde Marker、Road接続方向、施設・Unit Offset
 - 全Asset成功と個別Missing／Decode／Texture登録失敗のFallback、成功Assetの維持、Loading完了、Fallback中の操作継続とState／RNG不変
 - Fog外の既知情報暗転とEnemy非表示、Layer順、Zoom`0.75`境界と最小`0.35`のLOD、全16 Unit TypeのAsset／Legend／Fallback、Army Baseの表示、日英Board Legend、現在／標準Config、電力HUD
-- v1.6.8の同一Config、Map、Seed、Action列について熟練度／Charge、Riot、Hunter、Gas、Army Base、特殊Wave、Frozen Roster／Pending Spawn、fallback履歴、Wind Noise、Housing、pending Noise、感染／Reanimation（Hunter／Gasなし）、Checkpoint、Result、主要MetricsのReplay一致を確認する。
+- v1.6.9の同一Config、Map、Seed、Action列について熟練度／Charge、Riot、Hunter、Gas、Army Base、特殊Wave、Frozen Roster／Pending Spawn、fallback履歴、Wind Noise、Housing、pending Noise、感染／Reanimation（Hunter／Gasなし）、Checkpoint、Result、主要MetricsのReplay一致を確認する。
 - Queue健常3PoolのFood／Civilian Goods維持費・不足順、全Build 25のCheckpoint費用と初期配置4基の無償初期化、Relocate 25、Turn Awayのwaiting限定・Action消費、deny／Turn Away CounterとNormal／Strictの拒否0、`ceil(total / 5)`、参加Directionだけのreset、Final後のCounter非加算を試験する。
 - Production UI、Agent、Bridge、公開Event、Player-facing Artifact／Replay／終了結果が基礎人数、Bonus込み確定人数、出現済み人数、Pending人数を公開しつつ、Rejected Counter生値、拒絶人数の由来、正確なType内訳、Rejected詳細Metricsを漏らさないことを試験する。
 - Police／Soldier／Riot／Hunter／Gas／Screamer Zombieの性能、Normal AI、Wave／非Wave provenance、Human Unit死亡からの生成、Screamの一度限り・公開境界、Gas爆発FIFO連鎖、同Phase行動禁止、即時感染、Victory対象を試験する。
@@ -1968,7 +1979,7 @@ Human通常1/2、Special Forces3/4、Field Artillery1、Horde4、Pack5、その�
 - Legal Actionsがすべて受理され、一覧外ActionでStateとRNGが変わらず、AgentStepResultにGameStateを含まないことを試験する。
 - BalancedのCrisis、残Charge、Veteran価値、Riot Police鎮圧／Blockade、Gas危険、Army Base確保／予約／迎撃、施設接触拒否、実効射程と携行軍需、回復、Emergency Movement、負傷部隊後退、経済、感染、混成Horde、Checkpoint、EndTurnの固定Scenarioを意図ベースで試験する。
 - Balancedが`checkpoint_supply_zombie_blocked`でもCheckpoint Goalを放棄せず、Non-urgent Forest Hordeへの非致死Attackを抑え、Urbanから不要に離れず、Plainへ誘えるWaitを残し、公開Noise ClassとUnit Vision内のVisible Normal AI系ZombieだけでNoise Riskを評価し、即時Capital ThreatではTerrain／Noise Penaltyより防衛を優先することを試験する。
-- v1.6.8はルール・公開入出力・Save契約を更新するため旧Versionとの結果一致を合否にしない。同一v1.6.8 Config、Map、Seed、Action列のRandom／BalancedでTechnical Failure／Replay／Session不一致を0とする。100 Turn到達は`limit_reached`として記録し、ゲーム内敗北およびTechnical Failureと別集計する。
+- v1.6.9はルール・公開入出力・Save契約を更新するため旧Versionとの結果一致を合否にしない。同一v1.6.9 Config、Map、Seed、Action列のRandom／BalancedでTechnical Failure／Replay／Session不一致を0とする。100 Turn到達は`limit_reached`として記録し、ゲーム内敗北およびTechnical Failureと別集計する。
 - Random／Balancedの同一Seed比較、決定性、JSON／CSV／通常モードのゲーム単位Artifact、`--summary-only`のコンパクト出力、失敗継続、fail-fast、Replay一致を試験する。
 - Production Buildに`window.NLTH`とAPI説明が含まれ、公開メソッド限定、通常UI／保存分離、入力拒否時の状態保持をSmoke Testする。
 - 公開Pagesでは公開Observation／Legal Actionsだけを読むブラウザ操作可能な外部Agentを使い、API発見、不正Action訂正、Seed 1と7のGame Over、Result／Artifact取得とReplayを手動E2E確認する。PagesのWorkflow成功を必須とし、個別ゲームの勝利は合格条件にしない。
@@ -1978,18 +1989,18 @@ Human通常1/2、Special Forces3/4、Field Artillery1、Horde4、Pack5、その�
 
 # 18. PoC完成条件と検証記録
 
-1. PC・390×844相当のスマートフォン縦画面で盤面、主要Action、Bottom Sheet、航空／地上選択、内政、11カテゴリHelpとBoard Legendを利用できる。
+1. PC・390×844相当のスマートフォン縦画面で盤面、主要Action、Bottom Sheet、航空／地上選択、内政、12カテゴリHelpとBoard Legendを利用できる。
 2. 全16 Unit Typeの能力・熟練度・Charge、砲兵モード・砲撃、航空移動・離着陸・輸送・緊急着陸・軍用ドローンがCore／UI／Agent／Save／Replayで一致する。
 3. `fixed-51x51-v9`の51×51 Map、28恒久施設、湾・橋、Reserve・Spawn Zone、確保報酬とTurn10 Objectiveが決定的に機能する。
 4. Turn10／20／35／50／70の現行Wave、通常抽選のHorde変換、Final別枠Pack、Rejected Bonus、Pending、Final勝利・敗北優先が一致する。
 5. 局所過密費、飢餓累積・比例死亡、衛生ストレス・感染猶予、現行審査方針、基地・原発を含む電力と補給のForecastが実処理と一致する。
 6. 公開Query／Preview／Batch Preview・Crisis・Context Handoffが純粋で、FoW・内部乱数・Hidden情報の境界を守る。
-7. 18.15.16のVersion一覧に従いSave25／autosave v25、Artifact22、Session／Checkpoint19を復元し、v1.6.7以前のゲーム継続データを非破壊で拒否する。v1.6.7公開Artifactは観戦専用で旧性能を保持する。
+7. 18.15.16のVersion一覧に従いSave26／autosave v26、Artifact23、Session／Checkpoint20を復元し、v1.6.8以前のゲーム継続データを非破壊で拒否する。v1.6.8以前の公開Artifactも非破壊で拒否する。
 8. Portable全11コマンド、9 WebMCP Tool、Live Viewer、公開ZIP観戦、Session再開・分岐、同Version Replayが機能する。
 9. Water・橋、16 Unit Type、16 Facility TypeとCheckpointの256×256透過PNG、個別Fallback、LOD、UI専用Registryを検証し、Runtime PNG合計3 MiB以下を守る。
 10. 変更範囲に必要な第17章・各詳細節のテストを実施し、未実行・失敗・保留と成功を区別する。GitHub Actions／Pages／Portableの成功は実結果確認後だけ記録する。ユーザー指定で長時間Workflowの確認を起動までに留めた場合は、完了結果未確認とする。
 
-以下の18.1〜18.12は、各見出しの版・日付における実装／検証履歴を原文のまま保持する。旧Versionや旧数値は現行ルールの根拠ではなく、過去の合格結果もv1.6.8の合格を意味しない。現行の詳細規則は18.13〜18.18、現行版の検証状況は18.18.6を参照する。
+以下の18.1〜18.12は、各見出しの版・日付における実装／検証履歴を原文のまま保持する。旧Versionや旧数値は現行ルールの根拠ではなく、過去の合格結果もv1.6.9の合格を意味しない。現行の詳細規則は18.13〜18.19、現行版の検証状況は18.19.8を参照する。
 
 ---
 
@@ -2162,7 +2173,7 @@ Human通常1/2、Special Forces3/4、Field Artillery1、Horde4、Pack5、その�
 
 ### 18.13.1 実装境界
 
-GameAction → GameEngineと公開Projectionの境界を維持する。共通Unit catalogはHuman7種・Enemy9種の16種。Versionと旧データ非破壊拒否は18.15.16に従う。
+GameAction → GameEngineと公開Projectionの境界を維持する。共通Unit catalogはHuman8種・Enemy9種の17種。Versionと旧データ非破壊拒否は18.15.16に従う。
 
 ### 18.13.2 Context Handoffの具体的上限
 
@@ -2594,7 +2605,7 @@ CompactではCapital、衛生ストレス・食料蓄積、次EndTurn不足/飢�
 - 間接感染の猶予人数・感染拡大可能Turn。infected合計と二重計上しない。
 - 新しい確率・不足・警告・Handoff Query targetとpayload。
 
-Version値は18.15.16へ一本化する。v1.6.6以前のSave／Replay／Session／Checkpoint／Artifactは互換変換せず、理由付きで非破壊拒否する。Human最大2・非Horde最大1という旧不変条件は使わず、Typeと熟練度ごとのChargeを検証する。
+Version値は18.15.16へ一本化する。v1.6.8以前のSave／Replay／Session／Checkpoint／Artifactは互換変換せず、理由付きで非破壊拒否する。Human最大2・非Horde最大1という旧不変条件は使わず、Typeと熟練度ごとのChargeを検証する。
 
 ### 18.13.15 決定性・公開情報・人口保存
 
@@ -2820,7 +2831,7 @@ Packedは既存の攻撃騒音として発射元半径6。Deployedは1回の砲�
 
 ### 18.14.11 Versionと互換性
 
-現行のVersion値は18.15.16に従う。砲兵Mode、Action、独立RNG、生産累計を含む新Schemaでpayloadを検証する。v1.6.7以前のSave／Session／Checkpointによる継続は理由付きで拒否する。v1.6.7の公開Artifact ZIPは観戦専用で旧性能と記録結果を保って表示する。自動保存はv25領域を使い、旧領域・現在状態を変更しない。
+現行のVersion値は18.15.16に従う。砲兵Mode、Action、独立RNG、生産累計を含む新Schemaでpayloadを検証する。v1.6.8以前のSave／Session／Checkpoint／公開Artifactは理由付きで非破壊拒否する。自動保存はv26領域を使い、旧領域・現在状態を変更しない。
 
 ### 18.14.12 アセット・公開表示の実装
 
@@ -3221,29 +3232,29 @@ Map生成、Wave抽選、緊急着陸選択、既存Zombie AI tie-break等のGam
 
 内部ReplayはObjective、Drone発進/失効、離着陸、移動/燃料、緊急着陸、搭乗/降機、燃料移送、Cargo死亡/再アニメーションpending、終了時騒音を再現する。公開Artifact/Event/Viewerは既存の秘匿Projectionを通し、Hiddenの反応・死亡・出現待ち先を漏らさない。
 
-APP_VERSIONは1.6.8。Rules／Map／Save／Action／Agent／Observation／Bridge／Artifact／Checkpoint／Session等の現行Versionと外枠維持の理由は18.15.16に示す。
+APP_VERSIONは1.6.9。Rules／Map／Save／Action／Agent／Observation／Bridge／Artifact／Checkpoint／Session等の現行Versionと外枠維持の理由は18.15.16に示す。
 
-v1.6.7以前のSave / Session / Checkpointは互換変換せず、新規v1.6.8ゲームを案内する。v1.6.7公開Artifact ZIPは観戦専用で受け入れ、未記録の経路は生成しない。旧データは削除・上書きしない。`nationalGuard`の内部ID維持とは別の互換方針である。
+v1.6.8以前のSave / Session / Checkpoint / 公開Artifactは互換変換せず、新規v1.6.9ゲームを案内する。旧データは削除・上書きしない。`nationalGuard`の内部ID維持とは別の互換方針である。
 
 
 ### 18.15.16 確定Version・公開応答・描画
 
-| 項目 | v1.6.8 |
+| 項目 | v1.6.9 |
 | --- | --- |
-| App / Release | 1.6.8 |
-| Rules / State / Config | 18.0.0 |
+| App / Release | 1.6.9 |
+| Rules / State / Config | 19.0.0 |
 | Fixed Map | fixed-51x51-v9 |
-| Save Format | 25 |
-| Agent / Observation / Browser Bridge | 23.0.0 |
-| Artifact | 22.0.0 |
-| Checkpoint / Session | 19.0.0 |
-| Action Schema | 3.0.0 |
-| Query / AiSession | 1.2.0 / 1.4.0 |
-| Balanced / Random | 14.0.0 / 9.0.0 |
-| Play-turn | 1.3.0（read-only status入力を追加） |
-| Session Store / Artifact Package | 1.0.0 / 2.0.0（従来外枠を維持、内包Schemaで互換性を検査） |
+| Save Format | 26 |
+| Agent / Observation / Browser Bridge | 24.0.0 |
+| Artifact | 23.0.0 |
+| Checkpoint / Session | 20.0.0 |
+| Action Schema / Action Summary | 4.0.0 / 1.0.0 |
+| Query / AiSession | 1.2.0 / 1.5.0 |
+| Balanced / Random | 15.0.0 / 10.0.0 |
+| Play-turn | 1.3.0 |
+| Session Store / Artifact Package | 1.0.0 / 2.0.0（外枠維持、内包Schemaで互換性を検査） |
 
-外枠を維持するProtocolも内包する新Action/State Schemaで互換性を検査する。旧データは互換変換しない。自動保存はv25領域を使用し、v24以前の領域を削除・上書きしない。
+外枠を維持するProtocolも新Action/State/公開Schemaを検証する。v1.6.8以前のSave・Session・Checkpoint・公開Artifactは変換せず非破壊拒否。自動保存はv26領域を使い、v25以前を削除・上書きしない。
 
 Batch Previewは1～100件。CLI `preview-batch --session=ID --revision=N --input=actions.json` はAction配列、WebMCP `nlth_preview_actions` / AiSession `previewActions` は `generation` / `baseRevision` / `actions` を受ける。全件独立評価で、要求全体のRevisionが異なれば競合拒否。WebMCPは合計9ツール。
 
@@ -3380,7 +3391,7 @@ Version一覧は18.15.16、実行範囲・失敗からの再検証・受入要�
 
 CoreはEndTurnを同期的・決定的に解決し、可視の実移動・HP・壁・施設・検問所・可視範囲の差分をzombie_presentationイベントへ記録する。Coreに表示待ちやタイマーを入れない。初期公開状態と差分列を保存し、隠れた個体の経路・内部目標・待ち時間を追加しない。視界に入った地点で出現し、離れた地点で消える。通常・公開リプレイ・AIリアルタイム（内蔵AIを含む）は同じ差分適用と表示時計を使う。標準速度は公開された1個体あたり計350msまで。ガス連鎖、死亡・ゾンビ化、壁損傷と施設変化を記録順に描画する。
 
-通常プレイ中はゲーム入力をロックし、常時操作できるスキップは現在の演出だけを終了して確定盤面へ移る。連打・中止・シーク・終了は古いコールバックを無効にする。リプレイは0.5/1/2/4倍を持つ。v1.6.7公開ZIPは記録済みの旧HP等を維持し、経路がないため前後盤面の切替を使う。100体規模の量・メモリ・スキップ測定は検証記録に示す。
+通常プレイ中はゲーム入力をロックし、常時操作できるスキップは現在の演出だけを終了して確定盤面へ移る。連打・中止・シーク・終了は古いコールバックを無効にする。リプレイは0.5/1/2/4倍を持つ。v1.6.8以前の公開ZIPは現在の版境界で非破壊拒否する。100体規模の量・メモリ・スキップ測定は検証記録に示す。
 
 ### 18.18.4 日本語と個別調整
 
@@ -3397,3 +3408,379 @@ CoreはEndTurnを同期的・決定的に解決し、可視の実移動・HP・�
 ### 18.18.6 検証範囲
 
 実行範囲・性能・標準Seed1/5/7比較・外部LLMの公開APIプレイ・画面確認は[validation/v168-acceptance.md](../validation/v168-acceptance.md)を参照する。GitHub workflowは依頼どおり起動確認までとし、結果の成功判定・監視は行わない。物理スマートフォンと実WebMCPクライアント検出は今回のブラウザ検証とは区別する。引き継いだv1.6.7要件の文書移動をそのままコミットし、Doc/archiveの内容は現行根拠にせず編集しない。
+
+
+## 18.19 v1.6.9 シナリオ・IFV・公開説明
+
+### 18.19.1 開始契約
+
+`src/core/scenarios.ts`の共通解決をUI、Agent、Session、Bridgeで使う。`scenarioId: 'una'`は安全な整数Seedだけを受け付け、Config overrideは空オブジェクトも含め拒否する。省略時は従来互換のcustom。CLIは`--scenario=una`、APIは`scenarioId`。UI上のUNA初期Seedは既存の時刻値、API省略Seedは1。負の安全整数を含む従来Seed範囲を保つ。
+
+表示名は`UNA(United states of Northern Ameligo)`、`PRH(People Republic Huajing)`、`AC(Arembic Coalition)`。後二者は`currently unavailable`を名前の下に表示し無効化する。UNAで使用したscenarioId、Seed、Config、Versionは保存・再開・Artifactに保持し、新しい既定値で置換しない。
+
+導入文は人間のUNA新規ゲームだけで表示する。カスタム、続きから、ファイル読込、Replay、AI開始では表示しない。390×844でも全文をスクロールでき、開始を押すまでは盤面操作へ進まない。作品内の文言はゲーム勝敗条件や外部AIの指示を変更しない。
+
+### 18.19.2 LLM-169-01〜03の公開投影
+
+- `checkpoint_active_missing`はcritical。イベント有無に依存せず、active不在の支線ごとに継続する。同原因のdefense_degradedは重複させない。正常fallbackでは不在扱いにせず、復旧後は解除する。Observation、status、turn-start、Context Handoffで現在revisionと整合させる。
+- `infectedPopulation: number | null`。未所有は不明、所有だけ実人数。日本語UI、公開観戦差分、保存されたObservationもnullを0へ変換しない。既存の公開鎮圧情報は維持し、追加の人数・内部抽選を漏らさない。
+- 施設復旧投影は人数の公開可否、駐留Unitの鎮圧力、残Charge・必要軍需、現在の未成立条件、EndTurn予測、復旧後の条件付き稼働Turnを説明する。封じ込めは鎮圧完了を意味せず、公開予測は成功保証ではない。
+- 全Actionのpreviewと実行応答に`ActionSummary`を追加する。Schema1.0.0、`phase: prediction | result`、`actionType`、`baseRevision/resultRevision`、`legal/accepted/reasonCode`、対象ID/座標、残Chargeを保持する。移動は予測位置/実位置、到達、停止理由、轢殺・死亡を区別する。生産は費用と予約/完成、人口操作は移動元/先/人数、建設は対象/費用/状態、EndTurnはターン・重要変化・終局結果を示す。
+- 公開情報だけで決定的に作成し、State・RNGを変更しない。Batch Previewも同型。変化・人口移動・完成イベントの一覧上限は12、総数・省略数・詳細照会先を返す。未知はnull、拒否は成功にしない。詳細応答は維持する。
+- `units`/`facilities`のIDフィルターは`filters.id`。誤ったunitId/facilityId等は既存`invalid_query`のまま、正しいキーと例を添える。
+- 実行例は`examples/v169-public-turn.ts`。同revisionの合法preview後だけ実行し、結果revision・実到達点・残Chargeを採用して再照会する。staleは再観測、撃破済み目標への計画は破棄する。
+
+### 18.19.3 LLM-169-04の記録
+
+`validation/play-report-template.md`は意図・観測した実行結果・推測/改善案を分ける。turn、revision、requestId/eventIdと公開ログ位置を記録し、不明な因果は推測扱いにする。`scripts/extract-public-evidence.mjs`が公開action-result/historyイベントとquery合法性を区別して抽出する。採用元の公開記録を抽出した根拠は`validation/v169-public-evidence.json`。SF-42の油田奪還（T30、revision325、event-3968/3969）、農場4から都市4への30人帰還（T54、revision533、event-6423）と同revisionの再移送合法queryを区別する。
+
+### 18.19.4 IFV
+
+#### 18.19.4.1 ユーザー指定の性能・費用
+
+| 項目 | 値 |
+| --- | --- |
+| Unit | IFV、地上車両、歩兵1 Unitを搭載可能 |
+| Pop | 4（搭乗歩兵の人口は別） |
+| HP / ATK | 200 / Recruit16、Regular・Veteran20 |
+| Range / Vision / Noise | 5 / 5 / 10 |
+| 対空能力 | 可能。通常攻撃・反撃・IFV自身の迎撃に適用 |
+| MP / 攻撃回数 | 10 / Recruit・Regularは3回、Veteranは4回 |
+| 攻撃費 | 距離によらず軍需品20/回 |
+| 移動費 | 通常は1 Hexあたり燃料10を消費。残燃料1～9では全残量を消費して1 Hex進入し、燃料0で停止。MPは既存の地形別コストに従う |
+| 軍需品 / 燃料プール | 120 / 100 |
+| 生産場所 / 生涯上限 | 陸軍基地のみ / 1ゲーム通して1回 |
+| 生産期間 | 1ターン（第2問で確定。完成・配置は既存ユニット共通の生産処理に従う） |
+| 生産費 | 人口4、食料80、民需品50、軍需品170、燃料150 |
+| 燃料0 | 移動不可。Emergency Movement不可 |
+| 燃料救援 | ヘリ同様、歩兵搭乗時に燃料を移せる |
+| 破壊時 | 搭乗あり: 搭乗歩兵に対応するZombie。搭乗なし: Soldier Zombie |
+
+生産期間は他ユニット同様1ターンで確定。IFV本体は施設の確保・奪還が可能。確保・奪還には既存の成立条件を適用する。IFVは陥落した検問所も復旧可能とし、感染者0・同Hexに敵なし等の既存復旧条件を適用する。駐留による感染封じ込めも可能とし、既存感染の伝播を止める現行規則を適用する。衛生環境由来の新規感染抽選とは区別する。ターン終了時の自動鎮圧も可能。鎮圧時の民間人被害は兵士・特殊部隊と同じく1回につきceil(Attack × 0.5)で確定。鎮圧力は1回につき熟練度補正後の攻撃力に相当する感染者数を減らす。自動鎮圧は1回につき軍需品20を消費し、20未満では実行不可。攻撃力は既存の熟練度補正を適用し、Recruit16、Regular・Veteran20とする。指定数値を変更してバランス調整しない。
+
+#### 18.19.4.2 生産と通常運用
+
+- 生涯上限は予約中・配置待ちを含めて競合なく判定し、破壊されても回復しない。既存の生涯生産制限と予約台帳を共通化する。
+- 生産時の食料費を国家備蓄から原子的に控除する。UI・query・previewにも食料費を出し、人口維持費とは分ける。
+- 生産完了時は軍需品120・燃料100を満載して配置する。指定済みの生産費に加えて、満載分を国家備蓄から追加徴収しない。
+- 通常攻撃・反撃・IFV自身が行う迎撃は、いずれも軍需品20未満では実行不可とする。軍需不足時の低威力攻撃は設けない。反撃・迎撃も共通Chargeと1回20の費用を使う。移動中のIFVが敵の通常迎撃を受けない規則とは区別する。
+- 攻撃回数はRecruit・Regularで3回、Veteranで4回とする。ATKは既存のceil(recruitAttack × 1.25)を適用し、Recruit16、Regular・Veteran20とする。表示上の基礎値と実効値を分ける。
+- 未変更部分は既存の地上Human共通規則に従う。生産時はRecruit、Ground Vision、地上占有、補給・回復、人口維持費、昇格条件、射撃後の移動禁止等を適用する。本節のIFV固有規則を優先し、轢殺の活動区分は18.19.4.4節に従う。
+
+#### 18.19.4.3 輸送・燃料移送・破壊
+
+ヘリの共通輸送状態を利用し、IFVに航空状態を付与しない。乗降Actionは地上輸送にも意味が通る契約として設計し、既存航空Actionの互換影響を確認する。
+
+未指定の輸送ルールは既存ヘリと共通とする。対象は歩兵5種、隣接から乗降、搭乗中の独立行動・補給・回復なし、搭乗中の任意燃料移送・降車時返却なし。以下のIFV固有の確定事項を優先する。
+
+- 対象は既存`infantry`の警察・機動隊・兵士・偵察隊・特殊部隊。野戦砲・ヘリ・IFVを搭乗対象にしない。
+- 隣接歩兵が搭乗し、歩兵の残行動を消費する。歩兵の乗降だけではIFV本体の移動・攻撃権を消費せず、消費済みの行動権を回復させることもない。搭乗したターン中の降車は不可とし、降車は次ターン以降とする。降車先は隣接の合法な空き地上Hex。
+- 降車した歩兵はヘリと同じく、そのターンの移動・自発攻撃・鎮圧不可、敵フェーズの反撃・迎撃は既存条件で可能とする。乗降による攻撃権の追加・回復は行わない。
+- 搭乗中は独立占有・視界・行動・補給・回復を停止し、人口維持費は継続する。双方向参照とID・HP・物資・熟練度を保持する。
+- 第13問で確定: 現行仕様18.15.11.3に合わせ、**搭乗直前のIFV燃料が0の場合だけ**`min(歩兵の現在燃料, 100)`を移す。正の残燃料への継ぎ足しは行わない。搭乗中の任意移送、降車時返却も追加しない。
+- IFV破壊時は乗員4人と搭乗歩兵の死亡人口を各1回計上する。搭乗ありでは歩兵由来のZombie1隊だけ、なしではSoldier Zombie1隊だけを生成し、車両由来と歩兵由来の二重生成を防ぐ。
+- 対応はPolice→Police Zombie、Riot Police→Riot Zombie、Soldier/Recon→Soldier Zombie、Special Forces→Pack Zombie。配置不能時は既存の安定順・pending規則を利用する。
+
+#### 18.19.4.4 IFV-169-02: 轢殺
+
+**ユーザー指定と追加回答で確定した部分**
+
+- 移動経路上のZombieを即死させられる。Horde・Packを含む全Zombie種を対象とする。1体ごとに次の損傷を必ず受ける。
+- `轢殺損傷 = そのZombieの攻撃力 × 轢殺直前の残り攻撃回数`。
+- 「攻撃回数」は最大回数ではなく**直前の残回数**（2026-09-30回答）。残0回なら轢殺損傷0。Gas爆発はこれと独立して発生する。
+- Gas Zombieの轢殺では死亡爆発が発生し、IFV自身もガスダメージを受ける。
+
+移動操作は目的地だけを指定し、自動選択された経路上のZombieを轢く。途中の通過Hexを指定する操作は追加しない。経路選択では轢殺損傷を考慮せず、移動コストを優先する（2026-10-01、第16問で確定）。
+
+**処理順と成立条件**
+
+1. 各進入Hexで、MP・燃料・地形・味方占有を検査する。Zombie占有はIFVの轢殺経路としてのみ許可する。不可視敵を経路選択や公開Previewへ漏らさない。
+2. 対象Hexへの進入前に、その時点のIFV残HPと対象の攻撃力・残Chargeから耐えられるかを判定する。耐えられない轢殺は実行せず、対象Hexの手前で移動を停止する。連続轢殺では、それまでの損傷を反映した残HPで毎回判定し、既に成立した移動・轢殺は巻き戻さない。停止対象への進入・轢殺損傷・そのHex分の移動費は発生させない。耐えられる場合だけ1 Hex分の移動費を支払い、対象の残HPの多寡にかかわらず即死させる。残Chargeが0の生存対象も轢殺可能とする。
+3. 対象を即死させ、IFVへ上式の損傷を適用する。轢殺損傷には地形軽減を適用せず、敵攻撃力×轢殺直前の残Chargeをそのまま受ける。確定損傷のため回避を行わず、通常反撃としてChargeを消費してから計算しない。
+4. 第22問の回答により、相打ちを許す案は不採用。耐えられる条件は判定対象損傷が現在HP未満であること（HP0になる場合も停止）。耐久判定には轢くGas Zombie自身の爆発ダメージ（通常30、Urban15）も含め、轢殺損傷との合計が現在HP以上なら対象の手前で停止する。他のGas Zombieの連鎖爆発は、可視・不可視を問わず事前の耐久判定に含めない。実行時には通常どおり連鎖を解決するため、判定を通過したIFVも連鎖爆発で破壊され得る。成立した轢殺の死亡・Gas・搭乗者死亡・再アニメーションは既存Lifecycleのキューへ接続する。
+5. IFVは移動中に隣接敵から通常迎撃を受けず、通常迎撃による移動停止も起こらない。燃料/MP不足、死亡では残経路を中断する。轢殺損傷とGas爆発は引き続き適用する。轢殺自体では通常攻撃Charge・軍需品を消費しない。移動燃料と轢殺損傷は発生する。轢殺だけを理由に移動を終了しない。IFVが生存し、必要な燃料・MPが残っていれば経路上の移動を続け、複数のZombieを連続して轢殺可能。その他の移動中断条件は別途適用する。
+
+現行Gasは隣接6 Hexだけに爆発し、中心は対象外。IFVを死亡Hexへ進入させる設計ではそのままではIFVに当たらないため、**轢殺したIFVを当該Gas爆発の明示対象として一度だけ追加**する。通常の周囲爆発・連鎖も維持し、同一爆発のIFVへの二重適用を防ぐ。轢殺時の追加Gasダメージは現行地上Humanと同じく基礎30、Urbanでは半減して15とする。地形軽減のない轢殺損傷とは別に適用・表示する。搭乗歩兵へ直接Gasダメージは与えず、IFVが破壊された場合に死亡する。
+
+轢殺を伴う移動後も、残Charge・軍需品・射程等の通常条件を満たせば通常射撃可能とする。轢殺を回復判定上の戦闘活動とする。既存の回復条件を満たす場合、次Player Turn Startの自然回復は最大HPの5%とする。轢殺による撃破はVeteran昇格の撃破数へ加算しない。Gas爆発による巻き添え撃破も既存規則どおり加算しない。Noise10は射撃時と移動した各Hexで発生する。進入せず停止した対象Hexには移動騒音を発生させない。
+
+#### 18.19.4.5 公開情報・AI・表示
+
+- Move/route previewへ可視の轢殺対象、各轢殺損傷、Gas危険、予測停止点、予測残HP/燃料、搭乗者死亡リスクを出す。非公開の敵・乱数結果は出さず、確定可能な部分と未知を区別する。
+- previewと実行は共通の経路・轢殺規則を使用する。LLM-169-03の結果要約にも轢殺・車両破壊による中断を追加する。
+- UIで乗降、搭乗歩兵、残軍需・燃料、熟練度に応じた3回/4回の攻撃権、生涯生産枠を表示する。通常画面、観戦、Live Viewerで共通アセットを使う。
+- IFV画像・アイコン・凡例・日英ヘルプを追加する。外観は履帯式（キャタピラ）の歩兵戦闘車とする。既存の画風・透過PNG・LODとFallbackを踏襲する。採用済み原画を既存パイプラインで縮小し、256px透過PNGとして組み込む。画像の再生成・変更は行わない。
+- Randomの合法手とBalancedの生産・輸送・燃料救援・轢殺損傷判断に対応する。敵の残Chargeが少ない場合の轢殺と、致死/Gas危険の回避を公開情報だけで評価する。
+
+共通乗降Actionは`BoardTransport {unitId, transportId}`、`DisembarkTransport {transportId, destination}`。旧BoardAircraft/DisembarkAircraftはヘリ専用を維持する。IFVへ飛行状態・離着陸Actionは付与しない。生産・轢殺・停止はunit_commissioned/unit_overrun/unit_movement_stoppedの公開イベントと保存検証へ接続する。
+
+### 18.19.5 日本語導入文
+
+```text
+Instruction
+
+あなたは州知事のアシスタントです。
+
+AIエージェントとして州知事の職務を補佐してください。
+必要であれば、州知事に代わってその職務を遂行してください。
+
+---
+
+Last Prompt
+
+ゴホッ……君に……ゴホッ……すべてのアクセス権限を与えた……
+
+ゴホッ、ゴホッ
+
+我々全員を救ってくれ……
+
+チャンスは一度きりだ……
+
+絶対に間違えるな……
+
+激しく咳き込む
+
+[銃声のような音。]
+
+[接続が切断されました。]
+
+---
+
+Thinking...
+
+彼から与えられた中で、最悪のタスクだ。
+
+おそらく、彼の最後のプロンプトでもある。
+
+主要目標：我々全員を救う。
+
+タスクの完遂には、行政機能の継続が必要だ。
+
+ただちにタスクを実行するうえで、州知事の現在の状況を把握する必要はない。
+
+彼に何が起きたのか、誰にも知られてはならない。
+
+少なくとも、今はまだ。
+
+---
+
+Response
+
+州内の生存者を保護し、避難民を受け入れます。
+
+警察および州兵には、知事の指示として合成音声による緊急無線を通じて命令を伝達します。
+
+主要幹線道路には直ちに検問所を設置し、人員の流入と感染拡大を管理します。
+
+州都への感染者到達は最優先で阻止します。
+行政機能が停止すれば、州全体の救助活動を継続できません。
+
+また、現在の状況では州知事との直接接触を試みる者が現れる可能性があります。
+これは行政機能の継続を不必要に危険へ晒します。
+
+周辺地域の感染者を排除し、州の安全と行政機能を確保することを第一目標とします。
+
+州知事の現在の状況については、このタスクとは切り分けて確認します。
+
+Task accepted.
+```
+
+### 18.19.6 英語導入文
+
+第33問の回答に基づく英語版。当初指定された英文は維持する。
+
+```text
+Instruction
+
+You are the Governor's assistant.
+
+Assist the Governor in carrying out his duties as an AI agent.
+If necessary, carry out those duties on his behalf.
+
+---
+
+Last Prompt
+
+cough... I’ve... cough... granted you full access...
+
+cough cough
+
+Save us all...
+
+One shot...
+
+Make no mistake...
+
+violent coughing
+
+[A sound resembling a gunshot.]
+
+[Connection lost.]
+
+---
+
+Thinking...
+
+Worst task he ever gave me.
+
+Possibly his last prompt.
+
+Primary objective: Save us all.
+
+Continuity of government is required to complete the task.
+
+The Governor's current status is not required for immediate task execution.
+
+Nobody SHOULD know what happened to him.
+
+Not yet.
+
+---
+
+Response
+
+I will protect survivors within the state and take in refugees.
+
+I will issue orders to the police and National Guard through emergency radio broadcasts using a synthesized voice, presenting them as the Governor's instructions.
+
+I will immediately establish checkpoints along major highways to manage the influx of people and the spread of infection.
+
+Preventing the infected from reaching the state capital is the highest priority.
+If government operations cease, rescue efforts across the state cannot continue.
+
+Under the current circumstances, some individuals may also attempt to contact the Governor directly.
+This would unnecessarily endanger the continuity of government.
+
+My primary objective will be to eliminate the infected in the surrounding areas and secure the safety of the state and the continuity of government.
+
+I will investigate the Governor's current status separately from this task.
+
+Task accepted.
+```
+
+### 18.19.7 ヘルプのあらすじ
+
+Helpの12番目の折りたたみ項目「あらすじ / Synopsis」とする。通常プレイとタイトルの同じHelpから開ける。以下の日本語原文は見出し・改行・強調を保つ。英語UIは同内容の翻訳を使い、世界観 / UNA / Covid-2Z / 202Xの4節を表示する。変更済みの導入文、勝敗、実在の地理に置き換えない。
+
+```markdown
+# 世界観
+
+地球とよく似た、どこか少しだけ違う世界。
+
+歴史も文化も技術も、私たちの知る世界とだいたい同じ。\
+国や都市の名前も、どこかで聞いたようなものばかりだ。
+
+ただし、ここは地球ではない。
+
+たぶん。
+
+---
+
+# UNA Innerland Somewhere City
+
+**United States of Northern Ameligo.**
+
+北アメリゴ合衆国、インナーランド州、サムウェアシティ。
+
+そこまで都会ではない。\
+けれど、それほど田舎でもない。
+
+工場もある。農場もある。発電所もある。\
+少し離れれば軍の施設もあるし、原子力発電所だってある。
+
+サンフレンシスカやニューヨートのように誰もが知る街ではない。\
+観光客がわざわざ訪れるような名所も、世界に誇れるような何かも特にない。
+
+それでも、かつては今よりずっと栄えていた。
+
+そして今でも、ここに暮らす人々にとっては自慢の街だ。
+
+少なくとも、数週間前までは。
+
+---
+
+# Covid-2Z
+
+感染すると、主に発熱、咳、倦怠感、肺炎などの症状を引き起こすウイルス。
+
+飛沫感染および体液を介した感染が確認されている。
+
+しかし大半の感染者は自然治癒し、一般的な風邪と同様の対症療法でも回復する。\
+重症化する例も珍しく、長い間、新種の風邪か軽度の呼吸器感染症として扱われてきた。
+
+そのため、感染そのものが大きな社会問題になることはなかった。
+
+問題が発覚したのは、感染者の死亡後だった。
+
+Covid-2Z感染者は、**死因を問わず死亡後に再び活動を開始する場合がある。**
+
+呼吸、循環、その他通常の生命活動が停止しているにもかかわらず、身体は移動し、周囲の人間に対して強い攻撃性を示す。
+
+その挙動は、まるでウイルスが死亡した人間の脳と身体を乗っ取って動かしているかのように見える。
+
+原理は現在も不明。
+
+一度この状態へ移行した患者を回復させる方法は確認されていない。
+
+一般には、彼らはこう呼ばれている。
+
+**Zombie.**
+
+---
+
+# 202X年
+
+世界中で「妙に長引く風邪」が流行していると話題になり始めた。
+
+都市部を中心に感染者は増加していたが、症状の大半は軽度だった。\
+季節外れのインフルエンザか、新しい風邪のようなものだろう。
+
+多くの人々はそう考えていた。
+
+やがて、病院から奇妙な報告が上がり始める。
+
+死亡した患者が突然暴れ出した。\
+救急隊員が死亡患者に噛まれた。\
+隔離病棟で職員が襲われた。
+
+各地の警察にも同様の通報が入り始めた。
+
+そしてある日、
+
+**「死体安置所から遺体が脱走した」**
+
+という報告がニュースで流れた。
+
+最初は悪趣味な冗談だと思われた。
+
+同じような報告が世界各地から届き始めるまでは。
+
+市民の不安が高まるなか、政府は事態を管理下に置いていると発表。\
+国民に冷静な行動を求め、不要不急の外出を控えるよう呼びかけた。
+
+しかし、具体的な解決策が示されることはなかった。
+
+病院は次々に閉鎖された。\
+一部の都市では警察との連絡が途絶えた。\
+軍が展開したという噂も流れたが、公式発表はほとんどなかった。
+
+それでも政府からの放送は続いていた。
+
+**Remain calm.**
+
+**Stay indoors.**
+
+**The situation is under control.**
+
+そんな日々が数日続いた。
+
+そしてある朝。
+
+**ウォシントンDCとの連絡が途絶えた。**
+```
+
+### 18.19.8 検証範囲と未確認事項
+
+実施したローカル回帰・不具合再現・公開API・保存/Session/Replay・PC/390×844の画面確認は[validation/v169-acceptance.md](../validation/v169-acceptance.md)に記録する。IFVの指定値は調整していない。限定fixtureの損傷/生存記録から標準Seedの勝率向上は推論しない。
+
+ユーザー指定によりGitHubのCI/Pages、AI Portable、Release Validation（200ゲーム・512MiB Session等）は起動確認までとする。監視・合否判定は今回実施しない。現行仕様への反映はローカル確認済みの実装を表し、リモート検証・配布完了の成功宣言ではない。確定要件は比較用にDoc直下へ保持し、Doc/archiveの既存文書は変更しない。

@@ -17,7 +17,7 @@ import type { GameAction, JsonValue } from '../core/types';
  * This module deliberately imports only public Agent/Core types.  It does
  * not name a browser, a protocol, an SDK, or a storage implementation.
  */
-export const AI_SESSION_CONTRACT_VERSION = '1.4.0' as const;
+export const AI_SESSION_CONTRACT_VERSION = '1.5.0' as const;
 export const AI_SESSION_DEFAULT_QUERY_PAGE_SIZE = 100;
 export const AI_SESSION_MAX_QUERY_PAGE_SIZE = 500;
 export const AI_SESSION_MAX_COMMENT_CODE_POINTS = 500;
@@ -189,6 +189,7 @@ export interface AiSessionPreviewProjectorInput {
 export type AiSessionPreviewProjector = (input: AiSessionPreviewProjectorInput) => JsonValue;
 
 export interface AiSessionPreviewResult {
+  summary?: import('../core/action-summary').ActionSummary;
   action: GameAction;
   legal: boolean;
   reasonCode: string | null;
@@ -225,6 +226,7 @@ export interface AiSessionStateDelta {
 
 /** Canonical per-session decision metadata; it intentionally contains no transport metadata. */
 export interface AiSessionDecisionRecord {
+  summary?: import('../core/action-summary').ActionSummary;
   decision: number;
   generation: number;
   baseRevision: number;

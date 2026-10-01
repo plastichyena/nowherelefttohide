@@ -802,6 +802,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
     (event) => event.type === 'noise_emitted' && event.payload.sourceUnitType === 'riotPolice',
   ).length;
   const noisePulsesBySourceType: Record<HumanUnitType | 'hordeZombie', number> = {
+    ifv: events.filter(e => e.type === 'noise_emitted' && e.payload.sourceUnitType === 'ifv').length,
     police: policeNoisePulses,
     nationalGuard: nationalGuardNoisePulses,
     riotPolice: riotPoliceNoisePulses,
@@ -991,7 +992,7 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   const finalSecuredFacilities = finalObservation.facilities.filter(
     (facility) => facility.owner === 'player' && facility.status === 'owned',
   ).length;
-  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 });
+  const byHumanType = (): Record<HumanUnitType, number> => ({ police: 0, nationalGuard: 0, riotPolice: 0, reconTeam: 0, ifv: 0, fieldArtillery: 0, multipurposeHelicopter: 0, specialForces: 0 });
   const statisticHumanRecord = (key: string): Record<HumanUnitType, number> => {
     const source = numericRecord(isRecord(statistics) ? statistics[key] : undefined);
     return Object.fromEntries(HUMAN_UNIT_TYPES.map((type) => [type, source[type] ?? 0])) as Record<HumanUnitType, number>;

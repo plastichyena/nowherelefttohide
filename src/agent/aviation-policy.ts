@@ -8,13 +8,13 @@ export function aviationPolicy(observation: AgentObservation, actions: readonly 
   const units=new Map(observation.units.map(u=>[u.id,u]));
   const supplied=new Set(observation.supply.suppliedTileKeys);
   const objectiveIds=new Set(observation.facilityObjectives?.filter(o=>o.firstCapturedTurn===null && observation.turn<=o.rewardDeadlineTurn).map(o=>o.facilityId));
-  const targets=observation.facilities.filter(f=>f.owner!=='player' && f.status!=='ruined' || f.owner==='player' && f.infectedPopulation>0)
+  const targets=observation.facilities.filter(f=>f.owner!=='player' && f.status!=='ruined' || f.owner==='player' && f.infectedPopulation !== null && f.infectedPopulation>0)
     .sort((a,b)=>Number(objectiveIds.has(b.id))-Number(objectiveIds.has(a.id)) || a.id.localeCompare(b.id));
   const mission=(unit:AgentUnitObservation)=>[...targets].sort((a,b)=>
     (hexDistance(unit.position,a.position)-(objectiveIds.has(a.id)?20:0))-(hexDistance(unit.position,b.position)-(objectiveIds.has(b.id)?20:0)) || a.id.localeCompare(b.id))[0];
   const danger=(position:HexCoord,air:boolean)=>observation.zombies.filter(z=>(!air||z.canTargetAir)&&hexDistance(z.position,position)<=z.movement+z.effectiveRange).reduce((n,z)=>n+z.attack*Math.max(1,z.attackChargesRemaining),0);
   const infantry=observation.units.filter(u=>u.capabilities?.infantry && !u.transportedByUnitId && u.actionState!=='acted');
-  const soleDefender=(u:AgentUnitObservation)=>observation.facilities.some(f=>f.owner==='player' && f.type==='capital' && hexDistance(f.position,u.position)<=1 && (f.infectedPopulation>0||danger(f.position,false)>0) && observation.units.filter(v=>!v.transportedByUnitId&&v.capabilities?.contain&&hexDistance(v.position,f.position)<=1).length<=1);
+  const soleDefender=(u:AgentUnitObservation)=>observation.facilities.some(f=>f.owner==='player' && f.type==='capital' && hexDistance(f.position,u.position)<=1 && (f.infectedPopulation !== null && f.infectedPopulation>0||danger(f.position,false)>0) && observation.units.filter(v=>!v.transportedByUnitId&&v.capabilities?.contain&&hexDistance(v.position,f.position)<=1).length<=1);
   const droneTargets=[...targets.map(f=>f.position),...observation.map.tiles.filter(t=>t.hordeEntranceDirections.some(d=>observation.horde.warningDirections.includes(d)))];
   const droneValue=new Map<string,number>();
   for(const p of droneTargets)droneValue.set(hexKey(p),observation.map.tiles.filter(t=>!t.visibleToPlayer&&hexDistance(t,p)<=10).length);

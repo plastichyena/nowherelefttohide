@@ -51,6 +51,7 @@ describe('board asset registry', () => {
     ]);
     expect(Object.keys(BOARD_ASSET_REGISTRY.obstacles)).toEqual(['barbedWire']);
     expect(Object.keys(BOARD_ASSET_REGISTRY.units)).toEqual([
+      'ifv',
       'fieldArtillery',
       'multipurposeHelicopter',
       'police',

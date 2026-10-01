@@ -86,7 +86,7 @@ describe('v1.6.8 wall combat and performance', () => {
     const z=createUnit(state,'short-route','hordeZombie',{q:21,r:25});z.movement=3;state.units.push(z);prepareTestSnapshot(state);
     const route=findZombieTargetPath(state,z,{position:{q:25,r:25},population:100})!;
     expect(route.path.slice(0,3)).toEqual([{q:21,r:25},{q:22,r:25},{q:23,r:25}]);
-    const move=createMovement({emergencyLand:()=>{},interceptorsAt:()=>[],interceptArmyBase:()=>false,resolveCombat:()=>{},tryCapture:()=>{}});
+    const move=createMovement({ resolveOverrun: () => { throw new Error("Unexpected IFV"); }, emitMoveNoise: () => { throw new Error("Unexpected IFV"); },emergencyLand:()=>{},interceptorsAt:()=>[],interceptArmyBase:()=>false,resolveCombat:()=>{},tryCapture:()=>{}});
     move.applyMovement(state,z,route.path,3);expect(z.position).toEqual({q:22,r:25});
   });
   it('stops arrivals when the final roster freezes, including all unmanaged branches',()=>{
@@ -114,7 +114,7 @@ describe('v1.6.8 wall combat and performance', () => {
   it.each(ZOMBIE_UNIT_TYPES)('%s attacks the next adjacent wall with zero remaining MP and stops', type => {
     const state=createInitialState(1,quietConfig()); state.units=[];
     const p={q:25,r:24}, z=createUnit(state,'enemy',type,{q:24,r:24});state.units=[z];state.barbedWire=[wall(p.q,p.r)];
-    const move=createMovement({ emergencyLand:()=>{throw Error('ground');},interceptorsAt:()=>[],interceptArmyBase:()=>false,resolveCombat:()=>{throw Error('empty wall');},tryCapture:()=>{} });
+    const move=createMovement({ resolveOverrun: () => { throw new Error("Unexpected IFV"); }, emitMoveNoise: () => { throw new Error("Unexpected IFV"); }, emergencyLand:()=>{throw Error('ground');},interceptorsAt:()=>[],interceptArmyBase:()=>false,resolveCombat:()=>{throw Error('empty wall');},tryCapture:()=>{} });
     const before=z.attackChargesRemaining; move.applyMovement(state,z,[z.position,p],0);
     expect(z.position).toEqual({q:24,r:24});expect(z.attackChargesRemaining).toBeLessThan(before);
     expect(state.barbedWire[0]?.hp??0).toBeLessThan(20);

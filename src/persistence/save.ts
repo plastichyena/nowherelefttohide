@@ -14,16 +14,17 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.6.8 saves. */
+/** The sole game-rules version accepted by v1.6.9 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 25;
-/** v1.6.8 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v25';
+export const SAVE_FORMAT_VERSION = 26;
+/** v1.6.9 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v26';
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v24';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v25';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v24',
   'nowhere-left-to-hide:auto-save:v23',
   'nowhere-left-to-hide:auto-save:v22',
   'nowhere-left-to-hide:auto-save:v21',
@@ -106,8 +107,8 @@ export interface StorageLike {
 export type SaveErrorListener = (message: string, error?: unknown) => void;
 
 const BASE_TERRAINS = ['plain', 'forest', 'mountain', 'water'] as const;
-const UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
-const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter'] as const;
+const UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'ifv', 'fieldArtillery', 'multipurposeHelicopter', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
+const HUMAN_UNIT_TYPES = ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'ifv', 'fieldArtillery', 'multipurposeHelicopter'] as const;
 const ZOMBIE_UNIT_TYPES = ['zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie', 'packZombie'] as const;
 const FACILITY_TYPES = [
   'capital',
@@ -144,6 +145,7 @@ const CARDINAL_DIRECTIONS = ['north', 'east', 'south', 'west'] as const;
 const GAME_PHASES = ['player', 'economy', 'refugees', 'infection', 'zombie', 'horde', 'gameOver'] as const;
 const GAME_OVER_REASONS = ['capitalLost', 'healthyCiviliansLost', 'stateSecured', 'abandoned', 'error'] as const;
 const GAME_EVENT_TYPES = [
+  'unit_overrun', 'unit_movement_stopped', 'unit_commissioned',
   'public_health_infection', 'nuclear_objective_updated',
   'horde_wave_started',
   'horde_spawn_batch',
@@ -543,7 +545,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.6.8; v1.6.7 or earlier data requires a new v1.6.8 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.6.9; v1.6.8 or earlier data requires a new v1.6.9 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -799,7 +801,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       'nationalGuard',
       'riotPolice',
       'reconTeam',
-      'specialForces', 'fieldArtillery', 'multipurposeHelicopter',
+      'specialForces', 'ifv', 'fieldArtillery', 'multipurposeHelicopter',
       'unitPopulation',
       'facilityWorkers',
       'waitingRefugees',
@@ -1144,8 +1146,8 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       }
       if (!isInteger(pulse.radius) || !isInteger(pulse.emittedTurn, 1)) errors.push(`${path}.radius or emittedTurn is invalid`);
       if (!['humanCombat', 'hordeMovement', 'armyBase', 'windPower', 'scream'].includes(pulse.sourceKind as string)) errors.push(`${path}.sourceKind is invalid`);
-      if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter', 'hordeZombie', 'screamerZombie', 'armyBase', 'windPowerPlant'].includes(pulse.sourceUnitType as string)) errors.push(`${path}.sourceUnitType is invalid`);
-      const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter'].includes(pulse.sourceUnitType as string))
+      if (!['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'ifv', 'fieldArtillery', 'multipurposeHelicopter', 'hordeZombie', 'screamerZombie', 'armyBase', 'windPowerPlant'].includes(pulse.sourceUnitType as string)) errors.push(`${path}.sourceUnitType is invalid`);
+      const matchingSource = (pulse.sourceKind === 'humanCombat' && ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'ifv', 'fieldArtillery', 'multipurposeHelicopter'].includes(pulse.sourceUnitType as string))
         || (pulse.sourceKind === 'hordeMovement' && pulse.sourceUnitType === 'hordeZombie')
         || (pulse.sourceKind === 'armyBase' && pulse.sourceUnitType === 'armyBase')
         || (pulse.sourceKind === 'windPower' && pulse.sourceUnitType === 'windPowerPlant')
@@ -1159,7 +1161,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     const issued = (id: unknown) => { if (typeof id === 'string') highest = Math.max(highest, Number(/-(\d+)$/.exec(id)?.[1] ?? 0)); };
     for (const unit of state.units) if (isRecord(unit)) issued(unit.id);
     for (const event of state.events) if (isRecord(event) && isRecord(event.payload)) {
-      for (const [key,value] of Object.entries(event.payload)) if (/(?:unitId|UnitId|zombieId|attackerId|defenderId)$/.test(key) || (key === 'targetId' && typeof value === 'string' && /^(?:police|national-guard|riot-police|recon-team|special-forces|field-artillery|multipurpose-helicopter|zombie|horde|police-zombie|soldier-zombie|riot-zombie|hunter-zombie|gas-zombie|screamer-zombie|pack-zombie)-/.test(value))) issued(value);
+      for (const [key,value] of Object.entries(event.payload)) if (/(?:unitId|UnitId|zombieId|attackerId|defenderId)$/.test(key) || (key === 'targetId' && typeof value === 'string' && /^(?:police|national-guard|riot-police|recon-team|special-forces|field-artillery|multipurpose-helicopter|ifv|zombie|horde|police-zombie|soldier-zombie|riot-zombie|hunter-zombie|gas-zombie|screamer-zombie|pack-zombie)-/.test(value))) issued(value);
     }
     if (typeof state.nextUnitNumber === 'number' && state.nextUnitNumber <= highest) errors.push('state.nextUnitNumber must exceed every issued unit number; counters cannot rewind');
     if (Array.isArray(state.facilities)) {
@@ -1344,7 +1346,7 @@ function validateStatisticsShape(value: unknown, errors: string[], path: string)
   if (!isRecord(noiseBySource)) {
     errors.push(`${path}.noisePulsesBySourceType is invalid`);
   } else {
-    for (const sourceType of ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'fieldArtillery', 'multipurposeHelicopter', 'hordeZombie', 'screamerZombie', 'armyBase', 'windPowerPlant'] as const) {
+    for (const sourceType of ['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'specialForces', 'ifv', 'fieldArtillery', 'multipurposeHelicopter', 'hordeZombie', 'screamerZombie', 'armyBase', 'windPowerPlant'] as const) {
       if (!isInteger(noiseBySource[sourceType])) errors.push(`${path}.noisePulsesBySourceType.${sourceType} is invalid`);
     }
   }
@@ -1620,7 +1622,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the current v1.6.8/v25 key; legacy data is deliberately preserved. */
+  /** Clears only the current v1.6.9/v26 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

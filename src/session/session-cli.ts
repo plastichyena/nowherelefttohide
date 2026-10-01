@@ -31,6 +31,7 @@ interface ParsedCli {
   newSessionId?: string;
   checkpointId?: string;
   seed?: number;
+  scenarioId?: string;
   checkpointInterval?: number;
   agentId?: string;
   preferredCommentLocale?: SessionCommentLocale;
@@ -84,6 +85,7 @@ export function parseSessionCliArgs(argv: readonly string[]): ParsedCli {
     else if ((value = readOption(argument, '--new-session-id', remaining)) !== null) parsed.newSessionId = value;
     else if ((value = readOption(argument, '--checkpoint', remaining)) !== null) parsed.checkpointId = value;
     else if ((value = readOption(argument, '--checkpoint-id', remaining)) !== null) parsed.checkpointId = value;
+    else if ((value = readOption(argument, '--scenario', remaining)) !== null) parsed.scenarioId = value;
     else if ((value = readOption(argument, '--seed', remaining)) !== null) parsed.seed = integer(value, '--seed', Number.MIN_SAFE_INTEGER);
     else if ((value = readOption(argument, '--checkpoint-interval', remaining)) !== null) parsed.checkpointInterval = integer(value, '--checkpoint-interval', 1);
     else if ((value = readOption(argument, '--agent-id', remaining)) !== null) parsed.agentId = value;
@@ -202,6 +204,7 @@ export function executeSessionCommand(
       const status = service.newSession({
         sessionId: parsed.sessionId,
         seed: parsed.seed,
+        scenarioId: parsed.scenarioId,
         checkpointInterval: parsed.checkpointInterval,
         agentId: parsed.agentId,
         preferredCommentLocale: parsed.preferredCommentLocale,

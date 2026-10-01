@@ -5,7 +5,7 @@ import { effectiveZombieMovement } from './zombie-movement';
 
 /** Deliberately excludes targets, RNG, pursuit memory and unseen entities. */
 export type PresentationUnit = Pick<UnitState, 'id'|'type'|'position'|'hp'|'maxHp'|'isPlayerUnit'|'actionState'|'proficiency'|'mode'|'flightState'|'transportedByUnitId'|'cargoUnitId'|'movement'|'attack'|'range'|'vision'|'population'|'currentFuel'|'maxFuel'|'currentMilitaryGoods'|'maxMilitaryGoods'|'canMove'|'canAttack'|'attackChargesRemaining'|'maxAttackCharges'|'hordeKind'> & { effectiveMovement: number };
-export interface PresentationSite { id: string; position: HexCoord; type?: string; status: string; owner?: string; operationalStatus?: string; healthyPopulation: number | null; infectedPopulation: number; waiting?:number; screening?:number; approved?:number; infected?:number }
+export interface PresentationSite { id: string; position: HexCoord; type?: string; status: string; owner?: string; operationalStatus?: string; healthyPopulation: number | null; infectedPopulation: number | null; waiting?:number; screening?:number; approved?:number; infected?:number }
 export interface PresentationSnapshot { units: PresentationUnit[]; facilities: PresentationSite[]; checkpoints: PresentationSite[]; walls: BarbedWireState[]; visibleTileKeys: string[] }
 export interface EntityDelta<T> { upsert: T[]; remove: string[] }
 export interface PresentationFrame {
@@ -47,8 +47,8 @@ function snapshot(state: Readonly<GameState>, previous?: PresentationSnapshot, v
     return { id,type,position:{...position},hp,maxHp,isPlayerUnit,actionState,proficiency,mode,flightState,transportedByUnitId,cargoUnitId,movement,attack,range,vision,population,currentFuel,maxFuel,currentMilitaryGoods,maxMilitaryGoods,canMove,canAttack,attackChargesRemaining,maxAttackCharges,hordeKind,effectiveMovement:effectiveZombieMovement(u) };
   });
   const facilities = state.facilities.map(f => {
-    if (!visible.has(hexKey(f.position))) return previous?.facilities.find(p => p.id === f.id) ?? { id:f.id,position:{...f.position},type:f.type,status:f.owner==='player'?f.status:'unowned',owner:f.owner,healthyPopulation:f.owner==='player'?f.workers:null,infectedPopulation:0 };
-    return { id:f.id,position:{...f.position},type:f.type,status:f.status,owner:f.owner,operationalStatus:f.operationalStatus,healthyPopulation:f.owner==='player'?f.workers:null,infectedPopulation:f.infected };
+    if (!visible.has(hexKey(f.position))) return previous?.facilities.find(p => p.id === f.id) ?? { id:f.id,position:{...f.position},type:f.type,status:f.owner==='player'?f.status:'unowned',owner:f.owner,healthyPopulation:f.owner==='player'?f.workers:null,infectedPopulation:f.owner==='player'?f.infected:null };
+    return { id:f.id,position:{...f.position},type:f.type,status:f.status,owner:f.owner,operationalStatus:f.operationalStatus,healthyPopulation:f.owner==='player'?f.workers:null,infectedPopulation:f.owner==='player'?f.infected:null };
   });
   const checkpoints = state.checkpoints.map(c => (!visible.has(hexKey(c.position))?previous?.checkpoints.find(p=>p.id===c.id):null)??({ id:c.id,position:{...c.position},status:c.status,waiting:c.waiting,screening:c.screening,approved:c.approved,infected:c.infected,healthyPopulation:c.waiting+c.screening+c.approved,infectedPopulation:c.infected }));
   for(const site of previous?.facilities??[])if(!facilities.some(f=>f.id===site.id)&&!visible.has(hexKey(site.position)))facilities.push(site);

@@ -87,3 +87,7 @@ The Air Base and landed/airborne multipurpose helicopter images derive from the 
 ## v1.6.6 asset provenance
 
 The Relief Supply Center original was approved on 2026-09-25. Its original, prompt and approval record are preserved in `Art/reference/v1.6.6-concepts/`. `scripts/build-v166-assets.py` produces the 256px transparent runtime PNG shared by normal play, Replay and Live AI. The same project asset terms apply.
+
+## v1.6.9 asset provenance
+
+The approved IFV original and approval records are preserved in `Art/reference/v1.6.9-concepts/`. `scripts/build-v169-assets.py` resizes that existing artwork to the shared 256px transparent runtime PNG, without changing its design. Normal play, Replay and Live AI use the same registry. The same project asset terms apply.

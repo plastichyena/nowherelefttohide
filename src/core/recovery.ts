@@ -34,7 +34,7 @@ export function deriveUnitRecovery(
   options: RecoveryProjectionOptions = {},
 ): UnitRecoveryProjection {
   const inSupplyNow = unit.isPlayerUnit && unitCanReceiveSupply(unit) && isHexSupplied(state, unit.position);
-  const combat = (unit.type === 'multipurposeHelicopter' && unit.activity.moved) || unit.activity.attacked || unit.activity.intercepted || unit.activity.suppressed || options.projectedSuppression === true;
+  const combat = unit.activity.overran === true || (unit.type === 'multipurposeHelicopter' && unit.activity.moved) || unit.activity.attacked || unit.activity.intercepted || unit.activity.suppressed || options.projectedSuppression === true;
   const recoveryClass: UnitRecoveryClass = !inSupplyNow ? 'outOfSupply' : combat ? 'combat' : 'rest';
   const rate = recoveryClass === 'combat'
     ? state.config.naturalRecovery.combatRate

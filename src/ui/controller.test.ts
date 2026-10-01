@@ -61,8 +61,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.6.8');
-    expect(titleVersionLabel('en')).toContain('1.6.8');
+    expect(titleVersionLabel('ja')).toContain('1.6.9');
+    expect(titleVersionLabel('en')).toContain('1.6.9');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -110,7 +110,7 @@ describe('controller view models', () => {
       legal: true,
     });
     expect(recruitmentOptionsForFacility(state, armyBase, baseActions, 'en').map((option) => option.unitType))
-      .toEqual(['nationalGuard', 'reconTeam', 'fieldArtillery']);
+      .toEqual(['nationalGuard', 'reconTeam', 'ifv', 'fieldArtillery']);
     const markup = renderRecruitmentAccordion(state, armyBase, baseActions, 'en');
     expect(markup).toContain('<details class="recruitment-accordion"');
     expect(markup).not.toMatch(/<details[^>]*\sopen(?:\s|>)/);
@@ -309,26 +309,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.6.7-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.6.8-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.7以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.8');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.8以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.9');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.7 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.8');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.8 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.9');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('ルール版 18.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('保存形式 25');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 18.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 25');
+    expect(createTranslator('ja')('tipSave')).toContain('ルール版 19.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('保存形式 26');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 19.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 26');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.7以前' : 'v1.6.7-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8-or-earlier');
     }
   });
 

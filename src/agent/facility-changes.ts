@@ -3,7 +3,7 @@ import type { AgentObservation, AgentPublicEvent } from './types';
 export interface FacilityPopulationChange {
   facilityId: string;
   healthyPopulation: { before: number; after: number; delta: number; unintendedDelta: number };
-  infectedPopulation: { before: number; after: number };
+  infectedPopulation: { before: number | null; after: number | null };
   outputs: Record<string, { before: number; after: number; delta: number }> | null;
   outputReason: 'not_producing' | 'public_projection_unavailable' | null;
   eventTypes: string[];

@@ -78,6 +78,7 @@ export type UnitType =
   | 'riotPolice'
   | 'reconTeam'
   | 'specialForces'
+  | 'ifv'
   | 'fieldArtillery'
   | 'multipurposeHelicopter'
   | 'packZombie'
@@ -93,7 +94,7 @@ export type UnitType =
 /** Alias retained for systems that refer to units as a kind rather than type. */
 export type UnitKind = UnitType;
 
-export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam' | 'specialForces' | 'fieldArtillery' | 'multipurposeHelicopter'>;
+export type HumanUnitType = Extract<UnitType, 'police' | 'nationalGuard' | 'riotPolice' | 'reconTeam' | 'specialForces' | 'ifv' | 'fieldArtillery' | 'multipurposeHelicopter'>;
 
 export type UnitMode = 'packed' | 'deployed';
 
@@ -262,6 +263,7 @@ export interface RefineryAllowanceState {
 
 export interface PopulationState {
   multipurposeHelicopter: number;
+  ifv: number;
   /** Population present at new-game creation, including initial human units. */
   initialPopulation: number;
   cumulativeReinforcements: number;
@@ -368,6 +370,7 @@ export interface UnitState {
   hasScreamed: boolean;
   /** Activity since the previous Player Turn Start, used for natural healing. */
   activity: {
+    overran?: boolean;
     moved: boolean;
     attacked: boolean;
     intercepted: boolean;
@@ -523,6 +526,8 @@ export type GameEventType =
   | 'gas_explosion'
   | 'army_base_reward'
   | 'production_forfeited'
+  | 'unit_overrun'
+  | 'unit_movement_stopped'
   | 'unit_moved'
   | 'unit_recovered'
   | 'interception'
@@ -532,6 +537,7 @@ export type GameEventType =
   | 'facility_captured'
   | 'workers_assigned'
   | 'population_transferred'
+  | 'unit_commissioned'
   | 'population_conscripted'
   | 'resource_produced'
   | 'resource_consumed'
@@ -1014,6 +1020,7 @@ export type CrisisReasonCode =
   | 'temporary_housing_outage_forecast'
   | 'capital_infection_uncontained'
   | 'critical_site_infection_uncontained'
+  | 'checkpoint_active_missing'
   | 'checkpoint_defense_degraded'
   | 'unit_out_of_supply_risk'
   | 'horde_warning_active'
@@ -1228,6 +1235,8 @@ export interface LoadSnapshotAction {
 export type GameAction =
   | { type: 'TakeOff'; unitId: string }
   | { type: 'Land'; unitId: string }
+  | { type: 'BoardTransport'; unitId: string; transportId: string }
+  | { type: 'DisembarkTransport'; transportId: string; destination: HexCoord }
   | { type: 'BoardAircraft'; unitId: string; aircraftId: string }
   | { type: 'DisembarkAircraft'; aircraftId: string; destination: HexCoord }
   | { type: 'LaunchMilitaryDrone'; facilityId: string; target: HexCoord }
@@ -1297,6 +1306,7 @@ export interface BaseUnitConfig {
 
 export interface HumanUnitConfig extends BaseUnitConfig {
   capabilities: { capture: boolean; recoverCheckpoint: boolean; suppress: boolean; contain: boolean; infantry: boolean };
+  productionFood: number;
   productionFuel: number;
   productionLimitPerGame: number | null;
   regularAttackCharges: number;
@@ -1305,7 +1315,7 @@ export interface HumanUnitConfig extends BaseUnitConfig {
   recruitmentFacilityTypes: Array<'capital' | 'city' | 'armyBase' | 'airBase'>;
   productionCivilianGoods: number;
   productionMilitaryGoods: number;
-  fuelCostRule: 'policeLike' | 'nationalGuardLike' | 'perMovementPoint';
+  fuelCostRule: 'policeLike' | 'nationalGuardLike' | 'perMovementPoint' | 'perHex';
   suppressionCivilianDamageRate: number;
   reanimationUnitType: 'policeZombie' | 'soldierZombie' | 'riotZombie' | 'packZombie' | null;
   noiseClass: NoiseClass;
@@ -1320,6 +1330,7 @@ export interface ZombieUnitConfig extends BaseUnitConfig {
 export type UnitConfig = HumanUnitConfig | ZombieUnitConfig;
 
 export interface UnitConfigMap {
+  ifv: HumanUnitConfig & { fuelPerHex: number; cargoCapacity: number };
   multipurposeHelicopter: HumanUnitConfig & { airborneMovement: number; fuelPerMovementPoint: number; endTurnFuel: number; endTurnNoiseRadius: number; cargoCapacity: number };
   police: HumanUnitConfig;
   nationalGuard: HumanUnitConfig;
@@ -1505,6 +1516,7 @@ export interface NaturalRecoveryConfig {
 }
 
 export interface GameConfig {
+  scenarioId: import('./scenarios').ScenarioId;
   zombiePursuitMovementBonus: number;
   objectives: Record<'nuclearPowerPlant' | 'airBase', { rewardDeadlineTurn: number; requiresHealthySurvivors: boolean; failureOnUncapturedFall: boolean; rewardUnitType: 'specialForces'; failureUnitType: 'packZombie' }>;
   militaryDrone: { fuelPerHex: number; visionRadius: number; durationTurns: number };

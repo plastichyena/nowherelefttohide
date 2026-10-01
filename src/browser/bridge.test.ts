@@ -265,3 +265,13 @@ describe('Developer / Browser Bridge', () => {
     expect(api.getRunArtifact().invalidAttempts).toHaveLength(1);
   });
 });
+
+
+it('accepts the IFV and generic transport input schema and returns rejected result summaries',()=>{
+  const api=createBrowserBridge();api.reset({seed:7,scenarioId:'una'});
+  for(const action of [{type:'ProduceUnit',unitType:'ifv',destination:{q:25,r:25}}, {type:'BoardTransport',unitId:'police-1',transportId:'missing'}, {type:'DisembarkTransport',transportId:'missing',destination:{q:25,r:25}}] as const){
+    const result=api.step(action);
+    expect(result.error).not.toBeNull();
+    expect(result.summary).toMatchObject({phase:'result',actionType:action.type,accepted:false,legal:false});
+  }
+});

@@ -9,9 +9,9 @@ import type {
   AgentStepResult,
 } from '../agent/types';
 
-/** v1.6.8 deliberately rejects every earlier Session/Checkpoint continuation schema. */
-export const CHECKPOINT_SCHEMA_VERSION = '19.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '19.0.0' as const;
+/** v1.6.9 deliberately rejects every earlier Session/Checkpoint continuation schema. */
+export const CHECKPOINT_SCHEMA_VERSION = '20.0.0' as const;
+export const SESSION_SCHEMA_VERSION = '20.0.0' as const;
 export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
 export const SESSION_ARTIFACT_PACKAGE_VERSION = '2.0.0' as const;
 export const PLAY_TURN_PROTOCOL_VERSION = '1.3.0' as const;
@@ -179,6 +179,7 @@ export interface SessionStateDelta {
 
 /** Small hash-chained record. Observation/legal-action bodies live in the payload pool. */
 export interface PublicDecisionRecord {
+  summary?: import('../core/action-summary').ActionSummary;
   decision: number;
   turn: number;
   phase: AgentObservation['phase'];
@@ -344,6 +345,7 @@ export interface SessionStatusResult {
   sessionMetrics: SessionMetrics;
 }
 export interface SessionStepResult extends SessionStatusResult {
+  summary?: import('../core/action-summary').ActionSummary;
   accepted: boolean;
   error: AgentStepResult['error'];
   events: AgentPublicEvent[];
@@ -354,6 +356,7 @@ export interface SessionStepResult extends SessionStatusResult {
 }
 
 export interface SessionPlayTurnActionResult {
+  summary?: import('../core/action-summary').ActionSummary;
   kind: 'action-result';
   requestId: string;
   replayed: boolean;
@@ -388,7 +391,7 @@ export interface SessionPlayTurnPlanResult {
   result: AgentGameResult | null;
 }
 
-export interface NewSessionOptions { sessionId?: string; seed?: number; agentId?: string; checkpointInterval?: number; preferredCommentLocale?: SessionCommentLocale }
+export interface NewSessionOptions { scenarioId?: string; sessionId?: string; seed?: number; agentId?: string; checkpointInterval?: number; preferredCommentLocale?: SessionCommentLocale }
 export interface SessionGameRuntime {
   getApiInfo?(): AgentApiInfo;
   getObservation(): AgentObservation;
@@ -402,7 +405,7 @@ export interface SessionGameRuntime {
   exportPrivateState(): JsonValue;
 }
 export interface SessionGameFactory {
-  createNew(options: { seed: number; agentId: string }): SessionGameRuntime;
+  createNew(options: { seed: number; agentId: string; scenarioId?: string }): SessionGameRuntime;
   restore(options: { privateState: JsonValue; seed: number; agentId: string; sessionId: string; decision: number; traceHeadHash: string }): SessionGameRuntime;
 }
 

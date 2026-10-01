@@ -406,7 +406,7 @@ export function runAgentGame(seed: number, options: AgentRunnerGameOptions = {})
     if (!game || typeof game.reset !== 'function') throw new Error('AgentGame factory returned an invalid game');
     observation = clone(game.reset({
       seed,
-      configOverrides: config,
+      ...(config.scenarioId === 'una' ? { scenarioId: 'una' } : { configOverrides: config }),
       agent: { id: agent.id },
     }));
     currentTurn = observation.turn;
@@ -880,7 +880,7 @@ export function replayArtifact(
   const game = (options.gameFactory ?? defaultFactory(options.buildId ?? artifact.buildId, false))(artifact.seed, config, agent);
   let observation: AgentObservation;
   try {
-    observation = clone(game.reset({ seed: artifact.seed, configOverrides: config, agent: { id: agent.id } }));
+    observation = clone(game.reset({ seed: artifact.seed, ...(config.scenarioId === 'una' ? { scenarioId: 'una' } : { configOverrides: config }), agent: { id: agent.id } }));
   } catch (thrown) {
     return { result: null, observation: null, actionsReplayed: 0, error: publicActionError('RESET_THREW', thrown instanceof Error ? thrown.message : String(thrown)), reproduced: false, mismatch: 'Replay reset failed' };
   }

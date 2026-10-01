@@ -37,6 +37,7 @@ const worseningCases: FactCase[] = [
   ['critical_site_infection_uncontained', 'infected', 1, 2],
   ['critical_site_infection_uncontained', 'healthyPopulation', 20, 19],
   ['critical_site_infection_uncontained', 'currentProductionLoss', 1, 2],
+  ['checkpoint_active_missing', 'activeCheckpointId', 'cp-1', null],
   ['checkpoint_defense_degraded', 'standbyCount', 2, 1],
   ['checkpoint_defense_degraded', 'fallbackDepth', 3, 2],
   ['checkpoint_defense_degraded', 'roleChangedThisTurn', false, true],
@@ -74,7 +75,7 @@ function alert(reasonCode: CrisisAlert['reasonCode'], publicFacts: JsonObject = 
 describe('v1.5.4 public crisis worsening contract', () => {
   it('covers all reason codes and their declared comparison facts', () => {
     expect(Object.keys(CRISIS_WORSENING_FACTS).sort()).toEqual([
-      'capital_infection_uncontained', 'critical_site_infection_uncontained', 'checkpoint_defense_degraded',
+      'capital_infection_uncontained', 'critical_site_infection_uncontained', 'checkpoint_active_missing', 'checkpoint_defense_degraded',
       'unit_out_of_supply_risk', 'horde_warning_active', 'guaranteed_resource_defeat', 'new_state_loss',
       'production_outage', 'resource_runway_risk', 'overcrowding_forecast', 'temporary_housing_outage_forecast',
       'military_goods_national_shortage', 'military_goods_supply_disconnected', 'facility_workers_zero',

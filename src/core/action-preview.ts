@@ -1,3 +1,4 @@
+import { summarizePreview, type ActionSummary } from './action-summary';
 import { previewMove } from './movement-query';
 import { destinationContactRisk } from './contact-risk';
 import { deriveCheckpointRole } from './supply';
@@ -34,6 +35,7 @@ export interface EconomyPreviewSnapshot {
 }
 
 export interface CoreActionPreview {
+  summary: ActionSummary;
   contactRisk?: ReturnType<typeof destinationContactRisk>;
   checkpointRelocation?: { oldCheckpointId: string; branchId: string; remaining: { waiting: number; screening: number; approved: number; infected: number }; oldRoleAfter: string; newActive: { position: { q: number; r: number }; id: null }; reason: string };
   populationMovements: {fromFacilityId:string;toFacilityId:string;people:number;reason:string}[];
@@ -198,7 +200,7 @@ export function previewCoreAction(
   if(legal && action.type==='AssignWorkers') for(const delta of facilityResidentDeltas.filter(d=>d.facilityId!==action.facilityId)) populationMovements.push({fromFacilityId:delta.delta>0?action.facilityId:delta.facilityId,toFacilityId:delta.delta>0?delta.facilityId:action.facilityId,people:Math.abs(delta.delta),reason:delta.delta>0?'worker_return':'worker_assignment'});
   if(legal && action.type==='TransferPopulation') populationMovements.push({fromFacilityId:action.fromFacilityId,toFacilityId:action.toFacilityId,people:action.people,reason:'population_transfer'});
   const production=action.type==='ProduceUnit'?productionCandidates(state,{unitType:action.unitType,facilityId:state.facilities.find(f=>action.destination && f.position.q===action.destination.q && f.position.r===action.destination.r)?.id})[0]:undefined;
-  return {
+  const preview: Omit<CoreActionPreview, 'summary'> = {
     populationMovements,facilityResidentDeltas,
     ...(action.type === 'Move' ? { contactRisk: destinationContactRisk(state, action.unitId, action.destination) } : {}),
     ...(action.type === 'RelocateCheckpoint' && beforeState.checkpoints.some(c => c.id === action.checkpointId) ? { checkpointRelocation: (() => {
@@ -234,6 +236,10 @@ export function previewCoreAction(
     steadyStatePerTurnDelta: productionDelta(beforeForecast, afterForecast),
     uncertain: ['combat', 'infection', 'refugee_arrivals', 'zombie_ai', 'unpublished_wave_composition'],
   };
+  const actorId = 'unitId' in action ? action.unitId : 'attackerId' in action ? action.attackerId : null;
+  const actor = state.units.find(u => u.isPlayerUnit && u.id === actorId);
+  const charges = actor ? Math.max(0, actor.attackChargesRemaining - (legal && (action.type === 'Attack' || action.type === 'AttackHex') ? 1 : 0)) : null;
+  return { ...preview, summary: summarizePreview(preview, state.turn, charges) };
 }
 
 export function coreActionPreviewJson(state: Readonly<GameState>, action: GameAction, baseRevision: number): JsonValue {

@@ -66,7 +66,7 @@ export function forecastUnitCombatAtDistance(
       reason: null,
     };
   }
-  if (normalizedDistance === 1 && unit.type !== 'reconTeam' && unit.type !== 'multipurposeHelicopter' && unit.currentMilitaryGoods < militaryGoodsCost) {
+  if (normalizedDistance === 1 && unit.type !== 'ifv' && unit.type !== 'reconTeam' && unit.type !== 'multipurposeHelicopter' && unit.currentMilitaryGoods < militaryGoodsCost) {
     return {
       distance: normalizedDistance,
       canAttack: true,
@@ -172,7 +172,7 @@ export function forecastUnitSuppression(
   militaryGoods = unit.currentMilitaryGoods,
 ): SuppressionProjection | null {
   if (
-    !unit.isPlayerUnit || unit.transportedByUnitId || (unit.type === 'multipurposeHelicopter' && !isAirborne(unit)) ||
+    !unit.isPlayerUnit || unit.disembarkedTurn === state.turn || unit.transportedByUnitId || (unit.type === 'multipurposeHelicopter' && !isAirborne(unit)) ||
     !unit.canAttack ||
     unit.attackChargesRemaining <= 0
   ) return null;

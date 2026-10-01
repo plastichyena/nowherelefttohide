@@ -1,3 +1,4 @@
+import { summarizeActionResult } from '../core/action-summary';
 import { buildContextHandoff, handoffJson, type ContextHandoff } from './context-handoff';
 import { isGameActionInput, isPlainObject, isBoundedJson, hasOnlyKeys, isSafeId } from '../agent/action-input';
 import { cloneAction, cloneJson, actionKey, matchLegalAction } from '../agent/action';
@@ -280,7 +281,7 @@ export class AiSession implements AiSessionPort {
   private readonly requestLedger = new Map<string, RequestLedgerEntry>();
   private readonly decisions: AiSessionDecisionRecord[] = [];
   private automaticContextCheckpoint: ContextHandoff | null = null;
-  private handoff() { return buildContextHandoff(this.game.getObservation(), { sessionId: this.sessionId, revision: this.revision, preferredCommentLocale: this.preferredCommentLocale, branchLineage: null }, this.decisions); }
+  private handoff() { return buildContextHandoff(this.observation(), { sessionId: this.sessionId, revision: this.revision, preferredCommentLocale: this.preferredCommentLocale, branchLineage: null }, this.decisions); }
   private lifecycle: AiSessionLifecycle = 'active';
   private revision = 0;
   private acting = false;
@@ -300,6 +301,13 @@ export class AiSession implements AiSessionPort {
       recordHistory: true,
     });
     if (options.initial !== undefined) this.game.reset(options.initial);
+  }
+
+  private observation(): AgentObservation {
+    const observation=this.game.getObservation();
+    for(const alert of observation.crisisSummary.alerts)alert.sourceRevision=this.revision;
+    for(const alert of observation.endTurnRisk.criticalAlerts)alert.sourceRevision=this.revision;
+    return observation;
   }
 
   public getContext(): AiSessionContext {
@@ -331,7 +339,7 @@ export class AiSession implements AiSessionPort {
   }
 
   public observe(): AiSessionResponse<{ observation: AiSessionObservationSummary; availableQueryTargets: PublicQueryTarget[] }> {
-    const observation = this.game.getObservation();
+    const observation = this.observation();
     return this.success({
       observation: observationSummary(observation, this.game.isGameOver(), this.game.getResult()),
       availableQueryTargets: [...QUERY_TARGETS],
@@ -373,7 +381,7 @@ export class AiSession implements AiSessionPort {
           generation: this.generation,
           baseRevision: this.revision,
           action: cloneAction(action),
-          observation: this.game.getObservation(),
+          observation: this.observation(),
           legalActions: legalActions.map(cloneAction),
         });
         projection = { kind: 'core_projection', reasonCode: null, value: cloneJson(value) };
@@ -399,6 +407,7 @@ export class AiSession implements AiSessionPort {
       legal,
       reasonCode: legal ? null : typeof core?.reasonCode === 'string' ? core.reasonCode : 'action_not_legal',
       projection,
+      ...(core?.summary ? { summary: core.summary as unknown as import('../core/action-summary').ActionSummary } : {}),
     });
   }
 
@@ -443,7 +452,7 @@ export class AiSession implements AiSessionPort {
     if (this.lifecycle === 'paused') return this.failure('paused', 'session action acceptance is paused');
     if (this.acting) return this.failure('busy', 'another action is being processed');
 
-    const before = this.game.getObservation();
+    const before = this.observation();
     let stepped: AgentStepResult;
     this.acting = true;
     try {
@@ -452,9 +461,10 @@ export class AiSession implements AiSessionPort {
       this.acting = false;
     }
     this.revision += 1;
-    const after = cloneJson(stepped.observation);
+    const after = this.observation();
     const accepted = stepped.error === null;
     const withoutHash = {
+      summary: summarizeActionResult(normalized.action, before, after, stepped.events, stepped.error, normalized.baseRevision, this.revision),
       decision: this.decisions.length + 1,
       generation: this.generation,
       baseRevision: normalized.baseRevision,
@@ -520,7 +530,7 @@ export class AiSession implements AiSessionPort {
       },
       agentArtifact: cloneJson(this.game.getRunArtifact()),
       decisions: cloneJson(this.decisions),
-      finalObservation: this.game.getObservation(),
+      finalObservation: this.observation(),
       result: cloneJson(this.game.getResult()),
     };
     return this.success({ artifact });
@@ -553,7 +563,7 @@ export class AiSession implements AiSessionPort {
     const filterErrors = validateQuerySchema(filters, QUERY_FILTER_SCHEMAS[target]);
     if (filterErrors.length) return this.failure('invalid_query', filterErrors.join('; '));
     const filtersHash = sha256AiSessionJson(filters);
-    const observation = this.game.getObservation();
+    const observation = this.observation();
     const legalActions = this.game.getLegalActions();
     let value: JsonValue | undefined;
     let items: JsonValue[] = [];

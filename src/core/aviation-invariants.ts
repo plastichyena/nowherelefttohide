@@ -24,11 +24,12 @@ export function validateAviationState(state: GameState): string[] {
       if(unit.transportedByUnitId) errors.push('Aircraft cannot be cargo');
       if(unit.cargoUnitId && !state.units.some(c=>c.id===unit.cargoUnitId && c.transportedByUnitId===unit.id && c.isPlayerUnit && isInfantry(state,c) && hexKey(c.position)===hexKey(unit.position))) errors.push('Invalid aircraft cargo reference');
       if(!isAirborne(unit)) { const tile=getTile(state.map,unit.position); if(tile?.terrain==='water' && !hasMovementRoad(state.map,unit.position)) errors.push('Aircraft cannot land on water'); }
-    } else if(unit.flightState!==undefined || unit.tookOffTurn!==undefined || unit.landedTurn!==undefined || unit.cargoUnitId!==undefined) errors.push('Flight state only applies to aircraft');
+    } else if(unit.flightState!==undefined || unit.tookOffTurn!==undefined || unit.landedTurn!==undefined || (unit.cargoUnitId!==undefined && unit.type!=='ifv')) errors.push('Flight state only applies to aircraft');
+    if (unit.type === 'ifv' && (unit.transportedByUnitId || (unit.cargoUnitId && !state.units.some(c => c.id === unit.cargoUnitId && c.transportedByUnitId === unit.id && isInfantry(state,c))))) errors.push('Invalid IFV cargo reference');
     for(const key of ['tookOffTurn','landedTurn','boardedTurn','disembarkedTurn'] as const) if(unit[key]!==undefined && !turn(unit[key])) errors.push(`Invalid flight/transport turn: ${unit.id}:${key}`);
     if(unit.transportedByUnitId) {
       const carrier=state.units.find(u=>u.id===unit.transportedByUnitId);
-      if(!isInfantry(state,unit) || !unit.isPlayerUnit || !carrier || carrier.cargoUnitId!==unit.id || carrier.type!=='multipurposeHelicopter' || !turn(unit.boardedTurn) || unit.canMove || unit.canAttack || unit.actionState!=='acted' || hexKey(carrier.position)!==hexKey(unit.position)) errors.push(`Invalid transported unit: ${unit.id}`);
+      if(!isInfantry(state,unit) || !unit.isPlayerUnit || !carrier || carrier.cargoUnitId!==unit.id || !['multipurposeHelicopter','ifv'].includes(carrier.type) || !turn(unit.boardedTurn) || unit.canMove || unit.canAttack || unit.actionState!=='acted' || hexKey(carrier.position)!==hexKey(unit.position)) errors.push(`Invalid transported unit: ${unit.id}`);
     }
     if(unit.disembarkedTurn===state.turn && (unit.canMove || unit.actionState!=='acted')) errors.push('Disembarked infantry must remain committed');
     if(unit.landedTurn===state.turn && isAirborne(unit)) errors.push('Same-turn relaunch is forbidden');

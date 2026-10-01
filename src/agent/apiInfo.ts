@@ -1,3 +1,6 @@
+import { RULES_V169 } from '../core/rules-v169';
+import { ACTION_SUMMARY_SCHEMA } from '../core/action-summary';
+import { SCENARIOS } from '../core/scenarios';
 import { RULES_V165 } from '../core/rules-v165';
 import { RULES_V164 } from '../core/rules-v164';
 import { HUMAN_UNIT_TYPES } from '../core/unit-catalog';
@@ -98,6 +101,7 @@ export function createAgentApiInfo(
     temporary_housing_outage_forecast: { severity: 'warning', category: 'resource' },
     capital_infection_uncontained: { severity: 'critical', category: 'infection' },
     critical_site_infection_uncontained: { severity: 'critical', category: 'infection' },
+    checkpoint_active_missing: { severity: 'critical', category: 'checkpoint' },
     checkpoint_defense_degraded: { severity: 'critical', category: 'checkpoint_defense' },
     unit_out_of_supply_risk: { severity: 'warning', category: 'unit_supply' },
     horde_warning_active: { severity: 'advisory', category: 'horde' },
@@ -112,6 +116,8 @@ export function createAgentApiInfo(
     oil_field_allowance_blocked: { severity: 'warning', category: 'facility' },
   };
   return cloneJson({
+    actionSummarySchema: ACTION_SUMMARY_SCHEMA,
+    scenarios: { selected: config.scenarioId, choices: SCENARIOS, unaOptions: ['seed'], defaultSeed: 1, seedRange: 'safe integer', configOverrides: 'custom only' },
     actionSchemaVersion: ACTION_SCHEMA_VERSION,
     queryContract: publicQueryContract(),
     responseSemantics: ACTION_RESPONSE_SEMANTICS,
@@ -127,6 +133,8 @@ export function createAgentApiInfo(
     methods: [...PUBLIC_METHODS],
     parameterQueries: { construction: 'query construction; filters facilityType, legalOnly, inSupply, reasonCode, q/r or qMin/qMax/rMin/rMax; paginated and revision-bound', transferPopulation: 'query population-transfers; filters fromFacilityId/toFacilityId; min/max inclusive, positive integers, expectedRevision', legalActionsExhaustive: false, revisionRequiredForSession: true },
     actionContracts: {
+      BoardTransport: { required: ['unitId','transportId'], example: {type:'BoardTransport',unitId:'police-1',transportId:'ifv-1'}, conditions: ['adjacent eligible infantry; capacity one; consumes infantry action only', 'fuel transfer only when carrier fuel is zero'] },
+      DisembarkTransport: { required: ['transportId','destination'], example: {type:'DisembarkTransport',transportId:'ifv-1',destination:{q:24,r:25}}, conditions: ['next turn or later; empty adjacent passable ground; no voluntary infantry action this turn'] },
       AttackHex: { required:['attackerId','position'],example:{type:'AttackHex',attackerId:'fieldArtillery-1',position:{q:25,r:25}},conditions:['deployed and unlocked; one charge and 50 carried Military Goods','visible Hex at distance 10..200, including empty or water; no LOS','preview returns a probability distribution without execution RNG','re-preview after revision changes; human collateral requires confirmation; AI must evaluate all emergency conditions'] },
       ChangeUnitMode: { required:['unitId','mode'],example:{type:'ChangeUnitMode',unitId:'fieldArtillery-1',mode:'deployed'},conditions:['unused artillery this turn, packed/deployed only','no resource payment; all actions and reactions locked until next player turn'] },
       RelocateCheckpoint: { required: ['checkpointId', 'position'], example: { type: 'RelocateCheckpoint', checkpointId: 'checkpoint-1', position: { q: 25, r: 21 } }, conditions: ['use the current road branch activeCheckpointId; other operational posts are not relocation sources', 'same branch', 'visible capital-side road route', 'query checkpoints and construction at the current revision', 'preview keeps all four queue pools at the old physical post; read actual new IDs from the accepted result'] },
@@ -141,7 +149,7 @@ export function createAgentApiInfo(
     methodSchemas: {
       getArtifactPage: { arguments: 'AgentArtifactPageOptions? { target?, offset?, pageSize? (1..500; default 100), expectedRevision? }', returns: 'AgentArtifactPage', description: 'Read a bounded public manifest, observations, actions, events or invalid-attempts page. Continue using nextOffset and expectedRevision; stale_revision rejects changed runs. No network or filesystem access.' },
       getApiInfo: { arguments: 'none', returns: 'AgentApiInfo', description: 'Returns versions, public methods, fair-play boundaries, and static rules.' },
-      reset: { arguments: 'AgentResetOptions? { seed?, configOverrides?, agent?: { id } }', returns: 'AgentObservation', description: 'Replaces the in-memory Agent session.' },
+      reset: { arguments: 'AgentResetOptions? { scenarioId? (una/custom), seed?, configOverrides? (custom only), agent?: { id } }', returns: 'AgentObservation', description: 'Replaces the in-memory Agent session.' },
       getObservation: { arguments: 'none', returns: `AgentObservation ${OBSERVATION_API_VERSION}`, description: 'Returns a deterministic JSON copy of current public information, including Ground/Aerial visibility, the last 50 important public site events, checkpoint candidates, Horde status, and Victory progress.' },
       getLegalActions: { arguments: 'none', returns: 'GameAction[]', description: 'Returns deterministic currently legal atomic actions.' },
       step: { arguments: 'one concrete legal GameAction; TransferPopulation also accepts the queried positive integer domain', returns: 'AgentStepResult', description: 'Validates and applies exactly one action through GameEngine.' },
@@ -211,6 +219,8 @@ export function createAgentApiInfo(
       'Do not infer or request private chain-of-thought; concise action reasons are sufficient.',
     ],
     rules: {
+      v169: RULES_V169,
+      ifv: cloneJson(config.units.ifv),
       v165: {explanations:RULES_V165,helicopter:cloneJson(config.units.multipurposeHelicopter),airBase:cloneJson(config.facilities.airBase),objectives:cloneJson(config.objectives),militaryDrone:cloneJson(config.militaryDrone)},
       v164: {explanations:RULES_V164,artillery:cloneJson(config.units.fieldArtillery),humanCapabilities:Object.fromEntries(HUMAN_UNIT_TYPES.map(t=>[t,config.units[t].capabilities])) as AgentApiInfo['rules']['v164']['humanCapabilities'],productionLimits:Object.fromEntries(HUMAN_UNIT_TYPES.map(t=>[t,config.units[t].productionLimitPerGame])) as AgentApiInfo['rules']['v164']['productionLimits']},
       v163: { explanations: RULES_V163, contextHandoffLimits: CONTEXT_HANDOFF_LIMITS, capitalMinimum: 1, healthStress: { persistence: 0.75, deficitWeight: 0.40 }, starvation: { threshold: 2, cap: 7, recovery: 0.5, maximumRate: 0.10 }, screening: { normal: 0.05, strict: 0, passThroughBase: 0.25, passThroughCap: 0.60 }, infectionGrace: 'next_end_turn', nuclearCaptureDeadline: config.objectives.nuclearPowerPlant.rewardDeadlineTurn, nuclearFailureTurn: config.objectives.nuclearPowerPlant.rewardDeadlineTurn+1 },

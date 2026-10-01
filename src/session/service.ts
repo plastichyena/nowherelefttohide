@@ -1,3 +1,4 @@
+import { summarizeActionResult } from '../core/action-summary';
 import { compactPublicHealth } from '../core/public-health';
 import { ContextHandoffHistory, projectContextHandoff, handoffJson } from './context-handoff';
 import { CRISIS_WORSENING_FACTS } from '../core/crisis';
@@ -453,7 +454,7 @@ function playTurnStop(
   return { reason: null, details: {} };
 }
 
-function siteRecords(observation: AgentObservation): Array<{ id: string; infected: number; status: string }> {
+function siteRecords(observation: AgentObservation): Array<{ id: string; infected: number | null; status: string }> {
   return [...observation.facilities.map((facility) => ({ id: facility.id, infected: facility.infectedPopulation, status: facility.status })), ...observation.checkpoints.map((checkpoint) => ({ id: checkpoint.id, infected: checkpoint.infected, status: checkpoint.status }))];
 }
 
@@ -471,7 +472,7 @@ export function deriveSessionStateDelta(before: AgentObservation, after: AgentOb
   const afterUnits = new Map(after.units.map((unit) => [unit.id, unit] as const));
   const beforeCheckpoints = new Map(before.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint] as const));
   return {
-    newlyInfectedSites: sortedUnique([...afterSites.values()].filter((site) => site.infected > 0 && (beforeSites.get(site.id)?.infected ?? 0) <= 0).map((site) => site.id)),
+    newlyInfectedSites: sortedUnique([...afterSites.values()].filter((site) => site.infected !== null && site.infected > 0 && beforeSites.get(site.id)?.infected === 0).map((site) => site.id)),
     beforeTurn: before.turn,
     afterTurn: after.turn,
     facilityChanges: facilityChanges(before, after, events),
@@ -549,6 +550,8 @@ export class SessionService {
 
   public newSession(options: NewSessionOptions = {}): SessionStatusResult {
     if (!isObject(options)) throw new SessionError('invalid_session_option', 'new options must be a JSON object');
+    if (options.scenarioId !== undefined && typeof options.scenarioId !== 'string') throw new SessionError('invalid_session_option', 'scenarioId must be a string');
+    if (Object.keys(options).some(k => !['scenarioId','sessionId','seed','agentId','checkpointInterval','preferredCommentLocale'].includes(k))) throw new SessionError('invalid_session_option', 'Unknown new option; UNA accepts only seed as game configuration');
     const sessionId = options.sessionId ?? newSessionId();
     const seed = requireSafeInteger(options.seed ?? 1, 'seed', Number.MIN_SAFE_INTEGER);
     const checkpointInterval = requireSafeInteger(options.checkpointInterval ?? DEFAULT_CHECKPOINT_INTERVAL, 'checkpointInterval', 1);
@@ -557,7 +560,7 @@ export class SessionService {
     assertSafeIdentifier(sessionId, 'sessionId'); assertSafeIdentifier(agentId, 'agentId');
     const lock = this.store.acquireLock(sessionId);
     try {
-      const runtime = this.gameFactory.createNew({ seed, agentId });
+      const runtime = this.gameFactory.createNew({ seed, agentId, scenarioId: options.scenarioId });
       const observation = clone(runtime.getObservation());
       if (observation.map.id !== this.identity.mapId) throw new SessionError('session_version_mismatch', `Runtime map ${observation.map.id} does not match ${this.identity.mapId}`);
       const publicConfig = clone(runtime.getRunArtifact().config) as unknown as JsonValue;
@@ -627,7 +630,8 @@ export class SessionService {
         : this.store.writePayload('public', { kind: 'diff', beforeDocumentHash: beforeHash, afterDocumentHash: afterHash, operations } satisfies SessionPublicDiffPayload);
       const stateDelta = deriveSessionStateDelta(beforeObservation, afterObservation, result.events);
       const stop = request ? playTurnStop(input.action, accepted, beforeObservation, afterObservation, request.expectations) : { reason: null, details: {} as JsonValue };
-      const withoutHash = { decision: nextDecision, turn: beforeObservation.turn, phase: beforeObservation.phase, inputAction: cloneAction(input.action), decisionSummary: input.decisionSummary ?? null, requestedCommentLocale: request?.requestedCommentLocale ?? loaded.descriptor.preferredCommentLocale, requestId: request?.requestId ?? null, requestHash: request?.requestHash ?? null, playTurnStopReason: stop.reason, playTurnStopDetails: clone(stop.details), accepted, error: clone(result.error), events: clone(result.events), stateDelta, importantChanges: accepted ? deriveImportantChanges(beforeObservation, afterObservation, result.events) : [], beforePublicHash: beforeHash, afterPublicHash: afterHash, publicPayload: payload, publicPayloadKind: payloadKind, previousDecisionHash: loaded.active.traceHeadHash } satisfies Omit<PublicDecisionRecord, 'decisionHash'>;
+      const summary = summarizeActionResult(input.action, beforeObservation, afterObservation, result.events, result.error, loaded.active.revision, loaded.active.revision + 1);
+      const withoutHash = { summary, decision: nextDecision, turn: beforeObservation.turn, phase: beforeObservation.phase, inputAction: cloneAction(input.action), decisionSummary: input.decisionSummary ?? null, requestedCommentLocale: request?.requestedCommentLocale ?? loaded.descriptor.preferredCommentLocale, requestId: request?.requestId ?? null, requestHash: request?.requestHash ?? null, playTurnStopReason: stop.reason, playTurnStopDetails: clone(stop.details), accepted, error: clone(result.error), events: clone(result.events), stateDelta, importantChanges: accepted ? deriveImportantChanges(beforeObservation, afterObservation, result.events) : [], beforePublicHash: beforeHash, afterPublicHash: afterHash, publicPayload: payload, publicPayloadKind: payloadKind, previousDecisionHash: loaded.active.traceHeadHash } satisfies Omit<PublicDecisionRecord, 'decisionHash'>;
       const record: PublicDecisionRecord = { ...withoutHash, decisionHash: decisionHash(withoutHash) };
       const nextPublic: SessionPublicState = { ...afterDocument, decision: nextDecision, traceHeadHash: record.decisionHash, documentHash: afterHash };
       const nextActive = this.store.commit({ descriptor: loaded.descriptor, previous: loaded.active, privateState: afterPrivate, publicState: nextPublic, decisionRecord: record, acceptedActionCount: loaded.active.acceptedActionCount + (accepted ? 1 : 0), invalidActionCount: loaded.active.invalidActionCount + (accepted ? 0 : 1) });
@@ -639,7 +643,7 @@ export class SessionService {
       this.guidance.set(sessionId, { commitIntegrityHash: nextActive.commitIntegrityHash, history });
       this.cacheContinuation(sessionId, { ...committed, privateState: null });
       this.cacheRuntime(sessionId, committed, runtime);
-      return { ...this.statusResult(committed), active: clone(nextActive), accepted, error: clone(result.error), events: clone(result.events), stateDelta: clone(stateDelta), importantChanges: summarizeImportantChanges([{ decision: record.decision, changes: record.importantChanges }], record.decision, record.decision, nextActive.revision), decisionRecord: clone(record), checkpointsCreated };
+      return { ...this.statusResult(committed), active: clone(nextActive), summary: clone(summary), accepted, error: clone(result.error), events: clone(result.events), stateDelta: clone(stateDelta), importantChanges: summarizeImportantChanges([{ decision: record.decision, changes: record.importantChanges }], record.decision, record.decision, nextActive.revision), decisionRecord: clone(record), checkpointsCreated };
     } catch (error) {
       this.closeContinuation(sessionId);
       throw error;
@@ -792,7 +796,7 @@ export class SessionService {
   private playTurnActionResult(status: SessionStatusResult, record: PublicDecisionRecord, replayed: boolean): SessionPlayTurnActionResult {
     return {
       kind: 'action-result', requestId: record.requestId!, replayed, originalDecision: record.decision, originalRevision: record.decision,
-      currentRevision: status.revision, accepted: record.accepted, error: clone(record.error), events: clone(record.events), stateDelta: clone(record.stateDelta), importantChanges: summarizeImportantChanges([{ decision: record.decision, changes: record.importantChanges }], record.decision, record.decision, status.revision),
+      currentRevision: status.revision, summary: clone(record.summary), accepted: record.accepted, error: clone(record.error), events: clone(record.events), stateDelta: clone(record.stateDelta), importantChanges: summarizeImportantChanges([{ decision: record.decision, changes: record.importantChanges }], record.decision, record.decision, status.revision),
       stopReason: record.playTurnStopReason, stopDetails: clone(record.playTurnStopDetails), observation: status.observation, gameOver: status.gameOver, result: status.result,
     };
   }
@@ -1100,7 +1104,7 @@ export class SessionService {
     if (first.done) throw new SessionError('artifact_corrupt', 'Artifact stream is empty');
     const header = JSON.parse(first.value) as { descriptor: SessionDescriptor; finalPublicHash: string };
     this.assertDescriptorCompatible(header.descriptor);
-    const runtime = this.gameFactory.createNew({ seed: header.descriptor.seed, agentId: header.descriptor.agentId });
+    const runtime = this.gameFactory.createNew({ seed: header.descriptor.seed, agentId: header.descriptor.agentId, scenarioId: (header.descriptor.publicConfig as unknown as GameConfig).scenarioId });
     let decisionCount = 0;
     for (let next = lines.next(); !next.done; next = lines.next()) {
       const entry = JSON.parse(next.value) as { kind: string; record?: PublicDecisionRecord };

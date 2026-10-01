@@ -15,7 +15,7 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '18.0.0';
+export const CONFIG_VERSION = '19.0.0';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v9';
 
 const facilityIds: FacilityId[] = [
@@ -66,9 +66,20 @@ function production(
   return { inputs, outputs, powerMode, requiresPower: powerMode === 'required', powerCapacity, powerGeneration, fixedPowerGeneration };
 }
 
-const standardHuman = { capabilities: { capture: true, recoverCheckpoint: true, suppress: true, contain: true, infantry: true }, productionFuel: 0, productionLimitPerGame: null };
+const standardHuman = { capabilities: { capture: true, recoverCheckpoint: true, suppress: true, contain: true, infantry: true }, productionFood: 0, productionFuel: 0, productionLimitPerGame: null };
 
 const defaultUnitConfig: UnitConfigMap = {
+  ifv: {
+    ...standardHuman, capabilities: { ...standardHuman.capabilities, infantry: false },
+    canTargetAir: true, movementDomain: 'ground', regularAttackCharges: 3, veteranAttackCharges: 4,
+    hp: 200, recruitAttack: 16, movement: 10, range: 5, vision: 5, population: 4,
+    maxFuel: 100, maxMilitaryGoods: 120, fixedMilitaryGoodsUpkeepPerTurn: 0,
+    attackMilitaryGoodsCostByRange: { 0: 20, 1: 20, 2: 20, 3: 20, 4: 20, 5: 20 }, suppressionMilitaryGoodsCost: 20,
+    militaryGoodsShortageAttackMultiplier: 0, emergencyMovementPoints: 0, recruitmentFacilityTypes: ['armyBase'],
+    productionFood: 80, productionCivilianGoods: 50, productionMilitaryGoods: 170, productionFuel: 150, productionLimitPerGame: 1,
+    fuelCostRule: 'perHex', fuelPerHex: 10, cargoCapacity: 1,
+    suppressionCivilianDamageRate: 0.5, reanimationUnitType: 'soldierZombie', noiseClass: 'large', noiseRadius: 10,
+  },
   multipurposeHelicopter: {
     ...standardHuman, capabilities: { capture: false, recoverCheckpoint: false, suppress: false, contain: false, infantry: false },
     canTargetAir: true, movementDomain: 'ground', regularAttackCharges: 1, veteranAttackCharges: 2,
@@ -356,12 +367,14 @@ export const DEFAULT_CONFIG: GameConfig = {
   militaryDrone: { fuelPerHex: 5, visionRadius: 10, durationTurns: 5 },
   windPower: { noiseRadius: 8 },
   armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 10 },
+  scenarioId: 'custom',
   version: CONFIG_VERSION,
   mapId: DEFAULT_MAP_ID,
   maxActionsPerTurn: 100,
   units: defaultUnitConfig,
   unitExperience: {
     productionProficiencyByType: {
+      ifv: 'recruit',
       fieldArtillery: 'recruit',
       multipurposeHelicopter: 'recruit',
       police: 'recruit',
@@ -536,6 +549,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
   if (!config || typeof config !== 'object') {
     return { valid: false, errors: ['Config must be an object'] };
   }
+  if (!['custom', 'una'].includes(config.scenarioId)) errors.push('scenarioId must be custom or una');
   if (config.version !== CONFIG_VERSION) {
     errors.push(`version must be ${CONFIG_VERSION}`);
   }
@@ -574,6 +588,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       requireInteger(errors, humanUnit.veteranAttackCharges, `units.${type}.veteranAttackCharges`, 1);
       requireInteger(errors, humanUnit.recruitAttack, `units.${type}.recruitAttack`, 1);
       requireInteger(errors, humanUnit.productionCivilianGoods, `units.${type}.productionCivilianGoods`, 0);
+      requireInteger(errors, humanUnit.productionFood, `units.${type}.productionFood`, 0);
       requireInteger(errors, humanUnit.productionFuel, `units.${type}.productionFuel`, 0);
       if (humanUnit.productionLimitPerGame !== null) requireInteger(errors, humanUnit.productionLimitPerGame, `units.${type}.productionLimitPerGame`, 0);
       for (const capability of ['capture','recoverCheckpoint','suppress','contain','infantry'] as const) if (typeof humanUnit.capabilities?.[capability] !== 'boolean') errors.push(`Invalid ${type} capability ${capability}`);
@@ -581,7 +596,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
       if (!Array.isArray(humanUnit.recruitmentFacilityTypes) || (type !== 'specialForces' && humanUnit.recruitmentFacilityTypes.length === 0)) {
         errors.push(`units.${type}.recruitmentFacilityTypes is required`);
       }
-      if (!['policeLike', 'nationalGuardLike', 'perMovementPoint'].includes(humanUnit.fuelCostRule)) {
+      if (!['policeLike', 'nationalGuardLike', 'perMovementPoint', 'perHex'].includes(humanUnit.fuelCostRule)) {
         errors.push(`units.${type}.fuelCostRule is invalid`);
       }
       if (!['small', 'medium', 'large', 'extraLarge'].includes(humanUnit.noiseClass)) {
@@ -627,6 +642,8 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     }
   }
 
+  requireInteger(errors, config.units.ifv?.fuelPerHex, 'units.ifv.fuelPerHex', 1);
+  requireInteger(errors, config.units.ifv?.cargoCapacity, 'units.ifv.cargoCapacity', 1);
   const helicopter=config.units.multipurposeHelicopter;
   for(const key of ['airborneMovement','fuelPerMovementPoint','endTurnFuel','endTurnNoiseRadius','cargoCapacity'] as const) requireInteger(errors,helicopter?.[key],`units.multipurposeHelicopter.${key}`,1);
   if(helicopter?.reanimationUnitType!==null || helicopter?.movement!==0 || helicopter?.cargoCapacity!==1) errors.push('Helicopter must start landed and cannot reanimate');

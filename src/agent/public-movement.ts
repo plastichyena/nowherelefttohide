@@ -1,3 +1,4 @@
+import { projectIfvPath, type IfvPublicEnemy } from '../core/ifv';
 import { findReachablePaths, findShortestPath, pathMovementCost } from '../core/path';
 import { hexDistance, hexKey } from '../core/hex';
 import { movementPlan, movementUnavailableReason, previewMovementPath, type MovementActor } from '../core/move-plan';
@@ -8,7 +9,7 @@ export interface PublicMovementSource {
   phase: string; gameOver?: boolean;
   map: Pick<AgentMapObservation, 'width' | 'height' | 'tiles'>;
   units: ReadonlyArray<MovementActor & { position: HexCoord }>;
-  zombies: ReadonlyArray<{ id: string; position: HexCoord; canAttack?: boolean; attackChargesRemaining?: number; canTargetAir?: boolean; effectiveRange?: number }>;
+  zombies: ReadonlyArray<{ type?: string; hp?: number; attack?: number; terrainDamageMultiplier?: number; id: string; position: HexCoord; canAttack?: boolean; attackChargesRemaining?: number; canTargetAir?: boolean; effectiveRange?: number }>;
 }
 
 const decisionCaches = new WeakMap<PublicMovementSource, { geometry: Map<string, ReturnType<typeof makeGeometry>>; candidates: Map<string, ReturnType<typeof publicMoveCandidates>> }>();
@@ -28,7 +29,7 @@ function makeGeometry(source: PublicMovementSource, unit: MovementActor) {
   const flying = unit.flightState === 'airborne';
   const blocked = new Set([
     ...source.units.filter(u => u.id !== unit.id && !u.transportedByUnitId && (flying ? u.flightState === 'airborne' : u.flightState !== 'airborne')),
-    ...(flying ? [] : source.zombies),
+    ...(flying || unit.type === 'ifv' ? [] : source.zombies),
   ].map(u => hexKey(u.position)));
   const resolver = (p: HexCoord) => {
     const tile = tiles.get(hexKey(p));
@@ -65,6 +66,17 @@ export function publicMoveDetails(source: PublicMovementSource, unitId: string, 
   const path = pathOverride ?? (decisionCaches.has(source) ? publicMoveCandidates(source, unitId).find(p => hexKey(p.destination) === hexKey(destination))?.path : undefined) ?? findShortestPath(map, unit.position, destination, blocked, resolver);
   if (!path) return null;
   const plan = movementPlan(unit, source.gameOver ? 'ended' : source.phase, path.length - 1, pathMovementCost(path, resolver));
+  if (unit.type === 'ifv' && unit.hp !== undefined && unit.ifv) {
+    const tiles = new Map(source.map.tiles.map(t => [hexKey(t), t]));
+    const enemies = source.zombies.filter((z): z is typeof z & IfvPublicEnemy => z.hp !== undefined && z.type !== undefined && z.attack !== undefined && z.attackChargesRemaining !== undefined);
+    const preview = projectIfvPath({ ...unit, hp: unit.hp }, path, {
+      visible: new Set(source.map.tiles.filter(t => t.visibleToPlayer).map(hexKey)), enemies,
+      fuelPerHex: unit.ifv.fuelPerHex, movementCost: p => resolver(p) ?? 0,
+      gasDamage: p => Math.max(0, Math.ceil(unit.ifv!.gasDamage * (tiles.get(hexKey(p))?.urban ? tiles.get(hexKey(p))!.terrainDamageMultiplier : 1))),
+      zombieGasDamage: e => Math.max(0, Math.ceil(unit.ifv!.zombieGasDamage * (source.zombies.find(z => z.id === e.id)?.terrainDamageMultiplier ?? 1))),
+    });
+    return { ...plan, destination: { ...destination }, preview: plan.legal ? preview : null };
+  }
   const visibleEnemies = [...source.zombies].sort((a,b) => a.id.localeCompare(b.id));
   const preview = previewMovementPath(unit, source.phase, path, p => resolver(p) ?? 0,
     p => visibleEnemies.find(z => z.canAttack && (z.attackChargesRemaining ?? 0) > 0 &&

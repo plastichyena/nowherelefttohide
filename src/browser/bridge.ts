@@ -1,3 +1,4 @@
+import { isGameActionInput } from '../agent/action-input';
 import { cloneAction, cloneJson } from '../agent/action';
 import { createAgentGame } from '../agent/game';
 import {
@@ -153,80 +154,7 @@ function hasOnlyKeys(value: Record<string, unknown>, required: readonly string[]
  * decides whether a well-formed action is legal for the current state.
  */
 function isBridgeAction(value: unknown): value is GameAction {
-  if (!isPlainObject(value) || boundedJsonLength(value) === null || boundedJsonLength(value)! > MAX_ACTION_JSON_LENGTH) return false;
-  try {
-    switch (value.type) {
-      case 'Move':
-        return hasOnlyKeys(value, ['type', 'unitId', 'destination']) && isSafeId(value.unitId) && isCoordinate(value.destination);
-      case 'ChangeUnitMode':
-        return hasOnlyKeys(value,['type','unitId','mode']) && isSafeId(value.unitId) && (value.mode==='packed'||value.mode==='deployed');
-      case 'AttackHex':
-        return hasOnlyKeys(value,['type','attackerId','position']) && isSafeId(value.attackerId) && isCoordinate(value.position);
-      case 'Attack':
-        return hasOnlyKeys(value, ['type', 'attackerId', 'targetId']) && isSafeId(value.attackerId) && isSafeId(value.targetId);
-      case 'Wait':
-        return hasOnlyKeys(value, ['type', 'unitId']) && isSafeId(value.unitId);
-      case 'AssignWorkers':
-        return hasOnlyKeys(value, ['type', 'facilityId', 'workers']) && isSafeId(value.facilityId) && isNonNegativeSafeInteger(value.workers);
-      case 'TransferPopulation':
-        return (
-          hasOnlyKeys(value, ['type', 'fromFacilityId', 'toFacilityId', 'people']) &&
-          isSafeId(value.fromFacilityId) &&
-          isSafeId(value.toFacilityId) &&
-          isNonNegativeSafeInteger(value.people)
-        );
-      case 'SetCheckpointPolicy':
-        return (
-          hasOnlyKeys(value, ['type', 'branchId', 'policy']) &&
-          isSafeId(value.branchId) &&
-          (value.policy === 'passThrough' || value.policy === 'normal' || value.policy === 'strict' || value.policy === 'deny')
-        );
-      case 'SetPowerSupply':
-        return (
-          hasOnlyKeys(value, ['type', 'facilityId', 'enabled']) &&
-          isSafeId(value.facilityId) &&
-          typeof value.enabled === 'boolean'
-        );
-      case 'BuildBarbedWire':
-        return hasOnlyKeys(value, ['type', 'position']) && isCoordinate(value.position);
-      case 'BuildCheckpoint':
-        return hasOnlyKeys(value, ['type', 'position'], ['branchId']) &&
-          isCoordinate(value.position) &&
-          (value.branchId === undefined || isSafeId(value.branchId));
-      case 'BuildConstructibleFacility':
-        return hasOnlyKeys(value, ['type', 'facilityType', 'position']) &&
-          (value.facilityType === 'simpleFarm' || value.facilityType === 'civilianDroneBase' || value.facilityType === 'temporaryHousing' || value.facilityType === 'windPowerPlant') &&
-          isCoordinate(value.position);
-      case 'DecommissionConstructibleFacility':
-        return hasOnlyKeys(value, ['type', 'facilityId']) && isSafeId(value.facilityId);
-      case 'RelocateCheckpoint':
-        return hasOnlyKeys(value, ['type', 'checkpointId', 'position'], ['branchId']) &&
-          isSafeId(value.checkpointId) &&
-          isCoordinate(value.position) &&
-          (value.branchId === undefined || isSafeId(value.branchId));
-      case 'ActivateCheckpoint':
-        return hasOnlyKeys(value, ['type', 'branchId', 'checkpointId']) &&
-          isSafeId(value.branchId) &&
-          isSafeId(value.checkpointId);
-      case 'TurnAwayCheckpointRefugees':
-        return hasOnlyKeys(value, ['type', 'checkpointId', 'count']) &&
-          isSafeId(value.checkpointId) &&
-          isNonNegativeSafeInteger(value.count) && value.count >= 1;
-      case 'ProduceUnit':
-        return (
-          hasOnlyKeys(value, ['type', 'unitType'], ['destination']) &&
-          (value.unitType === 'police' || value.unitType === 'nationalGuard' || value.unitType === 'riotPolice' || value.unitType === 'reconTeam' || value.unitType === 'fieldArtillery') &&
-          (value.destination === undefined || isCoordinate(value.destination))
-        );
-      case 'EndTurn':
-        return hasOnlyKeys(value, ['type']);
-      default:
-        // StartNewGame and LoadSnapshot are intentionally not bridge actions.
-        return false;
-    }
-  } catch {
-    return false;
-  }
+  return isGameActionInput(value);
 }
 
 export function resolveBuildId(explicit: string | undefined): string {

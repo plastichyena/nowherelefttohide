@@ -25,6 +25,7 @@ export interface GasExplosionSiteTarget {
 interface GasExplosionEntry {
   sourceUnitId: string;
   position: UnitState['position'];
+  explicitTargetId?: string;
 }
 
 export interface UnitLifecycleHooks {
@@ -105,7 +106,7 @@ function destroyUnit(
   if (unit.type === 'gasZombie') {
     explosionQueue.push({ sourceUnitId: unit.id, position: { ...unit.position } });
   }
-  if (isHumanUnit(unit)) reanimate(state,unit,cause,rng);
+  if (isHumanUnit(unit) && !(unit.type === 'ifv' && cargo)) reanimate(state,unit,cause,rng);
 }
 
 function reanimate(state: GameState, unit: UnitState, cause: string, rng: SeededRng): void {
@@ -245,7 +246,7 @@ function resolveGasExplosions(
         .map(hexKey),
     );
     const unitSnapshot = state.units
-      .filter((unit) => unit.hp > 0 && occupiesGroundLayer(unit) && adjacentKeys.has(hexKey(unit.position)))
+      .filter((unit) => unit.hp > 0 && occupiesGroundLayer(unit) && (adjacentKeys.has(hexKey(unit.position)) || unit.id === explosion.explicitTargetId))
       .sort((left, right) => left.id.localeCompare(right.id));
     const siteSnapshot = snapshotExplosionSites(state, adjacentKeys);
     const config = state.config.units.gasZombie;
@@ -353,5 +354,15 @@ function dealDamage(
     const pending=state.pendingReanimations; state.pendingReanimations=[];
     for(const entry of pending) reanimate(state,createUnit(state,entry.humanUnitId,entry.humanUnitType,entry.position),entry.cause,rng);
   }
-  return { dealDamage, dealAreaDamage, destroyForCrash, retryPendingReanimations };
+  function resolveOverrun(state: GameState, mover: UnitState, target: UnitState, impactDamage: number, rng: SeededRng): void {
+    const explosions: GasExplosionEntry[] = [];
+    target.hp = 0;
+    mover.hp -= impactDamage;
+    mover.activity.overran = true;
+    emit(state, 'unit_overrun', { unitId: mover.id, targetId: target.id, targetType: target.type, impactDamage, enemyCharges: target.attackChargesRemaining, q: mover.position.q, r: mover.position.r });
+    destroyUnit(state, target, 'overrun', rng, explosions);
+    for (const explosion of explosions) if (explosion.sourceUnitId === target.id) explosion.explicitTargetId = mover.id;
+    resolveGasExplosions(state, rng, explosions);
+  }
+  return { dealDamage, dealAreaDamage, destroyForCrash, retryPendingReanimations, resolveOverrun };
 }

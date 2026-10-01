@@ -23,6 +23,7 @@ export const CRISIS_WORSENING_FACTS = {
   temporary_housing_outage_forecast: { outageCount: 'up', penaltyRatio: 'up', additionalFood: 'up', additionalCivilianGoods: 'up' },
   capital_infection_uncontained: { infected: 'up', healthyPopulation: 'down', suppressionUnitAvailable: 'false' },
   critical_site_infection_uncontained: { infected: 'up', healthyPopulation: 'down', currentProductionLoss: 'up' },
+  checkpoint_active_missing: { activeCheckpointId: 'lost' },
   checkpoint_defense_degraded: { standbyCount: 'down', fallbackDepth: 'down', roleChangedThisTurn: 'true', activeCheckpointId: 'lost' },
   unit_out_of_supply_risk: { hp: 'down', fuel: 'down', militaryGoods: 'down' },
   horde_warning_active: { turnsRemaining: 'down', directionCount: 'up', final: 'true' },
@@ -135,7 +136,12 @@ export function deriveCrisisSummary(state: Readonly<GameState>): CrisisAlert[] {
     const roleLossThisTurn = state.events.some((event) => event.turn === state.turn
       && event.type === 'checkpoint_fallback'
       && event.payload.branchId === branch.branchId);
-    if ((active && (active.infected > 0 || active.status !== 'operational')) || roleLossThisTurn) {
+    if (!active) {
+      alerts.push(alert('critical', 'checkpoint', 'checkpoint_active_missing', [branch.branchId], {
+        branchId: branch.branchId, activeCheckpointId: null,
+        detailQueries: [{ target: 'branches' }, { target: 'checkpoints' }, { target: 'construction' }],
+      }, ['BuildCheckpoint', 'ActivateCheckpoint']));
+    } else if ((active && (active.infected > 0 || active.status !== 'operational')) || roleLossThisTurn) {
       alerts.push(alert('critical', 'checkpoint', 'checkpoint_defense_degraded', [branch.branchId], {
         branchId: branch.branchId,
         activeCheckpointId: active?.id ?? null,

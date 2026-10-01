@@ -664,3 +664,14 @@ button.crisis-alert:hover, button.crisis-alert:focus-visible { border-color: #ff
 .zombie-playback-controls[hidden] { display:none; }
 .zombie-playback-controls strong { flex-shrink:0; white-space:nowrap; }
 .zombie-playback-controls button { min-height:44px; min-width:128px; }
+
+/* UNA start and authored story remain scrollable on small screens. */
+.scenario-select { display: grid; gap: 1rem; }
+.scenario-select button { width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.scenario-select button:disabled { opacity: .5; cursor: not-allowed; }
+.scenario-select p { margin: .25rem 0 0; }
+.intro-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+.scenario-intro { max-height: calc(100dvh - 24px); overflow-y: auto; }
+.scenario-intro > button { margin-top: 1.5rem; width: 100%; }
+.synopsis { overflow-wrap: anywhere; line-height: 1.8; }
+.synopsis h3 { margin-top: 2rem; }

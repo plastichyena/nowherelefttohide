@@ -1,4 +1,4 @@
-import { aviationReason, emergencyLandingPreview, isAviationAction, unitCanReceiveSupply } from './aircraft';
+import { aviationReason, normalizeTransportAction, emergencyLandingPreview, isAviationAction, unitCanReceiveSupply } from './aircraft';
 import { hexDistance, hexNeighbors } from './hex';
 import { isAirborne } from './unit-capabilities';
 import { isHexSupplied } from './supply';
@@ -7,10 +7,10 @@ import type { GameAction, GameState, UnitState } from './types';
 export function aviationUnitProjection(state: Readonly<GameState>, unit: UnitState) {
   const takeoff=aviationReason(state,{type:'TakeOff',unitId:unit.id});
   const land=aviationReason(state,{type:'Land',unitId:unit.id});
-  const boardingCandidates=state.units.filter(u=>u.isPlayerUnit && u.id!==unit.id && hexDistance(unit.position,u.position)===1).map(u=>({unitId:u.id,reasonCode:aviationReason(state,{type:'BoardAircraft',unitId:u.id,aircraftId:unit.id})}));
-  const disembarkCandidates=hexNeighbors(unit.position).map(destination=>({destination,reasonCode:aviationReason(state,{type:'DisembarkAircraft',aircraftId:unit.id,destination})}));
+  const boardingCandidates=state.units.filter(u=>u.isPlayerUnit && u.id!==unit.id && hexDistance(unit.position,u.position)===1).map(u=>({unitId:u.id,reasonCode:aviationReason(state,{type:'BoardTransport',unitId:u.id,transportId:unit.id})}));
+  const disembarkCandidates=hexNeighbors(unit.position).map(destination=>({destination,reasonCode:aviationReason(state,{type:'DisembarkTransport',transportId:unit.id,destination})}));
   const supply=unitCanReceiveSupply(unit) && isHexSupplied(state,unit.position);
-  return {flightState:unit.flightState!,cargoUnitId:unit.cargoUnitId??null,cargoUnitType:state.units.find(u=>u.id===unit.cargoUnitId)?.type as import('./types').HumanUnitType ?? null,
+  return {flightState:unit.flightState,cargoUnitId:unit.cargoUnitId??null,cargoUnitType:state.units.find(u=>u.id===unit.cargoUnitId)?.type as import('./types').HumanUnitType ?? null,
     tookOffTurn:unit.tookOffTurn??null,landedTurn:unit.landedTurn??null,canTakeOff:!takeoff,takeOffReasonCode:takeoff,canLand:!land,landReasonCode:land,
     canBoard:boardingCandidates.some(c=>!c.reasonCode),boardingCandidates,canDisembark:disembarkCandidates.some(c=>!c.reasonCode),disembarkCandidates,
     canRefuel:supply,canResupplyMilitaryGoods:supply,supplyReasonCode:supply?null:isAirborne(unit)?'aircraft_airborne':'out_of_supply'};
@@ -23,7 +23,7 @@ export function militaryDroneProjection(state: Readonly<GameState>) {
 export function aviationPreview(state: Readonly<GameState>,action: GameAction) {
   if(action.type==='EndTurn') return {aircraft:state.units.filter(isAirborne).map(unit=>({unitId:unit.id,fuelCost:Math.min(unit.currentFuel,state.config.units.multipurposeHelicopter.endTurnFuel),noiseRadius:state.config.units.multipurposeHelicopter.endTurnNoiseRadius,emergencyLandingRisk:unit.currentFuel<=state.config.units.multipurposeHelicopter.endTurnFuel,landing:emergencyLandingPreview(state,unit,unit.position)})),cargoUpkeepContinues:true,droneExpiresNextTurn:!!state.militaryDrone && state.militaryDrone.expiresBeforeTurn===state.turn+1};
   if(!isAviationAction(action)) return undefined;
-  const reasonCode=aviationReason(state,action); const common={legal:!reasonCode,reasonCode};
+  const reasonCode=aviationReason(state,action); action = normalizeTransportAction(action); const common={legal:!reasonCode,reasonCode};
   if(action.type==='LaunchMilitaryDrone') {
     const base=state.facilities.find(f=>f.id===action.facilityId && f.type==='airBase');
     const distance=base?hexDistance(base.position,action.target):0; const fuelCost=distance*state.config.militaryDrone.fuelPerHex;

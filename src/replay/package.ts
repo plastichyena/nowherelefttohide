@@ -92,8 +92,7 @@ export class ReplayPackage {
     checkHash(this.manifest as unknown as Record<string,unknown>,'manifestHash');
     const m=this.manifest;
     const current=m.gameRulesVersion===GAME_RULES_VERSION && String(m.saveFormatVersion)===SAVE_FORMAT_VERSION && m.agentApiVersion===AGENT_API_VERSION && m.bridgeApiVersion===BRIDGE_API_VERSION && m.appVersion===APP_VERSION && m.artifactSchemaVersion===ARTIFACT_SCHEMA_VERSION && m.observationApiVersion===OBSERVATION_API_VERSION && m.sessionSchemaVersion===SESSION_SCHEMA_VERSION;
-    const legacy=m.appVersion==='1.6.7' && m.gameRulesVersion==='17.0.0' && String(m.saveFormatVersion)==='24' && m.agentApiVersion==='22.0.0' && m.bridgeApiVersion==='22.0.0' && m.observationApiVersion==='22.0.0' && m.artifactSchemaVersion==='21.0.0' && String(m.sessionSchemaVersion)==='18.0.0';
-    if((!current&&!legacy)||m.mapId!==FIXED_MAP_ID||m.packageVersion!==SESSION_ARTIFACT_PACKAGE_VERSION)fail('Unsupported replay version: supported public Artifacts are v1.6.7 and v1.6.8. Replay never migrates recorded rules or performance.');
+    if((!current)||m.mapId!==FIXED_MAP_ID||m.packageVersion!==SESSION_ARTIFACT_PACKAGE_VERSION)fail('Unsupported replay version: v1.6.8 and earlier public Artifacts are incompatible with v1.6.9. Keep the original ZIP and start a new game. Replay never migrates recorded rules or performance.');
     // Exported streams are stored, permitting random byte-range access without extracting history.
     const stream=this.zip.entries.get('artifact.ndjson');if(!stream || stream.method!==0)fail('Replay requires a stored artifact.ndjson entry; use the Portable ZIP export');
     const digest=new Digest();let pending=new Uint8Array(), accepted=0, offset=0, previous='0'.repeat(64), snapshot=-1, footer=false, document:SessionPublicDocument|undefined;

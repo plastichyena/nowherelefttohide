@@ -1798,12 +1798,12 @@ export class HexBoardScene extends Phaser.Scene {
       const proficiencyLabel = proficiency ? t(`proficiency.${proficiency}`) : null;
       const maxCharges = typeof unitRecord.maxAttackCharges === 'number' ? Math.max(1, Math.trunc(unitRecord.maxAttackCharges)) : 1;
       const charges = typeof unitRecord.attackChargesRemaining === 'number' ? Math.max(0, Math.min(maxCharges, Math.trunc(unitRecord.attackChargesRemaining))) : maxCharges;
-      const typeLabel = unit.type === 'multipurposeHelicopter' ? t('multipurposeHelicopter') : unit.type === 'fieldArtillery' ? t('fieldArtillery') : unit.type === 'specialForces' ? t('specialForces') : unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
+      const typeLabel = unit.type === 'ifv' ? t('ifv') : unit.type === 'multipurposeHelicopter' ? t('multipurposeHelicopter') : unit.type === 'fieldArtillery' ? t('fieldArtillery') : unit.type === 'specialForces' ? t('specialForces') : unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
       const supplyLabel = suppliedTiles.has(tileKey) ? t('supplied') : t('outOfSupply');
       const details = `${unit.flightState === 'airborne' ? '▲ ' : ''}${unit.cargoUnitId ? '▣ ' : ''}${typeLabel}${proficiencyLabel ? ` (${proficiencyLabel})` : ''} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
       this.addLabel(`unit:${unit.id}:detail`, details, position.x, position.y + 23, '#f3f7f9', 8, true);
     } else if (isZombie && render.selectedZombieId === unit.id) {
-      const typeLabel = unit.type === 'packZombie' ? t('packZombie') : unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : (unit.type as string) === 'hunterZombie' ? t('hunterZombie') : (unit.type as string) === 'gasZombie' ? t('gasZombie') : (unit.type as string) === 'screamerZombie' ? t('screamerZombie') : t('zombie');
+      const typeLabel = unit.type === 'ifv' ? t('ifv') : unit.type === 'packZombie' ? t('packZombie') : unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : (unit.type as string) === 'hunterZombie' ? t('hunterZombie') : (unit.type as string) === 'gasZombie' ? t('gasZombie') : (unit.type as string) === 'screamerZombie' ? t('screamerZombie') : t('zombie');
       this.addLabel(`unit:${unit.id}:detail`, `${typeLabel} HP ${unit.hp}/${unit.maxHp}`, position.x, position.y + 23, '#f3f7f9', 8, true);
     }
     void t;

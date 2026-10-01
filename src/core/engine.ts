@@ -129,8 +129,11 @@ import type {
   ZombieUnitType,
 } from './types';
 
-const { dealDamage, dealAreaDamage, destroyForCrash, retryPendingReanimations } = createUnitLifecycle({ applyGeneratedZombieOccupancy, processSpawnOccupancyQueue, applyGasExplosionSiteInfection, resolveGasExplosionSiteFalls });
-const { applyMovement } = createMovement({ interceptorsAt, resolveCombat, tryCapture, interceptArmyBase, emergencyLand });
+const { dealDamage, dealAreaDamage, destroyForCrash, retryPendingReanimations, resolveOverrun } = createUnitLifecycle({ applyGeneratedZombieOccupancy, processSpawnOccupancyQueue, applyGasExplosionSiteInfection, resolveGasExplosionSiteFalls });
+const { applyMovement } = createMovement({ resolveOverrun, emitMoveNoise(state, mover, rng) {
+  const noise = emitCombatNoise(state, mover, mover.position);
+  if (noise) resolveFallenSiteNoiseRespawns(state, noise.sourceUnitType, noise.center, noise.radius, rng);
+}, interceptorsAt, resolveCombat, tryCapture, interceptArmyBase, emergencyLand });
 
 function emergencyLand(state: GameState, unit: UnitState, rng: SeededRng): void { emergencyLanding(state, unit, rng, target=>destroyForCrash(state,target,rng)); }
 
@@ -387,6 +390,10 @@ function settleAirBaseObjective(state: GameState): void {
 
 function aviationLegalActions(state: GameState): GameAction[] {
   const actions: GameAction[]=[];
+  for (const unit of state.units.filter(u => u.isPlayerUnit && u.type === 'ifv')) {
+    for (const cargo of state.units.filter(u => u.isPlayerUnit && hexDistance(u.position,unit.position) === 1)) actions.push({ type: 'BoardTransport', unitId: cargo.id, transportId: unit.id });
+    for (const destination of hexNeighbors(unit.position)) actions.push({ type: 'DisembarkTransport', transportId: unit.id, destination });
+  }
   for(const unit of state.units.filter(u=>u.isPlayerUnit && u.type==='multipurposeHelicopter')) {
     actions.push({type:'TakeOff',unitId:unit.id},{type:'Land',unitId:unit.id});
     for(const cargo of state.units.filter(u=>u.isPlayerUnit && hexDistance(u.position,unit.position)===1)) actions.push({type:'BoardAircraft',unitId:cargo.id,aircraftId:unit.id});
@@ -1576,7 +1583,7 @@ function processSpawnOccupancyQueue(state: GameState, rng: SeededRng, queue: Spa
 }
 
 function suppressFacility(state: GameState, facility: FacilityState, unit: UnitState): boolean {
-  if (!hasCapability(state, unit, 'suppress') || !unit.canAttack || unit.attackChargesRemaining <= 0 || facility.infected <= 0) {
+  if (unit.disembarkedTurn === state.turn || !hasCapability(state, unit, 'suppress') || !unit.canAttack || unit.attackChargesRemaining <= 0 || facility.infected <= 0) {
     return false;
   }
   const militaryGoodsCost = state.config.units[unit.type as HumanUnitType].suppressionMilitaryGoodsCost;
@@ -1652,7 +1659,7 @@ function recoverRuinedCheckpoints(state: GameState): void {
 }
 
 function suppressCheckpoint(state: GameState, checkpoint: CheckpointState, unit: UnitState, _rng: SeededRng): boolean {
-  if (!hasCapability(state, unit, 'suppress') || !unit.canAttack || unit.attackChargesRemaining <= 0 || checkpoint.infected <= 0) {
+  if (unit.disembarkedTurn === state.turn || !hasCapability(state, unit, 'suppress') || !unit.canAttack || unit.attackChargesRemaining <= 0 || checkpoint.infected <= 0) {
     return false;
   }
   const militaryGoodsCost = state.config.units[unit.type as HumanUnitType].suppressionMilitaryGoodsCost;
@@ -2871,7 +2878,8 @@ function startPlayerTurn(state: GameState, rng: SeededRng): void {
       productionProficiency,
     );
     state.completedProductions[order.unitType] += 1;
-    if (!['fieldArtillery','multipurposeHelicopter'].includes(order.unitType)) { unit.currentFuel = 0; commissioned.push(unit); }
+    emit(state, 'unit_commissioned', { unitId: unit.id, unitType: unit.type, facilityId: city.id, orderId: order.id, q: position.q, r: position.r });
+    if (!['ifv','fieldArtillery','multipurposeHelicopter'].includes(order.unitType)) { unit.currentFuel = 0; commissioned.push(unit); }
     state.units.push(unit);
     if (productionProficiency === 'recruit') state.statistics.recruitsCommissionedByType[order.unitType] += 1;
     if (order.unitType === 'riotPolice') {
@@ -3666,6 +3674,7 @@ function setPowerSupply(state: GameState, action: Extract<GameAction, { type: 'S
 }
 
 function unitProductionCosts(state: Readonly<GameState>, unitType: HumanUnitType): {
+  food: number;
   population: number;
   civilianGoods: number;
   militaryGoods: number;
@@ -3674,6 +3683,7 @@ function unitProductionCosts(state: Readonly<GameState>, unitType: HumanUnitType
   const config = state.config.units[unitType];
   return {
     population: config.population,
+    food: config.productionFood,
     civilianGoods: config.productionCivilianGoods,
     militaryGoods: config.productionMilitaryGoods,
     fuel: config.productionFuel,
@@ -3699,7 +3709,7 @@ export function validateProduceUnit(state: Readonly<GameState>, action: Extract<
     const raw=eligibleSnapshotCities(state,'supply').reduce((n,city)=>n+city.workers,0);
     return error(action,raw>=costs.population?'capital_minimum_resident_required':'insufficient_population','Not enough eligible residents while retaining the Capital minimum');
   }
-  for(const [resource,code] of [['civilianGoods','insufficient_civilian_goods'],['militaryGoods','insufficient_military_goods'],['fuel','insufficient_fuel']] as const) if(state.resources[resource]<costs[resource]) return error(action,code,`Insufficient ${resource}`);
+  for(const [resource,code] of [['food','insufficient_food'],['civilianGoods','insufficient_civilian_goods'],['militaryGoods','insufficient_military_goods'],['fuel','insufficient_fuel']] as const) if(state.resources[resource]<costs[resource]) return error(action,code,`Insufficient ${resource}`);
   return {city,costs};
 }
 
@@ -3709,6 +3719,7 @@ function produceUnit(state: GameState, action: Extract<GameAction, { type: 'Prod
   const { city, costs } = validation;
   const sources = withdrawFromSupplyCities(state, costs.population);
   if (!sources) return error(action, 'population_move_failed', 'Recruitment population could not be conscripted atomically');
+  state.resources.food -= costs.food;
   state.resources.civilianGoods -= costs.civilianGoods;
   state.resources.militaryGoods -= costs.militaryGoods;
   state.resources.fuel -= costs.fuel;

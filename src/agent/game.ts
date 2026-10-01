@@ -1,3 +1,6 @@
+import { isGameActionInput } from './action-input';
+import { summarizeActionResult } from '../core/action-summary';
+import { resolveScenario } from '../core/scenarios';
 import { productionCandidates, attackCandidates } from '../core/action-candidates';
 import { facilityChanges, branchFlowChanges } from './facility-changes';
 import { ObservationHistory, metricObservation } from './history';
@@ -61,7 +64,7 @@ function normalizeResetOptions(value: AgentResetOptions | undefined): Required<P
   const options = value ?? {};
   if (!isPlainObject(options)) throw new Error('Reset options must be an object');
   for (const key of Object.keys(options)) {
-    if (!['seed', 'configOverrides', 'agent'].includes(key)) throw new Error(`Unknown reset option: ${key}`);
+    if (!['scenarioId', 'seed', 'configOverrides', 'agent'].includes(key)) throw new Error(`Unknown reset option: ${key}`);
   }
   validateFiniteNumbers(options);
   const seedValue: unknown = options.seed ?? DEFAULT_AGENT_SEED;
@@ -428,7 +431,8 @@ export class AgentGameAdapter implements AgentGame {
 
   public reset(options?: AgentResetOptions): AgentObservation {
     const normalized = normalizeResetOptions(options);
-    const config = buildConfig(normalized.configOverrides);
+    const resolved = resolveScenario(normalized);
+    const config = normalized.scenarioId === 'una' ? resolved.config : buildConfig(normalized.configOverrides);
     const next = new GameEngine(normalized.seed, config);
     this.engine = next;
     this.resetGeneration += 1;
@@ -492,6 +496,8 @@ export class AgentGameAdapter implements AgentGame {
   }
 
   public step(action: GameAction): AgentStepResult {
+    const summaryBefore = this.currentObservation();
+    const summaryRevision = this.decisionCount;
     // Legal actions are already cached for this state. `getLegalActions()`
     // clones for external callers, but a step only needs the private snapshot
     // to locate the canonical engine action.
@@ -518,6 +524,7 @@ export class AgentGameAdapter implements AgentGame {
       if (this.recordHistory) this.invalidAttempts.push({ decision: this.decisionCount + 1, action: safeUnknownClone(action), error });
       this.decisionCount += 1;
       return {
+        ...(isGameActionInput(action) ? { summary: summarizeActionResult(action, summaryBefore, summaryBefore, [], error, summaryRevision, this.decisionCount) } : {}),
         observation: this.getObservation(),
         events: [],
         error,
@@ -533,7 +540,7 @@ export class AgentGameAdapter implements AgentGame {
       if (this.recordHistory) this.invalidAttempts.push({ decision: this.decisionCount + 1, action: cloneAction(matched), error });
       this.decisionCount += 1;
       const observation = this.getObservation();
-      return { observation, events: [], error, gameOver: result.gameOver, result: this.getResult() };
+      return { summary: summarizeActionResult(action, summaryBefore, observation, [], error, summaryRevision, this.decisionCount), observation, events: [], error, gameOver: result.gameOver, result: this.getResult() };
     }
     this.decisionCount += 1;
     if (this.recordHistory) this.acceptedActions.push(cloneAction(matched));
@@ -544,6 +551,7 @@ export class AgentGameAdapter implements AgentGame {
     if (this.recordHistory) this.events.push(...events);
     if (this.recordHistory) this.observations.push(observation);
     return {
+      summary: summarizeActionResult(action, summaryBefore, observation, events, null, summaryRevision, this.decisionCount),
       observation: cloneJson(observation),
       facilityChanges: facilityChanges(beforeObservation, observation, events),
       branchFlowChanges: branchFlowChanges(beforeObservation, observation),
