@@ -16,7 +16,7 @@ const PUBLIC_METHODS = [
 ];
 
 it('executes the Deny policy returned by the production Bridge legal actions', () => {
-  const api=createBrowserBridge();api.reset({seed:7});
+  const api=createBrowserBridge();api.reset({mapMode:'fixed',seed:7});
   const action=api.getLegalActions().find(a=>a.type==='SetCheckpointPolicy'&&a.policy==='deny');expect(action).toBeDefined();
   const result=api.step(action!);expect(result.error).toBeNull();
   expect(api.getObservation().checkpoints.some(c=>c.currentPolicy==='deny')).toBe(true);
@@ -96,7 +96,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('keeps returned observations, actions, and artifacts detached from the session', () => {
     const api = bridge();
-    const observation = api.reset({ seed: 41, agent: { id: 'clone-test' } });
+    const observation = api.reset({mapMode:'fixed', seed: 41, agent: { id: 'clone-test' } });
     observation.resources.food = -999;
     observation.map.tiles[0].q = 999;
     observation.facilities[0].healthyPopulation = -999;
@@ -161,7 +161,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('rejects malformed and unsupported actions without changing state and records attempts', () => {
     const api = bridge();
-    api.reset({ seed: 17, agent: { id: 'validation-test' } });
+    api.reset({mapMode:'fixed', seed: 17, agent: { id: 'validation-test' } });
     const before = api.getObservation();
 
     const malformed = api.step({ type: 'EndTurn', extra: 'not-allowed' } as never);
@@ -193,7 +193,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('returns a reason and preserves state for a well-formed but illegal action', () => {
     const api = bridge();
-    api.reset({ seed: 19 });
+    api.reset({mapMode:'fixed', seed: 19 });
     const before = api.getObservation();
     const result = api.step({ type: 'Wait', unitId: 'missing-unit' });
     expect(result.error).not.toBeNull();
@@ -205,7 +205,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('rejects a checkpoint action whose branch does not match its position', () => {
     const api = bridge();
-    api.reset({ seed: 23, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    api.reset({mapMode:'fixed', seed: 23, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const before = api.getObservation();
     const legalBuild = api.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
     expect(legalBuild).toBeDefined();
@@ -218,7 +218,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('exposes distinct legal BuildCheckpoint and RelocateCheckpoint actions', () => {
     const api = bridge();
-    api.reset({ seed: 23, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    api.reset({mapMode:'fixed', seed: 23, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const build = api.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
     expect(build).toBeDefined();
     const built = api.step(build!);
@@ -235,7 +235,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('accepts a well-formed legal SetPowerSupply action through the public boundary', () => {
     const api = bridge();
-    api.reset({ seed: 127, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    api.reset({mapMode:'fixed', seed: 127, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const action = api.getLegalActions().find(
       (candidate) => candidate.type === 'SetPowerSupply' && candidate.facilityId === 'farm-1',
     );
@@ -247,7 +247,7 @@ describe('Developer / Browser Bridge', () => {
 
   it('accepts BuildConstructibleFacility through the same validated public boundary', () => {
     const api = bridge();
-    api.reset({ seed: 127, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    api.reset({mapMode:'fixed', seed: 127, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const action = api.getLegalActions().find((candidate) => candidate.type === 'BuildConstructibleFacility');
     expect(action).toBeDefined();
     const result = api.step(action!);
@@ -268,7 +268,7 @@ describe('Developer / Browser Bridge', () => {
 
 
 it('accepts the IFV and generic transport input schema and returns rejected result summaries',()=>{
-  const api=createBrowserBridge();api.reset({seed:7,scenarioId:'una'});
+  const api=createBrowserBridge();api.reset({mapMode:'fixed',seed:7,scenarioId:'una'});
   for(const action of [{type:'ProduceUnit',unitType:'ifv',destination:{q:25,r:25}}, {type:'BoardTransport',unitId:'police-1',transportId:'missing'}, {type:'DisembarkTransport',transportId:'missing',destination:{q:25,r:25}}] as const){
     const result=api.step(action);
     expect(result.error).not.toBeNull();

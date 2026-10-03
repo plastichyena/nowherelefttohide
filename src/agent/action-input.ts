@@ -1,6 +1,6 @@
 import type { GameAction, JsonValue } from '../core/types';
 
-export const ACTION_SCHEMA_VERSION = '4.0.0';
+export {ACTION_SCHEMA_VERSION} from '../core/versions';
 
 export const ACTION_RESPONSE_SEMANTICS = {
   ok: 'The CLI/protocol command was processed successfully; this does not mean the GameAction was accepted.',

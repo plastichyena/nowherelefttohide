@@ -30,7 +30,7 @@ const NO_ENEMY_CONFIG: DeepPartial<GameConfig> = {
 };
 
 function testConfig(overrides: DeepPartial<GameConfig> = {}): GameConfig {
-  return createDefaultConfig({
+  return createDefaultConfig({mapMode:'fixed',
     ...NO_ENEMY_CONFIG,
     ...overrides,
   });

@@ -7,7 +7,7 @@ import { QUERY_FILTER_SCHEMAS, publicQueryContract, validateQuerySchema } from '
 import { TwoUnitScenarioEngine as GameEngine } from '../core/testConfig';
 
 it('reports actual forward expansion and rear standby coverage from accepted Core actions', () => {
-  const engine = new GameEngine(1, createDefaultConfig({ vision: { capital: 50 } }));
+  const engine = new GameEngine(1, createDefaultConfig({mapMode:'fixed', vision: { capital: 50 } }));
   const initial = engine.getState();
   const state = { ...initial, units: initial.units.filter(u => u.isPlayerUnit) };
   expect(engine.step({ type: 'LoadSnapshot', snapshot: state }).error).toBeNull();
@@ -36,7 +36,7 @@ it('reports actual forward expansion and rear standby coverage from accepted Cor
 });
 
 it('links public factory and power losses to production and keeps losses separate from recovery decisions', () => {
-  const state = createInitialState(1, createDefaultConfig());
+  const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
   const before = createAgentObservation(state);
   const factory = before.facilities.find(f => before.strategicForecast.resources.civilianGoods.contributors.some(c => c.facilityId === f.id))!;
   expect(factory).toBeDefined();
@@ -63,7 +63,7 @@ it('bounds summary entries and each array with stable ordering and complete deta
 });
 
 it('reports real legal lethal gas previews and is unchanged by hidden enemies', () => {
-  const state = createInitialState(1, createDefaultConfig());
+  const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
   const human = state.units.find(u => u.type === 'police')!;
   human.position = { q: 25, r: 25 }; human.hp = 1;
   const gas = createUnit(state, 'gas-visible', 'gasZombie', { q: 26, r: 25 }); gas.hp = 1;

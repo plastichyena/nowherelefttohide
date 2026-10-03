@@ -10,7 +10,7 @@ import { decodeSaveCode, encodeSaveCode } from '../persistence/save';
 
 describe('v1.6.6 Core regressions', () => {
   it('starts the lifetime allocator above every initial ID, including dead zombie-8', () => {
-    const state = createInitialState(3, createDefaultConfig());
+    const state = createInitialState(3, createDefaultConfig({mapMode:'fixed'}));
     const issued = new Set(state.units.map(u => u.id));
     const rngBefore = structuredClone(state.rngState);
     state.units = state.units.filter(u => u.id !== 'zombie-8');
@@ -23,7 +23,7 @@ describe('v1.6.6 Core regressions', () => {
   });
 
   it('excludes the fixed initial supply from candidate branch blockers', () => {
-    const state = createInitialState(3, createDefaultConfig());
+    const state = createInitialState(3, createDefaultConfig({mapMode:'fixed'}));
     state.units = [createUnit(state, 'near-zombie', 'zombie', { q: 25, r: 23 }),
       createUnit(state, 'outer-zombie', 'zombie', { q: 25, r: 18 })];
     expect(getBlockingZombiesForCheckpoint(state, 'north', { q: 25, r: 17 }).map(u => u.id))
@@ -31,7 +31,7 @@ describe('v1.6.6 Core regressions', () => {
   });
 
   it('does not consume fixed ammunition even with a config override', () => {
-    const state = createInitialState(3, createDefaultConfig());
+    const state = createInitialState(3, createDefaultConfig({mapMode:'fixed'}));
     state.config.units.police.fixedMilitaryGoodsUpkeepPerTurn = 9;
     for (const unit of calculateEconomyPlan(state).forecast.militaryGoods.units) {
       expect(unit.fixedConsumption).toBe(0);
@@ -40,7 +40,7 @@ describe('v1.6.6 Core regressions', () => {
   });
 
   it('preserves lifetime IDs through mixed births, deaths, real reanimation and Save/Load', () => {
-    let state = createInitialState(3, createDefaultConfig());
+    let state = createInitialState(3, createDefaultConfig({mapMode:'fixed'}));
     const ids = new Set(state.units.map(u => u.id));
     const lifecycle = createUnitLifecycle({ applyGeneratedZombieOccupancy: () => {}, processSpawnOccupancyQueue: () => {}, applyGasExplosionSiteInfection: () => 0, resolveGasExplosionSiteFalls: () => {} });
     const rng = SeededRng.fromState(state.rngState);

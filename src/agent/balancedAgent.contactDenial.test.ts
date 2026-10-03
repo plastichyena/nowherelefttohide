@@ -9,7 +9,7 @@ function clone<T>(value: T): T {
 }
 
 function freshObservation(): AgentObservation {
-  return createAgentGame().reset({ seed: 1 });
+  return createAgentGame().reset({mapMode:'fixed', seed: 1 });
 }
 
 function facilityById(observation: AgentObservation, facilityId: string) {

@@ -6,7 +6,7 @@ import { BalancedAgent, RandomAgent, runAgentGame } from './runner';
 
 describe('unified Agent Runner', () => {
   it('forces EndTurn at the runner per-turn limit and classifies maxTurns as neutral', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: { warningLeadTurns: 1, waves: [{ turn: 30, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
       maxActionsPerTurn: 100,
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
@@ -26,7 +26,7 @@ describe('unified Agent Runner', () => {
   });
 
   it('keeps summary-only metrics identical while discarding heavyweight projections', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: { warningLeadTurns: 1, waves: [{ turn: 2, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
       maxActionsPerTurn: 2,
     });
@@ -50,7 +50,7 @@ describe('unified Agent Runner', () => {
   }, 120_000);
 
   it('keeps the default runner turn ceiling at 100 when the Final Horde is later', () => {
-    const initial = createAgentGame().reset({ seed: 1 });
+    const initial = createAgentGame().reset({mapMode:'fixed', seed: 1 });
     const overRunnerLimit = { ...initial, turn: 101, finalHordeTurn: 250 };
     const game: AgentGame = {
       getApiInfo: () => createAgentGame().getApiInfo(),
@@ -63,7 +63,7 @@ describe('unified Agent Runner', () => {
       getRunArtifact: () => ({}) as never,
     };
     const run = runAgentGame(1, {
-       config: createDefaultConfig({ horde: { warningLeadTurns: 1, waves: [{ turn: 250, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] } }),
+       config: createDefaultConfig({mapMode:'fixed', horde: { warningLeadTurns: 1, waves: [{ turn: 250, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] } }),
       agent: { id: 'fake', version: '1.0.0', decide: () => ({ action: { type: 'EndTurn' } }) },
       gameFactory: () => game,
     });
@@ -76,7 +76,7 @@ describe('unified Agent Runner', () => {
   });
 
   it('keeps the whole-game decision safety limit as a technical failure', () => {
-    const initialObservation = createAgentGame().reset({ seed: 1 });
+    const initialObservation = createAgentGame().reset({mapMode:'fixed', seed: 1 });
     const game: AgentGame = {
       getApiInfo: () => createAgentGame().getApiInfo(),
       reset: () => initialObservation,
@@ -94,7 +94,7 @@ describe('unified Agent Runner', () => {
       getRunArtifact: () => ({}) as never,
     };
     const run = runAgentGame(1, {
-      config: createDefaultConfig(),
+      config: createDefaultConfig({mapMode:'fixed'}),
       agent: { id: 'fake', version: '1.0.0', decide: () => ({ action: { type: 'EndTurn' } }) },
       gameFactory: () => game,
       limits: { maxTurns: 100, maxDecisionsPerTurn: 100, maxDecisionsPerGame: 1 },
@@ -108,14 +108,14 @@ describe('unified Agent Runner', () => {
 
   it('uses Observation only in the Balanced Agent decision contract', () => {
     const agent = new BalancedAgent();
-    const observation = createAgentGame().reset({ seed: 1 });
+    const observation = createAgentGame().reset({mapMode:'fixed', seed: 1 });
     const action = { type: 'EndTurn' } as const;
     expect(agent.decide(observation, [action]).action).toEqual(action);
   });
 
   it('captures a debug state on technical failure without exposing it to the Agent', () => {
     let state = { value: 0 };
-    const initialObservation = createAgentGame().reset({ seed: 1 });
+    const initialObservation = createAgentGame().reset({mapMode:'fixed', seed: 1 });
     const game: AgentGame = {
       getApiInfo: () => createAgentGame().getApiInfo(),
       reset: () => initialObservation,
@@ -129,7 +129,7 @@ describe('unified Agent Runner', () => {
     const run = runAgentGame(1, {
       gameFactory: () => game,
       agent: { id: 'fake', version: '1.0.0', decide: () => ({ action: { type: 'EndTurn' } }) },
-      config: createDefaultConfig({ horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] } }),
+      config: createDefaultConfig({mapMode:'fixed', horde: { warningLeadTurns: 1, waves: [{ turn: 1, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] } }),
       debugSnapshot: () => ({ value: state.value }),
       limits: { maxTurns: 2, maxDecisionsPerTurn: 2, maxDecisionsPerGame: 2 },
     });

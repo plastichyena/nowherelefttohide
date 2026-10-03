@@ -15,7 +15,7 @@ import { compactArtifactObservation, restoreArtifactObservation } from '../agent
 import { encodeSaveCode, decodeSaveCode } from '../persistence/save';
 import { prepareTestSnapshot } from './testConfig';
 
-const state = () => createInitialState(1, createDefaultConfig());
+const state = () => createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
 describe('v1.5.6 Barbed Wire', () => {
   it.each([5,10,15])('absorbs damage %i before human terrain defense', damage => {
     const s=state();const human=s.units.find(u=>u.isPlayerUnit)!;
@@ -34,7 +34,7 @@ describe('v1.5.6 Barbed Wire', () => {
     expect(human.hp).toBeLessThan(hp);expect(s.barbedWire[0].hp).toBe(10);
   });
   it('round-trips saves and restores dynamic obstacle movement in public artifacts', () => {
-    const engine=new GameEngine(1,createDefaultConfig());
+    const engine=new GameEngine(1,createDefaultConfig({mapMode:'fixed'}));
     const initial=createAgentObservation(engine.getState());
     const candidate=wireCandidates(engine.getState()).find(c=>c.legal)!;
     expect(engine.step({type:'BuildBarbedWire',position:candidate.position}).error).toBeNull();
@@ -55,7 +55,7 @@ describe('v1.5.6 Barbed Wire', () => {
     }
   });
   it('builds atomically for 5/5 and one action; rejects stacking without mutation', () => {
-    const engine = new GameEngine(1, createDefaultConfig());
+    const engine = new GameEngine(1, createDefaultConfig({mapMode:'fixed'}));
     const before = engine.getState();
     const candidate = wireCandidates(before).find(c => c.legal)!;
     expect(candidate).toBeDefined();

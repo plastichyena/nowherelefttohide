@@ -12,7 +12,7 @@ function cloneState(state: Readonly<GameState>): GameState {
 }
 
 function safeScenarioConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}) {
-  return createDefaultConfig({
+  return createDefaultConfig({mapMode:'fixed',
     economy: {
       initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: {
@@ -73,9 +73,9 @@ function createGroupedZombie(
 
 describe('v1.4 Horde composition and combat', () => {
   it('keeps Normal Zombie HP at 15 and requires three plain hits or five forest hits for a 40 HP Horde Zombie', () => {
-    expect(createDefaultConfig().units.zombie.hp).toBe(15);
-    expect(createDefaultConfig().units.hordeZombie.hp).toBe(40);
-    expect(new GameEngine(300, createDefaultConfig()).getState().units
+    expect(createDefaultConfig({mapMode:'fixed'}).units.zombie.hp).toBe(15);
+    expect(createDefaultConfig({mapMode:'fixed'}).units.hordeZombie.hp).toBe(40);
+    expect(new GameEngine(300, createDefaultConfig({mapMode:'fixed'})).getState().units
       .filter((unit) => unit.type === 'zombie')
       .every((unit) => unit.spawnGroupId === null && unit.hordeKind === null)).toBe(true);
 
@@ -108,7 +108,7 @@ describe('v1.4 Horde composition and combat', () => {
   });
 
   it('spawns the standard five deterministic multi-direction Waves', () => {
-    const defaultSchedule = createDefaultConfig().horde.waves;
+    const defaultSchedule = createDefaultConfig({mapMode:'fixed'}).horde.waves;
     expect(defaultSchedule.map((wave) => wave.turn)).toEqual([10, 20, 35, 50, 70]);
     // Preserve the standard wave sizes/directions while moving their turns
     // forward.  The full 50-turn map simulation is intentionally covered by

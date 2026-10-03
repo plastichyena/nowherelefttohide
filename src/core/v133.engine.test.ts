@@ -19,7 +19,7 @@ import type {
 
 /** Keep v1.4.0 scenarios deterministic and independent of normal economy noise. */
 function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): GameConfig {
-  return createDefaultConfig({
+  return createDefaultConfig({mapMode:'fixed',
     windPower: { noiseRadius: 0 },
     horde: singleFinalWave(100),
     economy: {

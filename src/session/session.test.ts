@@ -61,7 +61,7 @@ function identity(): SessionVersionIdentity {
 
 const realGame = createAgentGame({ buildId: 'test-build' });
 const observationTemplate = (() => {
-  const value = realGame.reset({ seed: 1, agent: { id: 'fake' } });
+  const value = realGame.reset({mapMode:'fixed', seed: 1, agent: { id: 'fake' } });
   return {
     ...cloneJson(value),
     map: {
@@ -250,7 +250,7 @@ describe('AI Portable Session lifecycle', () => {
       },
       refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 },
     });
-    const initial = api.newSession({ sessionId: 'real-wave-resume', seed: 2, checkpointInterval: 99 });
+    const initial = api.newSession({ sessionId: 'real-wave-resume', seed: 2, mapMode:'fixed', checkpointInterval: 99 });
     expect(initial.observation.supportHeadroom.peopleEquivalent).toBeGreaterThanOrEqual(0);
     expect((initial.observation.productionStops as { items: Array<{ facilityId: string }> }).items
       .some((entry) => entry.facilityId.includes('wind-power-plant'))).toBe(false);
@@ -299,10 +299,10 @@ describe('AI Portable Session lifecycle', () => {
       };
     };
     expect(beforeCheckpoint).toMatchObject({
-      gameVersion: '19.0.0',
+      gameVersion: '20.0.0',
       mapId: 'fixed-51x51-v9',
       config: {
-        version: '19.0.0',
+        version: '20.0.0',
         mapId: 'fixed-51x51-v9',
         infection: {
           zombieSpawnPopulationPerUnit: 5,

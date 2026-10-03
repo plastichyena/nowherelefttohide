@@ -6,7 +6,7 @@ import { effectiveMovementCost } from './terrain';
 import { canPlayerOccupyHex } from './map-reference';
 import { getPlayerVisibleTileKeys, getVisibleEnemyUnits } from './visibility';
 import { previewArtillery } from './artillery';
-import { forecastUnitCombatAtDistance } from './combat-query';
+import { getUnitLegalAttackProjections, forecastUnitCombatAtDistance } from './combat-query';
 import type { GameState, HumanUnitType } from './types';
 
 export function productionCandidates(state: Readonly<GameState>, filters: {facilityId?: string; unitType?: HumanUnitType} = {}) {
@@ -24,6 +24,7 @@ export function productionCandidates(state: Readonly<GameState>, filters: {facil
 export function attackCandidates(state: Readonly<GameState>, filters: {unitId?: string; targetKind?: 'enemy'|'hex'} = {}) {
   const enemies=getVisibleEnemyUnits(state); const visible=getPlayerVisibleTileKeys(state);
   return state.units.filter(u=>u.isPlayerUnit && (!filters.unitId || filters.unitId===u.id)).sort((a,b)=>a.id.localeCompare(b.id)).flatMap(unit=>{
+    const previews=getUnitLegalAttackProjections(state,unit.id);
     const targets=[...(filters.targetKind==='hex'?[]:enemies.map(target=>({targetId:target.id,targetHex:{...target.position}}))),
       ...(deployedArtillery(unit) && filters.targetKind!=='enemy' ? state.map.tiles.filter(t=>visible.has(t.key)).map(t=>({targetId:undefined,targetHex:{q:t.q,r:t.r}})):[])];
     return targets.map(({targetId,targetHex})=>{
@@ -31,7 +32,8 @@ export function attackCandidates(state: Readonly<GameState>, filters: {unitId?: 
       const error=validateAction(state,action); const distance=hexDistance(unit.position,targetHex); const projection=forecastUnitCombatAtDistance(state,unit,distance);
       const target=enemies.find(e=>e.id===targetId);
       const artillery=deployedArtillery(unit) && !error ? previewArtillery(state,unit,targetHex):null;
-      return {unitId:unit.id,attackerId:unit.id,...(targetId?{targetId}:{targetHex}),targetKind:targetId?'enemy':'hex',distance,legal:!error,reasonCode:error?.code??null,reason:error?.message??null,projectedAttack:projection.effectiveAttack,militaryGoodsCost:projection.militaryGoodsCost,projectedMilitaryGoodsRemaining:projection.projectedMilitaryGoodsAfterAttack,attackChargesRemaining:unit.attackChargesRemaining,counterattackPossible:!error && !!target && !artillery && canReact(target) && canTargetUnit(state,target,unit) && forecastUnitCombatAtDistance(state,target,distance).canAttack,interceptionRelevant:false,friendlyFirePossible:artillery?.friendlyFirePossible??false,artillery,predictionScope:'current_visible_information',hiddenEffectsMayDiffer:true};
+      const combat=previews.find(p=>p.targetUnitId===targetId), gas=combat?.gasExplosion??null;
+      return {action,mode:unit.mode??unit.flightState??'ground',damageAfterTerrain:combat?.projectedDamageAfterTerrain??null,killExpected:combat?.killExpected??null,conditionalCounterattack:combat?.conditionalCounterattack??null,gasExplosion:gas,gasRisk:{status:gas?'predicted':artillery?'conservative_artillery_risk':'not_applicable',known:gas!==null,friendlyLethal:gas?.units.some(u=>u.side==='player'&&u.lethal)??null,facilityInfection:gas?.sites.some(s=>s.infected>0)??null,productionStop:gas?.sites.some(s=>s.stopsProduction)??null,visibleChainCount:gas?.explosions.length??null,limitations:gas?.limitations??artillery?.limitations??['not_a_direct_gas_target'],details:{target:'attack-candidates',filters:{unitId:unit.id}}},unitId:unit.id,attackerId:unit.id,...(targetId?{targetId}:{targetHex}),targetKind:targetId?'enemy':'hex',distance,legal:!error,reasonCode:error?.code??null,reason:error?.message??null,projectedAttack:projection.effectiveAttack,militaryGoodsCost:projection.militaryGoodsCost,projectedMilitaryGoodsRemaining:projection.projectedMilitaryGoodsAfterAttack,attackChargesRemaining:unit.attackChargesRemaining,counterattackPossible:!error && !!target && !artillery && canReact(target) && canTargetUnit(state,target,unit) && forecastUnitCombatAtDistance(state,target,distance).canAttack,interceptionRelevant:false,friendlyFirePossible:artillery?.friendlyFirePossible??false,artillery,predictionScope:'current_visible_information',hiddenEffectsMayDiffer:true};
     });
   });
 }

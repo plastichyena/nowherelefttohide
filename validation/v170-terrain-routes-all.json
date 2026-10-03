@@ -1,0 +1,2503 @@
+[
+  {
+    "seed": 1,
+    "facilityId": "city-2",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 19,
+    "fuel": 40,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 36,
+            "r": 25
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-2",
+          "branchId": "east",
+          "position": {
+            "q": 46,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 39,
+            "r": 31
+          }
+        },
+        "mp": 9,
+        "fuel": 18
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "city-3",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 7,
+    "fuel": 8,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 26,
+            "r": 31
+          }
+        },
+        "mp": 6,
+        "fuel": 6
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 34
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 27,
+            "r": 30
+          }
+        },
+        "mp": 1,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "city-4",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 11,
+    "fuel": 24,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 36,
+            "r": 24
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-2",
+          "branchId": "east",
+          "position": {
+            "q": 39,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 37,
+            "r": 24
+          }
+        },
+        "mp": 1,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "city-5",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 16,
+    "fuel": 28,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 34,
+            "r": 25
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-2",
+          "branchId": "east",
+          "position": {
+            "q": 44,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 38,
+            "r": 29
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "city-6",
+    "capturedTurn": 1,
+    "suppliedTurn": 1,
+    "mp": 8,
+    "fuel": 14,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 19,
+            "r": 26
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 18,
+            "r": 25
+          }
+        }
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "city-7",
+    "capturedTurn": 5,
+    "suppliedTurn": 2,
+    "mp": 38,
+    "fuel": 50,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 18,
+            "r": 25
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 8,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 12,
+            "r": 25
+          }
+        },
+        "mp": 6,
+        "fuel": 6
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-west-5",
+          "branchId": "west",
+          "position": {
+            "q": 2,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 10,
+            "r": 33
+          }
+        },
+        "mp": 10,
+        "fuel": 14
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 4,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 6,
+            "r": 39
+          }
+        },
+        "mp": 10,
+        "fuel": 6
+      },
+      {
+        "turn": 4,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 5,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 4,
+            "r": 39
+          }
+        },
+        "mp": 2,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "city-8",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 20,
+    "fuel": 44,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 18
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 8
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 17,
+            "r": 16
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "farm-2",
+    "capturedTurn": 4,
+    "suppliedTurn": 2,
+    "mp": 30,
+    "fuel": 56,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 36
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 46
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 39
+          }
+        },
+        "mp": 3,
+        "fuel": 2
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-south-5",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 48
+          }
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 15,
+            "r": 40
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 4,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 8,
+            "r": 47
+          }
+        },
+        "mp": 7,
+        "fuel": 10
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "farm-3",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 18,
+    "fuel": 36,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 36,
+            "r": 25
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-2",
+          "branchId": "east",
+          "position": {
+            "q": 46,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 38,
+            "r": 31
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "farm-4",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 13,
+    "fuel": 24,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 18,
+            "r": 25
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 13,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 15,
+            "r": 28
+          }
+        },
+        "mp": 3,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "farm-5",
+    "capturedTurn": 3,
+    "suppliedTurn": 2,
+    "mp": 21,
+    "fuel": 34,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 18,
+            "r": 25
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 8,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 14,
+            "r": 25
+          }
+        },
+        "mp": 4,
+        "fuel": 2
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-west-5",
+          "branchId": "west",
+          "position": {
+            "q": 4,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 7,
+            "r": 25
+          }
+        },
+        "mp": 7,
+        "fuel": 10
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "civilian-factory-2",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 19,
+    "fuel": 40,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 18,
+            "r": 25
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 8,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 9,
+            "r": 27
+          }
+        },
+        "mp": 9,
+        "fuel": 18
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "civilian-factory-3",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 11,
+    "fuel": 24,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 24,
+            "r": 19
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 16
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 23,
+            "r": 20
+          }
+        },
+        "mp": 1,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "civilian-factory-4",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 11,
+    "fuel": 24,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 36
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 40
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 37
+          }
+        },
+        "mp": 1,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "military-factory-2",
+    "capturedTurn": 1,
+    "suppliedTurn": 1,
+    "mp": 10,
+    "fuel": 22,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 36,
+            "r": 24
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-2",
+          "branchId": "east",
+          "position": {
+            "q": 38,
+            "r": 25
+          }
+        }
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "military-factory-3",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 13,
+    "fuel": 16,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 34,
+            "r": 24
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-2",
+          "branchId": "east",
+          "position": {
+            "q": 36,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 34,
+            "r": 19
+          }
+        },
+        "mp": 5,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "oilfield-1",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 16,
+    "fuel": 28,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 18,
+            "r": 25
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 11,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 15,
+            "r": 23
+          }
+        },
+        "mp": 6,
+        "fuel": 6
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "nuclear-power-plant-1",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 19,
+    "fuel": 40,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 18
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 8
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 9
+          }
+        },
+        "mp": 9,
+        "fuel": 18
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-north-5",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 6
+          }
+        }
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "army-base-1",
+    "capturedTurn": 1,
+    "suppliedTurn": 1,
+    "mp": 5,
+    "fuel": 2,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 26,
+            "r": 30
+          }
+        },
+        "mp": 5,
+        "fuel": 2
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 33
+          }
+        }
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "facilityId": "air-base-1",
+    "capturedTurn": 1,
+    "suppliedTurn": 1,
+    "mp": 9,
+    "fuel": 18,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 26,
+            "r": 18
+          }
+        },
+        "mp": 9,
+        "fuel": 18
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 16
+          }
+        }
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "city-2",
+    "capturedTurn": 3,
+    "suppliedTurn": 1,
+    "mp": 21,
+    "fuel": 46,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 36
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 46
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 15,
+            "r": 43
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 14,
+            "r": 44
+          }
+        },
+        "mp": 1,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "city-3",
+    "capturedTurn": 3,
+    "suppliedTurn": 2,
+    "mp": 16,
+    "fuel": 26,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 24,
+            "r": 36
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 31
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 24,
+            "r": 40
+          }
+        },
+        "mp": 4,
+        "fuel": 2
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-south-5",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 42
+          }
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 22,
+            "r": 40
+          }
+        },
+        "mp": 2,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "city-4",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 13,
+    "fuel": 16,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 20
+          }
+        },
+        "mp": 10,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 15
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 26,
+            "r": 17
+          }
+        },
+        "mp": 3,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "city-5",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 20,
+    "fuel": 16,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 20
+          }
+        },
+        "mp": 10,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 15
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 21,
+            "r": 21
+          }
+        },
+        "mp": 10,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "city-6",
+    "capturedTurn": 3,
+    "suppliedTurn": 1,
+    "mp": 24,
+    "fuel": 38,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 20
+          }
+        },
+        "mp": 10,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 10
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 27,
+            "r": 11
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 30,
+            "r": 12
+          }
+        },
+        "mp": 4,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "city-7",
+    "capturedTurn": 3,
+    "suppliedTurn": 2,
+    "mp": 22,
+    "fuel": 38,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 16,
+            "r": 28
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 9,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 15,
+            "r": 25
+          }
+        },
+        "mp": 4,
+        "fuel": 2
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-west-5",
+          "branchId": "west",
+          "position": {
+            "q": 5,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 10,
+            "r": 22
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "city-8",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 19,
+    "fuel": 32,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 20
+          }
+        },
+        "mp": 10,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 10
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 21,
+            "r": 15
+          }
+        },
+        "mp": 9,
+        "fuel": 18
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "farm-2",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 15,
+    "fuel": 24,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 33
+          }
+        },
+        "mp": 7,
+        "fuel": 10
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 43
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 23,
+            "r": 41
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "farm-3",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 19,
+    "fuel": 40,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 36
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 46
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 32,
+            "r": 38
+          }
+        },
+        "mp": 9,
+        "fuel": 18
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "farm-4",
+    "capturedTurn": 3,
+    "suppliedTurn": 1,
+    "mp": 28,
+    "fuel": 58,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 36
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 46
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 15,
+            "r": 37
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 7,
+            "r": 45
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "farm-5",
+    "capturedTurn": 3,
+    "suppliedTurn": 2,
+    "mp": 22,
+    "fuel": 38,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 16,
+            "r": 28
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 9,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 15,
+            "r": 25
+          }
+        },
+        "mp": 4,
+        "fuel": 2
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-west-5",
+          "branchId": "west",
+          "position": {
+            "q": 5,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 8,
+            "r": 24
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "civilian-factory-2",
+    "capturedTurn": 3,
+    "suppliedTurn": 2,
+    "mp": 22,
+    "fuel": 30,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 20
+          }
+        },
+        "mp": 10,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 10
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 16
+          }
+        },
+        "mp": 4,
+        "fuel": 2
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-north-5",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 6
+          }
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 29,
+            "r": 8
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "civilian-factory-3",
+    "capturedTurn": 3,
+    "suppliedTurn": 2,
+    "mp": 22,
+    "fuel": 42,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 36,
+            "r": 25
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-2",
+          "branchId": "east",
+          "position": {
+            "q": 46,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 39,
+            "r": 25
+          }
+        },
+        "mp": 3,
+        "fuel": 2
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-east-5",
+          "branchId": "east",
+          "position": {
+            "q": 48,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 42,
+            "r": 30
+          }
+        },
+        "mp": 9,
+        "fuel": 18
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "civilian-factory-4",
+    "capturedTurn": 3,
+    "suppliedTurn": 2,
+    "mp": 22,
+    "fuel": 30,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 20
+          }
+        },
+        "mp": 10,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-1",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 10
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 16
+          }
+        },
+        "mp": 4,
+        "fuel": 2
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-north-5",
+          "branchId": "north",
+          "position": {
+            "q": 25,
+            "r": 6
+          }
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 28,
+            "r": 8
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "military-factory-2",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 15,
+    "fuel": 24,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 34,
+            "r": 25
+          }
+        },
+        "mp": 8,
+        "fuel": 14
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-2",
+          "branchId": "east",
+          "position": {
+            "q": 44,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 41,
+            "r": 25
+          }
+        },
+        "mp": 7,
+        "fuel": 10
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "military-factory-3",
+    "capturedTurn": 3,
+    "suppliedTurn": 1,
+    "mp": 21,
+    "fuel": 46,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 36,
+            "r": 25
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-2",
+          "branchId": "east",
+          "position": {
+            "q": 46,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 43,
+            "r": 28
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 3,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 42,
+            "r": 29
+          }
+        },
+        "mp": 1,
+        "fuel": 2
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "oilfield-1",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 20,
+    "fuel": 44,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 17,
+            "r": 27
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 9,
+            "r": 25
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 9,
+            "r": 37
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "nuclear-power-plant-1",
+    "capturedTurn": 2,
+    "suppliedTurn": 2,
+    "mp": 12,
+    "fuel": 24,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 24,
+            "r": 36
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 31
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 24,
+            "r": 38
+          }
+        },
+        "mp": 2,
+        "fuel": 2
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-south-5",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 40
+          }
+        }
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "army-base-1",
+    "capturedTurn": 1,
+    "suppliedTurn": 1,
+    "mp": 10,
+    "fuel": 22,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 18,
+            "r": 26
+          }
+        },
+        "mp": 10,
+        "fuel": 22
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-4",
+          "branchId": "west",
+          "position": {
+            "q": 16,
+            "r": 25
+          }
+        }
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "facilityId": "air-base-1",
+    "capturedTurn": 2,
+    "suppliedTurn": 1,
+    "mp": 11,
+    "fuel": 20,
+    "actions": [
+      {
+        "turn": 1,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 26,
+            "r": 35
+          }
+        },
+        "mp": 10,
+        "fuel": 18
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "RelocateCheckpoint",
+          "checkpointId": "checkpoint-3",
+          "branchId": "south",
+          "position": {
+            "q": 25,
+            "r": 38
+          }
+        }
+      },
+      {
+        "turn": 1,
+        "action": {
+          "type": "EndTurn"
+        }
+      },
+      {
+        "turn": 2,
+        "action": {
+          "type": "Move",
+          "unitId": "recon-team-1",
+          "destination": {
+            "q": 25,
+            "r": 35
+          }
+        },
+        "mp": 1,
+        "fuel": 2
+      }
+    ]
+  }
+]

@@ -430,6 +430,7 @@ export function getInitialZombieCandidates(map: FixedMap, armyBaseVision = 3): H
   const trunkKeys = new Set(map.roadBranches.flatMap((branch) => branch.roadTiles.map(hexKey)));
   const hardCandidates = map.tiles
     .filter((tile) => {
+      if (map.id !== FIXED_MAP_ID && !tile.playerOccupancyAllowed) return false;
       if ((tile.movementCost === null && !hasMovementRoad(map, tile))) return false;
       if (facilityKeys.has(tile.key) || humanKeys.has(tile.key)) return false;
       if (hexDistance(capital.position, tile) < 8) return false;
@@ -455,7 +456,7 @@ export function getInitialZombieCandidates(map: FixedMap, armyBaseVision = 3): H
 export function generateInitialZombiePositions(
   map: FixedMap,
   rngOrSeed: SeededRng | number,
-  count = FIXED_INITIAL_ZOMBIE_COUNT,
+  count: number = FIXED_INITIAL_ZOMBIE_COUNT,
   armyBaseVision = 3,
 ): HexCoord[] {
   if (!Number.isSafeInteger(count) || count < 0) {
@@ -508,7 +509,8 @@ export function generateInitialHunterPositions(
   ]);
   const militaryBases = map.facilities.filter(f => ['armyBase','airBase'].includes(f.type));
   const candidates = map.tiles.filter((tile) => (tile.movementCost !== null || hasMovementRoad(map, tile))
-    && !occupied.has(tile.key)
+    && (map.id === FIXED_MAP_ID || tile.playerOccupancyAllowed)
+      && !occupied.has(tile.key)
     && hexDistance(capital.position, tile) >= options.initialHunterMinDistance)
     .filter((tile) => militaryBases.every(base => hexDistance(base.position, tile) > armyBaseVision))
     .map(({ q, r }) => ({ q, r })).sort((a, b) => a.q - b.q || a.r - b.r);
@@ -641,7 +643,7 @@ export function validateFixedMap(map: FixedMap): FixedMapValidationResult {
     errors.push('map must contain 2601 tiles');
   }
   if (!Array.isArray(map?.facilities) || map.facilities.filter(f=>!['armyBase','airBase'].includes(f.type)).length !== FIXED_FACILITY_COUNT) {
-    errors.push(`map must contain exactly ${FIXED_FACILITY_COUNT + 1} facilities including Army Base`);
+    errors.push(`map must contain 26 non-military facilities; with Army Base and Air Base, 28 permanent facilities`);
   }
   if ((map?.facilities ?? []).filter((facility) => facility.type === 'oilField').length !== 1) errors.push('map must contain exactly one Oil Field');
 
@@ -877,6 +879,7 @@ export function generateInitialGasPositions(map: FixedMap, rng: SeededRng, hunte
   const militaryBases = map.facilities.filter(f => ['armyBase','airBase'].includes(f.type));
   const candidates = map.tiles
     .filter((tile) => (tile.movementCost !== null || hasMovementRoad(map, tile))
+      && (map.id === FIXED_MAP_ID || tile.playerOccupancyAllowed)
       && !occupied.has(tile.key)
       && hexDistance(tile, capital.position) >= options.initialGasMinDistance
       && (militaryBases.every(base => hexDistance(tile, base.position) > armyBaseVision)))

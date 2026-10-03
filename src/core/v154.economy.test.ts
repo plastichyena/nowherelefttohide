@@ -12,7 +12,7 @@ import { createCityPopulationSnapshot, createInitialState, synchronizePopulation
 import { getPlayerVisibleTileKeys } from './visibility';
 import type { FacilityState, GameState, HexCoord } from './types';
 
-const config = () => createDefaultConfig({
+const config = () => createDefaultConfig({mapMode:'fixed',
   economy: {
     initialZombieCount: 0, initialScreamerCount: 0,
     initialHunterCount: { min: 0, max: 0 },

@@ -41,7 +41,7 @@ describe('Balanced Agent scenario intentions', () => {
   let unitId: string;
 
   beforeEach(() => {
-    observation = createAgentGame().reset({ seed: 1 });
+    observation = createAgentGame().reset({mapMode:'fixed', seed: 1 });
     unitId = observation.units[0]!.id;
   });
 

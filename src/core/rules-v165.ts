@@ -10,7 +10,7 @@ export const RULES_V165 = {
     drone: '軍用ドローンは任意のヘックスへ、空軍基地からのヘックス距離×燃料5で派遣できます（距離0は無料）。半径10を地形無視で5ターン可視化。ターン20ならターン24まで有効でターン25開始に終了。稼働中の重複派遣は不可。基地喪失後も視界は期限まで残ります。',
     enemies: '飛行ヘリを攻撃できる敵はハンターとパックだけです。他の敵はヘリ・搭乗者を目標にせず、騒音には反応します。飛行ヘリは砲撃・ガスゾンビ爆発の被害対象外です。ヘリはゾンビ化せず、搭乗歩兵は通常の変異規則に従います。',
     economy: '仮設住宅の民需品生産は0（人口受入と維持費は継続）。正の施設電力容量は従来の2倍、軍需工場は労働者1人あたり民需品{factoryInput}→軍需品{factoryOutput}。ウェーブ特殊枠の重みは通常40 / 警察10 / 兵士10 / 機動隊5 / ハンター15 / ガスゾンビ15 / スクリーマー5。ハンターとガスゾンビに方向別上限はありません。',
-    compatibility: 'v1.6.8以前のセーブ・Session・Checkpoint・公開Replayは読み込めません。旧データを保持し、v1.6.9で新規ゲームを開始してください。',
+    compatibility: 'v1.6.9以前のセーブ・Session・Checkpoint・公開Replayは読み込めません。旧データを保持し、v1.7.0で新規ゲームを開始してください。',
   },
   en: {
     objectives: 'First capture deadlines for the nuclear plant and Air Base are the end of Turn 10 actions. Nuclear capture awards Special Forces regardless of survivors; no capture causes a Pack Zombie on Turn 11. The Air Base reward requires timely first capture, no earlier fall, and at least one healthy survivor. Timely capture with zero survivors still avoids the deadline Pack. A pre-capture fall commits one Pack, without a duplicate at the deadline. Blocked reinforcements remain pending until placement is possible.',
@@ -22,6 +22,6 @@ export const RULES_V165 = {
     drone: 'Launch to any Hex for distance from the Air Base × 5 national Fuel (zero distance is free). Terrain-ignoring radius10 vision lasts five turns: a Turn20 launch lasts through Turn24 and expires at Turn25 start. Only one active drone; base loss does not cancel existing vision.',
     enemies: 'Only Hunter and Pack Zombies can attack airborne helicopters. Other enemies ignore aircraft and cargo as targets but follow noise. Airborne helicopters ignore artillery and Gas blast damage. Helicopters never reanimate; cargo follows its normal conversion rules.',
     economy: 'Temporary Housing produces zero Civilian Goods; capacity and upkeep continue. Positive facility power capacities are doubled. Military Factories convert {factoryInput} Civilian Goods into {factoryOutput} Military Goods per worker. Wave slot weights: Normal40 / Police10 / Soldier10 / Riot5 / Hunter15 / Gas15 / Screamer5. Hunter and Gas have no per-direction cap.',
-    compatibility: 'Saves, Sessions, Checkpoints and public Replays from v1.6.8 or earlier cannot be loaded. Preserve old data and start a new v1.6.9 game.',
+    compatibility: 'Saves, Sessions, Checkpoints and public Replays from v1.6.9 or earlier cannot be loaded. Preserve old data and start a new v1.7.0 game.',
   },
 } as const;

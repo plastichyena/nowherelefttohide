@@ -1,3 +1,6 @@
+import { mapDomainSeed } from '../core/map-generation';
+import { validateInitialMap } from '../core/initial-map-validation';
+import { RANDOM_MAP_ID, SAVE_FORMAT_NUMBER } from '../core/versions';
 import { gzipSync, gunzipSync, strFromU8, strToU8 } from 'fflate';
 import { validateGameConfig } from '../core/config';
 import { validateInvariants } from '../core/invariants';
@@ -14,16 +17,17 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.6.9 saves. */
+/** The sole game-rules version accepted by v1.7.0 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
-export const SAVE_FORMAT_VERSION = 26;
-/** v1.6.9 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v26';
+export const SAVE_FORMAT_VERSION = SAVE_FORMAT_NUMBER;
+/** v1.7.0 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = `nowhere-left-to-hide:auto-save:v${SAVE_FORMAT_NUMBER}`;
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v25';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v26';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v25',
   'nowhere-left-to-hide:auto-save:v24',
   'nowhere-left-to-hide:auto-save:v23',
   'nowhere-left-to-hide:auto-save:v22',
@@ -545,7 +549,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.6.9; v1.6.8 or earlier data requires a new v1.6.9 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.7.0; v1.6.9 or earlier data requires a new v1.7.0 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -651,7 +655,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
   if (!isInteger(state.finalHordeTurn, 1)) errors.push('state.finalHordeTurn must be a positive integer');
   if (!isInteger(state.actionsTakenThisTurn)) errors.push('state.actionsTakenThisTurn must be a non-negative integer');
   if (!GAME_PHASES.includes(state.phase as typeof GAME_PHASES[number])) errors.push('state.phase is invalid');
-  if (state.mapId !== FIXED_MAP_ID) errors.push(`state.mapId must be ${FIXED_MAP_ID}`);
+  if (state.mapId !== FIXED_MAP_ID && state.mapId !== RANDOM_MAP_ID) errors.push(`state.mapId must be ${FIXED_MAP_ID} or ${RANDOM_MAP_ID}`);
 
   const artilleryRng = state.artilleryRngState;
   if (!isRecord(artilleryRng) || artilleryRng.algorithm !== 'xorshift32-v1' || !isUint32(artilleryRng.seed) || !isUint32(artilleryRng.state) || !isInteger(artilleryRng.calls)) errors.push('state.artilleryRngState is invalid');
@@ -666,7 +670,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     if (!isUint32(rngState.seed)) errors.push('state.rngState.seed must be an unsigned 32-bit integer');
     if (!isUint32(rngState.state)) errors.push('state.rngState.state must be an unsigned 32-bit integer');
     if (!isInteger(rngState.calls)) errors.push('state.rngState.calls must be a non-negative integer');
-    if (isSafeInteger(state.seed) && rngState.seed !== (state.seed >>> 0)) errors.push('state.rngState.seed must match the uint32 form of state.seed');
+    if (isSafeInteger(state.seed) && isRecord(state.config)) { const seed=(state.config.gameplaySeed ?? state.seed) as number; if(Number.isSafeInteger(seed) && rngState.seed !== (state.config.mapMode==='random'?mapDomainSeed(seed,'gameplay/main'):seed>>>0)) errors.push('state.rngState.seed must match the gameplay seed domain'); }
   }
 
   const config = state.config;
@@ -696,7 +700,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     if (hasOwn(config, 'maxTurns')) errors.push('state.config.maxTurns is obsolete; use horde.waves');
     if (hasOwn(config, 'finalHordeTurn')) errors.push('state.config.finalHordeTurn is obsolete; derive it from the Final Wave');
     if (config.version !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(config.version, 'state.config.version'));
-    if (config.mapId !== FIXED_MAP_ID) errors.push(`state.config.mapId must be ${FIXED_MAP_ID}`);
+    if (config.mapId !== FIXED_MAP_ID && config.mapId !== RANDOM_MAP_ID) errors.push(`state.config.mapId must be ${FIXED_MAP_ID} or ${RANDOM_MAP_ID}`);
     validateHordeConfigShape(config.horde, state.finalHordeTurn, errors);
     if (!isRecord(config.windPower)) {
       errors.push('state.config.windPower must be an object');
@@ -735,7 +739,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
       'roadBranches',
       'initialZombiePositions',
     ]);
-    if (map.id !== FIXED_MAP_ID) errors.push(`state.map.id must be ${FIXED_MAP_ID}`);
+    if (map.id !== FIXED_MAP_ID && map.id !== RANDOM_MAP_ID) errors.push(`state.map.id must be ${FIXED_MAP_ID} or ${RANDOM_MAP_ID}`);
     if (map.width !== FIXED_MAP_WIDTH || map.height !== FIXED_MAP_HEIGHT) errors.push(`state.map must be exactly ${FIXED_MAP_WIDTH}x${FIXED_MAP_HEIGHT}`);
     if (!Array.isArray(map.tiles)) {
       errors.push('state.map.tiles must be an array');
@@ -1383,7 +1387,7 @@ function validateStateForSave(state: GameState): string[] {
   const map = isRecord(raw.map) ? raw.map : null;
   if (!config || !map) return uniqueErrors(errors);
   if (raw.mapId !== config.mapId) errors.push('state.mapId must match state.config.mapId');
-  if (raw.mapId !== FIXED_MAP_ID) errors.push(`state.mapId must be ${FIXED_MAP_ID}`);
+  if (raw.mapId !== FIXED_MAP_ID && raw.mapId !== RANDOM_MAP_ID) errors.push(`state.mapId must be ${FIXED_MAP_ID} or ${RANDOM_MAP_ID}`);
   try {
     const configResult = validateGameConfig(config as unknown as GameState['config']);
     if (!configResult.valid) errors.push(...configResult.errors.map((error) => `config: ${error}`));
@@ -1391,15 +1395,8 @@ function validateStateForSave(state: GameState): string[] {
     errors.push(`config validation failed: ${error instanceof Error ? error.message : String(error)}`);
   }
   try {
-    const mapResult = validateFixedMap(map as unknown as GameState['map']);
-    if (!mapResult.valid) errors.push(...mapResult.errors.map((error) => `map: ${error}`));
-    if (Number.isSafeInteger(raw.seed)
-      && (!initialZombiePositionsMatchSeed(map as unknown as GameState['map'], raw.seed as number, (raw as unknown as GameState).config.units.zombie.vision) || !initialHunterPositionsMatchSeed(raw as unknown as GameState) || !initialGasPositionsMatchSeed(raw as unknown as GameState))) {
-      errors.push('map: initial Zombie positions and order must match the deterministic state seed');
-    }
-    if (!initialArmyBaseMatchesSeed(raw as unknown as GameState)) {
-      errors.push('map: exactly one Army Base must match the deterministic state seed');
-    }
+    const mapResult = validateInitialMap(state);
+    if (!mapResult.valid) errors.push(...mapResult.errors.map(error => `map: ${error}`));
   } catch (error) {
     errors.push(`map validation failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -1418,10 +1415,10 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.6.6以前 / v1.6.6 and earlier saves cannot be loaded or converted; earlier formats are rejected without conversion, deletion, or overwrite`);
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.6.9以前 / v1.6.9 and earlier saves cannot be loaded or converted; earlier formats are rejected without conversion, deletion, or overwrite`);
   }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
-  if (value.mapId !== FIXED_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID}`);
+  if (value.mapId !== FIXED_MAP_ID && value.mapId !== RANDOM_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID} or ${RANDOM_MAP_ID}`);
   if (!Number.isSafeInteger(value.seed)) errors.push('seed must be a safe integer');
   if (typeof value.checksum !== 'string' || !/^[0-9a-f]{8}$/u.test(value.checksum)) errors.push('checksum is invalid');
   if (!isRecord(value.state)) errors.push('state must be an object');
@@ -1622,7 +1619,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the current v1.6.9/v26 key; legacy data is deliberately preserved. */
+  /** Clears only the current v1.7.0/v27 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

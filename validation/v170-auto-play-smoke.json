@@ -1,0 +1,4812 @@
+{
+  "runs": [
+    {
+      "app": "1.7.0",
+      "rules": "20.0.0",
+      "plan": {
+        "start": 1,
+        "count": 1,
+        "gameplaySeed": 1,
+        "strategy": "random",
+        "mode": "random",
+        "maxTurns": 3
+      },
+      "results": [
+        {
+          "mapSeed": 1,
+          "gameplaySeed": 1,
+          "mode": "random",
+          "agent": {
+            "id": "random",
+            "version": "10.0.0",
+            "strategy": "random"
+          },
+          "descriptor": {
+            "scenario": "una",
+            "mode": "random",
+            "rootSeed": 1,
+            "mapSeed": 1,
+            "gameplaySeed": 1,
+            "generator": "inland-51x51-v1",
+            "generatorVersion": "inland-v1",
+            "settingsId": "711ed3a16162e0858521bde548e44cb059b2c4fb9bebc415a7978d940420c2d7",
+            "settings": {
+              "version": "inland-settings-v1",
+              "initialSupplyRadius": 5,
+              "capacities": {
+                "reliefSupplyCenter": 5,
+                "nuclearPowerPlant": 5,
+                "temporaryHousing": 10,
+                "airBase": 10,
+                "armyBase": 10,
+                "capital": 100,
+                "city": 50,
+                "farm": 30,
+                "civilianFactory": 30,
+                "militaryFactory": 30,
+                "oilField": 5,
+                "refinery": 30,
+                "powerPlant": 30,
+                "windPowerPlant": 0,
+                "simpleFarm": 10,
+                "civilianDroneBase": 5
+              },
+              "movementCost": {
+                "plain": 1,
+                "forest": 2,
+                "mountain": 3,
+                "water": null
+              }
+            },
+            "attempt": 1,
+            "fallback": null,
+            "mapHash": "102b7a5eae2c8805377c5238f65f43554eefb845d6f60b34366ede11da5d0f56",
+            "configVersion": "20.0.0",
+            "appVersion": "1.7.0",
+            "build": "1.7.0/inland-v1/inland-settings-v1"
+          },
+          "ms": 233089.5024,
+          "outcome": "turn_limit",
+          "result": null,
+          "technicalFailure": false,
+          "metrics": {
+            "appVersion": "1.7.0",
+            "barbedWireVisibleDestroyed": 0,
+            "barbedWireVisibleDamage": 0,
+            "barbedWireAbsorbedHumanDamage": 0,
+            "gameRulesVersion": "20.0.0",
+            "agentId": "random",
+            "agentVersion": "10.0.0",
+            "strategy": "random",
+            "agentApiVersion": "25.0.0",
+            "observationApiVersion": "25.0.0",
+            "bridgeApiVersion": "25.0.0",
+            "buildId": "local-unknown",
+            "mapId": "inland-51x51-v1",
+            "seed": 1,
+            "config": {
+              "zombiePursuitMovementBonus": 3,
+              "objectives": {
+                "nuclearPowerPlant": {
+                  "rewardDeadlineTurn": 10,
+                  "requiresHealthySurvivors": false,
+                  "failureOnUncapturedFall": false,
+                  "rewardUnitType": "specialForces",
+                  "failureUnitType": "packZombie"
+                },
+                "airBase": {
+                  "rewardDeadlineTurn": 10,
+                  "requiresHealthySurvivors": true,
+                  "failureOnUncapturedFall": true,
+                  "rewardUnitType": "specialForces",
+                  "failureUnitType": "packZombie"
+                }
+              },
+              "militaryDrone": {
+                "fuelPerHex": 5,
+                "visionRadius": 10,
+                "durationTurns": 5
+              },
+              "windPower": {
+                "noiseRadius": 8
+              },
+              "armyBase": {
+                "maxMilitaryGoods": 40,
+                "interceptionCost": 2,
+                "attack": 10,
+                "range": 2,
+                "noiseRadius": 8,
+                "staffedVision": 5,
+                "rewardLastTurn": 10
+              },
+              "scenarioId": "una",
+              "mapMode": "random",
+              "mapSeed": 1,
+              "gameplaySeed": 1,
+              "version": "20.0.0",
+              "mapId": "inland-51x51-v1",
+              "maxActionsPerTurn": 100,
+              "units": {
+                "ifv": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": false
+                  },
+                  "productionFood": 80,
+                  "productionFuel": 150,
+                  "productionLimitPerGame": 1,
+                  "canTargetAir": true,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 3,
+                  "veteranAttackCharges": 4,
+                  "hp": 200,
+                  "recruitAttack": 16,
+                  "movement": 10,
+                  "range": 5,
+                  "vision": 5,
+                  "population": 4,
+                  "maxFuel": 100,
+                  "maxMilitaryGoods": 120,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "0": 20,
+                    "1": 20,
+                    "2": 20,
+                    "3": 20,
+                    "4": 20,
+                    "5": 20
+                  },
+                  "suppressionMilitaryGoodsCost": 20,
+                  "militaryGoodsShortageAttackMultiplier": 0,
+                  "emergencyMovementPoints": 0,
+                  "recruitmentFacilityTypes": [
+                    "armyBase"
+                  ],
+                  "productionCivilianGoods": 50,
+                  "productionMilitaryGoods": 170,
+                  "fuelCostRule": "perHex",
+                  "fuelPerHex": 10,
+                  "cargoCapacity": 1,
+                  "suppressionCivilianDamageRate": 0.5,
+                  "reanimationUnitType": "soldierZombie",
+                  "noiseClass": "large",
+                  "noiseRadius": 10
+                },
+                "multipurposeHelicopter": {
+                  "capabilities": {
+                    "capture": false,
+                    "recoverCheckpoint": false,
+                    "suppress": false,
+                    "contain": false,
+                    "infantry": false
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 500,
+                  "productionLimitPerGame": 1,
+                  "canTargetAir": true,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 100,
+                  "recruitAttack": 13,
+                  "movement": 0,
+                  "airborneMovement": 50,
+                  "range": 2,
+                  "vision": 10,
+                  "population": 2,
+                  "maxFuel": 500,
+                  "maxMilitaryGoods": 40,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "0": 2,
+                    "1": 2,
+                    "2": 4
+                  },
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 0,
+                  "emergencyMovementPoints": 0,
+                  "recruitmentFacilityTypes": [
+                    "airBase"
+                  ],
+                  "productionCivilianGoods": 100,
+                  "productionMilitaryGoods": 140,
+                  "fuelCostRule": "perMovementPoint",
+                  "fuelPerMovementPoint": 5,
+                  "endTurnFuel": 1,
+                  "endTurnNoiseRadius": 15,
+                  "cargoCapacity": 1,
+                  "suppressionCivilianDamageRate": 0,
+                  "reanimationUnitType": null,
+                  "noiseClass": "large",
+                  "noiseRadius": 8
+                },
+                "specialForces": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 3,
+                  "veteranAttackCharges": 4,
+                  "hp": 50,
+                  "recruitAttack": 12,
+                  "movement": 10,
+                  "range": 2,
+                  "vision": 5,
+                  "population": 5,
+                  "maxFuel": 44,
+                  "maxMilitaryGoods": 40,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 2,
+                    "2": 4
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 2,
+                  "recruitmentFacilityTypes": [],
+                  "productionCivilianGoods": 0,
+                  "productionMilitaryGoods": 0,
+                  "fuelCostRule": "nationalGuardLike",
+                  "suppressionCivilianDamageRate": 0.5,
+                  "reanimationUnitType": "packZombie",
+                  "noiseClass": "medium",
+                  "noiseRadius": 4
+                },
+                "fieldArtillery": {
+                  "capabilities": {
+                    "capture": false,
+                    "recoverCheckpoint": false,
+                    "suppress": false,
+                    "contain": false,
+                    "infantry": false
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 100,
+                  "productionLimitPerGame": 2,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 1,
+                  "hp": 25,
+                  "recruitAttack": 7,
+                  "movement": 10,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 5,
+                  "maxFuel": 100,
+                  "maxMilitaryGoods": 100,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 4
+                  },
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 1,
+                  "recruitmentFacilityTypes": [
+                    "armyBase"
+                  ],
+                  "productionCivilianGoods": 100,
+                  "productionMilitaryGoods": 200,
+                  "fuelCostRule": "perMovementPoint",
+                  "fuelPerMovementPoint": 10,
+                  "suppressionCivilianDamageRate": 0,
+                  "reanimationUnitType": "soldierZombie",
+                  "noiseClass": "large",
+                  "noiseRadius": 6,
+                  "deployed": {
+                    "recruitAttack": 40,
+                    "movement": 0,
+                    "minRange": 10,
+                    "range": 200,
+                    "militaryGoodsCost": 50,
+                    "noiseRadius": 40
+                  },
+                  "scatter": {
+                    "recruit": {
+                      "hitProbability": 0.5,
+                      "radius": 2
+                    },
+                    "regular": {
+                      "hitProbability": 0.5,
+                      "radius": 1
+                    },
+                    "veteran": {
+                      "hitProbability": 1,
+                      "radius": 0
+                    }
+                  },
+                  "friendlyFire": true,
+                  "facilityPopulationDamage": true
+                },
+                "packZombie": {
+                  "canTargetAir": true,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 5,
+                  "hp": 50,
+                  "attack": 15,
+                  "movement": 10,
+                  "range": 1,
+                  "vision": 3,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "gasZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 35,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 3,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0,
+                  "explosionDamage": 30,
+                  "explosionZombieDamage": 15,
+                  "explosionInfection": 30
+                },
+                "screamerZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 15,
+                  "attack": 10,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 2,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0,
+                  "screamRadius": 30
+                },
+                "police": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 25,
+                  "recruitAttack": 6,
+                  "movement": 15,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 5,
+                  "maxFuel": 24,
+                  "maxMilitaryGoods": 10,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 2
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 3,
+                  "recruitmentFacilityTypes": [
+                    "capital",
+                    "city"
+                  ],
+                  "productionCivilianGoods": 10,
+                  "productionMilitaryGoods": 10,
+                  "fuelCostRule": "policeLike",
+                  "suppressionCivilianDamageRate": 0,
+                  "reanimationUnitType": "policeZombie",
+                  "noiseClass": "medium",
+                  "noiseRadius": 4
+                },
+                "nationalGuard": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 50,
+                  "recruitAttack": 12,
+                  "movement": 10,
+                  "range": 2,
+                  "vision": 5,
+                  "population": 10,
+                  "maxFuel": 44,
+                  "maxMilitaryGoods": 40,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 2,
+                    "2": 4
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 2,
+                  "recruitmentFacilityTypes": [
+                    "capital",
+                    "armyBase",
+                    "airBase"
+                  ],
+                  "productionCivilianGoods": 20,
+                  "productionMilitaryGoods": 25,
+                  "fuelCostRule": "nationalGuardLike",
+                  "suppressionCivilianDamageRate": 0.5,
+                  "reanimationUnitType": "soldierZombie",
+                  "noiseClass": "large",
+                  "noiseRadius": 8
+                },
+                "riotPolice": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 75,
+                  "recruitAttack": 9,
+                  "movement": 10,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 10,
+                  "maxFuel": 24,
+                  "maxMilitaryGoods": 10,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 2
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 2,
+                  "recruitmentFacilityTypes": [
+                    "capital",
+                    "city"
+                  ],
+                  "productionCivilianGoods": 25,
+                  "productionMilitaryGoods": 25,
+                  "fuelCostRule": "policeLike",
+                  "suppressionCivilianDamageRate": 0,
+                  "reanimationUnitType": "riotZombie",
+                  "noiseClass": "medium",
+                  "noiseRadius": 5
+                },
+                "reconTeam": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 25,
+                  "recruitAttack": 9,
+                  "movement": 10,
+                  "range": 6,
+                  "vision": 10,
+                  "population": 5,
+                  "maxFuel": 44,
+                  "maxMilitaryGoods": 40,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 6,
+                    "2": 6,
+                    "3": 6,
+                    "4": 6,
+                    "5": 6,
+                    "6": 6
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 2,
+                  "recruitmentFacilityTypes": [
+                    "capital",
+                    "armyBase"
+                  ],
+                  "productionCivilianGoods": 20,
+                  "productionMilitaryGoods": 25,
+                  "fuelCostRule": "nationalGuardLike",
+                  "suppressionCivilianDamageRate": 0.5,
+                  "reanimationUnitType": "soldierZombie",
+                  "noiseClass": "medium",
+                  "noiseRadius": 6
+                },
+                "zombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 15,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 3,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "hordeZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 4,
+                  "hp": 40,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 3,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "policeZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 10,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "soldierZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 20,
+                  "attack": 10,
+                  "movement": 5,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "riotZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 75,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "hunterZombie": {
+                  "canTargetAir": true,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 20,
+                  "attack": 15,
+                  "movement": 15,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                }
+              },
+              "unitExperience": {
+                "productionProficiencyByType": {
+                  "ifv": "recruit",
+                  "fieldArtillery": "recruit",
+                  "multipurposeHelicopter": "recruit",
+                  "police": "recruit",
+                  "nationalGuard": "recruit",
+                  "riotPolice": "recruit",
+                  "reconTeam": "recruit",
+                  "specialForces": "regular"
+                },
+                "recruitSurvivalTurnsRequired": 5,
+                "regularAttackMultiplier": 1.25,
+                "regularAttackRounding": "ceil",
+                "veteranZombieKillsRequired": 5,
+                "veteranAttackCharges": 2
+              },
+              "facilities": {
+                "reliefSupplyCenter": {
+                  "workerCapacity": 5,
+                  "production": {
+                    "inputs": {
+                      "food": 20
+                    },
+                    "outputs": {
+                      "civilianGoods": 5
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 5,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 50,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "nuclearPowerPlant": {
+                  "workerCapacity": 5,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 500,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "temporaryHousing": {
+                  "workerCapacity": 10,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 50,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "airBase": {
+                  "workerCapacity": 10,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "armyBase": {
+                  "workerCapacity": 10,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "capital": {
+                  "workerCapacity": 100,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "civilianGoods": 1
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 20,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "city": {
+                  "workerCapacity": 50,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "civilianGoods": 1
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 20,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "farm": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "food": 10
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "civilianFactory": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "civilianGoods": 10
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 30,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "militaryFactory": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {
+                      "civilianGoods": 10
+                    },
+                    "outputs": {
+                      "militaryGoods": 3
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 40,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "oilField": {
+                  "workerCapacity": 5,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "refinery": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "fuel": 5
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 20,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "powerPlant": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 15,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "windPowerPlant": {
+                  "workerCapacity": 0,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 15
+                  },
+                  "overrunSpawnCount": 0,
+                  "buildCivilianGoods": 150,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "simpleFarm": {
+                  "workerCapacity": 10,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "food": 5
+                    },
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 50,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "civilianDroneBase": {
+                  "workerCapacity": 5,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 50,
+                  "visionRadius": 15,
+                  "zombieTargetValue": 0
+                }
+              },
+              "economy": {
+                "unitFoodConsumption": 2,
+                "populationConsumption": {
+                  "food": 1,
+                  "civilianGoods": 1
+                },
+                "initialResources": {
+                  "food": 330,
+                  "civilianGoods": 355,
+                  "militaryGoods": 175,
+                  "fuel": 192
+                },
+                "initialRefineryAllowance": 2000,
+                "oilFieldAllowancePerWorker": 100,
+                "initialWorkersByFacility": {
+                  "nuclear-power-plant-1": 0,
+                  "army-base-1": 0,
+                  "air-base-1": 0,
+                  "capital": 51,
+                  "city-1": 0,
+                  "city-2": 0,
+                  "city-3": 0,
+                  "city-4": 0,
+                  "city-5": 0,
+                  "city-6": 0,
+                  "city-7": 0,
+                  "city-8": 0,
+                  "farm-1": 23,
+                  "farm-2": 0,
+                  "farm-3": 0,
+                  "farm-4": 0,
+                  "farm-5": 0,
+                  "civilian-factory-1": 23,
+                  "civilian-factory-2": 0,
+                  "civilian-factory-3": 0,
+                  "civilian-factory-4": 0,
+                  "military-factory-1": 0,
+                  "military-factory-2": 0,
+                  "military-factory-3": 0,
+                  "oilfield-north": 0,
+                  "oilfield-east": 0,
+                  "oilfield-south": 0,
+                  "oilfield-west": 0,
+                  "refinery-1": 10,
+                  "power-plant-1": 3,
+                  "wind-power-plant-1": 0
+                },
+                "initialZombieCount": 40,
+                "neutralSurvivorRewardLastTurn": 10,
+                "initialHunterCount": {
+                  "min": 4,
+                  "max": 4
+                },
+                "initialHunterMinDistance": 20,
+                "initialGasCount": {
+                  "min": 4,
+                  "max": 4
+                },
+                "initialGasMinDistance": 9,
+                "initialScreamerCount": 2
+              },
+              "initialFacilityPopulation": {
+                "nuclear-power-plant-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "army-base-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "air-base-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "capital": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-2": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-3": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-4": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-5": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-6": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-7": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-8": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-2": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-3": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-4": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-5": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "civilian-factory-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "civilian-factory-2": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "civilian-factory-3": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "civilian-factory-4": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "military-factory-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "military-factory-2": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "military-factory-3": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "oilfield-north": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "oilfield-east": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "oilfield-south": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "oilfield-west": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "refinery-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "power-plant-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "wind-power-plant-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                }
+              },
+              "naturalRecovery": {
+                "combatRate": 0.05,
+                "restRate": 0.1,
+                "rounding": "ceil"
+              },
+              "horde": {
+                "warningLeadTurns": 2,
+                "waves": [
+                  {
+                    "turn": 10,
+                    "directionCount": 1,
+                    "compositionPerDirection": {
+                      "hordeZombie": 5,
+                      "zombie": 5
+                    },
+                    "final": false
+                  },
+                  {
+                    "turn": 20,
+                    "directionCount": 2,
+                    "compositionPerDirection": {
+                      "hordeZombie": 3,
+                      "zombie": 8
+                    },
+                    "final": false
+                  },
+                  {
+                    "turn": 35,
+                    "directionCount": 1,
+                    "compositionPerDirection": {
+                      "hordeZombie": 8,
+                      "zombie": 11
+                    },
+                    "final": false
+                  },
+                  {
+                    "turn": 50,
+                    "directionCount": 3,
+                    "compositionPerDirection": {
+                      "hordeZombie": 5,
+                      "zombie": 11
+                    },
+                    "final": false
+                  },
+                  {
+                    "turn": 70,
+                    "directionCount": 4,
+                    "compositionPerDirection": {
+                      "hordeZombie": 8,
+                      "zombie": 12
+                    },
+                    "final": true
+                  }
+                ],
+                "specialZombieWeights": {
+                  "zombie": 40,
+                  "policeZombie": 10,
+                  "soldierZombie": 10,
+                  "riotZombie": 5,
+                  "hunterZombie": 15,
+                  "gasZombie": 15,
+                  "screamerZombie": 5
+                },
+                "riotZombieCapPerDirection": 1,
+                "hunterZombieCapPerDirection": null,
+                "movementNoiseRadius": 8
+              },
+              "refugees": {
+                "arrivalIntervalMin": 2,
+                "arrivalIntervalMax": 4,
+                "arrivalPeopleMin": 10,
+                "arrivalPeopleMax": 20,
+                "arrivalGrowthInterval": 2,
+                "arrivalGrowthPeople": 1,
+                "waitingCrowdingThreshold": 60,
+                "screeningCapacity": 20,
+                "policies": {
+                  "passThrough": {
+                    "turns": 0,
+                    "workerRate": 1,
+                    "infectionRate": 0.25,
+                    "infectionPopulationRate": 0.5
+                  },
+                  "normal": {
+                    "turns": 2,
+                    "workerRate": 1,
+                    "infectionRate": 0.05,
+                    "infectionPopulationRate": 1
+                  },
+                  "strict": {
+                    "turns": 5,
+                    "workerRate": 1,
+                    "infectionRate": 0,
+                    "infectionPopulationRate": 0
+                  },
+                  "deny": {
+                    "turns": 0,
+                    "workerRate": 0,
+                    "infectionRate": 0,
+                    "infectionPopulationRate": 0
+                  }
+                },
+                "waitingRiskThreshold": 100,
+                "waitingRiskMaxPercent": 100,
+                "waitingRiskInfectionMin": 1,
+                "waitingRiskInfectionMax": 5
+              },
+              "infection": {
+                "facilitySpreadPerTurn": 1,
+                "fallBackInfectionRate": 0.5,
+                "zombieSpawnPopulationPerUnit": 5,
+                "maxZombieSpawnPerResolution": 6,
+                "zombieSpawnRadius": 1,
+                "noiseRespawnEnabled": true
+              },
+              "checkpoint": {
+                "checkpointBonus": 25,
+                "constructionCivilianGoods": 25,
+                "subsequentConstructionCivilianGoods": 25,
+                "relocationCivilianGoods": 25,
+                "maxPreparedPostsPerDirection": 5,
+                "requiresPolice": false,
+                "consumesPower": false,
+                "initialSupplyRadius": 5
+              },
+              "constructibleFacility": {
+                "limitPerTypeDivisor": 2
+              },
+              "terrain": {
+                "movementCost": {
+                  "plain": 1,
+                  "forest": 2,
+                  "mountain": 3,
+                  "water": null
+                },
+                "damageMultiplier": {
+                  "urban": 0.5,
+                  "forestZombie": 0.5
+                }
+              },
+              "vision": {
+                "capital": 5,
+                "ownedFacility": 1,
+                "operationalCheckpoint": 1
+              }
+            },
+            "outcome": "limit_reached",
+            "limitReached": true,
+            "gameOverReason": null,
+            "finalTurn": 4,
+            "totalAgentDecisions": 276,
+            "acceptedActionCount": 276,
+            "invalidAttemptCount": 0,
+            "actionCounts": {
+              "BuildBarbedWire": 3,
+              "Move": 20,
+              "Attack": 2,
+              "Wait": 6,
+              "AssignWorkers": 198,
+              "TransferPopulation": 8,
+              "SetCheckpointPolicy": 19,
+              "SetPowerSupply": 6,
+              "BuildCheckpoint": 0,
+              "BuildConstructibleFacility": 7,
+              "DecommissionConstructibleFacility": 0,
+              "RelocateCheckpoint": 3,
+              "ActivateCheckpoint": 1,
+              "TurnAwayCheckpointRefugees": 0,
+              "ProduceUnit": 0,
+              "EndTurn": 3
+            },
+            "priorityGoalCounts": {
+              "avoid_defeat": 0,
+              "prevent_facility_contact": 0,
+              "rescue_critical_infection": 0,
+              "defend_horde": 0,
+              "suppress_infection": 0,
+              "restore_military_supply": 0,
+              "restore_economy": 0,
+              "reduce_overcrowding": 0,
+              "build_forces": 0,
+              "secure_facilities": 0,
+              "manage_checkpoint": 0,
+              "combat": 0,
+              "end_turn": 2
+            },
+            "initialPopulation": 155,
+            "finalHealthyCivilianPopulation": 109,
+            "maxPopulation": 156,
+            "civilianLosses": 25,
+            "infectionLosses": 25,
+            "resourceShortageLosses": 0,
+            "refugeesAccepted": 0,
+            "refugeeArrivalsByBranch": {
+              "east": 0,
+              "north": 0,
+              "south": 0,
+              "west": 0
+            },
+            "totalRefugeeArrivals": 0,
+            "unmanagedPassThrough": 0,
+            "refugeesScreenedByPolicy": {
+              "passThrough": 0,
+              "normal": 0,
+              "strict": 0
+            },
+            "refugeesDeparted": 0,
+            "barbedWireBuilt": 3,
+            "barbedWireDestroyed": 0,
+            "barbedWireDamageTaken": 0,
+            "barbedWireAbsorbedDamage": 0,
+            "barbedWireEmptyAttackCharges": 0,
+            "barbedWireOccupiedAttackCharges": 0,
+            "checkpointsBuilt": 0,
+            "checkpointsRelocated": 3,
+            "checkpointRetreats": 0,
+            "checkpointsRuined": 0,
+            "checkpointsRecovered": 0,
+            "checkpointsAbandoned": 0,
+            "checkpointsRemoved": 0,
+            "standbyCheckpointsCreated": 4,
+            "dormantCheckpointsCreated": 0,
+            "checkpointActivations": 1,
+            "checkpointFallbacks": 0,
+            "checkpointFallbacksByBranch": {
+              "east": 0,
+              "north": 0,
+              "south": 0,
+              "west": 0
+            },
+            "checkpointFallbacksFromStandby": 0,
+            "checkpointFallbacksFromDormant": 0,
+            "checkpointFallbacksPreventingUnmanagedArrival": 0,
+            "maxCheckpointPostsPerBranch": 2,
+            "maxPreparedCheckpointPostsPerBranch": 2,
+            "activeCheckpointLosses": 0,
+            "unmanagedBranchTurns": 0,
+            "maxSuppliedFacilities": 18,
+            "maxSupplyRadius": 11,
+            "supplyLosses": 1,
+            "supplyRejections": 0,
+            "maxOvercrowding": 0.02,
+            "maxOvercrowdingAdditionalFood": 1,
+            "maxOvercrowdingAdditionalCivilianGoods": 2,
+            "housingBuilt": 2,
+            "housingResidentTurns": 6,
+            "housingCivilianGoodsProduced": 0,
+            "housingOutageFacilityTurns": 0,
+            "housingResidentsFinal": 0,
+            "facilitiesCaptured": 1,
+            "facilitiesLost": 6,
+            "finalSecuredFacilities": 16,
+            "policeProduced": 0,
+            "nationalGuardProduced": 0,
+            "riotPoliceProduced": 0,
+            "policeInitial": 4,
+            "nationalGuardInitial": 1,
+            "riotPoliceInitial": 1,
+            "policeLosses": 1,
+            "nationalGuardLosses": 0,
+            "riotPoliceLosses": 0,
+            "policeFinal": 3,
+            "nationalGuardFinal": 1,
+            "riotPoliceFinal": 1,
+            "policeSurvivalRate": 0.75,
+            "nationalGuardSurvivalRate": 1,
+            "riotPoliceSurvivalRate": 1,
+            "outOfSupplyUnitLosses": 1,
+            "policeCombatRecoveryHp": 0,
+            "policeCombatRecoveryCount": 0,
+            "policeRestRecoveryHp": 3,
+            "policeRestRecoveryCount": 1,
+            "nationalGuardCombatRecoveryHp": 0,
+            "nationalGuardCombatRecoveryCount": 0,
+            "nationalGuardRestRecoveryHp": 0,
+            "nationalGuardRestRecoveryCount": 0,
+            "combatRecoverySelections": 0,
+            "restRecoverySelections": 3,
+            "maxWorkersInSingleFacility": 30,
+            "maxTotalProductionWorkers": 110,
+            "highCapacityFacilityTurns": 1,
+            "powerPlantStoppedTurns": 0,
+            "powerShortageTurns": 0,
+            "poweredIndustrialFacilityTurns": 2,
+            "unpoweredCityTurns": 2,
+            "refineryFacilitiesCaptured": 0,
+            "powerPlantFacilitiesCaptured": 0,
+            "checkpointPassThroughBranchTurns": 3,
+            "checkpointNormalBranchTurns": 5,
+            "checkpointStrictBranchTurns": 6,
+            "checkpointPassThroughBranchTurnRate": 0.1875,
+            "checkpointNormalBranchTurnRate": 0.3125,
+            "checkpointStrictBranchTurnRate": 0.375,
+            "checkpointPassThroughScreenedRate": 0,
+            "checkpointNormalScreenedRate": 0,
+            "checkpointStrictScreenedRate": 0,
+            "unitLosses": 1,
+            "zombiesKilled": 2,
+            "hordeInterceptions": 0,
+            "finalHordeSpawned": 0,
+            "finalHordeKilled": 0,
+            "finalHordeDefeated": false,
+            "periodicHordeZombiesSpawned": 0,
+            "periodicNormalZombiesSpawned": 0,
+            "finalHordeZombiesSpawned": 0,
+            "finalNormalZombiesSpawned": 0,
+            "normalZombiesKilled": 1,
+            "hordeZombiesKilled": 0,
+            "policeZombiesSpawned": 1,
+            "soldierZombiesSpawned": 0,
+            "policeZombiesKilled": 1,
+            "soldierZombiesKilled": 0,
+            "policeZombiesFinal": 0,
+            "soldierZombiesFinal": 0,
+            "riotZombiesSpawned": 0,
+            "riotZombiesKilled": 0,
+            "riotZombiesFinal": 0,
+            "hunterZombiesKilled": 0,
+            "hunterZombiesSpawned": 4,
+            "hunterZombiesFinal": 0,
+            "riotPoliceReanimations": 0,
+            "maxVisibleZombies": 11,
+            "turnsAfterFinalHorde": 0,
+            "suppliedAreaZombieClearTurn": 1,
+            "suppliedAreaInfectionClearTurn": 1,
+            "victoryTurn": null,
+            "terrainEntriesByType": {
+              "plain": 170,
+              "forest": 9,
+              "mountain": 7,
+              "water": 2
+            },
+            "urbanDefenseApplications": 1,
+            "urbanDefenseDamagePrevented": 2,
+            "forestDefenseApplications": 1,
+            "forestDefenseDamagePrevented": 4,
+            "normalZombieIdleCount": 122,
+            "hordeTargetInheritedCount": 0,
+            "hordeTargetClearedCount": 0,
+            "noisePulsesEmitted": 16,
+            "policeNoisePulses": 6,
+            "nationalGuardNoisePulses": 0,
+            "riotPoliceNoisePulses": 2,
+            "recruitsCommissionedByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "specialForces": 0,
+              "fieldArtillery": 0
+            },
+            "regularPromotionsByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "specialForces": 0,
+              "fieldArtillery": 0
+            },
+            "veteranPromotionsByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "specialForces": 0,
+              "fieldArtillery": 0
+            },
+            "veteranZombieKillsByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "specialForces": 0,
+              "fieldArtillery": 0
+            },
+            "hordeSpecialSpawnedByType": {
+              "policeZombie": 0,
+              "soldierZombie": 0,
+              "riotZombie": 0,
+              "hunterZombie": 0,
+              "gasZombie": 0,
+              "screamerZombie": 0,
+              "packZombie": 0
+            },
+            "noisePulsesBySourceType": {
+              "ifv": 0,
+              "police": 6,
+              "nationalGuard": 0,
+              "riotPolice": 2,
+              "reconTeam": 2,
+              "multipurposeHelicopter": 0,
+              "fieldArtillery": 0,
+              "specialForces": 0,
+              "hordeZombie": 0
+            },
+            "hordeMovementNoisePulses": 0,
+            "hordeNoiseRespawnedByType": {
+              "zombie": 0,
+              "hordeZombie": 0,
+              "policeZombie": 0,
+              "soldierZombie": 0,
+              "riotZombie": 0,
+              "hunterZombie": 0,
+              "gasZombie": 0,
+              "screamerZombie": 0,
+              "packZombie": 0
+            },
+            "unusedAttackChargesByTurn": 14,
+            "criticalInfectionAlertUnresolvedTurns": 0,
+            "normalZombiesNoiseTargeted": 8,
+            "noiseTargetsReached": 2,
+            "noiseTargetsOverriddenByHorde": 0,
+            "noiseTargetsOverriddenByVisiblePopulation": 3,
+            "initialNormalZombies": 40,
+            "combatNoiseByClass": {
+              "medium": 10,
+              "large": 0
+            },
+            "fallenSitesTriggeredByNoise": 0,
+            "noiseRespawnAttempts": 0,
+            "noiseRespawnZombiesSpawned": 0,
+            "noiseImmediateInfections": 0,
+            "noiseChainOverruns": 0,
+            "policeNoiseImmediateInfections": 0,
+            "nationalGuardNoiseImmediateInfections": 0,
+            "policeNoiseChainOverruns": 0,
+            "nationalGuardNoiseChainOverruns": 0,
+            "groundVisionPotentialHexes": 575,
+            "groundVisionVisibleHexes": 414,
+            "groundVisionBlockedHexes": 161,
+            "maxGroundVisionBlockedHexes": 161,
+            "averageGroundVisionBlockedHexes": 123.25,
+            "civilianDroneBasesBuilt": 0,
+            "civilianDroneBasesDecommissioned": 0,
+            "civilianGoodsRefundedFromDecommission": 0,
+            "maxCivilianDroneVisionRadius": 0,
+            "aerialDiscoveriesInGroundBlockedArea": 0,
+            "siteFirstInfectionsByType": {
+              "facility:farm": 2,
+              "facility:city": 2,
+              "facility:militaryFactory": 3,
+              "facility:simpleFarm": 1
+            },
+            "siteFallsByType": {
+              "facility:farm": 1
+            },
+            "siteZombieOccupancyDestructionsByType": {
+              "facility:farm": 1,
+              "facility:city": 2,
+              "facility:militaryFactory": 2
+            },
+            "infectedPopulationAtFall": 0,
+            "requestedSiteZombieSpawns": 0,
+            "actualSiteZombieSpawns": 0,
+            "fallSiteZombieSpawns": 0,
+            "noiseSiteZombieSpawns": 0,
+            "maxSixZombieSpawnResolutions": 0,
+            "infectedPopulationConvertedToZombies": 15,
+            "unspawnedInfectedPopulation": 0,
+            "immediateInfectionsFromSpawn": 0,
+            "chainOverruns": 0,
+            "maximumOverrunChainLength": 0,
+            "chainOriginsByType": {},
+            "constructibleInfectedDeaths": 0,
+            "earlyFacilityLosses": 6,
+            "earlyCheckpointLosses": 0,
+            "finalFood": 0,
+            "finalCivilianGoods": 0,
+            "finalMilitaryGoods": 150,
+            "finalFuel": 46,
+            "mapWidth": 51,
+            "mapHeight": 51,
+            "humanHexesMovedByType": {
+              "police": 85,
+              "nationalGuard": 21,
+              "riotPolice": 23,
+              "reconTeam": 14,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "maxSingleMoveDistanceByType": {
+              "police": 15,
+              "nationalGuard": 9,
+              "riotPolice": 10,
+              "reconTeam": 7,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "longMoves6PlusByType": {
+              "police": 7,
+              "nationalGuard": 2,
+              "riotPolice": 3,
+              "reconTeam": 1,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "unitFuelConsumedByType": {
+              "police": 108,
+              "nationalGuard": 34,
+              "riotPolice": 22,
+              "reconTeam": 14,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "unitFuelRefilledByType": {
+              "police": 44,
+              "nationalGuard": 34,
+              "riotPolice": 22,
+              "reconTeam": 12,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "commissioningFuelByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "turnsUnitsEndedOutOfSupplyByType": {
+              "police": 10,
+              "nationalGuard": 2,
+              "riotPolice": 2,
+              "reconTeam": 2,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "unitsUnableToMoveForFuel": 0,
+            "stateFuelSpentOnPower": 34,
+            "stateFuelSpentOnUnits": 112,
+            "fuelShortageTurns": 0,
+            "windPowerGenerated": 105,
+            "windDisabledTurns": 0,
+            "windOverruns": 0,
+            "windRecoveries": 0,
+            "simpleFarmsBuilt": 4,
+            "simpleFarmsDestroyed": 0,
+            "simpleFarmFoodProduced": 160,
+            "droneBasesBuilt": 0,
+            "droneBasesDestroyed": 0,
+            "maxDroneVisionRadius": 0,
+            "constructibleFacilityOverruns": 0,
+            "constructibleBuildRejectedByReason": {},
+            "guaranteedDefeatWarnings": 0,
+            "guaranteedDefeatIgnored": 0,
+            "resourceSinglePointFailureTurnsByResource": {
+              "food": 0,
+              "civilianGoods": 1,
+              "militaryGoods": 0,
+              "fuel": 0,
+              "electricity": 4
+            },
+            "checkpointMovesWithNoSupplyGain": 1,
+            "checkpointQueuePressureTurnsByClass": {
+              "none": 26,
+              "low": 0,
+              "medium": 0,
+              "high": 0
+            },
+            "checkpointQueueFoodDemand": 0,
+            "checkpointQueueCivilianGoodsDemand": 0,
+            "checkpointQueueFoodConsumed": 0,
+            "checkpointQueueCivilianGoodsConsumed": 0,
+            "refugeesRejectedByDirectionAndPolicy": {
+              "north": {
+                "normal": 0,
+                "strict": 0
+              },
+              "east": {
+                "normal": 0,
+                "strict": 0
+              },
+              "south": {
+                "normal": 0,
+                "strict": 0
+              },
+              "west": {
+                "normal": 0,
+                "strict": 0
+              }
+            },
+            "refugeesTurnedAwayByDirection": {
+              "north": 0,
+              "east": 0,
+              "south": 0,
+              "west": 0
+            },
+            "rejectedBonusZombiesByDirection": {
+              "north": 0,
+              "east": 0,
+              "south": 0,
+              "west": 0
+            },
+            "rejectedCounterResetsByDirection": {
+              "north": 0,
+              "east": 0,
+              "south": 0,
+              "west": 0
+            },
+            "preventedRefugeeArrivalsAfterFinal": 0,
+            "policeReanimations": 1,
+            "nationalGuardReanimations": 0,
+            "reanimationImmediateInfections": 0,
+            "reanimationFacilityInfections": 0,
+            "reanimationCheckpointInfections": 0,
+            "reanimationSiteFalls": 0,
+            "reanimationChainOverruns": 0,
+            "policeLongRangeMoves": 4,
+            "fixedMilitaryGoodsConsumedByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "attackMilitaryGoodsConsumedByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 12,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "counterattackMilitaryGoodsConsumedByType": {
+              "police": 6,
+              "nationalGuard": 0,
+              "riotPolice": 2,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "interceptionMilitaryGoodsConsumedByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "suppressionMilitaryGoodsConsumedByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "militaryGoodsRefilledByType": {
+              "police": 2,
+              "nationalGuard": 0,
+              "riotPolice": 2,
+              "reconTeam": 6,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "unfilledMilitaryGoodsRefillByType": {
+              "police": 10,
+              "nationalGuard": 0,
+              "riotPolice": 2,
+              "reconTeam": 12,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "militaryGoodsLostOnDestructionByType": {
+              "police": 6,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "zeroMilitaryGoodsWeakAttacksByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "nationalGuardAttacksByRange": {
+              "range1": 0,
+              "range2": 0
+            },
+            "nationalGuardMilitaryGoodsConsumedByRange": {
+              "range1": 0,
+              "range2": 0
+            },
+            "militaryGoodsRefillShortageTurns": 4,
+            "emergencyMovesByType": {
+              "police": 1,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "emergencyMovementHexesByType": {
+              "police": 1,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "emergencyMovementPointsByType": {
+              "police": 2,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "emergencyReturnsToSupplyByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "powerTurnsByFacilityType": {
+              "capital": {
+                "requested": 277,
+                "supplied": 273,
+                "unavailable": 4,
+                "off": 277
+              },
+              "city": {
+                "requested": 23,
+                "supplied": 23,
+                "unavailable": 0,
+                "off": 2031
+              },
+              "farm": {
+                "requested": 78,
+                "supplied": 78,
+                "unavailable": 0,
+                "off": 199
+              },
+              "civilianFactory": {
+                "requested": 303,
+                "supplied": 267,
+                "unavailable": 36,
+                "off": 79
+              },
+              "militaryFactory": {
+                "requested": 24,
+                "supplied": 18,
+                "unavailable": 6,
+                "off": 0
+              },
+              "oilField": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "refinery": {
+                "requested": 74,
+                "supplied": 47,
+                "unavailable": 27,
+                "off": 203
+              },
+              "powerPlant": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "windPowerPlant": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "civilianDroneBase": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "simpleFarm": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "temporaryHousing": {
+                "requested": 352,
+                "supplied": 352,
+                "unavailable": 0,
+                "off": 522
+              },
+              "armyBase": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "airBase": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 277
+              },
+              "nuclearPowerPlant": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              }
+            },
+            "powerRequestedTurnsByFacilityType": {
+              "capital": 277,
+              "city": 23,
+              "farm": 78,
+              "civilianFactory": 303,
+              "militaryFactory": 24,
+              "oilField": 0,
+              "refinery": 74,
+              "powerPlant": 0,
+              "windPowerPlant": 0,
+              "civilianDroneBase": 0,
+              "simpleFarm": 0,
+              "temporaryHousing": 352,
+              "armyBase": 0,
+              "airBase": 0,
+              "nuclearPowerPlant": 0
+            },
+            "powerSuppliedTurnsByFacilityType": {
+              "capital": 273,
+              "city": 23,
+              "farm": 78,
+              "civilianFactory": 267,
+              "militaryFactory": 18,
+              "oilField": 0,
+              "refinery": 47,
+              "powerPlant": 0,
+              "windPowerPlant": 0,
+              "civilianDroneBase": 0,
+              "simpleFarm": 0,
+              "temporaryHousing": 352,
+              "armyBase": 0,
+              "airBase": 0,
+              "nuclearPowerPlant": 0
+            },
+            "powerUnavailableTurnsByFacilityType": {
+              "capital": 4,
+              "city": 0,
+              "farm": 0,
+              "civilianFactory": 36,
+              "militaryFactory": 6,
+              "oilField": 0,
+              "refinery": 27,
+              "powerPlant": 0,
+              "windPowerPlant": 0,
+              "civilianDroneBase": 0,
+              "simpleFarm": 0,
+              "temporaryHousing": 0,
+              "armyBase": 0,
+              "airBase": 0,
+              "nuclearPowerPlant": 0
+            },
+            "powerSupplyOffTurnsByFacilityType": {
+              "capital": 277,
+              "city": 2031,
+              "farm": 199,
+              "civilianFactory": 79,
+              "militaryFactory": 0,
+              "oilField": 0,
+              "refinery": 203,
+              "powerPlant": 0,
+              "windPowerPlant": 0,
+              "civilianDroneBase": 0,
+              "simpleFarm": 0,
+              "temporaryHousing": 522,
+              "armyBase": 0,
+              "airBase": 277,
+              "nuclearPowerPlant": 0
+            },
+            "powerResourceLossByResource": {
+              "food": 30390,
+              "civilianGoods": 14681,
+              "militaryGoods": 318,
+              "fuel": 1770
+            },
+            "refineryPowerOutageTurns": 4,
+            "refineryOutageNextTurnFuelShortageTurns": 0,
+            "simpleFarmFoodShortageAvoidanceTurns": 144,
+            "checkpointBatchStartsByPolicy": {
+              "passThrough": 0,
+              "normal": 0,
+              "strict": 0,
+              "deny": 0
+            },
+            "checkpointBatchCompletionsByPolicy": {
+              "passThrough": 0,
+              "normal": 0,
+              "strict": 0,
+              "deny": 0
+            },
+            "checkpointAverageQueue": 0,
+            "checkpointCapacityUtilization": 0,
+            "checkpointEstimatedThroughput": 14.661636680208938,
+            "hordeWaves": [
+              {
+                "index": 1,
+                "spawnTurn": 10,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 5,
+                  "zombie": 5
+                },
+                "variantSlotCountPerDirection": 5,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": false,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              },
+              {
+                "index": 2,
+                "spawnTurn": 20,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 3,
+                  "zombie": 8
+                },
+                "variantSlotCountPerDirection": 8,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": false,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              },
+              {
+                "index": 3,
+                "spawnTurn": 35,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 8,
+                  "zombie": 11
+                },
+                "variantSlotCountPerDirection": 11,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": false,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              },
+              {
+                "index": 4,
+                "spawnTurn": 50,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 5,
+                  "zombie": 11
+                },
+                "variantSlotCountPerDirection": 11,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": false,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              },
+              {
+                "index": 5,
+                "spawnTurn": 70,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 8,
+                  "zombie": 12
+                },
+                "variantSlotCountPerDirection": 12,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": true,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              }
+            ],
+            "hordeDirectionSpawnCounts": {
+              "north": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "east": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "south": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "west": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              }
+            },
+            "hordeDirectionKillCounts": {
+              "north": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "east": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "south": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "west": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              }
+            },
+            "hordeFinalWaveSpawnTotal": 0,
+            "hordeFinalWaveKillTotal": 0,
+            "hordeFinalDefeatedTurn": null,
+            "hordeTurnsAfterFinal": 0,
+            "hordeMultiFrontCheckpointLosses": 0,
+            "hordeMultiFrontFallbacks": 0,
+            "failure": null
+          },
+          "objectives": null
+        }
+      ]
+    },
+    {
+      "app": "1.7.0",
+      "rules": "20.0.0",
+      "plan": {
+        "start": 1,
+        "count": 1,
+        "gameplaySeed": 1,
+        "strategy": "balanced",
+        "mode": "random",
+        "maxTurns": 3
+      },
+      "results": [
+        {
+          "mapSeed": 1,
+          "gameplaySeed": 1,
+          "mode": "random",
+          "agent": {
+            "id": "balanced",
+            "version": "15.0.0",
+            "strategy": "balanced"
+          },
+          "descriptor": {
+            "scenario": "una",
+            "mode": "random",
+            "rootSeed": 1,
+            "mapSeed": 1,
+            "gameplaySeed": 1,
+            "generator": "inland-51x51-v1",
+            "generatorVersion": "inland-v1",
+            "settingsId": "711ed3a16162e0858521bde548e44cb059b2c4fb9bebc415a7978d940420c2d7",
+            "settings": {
+              "version": "inland-settings-v1",
+              "initialSupplyRadius": 5,
+              "capacities": {
+                "reliefSupplyCenter": 5,
+                "nuclearPowerPlant": 5,
+                "temporaryHousing": 10,
+                "airBase": 10,
+                "armyBase": 10,
+                "capital": 100,
+                "city": 50,
+                "farm": 30,
+                "civilianFactory": 30,
+                "militaryFactory": 30,
+                "oilField": 5,
+                "refinery": 30,
+                "powerPlant": 30,
+                "windPowerPlant": 0,
+                "simpleFarm": 10,
+                "civilianDroneBase": 5
+              },
+              "movementCost": {
+                "plain": 1,
+                "forest": 2,
+                "mountain": 3,
+                "water": null
+              }
+            },
+            "attempt": 1,
+            "fallback": null,
+            "mapHash": "102b7a5eae2c8805377c5238f65f43554eefb845d6f60b34366ede11da5d0f56",
+            "configVersion": "20.0.0",
+            "appVersion": "1.7.0",
+            "build": "1.7.0/inland-v1/inland-settings-v1"
+          },
+          "ms": 63430.609899999996,
+          "outcome": "turn_limit",
+          "result": null,
+          "technicalFailure": null,
+          "metrics": {
+            "appVersion": "1.7.0",
+            "barbedWireVisibleDestroyed": 0,
+            "barbedWireVisibleDamage": 0,
+            "barbedWireAbsorbedHumanDamage": 0,
+            "gameRulesVersion": "20.0.0",
+            "agentId": "balanced",
+            "agentVersion": "15.0.0",
+            "strategy": "balanced",
+            "agentApiVersion": "25.0.0",
+            "observationApiVersion": "25.0.0",
+            "bridgeApiVersion": "25.0.0",
+            "buildId": "local-unknown",
+            "mapId": "inland-51x51-v1",
+            "seed": 1,
+            "config": {
+              "zombiePursuitMovementBonus": 3,
+              "objectives": {
+                "nuclearPowerPlant": {
+                  "rewardDeadlineTurn": 10,
+                  "requiresHealthySurvivors": false,
+                  "failureOnUncapturedFall": false,
+                  "rewardUnitType": "specialForces",
+                  "failureUnitType": "packZombie"
+                },
+                "airBase": {
+                  "rewardDeadlineTurn": 10,
+                  "requiresHealthySurvivors": true,
+                  "failureOnUncapturedFall": true,
+                  "rewardUnitType": "specialForces",
+                  "failureUnitType": "packZombie"
+                }
+              },
+              "militaryDrone": {
+                "fuelPerHex": 5,
+                "visionRadius": 10,
+                "durationTurns": 5
+              },
+              "windPower": {
+                "noiseRadius": 8
+              },
+              "armyBase": {
+                "maxMilitaryGoods": 40,
+                "interceptionCost": 2,
+                "attack": 10,
+                "range": 2,
+                "noiseRadius": 8,
+                "staffedVision": 5,
+                "rewardLastTurn": 10
+              },
+              "scenarioId": "una",
+              "mapMode": "random",
+              "mapSeed": 1,
+              "gameplaySeed": 1,
+              "version": "20.0.0",
+              "mapId": "inland-51x51-v1",
+              "maxActionsPerTurn": 100,
+              "units": {
+                "ifv": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": false
+                  },
+                  "productionFood": 80,
+                  "productionFuel": 150,
+                  "productionLimitPerGame": 1,
+                  "canTargetAir": true,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 3,
+                  "veteranAttackCharges": 4,
+                  "hp": 200,
+                  "recruitAttack": 16,
+                  "movement": 10,
+                  "range": 5,
+                  "vision": 5,
+                  "population": 4,
+                  "maxFuel": 100,
+                  "maxMilitaryGoods": 120,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "0": 20,
+                    "1": 20,
+                    "2": 20,
+                    "3": 20,
+                    "4": 20,
+                    "5": 20
+                  },
+                  "suppressionMilitaryGoodsCost": 20,
+                  "militaryGoodsShortageAttackMultiplier": 0,
+                  "emergencyMovementPoints": 0,
+                  "recruitmentFacilityTypes": [
+                    "armyBase"
+                  ],
+                  "productionCivilianGoods": 50,
+                  "productionMilitaryGoods": 170,
+                  "fuelCostRule": "perHex",
+                  "fuelPerHex": 10,
+                  "cargoCapacity": 1,
+                  "suppressionCivilianDamageRate": 0.5,
+                  "reanimationUnitType": "soldierZombie",
+                  "noiseClass": "large",
+                  "noiseRadius": 10
+                },
+                "multipurposeHelicopter": {
+                  "capabilities": {
+                    "capture": false,
+                    "recoverCheckpoint": false,
+                    "suppress": false,
+                    "contain": false,
+                    "infantry": false
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 500,
+                  "productionLimitPerGame": 1,
+                  "canTargetAir": true,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 100,
+                  "recruitAttack": 13,
+                  "movement": 0,
+                  "airborneMovement": 50,
+                  "range": 2,
+                  "vision": 10,
+                  "population": 2,
+                  "maxFuel": 500,
+                  "maxMilitaryGoods": 40,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "0": 2,
+                    "1": 2,
+                    "2": 4
+                  },
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 0,
+                  "emergencyMovementPoints": 0,
+                  "recruitmentFacilityTypes": [
+                    "airBase"
+                  ],
+                  "productionCivilianGoods": 100,
+                  "productionMilitaryGoods": 140,
+                  "fuelCostRule": "perMovementPoint",
+                  "fuelPerMovementPoint": 5,
+                  "endTurnFuel": 1,
+                  "endTurnNoiseRadius": 15,
+                  "cargoCapacity": 1,
+                  "suppressionCivilianDamageRate": 0,
+                  "reanimationUnitType": null,
+                  "noiseClass": "large",
+                  "noiseRadius": 8
+                },
+                "specialForces": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 3,
+                  "veteranAttackCharges": 4,
+                  "hp": 50,
+                  "recruitAttack": 12,
+                  "movement": 10,
+                  "range": 2,
+                  "vision": 5,
+                  "population": 5,
+                  "maxFuel": 44,
+                  "maxMilitaryGoods": 40,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 2,
+                    "2": 4
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 2,
+                  "recruitmentFacilityTypes": [],
+                  "productionCivilianGoods": 0,
+                  "productionMilitaryGoods": 0,
+                  "fuelCostRule": "nationalGuardLike",
+                  "suppressionCivilianDamageRate": 0.5,
+                  "reanimationUnitType": "packZombie",
+                  "noiseClass": "medium",
+                  "noiseRadius": 4
+                },
+                "fieldArtillery": {
+                  "capabilities": {
+                    "capture": false,
+                    "recoverCheckpoint": false,
+                    "suppress": false,
+                    "contain": false,
+                    "infantry": false
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 100,
+                  "productionLimitPerGame": 2,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 1,
+                  "hp": 25,
+                  "recruitAttack": 7,
+                  "movement": 10,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 5,
+                  "maxFuel": 100,
+                  "maxMilitaryGoods": 100,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 4
+                  },
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 1,
+                  "recruitmentFacilityTypes": [
+                    "armyBase"
+                  ],
+                  "productionCivilianGoods": 100,
+                  "productionMilitaryGoods": 200,
+                  "fuelCostRule": "perMovementPoint",
+                  "fuelPerMovementPoint": 10,
+                  "suppressionCivilianDamageRate": 0,
+                  "reanimationUnitType": "soldierZombie",
+                  "noiseClass": "large",
+                  "noiseRadius": 6,
+                  "deployed": {
+                    "recruitAttack": 40,
+                    "movement": 0,
+                    "minRange": 10,
+                    "range": 200,
+                    "militaryGoodsCost": 50,
+                    "noiseRadius": 40
+                  },
+                  "scatter": {
+                    "recruit": {
+                      "hitProbability": 0.5,
+                      "radius": 2
+                    },
+                    "regular": {
+                      "hitProbability": 0.5,
+                      "radius": 1
+                    },
+                    "veteran": {
+                      "hitProbability": 1,
+                      "radius": 0
+                    }
+                  },
+                  "friendlyFire": true,
+                  "facilityPopulationDamage": true
+                },
+                "packZombie": {
+                  "canTargetAir": true,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 5,
+                  "hp": 50,
+                  "attack": 15,
+                  "movement": 10,
+                  "range": 1,
+                  "vision": 3,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "gasZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 35,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 3,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0,
+                  "explosionDamage": 30,
+                  "explosionZombieDamage": 15,
+                  "explosionInfection": 30
+                },
+                "screamerZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 15,
+                  "attack": 10,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 2,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0,
+                  "screamRadius": 30
+                },
+                "police": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 25,
+                  "recruitAttack": 6,
+                  "movement": 15,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 5,
+                  "maxFuel": 24,
+                  "maxMilitaryGoods": 10,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 2
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 3,
+                  "recruitmentFacilityTypes": [
+                    "capital",
+                    "city"
+                  ],
+                  "productionCivilianGoods": 10,
+                  "productionMilitaryGoods": 10,
+                  "fuelCostRule": "policeLike",
+                  "suppressionCivilianDamageRate": 0,
+                  "reanimationUnitType": "policeZombie",
+                  "noiseClass": "medium",
+                  "noiseRadius": 4
+                },
+                "nationalGuard": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 50,
+                  "recruitAttack": 12,
+                  "movement": 10,
+                  "range": 2,
+                  "vision": 5,
+                  "population": 10,
+                  "maxFuel": 44,
+                  "maxMilitaryGoods": 40,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 2,
+                    "2": 4
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 2,
+                  "recruitmentFacilityTypes": [
+                    "capital",
+                    "armyBase",
+                    "airBase"
+                  ],
+                  "productionCivilianGoods": 20,
+                  "productionMilitaryGoods": 25,
+                  "fuelCostRule": "nationalGuardLike",
+                  "suppressionCivilianDamageRate": 0.5,
+                  "reanimationUnitType": "soldierZombie",
+                  "noiseClass": "large",
+                  "noiseRadius": 8
+                },
+                "riotPolice": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 75,
+                  "recruitAttack": 9,
+                  "movement": 10,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 10,
+                  "maxFuel": 24,
+                  "maxMilitaryGoods": 10,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 2
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 2,
+                  "recruitmentFacilityTypes": [
+                    "capital",
+                    "city"
+                  ],
+                  "productionCivilianGoods": 25,
+                  "productionMilitaryGoods": 25,
+                  "fuelCostRule": "policeLike",
+                  "suppressionCivilianDamageRate": 0,
+                  "reanimationUnitType": "riotZombie",
+                  "noiseClass": "medium",
+                  "noiseRadius": 5
+                },
+                "reconTeam": {
+                  "capabilities": {
+                    "capture": true,
+                    "recoverCheckpoint": true,
+                    "suppress": true,
+                    "contain": true,
+                    "infantry": true
+                  },
+                  "productionFood": 0,
+                  "productionFuel": 0,
+                  "productionLimitPerGame": null,
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "regularAttackCharges": 1,
+                  "veteranAttackCharges": 2,
+                  "hp": 25,
+                  "recruitAttack": 9,
+                  "movement": 10,
+                  "range": 6,
+                  "vision": 10,
+                  "population": 5,
+                  "maxFuel": 44,
+                  "maxMilitaryGoods": 40,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {
+                    "1": 6,
+                    "2": 6,
+                    "3": 6,
+                    "4": 6,
+                    "5": 6,
+                    "6": 6
+                  },
+                  "suppressionMilitaryGoodsCost": 1,
+                  "militaryGoodsShortageAttackMultiplier": 0.2,
+                  "emergencyMovementPoints": 2,
+                  "recruitmentFacilityTypes": [
+                    "capital",
+                    "armyBase"
+                  ],
+                  "productionCivilianGoods": 20,
+                  "productionMilitaryGoods": 25,
+                  "fuelCostRule": "nationalGuardLike",
+                  "suppressionCivilianDamageRate": 0.5,
+                  "reanimationUnitType": "soldierZombie",
+                  "noiseClass": "medium",
+                  "noiseRadius": 6
+                },
+                "zombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 15,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 3,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "hordeZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 4,
+                  "hp": 40,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 3,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "policeZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 10,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "soldierZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 20,
+                  "attack": 10,
+                  "movement": 5,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "riotZombie": {
+                  "canTargetAir": false,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 75,
+                  "attack": 5,
+                  "movement": 3,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                },
+                "hunterZombie": {
+                  "canTargetAir": true,
+                  "movementDomain": "ground",
+                  "maxAttackCharges": 1,
+                  "hp": 20,
+                  "attack": 15,
+                  "movement": 15,
+                  "range": 1,
+                  "vision": 5,
+                  "population": 0,
+                  "maxFuel": 0,
+                  "maxMilitaryGoods": 0,
+                  "fixedMilitaryGoodsUpkeepPerTurn": 0,
+                  "attackMilitaryGoodsCostByRange": {},
+                  "suppressionMilitaryGoodsCost": 0,
+                  "militaryGoodsShortageAttackMultiplier": 1,
+                  "emergencyMovementPoints": 0
+                }
+              },
+              "unitExperience": {
+                "productionProficiencyByType": {
+                  "ifv": "recruit",
+                  "fieldArtillery": "recruit",
+                  "multipurposeHelicopter": "recruit",
+                  "police": "recruit",
+                  "nationalGuard": "recruit",
+                  "riotPolice": "recruit",
+                  "reconTeam": "recruit",
+                  "specialForces": "regular"
+                },
+                "recruitSurvivalTurnsRequired": 5,
+                "regularAttackMultiplier": 1.25,
+                "regularAttackRounding": "ceil",
+                "veteranZombieKillsRequired": 5,
+                "veteranAttackCharges": 2
+              },
+              "facilities": {
+                "reliefSupplyCenter": {
+                  "workerCapacity": 5,
+                  "production": {
+                    "inputs": {
+                      "food": 20
+                    },
+                    "outputs": {
+                      "civilianGoods": 5
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 5,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 50,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "nuclearPowerPlant": {
+                  "workerCapacity": 5,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 500,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "temporaryHousing": {
+                  "workerCapacity": 10,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 50,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "airBase": {
+                  "workerCapacity": 10,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "armyBase": {
+                  "workerCapacity": 10,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "capital": {
+                  "workerCapacity": 100,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "civilianGoods": 1
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 20,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "city": {
+                  "workerCapacity": 50,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "civilianGoods": 1
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 20,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "farm": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "food": 10
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "civilianFactory": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "civilianGoods": 10
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 30,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "militaryFactory": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {
+                      "civilianGoods": 10
+                    },
+                    "outputs": {
+                      "militaryGoods": 3
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 40,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "oilField": {
+                  "workerCapacity": 5,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "refinery": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "fuel": 5
+                    },
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 20,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "powerPlant": {
+                  "workerCapacity": 30,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 15,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 0,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "windPowerPlant": {
+                  "workerCapacity": 0,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 15
+                  },
+                  "overrunSpawnCount": 0,
+                  "buildCivilianGoods": 150,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "simpleFarm": {
+                  "workerCapacity": 10,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {
+                      "food": 5
+                    },
+                    "powerMode": "none",
+                    "requiresPower": false,
+                    "powerCapacity": 0,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 50,
+                  "visionRadius": 1,
+                  "zombieTargetValue": 0
+                },
+                "civilianDroneBase": {
+                  "workerCapacity": 5,
+                  "production": {
+                    "inputs": {},
+                    "outputs": {},
+                    "powerMode": "required",
+                    "requiresPower": true,
+                    "powerCapacity": 10,
+                    "powerGeneration": 0,
+                    "fixedPowerGeneration": 0
+                  },
+                  "overrunSpawnCount": 2,
+                  "buildCivilianGoods": 50,
+                  "visionRadius": 15,
+                  "zombieTargetValue": 0
+                }
+              },
+              "economy": {
+                "unitFoodConsumption": 2,
+                "populationConsumption": {
+                  "food": 1,
+                  "civilianGoods": 1
+                },
+                "initialResources": {
+                  "food": 330,
+                  "civilianGoods": 355,
+                  "militaryGoods": 175,
+                  "fuel": 192
+                },
+                "initialRefineryAllowance": 2000,
+                "oilFieldAllowancePerWorker": 100,
+                "initialWorkersByFacility": {
+                  "nuclear-power-plant-1": 0,
+                  "army-base-1": 0,
+                  "air-base-1": 0,
+                  "capital": 51,
+                  "city-1": 0,
+                  "city-2": 0,
+                  "city-3": 0,
+                  "city-4": 0,
+                  "city-5": 0,
+                  "city-6": 0,
+                  "city-7": 0,
+                  "city-8": 0,
+                  "farm-1": 23,
+                  "farm-2": 0,
+                  "farm-3": 0,
+                  "farm-4": 0,
+                  "farm-5": 0,
+                  "civilian-factory-1": 23,
+                  "civilian-factory-2": 0,
+                  "civilian-factory-3": 0,
+                  "civilian-factory-4": 0,
+                  "military-factory-1": 0,
+                  "military-factory-2": 0,
+                  "military-factory-3": 0,
+                  "oilfield-north": 0,
+                  "oilfield-east": 0,
+                  "oilfield-south": 0,
+                  "oilfield-west": 0,
+                  "refinery-1": 10,
+                  "power-plant-1": 3,
+                  "wind-power-plant-1": 0
+                },
+                "initialZombieCount": 40,
+                "neutralSurvivorRewardLastTurn": 10,
+                "initialHunterCount": {
+                  "min": 4,
+                  "max": 4
+                },
+                "initialHunterMinDistance": 20,
+                "initialGasCount": {
+                  "min": 4,
+                  "max": 4
+                },
+                "initialGasMinDistance": 9,
+                "initialScreamerCount": 2
+              },
+              "initialFacilityPopulation": {
+                "nuclear-power-plant-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "army-base-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "air-base-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "capital": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-2": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-3": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-4": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-5": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-6": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-7": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "city-8": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-2": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-3": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-4": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "farm-5": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "civilian-factory-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "civilian-factory-2": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "civilian-factory-3": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "civilian-factory-4": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "military-factory-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "military-factory-2": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "military-factory-3": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "oilfield-north": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "oilfield-east": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "oilfield-south": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "oilfield-west": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "refinery-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "power-plant-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                },
+                "wind-power-plant-1": {
+                  "survivors": null,
+                  "infected": null,
+                  "survivorRange": null,
+                  "infectedRange": null
+                }
+              },
+              "naturalRecovery": {
+                "combatRate": 0.05,
+                "restRate": 0.1,
+                "rounding": "ceil"
+              },
+              "horde": {
+                "warningLeadTurns": 2,
+                "waves": [
+                  {
+                    "turn": 10,
+                    "directionCount": 1,
+                    "compositionPerDirection": {
+                      "hordeZombie": 5,
+                      "zombie": 5
+                    },
+                    "final": false
+                  },
+                  {
+                    "turn": 20,
+                    "directionCount": 2,
+                    "compositionPerDirection": {
+                      "hordeZombie": 3,
+                      "zombie": 8
+                    },
+                    "final": false
+                  },
+                  {
+                    "turn": 35,
+                    "directionCount": 1,
+                    "compositionPerDirection": {
+                      "hordeZombie": 8,
+                      "zombie": 11
+                    },
+                    "final": false
+                  },
+                  {
+                    "turn": 50,
+                    "directionCount": 3,
+                    "compositionPerDirection": {
+                      "hordeZombie": 5,
+                      "zombie": 11
+                    },
+                    "final": false
+                  },
+                  {
+                    "turn": 70,
+                    "directionCount": 4,
+                    "compositionPerDirection": {
+                      "hordeZombie": 8,
+                      "zombie": 12
+                    },
+                    "final": true
+                  }
+                ],
+                "specialZombieWeights": {
+                  "zombie": 40,
+                  "policeZombie": 10,
+                  "soldierZombie": 10,
+                  "riotZombie": 5,
+                  "hunterZombie": 15,
+                  "gasZombie": 15,
+                  "screamerZombie": 5
+                },
+                "riotZombieCapPerDirection": 1,
+                "hunterZombieCapPerDirection": null,
+                "movementNoiseRadius": 8
+              },
+              "refugees": {
+                "arrivalIntervalMin": 2,
+                "arrivalIntervalMax": 4,
+                "arrivalPeopleMin": 10,
+                "arrivalPeopleMax": 20,
+                "arrivalGrowthInterval": 2,
+                "arrivalGrowthPeople": 1,
+                "waitingCrowdingThreshold": 60,
+                "screeningCapacity": 20,
+                "policies": {
+                  "passThrough": {
+                    "turns": 0,
+                    "workerRate": 1,
+                    "infectionRate": 0.25,
+                    "infectionPopulationRate": 0.5
+                  },
+                  "normal": {
+                    "turns": 2,
+                    "workerRate": 1,
+                    "infectionRate": 0.05,
+                    "infectionPopulationRate": 1
+                  },
+                  "strict": {
+                    "turns": 5,
+                    "workerRate": 1,
+                    "infectionRate": 0,
+                    "infectionPopulationRate": 0
+                  },
+                  "deny": {
+                    "turns": 0,
+                    "workerRate": 0,
+                    "infectionRate": 0,
+                    "infectionPopulationRate": 0
+                  }
+                },
+                "waitingRiskThreshold": 100,
+                "waitingRiskMaxPercent": 100,
+                "waitingRiskInfectionMin": 1,
+                "waitingRiskInfectionMax": 5
+              },
+              "infection": {
+                "facilitySpreadPerTurn": 1,
+                "fallBackInfectionRate": 0.5,
+                "zombieSpawnPopulationPerUnit": 5,
+                "maxZombieSpawnPerResolution": 6,
+                "zombieSpawnRadius": 1,
+                "noiseRespawnEnabled": true
+              },
+              "checkpoint": {
+                "checkpointBonus": 25,
+                "constructionCivilianGoods": 25,
+                "subsequentConstructionCivilianGoods": 25,
+                "relocationCivilianGoods": 25,
+                "maxPreparedPostsPerDirection": 5,
+                "requiresPolice": false,
+                "consumesPower": false,
+                "initialSupplyRadius": 5
+              },
+              "constructibleFacility": {
+                "limitPerTypeDivisor": 2
+              },
+              "terrain": {
+                "movementCost": {
+                  "plain": 1,
+                  "forest": 2,
+                  "mountain": 3,
+                  "water": null
+                },
+                "damageMultiplier": {
+                  "urban": 0.5,
+                  "forestZombie": 0.5
+                }
+              },
+              "vision": {
+                "capital": 5,
+                "ownedFacility": 1,
+                "operationalCheckpoint": 1
+              }
+            },
+            "outcome": "limit_reached",
+            "limitReached": true,
+            "gameOverReason": null,
+            "finalTurn": 4,
+            "totalAgentDecisions": 57,
+            "acceptedActionCount": 57,
+            "invalidAttemptCount": 0,
+            "actionCounts": {
+              "BuildBarbedWire": 0,
+              "Move": 22,
+              "Attack": 4,
+              "Wait": 4,
+              "AssignWorkers": 6,
+              "TransferPopulation": 1,
+              "SetCheckpointPolicy": 5,
+              "SetPowerSupply": 0,
+              "BuildCheckpoint": 0,
+              "BuildConstructibleFacility": 5,
+              "DecommissionConstructibleFacility": 0,
+              "RelocateCheckpoint": 3,
+              "ActivateCheckpoint": 2,
+              "TurnAwayCheckpointRefugees": 0,
+              "ProduceUnit": 2,
+              "EndTurn": 3
+            },
+            "priorityGoalCounts": {
+              "avoid_defeat": 0,
+              "prevent_facility_contact": 1,
+              "rescue_critical_infection": 0,
+              "defend_horde": 0,
+              "suppress_infection": 0,
+              "restore_military_supply": 0,
+              "restore_economy": 54,
+              "reduce_overcrowding": 0,
+              "build_forces": 0,
+              "secure_facilities": 0,
+              "manage_checkpoint": 0,
+              "combat": 2,
+              "end_turn": 0
+            },
+            "initialPopulation": 155,
+            "finalHealthyCivilianPopulation": 106,
+            "maxPopulation": 166,
+            "civilianLosses": 17,
+            "infectionLosses": 17,
+            "resourceShortageLosses": 0,
+            "refugeesAccepted": 0,
+            "refugeeArrivalsByBranch": {
+              "east": 0,
+              "north": 0,
+              "south": 0,
+              "west": 0
+            },
+            "totalRefugeeArrivals": 0,
+            "unmanagedPassThrough": 0,
+            "refugeesScreenedByPolicy": {
+              "passThrough": 0,
+              "normal": 0,
+              "strict": 0
+            },
+            "refugeesDeparted": 0,
+            "barbedWireBuilt": 0,
+            "barbedWireDestroyed": 0,
+            "barbedWireDamageTaken": 0,
+            "barbedWireAbsorbedDamage": 0,
+            "barbedWireEmptyAttackCharges": 0,
+            "barbedWireOccupiedAttackCharges": 0,
+            "checkpointsBuilt": 0,
+            "checkpointsRelocated": 3,
+            "checkpointRetreats": 0,
+            "checkpointsRuined": 0,
+            "checkpointsRecovered": 0,
+            "checkpointsAbandoned": 0,
+            "checkpointsRemoved": 0,
+            "standbyCheckpointsCreated": 5,
+            "dormantCheckpointsCreated": 0,
+            "checkpointActivations": 2,
+            "checkpointFallbacks": 0,
+            "checkpointFallbacksByBranch": {
+              "east": 0,
+              "north": 0,
+              "south": 0,
+              "west": 0
+            },
+            "checkpointFallbacksFromStandby": 0,
+            "checkpointFallbacksFromDormant": 0,
+            "checkpointFallbacksPreventingUnmanagedArrival": 0,
+            "maxCheckpointPostsPerBranch": 2,
+            "maxPreparedCheckpointPostsPerBranch": 2,
+            "activeCheckpointLosses": 0,
+            "unmanagedBranchTurns": 0,
+            "maxSuppliedFacilities": 14,
+            "maxSupplyRadius": 6,
+            "supplyLosses": 1,
+            "supplyRejections": 0,
+            "maxOvercrowding": 0,
+            "maxOvercrowdingAdditionalFood": 0,
+            "maxOvercrowdingAdditionalCivilianGoods": 0,
+            "housingBuilt": 1,
+            "housingResidentTurns": 0,
+            "housingCivilianGoodsProduced": 0,
+            "housingOutageFacilityTurns": 0,
+            "housingResidentsFinal": 0,
+            "facilitiesCaptured": 3,
+            "facilitiesLost": 5,
+            "finalSecuredFacilities": 16,
+            "policeProduced": 1,
+            "nationalGuardProduced": 1,
+            "riotPoliceProduced": 0,
+            "policeInitial": 4,
+            "nationalGuardInitial": 1,
+            "riotPoliceInitial": 1,
+            "policeLosses": 0,
+            "nationalGuardLosses": 0,
+            "riotPoliceLosses": 0,
+            "policeFinal": 5,
+            "nationalGuardFinal": 2,
+            "riotPoliceFinal": 1,
+            "policeSurvivalRate": 1,
+            "nationalGuardSurvivalRate": 1,
+            "riotPoliceSurvivalRate": 1,
+            "outOfSupplyUnitLosses": 0,
+            "policeCombatRecoveryHp": 0,
+            "policeCombatRecoveryCount": 0,
+            "policeRestRecoveryHp": 0,
+            "policeRestRecoveryCount": 0,
+            "nationalGuardCombatRecoveryHp": 0,
+            "nationalGuardCombatRecoveryCount": 0,
+            "nationalGuardRestRecoveryHp": 0,
+            "nationalGuardRestRecoveryCount": 0,
+            "combatRecoverySelections": 1,
+            "restRecoverySelections": 0,
+            "maxWorkersInSingleFacility": 23,
+            "maxTotalProductionWorkers": 91,
+            "highCapacityFacilityTurns": 0,
+            "powerPlantStoppedTurns": 0,
+            "powerShortageTurns": 3,
+            "poweredIndustrialFacilityTurns": 14,
+            "unpoweredCityTurns": 0,
+            "refineryFacilitiesCaptured": 0,
+            "powerPlantFacilitiesCaptured": 0,
+            "checkpointPassThroughBranchTurns": 0,
+            "checkpointNormalBranchTurns": 6,
+            "checkpointStrictBranchTurns": 2,
+            "checkpointPassThroughBranchTurnRate": 0,
+            "checkpointNormalBranchTurnRate": 0.375,
+            "checkpointStrictBranchTurnRate": 0.125,
+            "checkpointPassThroughScreenedRate": 0,
+            "checkpointNormalScreenedRate": 0,
+            "checkpointStrictScreenedRate": 0,
+            "unitLosses": 0,
+            "zombiesKilled": 4,
+            "hordeInterceptions": 3,
+            "finalHordeSpawned": 0,
+            "finalHordeKilled": 0,
+            "finalHordeDefeated": false,
+            "periodicHordeZombiesSpawned": 0,
+            "periodicNormalZombiesSpawned": 0,
+            "finalHordeZombiesSpawned": 0,
+            "finalNormalZombiesSpawned": 0,
+            "normalZombiesKilled": 4,
+            "hordeZombiesKilled": 0,
+            "policeZombiesSpawned": 0,
+            "soldierZombiesSpawned": 0,
+            "policeZombiesKilled": 0,
+            "soldierZombiesKilled": 0,
+            "policeZombiesFinal": 0,
+            "soldierZombiesFinal": 0,
+            "riotZombiesSpawned": 0,
+            "riotZombiesKilled": 0,
+            "riotZombiesFinal": 0,
+            "hunterZombiesKilled": 0,
+            "hunterZombiesSpawned": 4,
+            "hunterZombiesFinal": 0,
+            "riotPoliceReanimations": 0,
+            "maxVisibleZombies": 6,
+            "turnsAfterFinalHorde": 0,
+            "suppliedAreaZombieClearTurn": 1,
+            "suppliedAreaInfectionClearTurn": 1,
+            "victoryTurn": null,
+            "terrainEntriesByType": {
+              "plain": 187,
+              "forest": 9,
+              "mountain": 2,
+              "water": 14
+            },
+            "urbanDefenseApplications": 0,
+            "urbanDefenseDamagePrevented": 0,
+            "forestDefenseApplications": 0,
+            "forestDefenseDamagePrevented": 0,
+            "normalZombieIdleCount": 134,
+            "hordeTargetInheritedCount": 0,
+            "hordeTargetClearedCount": 0,
+            "noisePulsesEmitted": 14,
+            "policeNoisePulses": 4,
+            "nationalGuardNoisePulses": 1,
+            "riotPoliceNoisePulses": 2,
+            "recruitsCommissionedByType": {
+              "police": 1,
+              "nationalGuard": 1,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "specialForces": 0,
+              "fieldArtillery": 0
+            },
+            "regularPromotionsByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "specialForces": 0,
+              "fieldArtillery": 0
+            },
+            "veteranPromotionsByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "specialForces": 0,
+              "fieldArtillery": 0
+            },
+            "veteranZombieKillsByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "specialForces": 0,
+              "fieldArtillery": 0
+            },
+            "hordeSpecialSpawnedByType": {
+              "policeZombie": 0,
+              "soldierZombie": 0,
+              "riotZombie": 0,
+              "hunterZombie": 0,
+              "gasZombie": 0,
+              "screamerZombie": 0,
+              "packZombie": 0
+            },
+            "noisePulsesBySourceType": {
+              "ifv": 0,
+              "police": 4,
+              "nationalGuard": 1,
+              "riotPolice": 2,
+              "reconTeam": 2,
+              "multipurposeHelicopter": 0,
+              "fieldArtillery": 0,
+              "specialForces": 0,
+              "hordeZombie": 0
+            },
+            "hordeMovementNoisePulses": 0,
+            "hordeNoiseRespawnedByType": {
+              "zombie": 0,
+              "hordeZombie": 0,
+              "policeZombie": 0,
+              "soldierZombie": 0,
+              "riotZombie": 0,
+              "hunterZombie": 0,
+              "gasZombie": 0,
+              "screamerZombie": 0,
+              "packZombie": 0
+            },
+            "unusedAttackChargesByTurn": 20,
+            "criticalInfectionAlertUnresolvedTurns": 0,
+            "normalZombiesNoiseTargeted": 2,
+            "noiseTargetsReached": 0,
+            "noiseTargetsOverriddenByHorde": 0,
+            "noiseTargetsOverriddenByVisiblePopulation": 1,
+            "initialNormalZombies": 40,
+            "combatNoiseByClass": {
+              "medium": 8,
+              "large": 1
+            },
+            "fallenSitesTriggeredByNoise": 0,
+            "noiseRespawnAttempts": 0,
+            "noiseRespawnZombiesSpawned": 0,
+            "noiseImmediateInfections": 0,
+            "noiseChainOverruns": 0,
+            "policeNoiseImmediateInfections": 0,
+            "nationalGuardNoiseImmediateInfections": 0,
+            "policeNoiseChainOverruns": 0,
+            "nationalGuardNoiseChainOverruns": 0,
+            "groundVisionPotentialHexes": 510,
+            "groundVisionVisibleHexes": 380,
+            "groundVisionBlockedHexes": 130,
+            "maxGroundVisionBlockedHexes": 244,
+            "averageGroundVisionBlockedHexes": 138.5,
+            "civilianDroneBasesBuilt": 2,
+            "civilianDroneBasesDecommissioned": 0,
+            "civilianGoodsRefundedFromDecommission": 0,
+            "maxCivilianDroneVisionRadius": 0,
+            "aerialDiscoveriesInGroundBlockedArea": 0,
+            "siteFirstInfectionsByType": {
+              "facility:farm": 2,
+              "facility:civilianFactory": 1,
+              "facility:city": 2
+            },
+            "siteFallsByType": {
+              "facility:farm": 1
+            },
+            "siteZombieOccupancyDestructionsByType": {
+              "facility:farm": 1,
+              "facility:civilianFactory": 1,
+              "facility:city": 2
+            },
+            "infectedPopulationAtFall": 0,
+            "requestedSiteZombieSpawns": 0,
+            "actualSiteZombieSpawns": 0,
+            "fallSiteZombieSpawns": 0,
+            "noiseSiteZombieSpawns": 0,
+            "maxSixZombieSpawnResolutions": 0,
+            "infectedPopulationConvertedToZombies": 10,
+            "unspawnedInfectedPopulation": 0,
+            "immediateInfectionsFromSpawn": 0,
+            "chainOverruns": 0,
+            "maximumOverrunChainLength": 0,
+            "chainOriginsByType": {},
+            "constructibleInfectedDeaths": 0,
+            "earlyFacilityLosses": 5,
+            "earlyCheckpointLosses": 0,
+            "finalFood": 333,
+            "finalCivilianGoods": 63,
+            "finalMilitaryGoods": 239,
+            "finalFuel": 226,
+            "mapWidth": 51,
+            "mapHeight": 51,
+            "humanHexesMovedByType": {
+              "police": 102,
+              "nationalGuard": 36,
+              "riotPolice": 20,
+              "reconTeam": 30,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "maxSingleMoveDistanceByType": {
+              "police": 15,
+              "nationalGuard": 10,
+              "riotPolice": 10,
+              "reconTeam": 10,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "longMoves6PlusByType": {
+              "police": 6,
+              "nationalGuard": 4,
+              "riotPolice": 2,
+              "reconTeam": 3,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "unitFuelConsumedByType": {
+              "police": 120,
+              "nationalGuard": 72,
+              "riotPolice": 24,
+              "reconTeam": 66,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "unitFuelRefilledByType": {
+              "police": 24,
+              "nationalGuard": 54,
+              "riotPolice": 24,
+              "reconTeam": 66,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "commissioningFuelByType": {
+              "police": 24,
+              "nationalGuard": 44,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "turnsUnitsEndedOutOfSupplyByType": {
+              "police": 17,
+              "nationalGuard": 4,
+              "riotPolice": 1,
+              "reconTeam": 1,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "unitsUnableToMoveForFuel": 0,
+            "stateFuelSpentOnPower": 110,
+            "stateFuelSpentOnUnits": 168,
+            "fuelShortageTurns": 0,
+            "windPowerGenerated": 105,
+            "windDisabledTurns": 0,
+            "windOverruns": 0,
+            "windRecoveries": 0,
+            "simpleFarmsBuilt": 0,
+            "simpleFarmsDestroyed": 0,
+            "simpleFarmFoodProduced": 0,
+            "droneBasesBuilt": 2,
+            "droneBasesDestroyed": 0,
+            "maxDroneVisionRadius": 0,
+            "constructibleFacilityOverruns": 0,
+            "constructibleBuildRejectedByReason": {},
+            "guaranteedDefeatWarnings": 0,
+            "guaranteedDefeatIgnored": 0,
+            "resourceSinglePointFailureTurnsByResource": {
+              "food": 0,
+              "civilianGoods": 4,
+              "militaryGoods": 0,
+              "fuel": 0,
+              "electricity": 1
+            },
+            "checkpointMovesWithNoSupplyGain": 0,
+            "checkpointQueuePressureTurnsByClass": {
+              "none": 24,
+              "low": 0,
+              "medium": 0,
+              "high": 0
+            },
+            "checkpointQueueFoodDemand": 0,
+            "checkpointQueueCivilianGoodsDemand": 0,
+            "checkpointQueueFoodConsumed": 0,
+            "checkpointQueueCivilianGoodsConsumed": 0,
+            "refugeesRejectedByDirectionAndPolicy": {
+              "north": {
+                "normal": 0,
+                "strict": 0
+              },
+              "east": {
+                "normal": 0,
+                "strict": 0
+              },
+              "south": {
+                "normal": 0,
+                "strict": 0
+              },
+              "west": {
+                "normal": 0,
+                "strict": 0
+              }
+            },
+            "refugeesTurnedAwayByDirection": {
+              "north": 0,
+              "east": 0,
+              "south": 0,
+              "west": 0
+            },
+            "rejectedBonusZombiesByDirection": {
+              "north": 0,
+              "east": 0,
+              "south": 0,
+              "west": 0
+            },
+            "rejectedCounterResetsByDirection": {
+              "north": 0,
+              "east": 0,
+              "south": 0,
+              "west": 0
+            },
+            "preventedRefugeeArrivalsAfterFinal": 0,
+            "policeReanimations": 0,
+            "nationalGuardReanimations": 0,
+            "reanimationImmediateInfections": 0,
+            "reanimationFacilityInfections": 0,
+            "reanimationCheckpointInfections": 0,
+            "reanimationSiteFalls": 0,
+            "reanimationChainOverruns": 0,
+            "policeLongRangeMoves": 5,
+            "fixedMilitaryGoodsConsumedByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "attackMilitaryGoodsConsumedByType": {
+              "police": 2,
+              "nationalGuard": 0,
+              "riotPolice": 2,
+              "reconTeam": 12,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "counterattackMilitaryGoodsConsumedByType": {
+              "police": 2,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "interceptionMilitaryGoodsConsumedByType": {
+              "police": 2,
+              "nationalGuard": 4,
+              "riotPolice": 2,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "suppressionMilitaryGoodsConsumedByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "militaryGoodsRefilledByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 4,
+              "reconTeam": 12,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "unfilledMilitaryGoodsRefillByType": {
+              "police": 16,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 6,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "militaryGoodsLostOnDestructionByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "zeroMilitaryGoodsWeakAttacksByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "nationalGuardAttacksByRange": {
+              "range1": 0,
+              "range2": 1
+            },
+            "nationalGuardMilitaryGoodsConsumedByRange": {
+              "range1": 0,
+              "range2": 4
+            },
+            "militaryGoodsRefillShortageTurns": 4,
+            "emergencyMovesByType": {
+              "police": 3,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "emergencyMovementHexesByType": {
+              "police": 7,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "emergencyMovementPointsByType": {
+              "police": 8,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "emergencyReturnsToSupplyByType": {
+              "police": 0,
+              "nationalGuard": 0,
+              "riotPolice": 0,
+              "reconTeam": 0,
+              "ifv": 0,
+              "fieldArtillery": 0,
+              "multipurposeHelicopter": 0,
+              "specialForces": 0
+            },
+            "powerTurnsByFacilityType": {
+              "capital": {
+                "requested": 58,
+                "supplied": 58,
+                "unavailable": 0,
+                "off": 58
+              },
+              "city": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 463
+              },
+              "farm": {
+                "requested": 96,
+                "supplied": 96,
+                "unavailable": 0,
+                "off": 0
+              },
+              "civilianFactory": {
+                "requested": 58,
+                "supplied": 58,
+                "unavailable": 0,
+                "off": 0
+              },
+              "militaryFactory": {
+                "requested": 71,
+                "supplied": 28,
+                "unavailable": 43,
+                "off": 0
+              },
+              "oilField": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "refinery": {
+                "requested": 58,
+                "supplied": 49,
+                "unavailable": 9,
+                "off": 0
+              },
+              "powerPlant": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "windPowerPlant": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "civilianDroneBase": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "simpleFarm": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "temporaryHousing": {
+                "requested": 39,
+                "supplied": 11,
+                "unavailable": 28,
+                "off": 44
+              },
+              "armyBase": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "airBase": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 58
+              },
+              "nuclearPowerPlant": {
+                "requested": 0,
+                "supplied": 0,
+                "unavailable": 0,
+                "off": 0
+              },
+              "reliefSupplyCenter": {
+                "requested": 25,
+                "supplied": 25,
+                "unavailable": 0,
+                "off": 0
+              }
+            },
+            "powerRequestedTurnsByFacilityType": {
+              "capital": 58,
+              "city": 0,
+              "farm": 96,
+              "civilianFactory": 58,
+              "militaryFactory": 71,
+              "oilField": 0,
+              "refinery": 58,
+              "powerPlant": 0,
+              "windPowerPlant": 0,
+              "civilianDroneBase": 0,
+              "simpleFarm": 0,
+              "temporaryHousing": 39,
+              "armyBase": 0,
+              "airBase": 0,
+              "nuclearPowerPlant": 0,
+              "reliefSupplyCenter": 25
+            },
+            "powerSuppliedTurnsByFacilityType": {
+              "capital": 58,
+              "city": 0,
+              "farm": 96,
+              "civilianFactory": 58,
+              "militaryFactory": 28,
+              "oilField": 0,
+              "refinery": 49,
+              "powerPlant": 0,
+              "windPowerPlant": 0,
+              "civilianDroneBase": 0,
+              "simpleFarm": 0,
+              "temporaryHousing": 11,
+              "armyBase": 0,
+              "airBase": 0,
+              "nuclearPowerPlant": 0,
+              "reliefSupplyCenter": 25
+            },
+            "powerUnavailableTurnsByFacilityType": {
+              "capital": 0,
+              "city": 0,
+              "farm": 0,
+              "civilianFactory": 0,
+              "militaryFactory": 43,
+              "oilField": 0,
+              "refinery": 9,
+              "powerPlant": 0,
+              "windPowerPlant": 0,
+              "civilianDroneBase": 0,
+              "simpleFarm": 0,
+              "temporaryHousing": 28,
+              "armyBase": 0,
+              "airBase": 0,
+              "nuclearPowerPlant": 0,
+              "reliefSupplyCenter": 0
+            },
+            "powerSupplyOffTurnsByFacilityType": {
+              "capital": 58,
+              "city": 463,
+              "farm": 0,
+              "civilianFactory": 0,
+              "militaryFactory": 0,
+              "oilField": 0,
+              "refinery": 0,
+              "powerPlant": 0,
+              "windPowerPlant": 0,
+              "civilianDroneBase": 0,
+              "simpleFarm": 0,
+              "temporaryHousing": 44,
+              "armyBase": 0,
+              "airBase": 58,
+              "nuclearPowerPlant": 0,
+              "reliefSupplyCenter": 0
+            },
+            "powerResourceLossByResource": {
+              "food": 0,
+              "civilianGoods": 0,
+              "militaryGoods": 345,
+              "fuel": 450
+            },
+            "refineryPowerOutageTurns": 2,
+            "refineryOutageNextTurnFuelShortageTurns": 0,
+            "simpleFarmFoodShortageAvoidanceTurns": 0,
+            "checkpointBatchStartsByPolicy": {
+              "passThrough": 0,
+              "normal": 0,
+              "strict": 0,
+              "deny": 0
+            },
+            "checkpointBatchCompletionsByPolicy": {
+              "passThrough": 0,
+              "normal": 0,
+              "strict": 0,
+              "deny": 0
+            },
+            "checkpointAverageQueue": 0,
+            "checkpointCapacityUtilization": 0,
+            "checkpointEstimatedThroughput": 10.617543859649123,
+            "hordeWaves": [
+              {
+                "index": 1,
+                "spawnTurn": 10,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 5,
+                  "zombie": 5
+                },
+                "variantSlotCountPerDirection": 5,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": false,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              },
+              {
+                "index": 2,
+                "spawnTurn": 20,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 3,
+                  "zombie": 8
+                },
+                "variantSlotCountPerDirection": 8,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": false,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              },
+              {
+                "index": 3,
+                "spawnTurn": 35,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 8,
+                  "zombie": 11
+                },
+                "variantSlotCountPerDirection": 11,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": false,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              },
+              {
+                "index": 4,
+                "spawnTurn": 50,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 5,
+                  "zombie": 11
+                },
+                "variantSlotCountPerDirection": 11,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": false,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              },
+              {
+                "index": 5,
+                "spawnTurn": 70,
+                "directions": [],
+                "baseWaveUnitCount": 0,
+                "committedWaveUnitCount": 0,
+                "spawnedSoFar": 0,
+                "pendingCount": 0,
+                "compositionPerDirection": {
+                  "hordeZombie": 8,
+                  "zombie": 12
+                },
+                "variantSlotCountPerDirection": 12,
+                "specialZombieSpawnedByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "specialZombieKilledByType": {
+                  "policeZombie": 0,
+                  "soldierZombie": 0,
+                  "riotZombie": 0,
+                  "hunterZombie": 0,
+                  "gasZombie": 0,
+                  "screamerZombie": 0,
+                  "packZombie": 0
+                },
+                "final": true,
+                "hordeZombieSpawned": 0,
+                "normalZombieSpawned": 0,
+                "hordeZombieKilled": 0,
+                "normalZombieKilled": 0
+              }
+            ],
+            "hordeDirectionSpawnCounts": {
+              "north": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "east": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "south": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "west": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              }
+            },
+            "hordeDirectionKillCounts": {
+              "north": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "east": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "south": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              },
+              "west": {
+                "hordeZombie": 0,
+                "normalZombie": 0
+              }
+            },
+            "hordeFinalWaveSpawnTotal": 0,
+            "hordeFinalWaveKillTotal": 0,
+            "hordeFinalDefeatedTurn": null,
+            "hordeTurnsAfterFinal": 0,
+            "hordeMultiFrontCheckpointLosses": 0,
+            "hordeMultiFrontFallbacks": 0,
+            "failure": null
+          },
+          "objectiveCaptures": [
+            {
+              "turn": 2,
+              "facilityId": "oilfield-1",
+              "unitId": "police-2",
+              "captureReward": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

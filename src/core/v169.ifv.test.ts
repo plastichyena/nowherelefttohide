@@ -10,7 +10,7 @@ import { validateInvariants } from './invariants';
 import { decodeSaveCode, encodeSaveCode } from '../persistence/save';
 import type { GameState, HumanUnitType, UnitProficiency, UnitType } from './types';
 
-const config = () => createDefaultConfig({ checkpoint: { initialSupplyRadius: 8 }, economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: {min:0,max:0}, initialGasCount: {min:0,max:0}, initialResources: {food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000} } });
+const config = () => createDefaultConfig({mapMode:'fixed', checkpoint: { initialSupplyRadius: 8 }, economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: {min:0,max:0}, initialGasCount: {min:0,max:0}, initialResources: {food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000} } });
 function load(engine: GameEngine, state: GameState) { prepareTestSnapshot(state); state.nextUnitNumber = Math.max(state.nextUnitNumber, ...state.units.map(u => Number(/-(\d+)$/.exec(u.id)?.[1] ?? 0) + 1)); const r=engine.step({type:'LoadSnapshot',snapshot:state}); expect(r.error?.message).toBeUndefined(); }
 function fixture(fuel=100, hp=200, proficiency: UnitProficiency='recruit') {
   const e=new GameEngine(1,config()),s=e.getState() as GameState;
@@ -43,7 +43,7 @@ describe('IFV movement and combat',()=>{
     const {e,s,vehicle}=fixture(100,hp);vehicle.position={q:24,r:25};
     enemy(s,'gasZombie',25,1);load(e,s);
     const p=previewMove(e.getState(),'ifv',{q:25,r:25});
-    expect(p.overruns?.[0]).toMatchObject({impactDamage:5,gasDamage:15,executed:hp>20});
+    expect(p.overruns?.[0]).toMatchObject({impactDamage:5,gasDamage:15,wouldExecute:hp>20});
     const r=e.step({type:'Move',unitId:'ifv',destination:{q:25,r:25}});expect(r.error).toBeNull();
     expect(r.state.units.find(u=>u.id==='ifv')).toMatchObject({hp:hp>20?hp-20:hp,currentFuel:hp>20?90:100});
   });
@@ -96,7 +96,7 @@ describe('IFV movement and combat',()=>{
     const cargo=createUnit(s,'cargo','specialForces',{q:24,r:25});s.units.push(cargo);load(e,s);
     expect(e.step({type:'BoardTransport',transportId:'ifv',unitId:'cargo'}).error).toBeNull();
     const before=e.getState(),p=previewMove(before,'ifv',gas.position),r=e.step({type:'Move',unitId:'ifv',destination:gas.position});
-    expect(r.error,r.error?.message).toBeNull();expect(p.overruns?.[0]?.executed).toBe(true);
+    expect(r.error,r.error?.message).toBeNull();expect(p.overruns?.[0]?.wouldExecute).toBe(true);
     expect(r.state.units.some(u=>u.id==='ifv'||u.id==='cargo')).toBe(false);
     expect(r.state.population.cumulativeDeaths-before.population.cumulativeDeaths).toBe(9);
     expect(r.events.filter(v=>v.type==='human_unit_reanimated').map(v=>v.payload.humanUnitId)).toEqual(['cargo']);

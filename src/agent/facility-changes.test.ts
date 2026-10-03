@@ -8,7 +8,7 @@ import { facilityChanges } from './facility-changes';
 import type { AgentPublicEvent } from './types';
 
 it('keeps a staffed factory 30 to 19 loss with output deltas even when production continues', () => {
-  const state = createInitialState(1, createDefaultConfig());
+  const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
   const factory = state.facilities.find(f => f.id === 'civilian-factory-1')!;
   factory.workers = 30;
   const before = createAgentObservation(state);
@@ -28,7 +28,7 @@ it('keeps a staffed factory 30 to 19 loss with output deltas even when productio
 
 it('does not report intentional recruitment population as civilian losses', () => {
   const game = createAgentGame();
-  const before = game.reset({ seed: 1 });
+  const before = game.reset({mapMode:'fixed', seed: 1 });
   const action = game.getLegalActions().find(a => a.type === 'ProduceUnit' && a.unitType === 'police');
   expect(action).toBeDefined();
   const step = game.step(action!);

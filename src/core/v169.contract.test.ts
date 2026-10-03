@@ -14,9 +14,9 @@ import type { GameAction, GameState } from './types';
 
 describe('v1.6.9 public contracts', {timeout:60000}, () => {
   it('resolves identical UNA initial state for the human engine and API; rejects overrides without reset', () => {
-    const preset=resolveScenario({scenarioId:'una',seed:7});
+    const preset=resolveScenario({scenarioId:'una',seed:7,mapMode:'fixed'});
     const human=new GameEngine(preset.seed,preset.config),game=createAgentGame();
-    game.reset({scenarioId:'una',seed:7});
+    game.reset({mapMode:'fixed',scenarioId:'una',seed:7});
     expect(game.getDebugState()).toEqual(human.getState());
     const before=game.getObservation();
     for(const input of [{scenarioId:'prh'},{scenarioId:'ac'},{scenarioId:'una',configOverrides:{}},{scenarioId:'una',seed:1.5}]) expect(()=>game.reset(input)).toThrow();
@@ -25,12 +25,12 @@ describe('v1.6.9 public contracts', {timeout:60000}, () => {
     expect(resolveScenario({scenarioId:'una'}).seed).toBe(1);
   });
   it('uses the approved Japanese text and exact bilingual introduction; renders four synopsis sections', () => {
-    const req=readFileSync('Doc/Nowhere Left to Hide PoC v1.6.9 アップデート要件 確定版.md','utf8').replace(/\r\n/g,'\n');
+    const req=readFileSync('Doc/Nowhere Left to Hide PoC 現行仕様.md','utf8').replace(/\r\n/g,'\n');
     for(const text of [UNA_INTRO.ja,UNA_INTRO.en,SYNOPSIS.ja])expect(req).toContain(text);
     for(const locale of ['ja','en'] as const){const html=renderSynopsis(locale);expect(html.match(/<h3>/g)).toHaveLength(4);expect(html).toContain('<strong>');expect(html).toContain('<br>');expect(html).toContain('The situation is under control.');}
   });
   it('shares IFV route damage with Core and reports actual overrun, fuel, charges and rejection', () => {
-    const game=createAgentGame();game.reset({seed:1});const s=game.exportPrivateSessionState();
+    const game=createAgentGame();game.reset({mapMode:'fixed',seed:1});const s=game.exportPrivateSessionState();
     s.units=[createUnit(s,'ifv-test','ifv',{q:25,r:25}),createUnit(s,'victim','hordeZombie',{q:26,r:25})];
     Object.assign(s.units[1]!,{spawnGroupId:'fixture',hordeKind:'periodic',attackChargesRemaining:2});
     prepareTestSnapshot(s);game.restorePrivateSessionState(s);

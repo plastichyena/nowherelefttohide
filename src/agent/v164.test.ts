@@ -11,7 +11,7 @@ describe('v1.6.4 public checkpoint relocation',()=>{
     expect(result).toMatchObject({ok:true,revision:1,record:{accepted:true}});
   });
   it.each([undefined,'east','west'])('handles branchId %s through the public AgentGame',branchId=>{
-    const game=createAgentGame();game.reset({seed:1});
+    const game=createAgentGame();game.reset({mapMode:'fixed',seed:1});
     const action={type:'RelocateCheckpoint' as const,checkpointId:'checkpoint-2',position:{q:29,r:25},...(branchId?{branchId}: {})};
     const result=game.step(action);
     if(branchId==='west')expect(result.error?.code).toBe('checkpoint_wrong_branch');

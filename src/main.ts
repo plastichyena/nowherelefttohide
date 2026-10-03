@@ -8,8 +8,8 @@ import { GameUiController, type UiGameEngine } from './ui/controller';
 const root = document.querySelector<HTMLElement>('#app');
 
 interface EngineModule {
-  GameEngine?: new () => UiGameEngine;
-  default?: new () => UiGameEngine;
+  GameEngine?: new (seed?:number,config?:import('./core/types').GameConfig,snapshot?:import('./core/types').GameState) => UiGameEngine;
+  default?: new (seed?:number,config?:import('./core/types').GameConfig,snapshot?:import('./core/types').GameState) => UiGameEngine;
   previewMove?: (state: Readonly<import('./core/types').GameState>, unitId: string, destination: import('./core/types').HexCoord) => unknown;
 }
 
@@ -22,15 +22,15 @@ async function loadEngineModule(): Promise<EngineModule> {
 
 async function boot(): Promise<void> {
   if (!root) throw new Error('App root element is missing');
-  let engineFactory: (() => UiGameEngine) | null = null;
+  let engineFactory: ((snapshot?:import('./core/types').GameState) => UiGameEngine) | null = null;
   try {
     // Load once so the title screen can render immediately and all game
     // sessions use the same bundled GameEngine constructor.
     const engineModule = await loadEngineModule();
     const Constructor = engineModule.GameEngine ?? engineModule.default;
     if (!Constructor) throw new Error('GameEngine export is unavailable');
-    engineFactory = () => {
-      const engine = new Constructor();
+    engineFactory = (snapshot) => {
+      const engine = new Constructor(snapshot?.seed,snapshot?.config,snapshot);
       // Core currently exports previewMove as a pure function. Adapt that
       // export to the optional UI-facing method without changing GameState or
       // introducing a second rules path.

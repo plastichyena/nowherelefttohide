@@ -1,3 +1,4 @@
+import { GAME_VERSION } from './state';
 import { wireRoutePenalty } from './barbed-wire';
 import { effectiveZombieMovement, updateZombiePursuit } from './zombie-movement';
 import { allocateUnitId } from './state';
@@ -351,7 +352,7 @@ function settleNuclearObjective(state: GameState): void {
     emit(state, 'nuclear_objective_updated', { reward: 'claimed', unitId: unit.id, facilityId: plant.id, reinforcementPopulation: unit.population });
   } else {
     objective.failureSpawn = 'spawned'; state.statistics.packZombiesSpawned += 1;
-    const rng = domainRng(state.seed, 'nuclear-failure-occupancy');
+    const rng = domainRng(state.config.gameplaySeed ?? state.seed, 'nuclear-failure-occupancy');
     const queue: SpawnOccupancyEntry[] = [];
     applyGeneratedZombieOccupancy(state, unit, rng, queue, '', 0);
     processSpawnOccupancyQueue(state, rng, queue);
@@ -382,7 +383,7 @@ function settleAirBaseObjective(state: GameState): void {
     emit(state,'facility_objective_updated',{facilityId:base.id,reward:'claimed',unitId:unit.id,reinforcementPopulation:unit.population});
   } else {
     objective.failureSpawn='spawned'; state.statistics.packZombiesSpawned++;
-    const queue: SpawnOccupancyEntry[]=[]; const rng=domainRng(state.seed,'air-base-failure-occupancy');
+    const queue: SpawnOccupancyEntry[]=[]; const rng=domainRng(state.config.gameplaySeed ?? state.seed,'air-base-failure-occupancy');
     applyGeneratedZombieOccupancy(state,unit,rng,queue,'',0); processSpawnOccupancyQueue(state,rng,queue);
   }
   synchronizePopulation(state);
@@ -564,7 +565,7 @@ function distributeToReceptionCities(state: GameState, amount: number): Array<{ 
 function infectAcceptedRefugees(state: GameState, sourceId: string, placements: Array<{ facilityId: string; people: number }>, probability: number, rng: SeededRng): void {
   for (const placement of placements) {
     const target = getFacilityState(state, placement.facilityId)!;
-    const converted = binomial(placement.people, probability, domainRng(state.seed, 'screening:' + state.turn + ':' + sourceId + ':' + target.id));
+    const converted = binomial(placement.people, probability, domainRng(state.config.gameplaySeed ?? state.seed, 'screening:' + state.turn + ':' + sourceId + ':' + target.id));
     if (converted <= 0) continue;
     const wasInfected = target.infected > 0;
     target.workers -= converted; target.infected += converted; addInfectionGrace(target, converted, state.turn);
@@ -610,7 +611,7 @@ function resolveScreeningBatch(state: GameState, checkpoint: CheckpointState, rn
     for (const placement of placements) emit(state, 'population_transferred', { from: checkpoint.id, to: placement.facilityId, people: placement.people, reason: 'screening_approved' });
     infectAcceptedRefugees(state, checkpoint.id, placements, probability, rng);
   } else {
-    const converted = binomial(screened, probability, domainRng(state.seed, 'screening:' + state.turn + ':' + checkpoint.id + ':approved'));
+    const converted = binomial(screened, probability, domainRng(state.config.gameplaySeed ?? state.seed, 'screening:' + state.turn + ':' + checkpoint.id + ':approved'));
     checkpoint.approved += screened - converted;
     checkpoint.infected += converted; addInfectionGrace(checkpoint, converted, state.turn);
     state.statistics.screeningInfections += converted;
@@ -780,7 +781,7 @@ function processRefugees(state: GameState, rng: SeededRng): void {
   for (const checkpoint of [...state.checkpoints].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!['operational', 'remnant'].includes(checkpoint.status)) continue;
     const probability = waitingProbability(checkpoint.waiting, state.config.refugees.waitingCrowdingThreshold, state.publicHealthStress);
-    const converted = binomial(checkpoint.waiting, probability, domainRng(state.seed, 'waiting:' + state.turn + ':' + checkpoint.id));
+    const converted = binomial(checkpoint.waiting, probability, domainRng(state.config.gameplaySeed ?? state.seed, 'waiting:' + state.turn + ':' + checkpoint.id));
     checkpoint.waitingRiskPercent = probability * 100;
     removeWaitingPeople(checkpoint, converted); checkpoint.infected += converted; addInfectionGrace(checkpoint, converted, state.turn);
     state.statistics.waitingInfections += converted;
@@ -1712,7 +1713,7 @@ function processInternalInfection(state: GameState, rng: SeededRng): void {
   for (const facility of [...state.facilities].sort((a,b) => a.id.localeCompare(b.id))) {
     if (facility.owner !== 'player' || facility.workers <= 0) continue;
     const risk = internalInfectionRisk(facility, state.publicHealthStress, facility.lastPowerSupplied === false || !isHexSupplied(state, facility.position));
-    const converted = binomial(facility.workers, risk.probability, domainRng(state.seed, `internal:${state.turn}:${facility.id}`));
+    const converted = binomial(facility.workers, risk.probability, domainRng(state.config.gameplaySeed ?? state.seed, `internal:${state.turn}:${facility.id}`));
     if (converted <= 0) continue;
     const wasInfected = facility.infected > 0;
     facility.workers -= converted; facility.infected += converted; addInfectionGrace(facility, converted, state.turn);
@@ -2510,7 +2511,7 @@ function processHorde(state: GameState, rng: SeededRng): ActionError | null {
     }
     const kind = wave.final ? 'final' as const : 'periodic' as const;
     const groupIds: string[] = [];
-    const packDirection = wave.final ? domainRng(state.seed, 'final-pack-direction').pick([...state.horde.warningDirections].sort()) : null;
+    const packDirection = wave.final ? domainRng(state.config.gameplaySeed ?? state.seed, 'final-pack-direction').pick([...state.horde.warningDirections].sort()) : null;
     for (const direction of state.horde.warningDirections) {
       if (!getHordeEntrance(state.map, direction) || getHordeSpawnZone(state.map, direction).length !== 22) {
         return error({ type: 'EndTurn' }, 'horde_spawn_technical_failure', `Invalid Horde Spawn Zone for ${direction}`);
@@ -4086,7 +4087,7 @@ export function validateAction(state: Readonly<GameState>, action: GameAction): 
   if (action.type === 'LoadSnapshot') {
     const valid = validateInvariants(action.snapshot);
     const seededInitialZombiesValid = initialZombiePositionsMatchSeed(action.snapshot.map, action.snapshot.seed, action.snapshot.config.units.zombie.vision) && initialHunterPositionsMatchSeed(action.snapshot);
-    if (action.snapshot.gameVersion !== state.gameVersion || !valid.valid || !seededInitialZombiesValid) {
+    if (action.snapshot.gameVersion !== state.gameVersion || !valid.valid) {
       if (!seededInitialZombiesValid) valid.errors.push('Map initial Zombie positions and order must match the deterministic state seed');
       return error(action, 'invalid_snapshot', valid.errors.join('; ') || 'Unsupported game version');
     }
@@ -4203,6 +4204,8 @@ function checkpointProjectedEffect(
   if (!legal) {
     const radius = getBranchSupplyRadius(state, branchId);
     return {
+      supplyOrigin: {kind:'capital',position:getCapitalPosition(state.map),sector:branchId,roadReachabilityIsSeparate:true},
+      projectionStatus:'not_applicable',
       currentBranchRadius: radius,
       projectedBranchRadius: radius,
       newlySuppliedHexCount: 0,
@@ -4241,6 +4244,8 @@ function checkpointProjectedEffect(
     .flatMap((key) => context.facilityIdsByTile.get(key) ?? [])
     .sort();
   return {
+    supplyOrigin: {kind:'capital',position:getCapitalPosition(state.map),sector:branchId,roadReachabilityIsSeparate:true},
+    projectionStatus:'predicted',
     currentBranchRadius: getBranchSupplyRadius(state, branchId),
     projectedBranchRadius: projectedRadius,
     newlySuppliedHexCount: newlySupplied.length,
@@ -4277,7 +4282,7 @@ export function getCheckpointPositionCandidates(
           : validateRelocateCheckpointAction(state, action, visibleZombies, visibleTileKeys).error;
         const effect = includeProjectedEffects
           ? checkpointProjectedEffect(state, action, reason === null, projectionContext!)
-          : {};
+          : {projectionStatus:'omitted' as const};
         candidates.push({
           actionType: action.type,
           branchId: branch.id,
@@ -4345,10 +4350,13 @@ export class GameEngine implements HeadlessGame {
 
   private committed(): void { this.revision += 1; registerCommittedState(this.state); }
 
-  public constructor(seed = 1, config: GameConfig = createDefaultConfig()) {
-    this.state = createInitialState(seed, config);
+  public constructor(seed = 1, config: GameConfig = createDefaultConfig(), snapshot?: GameState) {
+    if(snapshot) { const valid=validateInvariants(snapshot); if(snapshot.gameVersion!==GAME_VERSION || !valid.valid) throw new Error(`Invalid snapshot: ${valid.errors.join('; ')}`); }
+    this.state = snapshot ? cloneState(snapshot) : createInitialState(seed, config);
     this.committed();
   }
+
+  public static fromSnapshot(snapshot: GameState): GameEngine { return new GameEngine(snapshot.seed,snapshot.config,snapshot); }
 
   public reset(seed: number, config: GameConfig): Readonly<GameState> {
     this.state = createInitialState(seed, config);
@@ -4602,9 +4610,9 @@ export class GameEngine implements HeadlessGame {
       try {
         const candidate = cloneState(action.snapshot);
         const valid = validateInvariants(candidate);
-        const seededInitialZombiesValid = initialZombiePositionsMatchSeed(candidate.map, candidate.seed, candidate.config.units.zombie.vision) && initialHunterPositionsMatchSeed(candidate);
-        if (candidate.gameVersion !== original.gameVersion || !valid.valid || !seededInitialZombiesValid) {
-          if (!seededInitialZombiesValid) valid.errors.push('Map initial Zombie positions and order must match the deterministic state seed');
+
+        if (candidate.gameVersion !== original.gameVersion || !valid.valid) {
+
           return { state: this.getState(), events: [], error: error(action, 'invalid_snapshot', valid.errors.join('; ') || 'Unsupported game version'), gameOver: false, result: null };
         }
         this.state = candidate;

@@ -1,3 +1,4 @@
+import { mapStartFields, bindMapStart, readMapStart, generateGame, proposeMapCorrections } from './map-start';
 import { RULES_V169 } from '../core/rules-v169';
 import { SCENARIOS, resolveScenario } from '../core/scenarios';
 import { UNA_INTRO, renderSynopsis } from './story';
@@ -168,7 +169,7 @@ export interface UiQueryContext {
   getPublicCheckpointProjection?: (checkpointId: string) => AgentCheckpointObservation | null | undefined;
 }
 
-export type EngineFactory = () => UiGameEngine;
+export type EngineFactory = (snapshot?: GameState) => UiGameEngine;
 
 type Screen = 'title' | 'game';
 type SheetState = 'collapsed' | 'standard' | 'expanded';
@@ -3276,15 +3277,16 @@ export class GameUiController {
 
   private showScenarioSeed(): void {
     const ja = this.locale === 'ja';
-    this.root.innerHTML = `<section class="modal-card"><h2>${escapeHtml(SCENARIOS[0].name)}</h2><form data-form="scenario" class="settings-form"><label>Seed<input name="seed" type="number" step="1" min="${Number.MIN_SAFE_INTEGER}" max="${Number.MAX_SAFE_INTEGER}" required value="${Date.now() % 2147483647}"></label><p>${ja ? 'ゲーム設定は標準値で固定です。' : 'All game settings use the default values.'}</p><button type="submit" class="primary-button">${ja ? '開始' : 'Start'}</button><p data-scenario-error role="alert"></p></form><button data-action="new-game" class="ghost-button">${ja ? '戻る' : 'Back'}</button></section>`;
+    this.root.innerHTML = `<section class="modal-card"><h2>${escapeHtml(SCENARIOS[0].name)}</h2><form data-form="scenario" class="settings-form"><label>Seed<input name="seed" type="number" step="1" min="${Number.MIN_SAFE_INTEGER}" max="${Number.MAX_SAFE_INTEGER}" required value="${Date.now() % 2147483647}"></label>${mapStartFields(ja)}<p>${ja ? 'ゲーム設定は標準値で固定です。' : 'All game settings use the default values.'}</p><button type="submit" class="primary-button">${ja ? '開始' : 'Start'}</button><p data-scenario-error role="alert"></p></form><button data-action="new-game" class="ghost-button">${ja ? '戻る' : 'Back'}</button></section>`;
     this.bindRootEvents();
     const form = this.root.querySelector<HTMLFormElement>('[data-form="scenario"]')!;
+    bindMapStart(form,'una');
     form.addEventListener('submit', event => {
       event.preventDefault();
       try {
         const value = String(new FormData(form).get('seed'));
         if (!value.trim()) throw new Error('Seed is required');
-        const resolved = resolveScenario({ scenarioId: 'una', seed: Number(value) });
+        const resolved = resolveScenario({ scenarioId: 'una', ...readMapStart(form) });
         this.showScenarioIntro(resolved.seed, resolved.config);
       } catch (error) { this.root.querySelector('[data-scenario-error]')!.textContent = String(error); }
     });
@@ -3313,6 +3315,8 @@ export class GameUiController {
         <p class="muted">${escapeHtml(RULES_V163[this.locale].finalHorde)}</p>
         <form data-form="new-game" class="settings-form">
           <label>${escapeHtml(t('newSeed'))}<input name="seed" type="number" inputmode="numeric" value="${Date.now() % 2147483647}" /></label>
+          ${mapStartFields(this.locale === 'ja')}
+          <label>${this.locale === 'ja' ? '初期供給半径' : 'Initial supply radius'}<input name="initialSupplyRadius" type="number" min="0" step="1" value="5"></label>
           <section class="fixed-horde-schedule" aria-labelledby="horde-schedule-heading"><h3 id="horde-schedule-heading">${escapeHtml(t('hordeSchedule'))}</h3><p class="muted">${escapeHtml(t('fixedHordeScheduleHint'))}</p><ul>${schedule}</ul></section>
           <label>${escapeHtml(t('refugeeIntervalMin'))}<input name="refugeeIntervalMin" type="number" min="1" value="${refugeeDefaults.intervalMin}" /></label>
           <label>${escapeHtml(t('refugeeIntervalMax'))}<input name="refugeeIntervalMax" type="number" min="1" value="${refugeeDefaults.intervalMax}" /></label>
@@ -3326,6 +3330,7 @@ export class GameUiController {
       </section>`;
     this.bindRootEvents();
     const form = this.root.querySelector<HTMLFormElement>('[data-form="new-game"]');
+    if(form) bindMapStart(form,'custom');
     form?.addEventListener('submit', (event) => {
       event.preventDefault();
       const values = new FormData(form);
@@ -3359,15 +3364,40 @@ export class GameUiController {
         policy.infectionRate = Math.min(1, policy.infectionRate * infectionMultiplier);
         policy.infectionPopulationRate = Math.min(1, policy.infectionPopulationRate * infectionMultiplier);
       }
-      const seed = Math.trunc(numberValue(values.get('seed')?.toString(), Date.now()));
-      this.startGame(seed, config);
+      try {
+        const input=readMapStart(form);
+        config.checkpoint.initialSupplyRadius=Number(values.get('initialSupplyRadius'));
+        const resolved=resolveScenario({...input,configOverrides:config});
+        // mapId follows the explicit selection, not the form's initial default.
+        resolved.config.mapId=input.mapMode==='fixed'?'fixed-51x51-v9':'inland-51x51-v1';
+        void this.startGame(resolved.seed,resolved.config);
+      } catch(error) { this.showToast(String(error)); }
     });
   }
 
-  private startGame(seed: number, config: GameConfig): void {
+  private async startGame(seed: number, config: GameConfig): Promise<void> {
+    const ja=this.locale==='ja';
+    this.root.innerHTML=`<section class="modal-card generation-panel"><h2>${ja?'マップ生成中':'Generating map'}</h2><progress aria-label="${ja?'生成処理中':'Generation in progress'}"></progress><p data-generation-stage role="status">${ja?'準備':'Preparing'}</p><button data-generation-cancel class="secondary-button">${ja?'キャンセル':'Cancel'}</button></section>`;
+    const labels:Record<string,string> = ja?{terrain:'地形',hydrology:'河川・湖',layout:'施設',roads:'道路・橋',validation:'構造・供給の検証',fallback:'代替マップ',initialization:'初期配置',rejected:'候補の再検証'}:{};
+    const task=generateGame(seed,config,p=>{const el=this.root.querySelector('[data-generation-stage]');if(el)el.textContent=`${labels[p.stage]??p.stage} · ${ja?'試行':'attempt'} ${p.attempt}/${p.maxAttempts}`;});
+    this.root.querySelector('[data-generation-cancel]')!.addEventListener('click',()=>task.cancel(),{once:true});
+    let snapshot: GameState;
+    try { snapshot=await task.promise; }
+    catch(error) {
+      const message=error instanceof Error?error.message:String(error);
+      if(message==='generation_cancelled'){this.showTitle();return;}
+      const proposal=proposeMapCorrections(config,message);
+      this.root.innerHTML=`<section class="modal-card"><h2>${ja?'開始できません':'Cannot start'}</h2><p role="alert">${escapeHtml(message)}</p>${proposal.changes.length?`<h3>${ja?'補正案':'Proposed corrections'}</h3><ul>${proposal.changes.map(c=>`<li>${escapeHtml(c.field)}: ${escapeHtml(JSON.stringify(c.before))} → ${escapeHtml(JSON.stringify(c.after))}<p>${escapeHtml(c.reason)}</p></li>`).join('')}</ul><button data-correction-approve class="primary-button">${ja?'補正を承認して再検証':'Approve and validate again'}</button>`:''}<button data-generation-back class="ghost-button">${ja?'キャンセル':'Cancel'}</button></section>`;
+      this.root.querySelector('[data-correction-approve]')?.addEventListener('click',()=>void this.startGame(seed,proposal.corrected),{once:true});
+      this.root.querySelector('[data-generation-back]')!.addEventListener('click',()=>this.showTitle(),{once:true});return;
+    }
     try {
-      this.engine = this.createEngine();
-      this.state = this.engine.reset(seed, config);
+      const nextEngine=this.engine ?? this.createEngine(snapshot);
+      const loaded=nextEngine.step({type:'LoadSnapshot',snapshot});
+      if(loaded.error)throw new Error(loaded.error.message);
+      this.engine=nextEngine;
+      this.state=loaded.state;
+      if(snapshot.mapDescriptor.fallback)this.showToast(ja?'専用代替マップを使用しました':'Using the dedicated fallback map');
       this.screen = 'game';
       this.sheetState = 'standard';
       this.navMode = 'map';
@@ -3436,12 +3466,13 @@ export class GameUiController {
     this.root.className = 'app-shell game-screen';
     this.root.innerHTML = `
       <header class="top-hud">
-        <div class="hud-brand"><span class="hud-glyph">◇</span><span>${escapeHtml(t('title'))}</span></div>
+        <div class="hud-brand" title="${escapeHtml(JSON.stringify(this.state.mapDescriptor))}"><span class="hud-glyph">◇</span><span>${escapeHtml(t('title'))}</span></div>
         <div class="hud-turn"><span data-bind="turn">—</span><small data-bind="turn-label">${escapeHtml(t('turn'))}</small><span class="phase-dot" data-bind="phase" data-phase="${escapeHtml(phaseIndicator.phase)}" aria-hidden="true"></span><span class="phase-label" data-bind="phase-label" title="${escapeHtml(phaseIndicator.label)}">${escapeHtml(phaseIndicator.shortLabel)}</span></div>
         <div class="hud-pop"><span data-bind="population">—</span><small>${escapeHtml(t('population'))}</small></div>
         <button class="icon-button supply-toggle" aria-label="${escapeHtml(t('supplyOverlay'))}" aria-pressed="${this.supplyOverlay}" data-action="toggle-supply" title="${escapeHtml(this.supplyOverlay ? t('supplyOn') : t('supplyOff'))}">◎</button>
         <button class="icon-button" aria-label="${escapeHtml(t('help'))}" data-action="help">?</button>
       </header>
+      ${this.state.mapDescriptor?.fallback?`<p class="map-fallback-notice" role="status">${this.locale==='ja'?'専用代替マップを使用':'Dedicated fallback map'} · ${escapeHtml(this.state.mapDescriptor.fallback.id)}</p>`:''}
       <section class="resource-strip" aria-label="${escapeHtml(t('resources'))}">
         ${renderResourceAccordion(this.locale)}
         <span class="resource-pill civilian-pill">♙ <b data-bind="healthy-civilians">0</b><small>${escapeHtml(t('healthyCivilians'))}</small></span>
@@ -4282,7 +4313,7 @@ export class GameUiController {
       const detail = this.pendingArtilleryTarget ? renderArtilleryPreview(previewArtillery(this.state,unit,this.pendingArtilleryTarget),this.locale) : attackPreview
         ? renderAttackPreview(attackPreview, this.locale, publicUnit?.attack)
         : movePreview
-          ? `<div class="move-preview-detail" data-move-mode="${movePreview.movementMode}"><strong>${escapeHtml(t(movePreview.movementMode === 'emergency' ? 'emergencyMovement' : 'normalMovement'))}</strong><span>${escapeHtml(t('effectiveMovementCost'))} ${movePreview.effectiveMovementCost}</span><span>${escapeHtml(t('fuelCost'))} ${movePreview.fuelCost} · ${escapeHtml(t('fuelAfterMove'))} ${movePreview.projectedFuelAfterMove}</span>${movePreview.overruns?`<span>HP ${movePreview.projectedHpAfterMove} · ${escapeHtml(movePreview.arrivalReason ?? '')}</span><span>${movePreview.overruns.map(o=>`${escapeHtml(o.targetId)} −${o.impactDamage+o.gasDamage} HP${o.executed?'':' (stop)'}`).join(' · ')}</span>${movePreview.cargoDeathRisk?'<strong class="warning-text">Cargo: Gas chain risk</strong>':''}`:''}</div>`
+          ? `<div class="move-preview-detail" data-move-mode="${movePreview.movementMode}"><strong>${escapeHtml(t(movePreview.movementMode === 'emergency' ? 'emergencyMovement' : 'normalMovement'))}</strong><span>${escapeHtml(t('effectiveMovementCost'))} ${movePreview.effectiveMovementCost}</span><span>${escapeHtml(t('fuelCost'))} ${movePreview.fuelCost} · ${escapeHtml(t('fuelAfterMove'))} ${movePreview.projectedFuelAfterMove}</span>${movePreview.overruns?`<span>HP ${movePreview.projectedHpAfterMove} · ${escapeHtml(movePreview.arrivalReason ?? '')}</span><span>${movePreview.overruns.map(o=>`${escapeHtml(o.targetId)} −${o.impactDamage+o.gasDamage} HP${o.wouldExecute?'':' (stop)'}`).join(' · ')}</span>${movePreview.cargoDeathRisk?'<strong class="warning-text">Cargo: Gas chain risk</strong>':''}`:''}</div>`
           : '';
       layer.innerHTML = `<div class="unit-target-confirm" data-unit-context-ui role="group" aria-label="${escapeHtml(confirmLabel)}"><button type="button" class="unit-context-button unit-context-cancel" data-action="unit-target-cancel" data-unit-action="cancel" aria-label="${escapeHtml(t('cancelTarget'))}"><span aria-hidden="true">×</span><small>${escapeHtml(t('cancel'))}</small></button>${detail}<button type="button" class="unit-context-button unit-context-confirm" data-action="${confirmAction}" data-unit-action="confirm" aria-label="${escapeHtml(confirmLabel)}"><span aria-hidden="true">✓</span><small>${escapeHtml(confirmLabel)}</small></button></div>`;
       this.positionUnitContextUi();
@@ -5269,8 +5300,7 @@ export class GameUiController {
 
   private loadState(snapshot: GameState, migrated = false): void {
     try {
-      this.engine = this.createEngine();
-      this.engine.reset(snapshot.seed, snapshot.config);
+      this.engine = this.createEngine(snapshot);
       const result = this.engine.step({ type: 'LoadSnapshot', snapshot });
       if (result.error) throw new Error(result.error.message);
       this.state = result.state;
@@ -5444,7 +5474,7 @@ export class GameUiController {
     const zombieTypes=['zombie','hordeZombie','policeZombie','soldierZombie','riotZombie','hunterZombie','gasZombie','screamerZombie','packZombie'] as const;
     const zombiePerformance=zombieTypes.map(type=>{const unit=config.units[type];return `${t(type)} · HP ${unit.hp} · ${t('attack')} ${unit.attack} · ${t('movement')} ${unit.movement} · ${t('range')} ${unit.range} · ${t('attackCharge')} ${unit.maxAttackCharges}`;});
     const sections:[string,string[]][]=[
-      [ja?'勝敗と基本操作':'Victory, defeat and controls',[t('guideSteps'),ja?'移動力（MP）は1ターンに移動できる量です。地形ごとに必要な移動力を消費します。':'Movement points (MP) are the movement budget for one turn. Each entered terrain consumes its movement cost.',t('tipVictory'),RULES_V169[this.locale].compatibility]],
+      [ja?'勝敗と基本操作':'Victory, defeat and controls',[ja?'標準UNAとカスタムはランダムマップが既定です。固定マップも選べます。詳細seed・再現キーで同じ地図を共有できます。生成中は段階と試行数を表示し、キャンセルできます。':'UNA and custom games default to Random; Fixed is also available. Advanced seeds and reproduction keys identify the same map. Generation shows its stage and attempt and can be cancelled.',t('guideSteps'),ja?'移動力（MP）は1ターンに移動できる量です。地形ごとに必要な移動力を消費します。':'Movement points (MP) are the movement budget for one turn. Each entered terrain consumes its movement cost.',t('tipVictory'),RULES_V169[this.locale].compatibility]],
       [ja?'経済と人口':'Economy and population',[economyRules,foodRules,old.capital,old.health,old.starvation,old.grace,t('tipRecruitment')]],
       [ja?'電力':'Electricity',[t('tipPowerAllocation'),t('tipFuel')]],
       [ja?'施設':'Facilities',[r.airBase,r.drone,r.objectives,old.nuclear]],

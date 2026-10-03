@@ -36,17 +36,7 @@ import type {
 import type { UnitRecoveryClass } from '../core/recovery';
 import type { GameMetrics } from './metrics';
 
-/** v1.6.9 is a new rules, save, session and public-artifact boundary. */
-export const APP_VERSION = '1.6.9';
-export const GAME_RULES_VERSION = '19.0.0';
-export const SAVE_FORMAT_VERSION = '26';
-export const AGENT_API_VERSION = '24.0.0';
-export const OBSERVATION_API_VERSION = '24.0.0';
-export const BRIDGE_API_VERSION = '24.0.0';
-export const BALANCED_AGENT_VERSION = '15.0.0';
-export const RANDOM_AGENT_VERSION = '10.0.0';
-export const ARTIFACT_SCHEMA_VERSION = '23.0.0';
-export const CHECKPOINT_SCHEMA_VERSION = '20.0.0';
+export { APP_VERSION, GAME_RULES_VERSION, SAVE_FORMAT_VERSION, AGENT_API_VERSION, OBSERVATION_API_VERSION, BRIDGE_API_VERSION, BALANCED_AGENT_VERSION, RANDOM_AGENT_VERSION, ARTIFACT_SCHEMA_VERSION, CHECKPOINT_SCHEMA_VERSION } from '../core/versions';
 
 export type UnitProficiency = 'recruit' | 'regular' | 'veteran';
 
@@ -142,6 +132,7 @@ export interface AgentMapTileObservation {
 }
 
 export interface AgentMapObservation {
+  descriptor?: import('../core/map-generation').MapDescriptor;
   roads?: import('../core/roads').RoadNetwork;
   id: string;
   width: number;
@@ -365,24 +356,14 @@ export interface AgentUnitObservation {
   emergencyMovementPoints: number;
   emergencyMovementAvailable: boolean;
   movementSummary: import('../core/move-plan').MovementSummary;
-  attackPreviews: Array<{
-    artillery?: import('../core/artillery').ArtilleryPreview;
-    gasExplosion: import('../core/gas-preview').GasAttackPreview | null;
-    targetUnitId: string;
-    distance: number;
-    militaryGoodsCost: number;
-    projectedMilitaryGoodsAfterAttack: number;
-    projectedAttackChargesRemaining?: number;
-    effectiveAttack: number;
-    projectedDamageBeforeTerrain: number;
-    projectedDamageAfterTerrain: number;
-  }>;
+  attackPreviews: import('../core/combat-query').UnitLegalAttackProjection[];
   projectedRefillDemandIfTurnEndsNow: number;
   projectedRefillAmountIfTurnEndsNow: number;
   projectedMilitaryGoodsAfterFixedConsumption: number;
   projectedMilitaryGoodsAfterRefill: number;
   projectedMilitaryGoodsAfterSuppression: number;
   recoveryClassIfTurnEndsNow: UnitRecoveryClass | null;
+  recovery?: import('../core/recovery').UnitRecoveryProjection | null;
   recoveryRateIfTurnEndsNow: number;
   recoveryBaseAmountIfTurnEndsNow: number;
   recoveryTiming: 'nextPlayerTurnStart' | null;
@@ -831,6 +812,7 @@ export interface AgentGameResult {
 }
 
 export interface AgentObservation {
+  mapDescriptor?: import('../core/map-generation').MapDescriptor;
   militaryDrone?: ReturnType<typeof import('../core/aviation-preview').militaryDroneProjection>;
   facilityObjectives?: {facilityId:string;rewardDeadlineTurn:number;rewardState:string;failureSpawnState:string;rewardUnitType:string;failureUnitType:string;requiresHealthySurvivors:boolean;failureOnUncapturedFall:boolean;firstCapturedTurn:number|null;turnsRemaining:number;severity:'critical'|'warning'|'advisory'}[];
   /** Public Config used to distinguish infection, zombie conversion and actual deaths. */
@@ -960,6 +942,9 @@ export interface AgentStepResult {
 }
 
 export interface AgentResetOptions {
+  mapMode?: import('../core/map-generation').MapMode;
+  mapSeed?: number;
+  gameplaySeed?: number;
   scenarioId?: string;
   seed?: number;
   configOverrides?: DeepPartial<GameConfig>;

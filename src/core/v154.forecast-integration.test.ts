@@ -5,7 +5,7 @@ import { singleFinalWave } from './testConfig';
 import type { ConstructibleFacilityType } from './types';
 
 function forecastEngine(): GameEngine {
-  return new GameEngine(15420, createDefaultConfig({
+  return new GameEngine(15420, createDefaultConfig({mapMode:'fixed',
     economy: {
       initialResources: { fuel: 0, civilianGoods: 10_000 },
       initialZombieCount: 0, initialScreamerCount: 0,

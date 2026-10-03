@@ -6,7 +6,7 @@ import { isHumanUnitType, isZombieUnitType } from './unit-catalog';
 import { assertValidGameConfig, cloneConfig } from './config';
 import { hexKey } from './hex';
 import {
-  createFixedMap, placeArmyBase, placeAirBase, generateInitialGasPositions,
+  oilFieldCandidateForSeed, createFixedMap, placeArmyBase, placeAirBase, generateInitialGasPositions,
   FIXED_MAP_ID,
   generateInitialZombiePositions,
   generateInitialHunterPositions,
@@ -30,7 +30,9 @@ import type {
   UnitType,
 } from './types';
 
-export const GAME_VERSION = '19.0.0';
+import { STATE_VERSION } from './versions';
+import { describeMap, generateRandomMap, mapDomainSeed, MAP_GENERATION_LIMITS, type GenerationProgress } from './map-generation';
+export const GAME_VERSION = STATE_VERSION;
 
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = ['north', 'east', 'south', 'west'];
 
@@ -345,12 +347,14 @@ function facilityStateFromDefinition(
   rng: SeededRng,
   seed: number,
   mapId: string,
+  mapSeed: number,
 ): FacilityState {
   const owned = definition.startingOwned;
   const workerCapacity = config.facilities[definition.type].workerCapacity;
-  const populationConfig = config.initialFacilityPopulation[definition.id];
+  const populationId = definition.id === 'oilfield-1' ? oilFieldCandidateForSeed(mapSeed).id : definition.id;
+  const populationConfig = config.initialFacilityPopulation[populationId];
   let { workers: configuredWorkers, infected } = resolveInitialFacilityPopulation(
-    definition,
+    { ...definition, id: populationId },
     config,
     populationConfig,
     rng,
@@ -451,11 +455,8 @@ function selectWarningDirections(rng: SeededRng, count: number): CardinalDirecti
  * play.  The supplied Config is copied so option changes cannot alter a game
  * that is already in progress.
  */
-export function createInitialState(seed: number, config: GameConfig): GameState {
+export function createInitialState(seed: number, config: GameConfig, onProgress?: (p: GenerationProgress) => void, generationProbe?: Pick<NonNullable<Parameters<typeof generateRandomMap>[2]>, 'rejectCandidate'>): GameState {
   assertValidGameConfig(config);
-  if (config.mapId !== FIXED_MAP_ID) {
-    throw new Error(`Unsupported map id: ${config.mapId}`);
-  }
   if (!Number.isSafeInteger(seed)) {
     throw new Error('Seed must be a safe integer');
   }
@@ -463,25 +464,42 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
   const stateConfig = cloneConfig(config);
   const firstWave = stateConfig.horde.waves[0]!;
   const finalWave = stateConfig.horde.waves.at(-1)!;
-  const map = createFixedMap(
+  const mapSeed = config.mapSeed ?? seed, gameplaySeed = config.gameplaySeed ?? seed;
+  const generated = config.mapMode === 'random' ? generateRandomMap(mapSeed, config, {...generationProbe,onProgress}) : null;
+  const map = generated?.map ?? createFixedMap(
     Object.fromEntries(
       Object.entries(config.facilities).map(([type, facility]) => [type, facility.workerCapacity]),
     ) as Record<keyof GameConfig['facilities'], number>,
-    seed,
+    mapSeed,
   );
-  const rng = new SeededRng(seed);
+  let rng = new SeededRng(config.mapMode === 'fixed' ? gameplaySeed : mapDomainSeed(gameplaySeed,'gameplay/init'));
   // Initial Zombie placement is part of new-game setup and uses the same
   // serializable stream as every other seeded rule. Generate the full
   // canonical set even when a test Config requests fewer initial Zombies so
   // the map snapshot and replay contract remain stable.
-  placeArmyBase(map, rng, stateConfig.facilities.armyBase.workerCapacity);
-  placeAirBase(map, rng, stateConfig.facilities.airBase.workerCapacity);
-  map.initialZombiePositions = generateInitialZombiePositions(map, rng, undefined, stateConfig.units.zombie.vision);
-  const initialHunterPositions = generateInitialHunterPositions(map, rng, stateConfig.economy, stateConfig.units.hunterZombie.vision);
-  const initialGasPositions = generateInitialGasPositions(map, rng, initialHunterPositions, stateConfig.economy, stateConfig.units.gasZombie.vision);
-  const initialScreamerPositions = generateInitialScreamerPositions(map, rng,
-    [...initialHunterPositions, ...initialGasPositions], stateConfig.economy.initialScreamerCount,
-    stateConfig.units.screamerZombie.vision);
+  if (config.mapMode === 'fixed') {
+    // Map seed chooses legacy bases; always consume the two legacy gameplay draws.
+    const layoutRng = mapSeed === gameplaySeed ? rng : new SeededRng(mapSeed);
+    placeArmyBase(map, layoutRng, stateConfig.facilities.armyBase.workerCapacity);
+    placeAirBase(map, layoutRng, stateConfig.facilities.airBase.workerCapacity);
+    if (layoutRng !== rng) { rng.nextInt(0,3); rng.nextInt(0,3); }
+  }
+  onProgress?.({stage:'initialization',attempt:generated?.attempt??0,maxAttempts:MAP_GENERATION_LIMITS.attempts});
+  let initialHunterPositions: HexCoord[] = [], initialGasPositions: HexCoord[] = [], initialScreamerPositions: HexCoord[] = [];
+  let initialEnemyAttempt = 0;
+  for (let attempt=0; ; attempt++) {
+    try {
+      if (attempt>0) rng = new SeededRng(mapDomainSeed(gameplaySeed,'gameplay/init-enemies',attempt));
+      map.initialZombiePositions = generateInitialZombiePositions(map,rng,config.mapMode==='fixed'?undefined:stateConfig.economy.initialZombieCount,stateConfig.units.zombie.vision);
+      initialHunterPositions=generateInitialHunterPositions(map,rng,stateConfig.economy,stateConfig.units.hunterZombie.vision);
+      initialGasPositions=generateInitialGasPositions(map,rng,initialHunterPositions,stateConfig.economy,stateConfig.units.gasZombie.vision);
+      initialScreamerPositions=generateInitialScreamerPositions(map,rng,[...initialHunterPositions,...initialGasPositions],stateConfig.economy.initialScreamerCount,stateConfig.units.screamerZombie.vision);
+      initialEnemyAttempt=attempt; break;
+    } catch (error) {
+      if (config.mapMode==='fixed') throw error;
+      if (attempt+1>=MAP_GENERATION_LIMITS.enemyAttempts) throw new Error('initial_enemy_placement_failed: configured counts, safe distances and passable candidates are incompatible; map and current game were not replaced');
+    }
+  }
   let securedOrder = 0;
   const facilities = map.facilities.map((definition) =>
     facilityStateFromDefinition(
@@ -489,8 +507,9 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       stateConfig,
       definition.startingOwned ? securedOrder++ : null,
       rng,
-      seed,
+      gameplaySeed,
       map.id,
+      mapSeed,
     ),
   );
 
@@ -508,6 +527,8 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
       hasBuiltCheckpoint: false,
     }));
   const state: GameState = {
+    mapDescriptor: describeMap(map,seed,stateConfig,generated?.attempt??0,generated?.fallback??null),
+    initialEnemyAttempt,
     militaryDrone: null, pendingReanimations: [],
     airBaseObjective: { firstCapturedTurn: null, fellBeforeCapture: false, reward: 'unclaimed', failureSpawn: 'none' },
     initialHunterPositions,
@@ -519,7 +540,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     gameVersion: GAME_VERSION,
     config: stateConfig,
     seed,
-    rngState: rng.snapshot(),
+    rngState: config.mapMode==='fixed' ? rng.snapshot() : new SeededRng(mapDomainSeed(gameplaySeed,'gameplay/main')).snapshot(),
     turn: 1,
     finalHordeTurn: finalWave.turn,
     actionsTakenThisTurn: 0,
@@ -582,7 +603,7 @@ export function createInitialState(seed: number, config: GameConfig): GameState 
     pendingNoisePulses: [],
     pendingUnitProductions: [],
     completedProductions: Object.fromEntries(HUMAN_UNIT_TYPES.map(t => [t, 0])) as GameState['completedProductions'],
-    artilleryRngState: domainRng(seed, 'artillery').snapshot(),
+    artilleryRngState: domainRng(gameplaySeed, 'artillery').snapshot(),
     nextCheckpointNumber: 5,
     nextConstructibleFacilityNumber: 1,
     nextUnitNumber: 5,

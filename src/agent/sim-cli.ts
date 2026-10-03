@@ -1,3 +1,4 @@
+import { resolveScenario } from '../core/scenarios';
 import { writeJsonStream } from './json-stream';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
@@ -37,6 +38,7 @@ const CSV_DIRECTIONS = ['north', 'east', 'south', 'west'] as const;
 const CSV_WAVE_INDICES = [1, 2, 3, 4, 5] as const;
 
 export interface ParsedSimulationArguments {
+  mapMode?: 'random'|'fixed'; mapSeed?: number; gameplaySeed?: number;
   agents: AgentStrategyId[];
   games: number;
   seed: number;
@@ -214,6 +216,9 @@ export function parseSimulationArgs(argv: readonly string[]): ParsedSimulationAr
     else if (argument === '--games' || argument.startsWith('--games=')) parsed.games = integer(optionValue(argument, '--games', rest), '--games', 1);
     else if (argument === '--seed' || argument.startsWith('--seed=')) parsed.seed = integer(optionValue(argument, '--seed', rest), '--seed', Number.MIN_SAFE_INTEGER);
     else if (argument === '--seeds' || argument.startsWith('--seeds=')) parsed.seeds = parseSeeds(optionValue(argument, '--seeds', rest));
+    else if (argument === '--map-mode' || argument.startsWith('--map-mode=')) { const mode=optionValue(argument,'--map-mode',rest); if(mode!=='fixed'&&mode!=='random')throw new Error('invalid_map_mode');parsed.mapMode=mode; }
+    else if (argument === '--map-seed' || argument.startsWith('--map-seed=')) parsed.mapSeed=integer(optionValue(argument,'--map-seed',rest),'--map-seed',Number.MIN_SAFE_INTEGER);
+    else if (argument === '--gameplay-seed' || argument.startsWith('--gameplay-seed=')) parsed.gameplaySeed=integer(optionValue(argument,'--gameplay-seed',rest),'--gameplay-seed',Number.MIN_SAFE_INTEGER);
     else if (argument === '--config' || argument.startsWith('--config=')) parsed.configPath = optionValue(argument, '--config', rest);
     else if (argument === '--config-json' || argument.startsWith('--config-json=')) parsed.configJson = optionValue(argument, '--config-json', rest);
     else if (argument === '--out' || argument.startsWith('--out=')) parsed.out = optionValue(argument, '--out', rest);
@@ -235,12 +240,11 @@ export function parseSimulationArgs(argv: readonly string[]): ParsedSimulationAr
 
 export const parseArgs = parseSimulationArgs;
 
-function readConfig(parsed: Pick<ParsedSimulationArguments, 'configPath' | 'configJson'>): GameConfig {
+function readConfig(parsed: Pick<ParsedSimulationArguments, 'configPath' | 'configJson' | 'mapMode' | 'mapSeed' | 'gameplaySeed'>): GameConfig {
   let value: unknown;
   if (parsed.configJson !== undefined) value = JSON.parse(parsed.configJson);
   else if (parsed.configPath !== undefined) value = JSON.parse(readFileSync(resolve(parsed.configPath), 'utf8'));
-  if (value === undefined) return createDefaultConfig();
-  const config = createDefaultConfig(value as DeepPartial<GameConfig>);
+  const config = resolveScenario({mapMode:parsed.mapMode,mapSeed:parsed.mapSeed,gameplaySeed:parsed.gameplaySeed,configOverrides:value as DeepPartial<GameConfig>|undefined}).config;
   assertValidGameConfig(config);
   return config;
 }

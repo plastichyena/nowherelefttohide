@@ -9,7 +9,7 @@ import { CONTEXT_HANDOFF_LIMITS } from '../session/context-handoff';
 import { ACTION_SCHEMA_VERSION, ACTION_RESPONSE_SEMANTICS, ACTION_PLAY_GUIDANCE } from './action-input';
 import { publicQueryContract } from './query-contract';
 import { BARBED_WIRE_RULES } from '../core/barbed-wire';
-import type { GameConfig } from '../core/types';
+import type { GameConfig, FixedMap } from '../core/types';
 import { FIXED_MAP } from '../core/map';
 import {
   AGENT_API_VERSION,
@@ -56,7 +56,8 @@ const CHECKPOINT_REASON_CODES: Readonly<Record<string, string>> = Object.freeze(
 export function createAgentApiInfo(
   config: Readonly<GameConfig>,
   buildId: string,
-  bridgeApiVersion = BRIDGE_API_VERSION,
+  bridgeApiVersion: string = BRIDGE_API_VERSION,
+  map: Readonly<FixedMap> = FIXED_MAP,
 ): AgentApiInfo {
   const policies = config.refugees.policies;
   const configRecord = config as unknown as Record<string, unknown>;
@@ -149,7 +150,7 @@ export function createAgentApiInfo(
     methodSchemas: {
       getArtifactPage: { arguments: 'AgentArtifactPageOptions? { target?, offset?, pageSize? (1..500; default 100), expectedRevision? }', returns: 'AgentArtifactPage', description: 'Read a bounded public manifest, observations, actions, events or invalid-attempts page. Continue using nextOffset and expectedRevision; stale_revision rejects changed runs. No network or filesystem access.' },
       getApiInfo: { arguments: 'none', returns: 'AgentApiInfo', description: 'Returns versions, public methods, fair-play boundaries, and static rules.' },
-      reset: { arguments: 'AgentResetOptions? { scenarioId? (una/custom), seed?, configOverrides? (custom only), agent?: { id } }', returns: 'AgentObservation', description: 'Replaces the in-memory Agent session.' },
+      reset: { arguments: 'AgentResetOptions? { scenarioId? (una/custom), seed?, mapMode? (random default / fixed), mapSeed?, gameplaySeed?, configOverrides? (custom only), agent?: { id } }', returns: 'AgentObservation', description: 'Replaces the in-memory Agent session.' },
       getObservation: { arguments: 'none', returns: `AgentObservation ${OBSERVATION_API_VERSION}`, description: 'Returns a deterministic JSON copy of current public information, including Ground/Aerial visibility, the last 50 important public site events, checkpoint candidates, Horde status, and Victory progress.' },
       getLegalActions: { arguments: 'none', returns: 'GameAction[]', description: 'Returns deterministic currently legal atomic actions.' },
       step: { arguments: 'one concrete legal GameAction; TransferPopulation also accepts the queried positive integer domain', returns: 'AgentStepResult', description: 'Validates and applies exactly one action through GameEngine.' },
@@ -358,12 +359,19 @@ export function createAgentApiInfo(
         hiddenEnemyCountPublic: false,
       },
       map: {
-        id: FIXED_MAP.id,
-        width: FIXED_MAP.width,
-        height: FIXED_MAP.height,
+        id: config.mapId,
+        mode: config.mapMode,
+        width: map.width,
+        height: map.height,
+        initialComposition: {
+          permanentFacilityCount: map.facilities.length,
+          checkpointCount: 4,
+          playerFacilityIds: map.facilities.filter(f=>f.startingOwned).map(f=>f.id),
+          facilities: map.facilities.map(f=>({id:f.id,type:f.type,position:{...f.position},startingOwned:f.startingOwned,workerCapacity:f.workerCapacity})),
+        },
         coordinateSystem: 'axial-q-r',
         roads: { roles: ['trunk','collector','access'], explicitEdges: true, destinationMovementCost: 1, changesSupply: false, changesConstructionEligibility: false, preservesTerrainDefense: true },
-        hordeSpawnReserve: cloneJson(FIXED_MAP.hordeSpawnReserve),
+        hordeSpawnReserve: cloneJson(map.hordeSpawnReserve),
         playerOccupancyRule: 'playerOccupancyAllowed=false forbids Player Unit entry/traversal/stopping and Player placement; Zombie entry, attacks, and damage remain allowed',
       },
       horde: {
@@ -639,7 +647,7 @@ export function createAgentApiInfo(
     minimalExample: [
       'const game = window.NLTH; // Node: createAgentGame()',
       'const info = game.getApiInfo();',
-      "let observation = game.reset({ seed: 1, agent: { id: 'example' } });",
+      "let observation = game.reset({ seed: 1, mapMode: 'random', agent: { id: 'example' } });",
       'while (!game.isGameOver()) {',
       '  const legal = game.getLegalActions();',
       '  if (legal.length === 0) break;',

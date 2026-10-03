@@ -13,7 +13,7 @@ import { hasMovementRoad } from './terrain';
 // integration is exercised by the existing Gas and artillery Engine tests.
 const lifecycle=createUnitLifecycle({applyGeneratedZombieOccupancy(){},processSpawnOccupancyQueue(){},applyGasExplosionSiteInfection(){return 0;},resolveGasExplosionSiteFalls(){}});
 function fixture(type:HumanUnitType='police') {
-  const state=new GameEngine(7,createDefaultConfig()).getState() as GameState;
+  const state=new GameEngine(7,createDefaultConfig({mapMode:'fixed'})).getState() as GameState;
   const heli=createUnit(state,'heli','multipurposeHelicopter',{q:25,r:25});heli.flightState='airborne';heli.movementDomain='air';heli.movement=50;
   const troop=createUnit(state,'troop',type,heli.position);troop.transportedByUnitId=heli.id;troop.boardedTurn=1;troop.actionState='acted';troop.canMove=troop.canAttack=false;heli.cargoUnitId=troop.id;
   state.units=[heli,troop];state.barbedWire=[];state.facilities=[];state.checkpoints=[];synchronizePopulation(state);

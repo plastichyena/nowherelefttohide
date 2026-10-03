@@ -13,7 +13,7 @@ import { hexDistance } from './hex';
 import { decodeSaveCode, encodeSaveCode, exportSaveJson, importSaveJson } from '../persistence/save';
 import type { GameState } from './types';
 
-const quiet = () => createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0,
+const quiet = () => createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0,
   initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 },
   initialResources: { food: 100000, civilianGoods: 100000, militaryGoods: 100000, fuel: 100000 } },
   refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 }, horde: singleFinalWave(99) });
@@ -171,7 +171,7 @@ describe('v1.6.7 zombie pursuit', () => {
 });
 
 it('configures the five direction-wise rounded variant counts once', () => {
-  const config = createDefaultConfig();
+  const config = createDefaultConfig({mapMode:'fixed'});
   expect(config.horde.waves.map(w => w.compositionPerDirection)).toEqual([
     { hordeZombie: 5, zombie: 5 }, { hordeZombie: 3, zombie: 8 }, { hordeZombie: 8, zombie: 11 }, { hordeZombie: 5, zombie: 11 }, { hordeZombie: 8, zombie: 12 },
   ]);

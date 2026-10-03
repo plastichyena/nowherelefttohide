@@ -11,7 +11,7 @@ import {
 import type { GameState, UnitState } from './types';
 
 function freshState(seed = 15301): GameState {
-  const state = createInitialState(seed, createDefaultConfig({
+  const state = createInitialState(seed, createDefaultConfig({mapMode:'fixed',
     economy: { initialWorkersByFacility: { 'army-base-1': 0 } },
   }));
   state.units = [];

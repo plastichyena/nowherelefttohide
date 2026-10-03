@@ -252,6 +252,7 @@ export function createPublicUnitProjection(
     projectedMilitaryGoodsAfterFixedConsumption: military?.afterFixed ?? unit.currentMilitaryGoods,
     projectedMilitaryGoodsAfterRefill: military?.afterRefill ?? unit.currentMilitaryGoods,
     projectedMilitaryGoodsAfterSuppression: military?.afterSuppression ?? unit.currentMilitaryGoods,
+    recovery: recovery ? structuredClone(recovery) : null,
     recoveryClassIfTurnEndsNow: recovery?.recoveryClass ?? null,
     recoveryRateIfTurnEndsNow: recovery?.rate ?? 0,
     recoveryBaseAmountIfTurnEndsNow: recovery?.baseAmount ?? 0,
@@ -542,9 +543,9 @@ function armyBaseProjection(state: Readonly<GameState>, facility: FacilityState,
 
 export function checkpointRecoveryProjection(state: Readonly<GameState>, checkpoint: CheckpointState) {
   const visible = getPlayerVisibleTileKeys(state), key=hexKey(checkpoint.position), missing:string[]=[];
-  if(checkpoint.status!=='ruined')missing.push('not_ruined');
+  if(checkpoint.status!=='ruined')return { applicable:false,reason:'not_ruined',ready:false,missing:[] as string[] };
   if(checkpoint.infected>0)missing.push('suppress_infection');
   if(state.units.some(u=>!u.isPlayerUnit&&hexKey(u.position)===key&&visible.has(key)))missing.push('clear_visible_enemy');
   if(!state.units.some(u=>hexKey(u.position)===key&&hasCapability(state,u,'recoverCheckpoint')))missing.push('station_recovery_capable_unit');
-  return {ready:missing.length===0,missing};
+  return {applicable:true,reason:null,ready:missing.length===0,missing};
 }

@@ -12,7 +12,7 @@ import { emergencyLanding, emergencyLandingPreview } from './aircraft';
 import { SeededRng } from './rng';
 import type { GameAction, GameState, HumanUnitType, UnitType } from './types';
 
-const quiet=()=>createDefaultConfig({economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99}});
+const quiet=()=>createDefaultConfig({mapMode:'fixed',economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99}});
 function load(engine:GameEngine,state:GameState,preserve=false){prepareTestSnapshot(state,preserve);expect(engine.step({type:'LoadSnapshot',snapshot:state}).error).toBeNull();}
 function apply(engine:GameEngine,action:GameAction){const result=engine.step(action);expect(result.error).toBeNull();return result.state;}
 function flying(state:GameState,id='heli',position={q:25,r:25}){const unit=createUnit(state,id,'multipurposeHelicopter',position);unit.flightState='airborne';unit.movementDomain='air';unit.movement=50;return unit;}
@@ -21,13 +21,13 @@ describe('v1.6.5 rule boundaries',()=>{
   it('checks all seeded air-base candidates, deterministic terrain access and initial enemy sight exclusions',()=>{
     const seen=new Set<string>();
     for(let seed=1;seed<=24;seed++){
-      const engine=new GameEngine(seed,createDefaultConfig()),state=engine.getState() as GameState;
+      const engine=new GameEngine(seed,createDefaultConfig({mapMode:'fixed'})),state=engine.getState() as GameState;
       const air=state.facilities.find(f=>f.type==='airBase')!;seen.add(hexKey(air.position));
       expect(state.map.hordeSpawnReserve.some(p=>hexKey(p)===hexKey(air.position))).toBe(false);
       const reach=state.units.filter(u=>u.isPlayerUnit).some(u=>{const path=findShortestPath(state.map,u.position,air.position,new Set(),p=>effectiveMovementCost(state,p,true));if(!path)return false;const cost=pathMovementCost(path,p=>effectiveMovementCost(state,p,true));return cost<=u.movement*10&&(path.length-1)*2<=u.currentFuel;});
       expect(reach).toBe(true);
       for(const enemy of state.units.filter(u=>!u.isPlayerUnit))for(const base of state.facilities.filter(f=>f.type==='armyBase'||f.type==='airBase'))expect(getGroundVisionCoverageFrom(state,enemy.position,enemy.vision).visible.has(hexKey(base.position))).toBe(false);
-      expect(new GameEngine(seed,createDefaultConfig()).getState().map).toEqual(state.map);
+      expect(new GameEngine(seed,createDefaultConfig({mapMode:'fixed'})).getState().map).toEqual(state.map);
     }
     expect([...seen].sort()).toEqual(AIR_BASE_CANDIDATES.map(hexKey).sort());
   },30000);

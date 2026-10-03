@@ -6,7 +6,7 @@ import { createDefaultConfig } from '../core/config';
 import type { GameAction } from '../core/types';
 
 it('Balanced chooses real legal build, staffing and power actions from public forecasts', () => {
-  const engine = new GameEngine(3, createDefaultConfig({ facilities: { powerPlant: { production: { powerGeneration: 100 } } }, economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialResources: { food: 3000, civilianGoods: 200, fuel: 1000, militaryGoods: 500 } } }));
+  const engine = new GameEngine(3, createDefaultConfig({mapMode:'fixed', facilities: { powerPlant: { production: { powerGeneration: 100 } } }, economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialResources: { food: 3000, civilianGoods: 200, fuel: 1000, militaryGoods: 500 } } }));
   const choose = (types: string[], facilityId?: string) => {
     const legal = engine.getLegalActions().filter(a => a.type === 'EndTurn' || (types.includes(a.type) && (!facilityId || ('facilityId' in a && a.facilityId === facilityId))) && (a.type !== 'BuildConstructibleFacility' || a.facilityType === 'reliefSupplyCenter'));
     expect(legal.length).toBeGreaterThan(1);

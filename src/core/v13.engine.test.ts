@@ -11,7 +11,7 @@ import type { GameState } from './types';
 
 describe('v1.4 zombie, Final Horde and victory flow', () => {
   it('rejects corrupted v1.4 Horde and metric snapshot fields without changing the live state', () => {
-    const engine = new GameEngine(23, createDefaultConfig());
+    const engine = new GameEngine(23, createDefaultConfig({mapMode:'fixed'}));
     const before = engine.getState();
     const corrupted = JSON.parse(JSON.stringify(before)) as GameState;
     (corrupted.horde as unknown as { finalHordeStatus: string }).finalHordeStatus = 'bogus';
@@ -23,7 +23,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
   });
 
   it('idles normal zombies without visible or inherited targets', () => {
-    const engine = new GameEngine(7, createDefaultConfig());
+    const engine = new GameEngine(7, createDefaultConfig({mapMode:'fixed'}));
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
     expect(result.events.filter((event) => event.type === 'zombie_idle').length).toBeGreaterThan(0);
@@ -31,7 +31,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
   });
 
   it('spawns the Final Horde after its configured zombie phase and lets it act next turn', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(1),
     });
     const engine = new GameEngine(3, config);
@@ -52,7 +52,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
   });
 
   it('wins immediately after an accepted action when all three current-supply conditions are met', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(1),
     });
     const engine = new GameEngine(11, config);
@@ -88,7 +88,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
   });
 
   it('emits a discovery event when movement expands player visibility', () => {
-    const config = createDefaultConfig({ units: { police: { vision: 1 } } });
+    const config = createDefaultConfig({mapMode:'fixed', units: { police: { vision: 1 } } });
     const engine = new GameEngine(19, config);
     const editable = JSON.parse(JSON.stringify(engine.getState())) as GameState;
     const police = editable.units.find((unit) => unit.type === 'police')!;
@@ -110,7 +110,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
   });
 
   it('does not leak a hidden enemy through legal movement and stops before its occupied hex', () => {
-    const config = createDefaultConfig({ units: { police: { vision: 0 } } });
+    const config = createDefaultConfig({mapMode:'fixed', units: { police: { vision: 0 } } });
     const engine = new GameEngine(5, config);
     const editable = JSON.parse(JSON.stringify(engine.getState()));
     const police = editable.units.find((unit: { type: string }) => unit.type === 'police');
@@ -133,7 +133,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
   });
 
   it('snapshots Horde targets and propagates only their target coordinate to normal zombies', () => {
-    const config = createDefaultConfig({ horde: singleFinalWave(30) });
+    const config = createDefaultConfig({mapMode:'fixed', horde: singleFinalWave(30) });
     const engine = new GameEngine(13, config);
     const editable = JSON.parse(JSON.stringify(engine.getState()));
     editable.units = editable.units.filter((unit: { isPlayerUnit: boolean }) => unit.isPlayerUnit);
@@ -157,7 +157,7 @@ describe('v1.4 zombie, Final Horde and victory flow', () => {
   });
 
   it('allows checkpoint expansion when its only blocker is a hidden zombie', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       vision: { capital: 50 },
     });

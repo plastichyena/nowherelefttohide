@@ -33,7 +33,7 @@ describe('Agent seed regression', () => {
   it.each(seedBatches)('completes standard-config seeds $start through $end without technical failure', async ({ start, end }) => {
     for (let seed = start; seed <= end; seed += 1) {
       const game = createAgentGame();
-      game.reset({ seed, agent: { id: strategy } });
+      game.reset({mapMode:'fixed', seed, agent: { id: strategy } });
       const agent = strategy === 'random' ? new RandomAgent(seed) : new BalancedAgent();
       let decisions = 0;
       while (!game.isGameOver() && decisions < 5_000) {

@@ -10,7 +10,7 @@ import { decodeSaveCode, encodeSaveCode } from '../persistence/save';
 import type { GameAction, GameState } from './types';
 import { previewCoreAction } from './action-preview';
 
-const config = () => createDefaultConfig({ vision: { capital: 50 }, economy: { initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 10000, civilianGoods: 10000, militaryGoods: 10000, fuel: 10000 } } });
+const config = () => createDefaultConfig({mapMode:'fixed', vision: { capital: 50 }, economy: { initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 10000, civilianGoods: 10000, militaryGoods: 10000, fuel: 10000 } } });
 
 it.each(['initial', 'outside-overlap', 'destination', 'infected-source', 'infected-abandoned'] as const)('applies checkpoint initial-supply boundaries consistently: %s', scenario => {
   const engine = new GameEngine(3, config());

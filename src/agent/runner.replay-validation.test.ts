@@ -4,7 +4,7 @@ import { replayArtifact, runAgentGame } from './runner';
 
 describe('Agent replay version boundaries', () => {
   it('accepts release-only App metadata changes and rejects missing App metadata', async () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       maxActionsPerTurn: 4,
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { hordeZombie: { movement: 20, attack: 100 } },
@@ -35,7 +35,7 @@ describe('Agent replay version boundaries', () => {
   }, 120_000);
 
   it('rejects legacy artifacts before creating a v1.5.0 replay session', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: {
         warningLeadTurns: 1,
         waves: [{

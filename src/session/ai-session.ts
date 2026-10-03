@@ -296,6 +296,7 @@ export class AiSession implements AiSessionPort {
     this.preferredCommentLocale = options.preferredCommentLocale ?? 'en';
     this.previewProjector = options.previewProjector;
     this.game = createAgentGame({
+      ...(options.preparedInitialState ? {preparedInitialState:options.preparedInitialState} : {}),
       ...(options.buildId === undefined ? {} : { buildId: options.buildId }),
       ...(options.bridgeApiVersion === undefined ? {} : { bridgeApiVersion: options.bridgeApiVersion }),
       recordHistory: true,

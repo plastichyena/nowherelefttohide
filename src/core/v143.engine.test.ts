@@ -14,7 +14,7 @@ function cloneState(state: Readonly<GameState>): MutableState {
 }
 
 function quietConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): GameConfig {
-  return createDefaultConfig({
+  return createDefaultConfig({mapMode:'fixed',
     horde: singleFinalWave(100),
     economy: {
       initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 },
@@ -81,8 +81,8 @@ function movePlayersAway(state: MutableState): void {
 
 describe('v1.5.1 Core version, map, and initial state', () => {
   it('creates a v11.0.0 state on fixed-51x51-v8 with all 40 initial Normal Zombies', () => {
-    const state = createInitialState(14301, createDefaultConfig());
-    expect(state.gameVersion).toBe('19.0.0');
+    const state = createInitialState(14301, createDefaultConfig({mapMode:'fixed'}));
+    expect(state.gameVersion).toBe('20.0.0');
     expect(state.mapId).toBe('fixed-51x51-v9');
     expect(state.map.id).toBe('fixed-51x51-v9');
     const zombies = state.units.filter((unit) => unit.type === 'zombie');

@@ -47,21 +47,21 @@ describe('Batch Simulation CLI', () => {
   });
 
   it('runs multiple strategies against the same seed set and reports comparisons', () => {
-    const config = createDefaultConfig({ maxActionsPerTurn: 1 });
+    const config = createDefaultConfig({mapMode:'fixed', maxActionsPerTurn: 1 });
     const report = runSimulation({ agents: ['random', 'balanced'], seeds: [1], config, limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 } });
     expect(report.games).toHaveLength(2);
     expect(report.comparisons).toHaveLength(1);
     expect(Object.keys(report.comparisons[0]!.agents).sort()).toEqual(['balanced', 'random']);
     expect(report.technicalFailureCount).toBeGreaterThanOrEqual(0);
     expect(report.schemaVersion).toBe('7.0.0');
-    expect(report.appVersion).toBe('1.6.9');
+    expect(report.appVersion).toBe('1.7.0');
   // The v1.4.4 fixed 51×51 board deliberately raises deterministic run cost;
   // one shared seed still exercises both strategies and their comparison without
   // blocking Vitest's worker RPC heartbeat.
   }, 180_000);
 
   it('reports the runner default turn ceiling independently from finalHordeTurn', () => {
-    const initial = createAgentGame().reset({ seed: 1 });
+    const initial = createAgentGame().reset({mapMode:'fixed', seed: 1 });
     const failingFactory = (): AgentGame => ({
       getApiInfo: () => createAgentGame().getApiInfo(),
       reset: () => initial,
@@ -75,14 +75,14 @@ describe('Batch Simulation CLI', () => {
     const report = runSimulation({
       agents: ['random'],
       seeds: [1],
-      config: createDefaultConfig({ maxActionsPerTurn: 2 }),
+      config: createDefaultConfig({mapMode:'fixed', maxActionsPerTurn: 2 }),
       gameFactory: failingFactory,
     });
     expect(report.execution.limits).toMatchObject({ maxTurns: 100, maxDecisionsPerTurn: 2, maxDecisionsPerGame: 301 });
   });
 
   it('reports a maxTurns stop separately from losses and technical failures in JSON and CSV', () => {
-    const initial = createAgentGame().reset({ seed: 1 });
+    const initial = createAgentGame().reset({mapMode:'fixed', seed: 1 });
     const overRunnerLimit = { ...initial, turn: 101, finalHordeTurn: 250 };
     const limitedFactory = (): AgentGame => ({
       getApiInfo: () => createAgentGame().getApiInfo(),
@@ -97,7 +97,7 @@ describe('Batch Simulation CLI', () => {
     const report = runSimulation({
       agents: ['random'],
       seeds: [1],
-      config: createDefaultConfig(),
+      config: createDefaultConfig({mapMode:'fixed'}),
       gameFactory: limitedFactory,
     });
     expect(report.games[0]).toMatchObject({ outcome: 'limit_reached', limitReached: true, gameOverReason: null });
@@ -113,7 +113,7 @@ describe('Batch Simulation CLI', () => {
   });
 
   it('continues after a technical failure by default and stops only with fail-fast', () => {
-    const initial = createAgentGame().reset({ seed: 1 });
+    const initial = createAgentGame().reset({mapMode:'fixed', seed: 1 });
     const failingFactory = (): AgentGame => ({
       getApiInfo: () => createAgentGame().getApiInfo(),
       reset: () => initial,
@@ -124,7 +124,7 @@ describe('Batch Simulation CLI', () => {
       getResult: () => null,
       getRunArtifact: () => ({}) as never,
     });
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     const continued = runSimulation({ agents: ['random'], seeds: [1, 2, 3], config, gameFactory: failingFactory });
     expect(continued.games).toHaveLength(3);
     expect(continued.technicalFailureCount).toBe(3);
@@ -135,7 +135,7 @@ describe('Batch Simulation CLI', () => {
   });
 
   it('writes UTF-8 JSON, fixed-column CSV, and full per-game artifacts without accidental overwrite', () => {
-    const config = createDefaultConfig({ maxActionsPerTurn: 1 });
+    const config = createDefaultConfig({mapMode:'fixed', maxActionsPerTurn: 1 });
     const report = runSimulation({ agents: ['random'], seeds: [5], config, limits: { maxTurns: 8, maxDecisionsPerTurn: 1, maxDecisionsPerGame: 100 } });
     const output = mkdtempSync(join(tmpdir(), 'nlth-sim-'));
     const paths = writeSimulationOutput(report, output);
@@ -226,7 +226,7 @@ describe('Batch Simulation CLI', () => {
   }, 60_000);
 
   it('streams CLI-scale artifacts to disk without retaining full runs in the report', () => {
-    const config = createDefaultConfig({ maxActionsPerTurn: 1 });
+    const config = createDefaultConfig({mapMode:'fixed', maxActionsPerTurn: 1 });
     const output = mkdtempSync(join(tmpdir(), 'nlth-sim-stream-'));
     const { report, paths } = runSimulationToDirectory({
       agents: ['random'],
@@ -242,7 +242,7 @@ describe('Batch Simulation CLI', () => {
   }, 90_000);
 
   it('writes compact batch summaries without materializing full Replay JSON files', () => {
-    const config = createDefaultConfig({ maxActionsPerTurn: 1 });
+    const config = createDefaultConfig({mapMode:'fixed', maxActionsPerTurn: 1 });
     const output = mkdtempSync(join(tmpdir(), 'nlth-sim-summary-'));
     const { report, paths } = runSimulationToDirectory({
       agents: ['random'],

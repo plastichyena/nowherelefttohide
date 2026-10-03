@@ -8,7 +8,7 @@ import { createAgentObservation } from '../agent/observation';
 import { previewMove } from './movement-query';
 import type { GameState } from './types';
 
-const config = () => createDefaultConfig({checkpoint:{initialSupplyRadius:8},economy:{initialZombieCount:0,initialScreamerCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},horde:{waves:[{turn:99,directionCount:1,compositionPerDirection:{hordeZombie:1,zombie:0},final:true}]}});
+const config = () => createDefaultConfig({mapMode:'fixed',checkpoint:{initialSupplyRadius:8},economy:{initialZombieCount:0,initialScreamerCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},horde:{waves:[{turn:99,directionCount:1,compositionPerDirection:{hordeZombie:1,zombie:0},final:true}]}});
 function load(engine:GameEngine,state:GameState){prepareTestSnapshot(state,true);const r=engine.step({type:'LoadSnapshot',snapshot:state});expect(r.error,r.error?.message).toBeNull();}
 function baseScenario(){const engine=new GameEngine(1,config()),state=engine.getState() as GameState,base=state.facilities.find(f=>f.type==='armyBase')!;Object.assign(base,{owner:'player',status:'owned',operationalStatus:'operational',populationOperationalTurn:1,securedOrder:20,workers:0});load(engine,state);return {engine,state,base};}
 

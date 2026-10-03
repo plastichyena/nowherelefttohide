@@ -59,7 +59,7 @@ describe('v1.5.1 path differential fixtures', () => {
   });
 
   it('uses current urban/checkpoint/reserve rules without assuming tile array order', () => {
-    const state = createInitialState(17, createDefaultConfig());
+    const state = createInitialState(17, createDefaultConfig({mapMode:'fixed'}));
     state.map.tiles.reverse();
     const reference = createMapReference(state.map);
     const indexedCost = createMovementCostResolver(state);

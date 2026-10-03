@@ -1,3 +1,4 @@
+import { createDefaultConfig as v170FixedConfig } from './config';
 import { expect, it } from 'vitest';
 import { GameEngine } from './engine';
 import { createDefaultConfig } from './config';
@@ -8,7 +9,7 @@ import { forecastNextTurnPenalties } from './economy-query';
 import { validateInvariants } from './invariants';
 import type { GameState } from './types';
 
-const quiet = () => createDefaultConfig({
+const quiet = () => createDefaultConfig({mapMode:'fixed',
   economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0,
     initialResources: { food: 10000, civilianGoods: 10000, militaryGoods: 10000, fuel: 10000 } },
   refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 },
@@ -16,7 +17,7 @@ const quiet = () => createDefaultConfig({
 
 it('starts with four active checkpoints, seven regular units, 110 civilians and exactly 50 zombies', () => {
   for (const seed of [1, 7, 19]) {
-    const state = new GameEngine(seed).getState();
+    const state = new GameEngine(seed, v170FixedConfig({mapMode:'fixed'})).getState();
     expect(state.checkpoints.map(c => [c.id, hexKey(c.position)])).toEqual([
       ['checkpoint-1', '25,20'], ['checkpoint-2', '30,25'], ['checkpoint-3', '25,30'], ['checkpoint-4', '20,25'],
     ]);
@@ -44,7 +45,7 @@ it('starts with four active checkpoints, seven regular units, 110 civilians and 
 }, 60000);
 
 it('rejects a population transfer beyond Temporary Housing capacity', () => {
-  const engine = new GameEngine(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0 } }));
+  const engine = new GameEngine(1, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0 } }));
   const candidate = engine.getConstructibleFacilityPositionCandidates('temporaryHousing').find(c => c.legal)!;
   expect(engine.step({ type: 'BuildConstructibleFacility', facilityType: 'temporaryHousing', position: candidate.position }).error).toBeNull();
   expect(engine.step({ type: 'EndTurn' }).error).toBeNull();

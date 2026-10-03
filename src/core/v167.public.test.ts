@@ -8,7 +8,7 @@ import { createAgentObservation } from '../agent/observation';
 
 describe('v1.6.7 unowned population boundary', () => {
   function pair() {
-    const left = createInitialState(4, createDefaultConfig());
+    const left = createInitialState(4, createDefaultConfig({mapMode:'fixed'}));
     const right = structuredClone(left);
     for (const f of right.facilities.filter(f => f.owner !== 'player')) f.workers = f.workerCapacity;
     for (const f of left.facilities.filter(f => f.owner !== 'player')) f.workers = 0;

@@ -6,7 +6,7 @@ import { validateInvariants } from './invariants';
 import type { GameState } from './types';
 
 function fixture(seed:number) {
-  const engine=new GameEngine(seed,createDefaultConfig({economy:{initialZombieCount:0,initialScreamerCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:999,arrivalIntervalMax:999}}));
+  const engine=new GameEngine(seed,createDefaultConfig({mapMode:'fixed',economy:{initialZombieCount:0,initialScreamerCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:999,arrivalIntervalMax:999}}));
   const state=engine.getState() as GameState;
   state.facilities.find(f=>f.id==='capital')!.workers=90;
   state.facilities.find(f=>f.id==='city-1')!.workers=40;

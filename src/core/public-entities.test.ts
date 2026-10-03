@@ -5,7 +5,7 @@ import { createPublicUnitProjection } from './public-entities';
 
 describe('shared public entity projections', () => {
   it('keeps configured Horde charges and experience thresholds without mutating State', () => {
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     config.unitExperience.recruitSurvivalTurnsRequired = 7;
     const state = createInitialState(15201, config);
     const horde = createUnit(state, 'projection-horde', 'hordeZombie', { q: 25, r: 25 });

@@ -44,9 +44,9 @@ function adapt(game: SessionCapableAgentGame): SessionGameRuntime {
 
 export function createAgentSessionGameFactory(buildId: string, configOverrides?: DeepPartial<GameConfig>): SessionGameFactory {
   return {
-    createNew: ({ seed, agentId, scenarioId }) => {
+    createNew: ({ seed, agentId, scenarioId, mapMode, mapSeed, gameplaySeed }) => {
       const game = createAgentGame({ buildId, recordHistory: false }) as SessionCapableAgentGame;
-      game.reset({ seed, scenarioId, agent: { id: agentId }, ...(configOverrides === undefined ? {} : { configOverrides }) });
+      game.reset({ seed, scenarioId, mapMode, mapSeed, gameplaySeed, agent: { id: agentId }, ...(configOverrides === undefined ? {} : { configOverrides }) });
       return adapt(game);
     },
     restore: ({ privateState, agentId, decision }) => {

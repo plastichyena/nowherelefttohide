@@ -14,13 +14,13 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
 
 describe('AgentGame public boundary', { timeout: 60000 }, () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.6.9');
+    expect(APP_VERSION).toBe('1.7.0');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
     const game = createAgentGame();
-    const first = game.reset({ seed: 42, agent: { id: 'boundary-test' } });
-    const second = game.reset({ seed: 42, agent: { id: 'boundary-test' } });
+    const first = game.reset({mapMode:'fixed', seed: 42, agent: { id: 'boundary-test' } });
+    const second = game.reset({mapMode:'fixed', seed: 42, agent: { id: 'boundary-test' } });
     expect(second).toEqual(first);
     const encoded = JSON.stringify(first);
     expect(JSON.parse(encoded)).toEqual(first);
@@ -78,7 +78,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('invalidates checkpoint candidate projections when Drone Base vision changes', () => {
     const game = createAgentGame();
-    game.reset({ seed: 1423, configOverrides: { facilities: { powerPlant: { production: { powerGeneration: 100 } } } }, agent: { id: 'vision-cache-test' } });
+    game.reset({mapMode:'fixed', seed: 1423, configOverrides: { facilities: { powerPlant: { production: { powerGeneration: 100 } } } }, agent: { id: 'vision-cache-test' } });
     const build = game.getLegalActions().find(
       (action): action is Extract<GameAction, { type: 'BuildConstructibleFacility' }> =>
         action.type === 'BuildConstructibleFacility' && action.facilityType === 'civilianDroneBase',
@@ -116,12 +116,12 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('describes the v1.6.0 API, Wave, Housing, Wind, Crisis, and Noise rules from the same adapter boundary', () => {
     const game = createAgentGame({ buildId: 'api-info-test' });
-    game.reset({ seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
+    game.reset({mapMode:'fixed', seed: 2, configOverrides: { naturalRecovery: { combatRate: 0.15, restRate: 0.3 } } });
     const info = game.getApiInfo();
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('26');
+    expect(info.saveFormatVersion).toBe('27');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');
@@ -241,7 +241,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('does not share returned references with the private engine state', () => {
     const game = createAgentGame();
-    const observation = game.reset({ seed: 3 });
+    const observation = game.reset({mapMode:'fixed', seed: 3 });
     observation.resources.food = -999;
     const ownedId = observation.facilities.find(f => f.owner === 'player')!.id;
     observation.facilities.find(f => f.id === ownedId)!.healthyPopulation = -999;
@@ -275,7 +275,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('rejects illegal actions and invalid reset input without changing the session', () => {
     const game = createAgentGame();
-    const before = game.reset({ seed: 9, agent: { id: 'safe-agent' } });
+    const before = game.reset({mapMode:'fixed', seed: 9, agent: { id: 'safe-agent' } });
     const rejected = game.step({ type: 'Wait', unitId: 'does-not-exist' });
     expect(rejected.error?.code).toBe('cannot_wait');
     expect(rejected.observation).toEqual(before);
@@ -291,13 +291,13 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     });
     expect(game.getRunArtifact().config.windPower).toEqual({ noiseRadius: 8 });
     expect(game.getRunArtifact().metrics?.config.windPower).toEqual({ noiseRadius: 8 });
-    expect(() => game.reset({ seed: 10, configOverrides: { unknown: 1 } as never })).toThrow(/Unknown field/);
+    expect(() => game.reset({mapMode:'fixed', seed: 10, configOverrides: { unknown: 1 } as never })).toThrow(/Unknown field/);
     expect(game.getObservation()).toEqual(before);
   });
 
   it('returns only engine-legal actions and never exposes GameState in step results', () => {
     const game = createAgentGame();
-    game.reset({ seed: 11 });
+    game.reset({mapMode:'fixed', seed: 11 });
     const actions = game.getLegalActions();
     expect(actions.length).toBeGreaterThan(0);
     const representativeActions = [
@@ -309,7 +309,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     for (const action of representativeActions) {
       if (!action) continue;
       const isolated = createAgentGame();
-      isolated.reset({ seed: 11 });
+      isolated.reset({mapMode:'fixed', seed: 11 });
       const result = isolated.step(action);
       expect(result.error).toBeNull();
       expect(result).not.toHaveProperty('state');
@@ -319,7 +319,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('publishes frozen Wave and Spawn-batch counts without leaking roster types or coordinates', () => {
     const game = createAgentGame();
-    game.reset({
+    game.reset({mapMode:'fixed',
       seed: 21,
       configOverrides: {
         horde: {
@@ -358,7 +358,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('keeps rejected-refugee Horde detail out of public events, artifacts, and metrics', () => {
     const game = createAgentGame();
-    game.reset({
+    game.reset({mapMode:'fixed',
       seed: 22,
       configOverrides: {
         maxActionsPerTurn: 5,
@@ -419,7 +419,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('makes Turn Away public only as a qualitative event', () => {
     const game = createAgentGame();
-    game.reset({
+    game.reset({mapMode:'fixed',
       seed: 23,
       configOverrides: {
         economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
@@ -445,7 +445,7 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
 
   it('does not canonicalize a checkpoint action with the wrong branch', () => {
     const game = createAgentGame();
-    const before = game.reset({ seed: 12, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
+    const before = game.reset({mapMode:'fixed', seed: 12, configOverrides: { economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } } });
     const privateBefore = game.getDebugState();
     const legalBuild = game.getLegalActions().find((action) => action.type === 'BuildCheckpoint');
     expect(legalBuild).toBeDefined();

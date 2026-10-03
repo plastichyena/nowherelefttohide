@@ -9,7 +9,7 @@ import { queryRoute } from '../agent/route-query';
 import type { GameState } from './types';
 import { deriveCheckpointRole } from './supply';
 
-export const quiet164 = () => createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0, initialResources: { food: 100000, civilianGoods: 100000, militaryGoods: 100000, fuel: 100000 } }, refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 } });
+export const quiet164 = () => createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0, initialResources: { food: 100000, civilianGoods: 100000, militaryGoods: 100000, fuel: 100000 } }, refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 } });
 export function load164(engine: GameEngine, state: GameState) {
   prepareTestSnapshot(state);
   const result = engine.step({ type: 'LoadSnapshot', snapshot: state });

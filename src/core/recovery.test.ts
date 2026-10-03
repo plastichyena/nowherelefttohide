@@ -11,7 +11,7 @@ function rebalance(state: ReturnType<typeof createInitialState>): void {
 }
 
 function recoveryEngine(seed = 301): GameEngine {
-  return new GameEngine(seed, createDefaultConfig({
+  return new GameEngine(seed, createDefaultConfig({mapMode:'fixed',
     horde: singleFinalWave(4),
     economy: {
       initialZombieCount: 0, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
@@ -28,7 +28,7 @@ describe('v1.2.6 unit recovery and automatic suppression', () => {
     [{ moved: true, attacked: false, intercepted: false, suppressed: false }, 'rest', 3],
     [{ moved: false, attacked: false, intercepted: false, suppressed: false }, 'rest', 3],
   ] as const)('classifies activity %j as %s recovery', (activity, expectedClass, expectedAmount) => {
-    const state = createInitialState(300, createDefaultConfig({ economy: { initialZombieCount: 0, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const state = createInitialState(300, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const police = state.units.find((unit) => unit.id === 'police-1')!;
     police.position = { ...state.facilities.find((facility) => facility.id === 'capital')!.position };
     police.activity = { ...activity };

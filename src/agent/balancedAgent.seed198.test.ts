@@ -5,7 +5,7 @@ import { createAgentGame } from './game';
 describe('Balanced Agent checkpoint infection regression', () => {
   it('cleans checkpoint-queue infection in seed 198 before turn 100', async () => {
     const game = createAgentGame();
-    let observation = game.reset({ seed: 198, agent: { id: 'balanced' } });
+    let observation = game.reset({mapMode:'fixed', seed: 198, agent: { id: 'balanced' } });
     const agent = new BalancedAgent();
     let decisions = 0;
     while (!game.isGameOver() && observation.turn <= 100 && decisions < 5_000) {

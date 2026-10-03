@@ -32,6 +32,9 @@ interface ParsedCli {
   checkpointId?: string;
   seed?: number;
   scenarioId?: string;
+  mapMode?: 'fixed' | 'random';
+  mapSeed?: number;
+  gameplaySeed?: number;
   checkpointInterval?: number;
   agentId?: string;
   preferredCommentLocale?: SessionCommentLocale;
@@ -86,6 +89,9 @@ export function parseSessionCliArgs(argv: readonly string[]): ParsedCli {
     else if ((value = readOption(argument, '--checkpoint', remaining)) !== null) parsed.checkpointId = value;
     else if ((value = readOption(argument, '--checkpoint-id', remaining)) !== null) parsed.checkpointId = value;
     else if ((value = readOption(argument, '--scenario', remaining)) !== null) parsed.scenarioId = value;
+    else if ((value = readOption(argument, '--map-mode', remaining)) !== null) { if(value!=='fixed'&&value!=='random') throw new SessionError('invalid_cli_argument','--map-mode must be fixed or random'); parsed.mapMode=value; }
+    else if ((value = readOption(argument, '--map-seed', remaining)) !== null) parsed.mapSeed=integer(value,'--map-seed',Number.MIN_SAFE_INTEGER);
+    else if ((value = readOption(argument, '--gameplay-seed', remaining)) !== null) parsed.gameplaySeed=integer(value,'--gameplay-seed',Number.MIN_SAFE_INTEGER);
     else if ((value = readOption(argument, '--seed', remaining)) !== null) parsed.seed = integer(value, '--seed', Number.MIN_SAFE_INTEGER);
     else if ((value = readOption(argument, '--checkpoint-interval', remaining)) !== null) parsed.checkpointInterval = integer(value, '--checkpoint-interval', 1);
     else if ((value = readOption(argument, '--agent-id', remaining)) !== null) parsed.agentId = value;
@@ -204,7 +210,7 @@ export function executeSessionCommand(
       const status = service.newSession({
         sessionId: parsed.sessionId,
         seed: parsed.seed,
-        scenarioId: parsed.scenarioId,
+        scenarioId: parsed.scenarioId, mapMode: parsed.mapMode, mapSeed: parsed.mapSeed, gameplaySeed: parsed.gameplaySeed,
         checkpointInterval: parsed.checkpointInterval,
         agentId: parsed.agentId,
         preferredCommentLocale: parsed.preferredCommentLocale,

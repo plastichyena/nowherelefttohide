@@ -37,7 +37,7 @@ export function ifvPolicy(observation: AgentObservation) {
       const detail=publicMoveDetails(observation,unit.id,action.destination),p=detail?.preview;
       if(!p||!('overruns' in p))return result(-10_000,'IFV_PUBLIC_PREVIEW_REQUIRED');
       if(p.projectedHpAfterMove<=0 || p.cargoDeathRisk || p.arrivalReason==='overrun_insufficient_hp')return result(-10_000,'AVOID_LETHAL_OVERRUN_OR_CARGO_LOSS');
-      const kills=p.overruns.filter(o=>o.executed).length,damage=unit.hp-p.projectedHpAfterMove;
+      const kills=p.overruns.filter(o=>o.wouldExecute).length,damage=unit.hp-p.projectedHpAfterMove;
       const target=mission(unit),gain=target?hexDistance(unit.position,target.position)-hexDistance(p.reached,target.position):0;
       const supplied=observation.supply.suppliedTileKeys.includes(hexKey(p.reached));
       if(p.projectedFuelAfterMove===0&&!supplied)return result(-7_000,'KEEP_IFV_MOBILE');

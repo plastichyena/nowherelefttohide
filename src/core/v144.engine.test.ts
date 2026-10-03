@@ -23,7 +23,7 @@ function load(engine: GameEngine, snapshot: Snapshot): void {
 }
 
 function noInitialZombies() {
-  return createDefaultConfig({
+  return createDefaultConfig({mapMode:'fixed',
     economy: {
       initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 5_000, civilianGoods: 5_000, militaryGoods: 5_000, fuel: 5_000 },
@@ -105,7 +105,7 @@ describe('v1.4.5 checkpoint and rejection rules', () => {
   });
 
   it('adds ceil(rejected/5) normalized Horde Zombies on the participating front, resets it, and ends arrivals', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: {
         ...singleFinalWave(1, { hordeZombie: 1, zombie: 0 }, 1),
@@ -134,7 +134,7 @@ describe('v1.4.5 checkpoint and rejection rules', () => {
 
 describe('v1.4.4 maintenance, decommission, and reanimation rules', () => {
   it('rejects a LoadSnapshot whose legal initial Zombie order does not match its seed', () => {
-    const engine = new GameEngine(14407, createDefaultConfig());
+    const engine = new GameEngine(14407, createDefaultConfig({mapMode:'fixed'}));
     const before = engine.getState();
     const snapshot = engine.getState() as Snapshot;
     [snapshot.map.initialZombiePositions[0], snapshot.map.initialZombiePositions[1]] = [
@@ -145,7 +145,7 @@ describe('v1.4.4 maintenance, decommission, and reanimation rules', () => {
     const result = engine.step({ type: 'LoadSnapshot', snapshot });
 
     expect(result.error).toMatchObject({ code: 'invalid_snapshot' });
-    expect(result.error?.message).toMatch(/initial Zombie positions and order.*seed/i);
+    expect(result.error?.message).toMatch(/seeded_enemy_placement/i);
     expect(engine.getState()).toEqual(before);
   });
 

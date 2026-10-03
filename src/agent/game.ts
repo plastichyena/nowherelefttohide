@@ -64,7 +64,7 @@ function normalizeResetOptions(value: AgentResetOptions | undefined): Required<P
   const options = value ?? {};
   if (!isPlainObject(options)) throw new Error('Reset options must be an object');
   for (const key of Object.keys(options)) {
-    if (!['scenarioId', 'seed', 'configOverrides', 'agent'].includes(key)) throw new Error(`Unknown reset option: ${key}`);
+    if (!['scenarioId', 'seed', 'mapMode', 'mapSeed', 'gameplaySeed', 'configOverrides', 'agent'].includes(key)) throw new Error(`Unknown reset option: ${key}`);
   }
   validateFiniteNumbers(options);
   const seedValue: unknown = options.seed ?? DEFAULT_AGENT_SEED;
@@ -87,7 +87,7 @@ function buildConfig(overrides: DeepPartial<GameConfig> | undefined): GameConfig
     validateKnownKeys(overrides, createDefaultConfig(), 'configOverrides.');
   }
   const config = createDefaultConfig(overrides);
-  if (config.mapId !== DEFAULT_MAP_ID) throw new Error(`mapId must be ${DEFAULT_MAP_ID}`);
+
   assertValidGameConfig(config);
   return config;
 }
@@ -371,6 +371,8 @@ function checkpointCandidateProjectionKey(state: Readonly<GameState>): string {
 }
 
 export interface AgentGameAdapterOptions {
+  /** Internal initialization from the generation worker; never exposed by reset. */
+  preparedInitialState?: GameState;
   buildId?: string;
   bridgeApiVersion?: string;
   /**
@@ -411,7 +413,8 @@ export class AgentGameAdapter implements AgentGame {
   private decisionCount = 0;
 
   public constructor(options: AgentGameAdapterOptions = {}) {
-    this.engine = new GameEngine(this.seed, this.config);
+    if(options.preparedInitialState){this.seed=options.preparedInitialState.seed;this.config=cloneConfig(options.preparedInitialState.config);}
+    this.engine = options.preparedInitialState ? GameEngine.fromSnapshot(options.preparedInitialState) : new GameEngine(this.seed, this.config);
     this.buildId = options.buildId ?? 'local-unknown';
     this.bridgeApiVersion = options.bridgeApiVersion ?? BRIDGE_API_VERSION;
     this.recordHistory = options.recordHistory ?? true;
@@ -426,13 +429,14 @@ export class AgentGameAdapter implements AgentGame {
   }
 
   public getApiInfo() {
-    return createAgentApiInfo(this.config, this.buildId, this.bridgeApiVersion);
+    return createAgentApiInfo(this.config, this.buildId, this.bridgeApiVersion, this.engine.getState().map);
   }
 
   public reset(options?: AgentResetOptions): AgentObservation {
     const normalized = normalizeResetOptions(options);
     const resolved = resolveScenario(normalized);
-    const config = normalized.scenarioId === 'una' ? resolved.config : buildConfig(normalized.configOverrides);
+    if (normalized.configOverrides !== undefined) buildConfig(normalized.configOverrides);
+    const config = resolved.config;
     const next = new GameEngine(normalized.seed, config);
     this.engine = next;
     this.resetGeneration += 1;
@@ -671,7 +675,7 @@ export class AgentGameAdapter implements AgentGame {
   ): AgentObservation {
     const snapshotCopy = cloneJson(snapshot);
     const config = cloneConfig(snapshotCopy.config);
-    const next = new GameEngine(snapshotCopy.seed, config);
+    const next = GameEngine.fromSnapshot(snapshotCopy);
     const loaded = next.step({ type: 'LoadSnapshot', snapshot: snapshotCopy });
     if (loaded.error) throw new Error(`${loaded.error.code}: ${loaded.error.message}`);
 

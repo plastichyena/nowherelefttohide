@@ -1,0 +1,10 @@
+import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
+import assert from 'node:assert/strict';
+const root=process.argv[2];
+const read=os=>JSON.parse(readFileSync(join(root,`v170-platform-${os}`,'map-validation','results.json'),'utf8'));
+const a=read('windows-latest'),b=read('ubuntu-latest');
+assert.equal(a.summary.failures,0);assert.equal(b.summary.failures,0);
+const hashes=data=>data.results.map(r=>({seed:r.seed,hash:r.descriptor.mapHash,attempt:r.descriptor.attempt,fallback:r.descriptor.fallback}));
+assert.deepEqual(hashes(a),hashes(b));
+console.log(`Windows/Linux: ${a.results.length} map hashes and attempts match.`);

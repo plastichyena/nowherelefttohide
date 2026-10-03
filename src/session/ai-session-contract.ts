@@ -17,7 +17,8 @@ import type { GameAction, JsonValue } from '../core/types';
  * This module deliberately imports only public Agent/Core types.  It does
  * not name a browser, a protocol, an SDK, or a storage implementation.
  */
-export const AI_SESSION_CONTRACT_VERSION = '1.5.0' as const;
+import {AI_SESSION_CONTRACT_VERSION} from '../core/versions';
+export {AI_SESSION_CONTRACT_VERSION} from '../core/versions';
 export const AI_SESSION_DEFAULT_QUERY_PAGE_SIZE = 100;
 export const AI_SESSION_MAX_QUERY_PAGE_SIZE = 500;
 export const AI_SESSION_MAX_COMMENT_CODE_POINTS = 500;
@@ -68,6 +69,8 @@ export type AiSessionResponse<T extends object> = (AiSessionSuccess & T) | AiSes
 
 /** A factory input, not a reset endpoint.  A session is immutable in identity after creation. */
 export interface AiSessionCreateOptions {
+  /** Internal worker result for a newly generated game, not a transport field. */
+  preparedInitialState?: import('../core/types').GameState;
   /** Public AgentGame initialization. No save/session restoration is accepted here. */
   initial?: AgentResetOptions;
   /** Used by portable transports; an act call may explicitly override it. */

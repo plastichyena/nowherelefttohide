@@ -1,0 +1,26 @@
+/** Compatibility boundaries for the v1.7.0 release. */
+export const APP_VERSION = '1.7.0' as const;
+export const GAME_RULES_VERSION = '20.0.0' as const;
+export const CONFIG_VERSION = GAME_RULES_VERSION;
+export const STATE_VERSION = GAME_RULES_VERSION;
+export const SAVE_FORMAT_NUMBER = 27;
+export const SAVE_FORMAT_VERSION = '27' as const;
+export const AGENT_API_VERSION = '25.0.0' as const;
+export const OBSERVATION_API_VERSION = '25.0.0' as const;
+export const BRIDGE_API_VERSION = '25.0.0' as const;
+export const ARTIFACT_SCHEMA_VERSION = '24.0.0' as const;
+export const CHECKPOINT_SCHEMA_VERSION = '21.0.0' as const;
+export const BALANCED_AGENT_VERSION = '15.0.0' as const;
+export const RANDOM_AGENT_VERSION = '10.0.0' as const;
+export const RANDOM_MAP_ID = 'inland-51x51-v1' as const;
+export const GENERATOR_VERSION = 'inland-v1' as const;
+export const MAP_SETTINGS_VERSION = 'inland-settings-v1' as const;
+export const FALLBACK_ID = 'inland-fallback-1' as const;
+export const SESSION_SCHEMA_VERSION = '21.0.0' as const;
+export const ACTION_SCHEMA_VERSION = '4.0.0' as const;
+export const QUERY_SCHEMA_VERSION = '1.7.0' as const;
+export const SUMMARY_SCHEMA_VERSION = '2.0.0' as const;
+export const AI_SESSION_CONTRACT_VERSION = '1.5.0' as const;
+export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
+export const SESSION_ARTIFACT_PACKAGE_VERSION = '2.0.0' as const;
+export const PLAY_TURN_PROTOCOL_VERSION = '1.3.0' as const;

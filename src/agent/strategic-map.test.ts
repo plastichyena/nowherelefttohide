@@ -34,7 +34,7 @@ function tile(q: number, r: number, overrides: Partial<AgentMapTileObservation> 
 
 describe('strategic map public graph', () => {
   it('derives a stable compressed graph containing public strategic entities', () => {
-    const observation = createAgentObservation(createInitialState(15701, createDefaultConfig()));
+    const observation = createAgentObservation(createInitialState(15701, createDefaultConfig({mapMode:'fixed'})));
     const first = deriveStrategicMap(observation);
     const second = deriveStrategicMap(structuredClone(observation));
 
@@ -95,7 +95,7 @@ describe('strategic map public graph', () => {
   });
 
   it('does not let enemy state change topology or stable IDs', () => {
-    const observation = createAgentObservation(createInitialState(15702, createDefaultConfig()));
+    const observation = createAgentObservation(createInitialState(15702, createDefaultConfig({mapMode:'fixed'})));
     const changedEnemyState = structuredClone(observation) as typeof observation & { hiddenEnemyState?: unknown };
     changedEnemyState.zombies.reverse();
     changedEnemyState.hiddenEnemyState = [{ id: 'private-only', position: { q: 1, r: 1 } }];

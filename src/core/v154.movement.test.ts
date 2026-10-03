@@ -7,7 +7,7 @@ import { createCityPopulationSnapshot, createUnit, synchronizePopulation } from 
 import { effectiveMovementCost } from './terrain';
 import type { GameState } from './types';
 
-const config = () => createDefaultConfig({
+const config = () => createDefaultConfig({mapMode:'fixed',
   economy: {
     initialZombieCount: 0, initialScreamerCount: 0,
     initialHunterCount: { min: 0, max: 0 },

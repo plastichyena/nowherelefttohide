@@ -1,3 +1,4 @@
+import { createDefaultConfig as v170FixedConfig } from './config';
 import { describe, expect, it } from 'vitest';
 import { SeededRng } from './rng';
 import { selectArmyBasePosition } from './map';
@@ -14,7 +15,7 @@ import { findShortestPath, pathMovementCost } from './path';
 import { effectiveMovementCost } from './terrain';
 import { unitMoveFuelCost } from './movement-query';
 import type { GameState, ZombieUnitType } from './types';
-const config=()=>createDefaultConfig({economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},horde:{waves:[{turn:99,directionCount:1,compositionPerDirection:{hordeZombie:1,zombie:0},final:true}]}});
+const config=()=>createDefaultConfig({mapMode:'fixed',economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},horde:{waves:[{turn:99,directionCount:1,compositionPerDirection:{hordeZombie:1,zombie:0},final:true}]}});
 function load(engine:GameEngine,s:GameState) { prepareTestSnapshot(s, true); expect(engine.step({type:'LoadSnapshot',snapshot:s}).error?.message??null).toBeNull(); }
 function owned(engine:GameEngine,workers=0) { const s=engine.getState() as GameState; const b=s.facilities.find(f=>f.type==='armyBase')!; b.owner='player';b.status='owned';b.operationalStatus='operational';b.populationOperationalTurn=1;b.securedOrder=20;b.workers=workers; s.facilities.find(f=>f.type==='capital')!.workers-=workers; return {s,b}; }
 function horde(state: GameState, id: string, position: { q: number; r: number }) {
@@ -35,7 +36,7 @@ describe('v1.5.3 integrated rules',()=>{
   expect(new Set(selected.map(p => JSON.stringify(p))).size).toBe(ARMY_BASE_CANDIDATES.length);
   selected.forEach((position, index) => expect(selectArmyBasePosition(new SeededRng(index + 1))).toEqual(position));
  });
- it('places one seed-bound base outside initial supply and distinct Gas, without reroll',()=>{const seen=new Set<string>(); const counts=new Set<number>(); for(const seed of [1,7]){const engine=new GameEngine(seed);const s=engine.getState();const b=s.facilities.find(f=>f.type==='armyBase')!; seen.add(JSON.stringify(b.position));counts.add(s.initialGasPositions.length);expect(s.facilities).toHaveLength(28);expect(b).toMatchObject({owner:'none',infected:0,armyBase:{militaryGoods:40,reward:'unclaimed'}});expect(b.workers).toBeGreaterThanOrEqual(1);expect(b.workers).toBeLessThanOrEqual(10);expect(isHexSupplied(s,b.position)).toBe(false);expect(hexDistance(b.position,{q:25,r:25})).toBe(6);expect(initialArmyBaseMatchesSeed(s)).toBe(true);expect(initialGasPositionsMatchSeed(s)).toBe(true);expect(new Set(s.units.map(u=>JSON.stringify(u.position))).size).toBe(s.units.length);expect(s.units.filter(u=>u.type==='gasZombie').every(u=>u.hp===35&&hexDistance(u.position,{q:25,r:25})>=9)).toBe(true);}expect([...counts].sort()).toEqual([4]);},60000);
+ it('places one seed-bound base outside initial supply and distinct Gas, without reroll',()=>{const seen=new Set<string>(); const counts=new Set<number>(); for(const seed of [1,7]){const engine=new GameEngine(seed, v170FixedConfig({mapMode:'fixed'}));const s=engine.getState();const b=s.facilities.find(f=>f.type==='armyBase')!; seen.add(JSON.stringify(b.position));counts.add(s.initialGasPositions.length);expect(s.facilities).toHaveLength(28);expect(b).toMatchObject({owner:'none',infected:0,armyBase:{militaryGoods:40,reward:'unclaimed'}});expect(b.workers).toBeGreaterThanOrEqual(1);expect(b.workers).toBeLessThanOrEqual(10);expect(isHexSupplied(s,b.position)).toBe(false);expect(hexDistance(b.position,{q:25,r:25})).toBe(6);expect(initialArmyBaseMatchesSeed(s)).toBe(true);expect(initialGasPositionsMatchSeed(s)).toBe(true);expect(new Set(s.units.map(u=>JSON.stringify(u.position))).size).toBe(s.units.length);expect(s.units.filter(u=>u.type==='gasZombie').every(u=>u.hp===35&&hexDistance(u.position,{q:25,r:25})>=9)).toBe(true);}expect([...counts].sort()).toEqual([4]);},60000);
  it('keeps every Army Base candidate on a legal Turn-20-reachable route from the Capital', () => {
   const checked = new Set<string>();
   for (let seed = 1; seed <= 40 && checked.size < ARMY_BASE_CANDIDATES.length; seed += 1) {

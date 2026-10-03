@@ -88,7 +88,11 @@ function computeSectorBranchIds(
   map: Readonly<FixedMap>,
   position: HexCoord,
 ): RoadBranchId[] {
-  const branches = stableBranches(map);
+  return sectorBranchIds(stableBranches(map),position);
+}
+
+/** Shared public geometry; ties belong to every equally near sector. */
+export function sectorBranchIds(branches: ReadonlyArray<{id:string;roadTiles:HexCoord[]}>, position:HexCoord): RoadBranchId[] {
   if (branches.length === 0) return [];
   if (branches.length === 1) return [branches[0]!.id];
   const distances = branches.map((branch) => ({

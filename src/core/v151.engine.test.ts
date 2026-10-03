@@ -11,7 +11,7 @@ import { createAgentObservation } from '../agent/observation';
 import { prepareTestSnapshot } from './testConfig';
 
 function quiet() {
-  return createDefaultConfig({
+  return createDefaultConfig({mapMode:'fixed',
     economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialResources: { food: 10000, civilianGoods: 10000, fuel: 10000, militaryGoods: 10000 } },
     refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 },
     horde: { waves: [{ turn: 100, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
@@ -35,7 +35,7 @@ function load(engine: GameEngine, state: GameState) {
 
 describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
   it('keeps all seven zombie configurations separate and derives human ranks', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const expected = { zombie: [15, 5, 3, 1], hordeZombie: [40, 5, 3, 4], policeZombie: [10, 5, 3, 1], soldierZombie: [20, 10, 5, 1], riotZombie: [75, 5, 3, 1], hunterZombie: [20, 15, 15, 1], gasZombie: [35, 5, 3, 1] };
     for (const type of Object.keys(expected) as Array<keyof typeof expected>) {
       const unit = createUnit(state, type, type, { q: 20, r: 20 });
@@ -50,7 +50,7 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
 
   it('draws Hunter count after the canonical 50 normal positions, without overlap or private leakage', () => {
     for (const seed of [1, 7, 151]) {
-      const state = createInitialState(seed, createDefaultConfig());
+      const state = createInitialState(seed, createDefaultConfig({mapMode:'fixed'}));
       const rng = new SeededRng(seed);
       // New-game setup consumes the seeded Army Base candidate draw first.
       rng.nextInt(0, ARMY_BASE_CANDIDATES.length - 1);
@@ -74,7 +74,7 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
   });
 
   it('rejects unavailable initial placement without reducing count or relaxing distance', () => {
-    expect(() => createInitialState(1, createDefaultConfig({ economy: { initialHunterMinDistance: 100 } }))).toThrow(/Hunter.*valid candidates/);
+    expect(() => createInitialState(1, createDefaultConfig({mapMode:'fixed', economy: { initialHunterMinDistance: 100 } }))).toThrow(/Hunter.*valid candidates/);
     const state = createInitialState(1, quiet());
     const map = { ...state.map, tiles: state.map.tiles.filter((tile) => hexDistance(tile, { q: 25, r: 25 }) < 20) };
     expect(() => generateInitialHunterPositions(map, new SeededRng(1), { initialHunterCount: { min: 1, max: 1 }, initialHunterMinDistance: 20 })).toThrow();
@@ -87,7 +87,7 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
       (config: any) => { config.economy.initialHunterCount = { min: 4, max: 1 }; },
       (config: any) => { delete config.horde.hunterZombieCapPerDirection; },
     ]) {
-      const config = createDefaultConfig(); mutate(config);
+      const config = createDefaultConfig({mapMode:'fixed'}); mutate(config);
       expect(validateGameConfig(config).valid).toBe(false);
     }
   });
@@ -141,14 +141,14 @@ describe('v1.5.1 Hunter, balance and shared Horde charges', () => {
     expect(restored.state).toEqual(state);
     const other = new GameEngine(151, quiet()); load(other, restored.state!);
     expect(other.step({ type: 'EndTurn' })).toEqual(engine.step({ type: 'EndTurn' }));
-    const initial = createInitialState(7, createDefaultConfig());
+    const initial = createInitialState(7, createDefaultConfig({mapMode:'fixed'}));
     expect(decodeSaveCode(encodeSaveCode(initial)).state?.initialHunterPositions).toEqual(initial.initialHunterPositions);
     initial.initialHunterPositions[0]!.q += 1;
-    expect(() => encodeSaveCode(initial)).toThrow(/initial Zombie/);
+    expect(() => encodeSaveCode(initial)).toThrow(/seeded_enemy_placement/);
   });
 
   it('uses the specified v1.6.1 totals and independent special caps in an atomic four-direction wave', () => {
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.hordeZombie, 0)).toBe(66);
     expect(config.horde.waves.reduce((sum, wave) => sum + wave.directionCount * wave.compositionPerDirection.zombie, 0)).toBe(113);
     config.horde.waves = [{ ...config.horde.waves[4]!, turn: 1 }];

@@ -5,7 +5,7 @@ import { createCityPopulationSnapshot, createUnit, synchronizePopulation } from 
 import type { GameState } from './types';
 import { prepareTestSnapshot } from './testConfig';
 
-const quietConfig = () => createDefaultConfig({
+const quietConfig = () => createDefaultConfig({mapMode:'fixed',
   economy: {
     initialZombieCount: 0, initialScreamerCount: 0,
     initialHunterCount: { min: 0, max: 0 },

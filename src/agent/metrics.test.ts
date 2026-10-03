@@ -8,7 +8,7 @@ import type { AgentPublicEvent } from './types';
 
 describe('Agent Metrics', { timeout: 120000 }, () => {
   it('separates infection falls from direct and chained zombie-occupancy destruction by site type', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const observation = createAgentObservation(state);
     const event = (id: string, type: AgentPublicEvent['type'], siteType: string, cause: string): AgentPublicEvent => ({
       id,
@@ -41,7 +41,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
   });
 
   it('collects required game-level values and deterministic action counts', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       maxActionsPerTurn: 4,
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { hordeZombie: { movement: 20, attack: 100 } },
@@ -54,7 +54,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
     expect(run.metrics.actionCounts.EndTurn).toBeGreaterThan(0);
     expect(run.metrics.initialPopulation).toBeGreaterThan(0);
     expect(run.metrics.finalFood).toBeTypeOf('number');
-    expect(run.metrics.bridgeApiVersion).toBe('24.0.0');
+    expect(run.metrics.bridgeApiVersion).toBe('25.0.0');
     expect(run.metrics.refugeeArrivalsByBranch).toHaveProperty('north');
     expect(run.metrics.totalRefugeeArrivals).toBeGreaterThanOrEqual(0);
     expect(run.metrics.maxWorkersInSingleFacility).toBeGreaterThanOrEqual(0);
@@ -132,7 +132,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
   }, 120_000);
 
   it('keeps branch, policy, checkpoint, and supply metrics in the public result', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       maxActionsPerTurn: 1,
       horde: { warningLeadTurns: 1, waves: [{ turn: 3, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
     });
@@ -144,7 +144,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
   }, 120_000);
 
   it('counts policy branch-turns from the Active post only', () => {
-    const config = createDefaultConfig({ maxActionsPerTurn: 1 });
+    const config = createDefaultConfig({mapMode:'fixed', maxActionsPerTurn: 1 });
     const observation = createAgentObservation(createInitialState(4, config));
     const baseCheckpoint = {
       branchId: 'west',
@@ -195,7 +195,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
   });
 
   it('classifies every Military Goods and Emergency Movement metric from public facts', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } });
+    const config = createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } });
     const observation = createAgentObservation(createInitialState(145, config));
     const policeForecast = observation.endTurnForecast.militaryGoods.units.find((unit) => unit.unitType === 'police')!;
     policeForecast.unfilledRefillDemand = 3;
@@ -268,7 +268,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
   });
 
   it('aggregates averages, percentiles, outcomes, and action totals', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       maxActionsPerTurn: 4,
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { hordeZombie: { movement: 20, attack: 100 } },
@@ -287,7 +287,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
   }, 1120_000);
 
   it('can collect a technical-failure metric without pretending it is an in-game loss', () => {
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     const run = runAgentGame(3, {
       strategy: 'random',
       config,
@@ -300,7 +300,7 @@ describe('Agent Metrics', { timeout: 120000 }, () => {
   });
 
   it('keeps turn-limit rows separate from completed games and technical failures', () => {
-    const state = createInitialState(304, createDefaultConfig({ economy: { initialHunterCount: { min: 0, max: 0 } } }));
+    const state = createInitialState(304, createDefaultConfig({mapMode:'fixed', economy: { initialHunterCount: { min: 0, max: 0 } } }));
     const observation = createAgentObservation(state);
     const base = {
       initialObservation: observation,

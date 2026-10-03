@@ -9,7 +9,7 @@ import { BalancedAgent } from './balancedAgent';
 import { createAgentObservation } from './observation';
 
 function scenario() {
-  const config = createDefaultConfig({
+  const config = createDefaultConfig({mapMode:'fixed',
     economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0,
       initialResources: { food: 100000, civilianGoods: 100000, militaryGoods: 100000, fuel: 10000 } },
     facilities: { powerPlant: { production: { powerGeneration: 100 } } },

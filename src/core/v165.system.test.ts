@@ -18,7 +18,7 @@ import { AIR_BASE_CANDIDATES } from './map';
 import { findShortestPath, pathMovementCost } from './path';
 import { effectiveMovementCost } from './terrain';
 
-const config=()=>createDefaultConfig({economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99}});
+const config=()=>createDefaultConfig({mapMode:'fixed',economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99}});
 function load(engine:GameEngine,state:GameState){prepareTestSnapshot(state);expect(engine.step({type:'LoadSnapshot',snapshot:state}).error).toBeNull();}
 function apply(engine:GameEngine,action:GameAction){const result=engine.step(action);expect(result.error).toBeNull();return result.state;}
 function ownedAir(){const settings=config();settings.checkpoint.initialSupplyRadius=50;settings.facilities.powerPlant.production.powerGeneration=100;const engine=new GameEngine(1,settings),state=engine.getState() as GameState,base=state.facilities.find(f=>f.type==='airBase')!;base.owner='player';base.status='owned';base.operationalStatus='operational';base.workers=5;base.infected=0;base.securedOrder=Math.max(...state.facilities.map(f=>f.securedOrder??0))+1;base.populationOperationalTurn=1;base.firstCaptureRewardClaimed=true;state.airBaseObjective={firstCapturedTurn:1,reward:'expired',failureSpawn:'none',fellBeforeCapture:false};load(engine,state);return {engine,base};}

@@ -6,7 +6,7 @@ import { createDefaultConfig } from '../core/config';
 import { createAgentObservation } from '../agent/observation';
 
 it('uses the same visible-entity boundary for Live observations and Replay documents', () => {
-  const observation=createAgentGame().reset({seed:1});
+  const observation=createAgentGame().reset({mapMode:'fixed',seed:1});
   const enemy=observation.zombies[0]!;
   expect(enemy).toBeDefined();
   const frame=publicBoardFrame(observation);
@@ -17,7 +17,7 @@ it('uses the same visible-entity boundary for Live observations and Replay docum
 });
 
 it('draws air after ground even when public ID ordering places the helicopter first, and omits cargo',()=>{
-  const state=createInitialState(1,createDefaultConfig());
+  const state=createInitialState(1,createDefaultConfig({mapMode:'fixed'}));
   const heli=createUnit(state,'a-aircraft','multipurposeHelicopter',{q:25,r:25});heli.flightState='airborne';heli.movementDomain='air';heli.movement=50;heli.cargoUnitId='cargo';
   const cargo=createUnit(state,'cargo','police',heli.position);cargo.transportedByUnitId=heli.id;
   state.units=[heli,cargo,createUnit(state,'z-ground','police',heli.position)];

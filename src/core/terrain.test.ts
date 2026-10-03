@@ -6,7 +6,7 @@ import { terrainAdjustedDamage, terrainDefenseAt } from './terrain';
 
 describe('v1.4 terrain defense', () => {
   it('gives Urban defense to either side and Forest defense only to zombies', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const police = state.units.find((unit) => unit.type === 'police')!;
     const zombie = state.units.find((unit) => unit.type === 'zombie')!;
     police.position = { q: 4, r: 4 };
@@ -20,7 +20,7 @@ describe('v1.4 terrain defense', () => {
   });
 
   it('applies the shared calculation to normal combat and records mitigation', () => {
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     const snapshot = createInitialState(1, config);
     const police = snapshot.units.find((unit) => unit.type === 'police')!;
     const zombie = snapshot.units.find((unit) => unit.type === 'zombie')!;
@@ -36,7 +36,7 @@ describe('v1.4 terrain defense', () => {
   });
 
   it('counts actual entered base terrain rather than static map composition', () => {
-    const engine = new GameEngine(2, createDefaultConfig());
+    const engine = new GameEngine(2, createDefaultConfig({mapMode:'fixed'}));
     expect(engine.getState().statistics.terrainEntriesByType).toEqual({ plain: 0, forest: 0, mountain: 0, water: 0 });
     const action = engine.getLegalActions().find((candidate) => candidate.type === 'Move')!;
     const result = engine.step(action);

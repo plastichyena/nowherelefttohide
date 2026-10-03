@@ -20,7 +20,7 @@ function synchronizePopulation(state: ReturnType<typeof createInitialState>): vo
 
 describe('GameEngine', () => {
   it('creates a complete deterministic initial state', () => {
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     const first = createInitialState(42, config);
     const second = createInitialState(42, config);
     expect(first).toEqual(second);
@@ -38,7 +38,7 @@ describe('GameEngine', () => {
   });
 
   it('does not mutate the state for an invalid action', () => {
-    const engine = new GameEngine(7, createDefaultConfig());
+    const engine = new GameEngine(7, createDefaultConfig({mapMode:'fixed'}));
     const before = engine.getState();
     const result = engine.step({ type: 'Move', unitId: 'police-1', destination: { q: 99, r: 99 } });
     expect(result.error?.code).toBe('outside_map');
@@ -46,7 +46,7 @@ describe('GameEngine', () => {
   });
 
   it('rejects snapshots with a broken fixed map or stale derived population', () => {
-    const engine = new GameEngine(71, createDefaultConfig());
+    const engine = new GameEngine(71, createDefaultConfig({mapMode:'fixed'}));
     const before = engine.getState();
     const brokenMap = engine.getState() as ReturnType<typeof createInitialState>;
     brokenMap.map.tiles = [];
@@ -65,7 +65,7 @@ describe('GameEngine', () => {
   });
 
   it('detects an unexplained population change in the conservation ledger', () => {
-    const state = createInitialState(70, createDefaultConfig());
+    const state = createInitialState(70, createDefaultConfig({mapMode:'fixed'}));
     state.facilities.find((facility) => facility.id === 'capital')!.workers += 1;
     synchronizeDerivedPopulation(state);
     const result = validateInvariants(state);
@@ -74,7 +74,7 @@ describe('GameEngine', () => {
   });
 
   it('provides an interception preview and stops movement on interception', () => {
-    const engine = new GameEngine(7, createDefaultConfig());
+    const engine = new GameEngine(7, createDefaultConfig({mapMode:'fixed'}));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units.find((unit) => unit.type === 'zombie')!.position = { q: 25, r: 23 };
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
@@ -89,7 +89,7 @@ describe('GameEngine', () => {
   });
 
   it('captures an empty disconnected facility by entering it', () => {
-    const engine = new GameEngine(8, createDefaultConfig());
+    const engine = new GameEngine(8, createDefaultConfig({mapMode:'fixed'}));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units.find((unit) => unit.id === 'police-1')!.position = { q: 25, r: 22 };
     expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
@@ -100,7 +100,7 @@ describe('GameEngine', () => {
   });
 
   it('processes a complete end turn, spawns the Final Horde, and continues', () => {
-    const config = createDefaultConfig({ horde: singleFinalWave(1) });
+    const config = createDefaultConfig({mapMode:'fixed', horde: singleFinalWave(1) });
     const engine = new GameEngine(11, config);
     const result = engine.step({ type: 'EndTurn' });
     expect(result.error).toBeNull();
@@ -110,7 +110,7 @@ describe('GameEngine', () => {
   });
 
   it('uses the same engine path for headless legal actions', () => {
-    const engine = new GameEngine(99, createDefaultConfig({
+    const engine = new GameEngine(99, createDefaultConfig({mapMode:'fixed',
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: singleFinalWave(100, { hordeZombie: 1, zombie: 0 }),
     }));
@@ -122,7 +122,7 @@ describe('GameEngine', () => {
   });
 
   it('reserves units and completes them at the following player turn start', () => {
-    const engine = new GameEngine(31, createDefaultConfig({ horde: singleFinalWave(3) }));
+    const engine = new GameEngine(31, createDefaultConfig({mapMode:'fixed', horde: singleFinalWave(3) }));
     const before = engine.getState();
     expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 25, r: 25 } }).error).toBeNull();
     expect(engine.getState().pendingUnitProductions).toHaveLength(1);
@@ -133,7 +133,7 @@ describe('GameEngine', () => {
   });
 
   it('uses configured unit populations for recruitment, legal actions, and completion', () => {
-    const engine = new GameEngine(32, createDefaultConfig({
+    const engine = new GameEngine(32, createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(3),
       units: {
         police: { population: 6 },
@@ -168,7 +168,7 @@ describe('GameEngine', () => {
   });
 
   it('does not expose recruitment when configured population exceeds eligible city supply', () => {
-    const engine = new GameEngine(33, createDefaultConfig({
+    const engine = new GameEngine(33, createDefaultConfig({mapMode:'fixed',
       units: { police: { population: 42 } },
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
     }));
@@ -179,7 +179,7 @@ describe('GameEngine', () => {
   });
 
   it('builds a cardinal road checkpoint and resolves pass-through refugees', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(3),
       economy: { initialHunterCount: { min: 0, max: 0 } },
       refugees: { arrivalIntervalMin: 1, arrivalIntervalMax: 1, arrivalPeopleMin: 2, arrivalPeopleMax: 2, screeningCapacity: 2 },
@@ -199,7 +199,7 @@ describe('GameEngine', () => {
   });
 
   it('uses same-turn food and civilian production before maintenance shortages', () => {
-    const engine = new GameEngine(3, createDefaultConfig());
+    const engine = new GameEngine(3, createDefaultConfig({mapMode:'fixed'}));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.resources.food = 0;
     snapshot.resources.civilianGoods = 0;
@@ -211,7 +211,7 @@ describe('GameEngine', () => {
   });
 
   it('spawns a periodic Horde before the distinct Final Horde', () => {
-    const engine = new GameEngine(55, createDefaultConfig({
+    const engine = new GameEngine(55, createDefaultConfig({mapMode:'fixed',
       horde: {
         warningLeadTurns: 1,
         waves: [
@@ -236,7 +236,7 @@ describe('GameEngine', () => {
   });
 
   it('stops infection spread for a facility after stationed suppression, even with infected people remaining', () => {
-    const engine = new GameEngine(101, createDefaultConfig({
+    const engine = new GameEngine(101, createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(3),
       economy: { initialHunterCount: { min: 0, max: 0 } },
     }));
@@ -256,7 +256,7 @@ describe('GameEngine', () => {
   });
 
   it('stops checkpoint infection spread for a stationed suppressing unit', () => {
-    const engine = new GameEngine(102, createDefaultConfig({
+    const engine = new GameEngine(102, createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(3),
       economy: { initialHunterCount: { min: 0, max: 0 } },
     }));
@@ -287,7 +287,7 @@ describe('GameEngine', () => {
   });
 
   it('loses an empty capital when a zombie occupies it', () => {
-    const config = createDefaultConfig({ horde: singleFinalWave(3), units: { zombie: { movement: 0 } } });
+    const config = createDefaultConfig({mapMode:'fixed', horde: singleFinalWave(3), units: { zombie: { movement: 0 } } });
     const engine = new GameEngine(103, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     const zombie = snapshot.units.find((unit) => unit.type === 'zombie')!;
@@ -306,7 +306,7 @@ describe('GameEngine', () => {
   });
 
   it('resolves counterattacks, prevents a counter from a destroyed defender, and blocks post-attack movement', () => {
-    const engine = new GameEngine(104, createDefaultConfig({ horde: singleFinalWave(3), economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(104, createDefaultConfig({mapMode:'fixed', horde: singleFinalWave(3), economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     const zombie = createUnit(snapshot, 'zombie-test', 'zombie', { q: 25, r: 24 });
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
@@ -337,7 +337,7 @@ describe('GameEngine', () => {
   });
 
   it('uses Config rest-recovery rounding after a non-combat turn', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(3),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 2000, civilianGoods: 2000, militaryGoods: 2000, fuel: 2000 } },
       naturalRecovery: { combatRate: 0.1, restRate: 0.2, rounding: 'floor' },
@@ -353,7 +353,7 @@ describe('GameEngine', () => {
   });
 
   it('rejects both worker assignment directions at an infected facility', () => {
-    const engine = new GameEngine(106, createDefaultConfig());
+    const engine = new GameEngine(106, createDefaultConfig({mapMode:'fixed'}));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     const farm = snapshot.facilities.find((facility) => facility.id === 'farm-1')!;
     farm.workers = 22;
@@ -365,7 +365,7 @@ describe('GameEngine', () => {
   });
 
   it('forecasts and resolves fuel-backed power allocation without mutation', () => {
-    const config = createDefaultConfig({ horde: singleFinalWave(3), economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } });
+    const config = createDefaultConfig({mapMode:'fixed', horde: singleFinalWave(3), economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } });
     const engine = new GameEngine(107, config);
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
@@ -401,7 +401,7 @@ describe('GameEngine', () => {
   });
 
   it('blocks a range-2 national-guard attack when that unit carries fewer than two military goods', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(100),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 2000, civilianGoods: 2000, militaryGoods: 0, fuel: 2000 } },
     });
@@ -419,7 +419,7 @@ describe('GameEngine', () => {
   });
 
   it('keeps a started screening batch on its original policy and resolves all three policies', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(8),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
       refugees: { arrivalIntervalMin: 8, arrivalIntervalMax: 8, arrivalPeopleMin: 1, arrivalPeopleMax: 1, screeningCapacity: 4 },
@@ -464,7 +464,7 @@ describe('GameEngine', () => {
   });
 
   it('overruns and recovers a facility through infection, and loses immediately when the capital falls', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(4),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
       units: { zombie: { movement: 0 } },
@@ -505,7 +505,7 @@ describe('GameEngine', () => {
   });
 
   it('preserves the road arrival schedule after a ruined checkpoint is recovered', () => {
-    const engine = new GameEngine(114, createDefaultConfig({
+    const engine = new GameEngine(114, createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(10),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
     }));
@@ -534,7 +534,7 @@ describe('GameEngine', () => {
   });
 
   it('applies fixed and seeded disconnected-facility population Config without treating it as player workers', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       initialFacilityPopulation: {
         'farm-2': { survivors: 7, infected: 3 },
         'city-2': { survivorRange: { min: 4, max: 4 }, infectedRange: { min: 2, max: 2 } },
@@ -552,7 +552,7 @@ describe('GameEngine', () => {
   });
 
   it('uses the seeded RNG when a production order has multiple nearest spawn tiles', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(100),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 2000, civilianGoods: 2000, militaryGoods: 2000, fuel: 2000 } },
     });
@@ -579,7 +579,7 @@ describe('GameEngine', () => {
   });
 
   it('spawns increasing periodic Hordes followed by the configured Final Horde', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
       horde: {
         warningLeadTurns: 1,
@@ -601,7 +601,7 @@ describe('GameEngine', () => {
   });
 
   it('freezes deterministic supply and reception rankings for the whole player turn', () => {
-    const engine = new GameEngine(201, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(201, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     for (const [id, workers] of [['city-1', 20], ['city-2', 20]] as const) {
       const city = snapshot.facilities.find((facility) => facility.id === id)!;
@@ -629,7 +629,7 @@ describe('GameEngine', () => {
   });
 
   it('moves production workers atomically through frozen city supply and reception order', () => {
-    const engine = new GameEngine(202, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(202, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const before = engine.getState();
     const ledgerBefore = populationLedgerTotal(before as ReturnType<typeof createInitialState>);
     expect(engine.step({ type: 'AssignWorkers', facilityId: 'farm-1', workers: 30 }).error).toBeNull();
@@ -645,7 +645,7 @@ describe('GameEngine', () => {
   });
 
   it('fills reception cities to their soft caps, then balances occupancy ratios', () => {
-    const engine = new GameEngine(209, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(209, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     const populations: Record<string, number> = { capital: 100, 'city-1': 49, 'city-2': 50 };
     for (const [id, workers] of Object.entries(populations)) {
@@ -667,7 +667,7 @@ describe('GameEngine', () => {
   });
 
   it('keeps newly secured production facilities unavailable until the next player turn', () => {
-    const engine = new GameEngine(203, createDefaultConfig({
+    const engine = new GameEngine(203, createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(3),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       vision: { capital: 50 },
@@ -684,7 +684,7 @@ describe('GameEngine', () => {
   });
 
   it('applies city soft caps to production and exact overcrowding forecasts', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(2),
       economy: {
         initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },
@@ -714,7 +714,7 @@ describe('GameEngine', () => {
   });
 
   it('adds local overcrowding costs from three cities without a national multiplier', () => {
-    const engine = new GameEngine(210, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(210, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const snapshot = engine.getState() as ReturnType<typeof createInitialState>;
     snapshot.facilities.find((facility) => facility.id === 'capital')!.workers = 110;
     for (const id of ['city-1', 'city-2']) {
@@ -735,7 +735,7 @@ describe('GameEngine', () => {
   });
 
   it('enforces recruitment hubs, supply-order conscription, and the last-civilian guard', () => {
-    const engine = new GameEngine(205, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(205, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     expect(engine.step({ type: 'ProduceUnit', unitType: 'police', destination: { q: 23, r: 25 } }).error?.code).toBe('unit_not_producible_here');
     expect(engine.step({ type: 'ProduceUnit', unitType: 'nationalGuard', destination: { q: 25, r: 25 } }).error).toBeNull();
     expect(engine.getState().facilities.find((facility) => facility.id === 'capital')?.workers).toBe(31);
@@ -753,7 +753,7 @@ describe('GameEngine', () => {
   });
 
   it('uses the specified three-pool infection orders and auto-places approved refugees', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(3),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
       units: { zombie: { movement: 0 } },
@@ -788,7 +788,7 @@ describe('GameEngine', () => {
   });
 
   it('rolls only the newly approved batch at a blocked checkpoint and defers its spread to the next EndTurn', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(2),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 5000, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
       refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 },
@@ -815,7 +815,7 @@ describe('GameEngine', () => {
   });
 
   it('spreads checkpoint internal infection waiting-first while same-turn food production prevents losses', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(1),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialResources: { food: 100, civilianGoods: 5000, militaryGoods: 5000, fuel: 5000 } },
     });

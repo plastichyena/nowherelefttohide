@@ -10,7 +10,7 @@ function cloneState(state: Readonly<GameState>): GameState {
 }
 
 function reserveEngine(seed: number): GameEngine {
-  return new GameEngine(seed, createDefaultConfig({
+  return new GameEngine(seed, createDefaultConfig({mapMode:'fixed',
     horde: singleFinalWave(100),
     economy: {
       initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },

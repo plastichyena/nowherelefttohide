@@ -21,7 +21,7 @@ import {
 } from './save';
 
 function initialState(seed = 42): GameState {
-  return createInitialState(seed, createDefaultConfig());
+  return createInitialState(seed, createDefaultConfig({mapMode:'fixed'}));
 }
 
 class MemoryStorage implements StorageLike {
@@ -129,7 +129,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 26,
+      formatVersion: 27,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-51x51-v9',
       seed: 77,
@@ -242,9 +242,9 @@ describe('v1.6.0 Save Format 17', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(26);
-    expect(envelope.gameVersion).toBe('19.0.0');
-    expect(config.version).toBe('19.0.0');
+    expect(envelope.formatVersion).toBe(27);
+    expect(envelope.gameVersion).toBe('20.0.0');
+    expect(config.version).toBe('20.0.0');
     expect(config.mapId).toBe('fixed-51x51-v9');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);
@@ -438,7 +438,7 @@ describe('v1.6.0 Save Format 17', () => {
   });
 
   it('preserves terrain, Horde Zombie target state, Final Horde group, and Victory fields', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 } },
       horde: {
         warningLeadTurns: 1,
@@ -463,7 +463,7 @@ describe('v1.6.0 Save Format 17', () => {
   });
 
   it('rejects duplicate or missing Pending Wave rosters that disagree with a public Wave count', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 } },
       horde: {
         warningLeadTurns: 1,
@@ -524,7 +524,7 @@ describe('v1.6.0 Save Format 17', () => {
   });
 
   it('persists Unit Fuel and Wind / Constructible Facility state without derived Forecast fields', () => {
-    const engine = new GameEngine(73, createDefaultConfig());
+    const engine = new GameEngine(73, createDefaultConfig({mapMode:'fixed'}));
     const candidate = engine.getConstructibleFacilityPositionCandidates('simpleFarm').find((entry) => entry.legal)!;
     const built = engine.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: candidate.position });
     expect(built.error).toBeNull();
@@ -572,7 +572,7 @@ describe('v1.6.0 Save Format 17', () => {
 
     expect(result.valid).toBe(false);
     expect(result.state).toBeNull();
-    expect(result.errors.join(' ')).toMatch(/initial Zombie positions and order.*seed/i);
+    expect(result.errors.join(' ')).toMatch(/seeded_enemy_placement/i);
   });
 
   it('re-derives identical checkpoint candidates after load without storing them in GameState', () => {
@@ -600,7 +600,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
     expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.3\.0/i);
-    expect(result.errors.join(' ')).toContain('v1.6.6 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toContain('v1.6.9 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 

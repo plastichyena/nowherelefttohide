@@ -9,7 +9,7 @@ import { previewMove } from './movement-query';
 import { validateInvariants } from './invariants';
 import type { GameAction, GameState } from './types';
 
-export const quiet165 = () => createDefaultConfig({economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99}});
+export const quiet165 = () => createDefaultConfig({mapMode:'fixed',economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99}});
 function fixture(fuel=500) {
   const engine=new GameEngine(1,quiet165()); const state=engine.getState() as GameState;
   state.units=[createUnit(state,'heli','multipurposeHelicopter',{q:25,r:25},'ready','recruit'),createUnit(state,'troop','police',{q:24,r:25})];

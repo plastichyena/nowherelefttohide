@@ -1,5 +1,6 @@
 import type { AgentObservation, AgentPublicEvent } from './types';
 import { facilityChanges } from './facility-changes';
+import { sectorBranchIds } from '../core/supply';
 
 export interface ImportantChange {
   id: string;
@@ -16,9 +17,13 @@ export interface ChangeDecision { decision: number; changes: readonly ImportantC
 const severity = { critical: 0, warning: 1, advisory: 2 };
 
 /** Session guidance derived only from the existing public supply projection. */
-export function checkpointSupplyExplanation(observation: Pick<AgentObservation, 'supply'>, branchId: string, revision: number) {
+export function checkpointSupplyExplanation(observation: Pick<AgentObservation, 'supply'> & Partial<Pick<AgentObservation,'facilities'|'map'|'roadBranches'>>, branchId: string, revision: number) {
   return {
     center: 'capital' as const,
+    capitalPosition: observation.facilities?.find(f=>f.type==='capital')?.position ?? {q:25,r:25},
+    sector: branchId,
+    affectedFacilityIds: observation.roadBranches ? observation.facilities?.filter(f=>sectorBranchIds(observation.roadBranches!.map(b=>({id:b.branchId,roadTiles:b.roadTiles})),f.position).includes(branchId)).map(f=>f.id) ?? null : null,
+    roadReachabilityIsSeparate: true,
     scope: 'branch_sector' as const,
     radiusRule: 'max(initialRadius, capitalToActiveCheckpointHexDistance)',
     initialRadius: observation.supply.initialRadius,

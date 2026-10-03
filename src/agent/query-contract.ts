@@ -1,3 +1,4 @@
+import { QUERY_SCHEMA_VERSION } from '../core/versions';
 import type {
   BaseTerrain,
   CheckpointPolicy,
@@ -256,7 +257,7 @@ function responseEnvelope(target: PublicQueryTarget, spec: TargetResponseSpec): 
 export function publicQueryContract() {
   const listFields = ['sessionId', 'revision', 'target', 'count', 'total', 'hasMore', 'nextCursor', 'items'];
   return {
-    schemaFormat: 'JSON Schema', schemaVersion: '2020-12', contractVersion: '1.2.0',
+    schemaFormat: 'JSON Schema', schemaVersion: '2020-12', contractVersion: QUERY_SCHEMA_VERSION,
     requestEnvelopes: {
       programmatic: { required: ['target'], optional: ['expectedRevision', 'cursor', 'pageSize', 'filters'], fields: { target: { enum: Object.keys(QUERY_FILTER_SCHEMAS) }, expectedRevision: { type: 'integer', minimum: 0 }, cursor: string, pageSize: { type: 'integer', minimum: 1, maximum: 500, default: 100 }, filters: { type: 'object', default: {} } } },
       cliInputFile: 'The --input JSON file contains the selected target filter object directly.',

@@ -33,7 +33,7 @@ const QUIET_CONFIG: DeepPartial<GameConfig> = {
 };
 
 function quietConfig(overrides: DeepPartial<GameConfig> = {}): GameConfig {
-  return createDefaultConfig({ ...QUIET_CONFIG, ...overrides });
+  return createDefaultConfig({mapMode:'fixed', ...QUIET_CONFIG, ...overrides });
 }
 
 function resetLedgerBaseline(state: GameState): void {
@@ -59,15 +59,15 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
       checkpoint: CHECKPOINT_SCHEMA_VERSION,
       map: FIXED_MAP_ID,
     }).toEqual({
-      app: '1.6.9', rules: '19.0.0', save: 26, publicSave: '26',
-      agent: '24.0.0', observation: '24.0.0', bridge: '24.0.0', artifact: '23.0.0',
-      session: '20.0.0', checkpoint: '20.0.0', map: 'fixed-51x51-v9',
+      app: '1.7.0', rules: '20.0.0', save: 27, publicSave: '27',
+      agent: '25.0.0', observation: '25.0.0', bridge: '25.0.0', artifact: '24.0.0',
+      session: '21.0.0', checkpoint: '21.0.0', map: 'fixed-51x51-v9',
     });
   });
 
   it('uses one seed-selected Oil Field and deterministic neutral survivors without consuming gameplay RNG', () => {
-    const first = createInitialState(16101, createDefaultConfig());
-    const second = createInitialState(16101, createDefaultConfig());
+    const first = createInitialState(16101, createDefaultConfig({mapMode:'fixed'}));
+    const second = createInitialState(16101, createDefaultConfig({mapMode:'fixed'}));
     expect(second).toEqual(first);
     expect(first.facilities.filter((facility) => facility.type === 'oilField')).toHaveLength(1);
     const neutral = first.facilities.filter((facility) => facility.owner === 'none' && facility.type !== 'nuclearPowerPlant');
@@ -77,7 +77,7 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
   });
 
   it('places 40 Normal Zombies away from Capital and outside the selected Army Base vision', () => {
-    const state = createInitialState(16102, createDefaultConfig());
+    const state = createInitialState(16102, createDefaultConfig({mapMode:'fixed'}));
     const capital = state.facilities.find((facility) => facility.type === 'capital')!;
     const base = state.facilities.find((facility) => facility.type === 'armyBase')!;
     const normals = state.units.filter((unit) => unit.type === 'zombie');
@@ -139,7 +139,7 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
 
   it('emits each Screamer pulse once and keeps exact radius out of public events and Config', () => {
     const game = createAgentGame();
-    game.reset({
+    game.reset({mapMode:'fixed',
       seed: 16106,
       configOverrides: {
         economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } },
@@ -160,13 +160,13 @@ describe('v1.6.1 acceptance', { timeout: 30_000 }, () => {
       message: { ja: '悍ましい叫び声(特大ノイズ)', en: 'Horrifying scream (extra-large noise)' },
     });
     expect(JSON.stringify(screams)).not.toMatch(/radius|position|source/i);
-    const publicConfig = createAgentPublicConfig(createDefaultConfig()) as unknown as Record<string, unknown>;
+    const publicConfig = createAgentPublicConfig(createDefaultConfig({mapMode:'fixed'})) as unknown as Record<string, unknown>;
     expect(JSON.stringify(publicConfig)).not.toContain('screamRadius');
     expect(JSON.stringify(publicConfig)).not.toContain('"noiseRadius":6');
   });
 
   it('round-trips all v1.6.1 state fields in Save 18 without rerolling', () => {
-    const state = createInitialState(16107, createDefaultConfig());
+    const state = createInitialState(16107, createDefaultConfig({mapMode:'fixed'}));
     clearScenarioCheckpoints(state);
     resetLedgerBaseline(state);
     const code = encodeSaveCode(state);

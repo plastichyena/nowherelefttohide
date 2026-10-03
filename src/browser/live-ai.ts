@@ -1,4 +1,6 @@
 import type { WebMcpRegistration } from './webmcp';
+import {mapStartFields,bindMapStart,readMapStart,generateGame} from '../ui/map-start';
+import {resolveScenario} from '../core/scenarios';
 import { PublicBoardRenderer, publicBoardFrame, presentationBoardFrame } from '../ui/publicBoard';
 import { TurnPlayback, turnPresentation, createPlaybackControls } from '../ui/turnPlayback';
 import type { AgentObservation } from '../agent/types';
@@ -89,6 +91,7 @@ export class LiveAiViewer {
       <button type="button" class="live-ai-launcher">${ja?'AIプレイ・観戦':'AI Play / Watch'}</button>
       <section class="live-ai-panel" hidden aria-label="${ja?'AIプレイ・観戦':'AI Play / Watch'}">
         <header><strong>${ja?'AIプレイ・観戦':'AI Play / Watch'}</strong><span class="live-ai-state">${ja?'開始前':'not started'}</span></header>
+        <form class="live-map-start settings-form"><label>Seed<input name="seed" type="number" step="1" value="1"></label>${mapStartFields(ja)}</form>
         <div class="live-ai-controls">
           <button type="button" data-live-ai="start">${ja?'開始':'Start'}</button>
           <button type="button" data-live-ai="balanced">${ja?'内蔵AIを観戦':'Balanced AI'}</button>
@@ -116,6 +119,8 @@ export class LiveAiViewer {
     this.log = this.host.querySelector('.live-ai-log')!;
     this.omitted = this.host.querySelector('.live-ai-omitted')!;
     this.state = this.host.querySelector('.live-ai-state')!;
+    bindMapStart(this.host.querySelector<HTMLFormElement>('.live-map-start')!,'una');
+    this.host.querySelector('form')!.addEventListener('submit',e=>e.preventDefault());
     new MutationObserver(()=>this.refreshLocale()).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
     const appRoot = document.querySelector<HTMLElement>('#app');
     const syncTitleVisibility = (): void => {
@@ -136,11 +141,18 @@ export class LiveAiViewer {
   public setRegistration(registration: WebMcpRegistration): void { this.registration = registration; this.refreshDiagnostics(); }
   private refreshLocale():void {
     const ja=locale()==='ja', title=ja?'AIプレイ・観戦':'AI Play / Watch';
+    const form=this.host.querySelector<HTMLFormElement>('.live-map-start')!;
+    if(!form.querySelector('progress')){
+      const values=new FormData(form);
+      form.innerHTML=`<label>Seed<input name="seed" type="number" step="1" value="1"></label>${mapStartFields(ja)}`;
+      for(const [name,value] of values){const control=form.elements.namedItem(name);if(control instanceof HTMLInputElement||control instanceof HTMLSelectElement)control.value=String(value);}
+      bindMapStart(form,'una');
+    }
     this.launcher.textContent=title;this.panel.setAttribute('aria-label',title);
     this.panel.querySelector('header strong')!.textContent=title;
     const labels:Record<string,[string,string]>={start:['開始','Start'],balanced:['内蔵AIを観戦','Balanced AI'],pause:['一時停止','Pause'],resume:['再開','Resume'],export:['ZIPを書き出す','Export ZIP'],end:['終了','End'],close:['閉じる','Close'],smoke:['読み取り専用の接続テスト','Read-only Self Test'],fit:['全体','Fit']};
     for(const [key,pair] of Object.entries(labels))this.panel.querySelector(`[data-live-ai="${key}"]`)!.textContent=pair[ja?0:1];
-    const summaries=this.panel.querySelectorAll('details > summary');
+    const summaries=this.panel.querySelectorAll(':scope > details > summary');
     summaries[0]!.textContent=ja?'WebMCP接続診断':'WebMCP diagnostics';summaries[1]!.textContent=ja?'判断ログ':'Decision log';
     this.playbackControls.querySelector('strong')!.textContent=ja?'ゾンビターン':'Zombie turn';
     this.playbackControls.querySelector('button')!.textContent=ja?'演出をスキップ':'Skip animation';
@@ -189,10 +201,21 @@ export class LiveAiViewer {
     if(this.latestObservation)this.board.setFrame(publicBoardFrame(this.latestObservation));
   }
 
-  private async start(): Promise<void> {
+  private async start(): Promise<boolean> {
+    const form=this.host.querySelector<HTMLFormElement>('.live-map-start')!;
+    const ja=locale()==='ja';
+    const input=readMapStart(form), resolved=resolveScenario({...input,scenarioId:'una'});
+    const progress=document.createElement('section');progress.innerHTML=`<progress></progress><p role="status"></p><button type="button">${ja?'キャンセル':'Cancel'}</button>`;
+    form.append(progress);
+    const task=generateGame(resolved.seed,resolved.config,p=>{progress.querySelector('p')!.textContent=`${p.stage} ${p.attempt}/${p.maxAttempts}`;});
+    progress.querySelector('button')!.addEventListener('click',()=>task.cancel(),{once:true});
+    const buttons=[...this.host.querySelectorAll<HTMLButtonElement>('[data-live-ai="start"],[data-live-ai="balanced"]')];buttons.forEach(b=>b.disabled=true);
+    let preparedInitialState;
+    try{preparedInitialState=await task.promise;}catch(error){this.result.textContent=String(error);return false;}
+    finally{progress.remove();buttons.forEach(b=>b.disabled=false);}
     this.builtInGeneration++;this.builtInRunning=false;
     this.cancelPlayback();
-    this.session = createAiSession(liveAiSessionOptions(this.options, locale()));
+    this.session = createAiSession({...liveAiSessionOptions(this.options, locale()),preparedInitialState});
     const artifact = this.session.buildPublicArtifact();
     if (artifact.ok) {
       this.latestObservation = artifact.artifact.finalObservation;
@@ -207,11 +230,12 @@ export class LiveAiViewer {
     this.omittedDecisions = 0;
     this.logBytes = 0;
     this.updateOmitted();
+    return true;
   }
 
   /** Built-in policy consumes the same public session and display queue as WebMCP. */
   private async startBalanced():Promise<void> {
-    await this.start();
+    if(!await this.start())return;
     const token=++this.builtInGeneration;this.builtInRunning=true;
     const {BalancedAgent}=await import('../agent/balancedAgent');const agent=new BalancedAgent();
     let decision=0;

@@ -1,3 +1,4 @@
+import { createDefaultConfig as v170FixedConfig } from './config';
 import { describe, expect, it } from 'vitest';
 import { GameEngine, validateAction } from './engine';
 import { createDefaultConfig } from './config';
@@ -7,11 +8,11 @@ import { getPlayerVisionCoverage } from './visibility';
 import { withReadOnlyQueryScope } from './query-cache';
 import type { GameState } from './types';
 
-const config = () => createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } });
+const config = () => createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } });
 
 describe('v1.5.2 committed query isolation', () => {
   it('shares public entity projections without exposing hidden enemies or mutable references', () => {
-    const engine = new GameEngine(1);
+    const engine = new GameEngine(1, v170FixedConfig({mapMode:'fixed'}));
     const query = engine.getQuery();
     const state = engine.getState();
     const unit = state.units.find(unit => unit.isPlayerUnit)!;

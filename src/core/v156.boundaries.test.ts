@@ -13,7 +13,7 @@ import type { GameState, UnitType } from './types';
 import spacing from '../testing/fixtures/v156-spacing.json';
 import { validateInvariants } from './invariants';
 
-const fresh = () => createInitialState(1, createDefaultConfig());
+const fresh = () => createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
 const movement = (overrides = {}) => createMovement({ resolveOverrun: () => { throw new Error("Unexpected IFV"); }, emitMoveNoise: () => { throw new Error("Unexpected IFV"); }, emergencyLand: () => { throw new Error('Unexpected aircraft in ground fixture'); }, interceptorsAt: () => [], interceptArmyBase: () => false, resolveCombat: () => {}, tryCapture: () => {}, ...overrides });
 const addWall = (s: GameState, p = { q: 26, r: 24 }, hp = 10) => s.barbedWire.push({ id: `wall-${s.barbedWire.length}`, position: p, hp, maxHp: 20, builtTurn: 1 });
 
@@ -113,7 +113,7 @@ describe('v1.5.6 obstacle boundaries', () => {
   });
 
   it('rejects facilities on walls and rebuilding beside an enemy without mutating state', () => {
-    const e = new GameEngine(1, createDefaultConfig()); const c = wireCandidates(e.getState()).find(c => c.legal)!;
+    const e = new GameEngine(1, createDefaultConfig({mapMode:'fixed'})); const c = wireCandidates(e.getState()).find(c => c.legal)!;
     expect(e.step({ type: 'BuildBarbedWire', position: c.position }).error).toBeNull();
     const before = e.getState();
     expect(e.step({ type: 'BuildConstructibleFacility', facilityType: 'simpleFarm', position: c.position }).error).not.toBeNull();
@@ -124,7 +124,7 @@ describe('v1.5.6 obstacle boundaries', () => {
   });
 
   it('retains ordinary counterattacks and Human combat noise when a wall takes all counter damage', () => {
-    const e = new GameEngine(1, createDefaultConfig()); const s = e.getState() as GameState;
+    const e = new GameEngine(1, createDefaultConfig({mapMode:'fixed'})); const s = e.getState() as GameState;
     const human = s.units.find(u => u.type === 'police')!; human.position = wireCandidates(s).find(c => c.legal)!.position;
     s.units = s.units.filter(u => u.isPlayerUnit);
     const z = createUnit(s, 'test-zombie', 'riotZombie', { q: human.position.q + 1, r: human.position.r }); s.units.push(z); addWall(s, human.position);

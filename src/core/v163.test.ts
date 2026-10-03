@@ -12,7 +12,7 @@ import { hexDistance, hexKey } from './hex';
 import { healthTransition, internalInfectionRisk, waitingProbability, screeningProbability, starvationAllocation, addInfectionGrace, consumeInfected, graceCount, binomial, domainRng } from './public-health';
 import type { GameState } from './types';
 
-const quiet = () => createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0, initialResources: { food: 100000, civilianGoods: 100000, militaryGoods: 100000, fuel: 100000 } }, refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 } });
+const quiet = () => createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0, initialResources: { food: 100000, civilianGoods: 100000, militaryGoods: 100000, fuel: 100000 } }, refugees: { arrivalIntervalMin: 99, arrivalIntervalMax: 99 } });
 function load(engine: GameEngine, state: GameState) { prepareTestSnapshot(state); const result=engine.step({ type: 'LoadSnapshot', snapshot: state }); expect(result.error,result.error?.message).toBeNull(); }
 
 describe('v1.6.3 health equations', () => {

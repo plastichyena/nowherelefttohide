@@ -10,7 +10,7 @@ import { beginTurnPresentation,capturePresentation,presentationActor,finishTurnP
 import { hexKey,hexDistance } from './hex';
 import { getPlayerVisibleTileKeys } from './visibility';
 
-const config=()=>createDefaultConfig({economy:{initialZombieCount:0,initialScreamerCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0}},horde:singleFinalWave(200)});
+const config=()=>createDefaultConfig({mapMode:'fixed',economy:{initialZombieCount:0,initialScreamerCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0}},horde:singleFinalWave(200)});
 function load(state:GameState){prepareTestSnapshot(state);const e=new GameEngine(state.seed,state.config);expect(e.step({type:'LoadSnapshot',snapshot:state}).error).toBeNull();return e;}
 
 describe('v1.6.8 public contracts',()=>{

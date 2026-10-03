@@ -1,3 +1,4 @@
+import { createDefaultConfig as v170FixedConfig } from '../core/config';
 import { describe, expect, it, vi } from 'vitest';
 
 // The controller imports the Phaser adapter, but these view-model helpers are
@@ -61,14 +62,14 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.6.9');
-    expect(titleVersionLabel('en')).toContain('1.6.9');
+    expect(titleVersionLabel('ja')).toContain('1.7.0');
+    expect(titleVersionLabel('en')).toContain('1.7.0');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
 
   it('uses Core refugee defaults and uses the same Gas weights in every Wave', () => {
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     expect(newGameRefugeeDefaults(config)).toEqual({
       intervalMin: config.refugees.arrivalIntervalMin,
       intervalMax: config.refugees.arrivalIntervalMax,
@@ -84,7 +85,7 @@ describe('controller view models', () => {
   });
 
   it('renders one collapsed Config-backed recruitment accordion for each supported hub', () => {
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     const capital = { id: 'capital', type: 'capital', position: { q: 25, r: 25 } } as FacilityState;
     const armyBase = { id: 'army-base-1', type: 'armyBase', position: { q: 25, r: 19 } } as FacilityState;
     const state = { config, completedProductions: {}, pendingUnitProductions: [] } as unknown as GameState;
@@ -268,7 +269,7 @@ describe('controller view models', () => {
   });
 
   it('selects an empty trunk-road Hex in domestic mode and resolves its branch', () => {
-    const state = new GameEngine(145).getState();
+    const state = new GameEngine(145, v170FixedConfig({mapMode:'fixed'})).getState();
     const branch = state.map.roadBranches[0]!;
     const position = branch.roadTiles[0]!;
 
@@ -289,7 +290,7 @@ describe('controller view models', () => {
   });
 
   it('does not auto-show Supply for the capital but keeps it for worker facilities', () => {
-    const state = new GameEngine(1).getState();
+    const state = new GameEngine(1, v170FixedConfig({mapMode:'fixed'})).getState();
     const capital = state.facilities.find((facility) => facility.type === 'capital')!;
     const city = state.facilities.find((facility) => facility.type === 'city')!;
     const farm = state.facilities.find((facility) => facility.type === 'farm')!;
@@ -309,26 +310,26 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.6.8-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.6.9-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.8以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.9');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.9以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.7.0');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.8 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.9');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.9 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.7.0');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('ルール版 19.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('保存形式 26');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 19.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 26');
+    expect(createTranslator('ja')('tipSave')).toContain('ルール版 20.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('保存形式 27');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 20.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 27');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.8以前' : 'v1.6.8-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9-or-earlier');
     }
   });
 
@@ -404,7 +405,7 @@ describe('controller view models', () => {
   });
 
   it('projects all checkpoint roles and branch fallback fields', () => {
-    const state = JSON.parse(JSON.stringify(new GameEngine(1).getState())) as GameState;
+    const state = JSON.parse(JSON.stringify(new GameEngine(1, v170FixedConfig({mapMode:'fixed'})).getState())) as GameState;
     const branch = state.map.roadBranches[0]!;
     const branchState = state.roadBranches.find((candidate) => candidate.branchId === branch.id)!;
     const roadPosition = (index: number): { q: number; r: number } => ({ ...branch.roadTiles[index]! });
@@ -490,7 +491,7 @@ describe('controller view models', () => {
     }, 'en');
     expect(debug).toContain('4');
     expect(debug).toContain('zombie-hidden');
-    const debugState = structuredClone(new GameEngine(99).getState());
+    const debugState = structuredClone(new GameEngine(99, v170FixedConfig({mapMode:'fixed'})).getState());
     const hiddenZombie = debugState.units.find((unit) => unit.type === 'zombie')!;
     hiddenZombie.noiseTarget = { q: 2, r: 3 };
     debugState.events.push(
@@ -562,7 +563,7 @@ describe('controller view models', () => {
   });
 
   it('keeps the global End Turn forecast to an unpowered count, not facility IDs or reasons', () => {
-    const base = forecastEndTurn(new GameEngine(145).getState());
+    const base = forecastEndTurn(new GameEngine(145, v170FixedConfig({mapMode:'fixed'})).getState());
     const forecast = {
       ...base,
       electricity: {
@@ -664,7 +665,7 @@ describe('controller view models', () => {
   });
 
   it('renders the detailed End Turn forecast in both UI languages', () => {
-    const forecast = forecastEndTurn(new GameEngine(127).getState());
+    const forecast = forecastEndTurn(new GameEngine(127, v170FixedConfig({mapMode:'fixed'})).getState());
     const japanese = renderEndTurnForecast(forecast, 'ja');
     const english = renderEndTurnForecast(forecast, 'en');
     for (const [html, locale] of [[japanese, 'ja'], [english, 'en']] as const) {
@@ -678,7 +679,7 @@ describe('controller view models', () => {
   });
 
   it('renders v1.4.1 carried Military Goods, attack, and Emergency Movement facts bilingually', () => {
-    const state = new GameEngine(141).getState();
+    const state = new GameEngine(141, v170FixedConfig({mapMode:'fixed'})).getState();
     const unit = createAgentObservation(state).units.find((candidate) => candidate.type === 'nationalGuard')!;
     for (const locale of ['ja', 'en'] as const) {
       const details = renderUnitMilitaryGoodsDetails(unit, locale, state.config.units.nationalGuard.militaryGoodsShortageAttackMultiplier);
@@ -689,6 +690,8 @@ describe('controller view models', () => {
       expect(details).toContain(createTranslator(locale)('guardRangeTwoMilitaryGoodsRule'));
 
       const attack = renderAttackPreview({ gasExplosion: null,
+        action: {type:'Attack',attackerId:unit.id,targetId:'zombie-visible'},
+        mode: 'ground', killExpected: false, conditionalCounterattack: null,
         targetUnitId: 'zombie-visible',
         distance: 1,
         militaryGoodsCost: 0,
@@ -705,7 +708,7 @@ describe('controller view models', () => {
   });
 
   it('renders the new Military Goods forecast totals and per-Unit sequence', () => {
-    const forecast = forecastEndTurn(new GameEngine(142).getState()).militaryGoods;
+    const forecast = forecastEndTurn(new GameEngine(142, v170FixedConfig({mapMode:'fixed'})).getState()).militaryGoods;
     const html = renderMilitaryGoodsForecast(forecast, 'en');
     expect(html).toContain('data-forecast-resource="militaryGoods"');
     expect(html).toContain('Unfilled refill demand');
@@ -869,7 +872,7 @@ describe('controller view models', () => {
 
   it('separates bilingual visual legend from Help rules and shares all aviation assets', () => {
     for (const locale of ['ja','en'] as const) {
-      const html=renderBoardLegend(createDefaultConfig(),locale,ASSET_REGISTRY);
+      const html=renderBoardLegend(createDefaultConfig({mapMode:'fixed'}),locale,ASSET_REGISTRY);
       expect(html).toContain('data-board-legend="true"');
       for(const section of ['terrain','units','facilities','obstacles','dynamic']) expect(html).toContain(`data-legend-section="${section}"`);
       for(const asset of ['terrain/terrain_plain.png','units/unit_police_zombie.png','units/unit_soldier_zombie.png','units/unit_riot_police.png','units/unit_riot_zombie.png','units/unit_hunter_zombie.png','facilities/facility_air_base.png','units/unit_multipurpose_helicopter_landed.png','units/unit_multipurpose_helicopter_airborne.png','units/unit_field_artillery_packed.png','units/unit_field_artillery_deployed.png'])expect(html).toContain(asset);

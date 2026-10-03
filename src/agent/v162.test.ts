@@ -8,7 +8,7 @@ import { prepareTestSnapshot } from '../core/testConfig';
 import type { GameState } from '../core/types';
 
 function engine() {
-  return new GameEngine(1, createDefaultConfig({ economy: {
+  return new GameEngine(1, createDefaultConfig({mapMode:'fixed', economy: {
     initialZombieCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialScreamerCount: 0,
   } }));
 }

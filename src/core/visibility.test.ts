@@ -22,7 +22,7 @@ function tile(state: GameState, position: HexCoord) {
 
 describe('v1.4.4 player visibility', () => {
   it('preserves the former separate range/LOS passes and insertion order on reordered maps', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     for (const reverse of [false, true]) {
       if (reverse) state.map.tiles.reverse();
       for (const origin of [{ q: 0, r: 0 }, { q: 4, r: 4 }, { q: 25, r: 25 }]) {
@@ -39,7 +39,7 @@ describe('v1.4.4 player visibility', () => {
   });
 
   it('combines human units, capital, owned facilities and operational checkpoints', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const visible = getPlayerVisibleTileKeys(state);
     expect(visible.has('25,25')).toBe(true);
     expect(visible.has('4,4')).toBe(false);
@@ -63,7 +63,7 @@ describe('v1.4.4 player visibility', () => {
   });
 
   it('uses the first Forest or Mountain on a Ground LOS as the visible boundary', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const origin = { q: 25, r: 25 };
     const firstBlocking = { q: 25, r: 26 };
     const beyondBlocking = { q: 25, r: 27 };
@@ -81,7 +81,7 @@ describe('v1.4.4 player visibility', () => {
   });
 
   it('decomposes one Ground source without mixing in other player sources', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const source = getGroundVisionCoverageFrom(state, { q: 0, r: 0 }, 1);
 
     expect(source.potential.has('0,0')).toBe(true);
@@ -92,7 +92,7 @@ describe('v1.4.4 player visibility', () => {
   });
 
   it('does not let the source terrain block itself and uses base terrain behind overlays', () => {
-    const state = createInitialState(2, createDefaultConfig());
+    const state = createInitialState(2, createDefaultConfig({mapMode:'fixed'}));
     const origin = { q: 25, r: 25 };
     const target = { q: 25, r: 27 };
     const middle = { q: 25, r: 26 };
@@ -111,7 +111,7 @@ describe('v1.4.4 player visibility', () => {
   });
 
   it('keeps Capital Vision independent from the initial Supply radius', () => {
-    const state = createInitialState(3, createDefaultConfig({ checkpoint: { initialSupplyRadius: 0 } }));
+    const state = createInitialState(3, createDefaultConfig({mapMode:'fixed', checkpoint: { initialSupplyRadius: 0 } }));
     clearScenarioCheckpoints(state);
     const capitalSightline = '25,20';
     expect(getPlayerVisibleTileKeys(state).has(capitalSightline)).toBe(true);
@@ -119,7 +119,7 @@ describe('v1.4.4 player visibility', () => {
   });
 
   it('lets a powered worker Drone use unblocked Aerial Vision through Ground terrain', () => {
-    const state = createInitialState(4, createDefaultConfig());
+    const state = createInitialState(4, createDefaultConfig({mapMode:'fixed'}));
     const origin = { q: 5, r: 5 };
     const blocking = { q: 5, r: 6 };
     const target = { q: 5, r: 7 };

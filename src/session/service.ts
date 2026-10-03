@@ -1,3 +1,5 @@
+import { RANDOM_MAP_ID } from '../core/versions';
+import { FIXED_MAP_ID } from '../core/map';
 import { summarizeActionResult } from '../core/action-summary';
 import { compactPublicHealth } from '../core/public-health';
 import { ContextHandoffHistory, projectContextHandoff, handoffJson } from './context-handoff';
@@ -256,6 +258,8 @@ function compactSnapshot(loaded: LoadedSession, changes = summarizeImportantChan
     && facility.production.stoppedReason !== null
   );
   return {
+    map: {id:observation.mapId,...(observation.mapDescriptor?{descriptor:clone(observation.mapDescriptor)}:{})},
+    terminal: observation.gameOver ? {progressActionsAllowed:false,result:clone(observation.result),details:['result','artifact']} : null,
     publicHealth: clone(observation.publicHealth),
     nuclearObjective: clone(observation.nuclearObjective),
     refineryAllowance: clone(observation.refineryAllowance),
@@ -272,7 +276,7 @@ function compactSnapshot(loaded: LoadedSession, changes = summarizeImportantChan
     facilities: observation.facilities.map(({ id, type, position, status, owner, healthyPopulation, infectedPopulation, inSupply, operationalStatus, populationCapacity, populationOperational, populationUnavailableReason, populationIncreaseAvailable, populationDecreaseAvailable, production, recovery }) => ({ id, type, position, status, owner, healthyPopulation, infectedPopulation, inSupply, operationalStatus, populationCapacity, populationOperational, populationUnavailableReason, populationIncreaseAvailable, populationDecreaseAvailable, production: { stoppedReason: production.stoppedReason, projectedPowerReason: production.projectedPowerReason }, recovery: { status: recovery.status, missingConditions: recovery.missingConditions } })),
     militaryDrone: observation.militaryDrone,
     facilityObjectives: observation.facilityObjectives,
-    units: observation.units.map(({ id, type, unitType, position, hp, maxHp, proficiency, attackChargesRemaining, maxAttackCharges, canMove, canAttack, inSupply, currentFuel, maxFuel, currentMilitaryGoods, maxMilitaryGoods, fixedMilitaryGoodsUpkeepPerTurn, attack, baseRecruitAttack, effectiveAttack, movement, effectiveMovementCostAtPosition, baseRange, effectiveRange, rangeModifierReason, emergencyMovementPoints, emergencyMovementAvailable, flightState, movementDomain, cargoUnitId, cargoUnitType, transportedByUnitId, canTakeOff, canLand, canBoard, canDisembark, canRefuel, canResupplyMilitaryGoods, takeOffReasonCode, landReasonCode, supplyReasonCode, production }) => ({ id, type, unitType, position, hp, maxHp, proficiency, attackChargesRemaining, maxAttackCharges, canMove, canAttack, inSupply, currentFuel, maxFuel, currentMilitaryGoods, maxMilitaryGoods, fixedMilitaryGoodsUpkeepPerTurn, attack, baseRecruitAttack, effectiveAttack, movement, effectiveMovementCostAtPosition, baseRange, effectiveRange, rangeModifierReason, emergencyMovementPoints, emergencyMovementAvailable, flightState, movementDomain, cargoUnitId, cargoUnitType, transportedByUnitId, canTakeOff, canLand, canBoard, canDisembark, canRefuel, canResupplyMilitaryGoods, takeOffReasonCode, landReasonCode, supplyReasonCode, production })),
+    units: observation.units.map(u=>({...u,attackPreviews:u.attackPreviews.slice(0,12),attackPreviewsTotal:u.attackPreviews.length,attackPreviewsOmitted:Math.max(0,u.attackPreviews.length-12),attackPreviewDetails:{target:'attack-candidates',expectedRevision:loaded.active.revision,filters:{unitId:u.id}}})),
     visibleEnemies: clone(observation.zombies),
     checkpoints: observation.checkpoints.map(({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply }) => ({ id, branchId, position, status, role, waiting, screening, approved, infected, currentPolicy, providesSupply, supplyExplanation: checkpointSupplyExplanation(observation, branchId, loaded.active.revision) })),
     horde: clone(observation.horde),
@@ -436,9 +440,9 @@ function playTurnStop(
     const current = afterUnits.get(unit.id);
     if (!current || current.hp >= unit.hp) return [];
     const allowed = allowedHp.get(unit.id);
-    return allowed && current.hp >= allowed.minHp && current.hp <= allowed.maxHp ? [] : [{ unitId: unit.id, beforeHp: unit.hp, afterHp: current.hp, allowedMinHp: allowed?.minHp ?? null, allowedMaxHp: allowed?.maxHp ?? null }];
+    return allowed && current.hp >= allowed.minHp && current.hp <= allowed.maxHp ? [] : [{ unitId: unit.id, beforeHp: unit.hp, afterHp: current.hp, allowedMinHp: allowed?.minHp ?? null, allowedMaxHp: allowed?.maxHp ?? null, expectationStatus: allowed ? 'outside_bounds' : 'not_specified', actor: ('unitId' in action ? action.unitId : 'attackerId' in action ? action.attackerId : null) === unit.id }];
   });
-  if (unexpectedDamage.length > 0) return { reason: 'unexpected_unit_damage', details: { units: unexpectedDamage } };
+  if (unexpectedDamage.length > 0) return { reason: 'unexpected_unit_damage', details: { units: unexpectedDamage, classification:'accepted_attention_stop', previewMismatch:false, guidance:'Preview damage is not authorization. Set expectations.playerUnitHp explicitly for this action; other stop conditions remain active.' } };
   const beforeEnemies = new Set(before.zombies.map((unit) => unit.id));
   const newEnemyIds = after.zombies.map((unit) => unit.id).filter((id) => !beforeEnemies.has(id)).sort();
   if (newEnemyIds.length > 0) return { reason: 'new_enemy_spotted', details: { enemyIds: newEnemyIds } };
@@ -551,7 +555,7 @@ export class SessionService {
   public newSession(options: NewSessionOptions = {}): SessionStatusResult {
     if (!isObject(options)) throw new SessionError('invalid_session_option', 'new options must be a JSON object');
     if (options.scenarioId !== undefined && typeof options.scenarioId !== 'string') throw new SessionError('invalid_session_option', 'scenarioId must be a string');
-    if (Object.keys(options).some(k => !['scenarioId','sessionId','seed','agentId','checkpointInterval','preferredCommentLocale'].includes(k))) throw new SessionError('invalid_session_option', 'Unknown new option; UNA accepts only seed as game configuration');
+    if (Object.keys(options).some(k => !['scenarioId','mapMode','mapSeed','gameplaySeed','sessionId','seed','agentId','checkpointInterval','preferredCommentLocale'].includes(k))) throw new SessionError('invalid_session_option', 'Unknown new option; UNA accepts only seed as game configuration');
     const sessionId = options.sessionId ?? newSessionId();
     const seed = requireSafeInteger(options.seed ?? 1, 'seed', Number.MIN_SAFE_INTEGER);
     const checkpointInterval = requireSafeInteger(options.checkpointInterval ?? DEFAULT_CHECKPOINT_INTERVAL, 'checkpointInterval', 1);
@@ -560,12 +564,12 @@ export class SessionService {
     assertSafeIdentifier(sessionId, 'sessionId'); assertSafeIdentifier(agentId, 'agentId');
     const lock = this.store.acquireLock(sessionId);
     try {
-      const runtime = this.gameFactory.createNew({ seed, agentId, scenarioId: options.scenarioId });
+      const runtime = this.gameFactory.createNew({ seed, agentId, scenarioId: options.scenarioId, mapMode: options.mapMode as NewSessionOptions['mapMode'], mapSeed: options.mapSeed as number | undefined, gameplaySeed: options.gameplaySeed as number | undefined });
       const observation = clone(runtime.getObservation());
-      if (observation.map.id !== this.identity.mapId) throw new SessionError('session_version_mismatch', `Runtime map ${observation.map.id} does not match ${this.identity.mapId}`);
+      if (!([this.identity.mapId, FIXED_MAP_ID, RANDOM_MAP_ID] as string[]).includes(observation.map.id)) throw new SessionError('session_version_mismatch', `Runtime map ${observation.map.id} does not match ${this.identity.mapId}`);
       const publicConfig = clone(runtime.getRunArtifact().config) as unknown as JsonValue;
       const lineage = { parentSessionId: null, parentCheckpointId: null } satisfies SessionLineage;
-      const descriptor = descriptorWithHash(this.identity, this.store.manifest.storeId, { sessionId, seed, agentId, checkpointInterval, preferredCommentLocale, publicConfig, lineage, branchBase: null });
+      const descriptor = descriptorWithHash({ ...this.identity, mapId: observation.map.id }, this.store.manifest.storeId, { sessionId, seed, agentId, checkpointInterval, preferredCommentLocale, publicConfig, lineage, branchBase: null });
       const initialState = publicState(runtime, 0, ZERO_HASH);
       const initialSnapshot = this.store.writePayload('public', { kind: 'snapshot', document: { observation: initialState.observation, legalActions: initialState.legalActions, gameOver: initialState.gameOver, result: initialState.result }, documentHash: initialState.documentHash } satisfies SessionPublicSnapshotPayload);
       const runBase = runBaseWithHash({ sessionSchemaVersion: SESSION_SCHEMA_VERSION, artifactSchemaVersion: this.identity.artifactSchemaVersion, sessionId, seed, agentId, buildId: this.identity.buildId, publicConfig, fixedMap: this.store.writePayload('public', observation.map), initialPublicState: initialSnapshot, initialPublicHash: initialState.documentHash, ...lineage });
@@ -841,7 +845,7 @@ export class SessionService {
       const lock = this.store.acquireLock(newSessionId);
       try {
         const lineage = { parentSessionId: sourceSessionId, parentCheckpointId: checkpointId } satisfies SessionLineage;
-        const descriptor = descriptorWithHash(this.identity, this.store.manifest.storeId, { sessionId: newSessionId, seed: checkpoint.source.descriptor.seed, agentId: checkpoint.source.descriptor.agentId, checkpointInterval: checkpoint.source.descriptor.checkpointInterval, preferredCommentLocale: checkpoint.source.descriptor.preferredCommentLocale, publicConfig: checkpoint.source.descriptor.publicConfig, lineage, branchBase });
+        const descriptor = descriptorWithHash({ ...this.identity, mapId: checkpoint.source.descriptor.mapId }, this.store.manifest.storeId, { sessionId: newSessionId, seed: checkpoint.source.descriptor.seed, agentId: checkpoint.source.descriptor.agentId, checkpointInterval: checkpoint.source.descriptor.checkpointInterval, preferredCommentLocale: checkpoint.source.descriptor.preferredCommentLocale, publicConfig: checkpoint.source.descriptor.publicConfig, lineage, branchBase });
         const runBase = runBaseWithHash({ sessionSchemaVersion: SESSION_SCHEMA_VERSION, artifactSchemaVersion: checkpoint.source.runBase.artifactSchemaVersion, sessionId: newSessionId, seed: checkpoint.source.runBase.seed, agentId: checkpoint.source.runBase.agentId, buildId: checkpoint.source.runBase.buildId, publicConfig: checkpoint.source.runBase.publicConfig, fixedMap: checkpoint.source.runBase.fixedMap, initialPublicState: checkpoint.source.runBase.initialPublicState, initialPublicHash: checkpoint.source.runBase.initialPublicHash, ...lineage });
         const active = this.store.create(descriptor, runBase, checkpoint.privateState, checkpoint.publicState, ancestor);
         const loaded = this.loadCompatible(active.sessionId);
@@ -1015,7 +1019,7 @@ export class SessionService {
       for (const record of this.store.iterateAllDecisionRecords(sessionId)) if (this.copyPayloadToPackage(record.publicPayload, writer)) payloadCount++;
       if (this.copyPayloadToPackage(loaded.runBase.fixedMap, writer)) payloadCount++;
       if (this.copyPayloadToPackage(loaded.runBase.initialPublicState, writer)) payloadCount++;
-      const withoutHash = { ...this.identity, packageVersion: SESSION_ARTIFACT_PACKAGE_VERSION, sessionSchemaVersion: SESSION_SCHEMA_VERSION, sessionId, lineage: { parentSessionId: loaded.descriptor.parentSessionId, parentCheckpointId: loaded.descriptor.parentCheckpointId }, branchBase: loaded.descriptor.branchBase, decisionCount, acceptedActionCount, invalidActionCount, payloadCount, streamHash: streamHash.digest('hex') } satisfies Omit<SessionArtifactManifest, 'manifestHash'>;
+      const withoutHash = { ...this.identity, mapId:loaded.descriptor.mapId, packageVersion: SESSION_ARTIFACT_PACKAGE_VERSION, sessionSchemaVersion: SESSION_SCHEMA_VERSION, sessionId, lineage: { parentSessionId: loaded.descriptor.parentSessionId, parentCheckpointId: loaded.descriptor.parentCheckpointId }, branchBase: loaded.descriptor.branchBase, decisionCount, acceptedActionCount, invalidActionCount, payloadCount, streamHash: streamHash.digest('hex') } satisfies Omit<SessionArtifactManifest, 'manifestHash'>;
       const manifest: SessionArtifactManifest = { ...withoutHash, manifestHash: sha256Json(withoutHash) };
       writer.add('manifest.json', [Buffer.from(`${canonicalJson(manifest)}\n`, 'utf8')]);
       writer.finish(path => this.readArtifact(path, { signal: options.signal }));
@@ -1033,7 +1037,7 @@ export class SessionService {
     const manifest = JSON.parse(safeRoot.read('manifest.json', 1024 * 1024).toString('utf8')) as SessionArtifactManifest;
     const expected = integrityHash(manifest as unknown as Record<string, unknown>, 'manifestHash');
     if (expected !== manifest.manifestHash || manifest.packageVersion !== SESSION_ARTIFACT_PACKAGE_VERSION || manifest.sessionSchemaVersion !== SESSION_SCHEMA_VERSION) throw new SessionError('artifact_corrupt', 'Artifact manifest is unsupported or corrupt');
-    for (const field of ['appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit', 'mapId'] as const) {
+    for (const field of ['appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit'] as const) {
       if (manifest[field] !== this.identity[field]) throw new SessionError('artifact_version_mismatch', `Artifact ${field} ${String(manifest[field])} does not match ${String(this.identity[field])}`);
     }
     const hash = createHash('sha256');
@@ -1104,7 +1108,7 @@ export class SessionService {
     if (first.done) throw new SessionError('artifact_corrupt', 'Artifact stream is empty');
     const header = JSON.parse(first.value) as { descriptor: SessionDescriptor; finalPublicHash: string };
     this.assertDescriptorCompatible(header.descriptor);
-    const runtime = this.gameFactory.createNew({ seed: header.descriptor.seed, agentId: header.descriptor.agentId, scenarioId: (header.descriptor.publicConfig as unknown as GameConfig).scenarioId });
+    const runtime = this.gameFactory.createNew({ seed: header.descriptor.seed, agentId: header.descriptor.agentId, scenarioId: (header.descriptor.publicConfig as unknown as GameConfig).scenarioId, mapMode: (header.descriptor.publicConfig as unknown as GameConfig).mapMode, mapSeed: (header.descriptor.publicConfig as unknown as GameConfig).mapSeed ?? undefined, gameplaySeed: (header.descriptor.publicConfig as unknown as GameConfig).gameplaySeed ?? undefined });
     let decisionCount = 0;
     for (let next = lines.next(); !next.done; next = lines.next()) {
       const entry = JSON.parse(next.value) as { kind: string; record?: PublicDecisionRecord };
@@ -1290,7 +1294,8 @@ export class SessionService {
     return statusResult(loaded, this.store.readSessionMetrics(loaded.descriptor.sessionId), this.store, this.guidanceFor(loaded));
   }
   private assertDescriptorCompatible(descriptor: SessionDescriptor): void {
-    for (const field of ['appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit', 'mapId'] as const) if (descriptor[field] !== this.identity[field]) throw new SessionError('session_version_mismatch', `Session ${field} ${String(descriptor[field])} does not match ${String(this.identity[field])}`);
+    for (const field of ['appVersion', 'gameRulesVersion', 'saveFormatVersion', 'artifactSchemaVersion', 'agentApiVersion', 'observationApiVersion', 'bridgeApiVersion', 'buildId', 'gitCommit'] as const) if (descriptor[field] !== this.identity[field]) throw new SessionError('session_version_mismatch', `Session ${field} ${String(descriptor[field])} does not match ${String(this.identity[field])}`);
+    if (!([this.identity.mapId,FIXED_MAP_ID,RANDOM_MAP_ID] as string[]).includes(descriptor.mapId)) throw new SessionError('session_version_mismatch','Unsupported Map');
     if (descriptor.preferredCommentLocale !== 'ja' && descriptor.preferredCommentLocale !== 'en') throw new SessionError('session_version_mismatch', 'Session preferredCommentLocale is unsupported; start a new Session');
   }
 

@@ -93,7 +93,8 @@ describe('Session Schema 7 bounded storage and queries', () => {
     const api = service(path);
     const created = api.newSession({ sessionId: 'query' });
     expect(created.revision).toBe(0);
-    expect(created.observation).not.toHaveProperty('map');
+    expect(created.observation.map).toEqual({id:'test-map'});
+    expect(created.observation.map).not.toHaveProperty('tiles');
     const full = api.query('query', { target: 'full-snapshot', expectedRevision: 0 });
     expect((full.value as unknown as { observation: AgentObservation }).observation.map).toEqual(map);
     const first = api.query('query', { target: 'map', expectedRevision: 0, pageSize: 1 });

@@ -5,7 +5,7 @@ import { getHordeSpawnZone } from './map';
 import { createCityPopulationSnapshot, createUnit, synchronizePopulation } from './state';
 import type { GameState } from './types';
 
-const config = (units: number, final = false) => createDefaultConfig({
+const config = (units: number, final = false) => createDefaultConfig({mapMode:'fixed',
   economy: {
     initialZombieCount: 0, initialScreamerCount: 0,
     initialHunterCount: { min: 0, max: 0 },
@@ -114,7 +114,7 @@ describe('v1.5.4 scheduled Wave pending roster', () => {
   });
 
   it('keeps a newer same-direction Wave pending while the older roster still has entries after its batch', () => {
-    const multiConfig = createDefaultConfig({
+    const multiConfig = createDefaultConfig({mapMode:'fixed',
       economy: {
         initialZombieCount: 0, initialScreamerCount: 0,
         initialHunterCount: { min: 0, max: 0 },

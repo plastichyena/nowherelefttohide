@@ -12,7 +12,7 @@ import { isHexSupplied } from './supply';
 import type { GameState } from './types';
 
 function tenPersonNoProductionState(food: number): GameState {
-  const state = createInitialState(15750, createDefaultConfig({
+  const state = createInitialState(15750, createDefaultConfig({mapMode:'fixed',
     economy: {
       initialResources: { food, civilianGoods: 1_000, militaryGoods: 1_000, fuel: 1_000 },
       initialZombieCount: 0, initialScreamerCount: 0,
@@ -172,7 +172,7 @@ describe('v1.5.7 resource runway', () => {
   });
 
   it('does not mark the national Military Goods forecast short for only an out-of-supply Unit', () => {
-    const state = createInitialState(15752, createDefaultConfig());
+    const state = createInitialState(15752, createDefaultConfig({mapMode:'fixed'}));
     state.resources.militaryGoods = 1_000;
     for (const unit of state.units.filter((candidate) => candidate.isPlayerUnit)) {
       unit.currentMilitaryGoods = unit.maxMilitaryGoods;
@@ -193,7 +193,7 @@ describe('v1.5.7 resource runway', () => {
   });
 
   it('separates current runway from virtual largest-contributor loss', () => {
-    const state = createInitialState(15751, createDefaultConfig({
+    const state = createInitialState(15751, createDefaultConfig({mapMode:'fixed',
       economy: {
         initialResources: { food: 100, civilianGoods: 1_000, militaryGoods: 1_000, fuel: 1_000 },
         initialZombieCount: 0, initialScreamerCount: 0,

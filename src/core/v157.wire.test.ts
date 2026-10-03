@@ -12,7 +12,7 @@ import type { GameState } from './types';
 
 describe('v1.5.7 wall and charge accounting', () => {
   it.each([5, 20, 25])('absorbs damage %i into a fresh HP20 wall, with no minimum damage at zero penetration', damage => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const human = state.units.find(u => u.isPlayerUnit)!;
     const tile = state.map.tiles.find(t => t.q === human.position.q && t.r === human.position.r)!;
     tile.terrain = 'plain';
@@ -32,7 +32,7 @@ describe('v1.5.7 wall and charge accounting', () => {
   });
 
   it('uses four ordinary Horde charges to breach HP20 and stop for this phase (v1.6.6); damaged walls count actual HP loss', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const destination = wireCandidates(state).find(c => c.legal)!.position;
     const start = { q: destination.q - 1, r: destination.r };
     const zombie = createUnit(state, 'horde', 'hordeZombie', start);
@@ -55,7 +55,7 @@ describe('v1.5.7 wall and charge accounting', () => {
   });
 
   it('counts occupied attack charges once at the actual attack, excluding gas and subsequent attacks after destruction', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const human = state.units.find(u => u.isPlayerUnit)!;
     const enemy = createUnit(state, 'horde', 'hordeZombie', { q: human.position.q + 1, r: human.position.r });
     state.barbedWire.push({ id: 'wall', position: { ...human.position }, hp: 20, maxHp: 20, builtTurn: 1 });
@@ -69,7 +69,7 @@ describe('v1.5.7 wall and charge accounting', () => {
   });
 
   it('lets a later zombie pass a breached hex in the same phase and the breacher pass next phase without spending its remaining charges', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const destination = wireCandidates(state).find(c => c.legal)!.position;
     const start = { q: destination.q - 1, r: destination.r };
     const breacher = createUnit(state, 'breacher', 'hordeZombie', start);
@@ -90,7 +90,7 @@ describe('v1.5.7 wall and charge accounting', () => {
   });
 
   it('persists construction statistics and does not count a rejected build or Query', () => {
-    const engine = new GameEngine(1, createDefaultConfig());
+    const engine = new GameEngine(1, createDefaultConfig({mapMode:'fixed'}));
     const position = wireCandidates(engine.getState()).find(c => c.legal)!.position;
     const action = { type: 'BuildBarbedWire' as const, position };
     expect(engine.step(action).error).toBeNull();
@@ -104,7 +104,7 @@ describe('v1.5.7 wall and charge accounting', () => {
   });
 
   it('uses the actual Engine combat path for four occupied-wall attacks and no fifth attack', () => {
-    const engine = new GameEngine(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(1, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } } }));
     const state = engine.getState();
     const human = state.units.find(u => u.type === 'police')!;
     human.position = { q: 25, r: 24 }; human.canAttack = false; human.attackChargesRemaining = 0;
@@ -124,7 +124,7 @@ describe('v1.5.7 wall and charge accounting', () => {
   });
 
   it('does not expose damage or consumed charges from a wall outside public vision', () => {
-    const state = createInitialState(1, createDefaultConfig());
+    const state = createInitialState(1, createDefaultConfig({mapMode:'fixed'}));
     const position = { q: 0, r: 0 };
     state.barbedWire.push({ id: 'unobserved-wall', position, hp: 20, maxHp: 20, builtTurn: 1 });
     const statistics = structuredClone(state.statistics);
@@ -136,7 +136,7 @@ describe('v1.5.7 wall and charge accounting', () => {
   });
 
   it('retains breach charges for real combat when a legal target is available, without refreshing them', () => {
-    const engine = new GameEngine(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(1, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 } } }));
     const state = engine.getState() as GameState;
     const human = state.units.find(u => u.type === 'police')!;
     human.position = { q: 24, r: 24 }; human.attackChargesRemaining = 0; human.canAttack = false;

@@ -350,6 +350,7 @@ function createAgentObservationInScope(
   const crisisSummary = publicCrisisSummary(state);
   const endTurnRisk = publicEndTurnRisk(state);
   return cloneJson({
+    mapDescriptor: cloneJson(state.mapDescriptor),
     siteFallRules: { zombieSpawnPopulationPerUnit: state.config.infection.zombieSpawnPopulationPerUnit, maxZombieSpawnPerResolution: state.config.infection.maxZombieSpawnPerResolution },
     publicHealth: { stress: { ...state.publicHealthStress }, foodShortageAccumulation: state.foodShortageAccumulation, starvationCarry: state.starvationCarry },
     militaryDrone: militaryDroneProjection(state),
@@ -365,6 +366,7 @@ function createAgentObservationInScope(
     phase: state.phase,
     map: {
       id: state.mapId,
+      descriptor: cloneJson(state.mapDescriptor),
       width: state.map.width,
       height: state.map.height,
       coordinateSystem: 'axial-q-r' as const,

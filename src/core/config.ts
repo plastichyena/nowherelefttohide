@@ -15,7 +15,8 @@ import type {
 import { FIXED_INITIAL_ZOMBIE_COUNT } from './map';
 export { HUMAN_UNIT_TYPES } from './unit-catalog';
 
-export const CONFIG_VERSION = '19.0.0';
+import { CONFIG_VERSION, RANDOM_MAP_ID } from './versions';
+export { CONFIG_VERSION } from './versions';
 export const DEFAULT_MAP_ID = 'fixed-51x51-v9';
 
 const facilityIds: FacilityId[] = [
@@ -368,8 +369,11 @@ export const DEFAULT_CONFIG: GameConfig = {
   windPower: { noiseRadius: 8 },
   armyBase: { maxMilitaryGoods: 40, interceptionCost: 2, attack: 10, range: 2, noiseRadius: 8, staffedVision: 5, rewardLastTurn: 10 },
   scenarioId: 'custom',
+  mapMode: 'random',
+  mapSeed: null,
+  gameplaySeed: null,
   version: CONFIG_VERSION,
-  mapId: DEFAULT_MAP_ID,
+  mapId: RANDOM_MAP_ID,
   maxActionsPerTurn: 100,
   units: defaultUnitConfig,
   unitExperience: {
@@ -511,6 +515,7 @@ function mergeObjects(base: unknown, override: unknown): unknown {
 export function createDefaultConfig(overrides: DeepPartial<GameConfig> = {}): GameConfig {
   const merged = mergeObjects(DEFAULT_CONFIG, overrides);
   const config = cloneConfig(merged as GameConfig);
+  if (overrides.mapId === undefined) config.mapId = config.mapMode === 'fixed' ? DEFAULT_MAP_ID : RANDOM_MAP_ID;
   for (const type of HUMAN_UNIT_TYPES) config.units[type].fixedMilitaryGoodsUpkeepPerTurn = 0;
   return config;
 }
@@ -550,6 +555,9 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     return { valid: false, errors: ['Config must be an object'] };
   }
   if (!['custom', 'una'].includes(config.scenarioId)) errors.push('scenarioId must be custom or una');
+  if (!['fixed', 'random'].includes(config.mapMode)) errors.push('invalid_map_mode: use random or fixed');
+  for (const key of ['mapSeed','gameplaySeed'] as const) if (config[key] !== null && !Number.isSafeInteger(config[key])) errors.push(`invalid_seed: ${key} must be null or a safe integer`);
+  if (config.mapId !== (config.mapMode === 'fixed' ? DEFAULT_MAP_ID : RANDOM_MAP_ID)) errors.push('mapId does not match mapMode');
   if (config.version !== CONFIG_VERSION) {
     errors.push(`version must be ${CONFIG_VERSION}`);
   }

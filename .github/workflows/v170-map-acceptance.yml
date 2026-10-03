@@ -1,0 +1,83 @@
+name: v1.7.0 Map and gameplay acceptance
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cross-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npx vite-node --script scripts/v170-map-validation.ts --count=100
+      - run: npx vite-node --script scripts/v170-routes.ts
+      - run: npx vite-node --script scripts/v170-routes.ts --all
+      - run: npx vitest run src/core/v170.map.test.ts src/session/v170.test.ts --pool=threads --maxWorkers=1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v170-platform-${{ matrix.os }}
+          path: output/v170
+  generated-maps:
+    strategy:
+      fail-fast: false
+      matrix:
+        start: [1, 1001, 2001, 3001, 4001, 5001, 6001, 7001, 8001, 9001]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npx vite-node --script scripts/v170-map-validation.ts --start=${{ matrix.start }} --count=1000 --scattered=${{ matrix.start == 1 && 1000 || 0 }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v170-maps-${{ matrix.start }}
+          path: output/v170/map-validation
+  gameplay:
+    strategy:
+      fail-fast: false
+      matrix:
+        start: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        gameplay: [1, 2, 3]
+        agent: [random, balanced]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      # Local Random seed1 measured 233s for three turns. Freeze 60 games
+      # (10 maps x 3 gameplay seeds x 2 policies), keeping the 100-turn ceiling.
+      - run: npx vite-node --script scripts/v170-auto-play.ts --start=${{ matrix.start }} --count=1 --gameplay=${{ matrix.gameplay }} --agent=${{ matrix.agent }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v170-play-${{ matrix.agent }}-${{ matrix.start }}-${{ matrix.gameplay }}
+          path: output/v170/auto-play
+  compare-platforms:
+    needs: cross-platform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: v170-platform-*
+          path: output/platforms
+      - run: node scripts/v170-compare-platforms.mjs output/platforms

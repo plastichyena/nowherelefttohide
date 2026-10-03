@@ -1,3 +1,4 @@
+import { validateInitialMap } from './initial-map-validation';
 import { validateAviationState } from './aviation-invariants';
 import { humanAttack, isAirborne, occupiesGroundLayer } from './unit-capabilities';
 import { isHumanUnitType, HUMAN_UNIT_TYPES, isZombieUnitType } from './unit-catalog';
@@ -130,11 +131,9 @@ export function validateInvariants(state: GameState): InvariantResult {
     errors.push('Refinery allowance ledger must balance');
   }
   try {
-    const map = validateFixedMap(state.map);
+    const map = validateInitialMap(state);
     if (!map.valid) errors.push(...map.errors.map((error) => `map: ${error}`));
-    if (!initialArmyBaseMatchesSeed(state)) {
-      errors.push('map: exactly one Army Base must match the deterministic state seed');
-    }
+
   } catch (reason) {
     errors.push(`map: could not validate fixed map (${reason instanceof Error ? reason.message : String(reason)})`);
   }
@@ -518,7 +517,7 @@ export function validateInvariants(state: GameState): InvariantResult {
 
   const mapFacilityById = new Map(state.map.facilities.map((facility) => [facility.id, facility]));
   const armyBases = state.facilities.filter((facility) => facility.type === 'armyBase');
-  if (!initialAirBaseMatchesSeed(state)) errors.push('Invalid seeded Air Base');
+
   if(state.facilities.filter(f=>f.type==='airBase').length!==1) errors.push('Exactly one Air Base is required');
   if (armyBases.length !== 1) errors.push('State must contain exactly one Army Base');
   if (state.facilities.filter((facility) => !facility.constructible).length !== state.map.facilities.length) {

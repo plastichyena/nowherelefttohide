@@ -4,7 +4,7 @@ import { createDefaultConfig } from './config';
 import { calculateEconomyPlan } from './economy-query';
 
 it('distinguishes a switched-off or unpowered converter from missing input stock', () => {
-  const state = createInitialState(3, createDefaultConfig());
+  const state = createInitialState(3, createDefaultConfig({mapMode:'fixed'}));
   state.units = []; state.checkpoints = [];
   for (const facility of state.facilities) { facility.workers = 0; facility.infected = 0; }
   state.config.economy.populationConsumption = { food: 0, civilianGoods: 0 };

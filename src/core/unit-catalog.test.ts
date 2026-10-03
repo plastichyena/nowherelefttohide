@@ -8,7 +8,7 @@ describe('closed existing unit catalog', () => {
     expect(UNIT_TYPES).toEqual(['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'fieldArtillery', 'specialForces', 'ifv', 'multipurposeHelicopter', 'packZombie', 'zombie', 'hordeZombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie']);
     expect(HUMAN_UNIT_TYPES).toEqual(['police', 'nationalGuard', 'riotPolice', 'reconTeam', 'fieldArtillery', 'specialForces', 'ifv', 'multipurposeHelicopter']);
     expect(WAVE_NON_HORDE_TYPES).toEqual(['zombie', 'policeZombie', 'soldierZombie', 'riotZombie', 'hunterZombie', 'gasZombie', 'screamerZombie']);
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     for (const type of UNIT_TYPES) {
       const unit = createUnit({ config }, 'test', type, { q: 25, r: 25 });
       expect(unit.isPlayerUnit).toBe(isHumanUnitType(type));
@@ -23,7 +23,7 @@ describe('closed existing unit catalog', () => {
       expect(isHumanUnitType(type)).toBe(false);
       expect(isZombieUnitType(type)).toBe(false);
     }
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     (config.units as unknown as Record<string, unknown>).unknown = { ...config.units.zombie };
     expect(validateGameConfig(config).errors).toContain('units.unknown is not a supported unit type');
   });

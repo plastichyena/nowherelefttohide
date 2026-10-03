@@ -10,7 +10,7 @@ import type { GameState, HexCoord, NoisePulse, UnitState } from './types';
 import { prepareTestSnapshot } from './testConfig';
 
 function quietConfig() {
-  return createDefaultConfig({
+  return createDefaultConfig({mapMode:'fixed',
     economy: {
       initialZombieCount: 0, initialScreamerCount: 0,
       initialHunterCount: { min: 0, max: 0 },

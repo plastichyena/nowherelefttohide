@@ -211,6 +211,7 @@ export interface FacilityDefinition {
 }
 
 export interface FixedMap {
+  generation?: { terrainRepairs: number; river: HexCoord[]; lake: HexCoord; version: string };
   roads?: import('./roads').RoadNetwork;
   id: string;
   width: number;
@@ -401,6 +402,8 @@ export interface CheckpointState {
 }
 
 export interface CheckpointPositionCandidate {
+  supplyOrigin?: { kind:'capital'; position:HexCoord; sector:string; roadReachabilityIsSeparate:true };
+  projectionStatus?: 'predicted'|'not_applicable'|'omitted';
   routeVisibility?: { targetVisible: boolean; routeVisible: boolean; missingVisibleHexes: HexCoord[] };
   blockingEnemyIds?: string[];
   actionType: 'BuildCheckpoint' | 'RelocateCheckpoint' | 'ActivateCheckpoint';
@@ -1075,6 +1078,9 @@ export interface BarbedWireState {
 }
 
 export interface GameState {
+  mapDescriptor: import('./map-generation').MapDescriptor;
+  /** Private initialization retry metadata; never exposed in observations. */
+  initialEnemyAttempt: number;
   airBaseObjective: FacilityObjective;
   militaryDrone: { sourceFacilityId: string; center: HexCoord; radius: number; startedTurn: number; expiresBeforeTurn: number } | null;
   pendingReanimations: { humanUnitId: string; humanUnitType: HumanUnitType; zombieUnitType: ZombieUnitType; position: HexCoord; cause: string }[];
@@ -1516,6 +1522,9 @@ export interface NaturalRecoveryConfig {
 }
 
 export interface GameConfig {
+  mapMode: import('./map-generation').MapMode;
+  mapSeed: number | null;
+  gameplaySeed: number | null;
   scenarioId: import('./scenarios').ScenarioId;
   zombiePursuitMovementBonus: number;
   objectives: Record<'nuclearPowerPlant' | 'airBase', { rewardDeadlineTurn: number; requiresHealthySurvivors: boolean; failureOnUncapturedFall: boolean; rewardUnitType: 'specialForces'; failureUnitType: 'packZombie' }>;

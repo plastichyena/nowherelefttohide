@@ -6,7 +6,7 @@ import type { AgentObservation } from './types';
 import type { ArtilleryPreview } from '../core/artillery';
 
 function scenario(){
-  const observation=createAgentGame().reset({seed:1});
+  const observation=createAgentGame().reset({mapMode:'fixed',seed:1});
   const gun={...observation.units[0]!,id:'gun',type:'fieldArtillery' as const,mode:'deployed' as const,position:{q:10,r:25},attack:50,currentMilitaryGoods:100,range:200};
   const capital={...observation.facilities.find(f=>f.type==='capital')!,position:{q:10,r:10},healthyPopulation:50,infectedPopulation:0};
   const threatened={...capital,id:'threatened',type:'simpleFarm' as const,constructible:true,position:{q:30,r:25},healthyPopulation:40};
@@ -22,7 +22,7 @@ function scenario(){
 describe('public-only artillery collateral policy',()=>{
   it('rejects emergency predictions with unmodelled base interception or later friendly damage',()=>{
     const {observation,gun,preview}=scenario();
-    const base=createAgentGame().reset({seed:1}).facilities.find(f=>f.type==='armyBase')!;
+    const base=createAgentGame().reset({mapMode:'fixed',seed:1}).facilities.find(f=>f.type==='armyBase')!;
     observation.facilities.push({...base,position:{q:22,r:25},owner:'player',status:'owned',armyBase:{...base.armyBase!,interceptionAvailable:true,interceptionRange:10}});
     expect(assessArtillery(observation,gun,preview).allowed).toBe(false);
     observation.facilities.pop();

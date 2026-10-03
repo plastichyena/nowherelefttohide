@@ -1,7 +1,8 @@
 import { summarizePreview, type ActionSummary } from './action-summary';
+import { getUnitLegalAttackProjections } from './combat-query';
 import { previewMove } from './movement-query';
 import { destinationContactRisk } from './contact-risk';
-import { deriveCheckpointRole } from './supply';
+import { deriveCheckpointRole, deriveSupplySnapshot, getCapitalPosition, getSectorBranchIds, isHexSupplied } from './supply';
 import { isAirborne } from './unit-capabilities';
 import { aviationPreview } from './aviation-preview';
 import { productionCandidates } from './action-candidates';
@@ -36,6 +37,8 @@ export interface EconomyPreviewSnapshot {
 
 export interface CoreActionPreview {
   summary: ActionSummary;
+  combat?: ReturnType<typeof getUnitLegalAttackProjections>[number];
+  supply?: { origin: 'capital'; capitalPosition: {q:number;r:number}; before: ReturnType<typeof deriveSupplySnapshot>['branchRadii']; after: ReturnType<typeof deriveSupplySnapshot>['branchRadii']; affectedFacilities: Array<{id:string;sectors:string[];before:boolean;after:boolean}>; roadReachabilityIsSeparate:true };
   contactRisk?: ReturnType<typeof destinationContactRisk>;
   checkpointRelocation?: { oldCheckpointId: string; branchId: string; remaining: { waiting: number; screening: number; approved: number; infected: number }; oldRoleAfter: string; newActive: { position: { q: number; r: number }; id: null }; reason: string };
   populationMovements: {fromFacilityId:string;toFacilityId:string;people:number;reason:string}[];
@@ -163,7 +166,7 @@ export function previewCoreAction(
     legal = validation === null; reasonCode=validation?.code??null; reason=validation?.message??null;
     // Never execute a stochastic attack on a clone: that reveals the live stream's future.
   } else if (action.type !== 'EndTurn') {
-    const scratch = new GameEngine(beforeState.seed, beforeState.config);
+    const scratch = GameEngine.fromSnapshot(beforeState);
     const loaded = scratch.step({ type: 'LoadSnapshot', snapshot: beforeState });
     if (loaded.error) throw new Error(`Preview snapshot rejected: ${loaded.error.code}`);
     const result = scratch.step(action);
@@ -175,7 +178,7 @@ export function previewCoreAction(
       afterState = cloneState(result.state as GameState);
     }
   } else {
-    const scratch = new GameEngine(beforeState.seed, beforeState.config);
+    const scratch = GameEngine.fromSnapshot(beforeState);
     const loaded = scratch.step({ type: 'LoadSnapshot', snapshot: beforeState });
     if (loaded.error) throw new Error(`Preview snapshot rejected: ${loaded.error.code}`);
     legal = scratch.getLegalActions().some((candidate) => candidate.type === 'EndTurn');
@@ -201,6 +204,8 @@ export function previewCoreAction(
   if(legal && action.type==='TransferPopulation') populationMovements.push({fromFacilityId:action.fromFacilityId,toFacilityId:action.toFacilityId,people:action.people,reason:'population_transfer'});
   const production=action.type==='ProduceUnit'?productionCandidates(state,{unitType:action.unitType,facilityId:state.facilities.find(f=>action.destination && f.position.q===action.destination.q && f.position.r===action.destination.r)?.id})[0]:undefined;
   const preview: Omit<CoreActionPreview, 'summary'> = {
+    ...(['BuildCheckpoint','RelocateCheckpoint','ActivateCheckpoint'].includes(action.type) ? {supply:{origin:'capital' as const,capitalPosition:getCapitalPosition(state.map),before:deriveSupplySnapshot(beforeState).branchRadii,after:deriveSupplySnapshot(afterState).branchRadii,affectedFacilities:state.facilities.filter(f=>isHexSupplied(beforeState,f.position)!==isHexSupplied(afterState,f.position)).map(f=>({id:f.id,sectors:getSectorBranchIds(state.map,f.position),before:isHexSupplied(beforeState,f.position),after:isHexSupplied(afterState,f.position)})),roadReachabilityIsSeparate:true as const}} : {}),
+    ...(action.type==='Attack' && legal ? {combat:getUnitLegalAttackProjections(state,action.attackerId).find(p=>p.targetUnitId===action.targetId)} : {}),
     populationMovements,facilityResidentDeltas,
     ...(action.type === 'Move' ? { contactRisk: destinationContactRisk(state, action.unitId, action.destination) } : {}),
     ...(action.type === 'RelocateCheckpoint' && beforeState.checkpoints.some(c => c.id === action.checkpointId) ? { checkpointRelocation: (() => {

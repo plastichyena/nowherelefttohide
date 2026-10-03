@@ -8,7 +8,7 @@ import type { GameAction } from './types';
 
 describe('constructible facilities destroyed during an infection chain', () => {
   it('replays the Seed 3 action trace without duplicate site falls or broken population invariants', () => {
-    const engine = new GameEngine(fixture.seed, createDefaultConfig({
+    const engine = new GameEngine(fixture.seed, createDefaultConfig({mapMode:'fixed',
       economy: { initialResources: { civilianGoods: 2_000 } },
     }));
     for (const [index, action] of fixture.actions.entries()) {

@@ -22,6 +22,7 @@ const INITIAL_HUMAN_TYPES: readonly UnitType[] = ['police', 'nationalGuard', 'ri
  */
 export function createSessionReleaseConfig(): GameConfig {
   return createDefaultConfig({
+    mapMode:'fixed',
     maxActionsPerTurn: 100,
     economy: {
       initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 },

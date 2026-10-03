@@ -6,7 +6,7 @@ import { GameEngine } from './engine';
 import type { FacilityState, GameState } from './types';
 
 function fixture() {
-  const state = createInitialState(3, createDefaultConfig());
+  const state = createInitialState(3, createDefaultConfig({mapMode:'fixed'}));
   state.units = [];
   state.checkpoints = [];
   for (const f of state.facilities) { f.workers = 0; f.infected = 0; }
@@ -81,7 +81,7 @@ describe('v1.6.6 production allocation', () => {
   });
 
   it('constructs, powers, staffs and produces through real Core actions, then refunds once', () => {
-    const engine = new GameEngine(3, createDefaultConfig({ economy: { initialZombieCount: 0, initialGasCount: {min:0,max:0}, initialScreamerCount:0, initialHunterCount: {min:0,max:0}, initialResources: {food:10000,civilianGoods:10000,militaryGoods:10000,fuel:10000} } }));
+    const engine = new GameEngine(3, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialGasCount: {min:0,max:0}, initialScreamerCount:0, initialHunterCount: {min:0,max:0}, initialResources: {food:10000,civilianGoods:10000,militaryGoods:10000,fuel:10000} } }));
     const candidate = engine.getConstructibleFacilityPositionCandidates('reliefSupplyCenter').find(c => c.legal)!;
     expect(engine.step({type:'BuildConstructibleFacility', facilityType:'reliefSupplyCenter', position:candidate.position}).error).toBeNull();
     const id = engine.getState().facilities.find(f => f.type === 'reliefSupplyCenter')!.id;

@@ -10,11 +10,10 @@ import type {
 } from '../agent/types';
 
 /** v1.6.9 deliberately rejects every earlier Session/Checkpoint continuation schema. */
-export const CHECKPOINT_SCHEMA_VERSION = '20.0.0' as const;
-export const SESSION_SCHEMA_VERSION = '20.0.0' as const;
-export const SESSION_STORE_SCHEMA_VERSION = '1.0.0' as const;
-export const SESSION_ARTIFACT_PACKAGE_VERSION = '2.0.0' as const;
-export const PLAY_TURN_PROTOCOL_VERSION = '1.3.0' as const;
+import { CHECKPOINT_SCHEMA_VERSION, SESSION_SCHEMA_VERSION } from '../core/versions';
+export { CHECKPOINT_SCHEMA_VERSION, SESSION_SCHEMA_VERSION } from '../core/versions';
+import {SESSION_STORE_SCHEMA_VERSION,SESSION_ARTIFACT_PACKAGE_VERSION,PLAY_TURN_PROTOCOL_VERSION} from '../core/versions';
+export {SESSION_STORE_SCHEMA_VERSION,SESSION_ARTIFACT_PACKAGE_VERSION,PLAY_TURN_PROTOCOL_VERSION} from '../core/versions';
 export const DEFAULT_CHECKPOINT_INTERVAL = 5;
 export const PUBLIC_SNAPSHOT_INTERVAL = 50;
 export const DEFAULT_QUERY_PAGE_SIZE = 100;
@@ -284,6 +283,8 @@ export interface SessionCheckpointMetadata extends SessionVersionIdentity, Sessi
 export interface SessionPublicState extends SessionPublicDocument { decision: number; traceHeadHash: string; documentHash: string }
 
 export interface SessionCompactSnapshot {
+  map?: {id:string;descriptor?:AgentMapObservation['descriptor']};
+  terminal?: {progressActionsAllowed:false;result:AgentGameResult|null;details:string[]}|null;
   publicHealthForecast: ReturnType<typeof import('../core/public-health').compactPublicHealth>;
   publicHealth: AgentObservation['publicHealth'];
   nuclearObjective: AgentObservation['nuclearObjective'];
@@ -391,7 +392,7 @@ export interface SessionPlayTurnPlanResult {
   result: AgentGameResult | null;
 }
 
-export interface NewSessionOptions { scenarioId?: string; sessionId?: string; seed?: number; agentId?: string; checkpointInterval?: number; preferredCommentLocale?: SessionCommentLocale }
+export interface NewSessionOptions { mapMode?: import('../core/map-generation').MapMode; mapSeed?: number; gameplaySeed?: number; scenarioId?: string; sessionId?: string; seed?: number; agentId?: string; checkpointInterval?: number; preferredCommentLocale?: SessionCommentLocale }
 export interface SessionGameRuntime {
   getApiInfo?(): AgentApiInfo;
   getObservation(): AgentObservation;
@@ -405,7 +406,7 @@ export interface SessionGameRuntime {
   exportPrivateState(): JsonValue;
 }
 export interface SessionGameFactory {
-  createNew(options: { seed: number; agentId: string; scenarioId?: string }): SessionGameRuntime;
+  createNew(options: { seed: number; agentId: string; scenarioId?: string; mapMode?: import('../core/map-generation').MapMode; mapSeed?: number; gameplaySeed?: number }): SessionGameRuntime;
   restore(options: { privateState: JsonValue; seed: number; agentId: string; sessionId: string; decision: number; traceHeadHash: string }): SessionGameRuntime;
 }
 

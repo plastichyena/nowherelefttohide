@@ -204,7 +204,7 @@ function main(argv = process.argv.slice(2)) {
   if (platform === 'linux-x64') chmodSync(nodeTarget, 0o755);
   cpSync(cliSource, join(outputRoot, 'session-cli.mjs'));
   for (const file of REQUIRED_FILES) cpSync(join(sourceRoot, file), join(outputRoot, basename(file)));
-  for (const file of ['examples/v169-portable-turn.mjs','scripts/extract-public-evidence.mjs','validation/play-report-template.md','validation/v169-public-evidence.json','validation/v169-acceptance.md']) {
+  for (const file of ['examples/v169-portable-turn.mjs','scripts/extract-public-evidence.mjs','validation/play-report-template.md','validation/v169-public-evidence.json','validation/v169-acceptance.md','validation/v170-acceptance.md']) {
     const source=join(sourceRoot,file);
     if(existsSync(source)){const target=join(outputRoot,file);mkdirSync(resolve(target,'..'),{recursive:true});cpSync(source,target);}
   }

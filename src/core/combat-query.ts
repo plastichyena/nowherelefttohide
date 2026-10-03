@@ -88,6 +88,9 @@ export function forecastUnitCombatAtDistance(
 
 
 export interface UnitLegalAttackProjection {
+  action: {type:'Attack';attackerId:string;targetId:string};
+  mode: string;
+  killExpected: boolean | null;
   artillery?: ArtilleryPreview;
   conditionalCounterattack: ReturnType<typeof wireCombatProjection> | null;
   gasExplosion: GasAttackPreview | null;
@@ -124,6 +127,9 @@ export function getUnitLegalAttackProjections(
       const terrainDamage = terrainAdjustedDamage(snapshot, target, projection.effectiveAttack);
       const artillery = deployedArtillery(unit) ? previewArtillery(state, unit, target.position) : undefined;
       return {
+        action:{type:'Attack' as const,attackerId:unit.id,targetId:target.id},
+        mode:unit.mode??unit.flightState??'ground',
+        killExpected:artillery ? null : terrainDamage.finalDamage>=target.hp,
         ...(artillery ? {artillery} : {}),
         conditionalCounterattack: !artillery && terrainDamage.finalDamage < target.hp && canReact(target) && canTargetUnit(state,target,unit) && forecastUnitCombatAtDistance(snapshot, target, distance).canAttack ? wireCombatProjection(snapshot, unit, forecastUnitCombatAtDistance(snapshot, target, distance).effectiveAttack) : null,
         gasExplosion: artillery ? null : gasAttackPreview(state, target, terrainDamage.finalDamage),

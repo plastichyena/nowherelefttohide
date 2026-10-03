@@ -1,0 +1,125 @@
+{
+  "source": "f79eae9 / v1.6.9",
+  "fixtures": [
+    {
+      "seed": 0,
+      "actions": [
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        }
+      ],
+      "digests": [
+        "c8a457772696d2ddb387742b373adfd2b47c90afaea8e65c90762f036766f830",
+        "1c92b805ef6c7f8c457f7ec2ed14328b634eb5183a8c0728fdfc96a7c4501933",
+        "1ad7e925546eb4b73f2fc0134dc770a6af12c0f72079dd35da3878dedd41439d",
+        "e2d0a1eeb1af6ec0cd59ceb341b7d0ae4e96efff92275a435b626054ed4c595c"
+      ]
+    },
+    {
+      "seed": 1,
+      "actions": [
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        }
+      ],
+      "digests": [
+        "63a3869e0763ea25dce0a7faecf32313891ab57ce4bcfe3a69892809715c01b9",
+        "f75b7da10d4ae2bb4d64c1a9396cf64e9f62223d0a787facf0cab8c22db738e9",
+        "ce48100e95794fdaaa3ac4b0b7b16fc2f6ee3f2803dba3fc0ba91705fd0f71dd",
+        "d911a4af9263e77648a8e5d8d20e70e4f7240e9492c10468f25dc5c43effa664"
+      ]
+    },
+    {
+      "seed": -1,
+      "actions": [
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        }
+      ],
+      "digests": [
+        "f833ecc647a0e670816158af332ae4f356379359a558013ccdd91ce6320d548a",
+        "eb7498837632711994e56dc0f5239d7c7eb4b1feb827886883eaf0ea6fef831b",
+        "23db5e4f0279084d7f8b943ae54a9698736e81255789d6419fb2a0e8984a21de",
+        "70d58df3c99642c451fc987ed39f64124d719600e5296cb85fe89a1ed1c3eca2"
+      ]
+    },
+    {
+      "seed": 42,
+      "actions": [
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        }
+      ],
+      "digests": [
+        "16abdc8c16fba4b0df2d90bda4f9fffd259badfe3ffa963a672a3c419a20df32",
+        "dabc0cc6ae6b4d0d6899a0cf3b28334d74789bda57819937a5200d43653aef8b",
+        "5299ac31837e954a008d15764d55e5c57796420a0ce0c5e6f0bc234bae7f6d07",
+        "781fb174bcf7b250ff064543361c1f8fbf93732cfa9eea141836f14f87e3c674"
+      ]
+    },
+    {
+      "seed": 4294967296,
+      "actions": [
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        }
+      ],
+      "digests": [
+        "839e2361b5554506031120fbe1cb565b6914bd6abdd25bcf0474f811feabbb22",
+        "ffbe02613d67e17d8a53dea87c760cb2315a2f4338a2b6a6654b457bb2b7aa0b",
+        "98e96ff5b4509620be1597c0f8486124a3a07da722206a602ef1dcbbaf7edb3c",
+        "5b81aab3ce69edc16ea666969ad5734a27ca0bf3c541317987afc27b7c258bfe"
+      ]
+    },
+    {
+      "seed": 9007199254740991,
+      "actions": [
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        },
+        {
+          "type": "EndTurn"
+        }
+      ],
+      "digests": [
+        "275332ba8a6510ce131dc35c00861508ef803b51522d1176881e83a5893541f6",
+        "87fa0da37751a8ebb6896967a62b7a348797760647fe11c6a1e2047729a7c015",
+        "cce01fb475301f89819d04ab308045543d9d31bca71e7e6e8b9418b9fdd7a3d5",
+        "efc2633a80d63cae8fc238d32c4d61bd5459681d15bec0bc7b2d374761173fb6"
+      ]
+    }
+  ]
+}

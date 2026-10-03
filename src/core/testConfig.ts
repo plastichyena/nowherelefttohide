@@ -1,10 +1,14 @@
 import { GameEngine } from './engine';
+import {describeMap} from './map-generation';
 import { createDefaultConfig } from './config';
 import { createCityPopulationSnapshot, populationLedgerTotal, synchronizePopulation } from './state';
 import type { GameState, HordeComposition, HordeConfig } from './types';
 
 /** Rebuild derived population fields after a focused test mutates a scenario. */
 export function prepareTestSnapshot(state: GameState, preserveNeutralSurvivors = false): void {
+  // A test that explicitly changes Config must describe that new fixture.
+  // Map structure and Config legality are still checked by LoadSnapshot.
+  state.mapDescriptor=describeMap(state.map,state.seed,state.config,state.mapDescriptor.attempt,state.mapDescriptor.fallback);
   if (!preserveNeutralSurvivors) {
     for (const facility of state.facilities) {
       if (facility.owner === 'none' && facility.earlyCaptureSurvivorStatus === 'available') {
@@ -47,7 +51,7 @@ export function singleFinalWave(
  * is tested separately; this keeps combat/placement scenarios independent of it.
  * All actions still execute through the real current GameEngine. */
 export class TwoUnitScenarioEngine extends GameEngine {
-  constructor(seed: number, config = createDefaultConfig()) {
+  constructor(seed: number, config = createDefaultConfig({mapMode:'fixed'})) {
     super(seed, config);
     const state = this.getState() as GameState;
     state.units = state.units.filter(unit => !unit.isPlayerUnit || ['police-1', 'national-guard-1'].includes(unit.id));

@@ -6,7 +6,7 @@ import { isHexSupplied } from './supply';
 import { createInitialState } from './state';
 import type { FacilityState, GameState } from './types';
 
-const config = () => createDefaultConfig({
+const config = () => createDefaultConfig({mapMode:'fixed',
   economy: {
     initialZombieCount: 0, initialScreamerCount: 0,
     initialHunterCount: { min: 0, max: 0 },

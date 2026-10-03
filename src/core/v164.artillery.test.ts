@@ -17,7 +17,7 @@ import { createAgentGame } from '../agent/game';
 import { getPlayerVisibleTileKeys } from './visibility';
 
 function scenario(proficiency: UnitProficiency = 'veteran') {
-  const engine = new GameEngine(1, createDefaultConfig({ economy: { initialZombieCount: 0, initialHunterCount: { min:0,max:0 }, initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000} }, refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99} }));
+  const engine = new GameEngine(1, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialHunterCount: { min:0,max:0 }, initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000} }, refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99} }));
   const state=engine.getState() as GameState;
   state.units=[createUnit(state,'gun','fieldArtillery',{q:15,r:25},'ready',proficiency),createUnit(state,'spotter','reconTeam',{q:26,r:27})];
   const gun=state.units[0]!;gun.mode='deployed';gun.canMove=false;synchronizeArtilleryStats(state,gun);

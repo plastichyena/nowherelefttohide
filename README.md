@@ -1,6 +1,6 @@
 # Nowhere Left to Hide
 
-v1.6.9ではUNAシナリオ選択・開始メッセージ・あらすじ、IFV（歩兵戦闘車）の生産・輸送・轢過を追加しました。現役検問所の継続警告、未知の感染人数、操作の予測／実績要約と公開ログに基づくプレイ報告も整備しています。画像は採用済み原本を使用しています。旧版データは非破壊で拒否し、新しいゲームを開始します。検証範囲と未確認のWorkflow結果は [v1.6.9受入記録](validation/v169-acceptance.md) を参照してください。
+v1.7.0は内陸ランダムマップを既定にし、明示的な固定モードも選べます。地図とゲーム進行のseedを分離し、生成進捗・キャンセル、両モードの保存・観戦、AI向けの移動・攻撃・補給・回復の説明を整えました。検証範囲とGitHub Actionsの未確認項目は [v1.7.0受入記録](validation/v170-acceptance.md) を参照してください。
 
 v1.5.2で行ったPC Chromeの比較証跡は[`v152-performance-evidence.json`](src/testing/fixtures/v152-performance-evidence.json)、AI CLIは[`play-turn-performance-evidence.json`](src/session/play-turn-performance-evidence.json)に記録しています。390×844の同一Saveで、序盤の選択中央値は849→98ms、Turn 51の移動先確認は4,146→108ms、ターン終了操作全体は6,881→987msでした。Core単体のTurn 51は683→372msで、旧新版144回のStepResult hashが一致しています。ブラウザ値には自動操作と描画待ちが含まれ、SOG05の実測値ではありません。パン・ピンチ・人口スライダーは概ね横ばいで、選択・プレビュー・確定・資源／シート表示が主に改善しました。
 
@@ -18,8 +18,8 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 
 ## PoCの範囲
 
-- 固定51×51ヘックス、Seedで配置されるArmy BaseとAir Baseを含む28恒久施設、東西南北の道路支線とHorde入口、外周2列392 HexのHorde Spawn Reserve
-- Plain／Forest／Mountainの固定地形、重み付き移動、Urban／Forest防御、共通VisibilityとFog of War
+- 51×51ヘックスのランダム／固定モード、Army BaseとAir Baseを含む28恒久施設、東西南北の道路支線とHorde入口、外周2列392 HexのHorde Spawn Reserve
+- Plain／Forest／Mountain／Waterと連続した川・湖、重み付き移動、Urban／Forest防御、共通VisibilityとFog of War
 - 州都、地方都市、農場、工場、製油所、発電所の確保・稼働・感染・陥落・復旧
 - Police Movement 15／Soldier Movement 10／Riot Police Movement 10、機種別Fuel、Fuel 0 Emergency Movement、Unit別携行軍需品、補給、迎撃、攻撃、反撃、待機、自然回復
 - 食料・民需品・軍需品・燃料・電力Capacityの生産と不足処理
@@ -28,7 +28,7 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 所在地を持つ都市住民・生産施設労働者、都市間移住、都市過密
 - 検問所、避難民の到着・審査・Turn Away、waiting / screening / approved、潜伏感染、拒絶由来Horde増援
 - 道路方面ごとの独立到着予定、複数Checkpoint Post、Active / Standby / Dormant、Automatic Fallback
-- 州都と稼働中検問所を起点にした供給範囲、セクター境界、供給外Actionの理由表示
+- 州都を起点とし稼働中検問所までの距離で広がる方面別供給範囲、セクター境界、供給外Actionの理由表示
 - Seed付き乱数によるゾンビAI、避難民、感染、Hordeの再現
 - 戦闘地点・Horde移動地点から通常系Zombieを誘引する共通Noise Pulseと、Horde／人口Targetとの優先順位
 - Recruit／Regular／Veteran熟練度、Attack Charge、Recon Team、Riot Police／Riot Zombie／Hunter Zombie／Gas Zombie／Screamer Zombie、Army Base迎撃、特殊Zombie混成を含む固定Multi-direction Wave（Turn 10 / 20 / 35 / 50 / 70）
@@ -40,7 +40,7 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 - 1 Turnを同じNodeプロセスで対話できる`play-turn`、互換用の既存8コマンド、Active Session、Public Decision Log、履歴Checkpoint、分岐Session、Compact応答と詳細query
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.6.9の変更規則とローカル検証結果は現行仕様18.19に記録します。GitHub Actionsは起動確認までを今回の範囲とし、完了結果・配布先の検証は別途確認します。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.7.0の変更規則と検証範囲は現行仕様18.20と受入記録に記録します。GitHub Actionsは起動確認までを今回の範囲とし、完了結果・配布先の検証は別途確認します。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## v1.5.5 公開検証
 
@@ -165,7 +165,7 @@ Turn 70のFinal Waveは4方向・基本80体です。別枠Pack1体と参加方�
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。`SeededRng` のスナップショット（Seed、状態、呼出回数、アルゴリズム）もJSON化し、同じVersion・Build・Config・Map・Seed・Action列から同じ結果を得られるようにします。App/Release Versionは `1.6.8`、Game Rules / GameState / Configは `18.0.0`、Fixed Mapは `fixed-51x51-v9`、Save Formatは`25`、Agent / Observation / Browser Bridge APIは `23.0.0`、Artifact Schemaは `22.0.0`、Checkpoint／Session Schemaは`19.0.0`、Balanced Agentは`14.0.0`、Random Agentは`9.0.0`です。v1.6.7以前の通常Save、AI Session、Checkpointによるゲーム継続は変換せず拒否し、旧データを削除・上書きしません。v1.6.7の公開Artifact ZIPは記録された旧性能と結果のまま観戦できます。
+ゲームルール内では `Math.random()` を使いません。通常は `seed` 一つで開始し、詳細設定では `mapSeed` と `gameplaySeed` を個別指定できます。省略した個別seedは通常seedを使います。全入口で `mapMode` の省略は `random`、`fixed` は明示指定です。同じ版・実効Config・seedから同じ地図と進行を再現します。保存時は地図実体・再現descriptor・Config・RNG snapshotを保持し、ロードで地図を生成し直しません。版番号の正本は [versions.ts](src/core/versions.ts) です。App 1.7.0、Rules/State/Config 20、Save 27、Agent/Observation/Bridge 25、Artifact 24、Session/Checkpoint 21、Action 4、Query 1.7、Summary 2。v1.6.9以前のSave・Session・Checkpoint・公開Replayは、元データを変更せず拒否します。
 
 ## CoreとHeadless API
 
@@ -188,9 +188,9 @@ interface HeadlessGame {
 
 UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` を使用します。不正ActionやGame Over後の `step` は状態を変更せず、理由付きエラーを返します。`GameState` は `Map`、`Set`、`Date`、関数を含まないJSON互換データです。
 
-## v1.6.8 公開契約
+## v1.7.0 公開契約
 
-App 1.6.8 / Rules・State・Config 18.0.0 / Fixed Map v9 / Save 25 / Agent・Observation・Bridge 23.0.0 / Artifact 22.0.0 / Checkpoint・Session 19.0.0 / Action 3.0.0 / Query 1.2.0・AiSession 1.4.0 / Balanced 14.0.0 / Random 9.0.0。Play-turnは1.3.0へ更新し、Store 1.0.0とZIP Package 2.0.0を維持し、内包するAction・状態のVersionで旧データを拒否します。
+互換境界は上記の中央定義を使用します。Play-turn 1.3、AiSession 1.5、Store 1.0、ZIP Package 2.0は外側のプロトコルを維持します。内包する状態・API・Artifact版で旧版を拒否します。固定Map IDは `fixed-51x51-v9`、ランダムMap IDは `inland-51x51-v1` です。
 
 CLIの `preview-batch --session=ID --revision=N --input=actions.json` は1～100件のAction配列を同一Revisionから独立評価します。WebMCPは `nlth_preview_actions` を提供します。詳細は [PLAY_WITH_AI.md](PLAY_WITH_AI.md) を参照してください。
 
@@ -235,7 +235,7 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 
 Workflowは`actions/configure-pages`でPagesの有効化を要求し、相対asset URLで生成した`dist`を公開します。リポジトリ/組織ポリシーが自動有効化を拒否した場合だけ、Pages設定のSourceを「GitHub Actions」に変更してください。
 
-Pages公開後は実ブラウザでゲームURLを開き、`window.NLTH`をSeed 1でGame Overまで実行します。`appVersion` 1.6.9、Game Rules 19.0.0、各24.0.0 API、Artifact 23.0.0、51×51 Map、Checkpoint偵察ゲート、Ground／Aerial Vision、Crisis Summary／EndTurn Risk、生産余力、熟練度／Attack Charge、Riot／Hunter／Gas Zombie、Army Base、混成HordeのWarning公開境界、Turn Awayの公開境界、重要Site Event、`verificationEvents`とHidden Spawn／Rejected Counter情報の非公開、Action列Replay一致を確認します。勝利は合格条件ではありません。
+Pages公開後は実ブラウザでゲームURLを開き、`window.NLTH`をSeed 1でGame Overまで実行します。`appVersion` 1.7.0、Game Rules 20.0.0、各25.0.0 API、Artifact 24.0.0、51×51 Map、Checkpoint偵察ゲート、Ground／Aerial Vision、Crisis Summary／EndTurn Risk、生産余力、熟練度／Attack Charge、Riot／Hunter／Gas Zombie、Army Base、混成HordeのWarning公開境界、Turn Awayの公開境界、重要Site Event、`verificationEvents`とHidden Spawn／Rejected Counter情報の非公開、Action列Replay一致を確認します。勝利は合格条件ではありません。
 
 ## 実機確認条件と既知の問題
 

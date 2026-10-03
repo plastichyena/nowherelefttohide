@@ -47,7 +47,7 @@ function lineTile(q: number): AgentMapTileObservation {
 
 describe('public route query', () => {
   it('uses the Core legal-move projection for a player unit and omits raw Hexes by default', () => {
-    const observation = createAgentObservation(createInitialState(15711, createDefaultConfig()));
+    const observation = createAgentObservation(createInitialState(15711, createDefaultConfig({mapMode:'fixed'})));
     const unit = observation.units.find((candidate) => candidate.movementSummary.legalMoveCount > 0)!;
     const legal = publicMoveCandidates(observation, unit.id)[0]!;
     const result = queryRoute(observation, {
@@ -78,7 +78,7 @@ describe('public route query', () => {
   });
 
   it('separates terrain path existence, public center occupancy, and adjacent Facility candidates', () => {
-    const observation = createAgentObservation(createInitialState(15712, createDefaultConfig()));
+    const observation = createAgentObservation(createInitialState(15712, createDefaultConfig({mapMode:'fixed'})));
     const mover = observation.units[0]!;
     const facility = observation.facilities.find((candidate) => hexKey(candidate.position) !== hexKey(mover.position))!;
     const blocker = { ...structuredClone(observation.units[1] ?? mover), id: 'public-blocker', position: { ...facility.position } };
@@ -99,7 +99,7 @@ describe('public route query', () => {
   });
 
   it('marks Facility-to-Facility paths as reference routes without unit MP claims', () => {
-    const observation = createAgentObservation(createInitialState(15713, createDefaultConfig()));
+    const observation = createAgentObservation(createInitialState(15713, createDefaultConfig({mapMode:'fixed'})));
     const [source, destination] = observation.facilities;
     const result = queryRoute(observation, {
       source: { kind: 'facility', id: source!.id },
@@ -121,7 +121,7 @@ describe('public route query', () => {
   });
 
   it('reports a visible wall MP cost, an already-acted unit, and a zero-length route distinctly', () => {
-    const state = createInitialState(15716, createDefaultConfig());
+    const state = createInitialState(15716, createDefaultConfig({mapMode:'fixed'}));
     const unit = state.units.find((candidate) => candidate.isPlayerUnit)!;
     const occupied = new Set(state.units.map((candidate) => hexKey(candidate.position)));
     const destination = hexNeighbors(unit.position).find((position) => {
@@ -161,7 +161,7 @@ describe('public route query', () => {
   });
 
   it('rejects an enemy actor and a source that contradicts the player unit position', () => {
-    const observation = createAgentObservation(createInitialState(15714, createDefaultConfig()));
+    const observation = createAgentObservation(createInitialState(15714, createDefaultConfig({mapMode:'fixed'})));
     const unit = observation.units[0]!;
     const zombie = observation.zombies[0];
     if (zombie) {
@@ -231,7 +231,7 @@ describe('public route query', () => {
   });
 
   it('is unchanged when private enemy positions change outside public vision', () => {
-    const state = createInitialState(15715, createDefaultConfig());
+    const state = createInitialState(15715, createDefaultConfig({mapMode:'fixed'}));
     const visible = getPlayerVisibleTileKeys(state);
     const enemy = state.units.find((unit) => !unit.isPlayerUnit && !visible.has(hexKey(unit.position)))!;
     const occupied = new Set(state.units.map((unit) => hexKey(unit.position)));

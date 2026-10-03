@@ -8,8 +8,8 @@ import {
 describe('v1.6 GameConfig', () => {
   it('contains the agreed PoC defaults and validates', () => {
     expect(validateGameConfig(DEFAULT_CONFIG)).toEqual({ valid: true, errors: [] });
-    expect(DEFAULT_CONFIG.version).toBe('19.0.0');
-    expect(DEFAULT_CONFIG.mapId).toBe('fixed-51x51-v9');
+    expect(DEFAULT_CONFIG.version).toBe('20.0.0');
+    expect(DEFAULT_CONFIG.mapId).toBe('inland-51x51-v1');
     expect(DEFAULT_CONFIG.economy.initialRefineryAllowance).toBe(2_000);
     expect(DEFAULT_CONFIG.economy.oilFieldAllowancePerWorker).toBe(100);
     expect(DEFAULT_CONFIG.economy.initialZombieCount).toBe(40);
@@ -103,12 +103,12 @@ describe('v1.6 GameConfig', () => {
   });
 
   it('enforces type-specific capacity consumers and zero-capacity non-consumers', () => {
-    const requiredThree = createDefaultConfig({ facilities: { capital: { production: { powerCapacity: 3 } } } });
+    const requiredThree = createDefaultConfig({mapMode:'fixed', facilities: { capital: { production: { powerCapacity: 3 } } } });
     expect(validateGameConfig(requiredThree)).toMatchObject({
       valid: false,
       errors: expect.arrayContaining(['facilities.capital.production.powerCapacity must be 20']),
     });
-    const nonConsumerFive = createDefaultConfig({ facilities: { simpleFarm: { production: { powerCapacity: 5 } } } });
+    const nonConsumerFive = createDefaultConfig({mapMode:'fixed', facilities: { simpleFarm: { production: { powerCapacity: 5 } } } });
     expect(validateGameConfig(nonConsumerFive)).toMatchObject({
       valid: false,
       errors: expect.arrayContaining(['facilities.simpleFarm.production.powerCapacity must be 0']),
@@ -116,7 +116,7 @@ describe('v1.6 GameConfig', () => {
   });
 
   it('deep-merges options without mutating the default snapshot', () => {
-    const config = createDefaultConfig({ horde: { warningLeadTurns: 3 } });
+    const config = createDefaultConfig({mapMode:'fixed', horde: { warningLeadTurns: 3 } });
     expect(config.horde.warningLeadTurns).toBe(3);
     expect(config.horde.waves).toEqual(DEFAULT_CONFIG.horde.waves);
 
@@ -128,11 +128,11 @@ describe('v1.6 GameConfig', () => {
   });
 
   it('accepts zero initial Zombies but rejects more than the 50 fixed-map positions', () => {
-    expect(validateGameConfig(createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }))).toEqual({
+    expect(validateGameConfig(createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }))).toEqual({
       valid: true,
       errors: [],
     });
-    const tooMany = createDefaultConfig({ economy: { initialZombieCount: 51 } });
+    const tooMany = createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 51 } });
     expect(validateGameConfig(tooMany)).toMatchObject({
       valid: false,
       errors: expect.arrayContaining(['economy.initialZombieCount cannot exceed the 50 fixed-map positions']),
@@ -140,7 +140,7 @@ describe('v1.6 GameConfig', () => {
   });
 
   it('validates the v1.4.3 infection Spawn and Capital Vision fields', () => {
-    const invalid = createDefaultConfig({
+    const invalid = createDefaultConfig({mapMode:'fixed',
       infection: {
         zombieSpawnPopulationPerUnit: 0,
         maxZombieSpawnPerResolution: 0,
@@ -162,11 +162,11 @@ describe('v1.6 GameConfig', () => {
 
   it('validates every Horde composition component and rejects unusable groups', () => {
     const invalidConfigs = [
-      createDefaultConfig({ horde: { waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: -1, zombie: 0 }, final: true }] } }),
-      createDefaultConfig({ horde: { waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0.5 }, final: true }] } }),
-      createDefaultConfig({ horde: { waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 0, zombie: 0 }, final: true }] } }),
-      createDefaultConfig({ horde: { waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 0, zombie: 1 }, final: true }] } }),
-      createDefaultConfig({ horde: { waves: [
+      createDefaultConfig({mapMode:'fixed', horde: { waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: -1, zombie: 0 }, final: true }] } }),
+      createDefaultConfig({mapMode:'fixed', horde: { waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0.5 }, final: true }] } }),
+      createDefaultConfig({mapMode:'fixed', horde: { waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 0, zombie: 0 }, final: true }] } }),
+      createDefaultConfig({mapMode:'fixed', horde: { waves: [{ turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 0, zombie: 1 }, final: true }] } }),
+      createDefaultConfig({mapMode:'fixed', horde: { waves: [
         { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true },
         { turn: 5, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: false },
       ] } }),
@@ -178,7 +178,7 @@ describe('v1.6 GameConfig', () => {
   });
 
   it('clones custom per-type Horde compositions without sharing nested state', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: {
         waves: [{ turn: 12, directionCount: 2, compositionPerDirection: { hordeZombie: 9, zombie: 8 }, final: true }],
       },
@@ -192,7 +192,7 @@ describe('v1.6 GameConfig', () => {
   });
 
   it('rejects inverted ranges and invalid rates', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       refugees: {
         arrivalIntervalMin: 5,
         arrivalIntervalMax: 2,
@@ -206,13 +206,13 @@ describe('v1.6 GameConfig', () => {
   });
 
   it('rejects a pre-v1.1 Config version', () => {
-    const config = createDefaultConfig();
+    const config = createDefaultConfig({mapMode:'fixed'});
     config.version = '1.0.0';
     expect(validateGameConfig(config)).toMatchObject({ valid: false });
   });
 
   it('validates initial disconnected population ranges against their facility capacity', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       initialFacilityPopulation: {
         'farm-2': { survivorRange: { min: 20, max: 30 }, infected: 1 },
       },

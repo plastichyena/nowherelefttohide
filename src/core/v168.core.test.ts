@@ -12,12 +12,12 @@ import { prepareTestSnapshot, singleFinalWave } from './testConfig';
 import { createMovement } from './movement';
 import { ZOMBIE_UNIT_TYPES } from './unit-catalog';
 
-const quietConfig = () => createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } }, horde: singleFinalWave(200) });
+const quietConfig = () => createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 } }, horde: singleFinalWave(200) });
 const wall = (q: number, r: number, hp = 20) => ({ id: `wire-${q}-${r}`, position: { q, r }, hp, maxHp: 20, builtTurn: 1 });
 
 describe('v1.6.8 refugees and crowding', () => {
   it.each([[1,20],[2,20],[3,21],[20,29],[21,30],[41,40],[61,50],[69,54],[201,120]])('uses resolving turn %i upper %i', (turn, max) => {
-    expect(refugeeArrivalRange(createDefaultConfig().refugees, turn)).toEqual({ min: 10, max });
+    expect(refugeeArrivalRange(createDefaultConfig({mapMode:'fixed'}).refugees, turn)).toEqual({ min: 10, max });
   });
   it.each([false,true])('draws integer endpoints on all four branches (unmanaged=%s)', unmanaged => {
     const seen = new Set<number>();
@@ -34,7 +34,7 @@ describe('v1.6.8 refugees and crowding', () => {
       for (const e of arrivals) { const people = Number(e.payload.people); expect([20,21]).toContain(people); seen.add(people); }
     }
     expect([...seen].sort()).toEqual([20,21]);
-    expect(refugeeArrivalRange({ ...createDefaultConfig().refugees, arrivalGrowthPeople: 0 }, 100)).toEqual({ min: 10, max: 20 });
+    expect(refugeeArrivalRange({ ...createDefaultConfig({mapMode:'fixed'}).refugees, arrivalGrowthPeople: 0 }, 100)).toEqual({ min: 10, max: 20 });
   });
   it.each([[60,0,.25],[61,.01/60,.25*(1+.5/60)],[120,.01,.375],[180,.02,.375]])('waiting %i has independent threshold', (waiting,pWait,pPass) => {
     expect(waitingProbability(waiting,60,{food:0,civilianGoods:0})).toBeCloseTo(pWait);

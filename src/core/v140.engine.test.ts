@@ -21,7 +21,7 @@ import type { GameConfig, GameState, HexCoord } from './types';
 const CENTER: HexCoord = { q: 25, r: 25 };
 
 function safeConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}): GameConfig {
-  return createDefaultConfig({
+  return createDefaultConfig({mapMode:'fixed',
     horde: singleFinalWave(100),
     economy: {
       initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },

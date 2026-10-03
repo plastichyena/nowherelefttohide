@@ -32,7 +32,7 @@ describe('machine-readable public Query contract', () => {
     expect(contract).toMatchObject({
       schemaFormat: 'JSON Schema',
       schemaVersion: '2020-12',
-      contractVersion: '1.2.0',
+      contractVersion: '1.7.0',
       pagination: {
         cursor: { defaultPageSize: 100, maxPageSize: 500, revisionPinned: true, filtersPinned: true },
         routeRanges: { defaultOffset: 0, defaultLimit: 100, maxLimit: 500, hexPathIncludedByDefault: false },
@@ -62,7 +62,7 @@ describe('machine-readable public Query contract', () => {
     expect(validateQuerySchema(contract.examples.unitRoute.filters, QUERY_FILTER_SCHEMAS.route)).toEqual([]);
     expect(validateQuerySchema(contract.examples.referenceRoute.filters, QUERY_FILTER_SCHEMAS.route)).toEqual([]);
 
-    const observation = createAgentObservation(createInitialState(15721, createDefaultConfig()));
+    const observation = createAgentObservation(createInitialState(15721, createDefaultConfig({mapMode:'fixed'})));
     const unit = observation.units[0]!;
     const route = queryRoute(observation, { moverUnitId: unit.id, destination: { kind: 'facility', id: 'capital' } });
     const routeEnvelope = { sessionId: 'example', revision: 0, target: 'route', count: 1, total: 1, hasMore: false, nextCursor: null, value: route };

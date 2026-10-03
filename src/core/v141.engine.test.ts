@@ -24,7 +24,7 @@ function rebalance(state: Snapshot): void {
 }
 
 function quietEngine(seed = 1): GameEngine {
-  return new GameEngine(seed, createDefaultConfig({
+  return new GameEngine(seed, createDefaultConfig({mapMode:'fixed',
     horde: singleFinalWave(30),
     economy: {
       initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 },

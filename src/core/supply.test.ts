@@ -1,3 +1,4 @@
+import { createDefaultConfig as v170FixedConfig } from './config';
 import { TwoUnitScenarioEngine as GameEngine } from './testConfig';
 import { describe, expect, it } from 'vitest';
 import { createDefaultConfig } from './config';
@@ -20,7 +21,7 @@ function engineWithoutZombies(): GameEngine {
   // v1.4.5 checkpoint placement requires a currently visible capital
   // corridor. These supply tests exercise cost/radius behavior, so give them
   // a complete road reconnaissance budget explicitly.
-  const engine = new GameEngine(17, createDefaultConfig({ vision: { capital: 50 } }));
+  const engine = new GameEngine(17, createDefaultConfig({mapMode:'fixed', vision: { capital: 50 } }));
   const snapshot = engine.getState() as GameState;
   snapshot.units = snapshot.units.filter((unit) => unit.isPlayerUnit);
   expect(engine.step({ type: 'LoadSnapshot', snapshot }).error).toBeNull();
@@ -46,7 +47,7 @@ describe('road branches and supply network', () => {
   });
 
   it('defines four capital-outward branches and supplies radius five without checkpoints', () => {
-    const state = new GameEngine(1).getState();
+    const state = new GameEngine(1, v170FixedConfig({mapMode:'fixed'})).getState();
     expect(state.map.roadBranches.map((branch) => branch.id).sort()).toEqual([
       'east',
       'north',
@@ -64,7 +65,7 @@ describe('road branches and supply network', () => {
   });
 
   it('places an unsecured military factory inside the initial capital supply network', () => {
-    const state = new GameEngine(1).getState();
+    const state = new GameEngine(1, v170FixedConfig({mapMode:'fixed'})).getState();
     const unsecuredMilitaryFactories = state.facilities.filter(
       (facility) => facility.type === 'militaryFactory' && facility.owner !== 'player',
     );
@@ -82,7 +83,7 @@ describe('road branches and supply network', () => {
   });
 
   it('uses the candidate sector plus initial radius for zombie construction blockers', () => {
-    const state = new GameEngine(1, createDefaultConfig({ units: { police: { vision: 10 } } })).getState();
+    const state = new GameEngine(1, createDefaultConfig({mapMode:'fixed', units: { police: { vision: 10 } } })).getState();
     state.units.push(createUnit(state, 'zombie-checkpoint-blocker', 'zombie', { q: 24, r: 20 }));
     const blockers = getBlockingZombiesForCheckpoint(state, 'north', { q: 25, r: 19 });
     expect(blockers.length).toBeGreaterThan(0);
@@ -91,7 +92,7 @@ describe('road branches and supply network', () => {
   });
 
   it('does not let another sector zombie block a branch inside the shared initial radius', () => {
-    const state = new GameEngine(1).getState() as GameState;
+    const state = new GameEngine(1, v170FixedConfig({mapMode:'fixed'})).getState() as GameState;
     const otherSectorTile = state.map.tiles.find((tile) =>
       hexDistance({ q: 25, r: 25 }, tile) <= state.config.checkpoint.initialSupplyRadius &&
       !getSectorBranchIds(state.map, tile).includes('north'))!;
@@ -153,7 +154,7 @@ describe('road branches and supply network', () => {
   });
 
   it('processes all unmanaged road arrivals immediately without hidden checkpoint pools', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       horde: singleFinalWave(3),
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       refugees: {
@@ -175,7 +176,7 @@ describe('road branches and supply network', () => {
   });
 
   it('allows existing out-of-supply production but rejects worker increases and natural recovery', () => {
-    const config = createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } }, horde: singleFinalWave(3) });
+    const config = createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } }, horde: singleFinalWave(3) });
     const engine = new GameEngine(4, config);
     const snapshot = engine.getState();
     const power = snapshot.facilities.find((facility) => facility.id === 'farm-2')!;
@@ -199,7 +200,7 @@ describe('road branches and supply network', () => {
   });
 
   it('ruins an empty occupied checkpoint and allows a forward replacement once the Zombie is cleared', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       horde: singleFinalWave(4),
       vision: { capital: 50 },

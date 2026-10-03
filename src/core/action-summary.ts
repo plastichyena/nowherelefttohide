@@ -1,8 +1,9 @@
+import { SUMMARY_SCHEMA_VERSION } from './versions';
 import type { CoreActionPreview } from './action-preview';
 import type { GameAction, HexCoord, JsonValue, ResourceType } from './types';
 import type { AgentObservation, AgentPublicEvent } from '../agent/types';
 
-export const ACTION_SUMMARY_SCHEMA = { version: '1.0.0', eventLimit: 12, changeLimit: 12,
+export const ACTION_SUMMARY_SCHEMA = { version: SUMMARY_SCHEMA_VERSION, eventLimit: 12, changeLimit: 12,
   phases: ['prediction', 'result'], unknown: null,
   detailQueries: ['units', 'facilities', 'history', 'full-snapshot'],
 } as const;
@@ -13,10 +14,11 @@ export interface ActionSummary {
   baseRevision: number; resultRevision: number | null;
   legal: boolean | null; accepted: boolean | null; reasonCode: string | null;
   remainingAttackCharges: number | null;
+  combat?: JsonValue;
   targetIds: string[]; target: HexCoord | null;
   movement: { predictedPosition: HexCoord | null; actualPosition: HexCoord | null;
     destinationReached: boolean | null; interruptionReason: string | null;
-    remainingAttackCharges: number | null; overruns: JsonValue[]; overrunCount: number; overrunsOmitted: number; destroyed: boolean | null } | null;
+    remainingHp: number | null; remainingFuel: number | null; remainingAttackCharges: number | null; overruns: JsonValue[]; overrunCount: number; overrunsOmitted: number; destroyed: boolean | null } | null;
   resources: Partial<Record<ResourceType, number>>;
   populationMovementCount: number; populationMovementsOmitted: number;
   populationMovements: JsonValue[]; production: JsonValue | null; construction: JsonValue | null;
@@ -42,9 +44,11 @@ export function summarizePreview(preview: Omit<CoreActionPreview, 'summary'>, tu
   const { action, legal } = preview, id = identity(action), move = preview.movement;
   return { schemaVersion: ACTION_SUMMARY_SCHEMA.version, phase: 'prediction', actionType: action.type,
     baseRevision: preview.baseRevision, resultRevision: null, legal, accepted: null, reasonCode: preview.reasonCode,
+    ...(preview.combat ? {combat: copy(preview.combat) as unknown as JsonValue} : {}),
     ...id, remainingAttackCharges: move?.interception ? null : charges, movement: action.type === 'Move' ? { predictedPosition: legal ? copy(move?.reached ?? null) : null, actualPosition: null,
       destinationReached: legal ? move?.destinationReached ?? null : false,
       interruptionReason: !legal ? preview.reasonCode : move?.destinationReached === false ? move.arrivalReason ?? 'unknown' : null,
+      remainingHp: move?.projectedHpAfterMove ?? null, remainingFuel: move?.projectedFuelAfterMove ?? null,
       remainingAttackCharges: move?.interception ? null : charges, overruns: copy((move?.overruns ?? []).slice(0,ACTION_SUMMARY_SCHEMA.eventLimit)) as unknown as JsonValue[], overrunCount: move?.overruns?.length ?? 0, overrunsOmitted: Math.max(0,(move?.overruns?.length ?? 0)-ACTION_SUMMARY_SCHEMA.eventLimit), destroyed: legal && move?.projectedHpAfterMove !== undefined ? move.projectedHpAfterMove === 0 : null } : null,
     resources: legal ? copy(preview.immediate.resourceDelta) : {},
     populationMovementCount: preview.populationMovements.length, populationMovementsOmitted: Math.max(0,preview.populationMovements.length-12),
@@ -76,6 +80,7 @@ export function summarizeActionResult(action: GameAction, before: AgentObservati
     baseRevision, resultRevision, legal: accepted, accepted, reasonCode: error?.code ?? null, ...id, remainingAttackCharges: unit?.attackChargesRemaining ?? null,
     movement: action.type === 'Move' ? { predictedPosition: null, actualPosition: unit ? copy(unit.position) : null,
       destinationReached: accepted && targetReached, interruptionReason: interruption,
+      remainingHp: unit?.hp ?? null, remainingFuel: unit?.currentFuel ?? null,
       remainingAttackCharges: unit?.attackChargesRemaining ?? null,
       overruns: overrunEvents.slice(0,ACTION_SUMMARY_SCHEMA.eventLimit).map(e => ({eventId:e.id,...copy(e.payload)})), overrunCount: overrunEvents.length, overrunsOmitted: Math.max(0,overrunEvents.length-ACTION_SUMMARY_SCHEMA.eventLimit), destroyed } : null,
     resources, populationMovementCount: populationMovements.length, populationMovementsOmitted: Math.max(0,populationMovements.length-12), populationMovements: populationMovements.slice(0,ACTION_SUMMARY_SCHEMA.changeLimit),

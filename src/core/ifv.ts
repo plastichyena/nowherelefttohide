@@ -14,7 +14,7 @@ export function overrunDamage(state: Readonly<GameState>, mover: UnitState, targ
 
 export interface OverrunProjection {
   targetId: string; position: HexCoord; impactDamage: number; gasDamage: number;
-  remainingEnemyCharges: number; executed: boolean; hpAfter: number;
+  remainingEnemyCharges: number; wouldExecute: boolean; hpAfter: number;
 }
 
 export interface IfvPublicActor { hp: number; currentFuel: number; position: HexCoord; cargoUnitId?: string | null }
@@ -40,7 +40,7 @@ export function projectIfvPath(unit: IfvPublicActor, path: readonly HexCoord[], 
     const gas = target?.type === 'gasZombie' ? facts.gasDamage(position) : 0;
     const damage = target ? { impactDamage: impact, gasDamage: gas, survivesEntry: impact + gas < mover.hp } : null;
     if (damage && !damage.survivesEntry) {
-      overruns.push({ targetId: target!.id, position: { ...position }, ...damage, remainingEnemyCharges: target!.attackChargesRemaining, executed: false, hpAfter: mover.hp });
+      overruns.push({ targetId: target!.id, position: { ...position }, ...damage, remainingEnemyCharges: target!.attackChargesRemaining, wouldExecute: false, hpAfter: mover.hp });
       arrivalReason = 'overrun_insufficient_hp'; break;
     }
     const cost = Math.min(mover.currentFuel, facts.fuelPerHex);
@@ -61,7 +61,7 @@ export function projectIfvPath(unit: IfvPublicActor, path: readonly HexCoord[], 
         for (const e of hit) e.hp = Math.max(0, e.hp - facts.zombieGasDamage(e));
         queue.push(...hit.filter(e => e.hp === 0 && e.type === 'gasZombie'));
       }
-      overruns.push({ targetId: target.id, position: { ...position }, ...damage, remainingEnemyCharges: target.attackChargesRemaining, executed: true, hpAfter: mover.hp });
+      overruns.push({ targetId: target.id, position: { ...position }, ...damage, remainingEnemyCharges: target.attackChargesRemaining, wouldExecute: true, hpAfter: mover.hp });
       if (mover.hp === 0) { arrivalReason = 'unit_destroyed'; break; }
     }
   }

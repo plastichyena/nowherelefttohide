@@ -13,7 +13,7 @@ import { createAgentGame } from '../agent/game';
 import { createAgentObservation } from '../agent/observation';
 import type { GameState } from './types';
 
-const quiet = () => createDefaultConfig({ economy: { initialZombieCount:0, initialScreamerCount:0, initialHunterCount:{min:0,max:0}, initialGasCount:{min:0,max:0}, initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000} }, refugees:{arrivalIntervalMin:999,arrivalIntervalMax:999}, horde:{waves:[{turn:100,directionCount:4,compositionPerDirection:{hordeZombie:1,zombie:0},final:true}]} });
+const quiet = () => createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount:0, initialScreamerCount:0, initialHunterCount:{min:0,max:0}, initialGasCount:{min:0,max:0}, initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000} }, refugees:{arrivalIntervalMin:999,arrivalIntervalMax:999}, horde:{waves:[{turn:100,directionCount:4,compositionPerDirection:{hordeZombie:1,zombie:0},final:true}]} });
 function load(e:GameEngine,s:GameState){prepareTestSnapshot(s); const result=e.step({type:'LoadSnapshot',snapshot:s}); expect(result.error,result.error?.message).toBeNull();}
 function captureReady(turn=10){const e=new GameEngine(1,quiet()),s=e.getState() as GameState; s.turn=turn; const p=s.facilities.find(f=>f.type==='nuclearPowerPlant')!; const neighbor=hexNeighbors(p.position).find(h=>effectiveMovementCost(s,h)!==null&&!s.units.some(u=>hexKey(u.position)===hexKey(h)))!; const u=s.units.find(u=>u.isPlayerUnit)!; u.position=neighbor; load(e,s); return {e,p,u};}
 

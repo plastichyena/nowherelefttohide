@@ -12,7 +12,7 @@ import { queryRoute } from '../agent/route-query';
 import type { GameAction, GameState } from './types';
 
 function fixture() {
-  const config=createDefaultConfig({checkpoint:{initialSupplyRadius:50},facilities:{powerPlant:{production:{powerGeneration:100}}},economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99},horde:{waves:[{turn:99,directionCount:1,compositionPerDirection:{hordeZombie:1,zombie:0},final:true}]}});
+  const config=createDefaultConfig({mapMode:'fixed',checkpoint:{initialSupplyRadius:50},facilities:{powerPlant:{production:{powerGeneration:100}}},economy:{initialZombieCount:0,initialHunterCount:{min:0,max:0},initialGasCount:{min:0,max:0},initialScreamerCount:0,initialResources:{food:100000,civilianGoods:100000,militaryGoods:100000,fuel:100000}},refugees:{arrivalIntervalMin:99,arrivalIntervalMax:99},horde:{waves:[{turn:99,directionCount:1,compositionPerDirection:{hordeZombie:1,zombie:0},final:true}]}});
   const engine=new GameEngine(1,config),state=engine.getState() as GameState;
   const base=state.facilities.find(f=>f.type==='airBase')!;
   base.owner='player';base.status='owned';base.operationalStatus='operational';base.workers=5;base.infected=0;base.securedOrder=99;base.populationOperationalTurn=1;base.firstCaptureRewardClaimed=true;

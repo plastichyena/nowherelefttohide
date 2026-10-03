@@ -16,13 +16,17 @@ function call(command,args=[],input){
   if(!response.ok)throw Object.assign(new Error(response.error),{code:response.code});
   return response;
 }
-const initial=call('new',['--scenario=una','--seed=7']);
+const initial=call('new',['--scenario=una','--seed=7','--map-mode=random','--map-seed=42','--gameplay-seed=7']);
 const inputDirectory=resolve('output/public-example-inputs');mkdirSync(inputDirectory,{recursive:true});
 const moveFilter=join(inputDirectory,`${id}.json`);writeFileSync(moveFilter,JSON.stringify({type:'Move'}));
 const legal=call('query',['--target=legal-actions',`--revision=${initial.revision}`,`--input=${moveFilter}`]);
 const move=legal.items.find(action=>action.type==='Move');
 function execute(action){
   const status=call('status');
+  if(status.observation.gameOver){
+    console.log(JSON.stringify({kind:'terminal',progressActionsAllowed:false,result:status.observation.result,details:['status','artifact']}));
+    return;
+  }
   const prediction=call('preview',[`--revision=${status.revision}`],action).preview;
   console.log(JSON.stringify({kind:'prediction',summary:prediction.summary}));
   if(!prediction.legal || prediction.summary?.movement?.destinationReached===false)return;
@@ -31,6 +35,10 @@ function execute(action){
     console.log(JSON.stringify({kind:'result',summary:result.summary}));
     if(!result.accepted)return;
     const current=call('status'); // Public observation; no private Session files are read.
+    if(current.observation.gameOver){
+      console.log(JSON.stringify({kind:'terminal',progressActionsAllowed:false,result:current.observation.result,details:['status','artifact']}));
+      return;
+    }
     console.log(JSON.stringify({kind:'actual-state',revision:current.revision,units:current.observation.units.map(u=>({id:u.id,position:u.position,charges:u.attackChargesRemaining})),visibleTargets:current.observation.visibleEnemies.map(z=>z.id)}));
   } catch(error) {
     if(error.code!=='stale_revision')throw error;

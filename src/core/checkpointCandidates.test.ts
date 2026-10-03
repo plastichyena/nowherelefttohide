@@ -27,7 +27,7 @@ function actionFor(candidate: ReturnType<typeof getCheckpointPositionCandidates>
 }
 
 function noInitialZombiesConfig(overrides: Parameters<typeof createDefaultConfig>[0] = {}) {
-  return createDefaultConfig({
+  return createDefaultConfig({mapMode:'fixed',
     economy: {
       initialZombieCount: 0, initialScreamerCount: 0, initialGasCount: { min: 0, max: 0 }, initialHunterCount: { min: 0, max: 0 },
       initialResources: { food: 5_000, civilianGoods: 5_000, militaryGoods: 5_000, fuel: 5_000 },
@@ -76,7 +76,7 @@ function expectRejectedWithoutMutation(
 
 describe('v1.4 position candidates', () => {
   it('returns every branch road tile in a stable order and agrees with legal actions', () => {
-    const engine = new GameEngine(41, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(41, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const state = engine.getState();
     const first = getCheckpointPositionCandidates(state);
     const second = engine.getCheckpointPositionCandidates();
@@ -97,7 +97,7 @@ describe('v1.4 position candidates', () => {
   }, 30_000);
 
   it('returns the same concrete Core reason as execution and preserves state on failure', () => {
-    const engine = new GameEngine(42, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(42, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const illegal = engine.getCheckpointPositionCandidates().find((candidate) => !candidate.legal)!;
     expect(illegal).toBeDefined();
     const before = engine.getState();
@@ -107,7 +107,7 @@ describe('v1.4 position candidates', () => {
   });
 
   it('does not change candidates or expose identity when the only blocker is hidden', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       vision: { ownedFacility: 0, operationalCheckpoint: 0 },
@@ -123,7 +123,7 @@ describe('v1.4 position candidates', () => {
   });
 
   it('offers distinct rear build and relocation candidates for the active checkpoint', () => {
-    const engine = new GameEngine(44, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(44, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const build = engine.getCheckpointPositionCandidates().find(
       (candidate) => candidate.branchId === 'north' && candidate.legal,
     )!;
@@ -138,7 +138,7 @@ describe('v1.4 position candidates', () => {
   });
 
   it('returns all Constructible Facility candidates in stable coordinate order', () => {
-    const engine = new GameEngine(45, createDefaultConfig({ economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
+    const engine = new GameEngine(45, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } } }));
     const candidates = getConstructibleFacilityPositionCandidates(engine.getState(), 'simpleFarm');
     expect(candidates).toHaveLength(51 * 51);
     expect(candidates.map((candidate) => `${candidate.position.q},${candidate.position.r}`)).toEqual(
@@ -168,7 +168,7 @@ describe('v1.4 position candidates', () => {
   });
 
   it('does not expose a hidden Zombie when rejecting unseen Constructible destinations', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { police: { vision: 0 }, nationalGuard: { vision: 0 } },
       vision: { capital: 0, ownedFacility: 0, operationalCheckpoint: 0 },

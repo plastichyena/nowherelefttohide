@@ -11,7 +11,7 @@ import {
 
 describe('Agent Runner replay artifacts', () => {
   it('runs a deterministic random game and records a replay artifact', () => {
-    const config = createDefaultConfig({
+    const config = createDefaultConfig({mapMode:'fixed',
       maxActionsPerTurn: 4,
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
       units: { hordeZombie: { movement: 20, attack: 100 } },

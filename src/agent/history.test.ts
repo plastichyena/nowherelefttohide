@@ -13,7 +13,7 @@ import { resolve } from 'node:path';
 describe('bounded public history and artifact access', () => {
   it('reconstructs exact snapshots across the 50-entry boundary in arbitrary order', () => {
     const game = createAgentGame();
-    const observation = game.reset({ seed: 7 });
+    const observation = game.reset({mapMode:'fixed', seed: 7 });
     const history = new ObservationHistory();
     for (let index = 0; index < 55; index += 1) {
       observation.turn = index + 1;
@@ -36,18 +36,18 @@ describe('bounded public history and artifact access', () => {
 
   it('preserves metrics when heavyweight projections are omitted', () => {
     const game = createAgentGame();
-    const initial = game.reset({ seed: 1 });
+    const initial = game.reset({mapMode:'fixed', seed: 1 });
     const step = game.step({ type: 'EndTurn' });
     const base = { initialObservation: initial, finalObservation: step.observation,
       actions: [{ type: 'EndTurn' } as const], events: step.events, result: step.result,
-      agent: { id: 'test', version: '1' }, config: createDefaultConfig(), buildId: 'test', seed: 1 };
+      agent: { id: 'test', version: '1' }, config: createDefaultConfig({mapMode:'fixed'}), buildId: 'test', seed: 1 };
     expect(collectGameMetrics({ ...base, observations: [initial, step.observation].map(metricObservation) }))
       .toEqual(collectGameMetrics({ ...base, observations: [initial, step.observation] }));
   });
 
   it('paginates every public observation and rejects stale revisions without changing the run', () => {
     const game = createAgentGame();
-    game.reset({ seed: 1 });
+    game.reset({mapMode:'fixed', seed: 1 });
     const initial = game.getObservation();
     const first = game.getArtifactPage({ target: 'observations', pageSize: 1 });
     expect(first.items).toEqual([initial]);
@@ -62,7 +62,7 @@ describe('bounded public history and artifact access', () => {
 
   it('keeps supply return, checkpoint gain and emergency mobility metrics in the compact metric projection', () => {
     const game = createAgentGame();
-    const observation = game.reset({ seed: 1 });
+    const observation = game.reset({mapMode:'fixed', seed: 1 });
     const unit = observation.units[0]!;
     unit.currentFuel = 0; unit.canMove = true;
     expect(unit.movementSummary.legalMoveCount).toBeGreaterThan(0);
@@ -74,7 +74,7 @@ describe('bounded public history and artifact access', () => {
       actions: [{ type: 'BuildCheckpoint' as const, branchId: candidate.branchId, position: candidate.position }],
       events: [{ id: 'emergency-return', turn: observation.turn, phase: observation.phase, type: 'unit_moved' as const,
         payload: { unitId: unit.id, unitType: unit.type, movementMode: 'emergency', q: q!, r: r!, hexesMoved: 1, effectiveMovementCost: 1 } }],
-      result: null, agent: { id: 'test', version: '1' }, config: createDefaultConfig(), buildId: 'test', seed: 1 };
+      result: null, agent: { id: 'test', version: '1' }, config: createDefaultConfig({mapMode:'fixed'}), buildId: 'test', seed: 1 };
     const full = collectGameMetrics({ ...base, observations: [observation] });
     expect(full.checkpointMovesWithNoSupplyGain).toBe(1);
     expect(full.emergencyReturnsToSupplyByType[unit.type as 'police']).toBe(1);
@@ -84,8 +84,8 @@ describe('bounded public history and artifact access', () => {
 
   it('produces identical Metrics from streamed accepted and rejected Decisions', () => {
     const game = createAgentGame({ recordHistory: false });
-    const initial = game.reset({ seed: 7 });
-    const metadata = { config: createDefaultConfig(), agent: { id: 'stream-test', version: '1' }, buildId: 'test', seed: 7 };
+    const initial = game.reset({mapMode:'fixed', seed: 7 });
+    const metadata = { config: createDefaultConfig({mapMode:'fixed'}), agent: { id: 'stream-test', version: '1' }, buildId: 'test', seed: 7 };
     const accumulator = createGameMetricsAccumulator(metadata, initial);
     const observations = [initial];
     const actions: import('../core/types').GameAction[] = [];

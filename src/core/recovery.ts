@@ -5,6 +5,9 @@ import type { GameState, UnitState } from './types';
 export type UnitRecoveryClass = 'combat' | 'rest' | 'outOfSupply';
 
 export interface UnitRecoveryProjection {
+  projectedAmount: number;
+  unavailableReasons: string[];
+  activity: 'combat' | 'rest';
   recoveryClass: UnitRecoveryClass;
   rate: number;
   baseAmount: number;
@@ -42,6 +45,9 @@ export function deriveUnitRecovery(
       ? state.config.naturalRecovery.restRate
       : 0;
   return {
+    projectedAmount: Math.min(Math.max(0,unit.maxHp-unit.hp),roundedRecovery(unit.maxHp,rate,state.config.naturalRecovery.rounding)),
+    unavailableReasons: [...(!inSupplyNow?[unit.transportedByUnitId?'transported':'supply_unavailable']:[]),...(unit.hp>=unit.maxHp?['hp_full']:[])],
+    activity:combat?'combat':'rest',
     recoveryClass,
     rate,
     baseAmount: roundedRecovery(unit.maxHp, rate, state.config.naturalRecovery.rounding),

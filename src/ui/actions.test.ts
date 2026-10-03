@@ -19,7 +19,7 @@ import {
 
 describe('UI action projection', () => {
   it('derives legal movement without mutating the engine state', () => {
-    const engine = new GameEngine(5, createDefaultConfig());
+    const engine = new GameEngine(5, createDefaultConfig({mapMode:'fixed'}));
     const before = JSON.stringify(engine.getState());
     const state = engine.getState();
     const police = state.units.find((unit) => unit.type === 'police');
@@ -32,7 +32,7 @@ describe('UI action projection', () => {
   });
 
   it('matches worker assignment controls to atomic GameActions', () => {
-    const engine = new GameEngine(3, createDefaultConfig());
+    const engine = new GameEngine(3, createDefaultConfig({mapMode:'fixed'}));
     const state = engine.getState();
     const farm = state.facilities.find((facility) => facility.id === 'farm-1');
     expect(farm).toBeDefined();
@@ -47,14 +47,14 @@ describe('UI action projection', () => {
     expect(clampInteger('999', 0, 25)).toBe(25);
     expect(clampInteger('not a number', 0, 25, 4)).toBe(4);
 
-    const engine = new GameEngine(3, createDefaultConfig());
+    const engine = new GameEngine(3, createDefaultConfig({mapMode:'fixed'}));
     const state = engine.getState();
     const farm = state.facilities.find((facility) => facility.id === 'farm-1')!;
     expect(workerAssignmentBounds(state, farm)).toEqual({ minimum: 0, maximum: 30, current: 23 });
   });
 
   it('projects location-based population totals without legacy pools', () => {
-    const engine = new GameEngine(9, createDefaultConfig());
+    const engine = new GameEngine(9, createDefaultConfig({mapMode:'fixed'}));
     const population = populationLocationTotals(engine.getState());
     expect(population.cityResidents).toBe(51);
     expect(population.productionWorkers).toBe(59);
@@ -73,7 +73,7 @@ describe('UI action projection', () => {
   });
 
   it('recalculates the Core forecast for a hypothetical city transfer without mutating state', () => {
-    const engine = new GameEngine(14, createDefaultConfig({ economy: { initialZombieCount: 0 } }));
+    const engine = new GameEngine(14, createDefaultConfig({mapMode:'fixed', economy: { initialZombieCount: 0 } }));
     const state = JSON.parse(JSON.stringify(engine.getState())) as GameState;
     const destination = state.facilities.find((facility) => facility.id === 'city-1')!;
     destination.owner = 'player';

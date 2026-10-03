@@ -6,7 +6,7 @@ import { validateInvariants } from './invariants';
 import type { GameState } from './types';
 
 it.each([{ seed: 64, workers: 10 }, { seed: 123, workers: 1 }])('keeps Army Base interception capacity valid after living-condition infection: $workers workers', ({ seed, workers }) => {
-  const engine = new GameEngine(seed, createDefaultConfig({
+  const engine = new GameEngine(seed, createDefaultConfig({mapMode:'fixed',
     economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialResources: { food: 1000000, civilianGoods: 1000000, militaryGoods: 1000000, fuel: 1000000 } },
     refugees: { arrivalIntervalMin: 999, arrivalIntervalMax: 999 },
   }));
@@ -31,7 +31,7 @@ it.each([{ seed: 64, workers: 10 }, { seed: 123, workers: 1 }])('keeps Army Base
 });
 
 it('finishes a Turn 10 capital defeat after neutral Army Base survivors expire', () => {
-  const engine = new GameEngine(23, createDefaultConfig({
+  const engine = new GameEngine(23, createDefaultConfig({mapMode:'fixed',
     economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 }, initialGasCount: { min: 0, max: 0 }, initialResources: { food: 1000000, civilianGoods: 1000000, militaryGoods: 1000000, fuel: 1000000 } },
     refugees: { arrivalIntervalMin: 999, arrivalIntervalMax: 999 },
     horde: { waves: [{ turn: 100, directionCount: 1, compositionPerDirection: { hordeZombie: 1, zombie: 0 }, final: true }] },
