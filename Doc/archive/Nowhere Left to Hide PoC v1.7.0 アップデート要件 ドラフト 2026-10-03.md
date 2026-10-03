@@ -8,7 +8,7 @@
 
 v1.7.0では従来の固定マップを保持し、同じ51×51ヘックスで、地形・道路・施設配置をseedから再現できるランダムマップを追加する。開始時に固定／ランダムを選択できるようにする。同時に、既存プレイ報告と現行コードを照合し、AIが公開情報を誤読しやすい点と、再現確認が必要な不具合候補を整理する。
 
-本書は新規の要件文書であり、[現行仕様](Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)、[v1.6.9確定要件](Nowhere%20Left%20to%20Hide%20PoC%20v1.6.9%20アップデート要件%20確定版.md)を変更しない。本文の「要求」はユーザーから与えられた条件、「推奨案」は採用判断が必要な設計、「未確定」は決定または証拠が不足する事項である。P0はリリース成立に必要、P1は本版で優先、P2は後続でもよい項目を表す。
+本書は新規の要件文書であり、[現行仕様](../Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)、[v1.6.9確定要件](Nowhere%20Left%20to%20Hide%20PoC%20v1.6.9%20アップデート要件%20確定版.md)を変更しない。本文の「要求」はユーザーから与えられた条件、「推奨案」は採用判断が必要な設計、「未確定」は決定または証拠が不足する事項である。P0はリリース成立に必要、P1は本版で優先、P2は後続でもよい項目を表す。
 
 今回行うのはクラウド環境の静的コード・文書調査、公開一次資料の調査、本書の新規保存だけとする。ゲーム本体実装、依存追加、新プレイ、シミュレーション、再現テスト、GUI検証、branch/worktreeの作成・切替、commit/push/PRは行わない。Windows/T3、および停止を指示されたAstraセッションにはアクセスしない。他環境のパスや記録が本workspaceに存在するとは仮定しない。
 
@@ -155,7 +155,7 @@ T32→T79を情報改善・モデル能力・特定戦術の因果効果と断�
 
 ### 4.3 IFV停止理由の解釈（bug認定保留）
 
-`src/session/service.ts:412`の`playTurnStop`はAction後に公開HPが減った場合、要求の`expectations.playerUnitHp`のminHp/maxHp内かを判定する。previewの予測値を自動で保存・照合する処理ではない。指定がなければ、予測可能な反撃・轢過の損害でも`unexpected_unit_damage`になり得る。[PLAY_WITH_AI](../PLAY_WITH_AI.md)にもHP許容範囲を明示する契約がある。
+`src/session/service.ts:412`の`playTurnStop`はAction後に公開HPが減った場合、要求の`expectations.playerUnitHp`のminHp/maxHp内かを判定する。previewの予測値を自動で保存・照合する処理ではない。指定がなければ、予測可能な反撃・轢過の損害でも`unexpected_unit_damage`になり得る。[PLAY_WITH_AI](../../PLAY_WITH_AI.md)にもHP許容範囲を明示する契約がある。
 
 追送のT61では損傷5＋20を予測し、HP127・Fuel20の実績が予測と一致している。計算不一致の根拠ではない。実行要求のexpectationsの有無・内容は引き継ぎ本文にないため、本書で「未指定だった」と断定しない。
 
@@ -443,7 +443,7 @@ Mapgen2全体を入れる必要はない。第一案はsimplex-noiseの限定導
 
 採用ファイル/版/取得元URL/hash、LICENSE全文、著作権notice、移植・変更箇所、runtime依存と配布対象の依存、NOTICEの有無を記録し、`THIRD_PARTY_NOTICES`と配布物へ反映する。MIT/ISC/Apache-2.0は確認した本文上商用利用を許す根拠があるが、個別権利侵害の不存在やすべての法域での結論を保証するものではない。未確認依存・画像・記事本文を同じ許諾で利用できるとはしない。
 
-本作自身は[LICENSE](../LICENSE)でPolyForm Noncommercial、[追加許諾](../ADDITIONAL_PERMISSIONS.md)と[素材条件](../ASSETS_LICENSE.md)を持つ。**採用する部品が商用利用可能でも、本作/派生ゲーム全体の販売を自動的に許可する変更にはならない。** 本依頼は外部部品の選定条件であり、repo全体の再ライセンス要求とは解釈しない。
+本作自身は[LICENSE](../../LICENSE)でPolyForm Noncommercial、[追加許諾](../../ADDITIONAL_PERMISSIONS.md)と[素材条件](../../ASSETS_LICENSE.md)を持つ。**採用する部品が商用利用可能でも、本作/派生ゲーム全体の販売を自動的に許可する変更にはならない。** 本依頼は外部部品の選定条件であり、repo全体の再ライセンス要求とは解釈しない。
 
 ## 11. 受入基準と検証計画（すべて将来実施）
 
@@ -531,14 +531,14 @@ CI短縮群は固定seed1～100＋境界・既知失敗fixture。リリース前
 
 | 論点 | 主要なローカル出典 |
 | --- | --- |
-| 正本・既存公開ルール | [README](../README.md)、[現行仕様](Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)、[PLAY_WITH_AI](../PLAY_WITH_AI.md) |
-| マップ・施設・初期配置 | [map.ts](../src/core/map.ts)、[initial-deployment.ts](../src/core/initial-deployment.ts)、[config.ts](../src/core/config.ts)、[state.ts](../src/core/state.ts)、[bay.ts](../src/core/bay.ts) |
-| 地形・道路・供給 | [hex.ts](../src/core/hex.ts)、[terrain.ts](../src/core/terrain.ts)、[roads.ts](../src/core/roads.ts)、[supply.ts](../src/core/supply.ts)、[engine.ts](../src/core/engine.ts) |
-| 開始・乱数 | [scenarios.ts](../src/core/scenarios.ts)、[rng.ts](../src/core/rng.ts)、[public-health.ts](../src/core/public-health.ts)のdomain方式 |
-| AI情報と停止 | [service.ts](../src/session/service.ts)、[action-summary.ts](../src/core/action-summary.ts)、[action-candidates.ts](../src/core/action-candidates.ts)、[gas-preview.ts](../src/core/gas-preview.ts)、[recovery.ts](../src/core/recovery.ts)、[apiInfo.ts](../src/agent/apiInfo.ts) |
-| API入力・query・移動 | [action-input.ts](../src/agent/action-input.ts)、[query-contract.ts](../src/agent/query-contract.ts)、[route-query.ts](../src/agent/route-query.ts)、[types.ts](../src/agent/types.ts) |
-| 保存・互換 | [save.ts](../src/persistence/save.ts)、[invariants.ts](../src/core/invariants.ts)、[package.ts](../src/replay/package.ts)、[Session types](../src/session/types.ts) |
-| 既存検証・過去調査 | [v1.6.9受入](../validation/v169-acceptance.md)、[9/30 LLM調査](v1.6.9%20LLM改善調査%20引き継ぎ%202026-09-30.md)、[報告テンプレート](../validation/play-report-template.md) |
-| 第三者ライセンス | 第10章の一次URL、[既存THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES)、[本体LICENSE](../LICENSE) |
+| 正本・既存公開ルール | [README](../../README.md)、[現行仕様](../Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)、[PLAY_WITH_AI](../../PLAY_WITH_AI.md) |
+| マップ・施設・初期配置 | [map.ts](../../src/core/map.ts)、[initial-deployment.ts](../../src/core/initial-deployment.ts)、[config.ts](../../src/core/config.ts)、[state.ts](../../src/core/state.ts)、[bay.ts](../../src/core/bay.ts) |
+| 地形・道路・供給 | [hex.ts](../../src/core/hex.ts)、[terrain.ts](../../src/core/terrain.ts)、[roads.ts](../../src/core/roads.ts)、[supply.ts](../../src/core/supply.ts)、[engine.ts](../../src/core/engine.ts) |
+| 開始・乱数 | [scenarios.ts](../../src/core/scenarios.ts)、[rng.ts](../../src/core/rng.ts)、[public-health.ts](../../src/core/public-health.ts)のdomain方式 |
+| AI情報と停止 | [service.ts](../../src/session/service.ts)、[action-summary.ts](../../src/core/action-summary.ts)、[action-candidates.ts](../../src/core/action-candidates.ts)、[gas-preview.ts](../../src/core/gas-preview.ts)、[recovery.ts](../../src/core/recovery.ts)、[apiInfo.ts](../../src/agent/apiInfo.ts) |
+| API入力・query・移動 | [action-input.ts](../../src/agent/action-input.ts)、[query-contract.ts](../../src/agent/query-contract.ts)、[route-query.ts](../../src/agent/route-query.ts)、[types.ts](../../src/agent/types.ts) |
+| 保存・互換 | [save.ts](../../src/persistence/save.ts)、[invariants.ts](../../src/core/invariants.ts)、[package.ts](../../src/replay/package.ts)、[Session types](../../src/session/types.ts) |
+| 既存検証・過去調査 | [v1.6.9受入](../../validation/v169-acceptance.md)、[9/30 LLM調査](v1.6.9%20LLM改善調査%20引き継ぎ%202026-09-30.md)、[報告テンプレート](../../validation/play-report-template.md) |
+| 第三者ライセンス | 第10章の一次URL、[既存THIRD_PARTY_NOTICES](../../THIRD_PARTY_NOTICES)、[本体LICENSE](../../LICENSE) |
 
 今回の検証は、参照ファイル存在、文書リンク、構成数量の静的集計、HEAD/branch/既存追跡ファイルの不変、本書の新規作成を確認する文書検査に限る。ゲーム動作や将来の受入項目が成功したという意味ではない。Library保存の成否・IDは最終返答に記す。
