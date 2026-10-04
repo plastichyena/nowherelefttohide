@@ -10,11 +10,11 @@
 
 v1.7.0は、既存の固定マップを保持してランダムマップを追加し、AI向けの情報・操作説明・公開APIを改善する。本文の必須条件と採用したAI改善はすべてリリース必須である。
 
-安定版の唯一の正本は[現行仕様](Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)（v1.6.9）。本書は変更部分の実装目標とし、未変更部分は現行仕様に従う。実装・テスト・動作確認の完了後に本書の確定内容を現行仕様へ反映し、整合を確認する。要件を確定しただけでは現行仕様をv1.7.0へ更新しない。
+安定版の唯一の正本は[現行仕様](../Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)（v1.6.9）。本書は変更部分の実装目標とし、未変更部分は現行仕様に従う。実装・テスト・動作確認の完了後に本書の確定内容を現行仕様へ反映し、整合を確認する。要件を確定しただけでは現行仕様をv1.7.0へ更新しない。
 
 今回の作業は文書作成・配置整理・Gitへの記録とpushまで。ゲーム実装、依存導入、ゲーム検証、リリースは別工程である。サブエージェントは使用しない。
 
-本書は[元ドラフト](archive/Nowhere%20Left%20to%20Hide%20PoC%20v1.7.0%20アップデート要件%20ドラフト%202026-10-03.md)に優先する。ドラフトにあったクラウド調査だけの作業制限・未承認表示・推奨案は本書の実装指示へ引き継がない。archiveの資料は調査・決定の履歴であり、現行判断の正本にしない。
+本書は[元ドラフト](Nowhere%20Left%20to%20Hide%20PoC%20v1.7.0%20アップデート要件%20ドラフト%202026-10-03.md)に優先する。ドラフトにあったクラウド調査だけの作業制限・未承認表示・推奨案は本書の実装指示へ引き継がない。archiveの資料は調査・決定の履歴であり、現行判断の正本にしない。
 
 ### 1.1 調整可能な値と固定条件
 
@@ -230,9 +230,9 @@ DOC-01: README・ガイド・API・ヘルプ・配布情報の版と契約を揃
 
 外部ライブラリの限定利用を認める。地形ノイズはsimplex-noiseを第一候補とし、河川・道路・施設・制約検証は既存hex処理と本作の実装で構成する。既定Math.randomを使わず専用PRNGを注入する。Mapgen2全体の導入や他作品コード・画像の流用を承認したものではない。
 
-2026-10-03に[simplex-noise 4.0.3のLICENSE](https://github.com/jwagner/simplex-noise.js/blob/4.0.3/LICENSE)と[package.json](https://github.com/jwagner/simplex-noise.js/blob/4.0.3/package.json)を参照。MITの著作権表示・許諾文保持を条件に利用する。本作の[LICENSE](../LICENSE)（PolyForm Noncommercial）＋[追加許諾](../ADDITIONAL_PERMISSIONS.md)、[画像の条件](../ASSETS_LICENSE.md)を維持する。第三者部分はそのライセンスを保持し、本作全体をMITへ変更しない。
+2026-10-03に[simplex-noise 4.0.3のLICENSE](https://github.com/jwagner/simplex-noise.js/blob/4.0.3/LICENSE)と[package.json](https://github.com/jwagner/simplex-noise.js/blob/4.0.3/package.json)を参照。MITの著作権表示・許諾文保持を条件に利用する。本作の[LICENSE](../../LICENSE)（PolyForm Noncommercial）＋[追加許諾](../../ADDITIONAL_PERMISSIONS.md)、[画像の条件](../../ASSETS_LICENSE.md)を維持する。第三者部分はそのライセンスを保持し、本作全体をMITへ変更しない。
 
-採用時に実際の取得版・取得元・hash・LICENSE全文・著作権／由来表示・変更箇所・配布対象依存を確認して固定する。[THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES)とブラウザ／Portableを含む配布物へ必要な表示・許諾文を同梱する。候補調査を実際の配布物確認の代わりにしない。
+採用時に実際の取得版・取得元・hash・LICENSE全文・著作権／由来表示・変更箇所・配布対象依存を確認して固定する。[THIRD_PARTY_NOTICES](../../THIRD_PARTY_NOTICES)とブラウザ／Portableを含む配布物へ必要な表示・許諾文を同梱する。候補調査を実際の配布物確認の代わりにしない。
 
 ## 9. 実装と受入検証
 
@@ -339,9 +339,9 @@ v1.7.0実装の完了には全必須要件・受入検証・文書／配布整�
 
 ## 付録B. 参照と文書作成時の検証範囲
 
-- 現行ルール: [現行仕様](Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)の開始・乱数・公開情報・地図／初期状態・供給・検証の各節。
-- 固定配置照合: [initial-deployment.ts](../src/core/initial-deployment.ts)。
-- 既存版の実施範囲: [v1.6.9受入記録](../validation/v169-acceptance.md)。旧版の実績を本版の検証済み証拠にしない。
-- 調査履歴: [元ドラフト](archive/Nowhere%20Left%20to%20Hide%20PoC%20v1.7.0%20アップデート要件%20ドラフト%202026-10-03.md)。元プレイの証跡識別子等はここへ残す。
+- 現行ルール: [現行仕様](../Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md)の開始・乱数・公開情報・地図／初期状態・供給・検証の各節。
+- 固定配置照合: [initial-deployment.ts](../../src/core/initial-deployment.ts)。
+- 既存版の実施範囲: [v1.6.9受入記録](../../validation/v169-acceptance.md)。旧版の実績を本版の検証済み証拠にしない。
+- 調査履歴: [元ドラフト](Nowhere%20Left%20to%20Hide%20PoC%20v1.7.0%20アップデート要件%20ドラフト%202026-10-03.md)。元プレイの証跡識別子等はここへ残す。
 
 本書作成時は回答47件の反映、参照とファイル配置、文書差分を確認する。ゲーム実装・ゲームテスト・build・生成性能測定・配布検証は未実施であり、第9章は将来の受入要件である。
