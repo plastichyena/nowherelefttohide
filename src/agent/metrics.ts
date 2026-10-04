@@ -1306,7 +1306,10 @@ export function collectGameMetrics(input: GameMetricsInput): GameMetrics {
   }
   const refineryPowerOutageTurns = refineryOutageTurns.size;
   const refineryOutageNextTurnFuelShortageTurns = [...refineryOutageTurns].filter((turn) => {
-    const next = turnObservations.find((observation) => observation.turn === turn + 1);
+    // The last sample is already indexed. A find() from the start for every
+    // outage repeatedly decompresses lazy history, making long exports O(N²).
+    const nextIndex = lastIndexByTurn.get(turn + 1);
+    const next = nextIndex === undefined ? undefined : observations[nextIndex];
     return next !== undefined && next.endTurnForecast.fuel.totalFuelShortage > 0;
   }).length;
   const hordeDirectionSpawnCounts = zeroDirectionMetric();

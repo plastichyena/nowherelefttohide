@@ -2,7 +2,7 @@
 
 2026-10-04。Windows 11 Home、Node 22.14.0、npm 11.19.1、Chromium 154。単独作業。
 
-状態: 実装・ローカル必須受入検証完了。現行仕様へ反映済み。GitHub Actionsの結果・配布物・Pagesは未確認。
+状態: 実装・ローカル必須受入検証完了。現行仕様へ反映済み。追加依頼でRelease Validationの200ゲーム成功と512 MiB検証の時間切れを確認した。修正と再検証の範囲は末尾を参照。CI・配布物・Pagesは未確認。
 
 ## 範囲と版
 
@@ -62,6 +62,23 @@ Replayは公式CLIが出力した勝利・敗北ZIPを、3サイズ×日英の12
 
 最後の拒否assert追加後の単独型検査も成功。最終production build（型検査を含む）は成功、Vite buildは13.72秒。production Browser Bridge smokeは3 JS bundleで成功。buildの既存chunkサイズ・dynamic import警告は、ブラウザの警告／エラー0と区別する。航空／輸送の確認画面から一般ルールの長文を外した後も、関連36状態を再実行して違反0を確認した。
 
-GitHub Actionsは今回のユーザー指示に従い起動確認まで。結果・配布物・Pages公開先の確認と監視は行わず、後日の依頼を待つ。起動を合格と扱わない。1.7.0の大量map生成、過去のAI勝率・大規模Sessionの実績を今回の成功へ流用しない。
+初回実装時のGitHub Actionsはユーザー指示に従い起動確認までとした。その時点では結果・配布物・Pages公開先の確認と監視は行っていない。後続の確認は末尾の追補に記録する。起動を合格と扱わない。1.7.0の大量map生成、過去のAI勝率・大規模Sessionの実績を今回の成功へ流用しない。
 
 文書の参照リンク40件と `git diff --check` を確認。文書整理コミット以降のarchive差分は0。v1.7.1確定要件はユーザーの追加指示に従い、比較と後日のWorkflow結果確認用にDoc直下に保持する。
+
+## Release Validationの時間切れへの追補（2026-10-04）
+
+ユーザーの追加依頼により[Run 37178009615の大容量Session Job](https://github.com/plastichyena/nowherelefttohide/actions/runs/37178009615/job/111364602899)を確認した。対象は `db198a8744e216a1d464ede7880ffad7c63b2643`。Jobは04:47:29 UTC開始、10:47:44 UTC終了で、6時間上限によりcancelled。1,000操作の生成は05:38:47 UTCに完了し、公開Payload実容量は1,459,547,513 bytesだった。最終報告は生成されず、ZIP Viewer工程は未実行。同Runの20 shardと200ゲーム・Replayの集約Jobは成功している。
+
+後工程にはログがなかったため、GitHubログだけでは停止した内部関数を断定できない。同じ実Core fixtureをローカルで計測し、ArtifactのMetrics集計に、製油所の停電ターンごとに圧縮履歴を先頭から探索する処理を確認した。30操作＋分岐1操作の旧ZIPには32ターンすべての停電が記録されていた。1,000ターン規模では翌ターン探索だけで約50万件を復元する二重走査になる。
+
+既存の「各ターンの最終Observationのindex」を使い、翌ターンのindexを直接参照するよう変更した。最後のサンプル、同一ターンの停電の重複除外、翌ターン欠落時の扱い、全Metricsの値を維持する。全Observationの配列化や追加キャッシュは導入せず、Readerのhash・Metrics照合も省略しない。ゲームルール、Version、保存形式、検証Action数、容量、圧縮設定、Job時間上限は変更していない。
+
+- 新しい回帰試験の128ターン入力では、修正前は先頭ターンを163回読んで上限64回のassertに失敗した。修正後は成功し、1,000ターン入力も追加した。各ターン2サンプルで最終予測を使うこと、翌ターン欠落、通常配列との全Metrics一致を検証する。これは集計入力の試験であり、実Coreの1,000操作耐久試験ではない。
+- 修正前に作った31 DecisionのZIPを、修正後のReaderで再読込し、保存済みの全Metricsと再計算値の一致を確認した。
+- 実Coreの大容量モード `--decisions=30 --large-mib=1` は修正前後とも完了。修正後は51×51・21部隊、30 EndTurn＋分岐1操作、現在状態の長短履歴比較、Full Snapshot、Artifact出力／読込／Replay一致を確認。実ZIPは47,906,133 bytes、Compact応答比5.659%。全体298.11秒、Artifact工程123.16秒（修正前324.41秒／145.05秒）。一部テストを同時実行しており厳密な速度比較ではなく、512 MiB全量の成功や完了時間を保証する値でもない。ローカル報告は `output/v171-large-{before,after}-30.json`。
+- 新規試験fixtureの `agent.version` 不足を補完後、型検査は成功。関連7ファイルの最初の実行は28 assert成功だったが、Vitestの `Timeout calling "onTaskUpdate"` が1件発生して終了コード1。成功した実行として扱わず、他の通し検証が終了した後、threads pool・worker1で再実行した。最終結果は **7ファイル・29テスト成功、失敗／skip／実行器エラー0**、227.08秒。対象は `src/agent/{metrics-scaling,metrics,history}.test.ts`、`src/session/artifact.v166.test.ts`、`src/testing/session-release-{validation,fixture,size}.test.ts`。今回は集計の参照方法と検証診断の変更に絞り、初回実装時の全体回帰・GUI試験は反復していない。
+
+大容量Scriptは工程開始・status各サンプル・生成量・検証完了を `large-512.progress.ndjson` に追記し、workflowのalways-uploadへ含める。タイムアウト時も最後に到達した工程が残る。途中ログを最終報告や合格証跡として扱わない。ローカル通し実行では24レコードの保存を確認した。
+
+再実行対象は `session_only=true` の512 MiB Session／ZIP Viewerとする。成功済み200ゲームを再実行せず、部分実行を新しい全体成功とは扱わない。ユーザー指定に従いpush・dispatch後の監視は行わず、新Runの結果は後日の確認に残す。Doc/archiveは参照・変更していない。

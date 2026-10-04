@@ -3848,6 +3848,8 @@ Session復元は検証済みGameEngine.fromSnapshotの後に重複してLoadSnap
 
 日英・390×844／360×740／1280×720で通常UI600状態と砲撃確認6状態、Replay12通り、Live6通り、終局Saveの画面復元2通りを確認した。390×844の上部は132px・3段、盤面は未選択71.56%、部隊標準55.95%。文字11px以上、操作域44px以上、横はみ出し・ブラウザ警告／エラー0。PCブラウザのViewport検証であり実機試験ではない。
 
-最終差分の全体回帰（要件8.3で対象外の長時間Random／Balanced専用2ファイルを除く）、型検査、production build、Browser Bridge smokeを実施した。最終件数、既存skip、最初の時間切れと再検証、実寸・画像・再現手順は[受入記録](../validation/v171-acceptance.md)を参照する。GitHub Actionsはユーザー指定により起動確認までとし、結果・配布物・Pagesは未確認。起動を合格として扱わない。
+最終差分の全体回帰（要件8.3で対象外の長時間Random／Balanced専用2ファイルを除く）、型検査、production build、Browser Bridge smokeを実施した。最終件数、既存skip、最初の時間切れと再検証、実寸・画像・再現手順は[受入記録](../validation/v171-acceptance.md)を参照する。初回実装時のGitHub Actions確認はユーザー指定により起動までとし、その時点では結果・配布物・Pagesを確認していない。後続確認は以下と受入記録の追補に記録する。起動を合格として扱わない。
 
 要件文書の確定・指定3文書のarchive移動を62dd8e7へ先にコミットし、その後の実装ではarchiveを参照・変更していない。追加指示に従い、v1.7.1確定要件は照合・後日のWorkflow確認用にDoc直下へ保持する。
+
+同日の追加依頼でRelease Validationの200ゲーム・Replay集約成功と512 MiB Session Jobの6時間タイムアウトを確認した。ArtifactのMetrics集計は、製油所の停電ターンごとの履歴先頭からの探索を、既存のターン別最終indexへの直接参照へ変更する。集計値・hash照合・保存形式・ゲームルール・耐久試験の基準は維持する。工程ログも途中保存してタイムアウト時のupload対象にする。再現、回帰試験、小規模通し検証と未確認の大容量再実行は[受入記録の追補](../validation/v171-acceptance.md#release-validationの時間切れへの追補2026-10-04)を参照する。再実行の結果監視はユーザーの指定により行わない。

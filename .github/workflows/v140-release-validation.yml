@@ -134,7 +134,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: session-v162-large-512mib
-          path: output/session-release/large-512*.json
+          path: |
+            output/session-release/large-512*.json
+            output/session-release/large-512.progress.ndjson
           if-no-files-found: warn
           retention-days: 30
 

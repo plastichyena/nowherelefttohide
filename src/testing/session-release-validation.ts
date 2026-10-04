@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, statSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, statSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { resolveSessionIdentity } from '../session/agent-adapter';
@@ -293,6 +293,17 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
     const sessionRoot = join(dirname(output), `${output.split(/[\\/]/u).at(-1)!.replace(/\.json$/u, '')}-store`);
     if (existsSync(sessionRoot))
         throw new Error(`Refusing to reuse existing Session root: ${sessionRoot}`);
+    // A runner timeout kills the process before the final report/catch can run.
+    // Persist coarse progress separately so the always-upload step retains the
+    // last reached operation without presenting an incomplete run as a pass.
+    const progressPath = `${output.replace(/\.json$/u, '')}.progress.ndjson`;
+    writeFileSync(progressPath, '', { encoding: 'utf8', flag: 'wx' });
+    const progress = (stage: string, details: Record<string, unknown> = {}): void => {
+        const line = `${JSON.stringify({ stage, at: new Date().toISOString(), elapsedMs: performance.now() - totalStarted, ...details })}\n`;
+        appendFileSync(progressPath, line, 'utf8');
+        process.stdout.write(line);
+    };
+    progress('setup');
     const identity = resolveSessionIdentity();
     const factory = createSessionReleaseFixtureFactory(identity.buildId);
     const largeFixture = options.largeMiB !== null;
@@ -330,6 +341,7 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
     let largeTargetReached = largeTargetBytes === null;
     let publicArtifactPayloadBytes = 0;
     let decisionsExecuted = 0;
+    progress('generation');
     while (decisionsExecuted < options.decisions || !largeTargetReached) {
         if (decisionsExecuted >= LARGE_MAX_DECISIONS)
             throw new Error(`Large validation did not reach ${options.largeMiB} MiB after ${LARGE_MAX_DECISIONS} valid Core actions`);
@@ -372,10 +384,11 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
             if (largeTargetBytes !== null) {
                 publicArtifactPayloadBytes = measure(timings, 'storageScanMs', () => artifactPayloadBytes(store, sessionId));
                 largeTargetReached = publicArtifactPayloadBytes > largeTargetBytes;
-                process.stdout.write(`${JSON.stringify({ stage: 'large-package-generation', decisions: decision, storeBytes: storage.bytes, publicArtifactPayloadBytes, targetBytes: largeTargetBytes })}\n`);
+                progress('large-package-generation', { decisions: decision, storeBytes: storage.bytes, publicArtifactPayloadBytes, targetBytes: largeTargetBytes });
             }
         }
     }
+    progress('history-length-comparison', { decisions: decisionsExecuted });
     const historyLengthComparison = measure(timings, 'historyLengthComparisonMs', () => {
         const currentPrivateState = reference.exportPrivateState();
         const currentPrivateStateHash = sha256Json(currentPrivateState);
@@ -430,7 +443,9 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
         assert(shortFull.value !== undefined && shortDifference === null,
             `Current-state comparison Session did not preserve Observation and Legal Actions (${shortDifference ?? 'missing value'})`);
 
+        progress('long-history-status-probe');
         const longProbe = runFreshStatusProbe(sessionRoot, sessionId);
+        progress('short-history-status-probe');
         const shortProbe = runFreshStatusProbe(shortRoot, shortSessionId);
         assert(
             longProbe.publicObservationLegalSha256 === currentPublicStateHash
@@ -475,6 +490,7 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
             shortHistory: probeSummary(shortProbe),
         };
     });
+    progress('queries');
     const { mapPages, full, expectedFull } = measure(timings, 'queryMs', () => {
         const pagedMap = mapPageDigest(service, sessionId, revision);
         const snapshot = service.query(sessionId, {
@@ -498,6 +514,7 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
     const readBefore = ioReadBytes();
     measure(timings, 'statusMs', () => {
         for (let index = 0; index < STATUS_SAMPLES; index += 1) {
+            progress('status', { sample: index + 1, samples: STATUS_SAMPLES });
             const compact = compactResult(service, sessionId);
             assert(compact.result.active.revision === revision, 'status changed the current revision');
             compactResponseBytes = Math.max(compactResponseBytes, compact.bytes);
@@ -507,13 +524,16 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
     });
     const readAfter = ioReadBytes();
     const { checkpoint, branchStep } = measure(timings, 'checkpointBranchMs', () => {
+        progress('save-checkpoint');
         const saved = service.saveCheckpoint(sessionId);
+        progress('load-checkpoint');
         const branch = service.loadCheckpoint(sessionId, saved.checkpointId, childSessionId);
         assert(
             branch.active.revision === revision && branch.session.branchBase?.baseDecision === revision,
             'Checkpoint branch did not preserve its immutable base revision',
         );
         const branchAction = chooseAction(reference.getLegalActions(), decisionsExecuted + 1, largeFixture);
+        progress('branch-step');
         const stepped = service.step(childSessionId, {
             action: branchAction,
             decisionSummary: 'release fixture branch Core action',
@@ -525,12 +545,16 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
         );
         return { checkpoint: saved, branchStep: stepped };
     });
+    progress('storage-scan');
     const sessionStorage = measure(timings, 'storageScanMs', () => directoryStats(sessionRoot));
     const { artifactPath, artifact, manifest, readManifest, replay } = measure(timings, 'artifactMs', () => {
         const packagePath = join(sessionRoot, 'release-branch.nlth-artifact');
+        progress('artifact-export');
         const exported = service.exportArtifact(childSessionId, packagePath);
         assert(exported.decisionCount === revision + 1, 'Artifact has an unexpected decision count');
+        progress('artifact-read');
         const read = service.readArtifact(exported.artifactPath);
+        progress('artifact-replay');
         const replayed = service.replayArtifact(exported.artifactPath);
         assert(
             read.manifestHash === exported.manifestHash && replayed.matched === true,
@@ -561,6 +585,7 @@ export function runSessionReleaseValidation(options: ParsedArguments): Record<st
         );
     }
 
+    progress('validation-complete', { decisions: decisionsExecuted, artifactBytes: artifact.bytes });
     timings.totalMs = performance.now() - totalStarted;
     return {
         ok: true,
