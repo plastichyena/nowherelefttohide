@@ -1,6 +1,6 @@
 import { mapDomainSeed } from '../core/map-generation';
 import { validateInitialMap } from '../core/initial-map-validation';
-import { RANDOM_MAP_ID, SAVE_FORMAT_NUMBER } from '../core/versions';
+import { APP_VERSION, RANDOM_MAP_ID, SAVE_FORMAT_NUMBER } from '../core/versions';
 import { gzipSync, gunzipSync, strFromU8, strToU8 } from 'fflate';
 import { validateGameConfig } from '../core/config';
 import { validateInvariants } from '../core/invariants';
@@ -17,16 +17,17 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.7.0 saves. */
+/** The sole game-rules version accepted by v1.7.1 saves. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
 export const SAVE_FORMAT_VERSION = SAVE_FORMAT_NUMBER;
-/** v1.7.0 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = `nowhere-left-to-hide:auto-save:v${SAVE_FORMAT_NUMBER}`;
+/** v1.7.1 never writes to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = `nowhere-left-to-hide:auto-save:v${SAVE_FORMAT_NUMBER}:v171`;
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
-export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v26';
+export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v27';
 const OLDER_AUTOSAVE_KEYS = [
+  'nowhere-left-to-hide:auto-save:v26',
   'nowhere-left-to-hide:auto-save:v25',
   'nowhere-left-to-hide:auto-save:v24',
   'nowhere-left-to-hide:auto-save:v23',
@@ -549,7 +550,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.7.0; v1.6.9 or earlier data requires a new v1.7.0 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v1.7.1; v1.7.0 or earlier data requires a new v1.7.1 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -1395,6 +1396,7 @@ function validateStateForSave(state: GameState): string[] {
     errors.push(`config validation failed: ${error instanceof Error ? error.message : String(error)}`);
   }
   try {
+    if (state.mapDescriptor?.appVersion !== APP_VERSION) errors.push(`Unsupported App version ${state.mapDescriptor?.appVersion}; v1.7.0 or earlier saves cannot be loaded by v${APP_VERSION}. Original data is unchanged.`);
     const mapResult = validateInitialMap(state);
     if (!mapResult.valid) errors.push(...mapResult.errors.map(error => `map: ${error}`));
   } catch (error) {
@@ -1415,7 +1417,7 @@ export function validateSnapshot(value: unknown): SaveValidationResult {
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
-    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.6.9以前 / v1.6.9 and earlier saves cannot be loaded or converted; earlier formats are rejected without conversion, deletion, or overwrite`);
+    errors.push(`unsupported save format version: ${String(value.formatVersion)}; v1.7.0以前 / v1.7.0 and earlier saves cannot be loaded or converted; earlier formats are rejected without conversion, deletion, or overwrite`);
   }
   if (value.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(value.gameVersion, 'gameVersion'));
   if (value.mapId !== FIXED_MAP_ID && value.mapId !== RANDOM_MAP_ID) errors.push(`mapId must be ${FIXED_MAP_ID} or ${RANDOM_MAP_ID}`);
@@ -1619,7 +1621,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the current v1.7.0/v27 key; legacy data is deliberately preserved. */
+  /** Clears only the current v1.7.1/v27 key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

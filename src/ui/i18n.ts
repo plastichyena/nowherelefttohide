@@ -563,10 +563,10 @@ const JA: TranslationTable = {
   unavailable: '利用不可',
   noSave: '保存データがありません',
   loadError: 'セーブデータを読み込めません',
-  legacySaveNotice: 'v1.6.9以前の自動保存・セーブコード・JSONはv1.7.0と互換性がなく読み込めません。旧データは変換・削除・上書きされません。「最初から」で新しいゲームを開始してください。',
-  legacySaveError: 'v1.6.9以前のセーブデータはv1.7.0で読み込めません。現在の状態は変更されず、元データも保持されます。「最初から」を選択してください。',
-  migrationSaveError: 'v1.6.9以前のセーブはv1.7.0へ移行できないため読み込めません。現在の状態と元データは変更されていません。',
-  migratedSaveNotice: 'v1.6.9以前のセーブはv1.7.0へ移行されません。元データは変更・削除・上書きされません。',
+  legacySaveNotice: 'v1.7.0以前の自動保存・セーブコード・JSONはv1.7.1と互換性がなく読み込めません。旧データは変換・削除・上書きされません。「最初から」で新しいゲームを開始してください。',
+  legacySaveError: 'v1.7.0以前のセーブデータはv1.7.1で読み込めません。現在の状態は変更されず、元データも保持されます。「最初から」を選択してください。',
+  migrationSaveError: 'v1.7.0以前のセーブはv1.7.1へ移行できないため読み込めません。現在の状態と元データは変更されていません。',
+  migratedSaveNotice: 'v1.7.0以前のセーブはv1.7.1へ移行されません。元データは変更・削除・上書きされません。',
   saved: '自動保存しました',
   saveFailed: '保存に失敗しました',
   manualSave: '手動保存',
@@ -797,7 +797,7 @@ const JA: TranslationTable = {
   eventCauseCombatNoise: '戦闘騒音',
   tipNoise: '人間部隊の戦闘とゾンビの大群の実移動は騒音を発生させます。警察・機動隊・偵察班は中、兵士は大を公開し、ゾンビの大群の移動騒音は半径 8です。スクリーマーは人間を初めて発見すると位置非公開の特大騒音を1回発生させます。通常AI系ゾンビは次のゾンビターンで反応し、非公開な反応個体・目標・発生位置・スクリーマーの正確な半径は公開しません。',
   tipCrisis: '危機の要約は公開状態から重大度別に危機を整理します。ターン終了時は重大件数、攻撃可能攻撃回数、感染を自動鎮圧できる部隊だけを短く確認できます。',
-  tipSave: 'v1.7.0のゲーム続行は新形式のみ対応します。v1.6.9以前の公開観戦記録は読み込めません。v1.6.9以前のセーブ・セッション・保存チェックポイントからの続行はできません。旧データは変換・削除・上書きされません。ルール版 20.0.0／保存形式 27を使用します。新規ゲーム開始時、正常に完了したターン終了後、勝利・敗北確定時に自動保存し、任意のタイミングで手動保存できます。',
+  tipSave: 'v1.7.1のゲーム続行は新形式のみ対応します。v1.7.0以前の公開観戦記録は読み込めません。v1.7.0以前のセーブ・セッション・保存チェックポイントからの続行はできません。旧データは変換・削除・上書きされません。ルール版 20.0.0／保存形式 27を使用します。新規ゲーム開始時、正常に完了したターン終了後、勝利・敗北確定時に自動保存し、任意のタイミングで手動保存できます。',
   tipInfectionEvents: '感染者5人につきゾンビ 1体を生成し、1回最大6体です。隣接空き不足分は拠点へ残り、陥落拠点は戦闘騒音で再流出します。連鎖陥落と建設施設の消滅は重要イベント履歴へ記録します。',
   tipTerrain: '地形は平地／森林／山地／水域で、道路と市街地は重畳表示です。道路または市街地は実効費用 1、森林上のゾンビには森林防御が適用されます。',
   tipVision: '人間の部隊・プレイヤー所有施設・稼働検問所の視界が合成されます。地上視界は森林／山地の最初のヘックスを表示してその先を遮蔽し、航空視界（民間ドローン基地）は地形による遮蔽を無視します。ゾンビの視界、騒音、射線は地形に遮られません。',
@@ -1500,10 +1500,10 @@ const EN: TranslationTable = {
   unavailable: 'Unavailable',
   noSave: 'No save data',
   loadError: 'Could not load save data',
-  legacySaveNotice: 'Autosaves, save codes, and JSON from v1.6.9 or earlier are incompatible with v1.7.0. Legacy data is never converted, deleted, or overwritten. Choose New Game to start again.',
-  legacySaveError: 'This save is from v1.6.9 or earlier and cannot be loaded by v1.7.0. Your current state remains unchanged and the source data is retained. Choose New Game.',
-  migrationSaveError: 'v1.6.9-or-earlier saves cannot be migrated to v1.7.0. The current state and source data were not changed.',
-  migratedSaveNotice: 'v1.6.9-or-earlier saves are not migrated to v1.7.0. Source data is never changed, deleted, or overwritten.',
+  legacySaveNotice: 'Autosaves, save codes, and JSON from v1.7.0 or earlier are incompatible with v1.7.1. Legacy data is never converted, deleted, or overwritten. Choose New Game to start again.',
+  legacySaveError: 'This save is from v1.7.0 or earlier and cannot be loaded by v1.7.1. Your current state remains unchanged and the source data is retained. Choose New Game.',
+  migrationSaveError: 'v1.7.0-or-earlier saves cannot be migrated to v1.7.1. The current state and source data were not changed.',
+  migratedSaveNotice: 'v1.7.0-or-earlier saves are not migrated to v1.7.1. Source data is never changed, deleted, or overwritten.',
   saved: 'Autosaved',
   saveFailed: 'Save failed',
   manualSave: 'Manual save',
@@ -1734,7 +1734,7 @@ const EN: TranslationTable = {
   eventCauseCombatNoise: 'Combat Noise',
   tipNoise: 'Human combat and actual Horde movement emit common Noise Pulses. Police, Riot Police, and Recon expose Medium; Soldier exposes Large; and Horde movement uses Radius 8. A Screamer emits one position-hidden extra-large Noise when it first discovers humans. Normal-AI Zombies react at the next Zombie Phase. Hidden responders, targets, source positions, and the exact Screamer radius are never public.',
   tipCrisis: 'Crisis Summary groups threats derived from public state by severity. End Turn confirmation briefly shows the Critical count, Units with attack Charges, and Units able to auto-suppress infection.',
-  tipSave: 'v1.7.0 continuation requires the new formats. v1.6.9 and earlier public replay artifacts cannot be loaded. v1.6.9-or-earlier saves, sessions and checkpoints cannot continue. Legacy data is never converted, deleted, or overwritten. It uses Game Rules 20.0.0 and Save Format 27. Autosave runs at New Game start, after a successful End Turn, and when victory or defeat is confirmed; manual save remains available.',
+  tipSave: 'v1.7.1 continuation requires the new formats. v1.7.0 and earlier public replay artifacts cannot be loaded. v1.7.0-or-earlier saves, sessions and checkpoints cannot continue. Legacy data is never converted, deleted, or overwritten. It uses Game Rules 20.0.0 and Save Format 27. Autosave runs at New Game start, after a successful End Turn, and when victory or defeat is confirmed; manual save remains available.',
   tipInfectionEvents: 'One Normal Zombie is requested per 5 infected people, up to 6 per resolution. Missing adjacent space remains infected, and fallen sites can release Zombies again through Combat Noise. Chain falls and Constructible Facility destruction appear in Important Event History.',
   tipTerrain: 'Base Terrain is Plain, Forest, Mountain, or Water; Road and Urban are overlays. Road or Urban costs 1 movement, and Zombies receive Forest defense on Forest tiles.',
   tipVision: 'Visibility is the union of Human Unit, Player-owned Facility, and operational Checkpoint Vision. Ground Vision shows the first Forest/Mountain Hex and hides beyond it; Aerial Vision from Civilian Drone Bases ignores Terrain LOS. Zombie Vision, Noise, and Attack lines are not blocked by Terrain.',
@@ -1947,6 +1947,7 @@ const AVIATION_LABELS: Record<string,[string,string]> = {
   'facility.airBase':['空軍基地','Air Base'], airBase:['空軍基地','Air Base'],multipurposeHelicopter:['多目的ヘリコプター','Multipurpose Helicopter'],produceHelicopter:['ヘリを生産','Produce helicopter'],
   takeOff:['離陸','Take off'],land:['着陸','Land'],landed:['着陸中','Landed'],airborne:['飛行中','Airborne'],flightState:['飛行状態','Flight state'],cargo:['搭乗部隊','Cargo'],boardTransport:['搭乗','Board'],disembarkTransport:['降車','Disembark'],transportRules:['IFV・輸送ルール','IFV and transport rules'],boardAircraft:['搭乗','Board'],disembarkAircraft:['降機','Disembark'],flightRules:['飛行・輸送ルール','Flight and transport rules'],militaryDrone:['軍用ドローン','Military Drone'],selectDroneTarget:['盤面で派遣先を選択','Select target on map'],facilityObjectives:['期限付き施設目標','Timed facility objectives'],remaining:['残りターン','Turns remaining'],distance:['距離','Distance'],transferredFuel:['移した燃料','Transferred fuel'],aircraftFuelAfter:['ヘリの移転後燃料','Aircraft fuel after transfer'],infantryFuelAfter:['歩兵の移転後燃料','Infantry fuel after transfer'],
   TakeOff:['離陸','Take off'],Land:['着陸','Land'],BoardAircraft:['搭乗','Board'],DisembarkAircraft:['降機','Disembark'],LaunchMilitaryDrone:['軍用ドローン派遣','Launch Military Drone'],
+  BoardTransport:['搭乗','Board transport'],DisembarkTransport:['降車・降機','Disembark transport'],
   'objective.unclaimed':['未確保','Not captured'],'objective.pending':['援軍配置待ち','Reinforcement pending'],'objective.claimed':['援軍獲得済み','Reward claimed'],'objective.expired':['報酬条件終了','Reward expired'],
   'alert.air_base_early_capture_window.title':['空軍基地確保の期限','Air Base capture deadline'],'alert.air_base_early_capture_window.body':['ターン10まで残り {turnsRemaining} ターン。陥落前・健康生存者ありで確保すると特殊部隊が合流。','{turnsRemaining} turns until Turn10. Capture before a fall with healthy survivors awards Special Forces.'],'crisisReason.air_base_early_capture_window':['空軍基地の早期確保期限','Air Base capture deadline'],
 };
@@ -1961,6 +1962,20 @@ const TABLES: Record<Locale, TranslationTable> = { ja: JA, en: EN };
 
 export function createTranslator(locale: Locale): (key: string, fallback?: string) => string {
   return (key, fallback = key) => TABLES[locale][key] ?? fallback;
+}
+
+/** Shared human labels: a missing translation must never expose an internal key. */
+export function facilityLabel(type: string, locale: Locale): string {
+  return createTranslator(locale)(`facility.${type}`, locale === 'ja' ? '施設' : 'Facility');
+}
+
+export function unitLabel(type: string, locale: Locale): string {
+  return createTranslator(locale)(type, locale === 'ja' ? '部隊' : 'Unit');
+}
+
+/** Watch screens deliberately preserve the public ID used by the AI. */
+export function viewerUnitLabel(unit: { id: string; type: string }, locale: Locale): string {
+  return `${unitLabel(unit.type, locale)} [${unit.id}]`;
 }
 
 export function getInitialLocale(): Locale {

@@ -800,6 +800,7 @@ function artifactValidationError(artifact: AgentRunArtifact): AgentActionError |
     return publicActionError('artifact_invalid', 'Replay artifact appVersion metadata must be a non-empty string');
   }
   const versions: Array<[string, unknown, string]> = [
+    ['appVersion', artifact.appVersion, APP_VERSION],
     ['artifactSchemaVersion', artifact.artifactSchemaVersion, ARTIFACT_SCHEMA_VERSION],
     ['gameRulesVersion', artifact.gameRulesVersion, GAME_RULES_VERSION],
     ['agentApiVersion', artifact.agentApiVersion, AGENT_API_VERSION],

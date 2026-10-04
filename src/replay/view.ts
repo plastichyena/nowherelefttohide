@@ -1,3 +1,4 @@
+import { viewerReferenceText } from '../ui/viewerNames';
 import { ARTILLERY_ASSETS, HELICOPTER_ASSETS } from '../ui/boardAssets';
 import { PublicBoardRenderer, publicBoardFrame, presentationBoardFrame } from '../ui/publicBoard';
 import { TurnPlayback, turnPresentation, createPlaybackControls } from '../ui/turnPlayback';
@@ -48,11 +49,14 @@ export function showReplay(root: HTMLElement, locale: Locale, exit: () => void):
     if(!frame||!pkg)return;
     current=resultPhase?frame.after:frame.before;
     get('position').textContent=`${ja?'ターン':'Turn'} ${current.observation.turn} · ${ja?'判断':'Decision'} ${decision+1}/${pkg.index.length} · ${resultPhase?(ja?'行動結果':'Result'):(ja?'判断直前':'Before decision')}`;
+    if (current.gameOver) get('position').textContent += ` · ${current.result?.outcome === 'won' ? (ja?'勝利':'Victory') : (ja?'敗北':'Defeat')} (${current.result?.reason === 'capitalLost' ? (ja?'州都陥落':'Capital lost') : current.result?.reason === 'stateSecured' ? (ja?'州の確保':'State secured') : current.result?.reason ?? ''})`;
     const h=current.observation.endTurnForecast.publicHealth;
     get('health').textContent=`${ja?'衛生ストレス 食料 / 民需品':'Health stress food / goods'} ${h.stressBefore.food.toFixed(2)} → ${h.stressAfter.food.toFixed(2)} / ${h.stressBefore.civilianGoods.toFixed(2)} → ${h.stressAfter.civilianGoods.toFixed(2)} · ${ja?'食料不足蓄積':'Food accumulation'} ${h.accumulationBefore.toFixed(2)} → ${h.accumulationAfter.toFixed(2)} · ${ja?'飢餓予測人数':'Projected starvation deaths'} ${h.starvation.loss} · ${ja?'繰越端数':'Carry'} ${h.starvation.carryAfter.toFixed(3)}`;
     get('comment').textContent=frame.record.decisionSummary || (ja?'コメントなし':'No comment');
-    get('action').textContent=`${JSON.stringify(frame.record.inputAction)}${resultPhase?` — ${frame.record.accepted?(ja?'実行済み':'Executed'):`${ja?'拒否':'Rejected'}: ${frame.record.error?.message ?? ''}`}`:''}`;
-    if(resultPhase)logs.set(decision,[`${ja?'判断':'Decision'} ${decision+1}: ${JSON.stringify(frame.record.inputAction)}`, ...frame.record.events.filter(e=>e.type!=='zombie_presentation').map(e=>`Turn ${e.turn} · ${e.type} ${JSON.stringify(e.payload)}`), ...(frame.record.error?[frame.record.error.message]:[])]);
+    const publicUnits = [...frame.before.observation.units,...frame.before.observation.zombies,...frame.after.observation.units,...frame.after.observation.zombies];
+    const describe = (value: unknown) => viewerReferenceText(value,publicUnits,locale,undefined,[...frame!.before.observation.facilities,...frame!.before.observation.checkpoints,...frame!.after.observation.facilities,...frame!.after.observation.checkpoints]);
+    get('action').textContent=`${describe(frame.record.inputAction)}${resultPhase?` — ${frame.record.accepted?(ja?'実行済み':'Executed'):`${ja?'拒否':'Rejected'}: ${frame.record.error?.message ?? ''}`}`:''}`;
+    if(resultPhase)logs.set(decision,[`${ja?'判断':'Decision'} ${decision+1}: ${describe(frame.record.inputAction)}`, ...frame.record.events.filter(e=>e.type!=='zombie_presentation').map(e=>`Turn ${e.turn} · ${e.type} ${describe(e.payload)}`), ...(frame.record.error?[frame.record.error.message]:[])]);
     // Retain a bounded log window; older Decisions remain reachable through the seek controls.
     while(logs.size>100)logs.delete(logs.keys().next().value!);
     const ol=get('events');ol.replaceChildren();for(const [,lines] of [...logs].sort(([a],[b])=>a-b))for(const line of lines){const li=document.createElement('li');li.textContent=line;ol.append(li);}draw();

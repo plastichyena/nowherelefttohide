@@ -1,3 +1,7 @@
+import { mergeDisplayAlerts, compactCrisisText } from './status';
+import { humanNames, localizeHumanReferences } from './displayNames';
+import { panelViewModel, type PanelSource } from './panel';
+import { resolveTileTargets, nextPrincipalTarget, selectableSelection, targetKey, type Selection } from './selection';
 import { mapStartFields, bindMapStart, readMapStart, generateGame, proposeMapCorrections } from './map-start';
 import { RULES_V169 } from '../core/rules-v169';
 import { SCENARIOS, resolveScenario } from '../core/scenarios';
@@ -106,6 +110,8 @@ import { createBoardGame, type BoardAssetWarning, type BoardRenderState, type Bo
 import {
   createTranslator,
   getInitialLocale,
+  facilityLabel,
+  unitLabel,
   persistLocale,
   toggleLocale,
   type Locale,
@@ -186,18 +192,7 @@ type ConstructiblePlacement = {
 };
 type CheckpointPreviewTarget = { branchId: RoadBranchId; position: HexCoord };
 export type NavigationMode = 'map' | 'domestic';
-export type Selection =
-  | { kind: 'unit'; id: string }
-  /** A visible enemy unit selected from the board. */
-  | { kind: 'zombie'; id: string }
-  | { kind: 'facility'; id: string }
-  | { kind: 'checkpoint'; id: string }
-  /** An empty trunk-road tile selected in Domestic mode. */
-  | { kind: 'road'; position: HexCoord }
-  /** An otherwise empty, public map tile selected for local Domestic actions. */
-  | { kind: 'hex'; position: HexCoord }
-  | null;
-
+export type { Selection } from './selection';
 export type UnitActionMode = 'move' | 'attack' | null;
 
 /** The v1.5.0 proficiency values are kept at the UI boundary so older
@@ -262,6 +257,8 @@ function proficiencyLabel(proficiency: UnitProficiency, locale: Locale): string 
 }
 
 export interface CrisisAlertViewModel {
+  label?: string;
+  detail?: string;
   id: string;
   severity: 'critical' | 'warning' | 'advisory';
   category: string;
@@ -324,6 +321,7 @@ export function crisisSummaryViewModel(observation: Readonly<AgentObservation> |
 }
 
 function crisisReasonLabel(alert: CrisisAlertViewModel, locale: Locale): string {
+  if (alert.label) return alert.label;
   const t = createTranslator(locale);
   const translated = alert.reasonCode ? t(`crisisReason.${alert.reasonCode}`) : '';
   if (translated && translated !== `crisisReason.${alert.reasonCode}`) return translated;
@@ -335,6 +333,7 @@ function crisisReasonLabel(alert: CrisisAlertViewModel, locale: Locale): string 
 }
 
 function crisisFactsLabel(alert: CrisisAlertViewModel, locale: Locale): string {
+  if (alert.detail) return alert.detail;
   const t = createTranslator(locale);
   const facts = alert.publicFacts;
   const bodyKey = `alert.${alert.reasonCode}.body`;
@@ -1218,7 +1217,7 @@ export function renderHordePublicEventHistory(
   const history = hordePublicEventViewModels(events, limit);
   if (history.length === 0) return `<section class="horde-event-history" data-horde-event-history="true"><div class="section-heading"><h3>${escapeHtml(t('horde'))}</h3></div><p class="muted">${escapeHtml(t('importantEventHistoryEmpty'))}</p></section>`;
   const rows = history.map((event) => `<li data-horde-event-type="${escapeHtml(event.type)}"><article class="horde-event-item"><span class="important-event-marker" aria-hidden="true">${event.type === 'horde_wave_started' ? '◇' : '▶'}</span><span><strong>${escapeHtml(event.type === 'horde_wave_started' ? t('hordeWaveStarted') : t('hordeSpawnBatch'))}</strong><small>${escapeHtml(formatHordePublicEvent(event, locale))}</small></span></article></li>`).join('');
-  return `<section class="horde-event-history" data-horde-event-history="true" aria-labelledby="horde-event-history-heading"><div class="section-heading"><h3 id="horde-event-history-heading">${escapeHtml(t('horde'))}</h3><span class="status-chip">${history.length}/50</span></div><ol>${rows}</ol><p class="muted">${escapeHtml(t('tipWaveRoster'))}</p></section>`;
+  return `<section class="horde-event-history" data-horde-event-history="true" aria-labelledby="horde-event-history-heading"><div class="section-heading"><h3 id="horde-event-history-heading">${escapeHtml(t('horde'))}</h3><span class="status-chip">${history.length}/50</span></div><ol>${rows}</ol></section>`;
 }
 
 /** Localize Core-owned candidate results without duplicating checkpoint rules in the UI. */
@@ -1312,60 +1311,9 @@ export function placeBoardContextUi(
   };
 }
 
-/**
- * Resolve a tapped tile according to the active navigation mode.
- *
- * This is deliberately a pure view concern. It never changes GameState and
- * it keeps the map-mode priority (player unit, then facility/checkpoint)
- * separate from the domestic-mode priority (facility/checkpoint only).
- */
-export function resolveTileSelection(
-  state: Readonly<GameState>,
-  position: HexCoord,
-  mode: NavigationMode,
-): Selection {
-  const facility = findFacilityAt(state, position);
-  const checkpoint = findCheckpointAt(state, position);
-  if (mode === 'domestic') {
-    if (facility) return { kind: 'facility', id: facility.id };
-    if (checkpoint) return { kind: 'checkpoint', id: checkpoint.id };
-    // Road selection is intentionally limited to the fixed map's trunk-road
-    // tiles.  Branch identity is derived from Core candidates later; keeping
-    // only the position in UI state avoids adding another persisted contract.
-    const roadBranches = state.map?.roadBranches ?? [];
-    if (roadBranches.some((branch) => branch.roadTiles.some((tile) => samePosition(tile, position)))) {
-      return { kind: 'road', position: { ...position } };
-    }
-    // Domestic mode can inspect any otherwise-empty public Hex so local
-    // Constructible actions can be shown at exactly the selected location.
-    const occupied = state.units.some((candidate) => candidate.actionState !== 'destroyed' && samePosition(candidate.position, position));
-    if (!occupied) return { kind: 'hex', position: { ...position } };
-    return null;
-  }
-
-  const unit = state.units.find(
-    (candidate) => candidate.actionState !== 'destroyed' && candidate.isPlayerUnit &&
-      candidate.position.q === position.q && candidate.position.r === position.r,
-  );
-  if (unit) return { kind: 'unit', id: unit.id };
-  if (facility) return { kind: 'facility', id: facility.id };
-  if (checkpoint) return { kind: 'checkpoint', id: checkpoint.id };
-  const visibleKeys = (() => {
-    try {
-      return getPlayerVisibleTileKeys(state);
-    } catch {
-      return new Set<string>();
-    }
-  })();
-  const zombie = state.units.find((candidate) => !candidate.isPlayerUnit
-    && candidate.actionState !== 'destroyed'
-    && samePosition(candidate.position, position)
-    && visibleKeys.has(hexKey(candidate.position)));
-  if (zombie) return { kind: 'zombie', id: zombie.id };
-  // A public empty tile remains selectable in Map mode for inspection. The
-  // tile itself is read from AgentObservation in the sheet.
-  const tile = state.map?.tiles?.find((candidate) => samePosition(candidate, position));
-  return tile ? { kind: 'hex', position: { ...position } } : null;
+/** Navigation changes the view, never the public target order. */
+export function resolveTileSelection(state: Readonly<GameState>, position: HexCoord, _mode: NavigationMode): Selection {
+  return resolveTileTargets(state, position)[0] ?? null;
 }
 
 function unselectedPrompt(mode: NavigationMode, locale: Locale): string {
@@ -2070,27 +2018,6 @@ function publicMapTileForPosition(
   };
 }
 
-function facilityLabel(type: string, locale: Locale): string {
-  const names: Record<string, [string, string]> = {
-    capital: ['州都', 'Capital'],
-    city: ['地方都市', 'City'],
-    farm: ['農場', 'Farm'],
-    civilianFactory: ['民需工場', 'Civilian Factory'],
-    militaryFactory: ['軍需工場', 'Military Factory'],
-    oilField: ['油田', 'Oil Field'],
-    refinery: ['製油所', 'Refinery'],
-    powerPlant: ['発電所', 'Power Plant'],
-    nuclearPowerPlant: ['原子力発電所', 'Nuclear Power Plant'],
-    windPowerPlant: ['風力発電所', 'Wind Power Plant'],
-    simpleFarm: ['簡易農場', 'Simple Farm'],
-    reliefSupplyCenter: ['救援物資センター', 'Relief Supply Center'],
-    civilianDroneBase: ['民間ドローン基地', 'Civilian Drone Base'],
-    temporaryHousing: ['仮設住宅', 'Temporary Housing'],
-    armyBase: ['陸軍基地', 'Army Base'],
-    airBase: ['空軍基地', 'Air Base'],
-  };
-  return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
-}
 
 export interface HordePublicCountsViewModel {
   waveIndex: number | null;
@@ -2168,28 +2095,6 @@ export function hordePublicCounts(source: unknown, requestedWaveIndex?: number |
   };
 }
 
-function unitLabel(type: string, locale: Locale): string {
-  const names: Record<string, [string, string]> = {
-    police: ['警察', 'Police'],
-    nationalGuard: ['兵士', 'Soldier'],
-    ifv: ['IFV（歩兵戦闘車）', 'IFV (Infantry Fighting Vehicle)'],
-    fieldArtillery: ['野戦砲', 'Field Artillery'],
-    multipurposeHelicopter: ['多目的ヘリコプター', 'Multipurpose Helicopter'],
-    riotPolice: ['機動隊', 'Riot Police'],
-    reconTeam: ['偵察隊', 'Recon'],
-    specialForces: ['特殊部隊', 'Special Forces'],
-    packZombie: ['Pack Zombie', 'Pack Zombie'],
-    zombie: ['ゾンビ', 'Zombie'],
-    hordeZombie: ['襲撃ゾンビ', 'Horde Zombie'],
-    policeZombie: ['警察ゾンビ', 'Police Zombie'],
-    soldierZombie: ['兵士ゾンビ', 'Soldier Zombie'],
-    riotZombie: ['機動隊ゾンビ', 'Riot Zombie'],
-    hunterZombie: ['ハンターゾンビ', 'Hunter Zombie'],
-    gasZombie: ['ガスゾンビ', 'Gas Zombie'],
-    screamerZombie: ['スクリーマーゾンビ', 'Screamer Zombie'],
-  };
-  return names[type]?.[locale === 'ja' ? 0 : 1] ?? type;
-}
 
 /** Human-facing release label; APP_VERSION remains the single source of truth. */
 export function titleVersionLabel(locale: Locale): string {
@@ -2216,7 +2121,7 @@ export function renderResourceAccordion(locale: Locale): string {
     electricity: '⚡',
   };
   const buttons = RESOURCE_ACCORDION_KEYS.map((resource) => {
-    const label = resource === 'electricity' ? t('powerHudLabel') : t(resource);
+    const label = resource === 'electricity' ? (locale==='ja'?'電力 需/供':'Power D/S') : t(resource);
     return `<button type="button" class="resource-pill resource-accordion-toggle ${resource}-pill" data-action="toggle-resource" data-resource="${resource}" aria-expanded="false" aria-controls="resource-details-${resource}"><span aria-hidden="true">${icons[resource]}</span><b data-bind="${resource}">0</b><small>${escapeHtml(label)}</small><span class="resource-warning-marker" data-resource-warning="${resource}" aria-label="${escapeHtml(t('forecastShortage'))}" hidden>!</span></button>`;
   }).join('');
   const panels = RESOURCE_ACCORDION_KEYS.map((resource) => `<div id="resource-details-${resource}" class="resource-accordion-panel" data-resource-panel="${resource}" role="region" aria-label="${escapeHtml(t(resource === 'electricity' ? 'electricity' : resource))}" hidden></div>`).join('');
@@ -2858,7 +2763,7 @@ export function renderArmyBaseDetails(
     : `<p class="muted">${escapeHtml(t('armyBaseNoPendingRecruitment'))}</p>`;
   const powerReason = reasonLabel(base.recruitmentPowerReason);
   const rewardReason = base.rewardUnavailableReason ? ` · ${reasonLabel(base.rewardUnavailableReason) ?? reward}` : '';
-  return `<section class="army-base-details" data-army-base-details="true"><h3>${escapeHtml(facility.type==='airBase'?t('facility.airBase'):t('armyBaseFunctions'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('dedicatedMilitaryGoods'))}</dt><dd>${base.militaryGoods}/${base.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('interceptionsRemaining'))}</dt><dd>${base.interceptionsRemaining} · ${escapeHtml(t('armyBaseInterceptionRefresh'))}</dd></div><div><dt>${escapeHtml(t('attack'))} / ${escapeHtml(t('range'))}</dt><dd>${base.interceptionAttack} / ${base.interceptionRange}</dd></div><div><dt>${escapeHtml(t('interceptionCost'))}</dt><dd>${base.interceptionCost} ${escapeHtml(t('militaryGoods'))}</dd></div><div><dt>${escapeHtml(t('noiseRadius'))}</dt><dd>${base.interceptionNoiseRadius}</dd></div><div><dt>${escapeHtml(t('interception'))}</dt><dd>${escapeHtml(availability(base.interceptionAvailable, base.interceptionUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('projectedRefill'))}</dt><dd>+${base.projectedMilitaryGoodsRefill} · ${escapeHtml(availability(base.refillAvailable, base.refillUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('earlyCaptureReward'))}</dt><dd>${escapeHtml(reward)} · ${escapeHtml(t('throughTurn'))} ${base.rewardLastTurn}${escapeHtml(rewardReason)}</dd></div><div><dt>${escapeHtml(t('recruitmentPower'))}</dt><dd>${base.recruitmentPowerDemand} · ${escapeHtml(base.recruitmentPowerAllocated ? t('powerSupplied') : t('powerNotSupplied'))}${powerReason ? ` · ${escapeHtml(powerReason)}` : ''}</dd></div></dl>${pendingMarkup}<p class="muted">${escapeHtml(facility.type==='airBase'?RULES_V165[locale].objectives:t('armyBaseRewardRule'))}</p><p class="muted">${escapeHtml(facility.type==='airBase'?RULES_V165[locale].airBase:t('armyBaseRecruitmentRule'))}</p><p class="muted">${escapeHtml(t('armyBaseForfeitRule'))}</p></section>`;
+  return `<section class="army-base-details" data-army-base-details="true"><h3>${escapeHtml(facility.type==='airBase'?t('facility.airBase'):t('armyBaseFunctions'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('dedicatedMilitaryGoods'))}</dt><dd>${base.militaryGoods}/${base.maxMilitaryGoods}</dd></div><div><dt>${escapeHtml(t('interceptionsRemaining'))}</dt><dd>${base.interceptionsRemaining} · ${escapeHtml(t('armyBaseInterceptionRefresh'))}</dd></div><div><dt>${escapeHtml(t('attack'))} / ${escapeHtml(t('range'))}</dt><dd>${base.interceptionAttack} / ${base.interceptionRange}</dd></div><div><dt>${escapeHtml(t('interceptionCost'))}</dt><dd>${base.interceptionCost} ${escapeHtml(t('militaryGoods'))}</dd></div><div><dt>${escapeHtml(t('noiseRadius'))}</dt><dd>${base.interceptionNoiseRadius}</dd></div><div><dt>${escapeHtml(t('interception'))}</dt><dd>${escapeHtml(availability(base.interceptionAvailable, base.interceptionUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('projectedRefill'))}</dt><dd>+${base.projectedMilitaryGoodsRefill} · ${escapeHtml(availability(base.refillAvailable, base.refillUnavailableReason))}</dd></div><div><dt>${escapeHtml(t('earlyCaptureReward'))}</dt><dd>${escapeHtml(reward)} · ${escapeHtml(t('throughTurn'))} ${base.rewardLastTurn}${escapeHtml(rewardReason)}</dd></div><div><dt>${escapeHtml(t('recruitmentPower'))}</dt><dd>${base.recruitmentPowerDemand} · ${escapeHtml(base.recruitmentPowerAllocated ? t('powerSupplied') : t('powerNotSupplied'))}${powerReason ? ` · ${escapeHtml(powerReason)}` : ''}</dd></div></dl>${pendingMarkup}</section>`;
 }
 
 function gameOverReasonLabel(reason: GameResult['reason'], locale: Locale): string {
@@ -2904,7 +2809,7 @@ export class GameUiController {
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
   private locale: Locale = getInitialLocale();
   private screen: Screen = 'title';
-  private sheetState: SheetState = 'standard';
+  private sheetState: SheetState = 'collapsed';
   private navMode: NavigationMode = 'map';
   private engine: UiGameEngine | null = null;
   private droneTargetFacilityId: string | null = null;
@@ -2948,6 +2853,10 @@ export class GameUiController {
   private sheetPointerY: number | null = null;
   private sheetDragged = false;
   /** UI-only accordion state; never serialized into GameState/Save. */
+  private upperOverlay: 'population' | 'horde' | 'more' | 'menu' | null = null;
+  private overflowChips: string[] = [];
+  private panelKey = '';
+  private openPanelSection: string | null = null;
   private resourceAccordion: ResourceAccordionKey | null = null;
   private readonly overviewSections = new Map<OverviewSectionKey, boolean>();
   /** Crisis groups reveal three alerts at a time without changing Core state. */
@@ -2984,7 +2893,8 @@ export class GameUiController {
   private readonly handleGlobalKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape' || this.screen !== 'game' || this.root.querySelector('[data-modal]')) return;
     event.preventDefault();
-    if (this.resourceAccordion) {
+    if (this.resourceAccordion || this.upperOverlay) {
+      this.upperOverlay = null;
       this.resourceAccordion = null;
       this.updateView();
       return;
@@ -3046,6 +2956,11 @@ export class GameUiController {
     }
     const alerts = deriveCoreCrisisSummary(this.state);
     return crisisSummaryViewModel({ crisisSummary: { alerts } });
+  }
+
+  private queryDisplayCrisis(): CrisisSummaryViewModel {
+    if (!this.state) return this.queryCrisisSummary();
+    return mergeDisplayAlerts(this.queryCrisisSummary(),strategicWarningViewModel({strategicForecast:this.queryStrategicForecast(),checkpoints:this.state.checkpoints.map(c=>this.queryPublicCheckpoint(c.id)).filter((c):c is AgentCheckpointObservation=>Boolean(c)),checkpointPositionCandidates:[...this.queryCheckpointPositionCandidates()]},this.locale));
   }
 
   private queryEndTurnRisk(): EndTurnRiskViewModel {
@@ -3237,6 +3152,8 @@ export class GameUiController {
     this.constructiblePlacementMessage = null;
     this.supplyOverlay = false;
     this.resourceAccordion = null;
+    this.upperOverlay = null;
+    this.openPanelSection = null;
     this.overviewSections.clear();
     this.eventHistoryLimit = 10;
     this.notifiedEventIds.clear();
@@ -3392,15 +3309,17 @@ export class GameUiController {
       this.root.querySelector('[data-generation-back]')!.addEventListener('click',()=>this.showTitle(),{once:true});return;
     }
     try {
-      const nextEngine=this.engine ?? this.createEngine(snapshot);
-      const loaded=nextEngine.step({type:'LoadSnapshot',snapshot});
-      if(loaded.error)throw new Error(loaded.error.message);
+      const nextEngine=this.createEngine(snapshot);
       this.engine=nextEngine;
-      this.state=loaded.state;
+      this.state=nextEngine.getState();
       if(snapshot.mapDescriptor.fallback)this.showToast(ja?'専用代替マップを使用しました':'Using the dedicated fallback map');
       this.screen = 'game';
-      this.sheetState = 'standard';
       this.navMode = 'map';
+      this.sheetState = 'collapsed';
+      this.upperOverlay = null;
+      this.openPanelSection = null;
+      this.pendingAviationAction = null;
+      this.droneTargetFacilityId = null;
       this.selection = null;
       this.unitActionMode = null;
       this.pendingMove = null;
@@ -3466,29 +3385,20 @@ export class GameUiController {
     this.root.className = 'app-shell game-screen';
     this.root.innerHTML = `
       <header class="top-hud">
-        <div class="hud-brand" title="${escapeHtml(JSON.stringify(this.state.mapDescriptor))}"><span class="hud-glyph">◇</span><span>${escapeHtml(t('title'))}</span></div>
-        <div class="hud-turn"><span data-bind="turn">—</span><small data-bind="turn-label">${escapeHtml(t('turn'))}</small><span class="phase-dot" data-bind="phase" data-phase="${escapeHtml(phaseIndicator.phase)}" aria-hidden="true"></span><span class="phase-label" data-bind="phase-label" title="${escapeHtml(phaseIndicator.label)}">${escapeHtml(phaseIndicator.shortLabel)}</span></div>
-        <div class="hud-pop"><span data-bind="population">—</span><small>${escapeHtml(t('population'))}</small></div>
-        <button class="icon-button supply-toggle" aria-label="${escapeHtml(t('supplyOverlay'))}" aria-pressed="${this.supplyOverlay}" data-action="toggle-supply" title="${escapeHtml(this.supplyOverlay ? t('supplyOn') : t('supplyOff'))}">◎</button>
-        <button class="icon-button" aria-label="${escapeHtml(t('help'))}" data-action="help">?</button>
+        <div class="hud-turn"><b data-bind="turn">—</b><small data-bind="turn-label">${escapeHtml(t('turn'))}</small><span class="phase-dot" data-bind="phase" aria-hidden="true"></span><span class="phase-label" data-bind="phase-label">${escapeHtml(phaseIndicator.shortLabel)}</span></div>
+        <button class="hud-pop" data-action="toggle-upper" data-overlay="population" aria-expanded="false"><span>${escapeHtml(t('population'))}</span> <b data-bind="population">—</b></button>
+        <button class="icon-button more-menu" data-action="toggle-upper" data-overlay="menu" aria-label="${this.locale==='ja'?'メニュー':'Menu'}" aria-expanded="false">⋯</button>
       </header>
-      ${this.state.mapDescriptor?.fallback?`<p class="map-fallback-notice" role="status">${this.locale==='ja'?'専用代替マップを使用':'Dedicated fallback map'} · ${escapeHtml(this.state.mapDescriptor.fallback.id)}</p>`:''}
-      <section class="resource-strip" aria-label="${escapeHtml(t('resources'))}">
-        ${renderResourceAccordion(this.locale)}
-        <span class="resource-pill civilian-pill">♙ <b data-bind="healthy-civilians">0</b><small>${escapeHtml(t('healthyCivilians'))}</small></span>
-        <span class="resource-pill infected-pill">☣ <b data-bind="infected">0</b><small>${escapeHtml(t('infected'))}</small></span>
-        <span class="save-status" data-bind="save-status" aria-live="polite"></span>
-      </section>
-      ${renderHordeWarningCard(this.locale)}
-      <div data-crisis-mount></div>
-      <section class="victory-progress" aria-live="polite" aria-label="${escapeHtml(t('victoryProgress'))}"><strong>${escapeHtml(t('victoryProgress'))}</strong><div data-bind="victory-progress"></div></section>
-      <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><div class="unit-context-layer" data-unit-context-layer aria-live="polite"></div>${noiseDebugMount}<div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
+      <section class="resource-strip" aria-label="${escapeHtml(t('resources'))}">${renderResourceAccordion(this.locale)}</section>
+      <div class="situation-strip" data-situation-strip aria-label="${this.locale==='ja'?'状況':'Situation'}"></div>
+      <aside class="upper-overlay" data-upper-overlay hidden></aside>
+      <main class="board-region"><div id="board-canvas" class="board-canvas" aria-label="${escapeHtml(t('map'))}"></div><button class="supply-toggle" aria-label="${escapeHtml(t('supplyOverlay'))}" aria-pressed="${this.supplyOverlay}" data-action="toggle-supply">◎ ${escapeHtml(t('supply'))}</button><div class="unit-context-layer" data-unit-context-layer aria-live="polite"></div>${noiseDebugMount}<div class="board-loading" data-board-loading role="status" aria-live="polite">${escapeHtml(t('boardLoading'))}</div><div id="toast" class="toast" role="status" aria-live="polite"></div></main>
       <section class="bottom-sheet" data-sheet="standard" aria-label="${escapeHtml(t('selected'))}">
         <button class="sheet-handle" type="button" data-action="sheet-toggle"><span></span><span class="sr-only">${escapeHtml(t('selected'))}</span></button>
-        <div class="sheet-header" data-action="sheet-toggle"><div><strong data-bind="selection-title">${escapeHtml(t('selectUnit'))}</strong><small data-bind="selection-summary">${escapeHtml(stateSummary(this.state, this.locale))}</small></div><span data-bind="sheet-state">${escapeHtml(sheetStateLabel(this.sheetState, this.locale))}</span></div>
-        <div class="sheet-body" data-bind="sheet-body"></div>
+        <div class="sheet-header"><div><strong data-bind="selection-title">${escapeHtml(t('selectUnit'))}</strong><small data-bind="selection-summary">${escapeHtml(stateSummary(this.state, this.locale))}</small></div><span class="sr-only" data-bind="sheet-state">${escapeHtml(sheetStateLabel(this.sheetState, this.locale))}</span></div>
+        <div data-bind="same-hex-targets"></div><div data-panel-summary></div><div class="panel-actions" data-panel-actions></div><div class="sheet-body" data-bind="sheet-body"></div>
       </section>
-      <nav class="bottom-nav" aria-label="${escapeHtml(t('map'))}"><button data-nav="map" class="${this.navMode === 'map' ? 'active' : ''}" aria-current="${this.navMode === 'map' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'map'}">▦<span>${escapeHtml(t('map'))}</span></button><button data-nav="domestic" class="${this.navMode === 'domestic' ? 'active' : ''}" aria-current="${this.navMode === 'domestic' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'domestic'}">⌂<span>${escapeHtml(t('domestic'))}</span></button><button data-action="end-turn" class="nav-end">▶<span>${escapeHtml(t('endTurn'))}</span></button><button data-action="save">▤<span>${escapeHtml(t('manualSave'))}</span></button></nav>`;
+      <nav class="bottom-nav" aria-label="${escapeHtml(t('map'))}"><button data-nav="map" class="${this.navMode === 'map' ? 'active' : ''}" aria-current="${this.navMode === 'map' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'map'}">▦<span>${escapeHtml(t('map'))}</span></button><button data-nav="domestic" class="${this.navMode === 'domestic' ? 'active' : ''}" aria-current="${this.navMode === 'domestic' ? 'page' : 'false'}" aria-pressed="${this.navMode === 'domestic'}">⌂<span>${escapeHtml(t('domestic'))}</span></button><button data-action="end-turn" class="nav-end">▶<span>${escapeHtml(t('endTurn'))}</span></button></nav>`;
     this.bindRootEvents();
     this.createBoard();
     this.updateView();
@@ -3501,8 +3411,8 @@ export class GameUiController {
     this.setBoardLoading(true);
     const callbacks = {
       onTileTap: (position: HexCoord) => this.onTileTap(position),
-      onBlankTap: () => this.cancelUnitInteractionLevel(),
-      onViewChange: () => this.positionUnitContextUi(),
+      onBlankTap: () => { this.closeUpperOverlay(); this.cancelUnitInteractionLevel(); },
+      onViewChange: () => { this.closeUpperOverlay(); this.positionUnitContextUi(); },
       // board.ts may call this while its runtime registry is preloading.  The
       // permissive input keeps the controller compatible with both boolean
       // and message-style loading callbacks without coupling the Core to UI.
@@ -3568,10 +3478,7 @@ export class GameUiController {
       const action = target.closest<HTMLElement>('[data-action]')?.dataset.action;
       const nav = target.closest<HTMLElement>('[data-nav]')?.dataset.nav;
       if (action && !(action === 'sheet-toggle' && this.sheetDragged)) this.onAction(action, target.closest<HTMLElement>('[data-action]') ?? target);
-      if (this.resourceAccordion && !target.closest('[data-resource-accordion]')) {
-        this.resourceAccordion = null;
-        this.updateView();
-      }
+      if ((this.resourceAccordion || this.upperOverlay) && !target.closest('[data-resource-accordion], [data-upper-overlay], [data-action="toggle-upper"]')) this.closeUpperOverlay();
       this.sheetDragged = false;
       if (nav) this.onNav(nav);
     };
@@ -3625,6 +3532,13 @@ export class GameUiController {
       case 'focus-important-event': this.focusImportantEvent(element); break;
       case 'focus-crisis-alert': this.focusCrisisAlert(element); break;
       case 'open-crisis': this.openCrisis(); break;
+      case 'open-panel': this.openPanelSection = element.dataset.section ?? null; this.sheetState = 'expanded'; this.updateView(); break;
+      case 'panel-details': this.openPanelSection = null; this.sheetState = this.sheetState === 'expanded' ? 'standard' : 'expanded'; this.updateView(); break;
+      case 'toggle-upper': {
+        const overlay = element.dataset.overlay as typeof this.upperOverlay;
+        this.upperOverlay = this.upperOverlay === overlay ? null : overlay;
+        this.resourceAccordion = null; this.updateHud(); break;
+      }
       case 'toggle-resource': this.toggleResourceAccordion(element.dataset.resource as ResourceAccordionKey); break;
       case 'toggle-overview': this.toggleOverviewSection(element.dataset.section as OverviewSectionKey); break;
       case 'show-more-crisis': this.showMoreCrisis(element.dataset.crisisSeverity as CrisisAlertViewModel['severity']); break;
@@ -3690,14 +3604,17 @@ export class GameUiController {
       case 'decommission-facility': this.decommissionFacility(element); break;
       default: break;
     }
+    this.localizeReferences();
   }
 
   private onNav(nav: string): void {
     if (nav !== 'domestic' && nav !== 'map') return;
     const mode = nav as NavigationMode;
-    const selected = this.selectedPosition();
+    this.closeUpperOverlay();
     this.navMode = mode;
+    this.droneTargetFacilityId = null;
     this.unitActionMode = null;
+    this.pendingAviationAction = null;
     this.pendingMove = null;
     this.pendingAttackTargetId = null;
     this.pendingArtilleryTarget = null;
@@ -3707,9 +3624,8 @@ export class GameUiController {
     this.constructiblePlacement = null;
     this.constructiblePreviewTarget = null;
     this.constructiblePlacementMessage = null;
-    if (this.state && selected) this.selection = resolveTileSelection(this.state, selected, mode);
-    else if (mode === 'domestic' && this.selection?.kind === 'unit') this.selection = null;
-    this.sheetState = mode === 'domestic' ? 'expanded' : 'standard';
+    if (this.state) this.selection = selectableSelection(this.state, this.selection);
+    this.sheetState = mode === 'domestic' ? 'expanded' : this.selection ? 'standard' : 'collapsed';
     this.updateView();
   }
 
@@ -3724,6 +3640,7 @@ export class GameUiController {
 
   private toggleResourceAccordion(resource?: ResourceAccordionKey): void {
     if (!resource || !['food', 'civilianGoods', 'militaryGoods', 'fuel', 'electricity'].includes(resource)) return;
+    this.upperOverlay = null;
     this.resourceAccordion = this.resourceAccordion === resource ? null : resource;
     this.updateView();
   }
@@ -3742,26 +3659,23 @@ export class GameUiController {
 
   private openCrisis(): void {
     this.resourceAccordion = null;
-    this.selection = null;
+    this.onNav('domestic');
     this.overviewSections.set('crisis', true);
     this.sheetState = 'expanded';
     this.updateView();
   }
 
   private selectSameHexTarget(element: HTMLElement): void {
-    if (!this.state) return;
-    const kind = element.dataset.selectionKind;
-    const id = element.dataset.selectionId;
-    if ((kind === 'unit' || kind === 'zombie' || kind === 'facility' || kind === 'checkpoint') && id) {
-      this.selection = { kind, id } as Selection;
-    } else if ((kind === 'hex' || kind === 'road') && Number.isInteger(Number(element.dataset.q)) && Number.isInteger(Number(element.dataset.r))) {
-      this.selection = { kind, position: { q: Number(element.dataset.q), r: Number(element.dataset.r) } } as Selection;
-    }
-    this.unitActionMode = null;
-    this.pendingMove = null;
-    this.pendingAttackTargetId = null;
-    this.pendingArtilleryTarget = null;
-    this.updateView();
+    if (!this.state || !this.selection) return;
+    const position = this.selectedPosition();
+    if (!position) return;
+    const next = resolveTileTargets(this.state, position).find(target =>
+      target.kind === element.dataset.selectionKind && ('id' in target
+        ? target.id === element.dataset.selectionId
+        : target.position.q === Number(element.dataset.q) && target.position.r === Number(element.dataset.r)));
+    if (!next || targetKey(next) === targetKey(this.selection)) return;
+    this.selection = next;
+    this.onNav('map');
   }
 
   private focusCrisisAlert(element: HTMLElement): void {
@@ -3784,6 +3698,7 @@ export class GameUiController {
       this.selection = { kind: 'checkpoint', id };
       position = this.state.checkpoints.find((candidate) => candidate.id === id)?.position ?? position;
     }
+    this.selection = selectableSelection(this.state, this.selection);
     if (position) this.boardScene?.focusHex(position);
     this.navMode = 'map';
     this.sheetState = 'standard';
@@ -3799,10 +3714,15 @@ export class GameUiController {
   private updateView(): void {
     if(this.turnPlayback.active)return;
     if (!this.state || !this.engine || this.screen !== 'game') return;
+    this.selection = selectableSelection(this.state, this.selection);
+    if (this.navMode === 'map' && !this.selection) this.sheetState = 'collapsed';
     this.updateHud();
     this.renderSheetBody();
     const sheetBody = this.root.querySelector<HTMLElement>('[data-bind="sheet-body"]');
-    if (this.selection?.kind === 'facility') this.updateFacilitySupplementalControls();
+    if (this.navMode === 'map' && this.selection?.kind === 'facility') this.updateFacilitySupplementalControls();
+    const targets = this.root.querySelector<HTMLElement>('[data-bind="same-hex-targets"]');
+    const position = this.selectedPosition();
+    if (targets) targets.innerHTML = this.navMode === 'map' && this.selection && position ? this.renderSameHexTabs(position, this.selection) : '';
     // v1.5.0 keeps global branch/resource/event information inside the
     // unselected accordions. Constructible candidates are rendered only for a
     // selected Domestic Hex; never append a board-wide candidate list here.
@@ -3812,6 +3732,9 @@ export class GameUiController {
     this.updateNoiseDebugOverlay();
     const sheet = this.root.querySelector<HTMLElement>('.bottom-sheet');
     sheet?.setAttribute('data-sheet', this.sheetState);
+    const handle = this.root.querySelector<HTMLElement>('.sheet-handle');
+    handle?.setAttribute('aria-label', `${this.translator()('selected')} · ${sheetStateLabel(this.sheetState, this.locale)}`);
+    handle?.setAttribute('aria-expanded', String(this.sheetState === 'expanded'));
     const sheetState = this.root.querySelector<HTMLElement>('[data-bind="sheet-state"]');
     if (sheetState) sheetState.textContent = sheetStateLabel(this.sheetState, this.locale);
     const supplyToggle = this.root.querySelector<HTMLButtonElement>('[data-action="toggle-supply"]');
@@ -3821,6 +3744,11 @@ export class GameUiController {
     }
     this.updateNavigation();
     this.renderToast();
+    this.localizeReferences();
+  }
+
+  private localizeReferences(): void {
+    if (this.state && this.screen === 'game' && !this.root.querySelector('.replay-view, .live-ai-view')) localizeHumanReferences(this.root,humanNames(this.state,this.locale));
   }
 
   private updateNavigation(): void {
@@ -3835,6 +3763,7 @@ export class GameUiController {
   private updateHud(): void {
     if (!this.state) return;
     const t = this.translator();
+    this.renderUpperOverlay();
     const population = populationLocationTotals(this.state);
     const forecast = this.queryEndTurnForecast();
     this.updateResourceAccordion(forecast);
@@ -3878,7 +3807,7 @@ export class GameUiController {
     }
     const bindings: Record<string, string> = {
       turn: String(this.state.turn),
-      'turn-label': `${this.translator()('turn')} · ${this.translator()('finalWaveTurn')} ${finalTurn ?? '—'}`,
+      'turn-label': t('turn'),
       population: String(population.total),
       food: String(this.state.resources.food),
       civilianGoods: String(this.state.resources.civilianGoods),
@@ -3911,25 +3840,12 @@ export class GameUiController {
     }
     const hordeCard = this.root.querySelector<HTMLElement>('[data-bind="horde-card"]');
     if (hordeCard) hordeCard.dataset.hordeState = finalHordeVisible ? 'final' : warningType;
-    const crisis = this.queryCrisisSummary();
-    const strategicWarnings = strategicWarningViewModel({
-      strategicForecast: this.queryStrategicForecast(),
-      checkpoints: this.state.checkpoints.map((checkpoint) => this.queryPublicCheckpoint(checkpoint.id)).filter((checkpoint): checkpoint is AgentCheckpointObservation => Boolean(checkpoint)),
-      checkpointPositionCandidates: [...this.queryCheckpointPositionCandidates()],
-    }, this.locale);
-    const critical = strategicWarnings.find((warning) => warning.tier === 'critical');
-    const criticalStrip = this.root.querySelector<HTMLElement>('[data-bind="strategic-critical"]');
-    if (criticalStrip) {
-      criticalStrip.hidden = !critical;
-      criticalStrip.dataset.warningTier = critical ? critical.tier : 'none';
-      const text = criticalStrip.querySelector<HTMLElement>('[data-bind="strategic-critical-text"]');
-      if (text) text.textContent = critical ? `${critical.title} · ${critical.detail}` : '';
-    }
+    const crisis = this.queryDisplayCrisis();
     const progress = this.root.querySelector<HTMLElement>('[data-bind="victory-progress"]');
     if (progress) {
       progress.innerHTML = renderVictoryProgress(this.state, this.locale);
     }
-    const powerElement = this.root.querySelector<HTMLElement>('[data-bind="power-pill"]');
+    const powerElement = this.root.querySelector<HTMLElement>('[data-resource="electricity"]');
     if (powerElement) {
       powerElement.title = powerHud.tooltip;
       powerElement.setAttribute('aria-label', powerHud.accessibleName);
@@ -3942,7 +3858,68 @@ export class GameUiController {
       fuelElement.title = `${t('fuelForecast')}: ${t('currentFuel')} ${fuel.turnStartFuel} · ${t('powerFuelDemand')} ${fuel.projectedPowerFuelDemand} · ${t('unitRefillDemand')} ${fuel.projectedUnitRefillDemand} · ${t('projectedEndingFuel')} ${fuel.projectedEndingFuel}`;
       fuelElement.setAttribute('aria-label', `${t('fuel')}: ${fuel.turnStartFuel}. ${t('totalFuelDemand')}: ${fuel.projectedTotalFuelDemand}. ${t('projectedEndingFuel')}: ${fuel.projectedEndingFuel}`);
     }
-    this.updateCrisisStrip(crisis);
+    this.renderSituationStrip(crisis, remainingTurns);
+    const menu = this.root.querySelector<HTMLElement>('.more-menu');
+    if (menu) { menu.dataset.pending = String(this.saveStatus === 'saving' || this.hasUnsavedChanges); menu.setAttribute('aria-label', `${this.locale === 'ja' ? 'メニュー' : 'Menu'} · ${this.saveStatusLabel()}`); }
+    this.root.querySelectorAll<HTMLElement>('[data-overlay]').forEach(button => button.setAttribute('aria-expanded', String(button.dataset.overlay === this.upperOverlay)));
+    this.root.querySelector<HTMLElement>('[data-bind="power"]')?.setAttribute('aria-label', powerHud.accessibleName);
+  }
+
+  private closeUpperOverlay(): void {
+    if (!this.upperOverlay && !this.resourceAccordion) return;
+    this.upperOverlay = null; this.resourceAccordion = null;
+    this.updateHud();
+  }
+
+  private renderUpperOverlay(): void {
+    const mount = this.root.querySelector<HTMLElement>('[data-upper-overlay]');
+    if (!mount || !this.state) return;
+    const t = this.translator(), ja = this.locale === 'ja';
+    mount.hidden = !this.upperOverlay;
+    if (!this.upperOverlay) { mount.innerHTML = ''; return; }
+    if (this.upperOverlay === 'menu') mount.innerHTML = `<p role="status">${escapeHtml(this.saveStatusLabel())}</p><button data-action="save">${escapeHtml(t('manualSave'))}</button><button data-action="help">${escapeHtml(t('help'))}</button><button data-action="toggle-language">日本語 / English</button>`;
+    if (this.upperOverlay === 'population') {
+      const p = populationLocationTotals(this.state);
+      mount.innerHTML = `<h3>${t('population')} ${p.total}</h3><dl class="location-grid">${[['cityResidents',p.cityResidents],['productionWorkers',p.productionWorkers],['unitPopulation',p.unitPopulation],['waiting',p.waitingRefugees],['screening',p.screeningRefugees],['approved',p.approvedRefugees],['infected',p.infected],['healthyCivilians',p.healthyCivilians]].map(([key,value])=>`<div><dt>${escapeHtml(t(String(key)))}</dt><dd>${value}</dd></div>`).join('')}</dl>`;
+    }
+    if (this.upperOverlay === 'horde') mount.innerHTML = renderHordeWarningCard(this.locale).replace('<details ', '<details open ') + `<p>${escapeHtml(t('finalWaveTurn'))} ${finalWaveTurn(this.state.config) ?? '—'}</p><div data-bind="victory-progress"></div>`;
+    if (this.upperOverlay === 'more') mount.innerHTML = `<h3>${ja?'その他の状況':'Other situations'}</h3>${this.overflowChips.join('')}`;
+  }
+
+  private renderSituationStrip(crisis: CrisisSummaryViewModel, remaining: number | null): void {
+    const mount = this.root.querySelector<HTMLElement>('[data-situation-strip]');
+    if (!mount || !this.state) return;
+    const t = this.translator(), ja = this.locale === 'ja', h = this.state.horde;
+    const chip = (label: string, action: string, severity = '', overlay = '') => `<button class="situation-chip ${severity}" data-action="${action}"${overlay ? ` data-overlay="${overlay}"` : ''}>${escapeHtml(label)}</button>`;
+    const hordeLabel = h.warningType === 'final' || h.finalHordeStatus !== 'notStarted' ? (ja?'最終襲撃':'Final Horde')
+      : h.warningType === 'periodic' ? `${ja?'襲撃警告':'Horde warning'} ${h.warningDirections.length}${ja?'方向':' dirs'} · ${remaining ?? '—'}T`
+      : `${ja?'襲撃':'Horde'} T${h.nextSpawnTurn ?? '—'} · ${ja?'あと':'in '}${remaining ?? '—'}`;
+    const horde = chip(hordeLabel, 'toggle-upper', h.warningType === 'final' ? 'critical' : h.warningType === 'periodic' ? 'warning' : '', 'horde');
+    const chips: Array<{html:string;rank:number}> = [];
+    const alert = crisis.alerts[0];
+    if (alert) {
+      const names = humanNames(this.state,this.locale);
+      const subject = alert.entityIds[0] ? (names.get(alert.entityIds[0]) ?? '').replace(/ \(.*\)$/, '') : '';
+      const label = `${alert.severity==='critical'?'!':alert.severity==='warning'?'⚠':'i'} ${subject} ${compactCrisisText(alert,this.locale,crisisReasonLabel(alert,this.locale))}${crisis.alerts.length>1?` +${crisis.alerts.length-1}`:''}`;
+      chips.push({html:chip(label,'open-crisis',alert.severity),rank:alert.severity==='critical'?0:alert.severity==='warning'?3:4});
+    }
+    if (this.saveStatus === 'failed') chips.push({html:chip(ja?'保存失敗':'Save failed','save','critical'),rank:1});
+    const infection = populationLocationTotals(this.state).infected;
+    if (infection > 0) chips.push({html:chip(`${t('infected')} ${infection}`,'toggle-upper','critical','population'),rank:2});
+    const final = victoryProgressViewModel(this.state);
+    if (h.finalHordeStatus !== 'notStarted' || (final.finalPendingCount > 0 || final.finalMapCount > 0)) chips.push({html:chip(`${ja?'最終 待機':'Final pending '}${final.finalPendingCount} / ${ja?'盤面':'map '}${final.finalMapCount}`, 'toggle-upper','','horde'),rank:5});
+    chips.sort((a,b)=>a.rank-b.rank);
+    mount.classList.remove('is-condensed','is-fit');
+    mount.innerHTML = horde + chips.map(c=>c.html).join('');
+    this.overflowChips = [];
+    if (mount.scrollWidth > mount.clientWidth && chips.length > 1) {
+      const keep = chips[0]!.rank < 5 ? 1 : 0;
+      this.overflowChips = chips.slice(keep).map(c=>c.html);
+      mount.classList.add('is-condensed');
+      mount.innerHTML = horde + chips.slice(0,keep).map(c=>c.html).join('') + chip(ja?`ほか${this.overflowChips.length}件`:`+${this.overflowChips.length} more`,'toggle-upper','','more');
+    }
+    mount.classList.add('is-fit');
+    if (this.upperOverlay === 'more') this.renderUpperOverlay();
   }
 
   private updateResourceAccordion(forecast: EndTurnForecast): void {
@@ -4237,6 +4214,7 @@ export class GameUiController {
   }
 
   private clearUnitSelection(): void {
+    this.sheetState = 'collapsed';
     this.selection = null;
     this.checkpointPlacementMessage = null;
     this.unitActionMode = null;
@@ -4275,7 +4253,7 @@ export class GameUiController {
     switch (unitInteractionCancelStep(this.unitActionMode, Boolean(this.pendingMove || this.pendingAttackTargetId || this.pendingArtilleryTarget), Boolean(this.selection))) {
       case 'target': this.cancelUnitTarget(); break;
       case 'mode': this.leaveUnitActionMode(); break;
-      case 'selection': this.selection = null; this.checkpointPlacementMessage = null; this.updateView(); break;
+      case 'selection': this.sheetState = 'collapsed'; this.selection = null; this.checkpointPlacementMessage = null; this.updateView(); break;
       default: break;
     }
   }
@@ -4294,7 +4272,7 @@ export class GameUiController {
     const layer = this.root.querySelector<HTMLElement>('[data-unit-context-layer]');
     if (!layer) return;
     layer.innerHTML = '';
-    if(this.droneTargetFacilityId){layer.innerHTML=`<div class="unit-target-confirm"><p>${this.translator()('selectDroneTarget')}</p><button class="secondary-button" data-action="drone-cancel">${this.translator()('cancel')}</button></div>`;return;}
+    if(this.droneTargetFacilityId){layer.innerHTML=`<div class="unit-mode-indicator" data-unit-context-ui role="status" style="top:60px"><strong>${this.translator()('selectDroneTarget')}</strong><button class="secondary-button" data-action="drone-cancel">${this.translator()('cancel')}</button></div>`;return;}
     if (!this.state || this.navMode !== 'map' || this.selection?.kind !== 'unit') return;
     const unit = findUnit(this.state, this.selection.id);
     if (!unit?.isPlayerUnit) return;
@@ -4341,6 +4319,7 @@ export class GameUiController {
     if (!context || !region || !position || !this.boardScene) return;
     const anchor = this.boardScene.projectHexToScreen(position);
     if (!anchor) return;
+    context.style.setProperty('--context-detail-height', `${Math.max(44, region.clientHeight - 76)}px`);
     const size = { width: context.offsetWidth, height: context.offsetHeight };
     const placement = placeBoardContextUi(
       anchor,
@@ -4348,6 +4327,7 @@ export class GameUiController {
       size,
     );
     context.style.left = `${placement.left + size.width / 2}px`;
+    placement.top = Math.max(60, placement.top);
     context.style.top = context.classList.contains('unit-mode-indicator')
       ? `${placement.top}px`
       : `${placement.top + size.height / 2}px`;
@@ -4357,6 +4337,7 @@ export class GameUiController {
   private onTileTap(position: HexCoord): void {
     if(this.turnPlayback.active)return;
     if (!this.state || !this.engine) return;
+    this.closeUpperOverlay();
     if (this.droneTargetFacilityId) { this.showAviationPreview({type:'LaunchMilitaryDrone',facilityId:this.droneTargetFacilityId,target:position}); return; }
     if (this.constructiblePlacement) {
       const candidate = this.constructibleFacilityCandidates().find((entry) => samePosition(entry.position, position));
@@ -4395,19 +4376,14 @@ export class GameUiController {
       return;
     }
     if (this.navMode === 'domestic') {
-      this.unitActionMode = null;
-      this.pendingMove = null;
-      this.pendingAttackTargetId = null;
-    this.pendingArtilleryTarget = null;
-      this.selection = resolveTileSelection(this.state, position, this.navMode);
-      this.checkpointPlacementMessage = null;
-      this.updateView();
+      this.selection = resolveTileSelection(this.state, position, 'map');
+      this.onNav('map');
       return;
     }
 
     if (this.selection?.kind === 'unit') {
       const selected = findUnit(this.state, this.selection.id);
-      if (selected && samePosition(selected.position, position)) {
+      if (selected && samePosition(selected.position, position) && (this.unitActionMode || this.pendingMove || this.pendingAttackTargetId || this.pendingArtilleryTarget)) {
         this.cancelUnitInteractionLevel();
         return;
       }
@@ -4446,24 +4422,17 @@ export class GameUiController {
       }
     }
 
-    const resolved = resolveTileSelection(this.state, position, this.navMode);
-    if (resolved) {
-      this.selection = resolved;
-      this.checkpointPlacementMessage = null;
-      this.unitActionMode = null;
-      this.pendingMove = null;
-      this.pendingAttackTargetId = null;
+    const previous = this.selectedPosition();
+    this.selection = previous && samePosition(previous, position)
+      ? nextPrincipalTarget(this.state, position, this.selection)
+      : resolveTileSelection(this.state, position, 'map');
+    this.sheetState = this.selection ? 'standard' : 'collapsed';
+    this.checkpointPlacementMessage = null;
+    this.unitActionMode = null;
+    this.pendingMove = null;
+    this.pendingAttackTargetId = null;
     this.pendingArtilleryTarget = null;
-      this.updateView();
-    } else {
-      this.selection = null;
-      this.checkpointPlacementMessage = null;
-      this.unitActionMode = null;
-      this.pendingMove = null;
-      this.pendingAttackTargetId = null;
-    this.pendingArtilleryTarget = null;
-      this.updateView();
-    }
+    this.updateView();
   }
 
   private preview(unitId: string, destination: HexCoord): MovePreview {
@@ -4572,6 +4541,7 @@ export class GameUiController {
     const result = this.apply({ type: 'EndTurn' });
     if (result) {
       this.selection = null;
+      this.sheetState = 'collapsed';
       this.unitActionMode = null;
       this.pendingMove = null;
       this.pendingAttackTargetId = null;
@@ -4919,7 +4889,8 @@ export class GameUiController {
     const first = candidates.find((candidate) => candidate.legal) ?? candidates[0]!;
     this.checkpointPreviewTarget = { branchId: first.branchId, position: { ...first.position } };
     this.supplyOverlay = true;
-    this.sheetState = 'standard';
+    this.openPanelSection = null;
+    this.sheetState = 'expanded';
     this.updateView();
   }
 
@@ -5300,13 +5271,18 @@ export class GameUiController {
 
   private loadState(snapshot: GameState, migrated = false): void {
     try {
-      this.engine = this.createEngine(snapshot);
-      const result = this.engine.step({ type: 'LoadSnapshot', snapshot });
-      if (result.error) throw new Error(result.error.message);
-      this.state = result.state;
+      // The constructor validates the snapshot, including terminal states, before replacing the live engine.
+      const nextEngine = this.createEngine(snapshot);
+      this.engine = nextEngine;
+      this.state = nextEngine.getState();
       this.invalidateQueryContext();
       this.screen = 'game';
       this.navMode = 'map';
+      this.sheetState = 'collapsed';
+      this.upperOverlay = null;
+      this.openPanelSection = null;
+      this.pendingAviationAction = null;
+      this.droneTargetFacilityId = null;
       this.selection = null;
       this.unitActionMode = null;
       this.pendingMove = null;
@@ -5452,11 +5428,11 @@ export class GameUiController {
     const preview=aviationPreview(this.state,action); if(!preview)return;
     const reason=validateAction(this.state,action),t=this.translator();
     this.pendingAviationAction=action;this.dismissModal();
-    const labels:Record<string,string>={aircraftId:this.locale==='ja'?'輸送機ID':'Aircraft ID',cargoUnitId:this.locale==='ja'?'搭乗者ID':'Cargo unit ID',target:this.locale==='ja'?'派遣先':'Target',destination:this.locale==='ja'?'降機先':'Destination',distance:t('distance'),fuelCost:this.locale==='ja'?'消費燃料':'Fuel cost',currentFuel:action.type==='LaunchMilitaryDrone'?(this.locale==='ja'?'国家備蓄の燃料':'National fuel stock'):t('currentFuel'),resultingFuel:this.locale==='ja'?'実行後の燃料':'Fuel after action',visionRadius:t('vision'),activeThroughTurn:t('throughTurn'),transferredFuel:t('transferredFuel'),aircraftFuelBefore:this.locale==='ja'?'ヘリの移送前燃料':'Aircraft fuel before',infantryFuelBefore:this.locale==='ja'?'歩兵の移送前燃料':'Infantry fuel before',aircraftFuelAfter:t('aircraftFuelAfter'),infantryFuelAfter:t('infantryFuelAfter'),resultingMovement:t('movement'),resultingFlightState:t('flightState')};
+    const labels:Record<string,string>={aircraftId:this.locale==='ja'?'輸送機':'Aircraft',cargoUnitId:this.locale==='ja'?'搭乗部隊':'Cargo unit',target:this.locale==='ja'?'派遣先':'Target',destination:this.locale==='ja'?'降機先':'Destination',distance:t('distance'),fuelCost:this.locale==='ja'?'消費燃料':'Fuel cost',currentFuel:action.type==='LaunchMilitaryDrone'?(this.locale==='ja'?'国家備蓄の燃料':'National fuel stock'):t('currentFuel'),resultingFuel:this.locale==='ja'?'実行後の燃料':'Fuel after action',visionRadius:t('vision'),activeThroughTurn:t('throughTurn'),transferredFuel:t('transferredFuel'),aircraftFuelBefore:this.locale==='ja'?'ヘリの移送前燃料':'Aircraft fuel before',infantryFuelBefore:this.locale==='ja'?'歩兵の移送前燃料':'Infantry fuel before',aircraftFuelAfter:t('aircraftFuelAfter'),infantryFuelAfter:t('infantryFuelAfter'),resultingMovement:t('movement'),resultingFlightState:t('flightState')};
     const rows=Object.entries(preview).filter(([key])=>key in labels).map(([key,value])=>`<p>${escapeHtml(labels[key]!)}: <strong>${escapeHtml(typeof value==='string'?t(value):value&&typeof value==='object'&&'q' in value&&'r' in value?`${value.q},${value.r}`:String(value))}</strong></p>`).join('');
-    const rules=RULES_V165[this.locale];
-    this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="aviation"><section class="modal-card floating-card"><h2>${this.locale==='ja'?'操作の確認':'Action preview'} · ${t(action.type)}</h2>${rows}<p>${escapeHtml(action.type==='LaunchMilitaryDrone'?rules.drone:action.type==='BoardAircraft'||action.type==='DisembarkAircraft'?rules.transport:rules.flight)}</p>${reason?`<p class="warning-text">${escapeHtml(t('error.'+reason.code,reason.code))}</p>`:''}<div class="action-row"><button class="primary-button" data-action="aviation-confirm" ${reason?'disabled':''}>${this.locale==='ja'?'実行':'Confirm'}</button><button class="ghost-button" data-action="dismiss-modal">${t('cancel')}</button></div></section></div>`);
+    this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="aviation"><section class="modal-card floating-card"><h2>${this.locale==='ja'?'操作の確認':'Action preview'} · ${t(action.type)}</h2>${rows}${reason?`<p class="warning-text">${escapeHtml(t('error.'+reason.code,reason.code))}</p>`:''}<div class="action-row"><button class="primary-button" data-action="aviation-confirm" ${reason?'disabled':''}>${this.locale==='ja'?'実行':'Confirm'}</button><button class="ghost-button" data-action="dismiss-modal">${t('cancel')}</button></div></section></div>`);
     if(!reason)this.droneTargetFacilityId=null;
+    this.localizeReferences();
   }
 
   private showBoardLegend(): void {
@@ -5474,10 +5450,11 @@ export class GameUiController {
     const zombieTypes=['zombie','hordeZombie','policeZombie','soldierZombie','riotZombie','hunterZombie','gasZombie','screamerZombie','packZombie'] as const;
     const zombiePerformance=zombieTypes.map(type=>{const unit=config.units[type];return `${t(type)} · HP ${unit.hp} · ${t('attack')} ${unit.attack} · ${t('movement')} ${unit.movement} · ${t('range')} ${unit.range} · ${t('attackCharge')} ${unit.maxAttackCharges}`;});
     const sections:[string,string[]][]=[
-      [ja?'勝敗と基本操作':'Victory, defeat and controls',[ja?'標準UNAとカスタムはランダムマップが既定です。固定マップも選べます。詳細seed・再現キーで同じ地図を共有できます。生成中は段階と試行数を表示し、キャンセルできます。':'UNA and custom games default to Random; Fixed is also available. Advanced seeds and reproduction keys identify the same map. Generation shows its stage and attempt and can be cancelled.',t('guideSteps'),ja?'移動力（MP）は1ターンに移動できる量です。地形ごとに必要な移動力を消費します。':'Movement points (MP) are the movement budget for one turn. Each entered terrain consumes its movement cost.',t('tipVictory'),RULES_V169[this.locale].compatibility]],
+      [ja?'操作の補足':'Operation notes',[t('assignWorkersHint'),t('checkpointPlacementLocalHint'),t('decommissionConditions'),t('localBuildOnly'),t('temporaryHousingUse'),t('tipFuel'),t('tipPopulation'),t('tipRecovery'),t('tipSuppression'),t('tipWaveRoster'),t('visibleEnemyOnly')]],
+      [ja?'勝敗と基本操作':'Victory, defeat and controls',[ja?'標準UNAとカスタムはランダムマップが既定です。固定マップも選べます。詳細seed・再現キーで同じ地図を共有できます。生成中は段階と試行数を表示し、キャンセルできます。':'UNA and custom games default to Random; Fixed is also available. Advanced seeds and reproduction keys identify the same map. Generation shows its stage and attempt and can be cancelled.',t('guideSteps'),ja?'移動力（MP）は1ターンに移動できる量です。地形ごとに必要な移動力を消費します。':'Movement points (MP) are the movement budget for one turn. Each entered terrain consumes its movement cost.',t('tipVictory'),t('tipSave')]],
       [ja?'経済と人口':'Economy and population',[economyRules,foodRules,old.capital,old.health,old.starvation,old.grace,t('tipRecruitment')]],
       [ja?'電力':'Electricity',[t('tipPowerAllocation'),t('tipFuel')]],
-      [ja?'施設':'Facilities',[r.airBase,r.drone,r.objectives,old.nuclear]],
+      [ja?'施設':'Facilities',[r.airBase,r.drone,r.objectives,old.nuclear,t('armyBaseRewardRule'),t('armyBaseRecruitmentRule'),t('armyBaseForfeitRule')]],
       [ja?'人間部隊':'Human units',[t('tipProficiency'),t('tipRetreat'),old.specialForces,RULES_V169[this.locale].ifv,RULES_V169[this.locale].movement,RULES_V169[this.locale].transport,RULES_V169[this.locale].production,r.helicopter,r.flight,r.transport,r.emergency,artillery.artillery,artillery.modes,artillery.bombardment,t('tipSuppression')]],
       [ja?'ゾンビ':'Zombies',[r.enemies,pursuitRules,t('tipGasZombie'),old.packZombie,...zombiePerformance]],
       [ja?'補給':'Supply',[t('tipSupply'),t('tipFuel')]],
@@ -5486,7 +5463,7 @@ export class GameUiController {
       [ja?'建設と検問所':'Construction and checkpoints',[old.water,t('tipRefugeeRejection'),t('tipCheckpoint'),old.screening,old.waiting,t('tipCheckpointFallback'),t('tipCheckpointMove'),t('checkpointRouteNotVisible'),t('tipBuild'),t('barbedWireRule')]],
       [ja?'AIと公開情報のルール':'AI / Fair Play',[RULES_V169[this.locale].public,ja?'組み込みAIと外部AIは公開された観測情報と合法な行動を使用します。未発見の敵・未来の乱数・非公開状態は判断に利用できません。プレビューは状態を変えず、複数行動の一括プレビューも同じ状態の版から独立して評価します。':'Built-in and external AI use public Observations and legal Actions. Hidden enemies, future random outcomes and private state are unavailable. Previews do not change state; every batch item is evaluated independently at the same revision.']],
     ];
-    this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${t('close')}" data-action="dismiss-modal">×</button><h2 id="help-heading">${t('help')}</h2><button class="secondary-button" data-action="board-legend">${t('legendTitle')}</button>${this.state?renderFacilityObjectives(this.state,this.locale):''}<details class="help-topic synopsis"><summary>${ja?'あらすじ':'Synopsis'}</summary>${renderSynopsis(this.locale)}</details>${sections.map(([title,texts])=>`<details class="help-topic"><summary>${escapeHtml(title)}</summary>${texts.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}</details>`).join('')}</section></div>`);
+    this.root.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" data-modal="help"><section class="modal-card floating-card help-modal" aria-labelledby="help-heading"><button class="icon-button modal-close" aria-label="${t('close')}" data-action="dismiss-modal">×</button><h2 id="help-heading">Nowhere Left to Hide · ${t('help')}</h2><button class="secondary-button" data-action="board-legend">${t('legendTitle')}</button>${this.state?renderFacilityObjectives(this.state,this.locale):''}<details class="help-topic synopsis"><summary>${ja?'あらすじ':'Synopsis'}</summary>${renderSynopsis(this.locale)}</details>${sections.map(([title,texts])=>`<details class="help-topic"><summary>${escapeHtml(title)}</summary>${texts.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}</details>`).join('')}</section></div>`);
   }
 
   private updateFacilitySupplementalControls(): void {
@@ -5652,7 +5629,7 @@ export class GameUiController {
           : `${t('vision')} ${config.visionRadius}`;
       return `<details class="recruitment-accordion construction-candidate-accordion" data-construction-candidate="${facilityType}"><summary data-action="toggle-construction-candidate" aria-expanded="false"><span>${escapeHtml(label)}</span><small>${escapeHtml(t('buildCost'))} ${config.buildCivilianGoods}</small></summary><div class="recruitment-accordion-panel"><p class="muted">${escapeHtml(usage)}</p><dl class="recruitment-performance"><div><dt>${escapeHtml(t('civilianGoods'))}</dt><dd>${config.buildCivilianGoods}</dd></div><div><dt>${escapeHtml(t('militaryGoods'))}</dt><dd>0</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>0</dd></div><div><dt>${escapeHtml(t('buildTurn'))}</dt><dd>1</dd></div><div><dt>${escapeHtml(t('workerCapacity'))}</dt><dd>${config.workerCapacity}</dd></div><div><dt>${escapeHtml(t('powerDemand'))}</dt><dd>${powerDemand}</dd></div><div><dt>${escapeHtml(t('powerGeneration'))}</dt><dd>${powerGeneration}</dd></div><div><dt>${escapeHtml(t('legendInputs'))}</dt><dd>${escapeHtml(inputs)}</dd></div><div><dt>${escapeHtml(t('legendOutputs'))}</dt><dd>${escapeHtml(outputs)}</dd></div><div><dt>${escapeHtml(t('buildLimit'))}</dt><dd>${escapeHtml(limitLabel)}</dd></div><div><dt>${escapeHtml(t('remaining'))}</dt><dd>${escapeHtml(remaining)}</dd></div><div><dt>${escapeHtml(t('status'))}</dt><dd>${escapeHtml(distinctive)}</dd></div></dl><p class="${candidate?.legal ? 'is-contained' : 'warning-text'}" data-constructible-legality="${facilityType}">${escapeHtml(legality)}</p></div></details>`;
     }).join('');
-    return `<div class="construction-overview" data-construction-overview="true"><p class="muted">${escapeHtml(t('localBuildOnly'))}</p>${rows}</div>`;
+    return `<div class="construction-overview" data-construction-overview="true">${rows}</div>`;
   }
 
   /**
@@ -5723,7 +5700,7 @@ export class GameUiController {
     const action = candidate?.legal && branchId
       ? `<button class="secondary-button" data-action="build-checkpoint-local" data-branch-id="${escapeHtml(branchId)}" data-q="${position.q}" data-r="${position.r}">${escapeHtml(t('roadCheckpointBuild'))} · ${escapeHtml(t('civilianGoods'))} ${cost}</button>`
       : `<p class="warning-text checkpoint-build-reason" data-checkpoint-build-reason="true" role="status">${escapeHtml(reason ?? t('checkpointBuildUnavailable'))}</p>`;
-    body.innerHTML = `${this.renderTerrainDetails(publicTile, 0)}<section class="road-checkpoint-action" data-road-checkpoint-action="true"><h3>${escapeHtml(t('roadCheckpointBuild'))}</h3><p class="muted">${escapeHtml(t('checkpointPlacementLocalHint'))}</p>${action}</section>`;
+    body.innerHTML = `${this.renderTerrainDetails(publicTile, 0)}<section class="road-checkpoint-action" data-road-checkpoint-action="true"><h3>${escapeHtml(t('roadCheckpointBuild'))}</h3>${action}</section>`;
   }
 
   /** Render an empty public Hex with local Constructible actions only. */
@@ -5753,10 +5730,8 @@ export class GameUiController {
     const wire = publicTile?.visibleToPlayer ? this.state?.barbedWire.find(w => samePosition(w.position, position)) : undefined;
     title.textContent = wire ? `${t('barbedWire')} · HP ${wire.hp}/${wire.maxHp}` : t('hex');
     summary.textContent = `${t('location')} ${position.q},${position.r} · ${publicTile?.road ? t('roadOverlay') : ''}${publicTile?.urban ? ` · ${t('urbanOverlay')}` : ''}`;
-    const buildBody = this.navMode === 'domestic'
-      ? `<section class="constructible-placement constructible-local" data-constructible-local="true"><h3>${escapeHtml(t('buildFacility'))}</h3><p class="muted">${escapeHtml(t('localBuildOnly'))}</p>${buttons || `<p class="warning-text constructible-inline-message" data-constructible-inline-message role="status">${escapeHtml(selectedReason ?? t('noConstructibleHere'))}</p>`}</section>`
-      : `<p class="muted">${escapeHtml(t('domesticBuildHint'))}</p>`;
-    body.innerHTML = `${this.renderSameHexTabs(position, { kind: 'hex', position })}${this.renderWirePanel(position, publicTile)}${this.renderTerrainDetails(publicTile, 0)}${buildBody}`;
+    const buildBody = `<section class="constructible-placement constructible-local" data-constructible-local="true"><h3>${escapeHtml(t('buildFacility'))}</h3>${buttons || `<p class="warning-text constructible-inline-message" data-constructible-inline-message role="status">${escapeHtml(selectedReason ?? t('noConstructibleHere'))}</p>`}</section>`;
+    body.innerHTML = `${''}${this.renderWirePanel(position, publicTile)}${this.renderTerrainDetails(publicTile, 0)}${buildBody}`;
   }
 
   private renderWirePanel(position: HexCoord, publicTile?: AgentMapTileObservation): string {
@@ -5764,67 +5739,127 @@ export class GameUiController {
     const wire = this.state?.barbedWire.find(w => samePosition(w.position, position) && publicTile?.visibleToPlayer);
     const t = this.translator();
     const wireName = t('barbedWire');
-    const wireControl = this.navMode === 'domestic' ? `<button class="secondary-button" data-action="build-barbed-wire" data-q="${position.q}" data-r="${position.r}" ${wireCandidate?.legal ? '' : 'disabled'}>${escapeHtml(wireName)} · 5/5</button><p>${escapeHtml(wireBuildReasonLabel(wireCandidate?.reason ?? (publicTile?.visibleToPlayer ? null : 'visibility_required'), this.locale))}</p>` : '';
+    const wireControl = `<button class="secondary-button" data-action="build-barbed-wire" data-q="${position.q}" data-r="${position.r}" ${wireCandidate?.legal ? '' : 'disabled'}>${escapeHtml(wireName)} · 5/5</button><p>${escapeHtml(wireBuildReasonLabel(wireCandidate?.reason ?? (publicTile?.visibleToPlayer ? null : 'visibility_required'), this.locale))}</p>`;
     const runtimeAsset = escapeHtml(resolveBoardAssetUrl(BOARD_ASSET_REGISTRY.obstacles.barbedWire));
-    const diagram = (coords: Array<[number, number]>, color: string, label: string) => {
-      const cells = coords.map(([q,r]) => {
-        const x=60+Math.sqrt(3)*16*(q+r/2),y=50+24*r;
-        const points=Array.from({length:6},(_,i)=>{const a=(60*i-30)*Math.PI/180;return `${x+15*Math.cos(a)},${y+15*Math.sin(a)}`;}).join(' ');
-        return `<polygon points="${points}" fill="${color}" fill-opacity=".3" stroke="${color}" stroke-width="2" />`;
-      }).join('');
-      return `<figure style="margin:0"><svg viewBox="0 0 120 100" width="120" role="img" aria-label="${escapeHtml(label)}">${cells}</svg><figcaption>${escapeHtml(label)}</figcaption></figure>`;
-    };
-    const placementExamples = '<div style="display:flex;gap:1rem;flex-wrap:wrap">'+diagram([[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]],'#6bddb5',this.locale==='ja'?'○ 閉じた輪：各壁2隣接':'Allowed ring: two neighbors each')+diagram([[0,0],[1,0],[0,1],[-1,1]],'#ff8b8b',this.locale==='ja'?'× 3隣接になる壁がある':'Rejected: three adjacent walls')+'</div>';
-    return `<section data-wire-panel><h3>${escapeHtml(wireName)}${wire ? ` HP ${wire.hp}/${wire.maxHp}` : ''}</h3><img class="wire-panel-icon" src="${runtimeAsset}" alt="${escapeHtml(wireName)}" loading="lazy" />${wireControl}<details><summary>${escapeHtml(t('barbedWireRule'))}</summary><p>${escapeHtml(t('barbedWireRule'))}</p>${placementExamples}</details></section>`;
+    return `<section data-wire-panel><h3>${escapeHtml(wireName)}${wire ? ` HP ${wire.hp}/${wire.maxHp}` : ''}</h3><img class="wire-panel-icon" src="${runtimeAsset}" alt="${escapeHtml(wireName)}" loading="lazy" />${wireControl}</section>`;
   }
 
   /** Same-Hex tabs expose alternate public targets without changing Core. */
   private renderSameHexTabs(position: HexCoord, selected: Exclude<Selection, null>): string {
     if (!this.state) return '';
-    const targets: Array<{ kind: Exclude<Selection, null>['kind']; id?: string; label: string }> = [];
-    const units = this.state.units.filter((unit) => !unit.transportedByUnitId && unit.actionState !== 'destroyed' && samePosition(unit.position, position));
-    for (const unit of units) {
-      if (unit.isPlayerUnit) targets.push({ kind: 'unit', id: unit.id, label: unitLabel(unit.type, this.locale)+(unit.flightState==='airborne'?' ▲':'') });
-      else targets.push({ kind: 'zombie', id: unit.id, label: unitLabel(unit.type, this.locale)+(unit.flightState==='airborne'?' ▲':'') });
-    }
-    const facility = findFacilityAt(this.state, position);
-    if (facility) targets.push({ kind: 'facility', id: facility.id, label: facilityLabel(facility.type, this.locale) });
-    const checkpoint = findCheckpointAt(this.state, position);
-    if (checkpoint) targets.push({ kind: 'checkpoint', id: checkpoint.id, label: this.translator()('checkpoint') });
-    const isRoad = this.state.map.roadBranches.some((branch) => branch.roadTiles.some((tile) => samePosition(tile, position)));
-    if (!facility && !checkpoint && !units.length) {
-      targets.push({ kind: isRoad ? 'road' : 'hex', label: isRoad ? this.translator()('roadHex') : this.translator()('hex') });
-    } else if (!targets.some((target) => target.kind === 'hex')) {
-      // Keep the full public terrain view reachable from every occupied
-      // target. Target tabs remain ordered Unit → Facility/Checkpoint → Hex.
-      targets.push({ kind: 'hex', label: this.state.barbedWire.some(w => samePosition(w.position, position) && this.queryVisibleTileKeys().has(hexKey(position))) ? `${this.translator()('barbedWire')} / ${this.translator()('hex')}` : this.translator()('hex') });
-    }
+    const targets = resolveTileTargets(this.state, position);
     if (targets.length < 2) return '';
-    return `<nav class="same-hex-tabs" data-same-hex-tabs="true" role="tablist" aria-label="${escapeHtml(this.translator()('sameHexActions'))}">${targets.map((target) => {
-      const active = selected.kind === target.kind && ('id' in selected ? selected.id === target.id : samePosition(selected.position, position));
-      const positionAttrs = target.id ? ` data-selection-id="${escapeHtml(target.id)}"` : ` data-q="${position.q}" data-r="${position.r}"`;
-      return `<button type="button" class="same-hex-tab${active ? ' active' : ''}" role="tab" aria-selected="${String(active)}" data-action="select-same-target" data-selection-kind="${target.kind}"${positionAttrs}>${escapeHtml(target.label)}</button>`;
+    const names = humanNames(this.state,this.locale);
+    return `<nav class="same-hex-tabs" data-same-hex-tabs role="tablist" aria-label="${escapeHtml(this.translator()('sameHexActions'))}">${targets.map(target => {
+      const label = 'id' in target ? names.get(target.id)! : this.translator()(target.kind === 'road' ? 'roadHex' : 'hex');
+      const attrs = 'id' in target ? `data-selection-id="${escapeHtml(target.id)}"` : `data-q="${position.q}" data-r="${position.r}"`;
+      const active = targetKey(target) === targetKey(selected);
+      return `<button type="button" class="same-hex-tab${active ? ' active' : ''}" role="tab" aria-selected="${active}" data-action="select-same-target" data-selection-kind="${target.kind}" ${attrs}>${escapeHtml(label)}</button>`;
     }).join('')}</nav>`;
   }
 
   private renderSheetBody(): void {
+    if (!this.state) return;
+    const key = `${this.navMode}:${targetKey(this.selection)}`;
+    if (key !== this.panelKey) { this.panelKey = key; this.openPanelSection = null; }
+    this.renderDetailedSheetBody();
+    const body = this.root.querySelector<HTMLElement>('[data-bind="sheet-body"]')!;
+    const fixed = this.root.querySelector<HTMLElement>('[data-panel-summary]');
+    const actions = this.root.querySelector<HTMLElement>('[data-panel-actions]');
+    if (!fixed || !actions) return;
+    fixed.innerHTML = ''; actions.innerHTML = '';
+    this.root.querySelector('.bottom-sheet')?.classList.toggle('is-unselected', this.navMode === 'map' && !this.selection);
+    if (!this.selection || this.navMode === 'domestic') return;
+    const selected = this.selection;
+    let source: PanelSource | undefined;
+    if (selected.kind === 'unit' || selected.kind === 'zombie') {
+      const value = this.queryPublicUnit(selected.id);
+      if (value) source = {
+        kind: selected.kind, value, supplied: isHexSupplied(this.state, value.position),
+        infectedSite: this.state.facilities.some(site => samePosition(site.position,value.position) && (this.queryPublicFacility(site.id)?.infectedPopulation ?? 0) > 0)
+          || this.state.checkpoints.some(site => samePosition(site.position,value.position) && (this.queryPublicCheckpoint(site.id)?.infected ?? 0) > 0),
+      };
+    } else if (selected.kind === 'facility') {
+      const value = this.queryPublicFacility(selected.id); if (value) source = {kind:'facility',value,stoppedReason:stoppedReasonLabel(value.production.stoppedReason,this.locale),infectionRisk:this.queryEndTurnForecast().publicHealth.facilities.find(f=>f.facilityId===value.id)?.probability};
+    } else if (selected.kind === 'checkpoint') {
+      const value = this.queryPublicCheckpoint(selected.id); if (value) source = {kind:'checkpoint',value,infectionRisk:this.queryEndTurnForecast().publicHealth.checkpoints.find(c=>c.checkpointId===value.id)?.probability};
+    } else {
+      const value = publicMapTileForPosition(this.state, selected.position, this.queryVisibleTileKeys());
+      const wire = value?.visibleToPlayer ? this.state.barbedWire.find(w=>samePosition(w.position,selected.position)) : undefined;
+      if (value) source = {kind:selected.kind,value,wireHp:wire?`${wire.hp}/${wire.maxHp}`:undefined,reason:body.querySelector('[data-constructible-inline-message], [data-checkpoint-build-reason]')?.textContent ?? undefined};
+    }
+    if (!source) { this.selection = null; this.sheetState = 'collapsed'; this.renderSheetBody(); return; }
+    const model = panelViewModel(source, this.locale), t = this.translator(), ja = this.locale === 'ja';
+    this.root.querySelector<HTMLElement>('[data-bind="selection-title"]')!.textContent = "id" in selected ? humanNames(this.state,this.locale).get(selected.id)! : model.title;
+    this.root.querySelector<HTMLElement>('[data-bind="selection-summary"]')!.textContent = [model.status, ...(this.sheetState === 'collapsed' ? model.collapsed.slice(0,2) : [])].filter(Boolean).join(' · ');
+    if (this.sheetState === 'collapsed') { body.innerHTML = ''; return; }
+    fixed.innerHTML = `<dl class="panel-facts">${model.facts.map(f=>`<div><dt>${escapeHtml(f.label)}</dt><dd>${escapeHtml(f.value)}${f.ratio===undefined?'':`<meter min="0" max="1" value="${f.ratio}" aria-label="HP"></meter>`}</dd></div>`).join('')}</dl>${model.exceptions.length?`<div class="panel-exceptions">${model.exceptions.slice(0,2).map(e=>`<span>⚠ ${escapeHtml(e)}</span>`).join('')}${model.exceptions.length>2?`<button data-action="open-panel" data-section="exceptions">${ja?'ほか':'More'} ${model.exceptions.length-2}</button>`:''}</div>`:''}`;
+    // Existing forms remain authoritative for costs, legal actions and rejection reasons.
+    // Group those forms into individually opened disclosures, without moving state into Core.
+    const groups = new Map<string,{label:string;nodes:Node[];operation:boolean}>();
+    const add = (key:string,label:string,node:Node,operation=false) => {
+      const group=groups.get(key) ?? {label,nodes:[],operation}; group.nodes.push(node); groups.set(key,group);
+    };
+    const checkpoint = body.querySelector('.checkpoint-card');
+    if (checkpoint) { while(checkpoint.firstChild) body.insertBefore(checkpoint.firstChild,checkpoint); checkpoint.remove(); }
+    for (const node of Array.from(body.children)) {
+      const element=node as HTMLElement;
+      const heading=element.querySelector('h3, h4, summary')?.textContent?.trim();
+      if (element.matches('.facility-editor')) add('population',t('workers'),node,true);
+      else if (element.querySelector('[data-transfer-target]')) add('population',t('transferPopulation'),node,true);
+      else if (element.matches('[data-power-supply-editor]')) add('power',t('powerSupply'),node,true);
+      else if (element.matches('[data-recruitment-accordion]') || element.querySelector('[data-action="produce-unit"]')) add('recruitment',t('unitRecruitment'),node,true);
+      else if (element.querySelector('[data-policy]') || (selected.kind === 'checkpoint' && element.matches('p.warning-text'))) add('policy',t('branchPolicy'),node,true);
+      else if (element.matches('[data-aviation-unit]')) add('aviation',ja?'航空・輸送':'Flight / transport',node,true);
+      else if (element.matches('[data-military-drone]')) add('drone',t('militaryDrone'),node,true);
+      else if (element.matches('[data-constructible-local], [data-road-checkpoint-action], [data-wire-panel]')) add('construction',t('buildFacility'),node,true);
+      else if (element.matches('.decommission-editor, .checkpoint-activation, .refugee-turn-away') || element.querySelector('[data-action="relocate-checkpoint"], [data-action="turn-away-refugees"]')) add('operations',ja?'その他の操作':'Other actions',node,true);
+      else if (heading) add(`detail-${groups.size}`,heading,node);
+      else add('general',ja?'基本情報':'General information',node);
+    }
+    if (model.exceptions.length>2) { const list=document.createElement('ul'); model.exceptions.forEach(message=>{const li=document.createElement('li');li.textContent=message;list.append(li);});add('exceptions',ja?'すべての例外':'All exceptions',list); }
+    actions.innerHTML = [...groups].filter(([,g])=>g.operation).map(([key,g])=>`<button data-action="open-panel" data-section="${key}">${escapeHtml(g.label)}</button>`).join('') + `<button data-action="panel-details" aria-expanded="${this.sheetState==='expanded'}">${ja?'詳細':'Details'} ${this.sheetState==='expanded'?'▴':'▾'}</button>`;
+    body.replaceChildren();
+    if (this.sheetState !== 'expanded') return;
+    for (const [key, group] of groups) {
+      const details=document.createElement('details'); details.className='panel-section'; details.dataset.panelSection=key;
+      const heading=document.createElement('summary'); heading.textContent=group.label; details.append(heading);
+      for (const node of group.nodes) { if (node instanceof HTMLDetailsElement) { node.open=true; node.querySelector('summary')?.remove(); } details.append(node); }
+      details.open = this.openPanelSection === key;
+      heading.addEventListener('click',event=>{
+        event.preventDefault();
+        const open=!details.open;
+        body.querySelectorAll<HTMLDetailsElement>(':scope > details').forEach(other=>{other.open=false;});
+        details.open=open; this.openPanelSection=open?key:null;
+      });
+      body.append(details);
+    }
+  }
+
+  private renderDetailedSheetBody(): void {
     if (!this.state) return;
     const body = this.root.querySelector<HTMLElement>('[data-bind="sheet-body"]');
     const title = this.root.querySelector<HTMLElement>('[data-bind="selection-title"]');
     const summary = this.root.querySelector<HTMLElement>('[data-bind="selection-summary"]');
     if (!body || !title || !summary) return;
     const t = this.translator();
-    const selected = this.selection;
+    const selected = this.navMode === 'domestic' ? null : this.selection;
+    if (!selected && this.navMode === 'map') {
+      title.textContent = this.locale === 'ja' ? 'ユニットか施設を選択' : 'Select a unit or facility';
+      summary.textContent = '';
+      body.innerHTML = '';
+      return;
+    }
     if (!selected) {
       const prompt = unselectedPrompt(this.navMode, this.locale);
       const population = populationLocationTotals(this.state);
-      const crisis = this.queryCrisisSummary();
+      const crisis = this.queryDisplayCrisis();
       title.textContent = prompt;
       summary.textContent = stateSummary(this.state, this.locale);
       const isOpen = (section: OverviewSectionKey): boolean => this.overviewSections.has(section)
         ? Boolean(this.overviewSections.get(section))
         : section === 'crisis' && crisis.criticalCount > 0;
-      const populationContent = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl><p class="muted">${escapeHtml(t('tipPopulation'))}</p></div>`;
+      const populationContent = `<div class="population-overview"><div class="empty-state"><span class="empty-glyph">⌖</span><p>${escapeHtml(prompt)}</p></div><h3>${escapeHtml(t('populationLocations'))}</h3><dl class="location-grid"><div><dt>${escapeHtml(t('cityResidents'))}</dt><dd>${population.cityResidents}</dd></div><div><dt>${escapeHtml(t('productionWorkers'))}</dt><dd>${population.productionWorkers}</dd></div><div><dt>${escapeHtml(t('unitPopulation'))}</dt><dd>${population.unitPopulation}</dd></div><div><dt>${escapeHtml(t('waiting'))}</dt><dd>${population.waitingRefugees}</dd></div><div><dt>${escapeHtml(t('screening'))}</dt><dd>${population.screeningRefugees}</dd></div><div><dt>${escapeHtml(t('approved'))}</dt><dd>${population.approvedRefugees}</dd></div><div><dt>${escapeHtml(t('infected'))}</dt><dd>${population.infected}</dd></div><div><dt>${escapeHtml(t('population'))}</dt><dd>${population.total}</dd></div></dl></div>`;
       const risk = this.queryEndTurnRisk();
       const crisisSummary = `${crisis.criticalCount} ${t('crisisSeverity.critical')} · ${crisis.warningCount} ${t('crisisSeverity.warning')} · ${crisis.advisoryCount} ${t('crisisSeverity.advisory')}`;
       const branchContent = this.renderBranchFlow();
@@ -5862,7 +5897,7 @@ export class GameUiController {
       const supplied = isHexSupplied(this.state, unit.position);
       const supplyReason = supplied ? '' : localizeActionError('recovery_out_of_supply', this.locale);
       const incoming = publicUnit?.conditionalIncomingCombat?.map(p => `<li>${escapeHtml(p.enemyId)}: ${this.locale === 'ja' ? '攻撃された場合' : 'if attacked'} D${p.attack} → ${t('barbedWire')} -${p.wallDamage} / HP${p.remainingWallHp}; Human -${p.humanDamage} / HP${p.remainingHumanHp}</li>`).join('');
-      body.innerHTML = this.renderSameHexTabs(unit.position, selected) + (incoming ? `<details><summary>${this.locale === 'ja' ? '条件付き被攻撃予測（移動予測を含まない）' : 'Conditional attacks (no movement prediction)'}</summary><ul>${incoming}</ul></details>` : '') + this.renderUnitSheet(unit, publicUnit, publicTile, actions, riskText, supplied, supplyReason);
+      body.innerHTML = '' + (incoming ? `<details><summary>${this.locale === 'ja' ? '条件付き被攻撃予測（移動予測を含まない）' : 'Conditional attacks (no movement prediction)'}</summary><ul>${incoming}</ul></details>` : '') + this.renderUnitSheet(unit, publicUnit, publicTile, actions, riskText, supplied, supplyReason);
       return;
     }
     if (selected.kind === 'zombie') {
@@ -5877,7 +5912,7 @@ export class GameUiController {
           ? t('waveMembership')
           : '';
       summary.textContent = `HP ${zombie.hp}/${zombie.maxHp} · ${t('attack')} ${publicZombie?.attack ?? zombie.attack} · ${t('movement')} ${publicZombie?.effectiveMovement ?? zombie.movement} · ${t('range')} ${publicZombie?.effectiveRange ?? zombie.range}`;
-      body.innerHTML = this.renderSameHexTabs(zombie.position, selected) + this.renderZombieSheet(zombie, publicZombie, publicTile, waveBadge);
+      body.innerHTML = '' + this.renderZombieSheet(zombie, publicZombie, publicTile, waveBadge);
       return;
     }
     if (selected.kind === 'hex') {
@@ -5887,7 +5922,7 @@ export class GameUiController {
     }
     if (selected.kind === 'road') {
       const publicTile = publicMapTileForPosition(this.state, selected.position, this.queryVisibleTileKeys());
-      body.innerHTML = this.renderSameHexTabs(selected.position, selected);
+      body.innerHTML = '';
       const content = document.createElement('div');
       this.renderRoadSheet(selected.position, content, title, summary, publicTile);
       body.insertAdjacentHTML('beforeend', content.innerHTML + this.renderWirePanel(selected.position, publicTile));
@@ -5898,7 +5933,7 @@ export class GameUiController {
       if (!checkpoint) return;
       const publicCheckpoint = this.queryPublicCheckpoint(checkpoint.id);
       const publicTile = publicMapTileForPosition(this.state, checkpoint.position, this.queryVisibleTileKeys());
-      body.innerHTML = this.renderSameHexTabs(checkpoint.position, selected);
+      body.innerHTML = '';
       const content = document.createElement('div');
       this.renderCheckpointSheet(checkpoint, content, title, summary, publicCheckpoint, publicTile);
       body.insertAdjacentHTML('beforeend', content.innerHTML);
@@ -5941,7 +5976,7 @@ export class GameUiController {
         ? t('housingOutageSupplyReason')
         : t('none');
     const housingDetails = facility.type === 'temporaryHousing'
-      ? `<section class="housing-detail" data-housing-detail="true"><div class="section-heading"><h3>${escapeHtml(t('temporaryHousing'))}</h3><span class="status-chip ${housingProjection?.outageReason ? 'is-warning' : 'is-clear'}">${escapeHtml(housingOutageLabel)}</span></div><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('housingCapacity'))}</dt><dd>${facility.workerCapacity}</dd></div><div><dt>${escapeHtml(t('housingPopulation'))}</dt><dd>${facility.workers + facility.infected}</dd></div><div><dt>${escapeHtml(t('housingWorkers'))}</dt><dd>${facility.workers}</dd></div><div><dt>${escapeHtml(t('housingInfected'))}</dt><dd>${facility.owner === 'player' ? facility.infected : escapeHtml(t('unknown'))}</dd></div><div><dt>${escapeHtml(t('facilitySupply'))}</dt><dd>${escapeHtml(facilityInSupply ? t('supplied') : t('outOfSupply'))}</dd></div></dl><p class="muted">${escapeHtml(t('temporaryHousingUse'))}</p>${housingOutageForecast ? `<p class="warning-text" data-housing-next-outage="true">${escapeHtml(t('housingOutageForecast'))}: ${escapeHtml(housingOutageForecast.reason === 'power_shortage' ? t('housingOutagePowerReason') : t('housingOutageSupplyReason'))}</p>` : ''}</section>`
+      ? `<section class="housing-detail" data-housing-detail="true"><div class="section-heading"><h3>${escapeHtml(t('temporaryHousing'))}</h3><span class="status-chip ${housingProjection?.outageReason ? 'is-warning' : 'is-clear'}">${escapeHtml(housingOutageLabel)}</span></div><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('housingCapacity'))}</dt><dd>${facility.workerCapacity}</dd></div><div><dt>${escapeHtml(t('housingPopulation'))}</dt><dd>${facility.workers + facility.infected}</dd></div><div><dt>${escapeHtml(t('housingWorkers'))}</dt><dd>${facility.workers}</dd></div><div><dt>${escapeHtml(t('housingInfected'))}</dt><dd>${facility.owner === 'player' ? facility.infected : escapeHtml(t('unknown'))}</dd></div><div><dt>${escapeHtml(t('facilitySupply'))}</dt><dd>${escapeHtml(facilityInSupply ? t('supplied') : t('outOfSupply'))}</dd></div></dl>${housingOutageForecast ? `<p class="warning-text" data-housing-next-outage="true">${escapeHtml(t('housingOutageForecast'))}: ${escapeHtml(housingOutageForecast.reason === 'power_shortage' ? t('housingOutagePowerReason') : t('housingOutageSupplyReason'))}</p>` : ''}</section>`
       : '';
     const powerSupplyEditor = isPowerSupplyFacility(facility)
       ? (() => {
@@ -5978,10 +6013,10 @@ export class GameUiController {
     const cityCap = isCity(facility) ? this.state.config.facilities[facility.type].workerCapacity : null;
     const cityExcess = cityCap === null ? 0 : Math.max(0, facility.workers - cityCap);
     const cityTransfer = city && owned
-      ? `<section class="population-editor" aria-labelledby="transfer-heading"><h3 id="transfer-heading">${escapeHtml(t('transferPopulation'))}</h3><p class="muted">${escapeHtml(t('assignWorkersHint'))}</p><label>${escapeHtml(t('toCity'))}<select data-transfer-target="true" ${eligibleCities.length > 0 && fromEligible ? '' : 'disabled'}>${eligibleCities.length > 0 ? eligibleCities.map((candidate) => `<option value="${escapeHtml(candidate.id)}">${escapeHtml(facilityLabel(candidate.type, this.locale))} · ${candidate.workers}/${this.state!.config.facilities[candidate.type].workerCapacity}</option>`).join('') : `<option value="">${escapeHtml(t('noSafeCity'))}</option>`}</select></label><label>${escapeHtml(t('people'))}<output data-transfer-output="true">${transferDefault}</output><input type="range" min="0" max="${Math.max(0, facility.workers)}" step="1" value="${transferDefault}" data-transfer-people="true" data-transfer-slider="true" /></label><input class="numeric-input" type="number" min="0" max="${Math.max(0, facility.workers)}" step="1" value="${transferDefault}" inputmode="numeric" aria-label="${escapeHtml(t('people'))}" data-transfer-people="true" data-transfer-number="true" /><div class="transfer-preview" data-transfer-preview="true"></div><p class="warning-text" data-transfer-reason="true" ${fromEligible && eligibleCities.length > 0 && facility.workers > 0 ? 'hidden' : ''}>${fromEligible && eligibleCities.length > 0 && facility.workers > 0 ? '' : escapeHtml(facility.populationOperationalTurn > this.state.turn ? t('facilityNotReady') : facility.infected > 0 ? t('infected') : t('noSafeCity'))}</p><button class="secondary-button" data-action="transfer-population" ${eligibleCities.length > 0 && fromEligible && facility.workers > 0 ? '' : 'disabled'}>${escapeHtml(t('transferPopulation'))}</button></section>`
+      ? `<section class="population-editor" aria-labelledby="transfer-heading"><h3 id="transfer-heading">${escapeHtml(t('transferPopulation'))}</h3><label>${escapeHtml(t('toCity'))}<select data-transfer-target="true" ${eligibleCities.length > 0 && fromEligible ? '' : 'disabled'}>${eligibleCities.length > 0 ? eligibleCities.map((candidate) => `<option value="${escapeHtml(candidate.id)}">${escapeHtml(facilityLabel(candidate.type, this.locale))} · ${candidate.workers}/${this.state!.config.facilities[candidate.type].workerCapacity}</option>`).join('') : `<option value="">${escapeHtml(t('noSafeCity'))}</option>`}</select></label><label>${escapeHtml(t('people'))}<output data-transfer-output="true">${transferDefault}</output><input type="range" min="0" max="${Math.max(0, facility.workers)}" step="1" value="${transferDefault}" data-transfer-people="true" data-transfer-slider="true" /></label><input class="numeric-input" type="number" min="0" max="${Math.max(0, facility.workers)}" step="1" value="${transferDefault}" inputmode="numeric" aria-label="${escapeHtml(t('people'))}" data-transfer-people="true" data-transfer-number="true" /><div class="transfer-preview" data-transfer-preview="true"></div><p class="warning-text" data-transfer-reason="true" ${fromEligible && eligibleCities.length > 0 && facility.workers > 0 ? 'hidden' : ''}>${fromEligible && eligibleCities.length > 0 && facility.workers > 0 ? '' : escapeHtml(facility.populationOperationalTurn > this.state.turn ? t('facilityNotReady') : facility.infected > 0 ? t('infected') : t('noSafeCity'))}</p><button class="secondary-button" data-action="transfer-population" ${eligibleCities.length > 0 && fromEligible && facility.workers > 0 ? '' : 'disabled'}>${escapeHtml(t('transferPopulation'))}</button></section>`
       : '';
     const workerEditor = owned && !city
-      ? `<section class="population-editor facility-editor" aria-labelledby="workers-heading"><h3 id="workers-heading">${escapeHtml(t('workers'))}</h3><p class="muted">${escapeHtml(t('assignWorkersHint'))}</p><label>${escapeHtml(t('workers'))}<output data-worker-output="true">${bounds.current}/${bounds.maximum}</output><input type="range" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" data-worker-control="true" data-worker-input="true" data-worker-slider="true" aria-label="${escapeHtml(t('workers'))}" /></label><input class="numeric-input" type="number" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" inputmode="numeric" aria-label="${escapeHtml(t('workers'))}" data-worker-control="true" data-worker-input="true" data-worker-number="true" /><p class="warning-text" data-worker-reason="true" ${workerReason ? '' : 'hidden'}>${workerReason ? escapeHtml(workerReason) : ''}</p><button class="secondary-button" data-action="assign-workers" ${workerAction && canOperatePopulation ? '' : 'disabled'}>${escapeHtml(t('assignWorkers'))}</button></section>`
+      ? `<section class="population-editor facility-editor" aria-labelledby="workers-heading"><h3 id="workers-heading">${escapeHtml(t('workers'))}</h3><label>${escapeHtml(t('workers'))}<output data-worker-output="true">${bounds.current}/${bounds.maximum}</output><input type="range" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" data-worker-control="true" data-worker-input="true" data-worker-slider="true" aria-label="${escapeHtml(t('workers'))}" /></label><input class="numeric-input" type="number" min="${bounds.minimum}" max="${bounds.maximum}" step="1" value="${bounds.current}" inputmode="numeric" aria-label="${escapeHtml(t('workers'))}" data-worker-control="true" data-worker-input="true" data-worker-number="true" /><p class="warning-text" data-worker-reason="true" ${workerReason ? '' : 'hidden'}>${workerReason ? escapeHtml(workerReason) : ''}</p><button class="secondary-button" data-action="assign-workers" ${workerAction && canOperatePopulation ? '' : 'disabled'}>${escapeHtml(t('assignWorkers'))}</button></section>`
       : '';
     const recruitment = renderRecruitmentAccordion(this.state, facility, this.legalActions(), this.locale);
     const armyBaseDetails = publicFacility ? renderArmyBaseDetails(publicFacility, this.locale) : '';
@@ -5995,9 +6030,9 @@ export class GameUiController {
       ? actionReasonFor(this.state, decommissionAction, this.locale)
       : null;
     const decommissionControl = isDecommissionableType
-      ? `<section class="decommission-editor" data-decommission-editor="true"><h3>${escapeHtml(t('decommissionFacility'))}</h3><p class="muted">${escapeHtml(t('decommissionConditions'))}</p><p>${escapeHtml(t('decommissionRefund'))}: <strong>${decommissionRefund} ${escapeHtml(t('civilianGoods'))}</strong></p><button class="secondary-button" data-action="decommission-facility" data-facility-id="${escapeHtml(facility.id)}" ${decommissionReason ? 'disabled' : ''}>${escapeHtml(t('decommissionFacility'))}</button>${decommissionReason ? `<p class="warning-text" data-decommission-reason="true">${escapeHtml(decommissionReason)}</p>` : '<p class="muted" data-decommission-reason="true"></p>'}</section>`
+      ? `<section class="decommission-editor" data-decommission-editor="true"><h3>${escapeHtml(t('decommissionFacility'))}</h3><p>${escapeHtml(t('decommissionRefund'))}: <strong>${decommissionRefund} ${escapeHtml(t('civilianGoods'))}</strong></p><button class="secondary-button" data-action="decommission-facility" data-facility-id="${escapeHtml(facility.id)}" ${decommissionReason ? 'disabled' : ''}>${escapeHtml(t('decommissionFacility'))}</button>${decommissionReason ? `<p class="warning-text" data-decommission-reason="true">${escapeHtml(decommissionReason)}</p>` : '<p class="muted" data-decommission-reason="true"></p>'}</section>`
       : '';
-    body.innerHTML = renderHealthDetails(this.state, this.locale, facility.id) + (facility.type === 'nuclearPowerPlant' ? renderNuclearObjective(this.state,this.locale) : '') + this.renderSameHexTabs(facility.position, selected) + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.owner === 'player' ? facility.workers : escapeHtml(t('unknown'))}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.owner === 'player' ? facility.infected : escapeHtml(t('unknown'))}</dd></div></dl>${facility.owner === 'player' && facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${housingDetails}${armyBaseDetails}${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
+    body.innerHTML = renderHealthDetails(this.state, this.locale, facility.id) + (facility.type === 'nuclearPowerPlant' ? renderNuclearObjective(this.state,this.locale) : '') + '' + `${powerSupplyEditor}<section class="location-card"><dl class="location-grid"><div><dt>${escapeHtml(city ? t('cityResidents') : t('workers'))}</dt><dd>${facility.owner === 'player' ? facility.workers : escapeHtml(t('unknown'))}${cityCap === null ? `/${facility.workerCapacity}` : `/${cityCap}`}</dd></div>${cityCap !== null ? `<div><dt>${escapeHtml(t('overcrowding'))}</dt><dd>${cityExcess > 0 ? escapeHtml(formatPercent(cityExcess / Math.max(1, cityCap), this.locale)) : '0%'}</dd></div>` : ''}<div><dt>${escapeHtml(t('infected'))}</dt><dd>${facility.owner === 'player' ? facility.infected : escapeHtml(t('unknown'))}</dd></div></dl>${facility.owner === 'player' && facility.infected > 0 ? `<p class="warning-text">${escapeHtml(t('infected'))}: ${facility.infected}</p>` : ''}${city && projectedPowerUnavailable ? `<p class="warning-text"><strong>${escapeHtml(t('unpoweredForecast'))}</strong>: ${escapeHtml(t('powerReason'))} · ${escapeHtml(powerReasonLabel(projectedProduction?.projectedPowerReason, this.locale))}</p>` : ''}${city && facility.populationOperationalTurn > this.state.turn ? `<p class="warning-text">${escapeHtml(t('facilityNotReady'))}</p>` : ''}</section>${housingDetails}${armyBaseDetails}${workerEditor}${cityTransfer}${recruitment}${decommissionControl}`;
     body.insertAdjacentHTML('beforeend', (facility.type==='airBase'?renderMilitaryDrone(this.state,facility.id,this.locale)+renderFacilityObjectives(this.state,this.locale):'')+this.renderFacilityForecast(publicFacility));
     this.updateTransferPreview();
     this.updateRecruitmentReasons();
@@ -6017,7 +6052,7 @@ export class GameUiController {
     const publicMaxAttackCharges = publicZombie?.maxAttackCharges ?? zombie.maxAttackCharges;
     const badge = waveBadge ? `<span class="status-chip zombie-wave-badge">${escapeHtml(waveBadge)}</span>` : '';
     const finalBadge = zombie.hordeKind === 'final' ? `<p class="warning-text">${escapeHtml(t('finalWaveMembership'))}</p>` : '';
-    return `<section class="zombie-detail-panel" data-zombie-panel="true"><div class="section-heading"><h3>${escapeHtml(unitLabel(zombie.type, this.locale))}</h3>${badge}</div><dl class="location-grid"><div><dt>${escapeHtml(t('hp'))}</dt><dd>${zombie.hp}/${zombie.maxHp}</dd></div><div><dt>${escapeHtml(t('attack'))}</dt><dd>${publicAttack}</dd></div><div><dt>${escapeHtml(t('attackCharge'))}</dt><dd>${publicAttackCharges}/${publicMaxAttackCharges}</dd></div><div><dt>${escapeHtml(t('movement'))}</dt><dd>${publicMovement} (${t('baseMovement')} ${publicZombie?.baseMovement ?? zombie.movement} + ${publicZombie?.appliedMovementBonus ?? 0})</dd></div><div><dt>${escapeHtml(t('range'))}</dt><dd>${publicRange}</dd></div></dl>${finalBadge}<p class="muted">${escapeHtml(t('visibleEnemyOnly'))}</p><p class="muted">${escapeHtml(t('tipZombiePursuit').replace('{bonus}',String(this.state!.config.zombiePursuitMovementBonus)))}</p></section>`;
+    return `<section class="zombie-detail-panel" data-zombie-panel="true"><div class="section-heading"><h3>${escapeHtml(unitLabel(zombie.type, this.locale))}</h3>${badge}</div><dl class="location-grid"><div><dt>${escapeHtml(t('hp'))}</dt><dd>${zombie.hp}/${zombie.maxHp}</dd></div><div><dt>${escapeHtml(t('attack'))}</dt><dd>${publicAttack}</dd></div><div><dt>${escapeHtml(t('attackCharge'))}</dt><dd>${publicAttackCharges}/${publicMaxAttackCharges}</dd></div><div><dt>${escapeHtml(t('movement'))}</dt><dd>${publicMovement} (${t('baseMovement')} ${publicZombie?.baseMovement ?? zombie.movement} + ${publicZombie?.appliedMovementBonus ?? 0})</dd></div><div><dt>${escapeHtml(t('range'))}</dt><dd>${publicRange}</dd></div></dl>${finalBadge}</section>`;
   }
 
   private renderUnitSheet(
@@ -6086,7 +6121,7 @@ export class GameUiController {
           ? t('refillStateFuelShortage')
           : t('refillAvailable');
     const movementMode = selectedMove?.movementMode ?? (publicUnit?.emergencyMovementAvailable ? 'emergency' : 'normal');
-    const fuelSection = `<section class="unit-fuel-forecast" data-unit-fuel="true"><h3>${escapeHtml(t('unitFuel'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentFuel'))}</dt><dd>${currentFuel}/${maxFuel}</dd></div><div><dt>${escapeHtml(t('movementMode'))}</dt><dd data-movement-mode="${movementMode}">${escapeHtml(t(movementMode === 'emergency' ? 'emergencyMovement' : 'normalMovement'))}</dd></div><div><dt>${escapeHtml(t('emergencyMovementLimit'))}</dt><dd>${publicUnit?.emergencyMovementPoints ?? 0} MP</dd></div>${selectedMove ? `<div><dt>${escapeHtml(t('effectiveMovementCost'))}</dt><dd>${selectedMove.effectiveMovementCost} MP</dd></div><div><dt>${escapeHtml(t('fuelCost'))}</dt><dd>-${selectedMove.fuelCost}</dd></div><div><dt>${escapeHtml(t('fuelAfterMove'))}</dt><dd>${selectedMove.projectedFuelAfterMove}/${maxFuel}</dd></div>` : ''}<div><dt>${escapeHtml(t('refillDemand'))}</dt><dd>${refillDemand}</dd></div><div><dt>${escapeHtml(t('refillAmount'))}</dt><dd>${refillAmount}</dd></div><div><dt>${escapeHtml(t('refillReason'))}</dt><dd>${escapeHtml(refillReason)}</dd></div></dl>${publicUnit?.emergencyMovementAvailable ? `<p class="warning-text">${escapeHtml(t('emergencyMovementActive'))}</p>` : ''}<p class="muted">${escapeHtml(t('tipFuel'))}</p></section>`;
+    const fuelSection = `<section class="unit-fuel-forecast" data-unit-fuel="true"><h3>${escapeHtml(t('unitFuel'))}</h3><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('currentFuel'))}</dt><dd>${currentFuel}/${maxFuel}</dd></div><div><dt>${escapeHtml(t('movementMode'))}</dt><dd data-movement-mode="${movementMode}">${escapeHtml(t(movementMode === 'emergency' ? 'emergencyMovement' : 'normalMovement'))}</dd></div><div><dt>${escapeHtml(t('emergencyMovementLimit'))}</dt><dd>${publicUnit?.emergencyMovementPoints ?? 0} MP</dd></div>${selectedMove ? `<div><dt>${escapeHtml(t('effectiveMovementCost'))}</dt><dd>${selectedMove.effectiveMovementCost} MP</dd></div><div><dt>${escapeHtml(t('fuelCost'))}</dt><dd>-${selectedMove.fuelCost}</dd></div><div><dt>${escapeHtml(t('fuelAfterMove'))}</dt><dd>${selectedMove.projectedFuelAfterMove}/${maxFuel}</dd></div>` : ''}<div><dt>${escapeHtml(t('refillDemand'))}</dt><dd>${refillDemand}</dd></div><div><dt>${escapeHtml(t('refillAmount'))}</dt><dd>${refillAmount}</dd></div><div><dt>${escapeHtml(t('refillReason'))}</dt><dd>${escapeHtml(refillReason)}</dd></div></dl>${publicUnit?.emergencyMovementAvailable ? `<p class="warning-text">${escapeHtml(t('emergencyMovementActive'))}</p>` : ''}</section>`;
     const militaryGoodsSection = publicUnit
       ? renderUnitMilitaryGoodsDetails(
         publicUnit,
@@ -6097,7 +6132,7 @@ export class GameUiController {
       )
       : '';
     const infectionSection = infectedTarget
-      ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicUnit?.infectionContainmentCapable ? 'is-contained' : 'warning-text'}">${escapeHtml(publicUnit?.infectionContainmentCapable ? t('infectionContained') : t('infectionNotContained'))}</p>${publicUnit?.suppressionAvailableIfTurnEndsNow ? `<p class="muted">${escapeHtml(t('automaticSuppression'))}: ${escapeHtml(t('projectedSuppression'))} ${Math.min(infectedTarget.infected, publicUnit.suppressionPower)} · ${escapeHtml(t('suppressionPower'))} ${publicUnit.suppressionPower} · ${escapeHtml(t('cost'))} ${publicUnit.suppressionMilitaryGoodsCost}</p>${publicUnit.suppressionCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicUnit.suppressionCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}` : publicUnit?.suppressionStatusIfTurnEndsNow === 'containment_only' ? `<p class="warning-text">${escapeHtml(t('containmentOnly'))}: ${escapeHtml(t('suppressionMilitaryGoodsUnavailable'))}</p>` : `<p class="muted">${escapeHtml(t('automaticSuppressionUnavailable'))}</p>`}<p class="muted">${escapeHtml(t('tipSuppression'))}</p></section>`
+      ? `<section class="infection-forecast"><h3>${escapeHtml(t('infectionForecast'))}</h3><p class="${publicUnit?.infectionContainmentCapable ? 'is-contained' : 'warning-text'}">${escapeHtml(publicUnit?.infectionContainmentCapable ? t('infectionContained') : t('infectionNotContained'))}</p>${publicUnit?.suppressionAvailableIfTurnEndsNow ? `<p class="muted">${escapeHtml(t('automaticSuppression'))}: ${escapeHtml(t('projectedSuppression'))} ${Math.min(infectedTarget.infected, publicUnit.suppressionPower)} · ${escapeHtml(t('suppressionPower'))} ${publicUnit.suppressionPower} · ${escapeHtml(t('cost'))} ${publicUnit.suppressionMilitaryGoodsCost}</p>${publicUnit.suppressionCivilianDamage > 0 ? `<p class="warning-text">${escapeHtml(t('projectedCivilianDamage'))}: ${publicUnit.suppressionCivilianDamage}</p>` : `<p class="muted">${escapeHtml(t('noCivilianDamage'))}</p>`}` : publicUnit?.suppressionStatusIfTurnEndsNow === 'containment_only' ? `<p class="warning-text">${escapeHtml(t('containmentOnly'))}: ${escapeHtml(t('suppressionMilitaryGoodsUnavailable'))}</p>` : `<p class="muted">${escapeHtml(t('automaticSuppressionUnavailable'))}</p>`}</section>`
       : '';
     const selectedAttack = this.pendingAttackTargetId
       ? publicUnit?.attackPreviews.find((candidate) => candidate.targetUnitId === this.pendingAttackTargetId)
@@ -6115,7 +6150,7 @@ export class GameUiController {
           ? t('selectAttackTarget')
           : t('selectUnitAction');
     const artilleryDetails=unit.type==='fieldArtillery'?`<section class="artillery-details"><h3>${this.locale==='ja'?'野戦砲':'Field Artillery'} · ${unit.mode==='packed'?(this.locale==='ja'?'梱包':'Packed'):(this.locale==='ja'?'展開':'Deployed')}</h3><p>${escapeHtml(RULES_V164[this.locale].modes)}</p><p>${escapeHtml(RULES_V164[this.locale].bombardment)}</p><p>${escapeHtml(RULES_V164[this.locale].artillery)}</p><p>${this.locale==='ja'?'次ターンまで行動不可':'Locked until next turn'}: ${publicUnit?.modeLockedUntilTurn??'—'}</p><p>${this.locale==='ja'?'生涯生産 / 予約 / 残枠':'Lifetime / Reserved / Remaining'}: ${publicUnit?.production?.completed??0} / ${publicUnit?.production?.reserved??0} / ${publicUnit?.production?.remaining??0}</p></section>`:'';
-    return `${this.state?renderAviationUnit(this.state,unit,this.locale,this.pendingMove?.destination):''}${artilleryDetails}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${proficiencySection}${fuelSection}${militaryGoodsSection}<section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p><p class="muted">${escapeHtml(t('tipRecovery'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
+    return `${this.state?renderAviationUnit(this.state,unit,this.locale,this.pendingMove?.destination):''}${artilleryDetails}<p class="supply-status ${supplied ? 'is-supplied' : 'is-out-of-supply'}">${escapeHtml(t(supplied ? 'supplied' : 'outOfSupply'))}${supplyReason ? ` · ${escapeHtml(supplyReason)}` : ''}</p>${proficiencySection}${fuelSection}${militaryGoodsSection}<section class="unit-forecast"><h3>${escapeHtml(t('recoveryForecast'))}</h3><p class="recovery-status recovery-${escapeHtml(recoveryClass)}"><strong>${escapeHtml(recoveryClassLabel(recoveryClass, this.locale))}</strong> · ${escapeHtml(formatPercent(recoveryRate, this.locale))} · +${recoveryBaseAmount} HP</p><dl class="forecast-detail-grid"><div><dt>${escapeHtml(t('recoveryTiming'))}</dt><dd>${escapeHtml(recoveryTiming)}</dd></div><div><dt>${escapeHtml(t('recoveryBaseAmount'))}</dt><dd>+${recoveryBaseAmount} HP</dd></div></dl><p class="muted">${escapeHtml(t('recoveryConditions'))}: ${escapeHtml(t('recoverySurvivalRequired'))} · ${escapeHtml(t('recoverySupplyRequired'))}</p></section><section class="range-forecast"><h3>${escapeHtml(t('range'))}</h3><p><span>${escapeHtml(t('baseRange'))} ${baseRange}</span> · <strong>${escapeHtml(t('effectiveRange'))} ${effectiveRange}</strong>${rangeReason ? ` · ${escapeHtml(rangeReason)}` : ''}</p></section>${noiseSection}${infectionSection}${preview}<div class="action-row">${canWait ? `<button class="secondary-button" data-action="wait">${escapeHtml(t('wait'))}</button>` : ''}</div><p class="muted">${escapeHtml(actionHint)}</p>`;
   }
 
   /**
@@ -6350,6 +6385,7 @@ export class GameUiController {
   private showToast(message: string): void {
     this.toastMessage = message;
     this.renderToast();
+    this.localizeReferences();
     if (this.noticeTimer) clearTimeout(this.noticeTimer);
     const timer = setTimeout(() => {
       this.toastMessage = null;

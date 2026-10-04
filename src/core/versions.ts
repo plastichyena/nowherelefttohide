@@ -1,5 +1,5 @@
-/** Compatibility boundaries for the v1.7.0 release. */
-export const APP_VERSION = '1.7.0' as const;
+/** Compatibility boundaries for the v1.7.1 release. */
+export const APP_VERSION = '1.7.1' as const;
 export const GAME_RULES_VERSION = '20.0.0' as const;
 export const CONFIG_VERSION = GAME_RULES_VERSION;
 export const STATE_VERSION = GAME_RULES_VERSION;

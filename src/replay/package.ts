@@ -93,7 +93,7 @@ export class ReplayPackage {
     checkHash(this.manifest as unknown as Record<string,unknown>,'manifestHash');
     const m=this.manifest;
     const current=m.gameRulesVersion===GAME_RULES_VERSION && String(m.saveFormatVersion)===SAVE_FORMAT_VERSION && m.agentApiVersion===AGENT_API_VERSION && m.bridgeApiVersion===BRIDGE_API_VERSION && m.appVersion===APP_VERSION && m.artifactSchemaVersion===ARTIFACT_SCHEMA_VERSION && m.observationApiVersion===OBSERVATION_API_VERSION && m.sessionSchemaVersion===SESSION_SCHEMA_VERSION;
-    if((!current)||!([FIXED_MAP_ID,RANDOM_MAP_ID] as string[]).includes(m.mapId)||m.packageVersion!==SESSION_ARTIFACT_PACKAGE_VERSION)fail('Unsupported replay version: v1.6.9 and earlier public Artifacts are incompatible with v1.7.0. Keep the original ZIP and start a new game. Replay never migrates recorded rules or performance.');
+    if((!current)||!([FIXED_MAP_ID,RANDOM_MAP_ID] as string[]).includes(m.mapId)||m.packageVersion!==SESSION_ARTIFACT_PACKAGE_VERSION)fail('Unsupported replay version: v1.7.0 and earlier public Artifacts are incompatible with v1.7.1. Keep the original ZIP and start a new game. Replay never migrates recorded rules or performance.');
     // Exported streams are stored, permitting random byte-range access without extracting history.
     const stream=this.zip.entries.get('artifact.ndjson');if(!stream || stream.method!==0)fail('Replay requires a stored artifact.ndjson entry; use the Portable ZIP export');
     const digest=new Digest();let pending=new Uint8Array(), accepted=0, offset=0, previous='0'.repeat(64), snapshot=-1, footer=false, document:SessionPublicDocument|undefined;

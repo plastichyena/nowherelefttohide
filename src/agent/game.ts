@@ -665,9 +665,10 @@ export class AgentGameAdapter implements AgentGame {
   }
 
   /**
-   * Restore a private Session snapshot through the same validated Core
-   * LoadSnapshot action. The current Adapter is replaced only after validation
-   * succeeds, so a rejected snapshot cannot damage the active session.
+   * Restore through Core's validated snapshot constructor. This is an internal
+   * persistence operation, not a new gameplay action: a finished game must
+   * remain readable while step() continues to reject all further play.
+   * Replace the current engine only after version/invariant validation succeeds.
    */
   public restorePrivateSessionState(
     snapshot: GameState,
@@ -676,8 +677,6 @@ export class AgentGameAdapter implements AgentGame {
     const snapshotCopy = cloneJson(snapshot);
     const config = cloneConfig(snapshotCopy.config);
     const next = GameEngine.fromSnapshot(snapshotCopy);
-    const loaded = next.step({ type: 'LoadSnapshot', snapshot: snapshotCopy });
-    if (loaded.error) throw new Error(`${loaded.error.code}: ${loaded.error.message}`);
 
     this.engine = next;
     this.seed = snapshotCopy.seed;

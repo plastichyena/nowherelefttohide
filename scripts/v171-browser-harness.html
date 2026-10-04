@@ -1,0 +1,15 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>v1.7.1 UI acceptance</title></head><body><div id="app"></div><script type="module">
+import '/src/styles.css';
+import { GameUiController } from '/src/ui/controller.ts';
+import { GameEngine, previewMove } from '/src/core/engine.ts';
+import { createDefaultConfig } from '/src/core/config.ts';
+import { prepareTestSnapshot } from '/src/core/testConfig.ts';
+import { createUnit } from '/src/core/state.ts';
+import { encodeSaveCode, decodeSaveCode, DEFAULT_AUTOSAVE_KEY } from '/src/persistence/save.ts';
+const factory = snapshot => { const engine=new GameEngine(snapshot?.seed,snapshot?.config,snapshot); engine.previewMove=(id,to)=>previewMove(engine.getState(),id,to); return engine; };
+const ui=new GameUiController(document.querySelector('#app'),factory);ui.mount();
+window.qa={ui,GameEngine,createDefaultConfig,prepareTestSnapshot,createUnit,encodeSaveCode,decodeSaveCode,DEFAULT_AUTOSAVE_KEY,
+ load(locale='ja',transform) { const state=new GameEngine(1547,createDefaultConfig({mapMode:'fixed'})).getState();if(transform)transform(state);prepareTestSnapshot(state);ui.locale=locale;document.documentElement.lang=locale;ui.loadState(state);return state; },
+ point(position) {const p=ui.boardScene.projectHexToScreen(position),r=document.querySelector('.board-region').getBoundingClientRect();return {x:p.x+r.x,y:p.y+r.y};}
+};
+</script></body></html>

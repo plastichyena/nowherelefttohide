@@ -30,7 +30,9 @@ describe('v1.6.5 rule boundaries',()=>{
       expect(new GameEngine(seed,createDefaultConfig({mapMode:'fixed'})).getState().map).toEqual(state.map);
     }
     expect([...seen].sort()).toEqual(AIR_BASE_CANDIDATES.map(hexKey).sort());
-  },30000);
+  // 48 complete map constructions plus path/vision checks need headroom when
+  // run with the full suite; the same assertions take about 28s in isolation.
+  },60000);
   it.each(['airBase','nuclearPowerPlant'] as const)('captures %s during Turn10 actions, awarding a single reinforcement',type=>{
     const engine=new GameEngine(1,quiet());for(let i=1;i<10;i++)apply(engine,{type:'EndTurn'});
     const state=engine.getState() as GameState,base=state.facilities.find(f=>f.type===type)!;

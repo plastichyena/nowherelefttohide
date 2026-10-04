@@ -94,6 +94,25 @@ function stateWithArmyBaseReservation(seed = 42): GameState {
   return state;
 }
 
+it('rejects v1.7.0 App data with a valid checksum and preserves its autosave while writing v1.7.1 separately', () => {
+  const current=initialState(1547);
+  const legacy=JSON.parse(exportSaveJson(current));
+  legacy.state.mapDescriptor.appVersion='1.7.0';
+  legacy.state.mapDescriptor.build=legacy.state.mapDescriptor.build.replace('1.7.1','1.7.0');
+  const encoded=codeForEnvelope(resign(legacy));
+  const storage=new MemoryStorage();storage.setItem(LEGACY_AUTOSAVE_KEY,encoded);
+  const store=new AutoSaveStore({storage});
+  const rejected=decodeSaveCode(encoded);
+  expect(rejected.valid).toBe(false);
+  expect(rejected.errors.join(' ')).toContain('Unsupported App version 1.7.0');
+  expect(storage.getItem(LEGACY_AUTOSAVE_KEY)).toBe(encoded);
+  expect(decodeSaveCode(encodeSaveCode(current)).state).toEqual(current);
+  store.save(current);
+  expect(storage.getItem(LEGACY_AUTOSAVE_KEY)).toBe(encoded);
+  expect(DEFAULT_AUTOSAVE_KEY).not.toBe(LEGACY_AUTOSAVE_KEY);
+  expect(decodeSaveCode(storage.getItem(DEFAULT_AUTOSAVE_KEY)!).valid).toBe(true);
+});
+
 describe('v1.6.0 Save Format 17', () => {
   it('rejects the v1.5.6 Save 15 boundary with a valid checksum without changing its input', () => {
     const legacy = exportedEnvelope();
@@ -600,7 +619,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(result.state).toBeNull();
     expect(result.envelope).toBeNull();
     expect(result.errors.join(' ')).toMatch(/format version|incompatible|2\.3\.0/i);
-    expect(result.errors.join(' ')).toContain('v1.6.9 and earlier saves cannot be loaded or converted');
+    expect(result.errors.join(' ')).toContain('v1.7.0 and earlier saves cannot be loaded or converted');
     expect(current).toEqual(before);
   });
 

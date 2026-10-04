@@ -7,6 +7,8 @@ import { SessionService } from '../session/service';
 import { createAgentSessionGameFactory, resolveSessionIdentity } from '../session/agent-adapter';
 import { writeArtifactZip } from '../session/artifact-zip';
 import { ReplayPackage, ReplayZip } from './package';
+import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
+import { sha256Json } from '../session/hash';
 
 it('exports and seeks a self-contained public ZIP, preserving rejection and comments across a different viewer build',async()=>{
   const root=mkdtempSync(join(tmpdir(),'nlth-v155-replay-'));
@@ -27,6 +29,18 @@ it('exports and seeks a self-contained public ZIP, preserving rejection and comm
   const manifest=service.exportArtifact('replay-test',join(root,'package'),{keepDirectory:true});
   expect(service.replayArtifact(manifest.artifactPath).matched).toBe(true);
   const bytes=readFileSync(manifest.artifactPath);
+  const sourceHash=sha256Json([...bytes]);
+  for(const appVersion of ['1.7.0','99.0.0']) {
+    const entries=unzipSync(bytes);
+    const {manifestHash: _oldHash,...recordedManifest}=JSON.parse(strFromU8(entries['manifest.json']!));
+    const unsupported={...recordedManifest,appVersion};
+    entries['manifest.json']=strToU8(JSON.stringify({...unsupported,manifestHash:sha256Json(unsupported)}));
+    const unsupportedZip=zipSync(entries,{level:0});
+    const blob=new Blob([unsupportedZip]);
+    await expect(new ReplayPackage(new ReplayZip(blob,new AbortController().signal)).open()).rejects.toThrow(/Unsupported replay version/);
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(unsupportedZip);
+    expect(sha256Json([...readFileSync(manifest.artifactPath)])).toBe(sourceHash);
+  }
   const replay=await new ReplayPackage(new ReplayZip(new Blob([bytes]),new AbortController().signal)).open();
   expect(replay.index.length).toBe(2);
   const rejected=await replay.decision(0);expect(rejected.record.accepted).toBe(false);expect(rejected.after).toEqual(rejected.before);expect(rejected.record.decisionSummary).toContain('<script>');

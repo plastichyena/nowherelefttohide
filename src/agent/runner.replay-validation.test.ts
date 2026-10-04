@@ -3,7 +3,7 @@ import { createDefaultConfig } from '../core/config';
 import { replayArtifact, runAgentGame } from './runner';
 
 describe('Agent replay version boundaries', () => {
-  it('accepts release-only App metadata changes and rejects missing App metadata', async () => {
+  it('rejects v1.7.0 and missing App metadata without executing the decision list', async () => {
     const config = createDefaultConfig({mapMode:'fixed',
       maxActionsPerTurn: 4,
       economy: { initialZombieCount: 0, initialScreamerCount: 0, initialHunterCount: { min: 0, max: 0 } },
@@ -26,9 +26,9 @@ describe('Agent replay version boundaries', () => {
 
     // Let worker reporting finish between the two synchronous full-game runs.
     await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
-    const previousAppReplay = replayArtifact({ ...run.artifact, appVersion: '1.3.1' });
-    expect(previousAppReplay.reproduced).toBe(true);
-    expect(previousAppReplay.error).toBeNull();
+    const previousAppReplay = replayArtifact({ ...run.artifact, appVersion: '1.7.0' });
+    expect(previousAppReplay.reproduced).toBe(false);
+    expect(previousAppReplay.error?.code).toBe('artifact_version_unsupported');
     const missingAppMetadataReplay = replayArtifact({ ...run.artifact, appVersion: '' });
     expect(missingAppMetadataReplay.reproduced).toBe(false);
     expect(missingAppMetadataReplay.error?.code).toBe('artifact_invalid');

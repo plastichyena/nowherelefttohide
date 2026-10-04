@@ -17,6 +17,7 @@ import {
   BOARD_RENDER_LAYER_ORDER,
   BOARD_MIN_ZOOM,
   BOARD_MAX_ZOOM,
+  HexBoardScene,
   boardTextureKey,
   checkpointCandidateMarkerStyle,
   classifyBoardAssetFailure,
@@ -31,8 +32,22 @@ import {
   visionOverlayState,
 } from './board';
 import { createFixedMap } from '../core/map';
+import { createTranslator } from './i18n';
 
 describe('Phaser board asset boundary helpers', () => {
+  it.each([['ja', '民需工場'], ['en', 'Civilian Factory']] as const)('renders a selected facility with its %s name rather than a translation key', (locale, expected) => {
+    const labels: string[] = [];
+    // Capture only the Phaser text sink; exercise the actual dynamic renderer.
+    const scene = Object.create(HexBoardScene.prototype) as any;
+    scene.boardLodActive = () => false;
+    scene.assetReady = () => true;
+    scene.addLabel = (_key: string, text: string) => labels.push(text);
+    scene.drawFacilityDynamic({ id: 'civilian-factory-1', type: 'civilianFactory', owner: 'player',
+      status: 'owned', operationalStatus: 'operational', infected: 0 }, undefined, { x: 0, y: 0 },
+    true, { locale }, new Set(['0,0']), '0,0', createTranslator(locale));
+    expect(labels).toEqual([expected]);
+  });
+
   it('keeps the required visual layer order explicit', () => {
     expect(BOARD_RENDER_LAYER_ORDER).toEqual([
       'terrain',

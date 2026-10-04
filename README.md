@@ -1,6 +1,6 @@
 # Nowhere Left to Hide
 
-v1.7.0は内陸ランダムマップを既定にし、明示的な固定モードも選べます。地図とゲーム進行のseedを分離し、生成進捗・キャンセル、両モードの保存・観戦、AI向けの移動・攻撃・補給・回復の説明を整えました。検証範囲とGitHub Actionsの未確認項目は [v1.7.0受入記録](validation/v170-acceptance.md) を参照してください。
+v1.7.1は通常プレイの上部表示・選択パネルを整理し、盤面を広くしました。同一ヘックスの対象切替、段階的な詳細表示、Replay / Liveの名前＋公開ユニットID併記に対応します。終了済みSessionから公式CLIで公開ZIPを出力できない不具合も修正しました。検証範囲とGitHub Actionsの未確認項目は [v1.7.1受入記録](validation/v171-acceptance.md) を参照してください。
 
 v1.5.2で行ったPC Chromeの比較証跡は[`v152-performance-evidence.json`](src/testing/fixtures/v152-performance-evidence.json)、AI CLIは[`play-turn-performance-evidence.json`](src/session/play-turn-performance-evidence.json)に記録しています。390×844の同一Saveで、序盤の選択中央値は849→98ms、Turn 51の移動先確認は4,146→108ms、ターン終了操作全体は6,881→987msでした。Core単体のTurn 51は683→372msで、旧新版144回のStepResult hashが一致しています。ブラウザ値には自動操作と描画待ちが含まれ、SOG05の実測値ではありません。パン・ピンチ・人口スライダーは概ね横ばいで、選択・プレビュー・確定・資源／シート表示が主に改善しました。
 
@@ -40,7 +40,7 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
 - 1 Turnを同じNodeプロセスで対話できる`play-turn`、互換用の既存8コマンド、Active Session、Public Decision Log、履歴Checkpoint、分岐Session、Compact応答と詳細query
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.7.0の変更規則と検証範囲は現行仕様18.20と受入記録に記録します。GitHub Actionsは起動確認までを今回の範囲とし、完了結果・配布先の検証は別途確認します。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.7.1の変更規則と検証範囲は現行仕様18.21と受入記録に記録します。GitHub Actionsは起動確認までを今回の範囲とし、完了結果・配布先の検証は別途確認します。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
 ## v1.5.5 公開検証
 
@@ -165,7 +165,7 @@ Turn 70のFinal Waveは4方向・基本80体です。別枠Pack1体と参加方�
 - ユニット性能、施設の労働者上限、生産式
 - 感染、鎮圧、検問所建設、人口・資源消費
 
-ゲームルール内では `Math.random()` を使いません。通常は `seed` 一つで開始し、詳細設定では `mapSeed` と `gameplaySeed` を個別指定できます。省略した個別seedは通常seedを使います。全入口で `mapMode` の省略は `random`、`fixed` は明示指定です。同じ版・実効Config・seedから同じ地図と進行を再現します。保存時は地図実体・再現descriptor・Config・RNG snapshotを保持し、ロードで地図を生成し直しません。版番号の正本は [versions.ts](src/core/versions.ts) です。App 1.7.0、Rules/State/Config 20、Save 27、Agent/Observation/Bridge 25、Artifact 24、Session/Checkpoint 21、Action 4、Query 1.7、Summary 2。v1.6.9以前のSave・Session・Checkpoint・公開Replayは、元データを変更せず拒否します。
+ゲームルール内では `Math.random()` を使いません。通常は `seed` 一つで開始し、詳細設定では `mapSeed` と `gameplaySeed` を個別指定できます。省略した個別seedは通常seedを使います。全入口で `mapMode` の省略は `random`、`fixed` は明示指定です。同じ版・実効Config・seedから同じ地図と進行を再現します。保存時は地図実体・再現descriptor・Config・RNG snapshotを保持し、ロードで地図を生成し直しません。版番号の正本は [versions.ts](src/core/versions.ts) です。App 1.7.1、Rules/State/Config 20、Save 27、Agent/Observation/Bridge 25、Artifact 24、Session/Checkpoint 21、Action 4、Query 1.7、Summary 2。v1.7.0以前のSave・Session・Checkpoint・公開Replayは、元データを変更せず拒否します。
 
 ## CoreとHeadless API
 
@@ -217,7 +217,7 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 
 `test:random`と`test:balanced`は標準ConfigのSeed群を共通Batch CLIで実行します。通常CIはUnit／Invariant、Observation境界、Replay、Production Bridge smokeに加え、独立したBalanced Seed `1..30` jobと、Pagesを待たせないSession 1,000 Action jobを検証します。Random／Balanced各100 Seed検証とSession 512 MiB Package境界は手動Release検証へ分離します。
 
-`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.6.8手動Release検証です。v1.6.8のRandom／Balanced各100ゲームを固定Seed 1～100、同じ100 Turn上限で実行し、技術的失敗0件、全Replay一致、JSON／CSV Reportと各Replay Artifactを保存します。v1.6.6以前のbaseline完全一致はルール変更のため要求しません。Sessionの512 MiB Package境界も専用JobでReportを保存します。各Agentを10 Seedずつの20 Jobへ分割し、全200ゲームの終局と全Replay一致を集約確認します。ゲーム内敗北は正常完了です。Final Horde到達は実測値として記録し、未到達を技術的失敗には分類しません。長時間BatchはPages公開を待たせません。
+`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.7.1手動Release検証です。v1.7.1のRandom／Balanced各100ゲームを固定Seed 1～100、同じ100 Turn上限で実行し、技術的失敗0件、全Replay一致、JSON／CSV Reportと各Replay Artifactを保存します。v1.6.6以前のbaseline完全一致はルール変更のため要求しません。Sessionの512 MiB Package境界も専用JobでReportを保存します。各Agentを10 Seedずつの20 Jobへ分割し、全200ゲームの終局と全Replay一致を集約確認します。ゲーム内敗北は正常完了です。Final Horde到達は実測値として記録し、未到達を技術的失敗には分類しません。長時間BatchはPages公開を待たせません。
 
 手動入力`reuse_run_id`を空にすると全件を新規実行します。Report検証だけを修正した場合は、同じリポジトリの完了済みRun IDを指定できます。元Runの20 Seed Jobと大容量Jobの成功、ゲーム実行コード・依存関係・耐久試験コードの不変、ReportのBuild IDと全Seed・Replay・物理容量の証跡を再検証します。再利用元RunとCommitを集約Artifactへ記録し、条件を満たさない場合は失敗します。
 
@@ -235,7 +235,7 @@ Coreテストでは、移動・戦闘、資源・電力、不足被害、感染�
 
 Workflowは`actions/configure-pages`でPagesの有効化を要求し、相対asset URLで生成した`dist`を公開します。リポジトリ/組織ポリシーが自動有効化を拒否した場合だけ、Pages設定のSourceを「GitHub Actions」に変更してください。
 
-Pages公開後は実ブラウザでゲームURLを開き、`window.NLTH`をSeed 1でGame Overまで実行します。`appVersion` 1.7.0、Game Rules 20.0.0、各25.0.0 API、Artifact 24.0.0、51×51 Map、Checkpoint偵察ゲート、Ground／Aerial Vision、Crisis Summary／EndTurn Risk、生産余力、熟練度／Attack Charge、Riot／Hunter／Gas Zombie、Army Base、混成HordeのWarning公開境界、Turn Awayの公開境界、重要Site Event、`verificationEvents`とHidden Spawn／Rejected Counter情報の非公開、Action列Replay一致を確認します。勝利は合格条件ではありません。
+Pages公開後は実ブラウザでゲームURLを開き、`window.NLTH`をSeed 1でGame Overまで実行します。`appVersion` 1.7.1、Game Rules 20.0.0、各25.0.0 API、Artifact 24.0.0、51×51 Map、Checkpoint偵察ゲート、Ground／Aerial Vision、Crisis Summary／EndTurn Risk、生産余力、熟練度／Attack Charge、Riot／Hunter／Gas Zombie、Army Base、混成HordeのWarning公開境界、Turn Awayの公開境界、重要Site Event、`verificationEvents`とHidden Spawn／Rejected Counter情報の非公開、Action列Replay一致を確認します。勝利は合格条件ではありません。
 
 ## 実機確認条件と既知の問題
 

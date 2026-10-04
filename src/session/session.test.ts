@@ -534,6 +534,32 @@ describe('AI Portable Session lifecycle', () => {
     expect(checkpointApi.store.load('v143-checkpoint').active).toEqual(activeBeforeCheckpointRejection);
   });
 
+  it('rejects v1.7.0 Session and Checkpoint metadata without rewriting source or Active', () => {
+    const root = tempRoot('v170-unsupported');
+    const api = service(root);
+    api.newSession({ sessionId: 'current' });
+    const checkpoint = api.saveCheckpoint('current');
+    const active = api.store.load('current').active;
+    const checkpointPath = join(root, 'current', 'checkpoints', `${checkpoint.checkpointId}.meta.json`);
+    const { metadataIntegrityHash: _hash, ...metadata } = JSON.parse(readFileSync(checkpointPath, 'utf8'));
+    const oldCheckpoint = { ...metadata, appVersion: '1.7.0' };
+    const checkpointBytes = JSON.stringify({ ...oldCheckpoint, metadataIntegrityHash: sha256Json(oldCheckpoint) });
+    writeFileSync(checkpointPath, checkpointBytes);
+    expect(() => api.loadCheckpoint('current', checkpoint.checkpointId, 'child')).toThrow(/appVersion|version/i);
+    expect(readFileSync(checkpointPath, 'utf8')).toBe(checkpointBytes);
+    expect(api.store.load('current').active).toEqual(active);
+    const descriptorPath = join(root, 'current', 'session.json');
+    const original = readFileSync(descriptorPath, 'utf8');
+    const { descriptorIntegrityHash: _descriptorHash, ...descriptor } = JSON.parse(original);
+    const legacy = { ...descriptor, appVersion: '1.7.0' };
+    const legacyBytes = JSON.stringify({ ...legacy, descriptorIntegrityHash: sha256Json(legacy) });
+    writeFileSync(descriptorPath, legacyBytes);
+    expect(() => api.status('current')).toThrow(/appVersion|version/i);
+    expect(readFileSync(descriptorPath, 'utf8')).toBe(legacyBytes);
+    writeFileSync(descriptorPath, original);
+    expect(api.store.load('current').active).toEqual(active);
+  });
+
   it('rejects concurrent locks and recovers only a definitely dead local PID lock', () => {
     const root = tempRoot('lock');
     const store = new SessionStore(root);

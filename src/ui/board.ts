@@ -34,7 +34,7 @@ import {
   mapUnitAssetLayers,
   resolveBoardAssetUrl,
 } from './boardAssets';
-import { createTranslator, type Locale } from './i18n';
+import { createTranslator, facilityLabel, unitLabel, type Locale } from './i18n';
 
 // Camera bounds are part of the Board UI contract; re-export the Registry's
 // single source of truth so direct Board consumers and tests cannot drift.
@@ -1685,19 +1685,6 @@ export class HexBoardScene extends Phaser.Scene {
       this.graphics.strokeCircle(center.x, center.y, 19);
     }
     if (tileSelected) {
-      const facilityLabels: Record<string, string> = {
-        capital: t('capital'),
-        city: t('city'),
-        farm: t('farm'),
-        civilianFactory: t('civilianFactory'),
-        militaryFactory: t('militaryFactory'),
-        refinery: t('refinery'),
-        powerPlant: t('powerPlant'),
-        nuclearPowerPlant: t('nuclearPowerPlant'),
-        windPowerPlant: t('windPowerPlant'),
-        simpleFarm: t('simpleFarm'),
-        civilianDroneBase: t('civilianDroneBase'),
-      };
       const badges: string[] = [];
       if (facility.infected > 0) badges.push(`!${facility.infected}`);
       if (facility.owner !== 'player') badges.push(t('unowned'));
@@ -1713,7 +1700,7 @@ export class HexBoardScene extends Phaser.Scene {
         badges.push(statusLabels[facility.operationalStatus] ?? facility.operationalStatus);
       }
       if (facility.owner === 'player' && !suppliedTiles.has(tileKey)) badges.push(t('outOfSupply'));
-      this.addLabel(`facility:${facility.id}:detail`, `${facilityLabels[facility.type] ?? facility.type}${badges.length > 0 ? ` · ${badges.join(' · ')}` : ''}`, center.x, center.y + 24, '#f3f7f9', 8, true);
+      this.addLabel(`facility:${facility.id}:detail`, `${facilityLabel(facility.type, render.locale ?? 'ja')}${badges.length > 0 ? ` · ${badges.join(' · ')}` : ''}`, center.x, center.y + 24, '#f3f7f9', 11, true);
     }
   }
 
@@ -1792,18 +1779,14 @@ export class HexBoardScene extends Phaser.Scene {
     if (render.supplyOverlay && !isZombie && !suppliedTiles.has(tileKey)) this.addLabel(`unit:${unit.id}:status`, '⊘', position.x - 15, position.y - 15, '#ef8c7a', 9, true);
     if (!isZombie && (selected || tileSelected)) {
       const unitRecord = unit as unknown as Record<string, unknown>;
-      const proficiency = unitRecord.proficiency === 'recruit' || unitRecord.proficiency === 'regular' || unitRecord.proficiency === 'veteran'
-        ? String(unitRecord.proficiency)
-        : null;
-      const proficiencyLabel = proficiency ? t(`proficiency.${proficiency}`) : null;
       const maxCharges = typeof unitRecord.maxAttackCharges === 'number' ? Math.max(1, Math.trunc(unitRecord.maxAttackCharges)) : 1;
       const charges = typeof unitRecord.attackChargesRemaining === 'number' ? Math.max(0, Math.min(maxCharges, Math.trunc(unitRecord.attackChargesRemaining))) : maxCharges;
-      const typeLabel = unit.type === 'ifv' ? t('ifv') : unit.type === 'multipurposeHelicopter' ? t('multipurposeHelicopter') : unit.type === 'fieldArtillery' ? t('fieldArtillery') : unit.type === 'specialForces' ? t('specialForces') : unit.type === 'nationalGuard' ? t('nationalGuard') : (unit.type as string) === 'riotPolice' ? t('riotPolice') : (unit.type as string) === 'reconTeam' ? t('reconTeam') : t('police');
+      const typeLabel = unitLabel(unit.type, render.locale ?? 'ja');
       const supplyLabel = suppliedTiles.has(tileKey) ? t('supplied') : t('outOfSupply');
-      const details = `${unit.flightState === 'airborne' ? '▲ ' : ''}${unit.cargoUnitId ? '▣ ' : ''}${typeLabel}${proficiencyLabel ? ` (${proficiencyLabel})` : ''} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
+      const details = `${unit.flightState === 'airborne' ? '▲ ' : ''}${unit.cargoUnitId ? '▣ ' : ''}${typeLabel} HP ${unit.hp}/${unit.maxHp} ⚔ ${charges}/${maxCharges} ${supplyLabel}`;
       this.addLabel(`unit:${unit.id}:detail`, details, position.x, position.y + 23, '#f3f7f9', 8, true);
     } else if (isZombie && render.selectedZombieId === unit.id) {
-      const typeLabel = unit.type === 'ifv' ? t('ifv') : unit.type === 'packZombie' ? t('packZombie') : unit.type === 'hordeZombie' ? t('hordeZombie') : unit.type === 'policeZombie' ? t('policeZombie') : unit.type === 'soldierZombie' ? t('soldierZombie') : (unit.type as string) === 'riotZombie' ? t('riotZombie') : (unit.type as string) === 'hunterZombie' ? t('hunterZombie') : (unit.type as string) === 'gasZombie' ? t('gasZombie') : (unit.type as string) === 'screamerZombie' ? t('screamerZombie') : t('zombie');
+      const typeLabel = unitLabel(unit.type, render.locale ?? 'ja');
       this.addLabel(`unit:${unit.id}:detail`, `${typeLabel} HP ${unit.hp}/${unit.maxHp}`, position.x, position.y + 23, '#f3f7f9', 8, true);
     }
     void t;
@@ -2040,12 +2023,13 @@ export class HexBoardScene extends Phaser.Scene {
 
   private addLabel(key: string, text: string, x: number, y: number, color: string, size: number, center = false): void {
     if (!this.dynamicLayer || this.boardLodActive()) return;
+    const fontSize = Math.max(size, 11 / this.cameras.main.zoom);
     let label = this.labels.get(key);
     if (!label) {
       label = this.add.text(x, y, text, {
         color: '#ffffff',
         fontFamily: 'system-ui, sans-serif',
-        fontSize: `${size}px`,
+        fontSize: `${fontSize}px`,
         fontStyle: 'bold',
         stroke: '#071019',
         strokeThickness: 2,
@@ -2061,6 +2045,7 @@ export class HexBoardScene extends Phaser.Scene {
       }
     }
     label.setPosition(x, y);
+    label.setFontSize(fontSize);
     label.setVisible(true);
     label.setTint(Phaser.Display.Color.HexStringToColor(color).color);
     this.activeLabelKeys.add(key);

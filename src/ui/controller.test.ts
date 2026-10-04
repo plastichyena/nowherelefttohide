@@ -21,7 +21,10 @@ import { createTranslator } from './i18n';
 import { deriveDevelopmentNoiseDebug, renderNoiseDebugOverlay } from './noiseDebug';
 
 function testState(units: Partial<UnitState>[], facilities: Partial<FacilityState>[] = []): GameState {
-  return { units, facilities } as unknown as GameState;
+  const state = new GameEngine(1, v170FixedConfig({mapMode:'fixed'})).getState();
+  const baseUnit = state.units.find(u => u.isPlayerUnit)!;
+  const baseFacility = state.facilities[0]!;
+  return { ...state, units: units.map(u => ({ ...baseUnit, ...u })), facilities: facilities.map(f => ({ ...baseFacility, ...f })), checkpoints: [] };
 }
 
 function testUnit(id: string, q: number, r: number, isPlayerUnit = true): Partial<UnitState> {
@@ -62,8 +65,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.7.0');
-    expect(titleVersionLabel('en')).toContain('1.7.0');
+    expect(titleVersionLabel('ja')).toContain('1.7.1');
+    expect(titleVersionLabel('en')).toContain('1.7.1');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -256,31 +259,31 @@ describe('controller view models', () => {
     expect(resolveTileSelection(state, { q: 7, r: 7 }, 'map')).toEqual({ kind: 'unit', id: 'police-1' });
   });
 
-  it('prioritizes a co-located facility over a player unit in domestic mode', () => {
+  it('uses the same first target when returning from domestic mode', () => {
     const state = testState([testUnit('police-1', 7, 7)], [testFacility('capital', 7, 7)]);
 
-    expect(resolveTileSelection(state, { q: 7, r: 7 }, 'domestic')).toEqual({ kind: 'facility', id: 'capital' });
+    expect(resolveTileSelection(state, { q: 7, r: 7 }, 'domestic')).toEqual({ kind: 'unit', id: 'police-1' });
   });
 
-  it('does not select a unit-only tile in domestic mode', () => {
+  it('selects a unit-only tile when leaving domestic mode', () => {
     const state = testState([testUnit('police-1', 4, 5)]);
 
-    expect(resolveTileSelection(state, { q: 4, r: 5 }, 'domestic')).toBeNull();
+    expect(resolveTileSelection(state, { q: 4, r: 5 }, 'domestic')).toEqual({ kind: 'unit', id: 'police-1' });
   });
 
   it('selects an empty trunk-road Hex in domestic mode and resolves its branch', () => {
     const state = new GameEngine(145, v170FixedConfig({mapMode:'fixed'})).getState();
     const branch = state.map.roadBranches[0]!;
-    const position = branch.roadTiles[0]!;
+    const position = branch.roadTiles.find(p => !state.units.some(u => u.position.q === p.q && u.position.r === p.r) && !state.checkpoints.some(c => c.position.q === p.q && c.position.r === p.r) && !state.facilities.some(f => f.position.q === p.q && f.position.r === p.r))!;
 
     expect(resolveTileSelection(state, position, 'domestic')).toEqual({ kind: 'road', position });
     expect(roadBranchForPosition(state, position)).toBe(branch.id);
   });
 
-  it('never selects an enemy-only tile through the human selection resolver', () => {
+  it('selects terrain without exposing a hidden enemy', () => {
     const state = testState([testUnit('zombie-1', 4, 5, false)]);
 
-    expect(resolveTileSelection(state, { q: 4, r: 5 }, 'map')).toBeNull();
+    expect(resolveTileSelection(state, { q: 4, r: 5 }, 'map')).toEqual({ kind: 'hex', position: { q: 4, r: 5 } });
   });
 
   it('selects a facility-only tile in map mode', () => {
@@ -310,14 +313,14 @@ describe('controller view models', () => {
     expect(shouldAutosaveAfterLoad(true)).toBe(false);
   });
 
-  it('reports unsupported v1.6.9-or-earlier saves in both UI languages', () => {
+  it('reports unsupported v1.7.0-or-earlier saves in both UI languages', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.6.9以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.7.0');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.7.0以前');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.7.1');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.6.9 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.7.0');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.7.0 or earlier');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.7.1');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
     expect(createTranslator('ja')('tipSave')).toContain('ルール版 20.0.0');
     expect(createTranslator('ja')('tipSave')).toContain('保存形式 27');
@@ -325,11 +328,11 @@ describe('controller view models', () => {
     expect(createTranslator('en')('tipSave')).toContain('Save Format 27');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
-      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9 or earlier');
-      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9 or earlier');
-      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9-or-earlier');
-      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.6.9以前' : 'v1.6.9-or-earlier');
+      expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0 or earlier');
+      expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0 or earlier');
+      expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0-or-earlier');
+      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0-or-earlier');
+      expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0-or-earlier');
     }
   });
 

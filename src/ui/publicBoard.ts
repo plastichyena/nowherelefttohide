@@ -5,7 +5,7 @@ import type { HexCoord } from '../core/types';
 import { hexDistance, hexKey } from '../core/hex';
 import { roadEdges } from '../core/roads';
 import { BOARD_ASSET_REGISTRY, resolveBoardAssetUrl, resolveUnitAssetPath, mapFacilityAssetLayers, mapCheckpointAssetLayers, mapUnitAssetLayers } from './boardAssets';
-import { createTranslator, type Locale } from './i18n';
+import { createTranslator, facilityLabel, viewerUnitLabel, type Locale } from './i18n';
 import type { PresentationSnapshot } from '../core/presentation';
 
 /** Paint recorded public values over a public document, without rebuilding game rules. */
@@ -101,16 +101,16 @@ export class PublicBoardRenderer {
     this.details.dataset.selection=e?.key??'';
     if(!e){this.details.textContent=this.locale==='ja'?'盤面の部隊・施設・検問所を選択すると詳細を表示します。':'Select a unit, facility or checkpoint for details.';return;}
     const d=e.data,heading=document.createElement('strong');
-    heading.textContent=e.kind==='unit'?createTranslator(this.locale)(String(d.type),String(d.type)):e.kind==='facility'?createTranslator(this.locale)(`facility.${d.type}`,String(d.type)):this.locale==='ja'?'検問所':'Checkpoint';
+    heading.textContent=e.kind==='unit'?viewerUnitLabel({id:String(d.id),type:String(d.type) as never},this.locale):e.kind==='facility'?facilityLabel(String(d.type) as never,this.locale):this.locale==='ja'?'検問所':'Checkpoint';
     this.details.append(heading);
-    const rows:Array<[string,unknown]>=[['ID',d.id],['Hex',`${e.position.q}, ${e.position.r}`]];
+    const rows:Array<[string,unknown]>=[['Hex',`${e.position.q}, ${e.position.r}`]];
     const label=(ja:string,en:string)=>this.locale==='ja'?ja:en;
     const t=createTranslator(this.locale);
     if(this.frame?.observation.militaryDrone?.active){const drone=this.frame.observation.militaryDrone;rows.push([label('軍用ドローン','Military Drone'),`${drone.center?.q},${drone.center?.r} · ${label('半径','Radius')} ${drone.radius} · Turn ${(drone.expiresBeforeTurn??0)-1}`]);}
     if(e.kind==='unit'){
       rows.push([label('移動力（直前フェーズ）','Movement (last phase)'), `${d.baseMovement ?? d.movement} + ${d.appliedMovementBonus ?? 0} = ${d.effectiveMovement ?? d.movement}`]);
       rows.push(['HP',`${d.hp} / ${d.maxHp}`],[label('状態','Mode'),d.mode==='packed'?label('梱包','Packed'):d.mode==='deployed'?label('展開','Deployed'):undefined],[label('熟練度','Proficiency'),d.proficiency? t(`proficiency.${d.proficiency}`,String(d.proficiency)):undefined],[label('攻撃 / 射程','Attack / Range'),`${d.attack} / ${d.artillery?(d.artillery as {minRange:number}).minRange+'–':''}${d.range}`],[label('燃料','Fuel'),`${d.currentFuel} / ${d.maxFuel}`],[label('軍需品','Military Goods'),`${d.currentMilitaryGoods} / ${d.maxMilitaryGoods}`],[label('攻撃回数','Charges'),`${d.attackChargesRemaining} / ${d.maxAttackCharges}`],[label('補給','Supply'),d.inSupply?label('補給内','In supply'):label('補給外','Out of supply')],[label('行動解禁ターン','Unlock turn'),d.modeLockedUntilTurn]);
-      rows.push([label('飛行状態','Flight'),d.flightState?label(d.flightState==='airborne'?'飛行中':'着陸中',String(d.flightState)):undefined],[label('搭乗部隊','Cargo'),d.cargoUnitId],[label('対空攻撃','Anti-air'),d.canTargetAir?label('可能','Yes'):label('不可','No')]);
+      rows.push([label('飛行状態','Flight'),d.flightState?label(d.flightState==='airborne'?'飛行中':'着陸中',String(d.flightState)):undefined],[label('搭乗部隊','Cargo'),d.cargoUnitId ? viewerUnitLabel({id:String(d.cargoUnitId),type:String(d.cargoUnitType) as never},this.locale) : undefined],[label('対空攻撃','Anti-air'),d.canTargetAir?label('可能','Yes'):label('不可','No')]);
       const production=d.production as {completed:number;reserved:number;remaining:number|null}|undefined;
       if(production?.remaining!==null&&production)rows.push([label('生涯生産 / 予約 / 残枠','Lifetime / Reserved / Remaining'),`${production.completed} / ${production.reserved} / ${production.remaining}`]);
       const capabilities=d.capabilities as Record<string,boolean>|undefined;
@@ -153,7 +153,7 @@ export class PublicBoardRenderer {
       const size=Math.max(14,g.scale*2);this.sprite(ctx,path,p.x,p.y,size);
       const overlays=e.kind==='facility'?mapFacilityAssetLayers({type:d.type as never,owner:d.owner as never,status:d.status as never,operationalStatus:d.operationalStatus as never,infected:Number(d.infectedPopulation??0)}).overlays:e.kind==='checkpoint'?mapCheckpointAssetLayers({status:d.status as never,infected:Number(d.infected??0)}).overlays:mapUnitAssetLayers({type:d.type as never,mode:d.mode as never,flightState:d.flightState as never,hordeKind:d.isFinalWaveMember?'final':d.isScheduledWaveMember?'periodic':null}).overlays;
       for(const overlay of overlays)this.sprite(ctx,overlay,p.x,p.y,size);
-    }if(d.flightState==='airborne'||d.cargoUnitId){ctx.fillStyle='#efffff';ctx.font=`${Math.max(10,g.scale*.65)}px sans-serif`;ctx.fillText(`${d.flightState==='airborne'?'▲':''}${d.cargoUnitId?'▣':''}`,p.x,p.y-g.scale*.7);}if(this.selected===e.key){ctx.strokeStyle='#ffe28a';ctx.lineWidth=2;ctx.strokeRect(p.x-g.scale,p.y-g.scale,g.scale*2,g.scale*2);}}
+    }if(d.flightState==='airborne'||d.cargoUnitId){ctx.fillStyle='#efffff';ctx.font=`${Math.max(11,g.scale*.65)}px sans-serif`;ctx.fillText(`${d.flightState==='airborne'?'▲':''}${d.cargoUnitId?'▣':''}`,p.x,p.y-g.scale*.7);}if(this.selected===e.key){ctx.strokeStyle='#ffe28a';ctx.lineWidth=2;ctx.strokeRect(p.x-g.scale,p.y-g.scale,g.scale*2,g.scale*2);}}
     for(const effect of this.frame.effects??[]) {const p=g.transform(effect.position);ctx.strokeStyle=effect.kind==='gas_explosion'?'#b8e66a':effect.kind==='appear'?'#72e0c2':'#ff8b63';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(6,g.scale*(effect.kind==='gas_explosion'?1.5:.7)),0,Math.PI*2);ctx.stroke();}
   }
 }

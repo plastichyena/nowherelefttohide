@@ -1,3 +1,4 @@
+import { viewerReferenceText } from '../ui/viewerNames';
 import type { WebMcpRegistration } from './webmcp';
 import {mapStartFields,bindMapStart,readMapStart,generateGame} from '../ui/map-start';
 import {resolveScenario} from '../core/scenarios';
@@ -47,14 +48,17 @@ function text(value: unknown): string {
 }
 
 /** The viewer shows a bounded receipt; canonical observations stay in Session/Artifact. */
-export function liveAiResultText(response: unknown): string {
+export function liveAiResultText(response: unknown, displayLocale: 'ja'|'en' = 'en'): string {
+  const publicUnits: AgentObservation['units'] = [];
+  const publicSites: Array<AgentObservation['facilities'][number] | AgentObservation['checkpoints'][number]> = [];
   let value = response;
   if (response && typeof response === 'object' && 'before' in response && 'after' in response) {
     const { before: _before, after, ...receipt } = response as Record<string, unknown>;
     const observation = after as Partial<AgentObservation>;
+    for (const document of [(_before as Partial<AgentObservation>),observation]) { publicUnits.push(...(document?.units ?? []),...(document?.zombies ?? [])); publicSites.push(...(document?.facilities ?? []),...(document?.checkpoints ?? [])); }
     value = { ...receipt, after: { turn: observation.turn, gameOver: observation.gameOver, resources: observation.resources }, observationDetails: 'Use nlth_observe / nlth_query or Export ZIP for full public state.' };
   }
-  const serialized = text(value);
+  const serialized = viewerReferenceText(value,publicUnits,displayLocale,2,publicSites);
   return serialized.length <= 16_384 ? serialized : `${serialized.slice(0, 16_384)}\n… Viewer receipt truncated; canonical Artifact is complete.`;
 }
 
@@ -294,7 +298,7 @@ export class LiveAiViewer {
 
   private showResult(response: unknown, renderError?: unknown): void {
     this.refreshDiagnostics();
-    this.result.textContent = renderError ? `${liveAiResultText(response)}\nrenderError: ${String(renderError)}` : liveAiResultText(response);
+    this.result.textContent = renderError ? `${liveAiResultText(response,locale())}\nrenderError: ${String(renderError)}` : liveAiResultText(response,locale());
   }
 
   private trimLog(): void {
