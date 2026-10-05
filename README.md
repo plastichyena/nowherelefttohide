@@ -23,7 +23,7 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 州都、地方都市、農場、工場、製油所、発電所の確保・稼働・感染・陥落・復旧
 - Police Movement 15／Soldier Movement 10／Riot Police Movement 10、機種別Fuel、Fuel 0 Emergency Movement、Unit別携行軍需品、補給、迎撃、攻撃、反撃、待機、自然回復
 - 食料・民需品・軍需品・燃料・電力Capacityの生産と不足処理
-- Fuel不要のWind Power Plant、Supply内に建設できるSimple Farm／Civilian Drone Base／Temporary Housing／Wind Power Plant
+- Fuel不要のWind Power Plant、Supply内に建設できるSimple Farm／Civilian Drone Base／Temporary Housing／Wind Power Plant／Relief Supply Center
 - Fuel／電力、Single Point of Failure、確定経済敗北、Checkpoint供給効果、Queue PressureのForecast
 - 所在地を持つ都市住民・生産施設労働者、都市間移住、都市過密
 - 検問所、避難民の到着・審査・Turn Away、waiting / screening / approved、潜伏感染、拒絶由来Horde増援
@@ -31,18 +31,20 @@ v1.5.2の再現用Core比較は`npx vite-node --script src/testing/v152-core-val
 - 州都を起点とし稼働中検問所までの距離で広がる方面別供給範囲、セクター境界、供給外Actionの理由表示
 - Seed付き乱数によるゾンビAI、避難民、感染、Hordeの再現
 - 戦闘地点・Horde移動地点から通常系Zombieを誘引する共通Noise Pulseと、Horde／人口Targetとの優先順位
-- Recruit／Regular／Veteran熟練度、Attack Charge、Recon Team、Riot Police／Riot Zombie／Hunter Zombie／Gas Zombie／Screamer Zombie、Army Base迎撃、特殊Zombie混成を含む固定Multi-direction Wave（Turn 10 / 20 / 35 / 50 / 70）
+- Recruit／Regular／Veteran熟練度、Attack Charge、Recon Team／Special Forces／Field Artillery／Multipurpose Helicopter／IFV、Riot Police／Riot Zombie／Hunter Zombie／Gas Zombie／Screamer Zombie／Pack Zombie、Army Base迎撃、特殊Zombie混成を含む固定Multi-direction Wave（Turn 10 / 20 / 35 / 50 / 70）
 - 公開ObservationのCrisis Summary／EndTurn Risk、AI Portable Session応答のState Delta
 - Core生成の全道路Checkpoint候補と、Human／Agent共通の利用不能理由
 - 自動保存、セーブコード、JSON保存・復元
 - 日本語（デフォルト）/英語切り替え、初回ガイド、常設ヘルプ、終了統計
 - ブラウザJavaScriptから利用できる、通常UI・保存領域と分離したDeveloper / Browser Bridge
 - 公開Observationだけで動くBalanced Agent、同一Seed比較、Metrics、Replay／Failure Artifactを持つBatch CLI
-- 1 Turnを同じNodeプロセスで対話できる`play-turn`、互換用の既存8コマンド、Active Session、Public Decision Log、履歴Checkpoint、分岐Session、Compact応答と詳細query
+- 1 Turnを同じNodeプロセスで対話できる`play-turn`、単発・復旧用の10コマンド、Active Session、Public Decision Log、履歴Checkpoint、分岐Session、Compact応答と詳細query
 
-ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.7.1の変更規則と検証範囲は現行仕様18.21と受入記録に記録します。GitHub Actionsは起動確認までを今回の範囲とし、完了結果・配布先の検証は別途確認します。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
+ゲームルールの正本は [`Doc/Nowhere Left to Hide PoC 現行仕様.md`](Doc/Nowhere%20Left%20to%20Hide%20PoC%20現行仕様.md) です。v1.7.1の変更規則・検証範囲と後続確認は現行仕様18.21と[受入記録](validation/v171-acceptance.md)に記録しています。2026-10-05に実装4958667と文書を再照合しました。過去版の実測値はその版の記録であり、現行版の性能・検証成功を示しません。READMEや変更記録が正本と矛盾する場合は現行仕様を優先します。
 
-## v1.5.5 公開検証
+## v1.5.5 公開検証（履歴）
+
+この節はv1.5.5当時の記録です。現在の公開先のCommitや現行版の検証結果は示しません。
 
 感染連鎖による施設陥落の二重処理を修正した公開Pagesは `5b6325d` です。[CIとPages公開](https://github.com/plastichyena/nowherelefttohide/actions/runs/34291663498) は672テスト成功・11件Skip、Balanced Seed 1～30、通常1,000判断を含め完了しました。[Linux/Windows AI Portable](https://github.com/plastichyena/nowherelefttohide/actions/runs/34300922082) は `95f1c14` で両方成功し、Bundled NodeでSeed 1/7の終局・Artifact・Replayを確認しています。公開Pagesでも不具合のSeed 3 Action列、通常UIのターン進行、autosaveと390×844表示を再確認しました。
 
@@ -93,7 +95,7 @@ npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random,balanced
 
 ## AI Session CLI
 
-Session CLIは、外部AIが同じゲームを安全に続けるための永続入口です。通常は`play-turn`を1 Turnにつき1回起動し、行単位JSONで結果を読んでから次のActionを決めます。対話接続を保持できない環境では、有限のAction計画を同じ入口へ渡せます。途中の新しい敵、移動中断、想定外の損害、危機の発生・悪化、拒否、Game Overでは残りを停止して再判断します。通常のSave Format 23とは分離したSessionディレクトリに、Actionごとに更新するActive状態、圧縮・分割された損失なしの公開履歴、既定5完了Turnごとの履歴Checkpointを保存します。Compact応答と`query`は公開情報だけを返し、Private Checkpoint内の完全GameState、RNG、Rejected CounterなどのHidden情報は再開専用です。
+Session CLIは、外部AIが同じゲームを安全に続けるための永続入口です。通常は`play-turn`を1 Turnにつき1回起動し、行単位JSONで結果を読んでから次のActionを決めます。対話接続を保持できない環境では、有限のAction計画を同じ入口へ渡せます。途中の新しい敵、移動中断、想定外の損害、危機の発生・悪化、拒否、Game Overでは残りを停止して再判断します。通常のSave Format 27とは分離したSessionディレクトリに、Actionごとに更新するActive状態、圧縮・分割された損失なしの公開履歴、既定5完了Turnごとの履歴Checkpointを保存します。Compact応答と`query`は公開情報だけを返し、Private Checkpoint内の完全GameState、RNG、Rejected CounterなどのHidden情報は再開専用です。
 
 ローカルリポジトリでは次のように実行します。
 
@@ -108,15 +110,15 @@ npm run session -- query --session=my-branch --target=legal-actions --page-size=
 npm run session -- artifact --session=my-branch --out=my-branch.nlth-artifact
 ```
 
-`play-turn`が標準入口で、`new`、`status`、`step`、`preview`、`preview-batch`、`save-checkpoint`、`list-checkpoints`、`load-checkpoint`、`query`、`artifact`の10コマンドは互換・復旧用に維持します。`status`が同じSession IDのActive復帰入口で、`load-checkpoint`は親を巻き戻さず必ず別IDの分岐Sessionを作ります。`step`はJSONの`action`を必須とし、1～500 Unicode code pointの公開`decisionSummary`を任意で受け付け、任意の`expectedRevision`が不一致ならAction適用・Decision採番前に`stale_revision`で拒否します。不正Actionも状態とRNGを変えず理由付きDecisionとして記録します。`query`はRevisionに結び付き、標準100件・最大500件のPageで`api`、`map`、`units`、`facilities`、`checkpoints`、`branches`、`construction`、`legal-actions`、`forecast`、`history`、`full-snapshot`を取得します。`artifact --out`は巨大な本文ではなく小さなManifestを標準出力へ返し、自己完結したPublic Artifact ZIPだけを指定先へ出力します。`--keep-directory`を明示した場合だけ同内容のディレクトリも残します。`artifactPath`／`replayZipPath`は実在するZIP、`artifactDirectoryPath`は既定nullです。破損時は暗黙に巻き戻さず、Checkpoint一覧から明示的に分岐復旧します。入力schemaと再送・停止条件は[`PLAY_WITH_AI.md`](PLAY_WITH_AI.md)を参照してください。
+`play-turn`が標準入口で、`new`、`status`、`step`、`preview`、`preview-batch`、`save-checkpoint`、`list-checkpoints`、`load-checkpoint`、`query`、`artifact`の10コマンドは互換・復旧用に維持します。`status`が同じSession IDのActive復帰入口で、`load-checkpoint`は親を巻き戻さず必ず別IDの分岐Sessionを作ります。`step`はJSONの`action`を必須とし、1～500 Unicode code pointの公開`decisionSummary`を任意で受け付け、任意の`expectedRevision`が不一致ならAction適用・Decision採番前に`stale_revision`で拒否します。不正Actionも状態とRNGを変えず理由付きDecisionとして記録します。`query`はRevisionに結び付き、標準100件・最大500件のPageで`api`、`context-handoff`、`map`、`units`、`enemies`、`facilities`、`checkpoints`、`branches`、`construction`、`legal-actions`、`production-candidates`、`attack-candidates`、`population-transfers`、`worker-assignments`、`strategic-map`、`route`、`forecast`、`history`、`full-snapshot`を取得します。target別のfilterと応答形式は`api.queryContract`が正本です。`artifact --out`は巨大な本文ではなく小さなManifestを標準出力へ返し、自己完結したPublic Artifact ZIPだけを指定先へ出力します。`--keep-directory`を明示した場合だけ同内容のディレクトリも残します。`artifactPath`／`replayZipPath`は実在するZIP、`artifactDirectoryPath`は既定nullです。破損時は暗黙に巻き戻さず、Checkpoint一覧から明示的に分岐復旧します。入力schemaと再送・停止条件は[`PLAY_WITH_AI.md`](PLAY_WITH_AI.md)を参照してください。
 
-## AI Portable Package
+## AI Portable Player Package
 
-`CI and GitHub Pages`が`main`で成功すると、独立した`AI Portable Package` Workflowが同じCommitからLinux x64とWindows x64のZIPを生成します。ZIPにはソース、lockfile固定済み依存、対象OSのNode.js、事前bundle済みSession CLI、`PLAY_WITH_AI.md`、Commit SHA・Build ID・App Version・Node Version入り`BUILD_INFO.txt`を同梱します。展開先にNode.jsを別途インストールする必要はありません。
+`CI and GitHub Pages`のmain向けpush実行が成功し、そのCommitが現在のmainと一致すると、`AI Portable Player Package v1.7.1` Workflowが同じCommitからLinux x64／Windows x64のZIPを生成します。対象refで手動実行することもできます。
 
-長時間のCI Jobを待たずに配布確認する場合は、対象CommitのPagesデプロイ成功後に`AI Portable Package`を同じrefで手動実行します。Linux／WindowsのPortable検証は完了まで確認します。その他の長時間Jobを開始確認で区切る場合は、結果未確認と記録し、成功済みの検証と分けます。
+Player ZIPは対象OSのBundled Node、bundle済みSession CLI、launcher、プレイ文書と公開APIの利用例・報告補助、Version／Build情報、ライセンスを含みます。ゲームソース、開発用node_modules、fixture、ビルドツールは同梱しません。展開先へのNode.js追加インストールやnpm ciは不要です。
 
-GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロードし、展開後は次でBundled Nodeによる永続Sessionを開始できます。
+GitHub Actionsの該当WorkflowからArtifactをダウンロードし、展開後に実行します。
 
 ```bash
 # Linux
@@ -128,11 +130,11 @@ GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロード�
 .\run-session.cmd play-turn --session=my-game
 ```
 
-`run-session.sh`と`run-session.cmd`は事前bundle済みESMをBundled Nodeで直接実行し、ActionごとにViteやTypeScript変換を起動しません。WorkflowはBundled Nodeだけで`play-turn`と既存8つのSessionコマンド、Artifact Package、Built-in Agent 1ゲーム、公開Observation／Legal Actionsだけを使う外部AI相当DriverのSeed 1・7 Game Over・Action列再実行・公開Artifact一致をSmoke Testします。外部AIへ渡す主要入口、Active復帰、Decision Log、Checkpoint分岐と公開APIだけを使うプレイ手順は[`PLAY_WITH_AI.md`](PLAY_WITH_AI.md)を参照してください。
+Checkout側の型検査・テスト・ビルド・組み込みAgent検証と、配布物側のBundled Nodeによる全11コマンド（play-turn＋10単発コマンド）、JSONL内Preview、Seed 1／7の終局・Action列Replay・公開Artifact一致を分けて検証します。起動と合格は別であり、実行結果・未確認項目は受入記録を参照してください。入力schema、Active復帰、Checkpoint分岐、公開APIだけを使うプレイ手順は[PLAY_WITH_AI.md](PLAY_WITH_AI.md)に記載しています。
 
 ## 操作
 
-盤面をタップして施設またはユニットを選択します。ユニット選択後は近傍の`Move / Attack / Wait`メニューから行動Modeを明示的に選びます。Moveでは合法な移動先、AttackではVisibilityを維持した合法対象が強調され、対象Hex近傍の`× / ✓`でキャンセルまたは確定します。Waitはその場で行動を確定します。攻撃後の移動や、行動済みユニットの再行動はできません。
+盤面をタップして施設またはユニットを選択します。ユニット選択後は近傍の`Move / Attack / Wait`メニューから行動Modeを明示的に選びます。Moveでは合法な移動先、AttackではVisibilityを維持した合法対象が強調され、対象Hex近傍の`× / ✓`でキャンセルまたは確定します。Waitはその場で行動を確定します。通常攻撃後は移動できませんが、残Attack Chargeと軍需があれば追加攻撃できます。移動時の迎撃・反撃でもChargeを消費するため、行動後の残量を確認してください。Waitは能動行動を終え、残Chargeを反撃・迎撃・自動鎮圧へ保持します。
 
 画面下部の情報パネルは次の3状態です。上部の供給範囲ボタンは常時利用でき、施設・検問所・建設/移設の確認時には自動表示されます。
 
@@ -147,9 +149,9 @@ GitHub Actionsの`AI Portable Package`実行からArtifactをダウンロード�
 Turn 70のFinal Waveは4方向・基本80体です。別枠Pack1体と参加方向の拒絶Bonusを加えた全rosterをWave開始時に確定し、混雑で配置できない分はPendingとして後続Turnに出現します。非HordeのTypeは確定時に抽選し、Gas Zombieは全Waveで抽選対象です。Final WaveのPendingが0、かつ盤面のFinal所属Unitが0になれば勝利します。非Final ZombieやSupply内感染は勝利条件に含めません。ゲームはTurn 71以降も勝敗まで続き、同時成立時は敗北を優先します。次のいずれかが成立した時点で即敗北です。
 
 1. 州都が陥落する
-2. 所有中の州都・地方都市・仮設住宅・生産施設にいる健全民間人口の合計が0になる
+2. 所有中の州都・地方都市・仮設住宅・生産施設・Army Base／Air Baseにいる健全民間人口の合計が0になる
 
-検問所の3健常者プール、施設内感染者、ユニット人口は健全民間人口0の判定には数えません。都市はソフトキャップを超えて受け入れられますが、民需品生産はソフトキャップで止まり、食料・民需品の追加消費が発生します。Warning Leadは2 Turnです。標準WaveはTurn 10（1方向・5 Horde＋5 slot）、Turn 20（2方向・3＋8）、Turn 35（1方向・8＋11）、Turn 50（3方向・5＋11）、Turn 70（4方向・8＋12 Final）で出現します。1方向の基本総数は10／11／19／16／20、全Scheduleの固定Hordeは66、Variant slotは113、合計179です。抽選WeightはNormal40／Police10／Soldier10／Riot5／Hunter15／Gas15／Screamer5で、Wave内のNormal結果はHordeへ正規化します。Riotだけ各方向・Waveで最大1体、HunterとGasに上限はありません。ゲームルール上のTurn上限はありません。
+検問所の3健常者プール、施設内感染者、ユニット人口・搭乗人口・編成待ち人口は健全民間人口0の判定には数えません。都市はソフトキャップを超えて受け入れられますが、民需品生産はソフトキャップで止まり、食料・民需品の追加消費が発生します。Warning Leadは2 Turnです。標準WaveはTurn 10（1方向・5 Horde＋5 slot）、Turn 20（2方向・3＋8）、Turn 35（1方向・8＋11）、Turn 50（3方向・5＋11）、Turn 70（4方向・8＋12 Final）で出現します。1方向の基本総数は10／11／19／16／20、全Scheduleの固定Hordeは66、Variant slotは113、合計179です。抽選WeightはNormal40／Police10／Soldier10／Riot5／Hunter15／Gas15／Screamer5で、Wave内のNormal結果はHordeへ正規化します。Riotだけ各方向・Waveで最大1体、HunterとGasに上限はありません。ゲームルール上のTurn上限はありません。
 
 ## ConfigとSeed
 
@@ -188,7 +190,7 @@ interface HeadlessGame {
 
 UIとRandom Test Agentは同じ `GameAction`、合法手検証、`GameEngine` を使用します。不正ActionやGame Over後の `step` は状態を変更せず、理由付きエラーを返します。`GameState` は `Map`、`Set`、`Date`、関数を含まないJSON互換データです。
 
-## v1.7.0 公開契約
+## 現行の公開契約
 
 互換境界は上記の中央定義を使用します。Play-turn 1.3、AiSession 1.5、Store 1.0、ZIP Package 2.0は外側のプロトコルを維持します。内包する状態・API・Artifact版で旧版を拒否します。固定Map IDは `fixed-51x51-v9`、ランダムMap IDは `inland-51x51-v1` です。
 
@@ -196,7 +198,9 @@ CLIの `preview-batch --session=ID --revision=N --input=actions.json` は1～100
 
 ## 保存と復元
 
-新規ゲーム、正常なEndTurnで次の自ターンへ進んだ状態、またはGame Overの確定状態をローカル領域へ自動保存します。ターン途中を残すときは手動保存を使い、どちらも同じ1枠の最後に成功した保存を更新します。タイトル画面から続きのゲームを読み込めます。App／Release `1.6.8`、Game Rules／State／Config `18.0.0`、Save Format `25`を使用します。固定Map、初期配置、Army Base、各Unitの状態、Checkpoint、RNG、Configと公開契約の整合性を検証し、導出値は復元時に再計算します。v1.6.7以前の通常Save／Session／Checkpointの継続はVersion不一致として拒否し、元データを保持します。v1.6.7の公開Artifactは観戦専用で対応します。
+新規ゲーム、正常なEndTurnで次の自ターンへ進んだ状態、またはGame Overの確定状態をローカル領域へ自動保存します。ターン途中を残すときは手動保存を使い、どちらも同じ1枠の最後に成功した保存を更新します。タイトル画面から続きのゲームを読み込めます。
+
+App 1.7.1、Rules／State／Config 20.0.0、Save Format 27を使用し、自動保存領域は`v27:v171`です。保存済みの実Map、Descriptor、Config、RNG、各Unit・施設・Checkpointと公開契約の整合性を検証し、導出値を再計算します。ロードで地図を再生成しません。v1.7.0以前のSave／Session／Checkpoint／公開Artifactは変換せず、元データを変更せずに拒否します。終了済みv1.7.1 Sessionの読取・公式ZIP出力は可能ですが、新たな進行Actionは拒否します。
 
 ## テスト
 
@@ -205,7 +209,6 @@ npm run typecheck
 npm test
 npx --no-install vite-node --script src/agent/sim-cli.ts --agent=random --games=100 --seed=1 --summary-only --out=output/simulations/random-smoke --overwrite
 npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --summary-only --out=output/simulations/balanced-smoke --overwrite
-npx --no-install vite-node --script src/agent/sim-cli.ts --agent=balanced --games=100 --seed=1 --max-turns=100 --summary-only --out=output/simulations/v1.6.8-balanced-100 --overwrite
 npx --no-install vite-node --script src/testing/session-release-validation.ts --decisions=1000 --json-out=output/session-release/normal-1000.json
 npm run build
 npm run test:browser-bridge
@@ -213,11 +216,11 @@ npm run test:browser-bridge
 
 Coreテストでは、移動・戦闘、資源・電力、不足被害、感染・鎮圧・陥落・復旧、避難民、Horde、勝敗、保存往復、不変条件、Seed再現性を確認します。Random／Balancedは公開Observationと合法手だけを使う統一Runnerで実行し、失敗時にはVersion、Config、Map ID、Seed、Action列、直前Observationとデバッグ用Stateを出力します。
 
-リリース前にはv1.6.8の正しいConfigでRandom／Balancedをそれぞれ固定Seed 1～100、Runner上限100 Turnで実行し、各Runの技術的失敗とReplay再現を確認します。v1.6.8では経済・Wave・Zombie追跡移動が変わるため、旧版との結果完全一致は要求しません。Sessionは実Coreの51×51・Human Unit 21体を使い、1,000件の受理Action、Compact／旧full比率、保存容量、RSS、status p50/p95、I/O、Page query、分岐復帰、Artifact read/replayを検証します。長履歴と同一現在状態のゼロ履歴を別fresh processで比較し、履歴Decision数、展開済み履歴bytes、RSS／peak RSSの差分と比率をReportへ残します。この比較には固定MBの合格値を設けず、単一の比較Reportが成功してもRAM改善または有界な増加を証明したとは扱いません。専用Release jobは有効な完全Snapshot履歴とArtifact Packageの実体が512 MiBを超えることも確認します。Workflowの起動と検証成功は区別し、完了したJobのReportに基づいて結果を記録します。
+リリース検証は現行Configと明示的なfixed MapでRandom／BalancedをそれぞれSeed 1～100、Runner上限100 Turnで実行し、各Runの技術的失敗とReplay再現を確認します。旧ルール版との結果完全一致は要求しません。random Mapの受入検証は別Workflow（`.github/workflows/v170-map-acceptance.yml`）で扱います。Sessionは実Coreの51×51・Human Unit 21体を使い、1,000件の受理Action、Compact／旧full比率、保存容量、RSS、status p50/p95、I/O、Page query、分岐復帰、Artifact read/replayを検証します。長履歴と同一現在状態のゼロ履歴を別fresh processで比較し、履歴Decision数、展開済み履歴bytes、RSS／peak RSSの差分と比率をReportへ残します。この比較には固定MBの合格値を設けず、単一の比較Reportが成功してもRAM改善または有界な増加を証明したとは扱いません。専用Release jobは有効な完全Snapshot履歴とArtifact Packageの実体が512 MiBを超えることも確認します。Workflowの起動と検証成功は区別し、完了したJobのReportに基づいて結果を記録します。
 
-`test:random`と`test:balanced`は標準ConfigのSeed群を共通Batch CLIで実行します。通常CIはUnit／Invariant、Observation境界、Replay、Production Bridge smokeに加え、独立したBalanced Seed `1..30` jobと、Pagesを待たせないSession 1,000 Action jobを検証します。Random／Balanced各100 Seed検証とSession 512 MiB Package境界は手動Release検証へ分離します。
+上記の`--summary-only`は集計用の実行例であり、完全Replay検証の代わりにはなりません。Map指定を省略するとrandomになります。`test:random`と`test:balanced`も共通Batch CLIを使います。通常CIはUnit／Invariant、Observation境界、Replay、Production Bridge smokeに加え、独立したBalanced Seed `1..30` jobと、Pagesを待たせないSession 1,000 Action jobを検証します。Random／Balanced各100 Seed検証とSession 512 MiB Package境界は手動Release検証へ分離します。
 
-`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.7.1手動Release検証です。v1.7.1のRandom／Balanced各100ゲームを固定Seed 1～100、同じ100 Turn上限で実行し、技術的失敗0件、全Replay一致、JSON／CSV Reportと各Replay Artifactを保存します。v1.6.6以前のbaseline完全一致はルール変更のため要求しません。Sessionの512 MiB Package境界も専用JobでReportを保存します。各Agentを10 Seedずつの20 Jobへ分割し、全200ゲームの終局と全Replay一致を集約確認します。ゲーム内敗北は正常完了です。Final Horde到達は実測値として記録し、未到達を技術的失敗には分類しません。長時間BatchはPages公開を待たせません。
+`.github/workflows/v140-release-validation.yml` はファイル名を維持したv1.7.1手動Release検証です。v1.7.1のRandom／Balanced各100ゲームを固定Seed 1～100、同じ100 Turn上限、明示的な`--map-mode=fixed`で実行し、技術的失敗0件、全Replay一致、JSON／CSV Reportと各Replay Artifactを保存します。v1.6.6以前のbaseline完全一致はルール変更のため要求しません。Sessionの512 MiB Package境界も専用JobでReportを保存します。各Agentを10 Seedずつの20 Jobへ分割し、全200ゲームの終局と全Replay一致を集約確認します。ゲーム内敗北は正常完了です。Final Horde到達は実測値として記録し、未到達を技術的失敗には分類しません。長時間BatchはPages公開を待たせません。
 
 手動入力`reuse_run_id`を空にすると全件を新規実行します。Report検証だけを修正した場合は、同じリポジトリの完了済みRun IDを指定できます。元Runの20 Seed Jobと大容量Jobの成功、ゲーム実行コード・依存関係・耐久試験コードの不変、ReportのBuild IDと全Seed・Replay・物理容量の証跡を再検証します。再利用元RunとCommitを集約Artifactへ記録し、条件を満たさない場合は失敗します。
 
@@ -245,7 +248,7 @@ Pages公開後は実ブラウザでゲームURLを開き、`window.NLTH`をSeed 
 - iPhone Safari（対応するiOSの安定版）: 縦向き、Safe Area、44pxタッチ対象、3状態パネル、スクロール競合、ページ再読込
 - Android Chrome（対応するAndroidの安定版）: 縦向き、タッチ操作、パン/ピンチズーム、3状態パネル、保存復元
 
-ブラウザの実機確認はローカルのNode/Vitestだけでは代替できません。GitHub Pagesのデプロイ後に上記環境で実施し、端末/OS/ブラウザ版と確認日時を記録します。Random Test AgentはCIで最低100ゲームを実行し、失敗時のJSONをWorkflow artifactとして保存します。
+ブラウザの実機確認はローカルのNode/Vitestだけでは代替できません。GitHub Pagesのデプロイ後に上記環境で実施し、端末/OS/ブラウザ版と確認日時を記録します。Random／Balanced各100ゲームは前述の手動Release検証で実行し、失敗時のJSONをWorkflow artifactとして保存します。
 
 ## Design influences
 
