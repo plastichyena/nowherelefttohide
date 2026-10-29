@@ -1,0 +1,19 @@
+{
+  "languageSwitch": {
+    "score": "Terminal score: +17951",
+    "unchanged": true,
+    "lang": "en",
+    "width": 356,
+    "scroll": 356
+  },
+  "failure": {
+    "score": "Terminal score: +17951",
+    "status": "Save failed · Last saved turn 1",
+    "previousSlotPreserved": true
+  },
+  "retry": {
+    "saved": "Saved · Last saved turn 2",
+    "unchanged": true,
+    "noExtraEndTurn": true
+  }
+}

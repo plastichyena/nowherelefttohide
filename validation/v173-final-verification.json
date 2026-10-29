@@ -1,0 +1,228 @@
+{
+  "at": "2026-10-29T14:14:01.778Z",
+  "applicationVersion": "1.7.3",
+  "baseCommit": "d0b08ccaf5969c00f8d021a2e0c2ff3d880121f3",
+  "branch": "codex/nlth-v1-7-3-security",
+  "status": "local_required_checks_passed; commit/push receipt is recorded separately after execution",
+  "authorization": "User resumed publication after original v1.7.2 author completed the limited fix. Existing origin/main Pages path only; no release/tag or portable publication.",
+  "patch": {
+    "sha256": "280e63b239ac6e4a391f340d387fe87b4626d9a099dbd1447fca5fd3754b7ee7",
+    "applyCheckExit": 0,
+    "applyExit": 0,
+    "files": [
+      "src/ui/controller.ts",
+      "src/ui/controller.save-status.test.ts"
+    ],
+    "manualAdjustments": false,
+    "beforeControllerSha256": "1c1e1622146b9726e53a004738b3171c81a89fb9da747f23baccb3cc565096cb",
+    "afterControllerSha256": "7759ac1dc29879a120845609fbd53edcb7e651bce748e8fa1ac29814dfd8dbe2",
+    "testSha256": "1e5020d3453ce4bf5f2a6ed00b3a9701a83bfe4ae838861b56a0ac91c7bde495",
+    "newTestLineEndings": "Git applied CRLF; normalized LF content equals source test"
+  },
+  "originalAuthorBefore": {
+    "failed": 6,
+    "passed": 0,
+    "skipped": 0,
+    "exitCode": 1,
+    "rerunHere": false,
+    "evidence": "source-before.log and source-verification.json"
+  },
+  "postFix": {
+    "testFiles": 2,
+    "passed": 55,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 19.4,
+    "startTime": 1793282256141,
+    "exitCode": 0,
+    "command": "npx --no-install vitest run src/ui/controller.test.ts src/ui/controller.save-status.test.ts --pool=threads --maxWorkers=1 --reporter=default --reporter=json --outputFile=output/v173-security/save-status-fix/related.json",
+    "typecheck": 0,
+    "build": 0,
+    "staticBrowserBridge": 0,
+    "portableBundle": 0,
+    "realBrowser": "v173-final-browser-checks.json"
+  },
+  "previousIntegratedRegression": {
+    "record": "v173-verification.json",
+    "inputs": "v173-regression-inputs.json",
+    "files": 149,
+    "passed": 1304,
+    "failed": 0,
+    "skipped": 11,
+    "includesSaveStatusFix": false,
+    "notRerun": "Only Controller display refresh and 6 scoped regression tests changed; required scoped tests, typecheck, production build and real browser were rerun."
+  },
+  "currentInputs": {
+    "record": "v173-final-inputs.json",
+    "count": 472,
+    "delta": [
+      {
+        "file": "src/ui/controller.ts",
+        "before": "1c1e1622146b9726e53a004738b3171c81a89fb9da747f23baccb3cc565096cb",
+        "after": "7759ac1dc29879a120845609fbd53edcb7e651bce748e8fa1ac29814dfd8dbe2"
+      }
+    ],
+    "added": [
+      "src/ui/controller.save-status.test.ts"
+    ]
+  },
+  "cleanInstall": {
+    "lockUnchangedSinceVerifiedCleanInstall": true,
+    "sha256": "fe8fe99da792a4819b4f387dbfd836504e7f60aa34100edfebf3a68709cbcc59",
+    "evidence": "v173-verification.json",
+    "baselineEusageReproduced": false,
+    "exactOriginalCheckoutReinstalled": false
+  },
+  "portable": {
+    "bundleSha256": "f94085d7e1c743f4ad62e1f3692835a1025bcd93a40e48164b52341d56e7b88f",
+    "closureCount": 91,
+    "controllerIncluded": false,
+    "byteIdenticalToPreviouslySmokedBundle": true,
+    "previousEvidence": [
+      "v173-portable-summary.json",
+      "output/v173-security/preview-batch-final-receipt.json"
+    ],
+    "finalCommitPackage": "Generate locally after commit; separate receipt; never claim the earlier dirty-build ZIP is a final commit release."
+  },
+  "preservation": {
+    "mainAndSourceUnchanged": true,
+    "roots": [
+      {
+        "root": "D:/private/nowherelefttohide",
+        "head": "d0b08ccaf5969c00f8d021a2e0c2ff3d880121f3",
+        "branch": "main",
+        "files": 626,
+        "dirtyEntries": 2
+      },
+      {
+        "root": "D:/private/t3-code-setup-20261001/t3-data/worktrees/nowherelefttohide/codex-nlth-v1-7-2-score",
+        "head": "d0b08ccaf5969c00f8d021a2e0c2ff3d880121f3",
+        "branch": "codex/nlth-v1-7-2-score",
+        "files": 658,
+        "dirtyEntries": 73
+      }
+    ],
+    "originalRequirementSha256": "f5fd266b6fd064cf2bd37e7e90ab5d40aceaeacd2b3e35771718cb9faa71bc37"
+  },
+  "cleanup": {
+    "previewTabClosed": true,
+    "previewStatusAvailable": false,
+    "serverSession": 90845,
+    "exitCode": 1,
+    "reason": "Owned preview stopped by Ctrl+C after tests. Read-only process query found no matching Vite preview on 4175."
+  },
+  "residualAudit": {
+    "packages": [
+      "@vitest/mocker",
+      "vitest",
+      "tinypool"
+    ],
+    "moderate": 1,
+    "critical": 2,
+    "production": 0,
+    "conditions": "See security plan; count is not the number of independent CVEs or proof of safety."
+  },
+  "unverified": [
+    "GitHub Actions/CI results (no monitoring/wait/poll)",
+    "Live Pages reflection (separate post-push check)",
+    "Native Linux portable; Node24/26 runtime",
+    "Long 30-seed/seed198/200-game/512MiB gates",
+    "Physical mobile and all custom/seed combinations"
+  ],
+  "logs": [
+    {
+      "path": "output/v173-security/save-status-fix/source.patch",
+      "bytes": 13980,
+      "sha256": "280e63b239ac6e4a391f340d387fe87b4626d9a099dbd1447fca5fd3754b7ee7"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/source-report.md",
+      "bytes": 10291,
+      "sha256": "5e1a809e6877134d2dcbc3c34df3f1652768539812f0b3492a61dbef5c987ca6"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/source-verification.json",
+      "bytes": 11268,
+      "sha256": "ab2c716fc66a8abc5a0340ebfc60ad522751998811ccd4ff571b65ae321fd7af"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/source-before.log",
+      "bytes": 8435,
+      "sha256": "6031298e2f9d110cdd1b4895a23da02831b38fba26402aa403661349ef21554e"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/controller-before.ts",
+      "bytes": 436036,
+      "sha256": "1c1e1622146b9726e53a004738b3171c81a89fb9da747f23baccb3cc565096cb"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/related.log",
+      "bytes": 2617,
+      "sha256": "29468fa7ee297d61845770596fe9b771fcac9798e3d412b869ddffa6834dd3af"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/related.json",
+      "bytes": 18208,
+      "sha256": "3c0546c9ff6a5e95c48ea9018ddd1bae88aa61f33e8364a502489de707f049fb"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/typecheck.log",
+      "bytes": 60,
+      "sha256": "dee9056a6faa9c9159639a3b2ff9f5f660e802a90af75e5f7dfb99b40c850218"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/build.log",
+      "bytes": 2452,
+      "sha256": "4ab5facb8e04e9fe81987e85d24ba1818ebfc4e689f471caad5e6839ceef1488"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/bridge.log",
+      "bytes": 258,
+      "sha256": "57bf1284b0fbf8b4e30238085f59f5de20709836cec13ac53232f86d1cd7dde9"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/portable-build.log",
+      "bytes": 320,
+      "sha256": "cca805ae2ce11836b2b0872c01145bef36106b781aea4574ec6b8d3f8b49a5c6"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/input-delta.json",
+      "bytes": 576,
+      "sha256": "920c3f65c0aff6ddf181c5a7e2d8807f2a2c639301f7a4742a96a0c85e64fbc6"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/preservation-before.json",
+      "bytes": 220615,
+      "sha256": "eee508ec4c15b9564aeb448d7a31641e9905d1d4051ee057da434b2d48ac2066"
+    },
+    {
+      "path": "output/v173-security/save-status-fix/preservation-after.json",
+      "bytes": 220615,
+      "sha256": "f01123ca2cdd90aff8a7338d1eff988124b8858ae41e623067b5b61092f97917"
+    }
+  ],
+  "priorRecordsPreserved": true,
+  "otherModelsOrAgentsStarted": false,
+  "whitespace": {
+    "beforeStageExit": 0,
+    "allStagedExit": 2,
+    "excludingPreservedRequirementsExit": 0,
+    "findings": [
+      {
+        "file": "Doc/Nowhere Left to Hide PoC v1.7.2 終局スコア アップデート要件案.md",
+        "lines": [
+          3,
+          4,
+          5
+        ],
+        "reason": "Original Markdown hard-break trailing double spaces; preserved exact source SHA256 per user instruction."
+      }
+    ],
+    "evidence": "output/v173-security/save-status-fix/staged-diff-check.json"
+  },
+  "documentLinks": {
+    "checked": 49,
+    "missing": [],
+    "evidence": "output/v173-security/save-status-fix/doc-links-final.json"
+  }
+}

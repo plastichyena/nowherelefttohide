@@ -1,4 +1,5 @@
 import { humanAttack, occupiesGroundLayer } from './unit-capabilities';
+import { createScoreContext } from './terminal-score';
 import { domainRng } from './public-health';
 import { HUMAN_UNIT_TYPES } from './unit-catalog';
 import { initialUnitDeployment, INITIAL_CHECKPOINT_DEPLOYMENT } from './initial-deployment';
@@ -526,8 +527,10 @@ export function createInitialState(seed: number, config: GameConfig, onProgress?
       currentPolicy: 'normal' as const,
       hasBuiltCheckpoint: false,
     }));
+  const mapDescriptor = describeMap(map,seed,stateConfig,generated?.attempt??0,generated?.fallback??null);
   const state: GameState = {
-    mapDescriptor: describeMap(map,seed,stateConfig,generated?.attempt??0,generated?.fallback??null),
+    scoreContext: createScoreContext({ config: stateConfig, map, mapDescriptor, seed }),
+    mapDescriptor,
     initialEnemyAttempt,
     militaryDrone: null, pendingReanimations: [],
     airBaseObjective: { firstCapturedTurn: null, fellBeforeCapture: false, reward: 'unclaimed', failureSpawn: 'none' },

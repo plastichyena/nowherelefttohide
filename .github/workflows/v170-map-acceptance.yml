@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
       - run: npx vite-node --script scripts/v170-map-validation.ts --count=100
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
       - run: npx vite-node --script scripts/v170-map-validation.ts --start=${{ matrix.start }} --count=1000 --scattered=${{ matrix.start == 1 && 1000 || 0 }}
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
       # Local Random seed1 measured 233s for three turns. Freeze 60 games

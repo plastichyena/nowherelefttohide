@@ -1,4 +1,5 @@
 import { mergeDisplayAlerts, compactCrisisText } from './status';
+import { renderTerminalScore } from './terminalScore';
 import { humanNames, localizeHumanReferences } from './displayNames';
 import { panelViewModel, type PanelSource } from './panel';
 import { resolveTileTargets, nextPrincipalTarget, selectableSelection, targetKey, type Selection } from './selection';
@@ -1863,6 +1864,9 @@ function isLegacySaveError(message: string): boolean {
 /** Localize version failures without hiding generic diagnostics. */
 export function localizeSaveLoadError(message: string, locale: Locale): string {
   const t = createTranslator(locale);
+  if (/score:|v1\.7\.1 (migration rejected|map descriptor mismatch|save contains)/iu.test(message)) {
+    return `${locale === 'ja' ? '保存データの検証に失敗しました。現在状態と元データは保持されます' : 'Save validation failed. Current state and source data are retained'}: ${message}`;
+  }
   if (/v1\.2\.5|migrat/iu.test(message)) return t('migrationSaveError');
   if (isLegacySaveError(message)) return t('legacySaveError');
   return message;
@@ -3518,7 +3522,7 @@ export class GameUiController {
       case 'continue': this.loadAutosave(); break;
       case 'load': this.showLoadModal(); break;
       case 'options': this.beginNewGame(); break;
-      case 'toggle-language': this.locale = toggleLocale(this.locale); document.documentElement.lang = this.locale; persistLocale(this.locale); this.checkpointPlacementMessage = null; this.constructiblePlacementMessage = null; this.screen === 'game' ? this.renderGame() : this.showTitle(); break;
+      case 'toggle-language': this.locale = toggleLocale(this.locale); document.documentElement.lang = this.locale; persistLocale(this.locale); this.checkpointPlacementMessage = null; this.constructiblePlacementMessage = null; this.screen === 'game' ? this.renderGame() : this.showTitle(); if (this.screen === 'game' && this.state?.gameOver) this.showStatistics(this.state.result); break;
       case 'title': this.showTitle(); break;
       case 'custom-game': this.beginCustomGame(); break;
       case 'help': this.showHelp(); break;
@@ -3859,8 +3863,7 @@ export class GameUiController {
       fuelElement.setAttribute('aria-label', `${t('fuel')}: ${fuel.turnStartFuel}. ${t('totalFuelDemand')}: ${fuel.projectedTotalFuelDemand}. ${t('projectedEndingFuel')}: ${fuel.projectedEndingFuel}`);
     }
     this.renderSituationStrip(crisis, remainingTurns);
-    const menu = this.root.querySelector<HTMLElement>('.more-menu');
-    if (menu) { menu.dataset.pending = String(this.saveStatus === 'saving' || this.hasUnsavedChanges); menu.setAttribute('aria-label', `${this.locale === 'ja' ? 'メニュー' : 'Menu'} · ${this.saveStatusLabel()}`); }
+    this.refreshSaveStatusUi();
     this.root.querySelectorAll<HTMLElement>('[data-overlay]').forEach(button => button.setAttribute('aria-expanded', String(button.dataset.overlay === this.upperOverlay)));
     this.root.querySelector<HTMLElement>('[data-bind="power"]')?.setAttribute('aria-label', powerHud.accessibleName);
   }
@@ -4498,6 +4501,7 @@ export class GameUiController {
 
   private endTurn(): void {
     if (!this.state) return;
+    if (this.state.gameOver) { this.showStatistics(this.state.result); return; }
     const forecast = this.queryEndTurnForecast();
     const crisis = this.queryCrisisSummary();
     const endTurnRisk = this.queryEndTurnRisk();
@@ -5231,8 +5235,20 @@ export class GameUiController {
   }
 
   private refreshSaveStatusUi(): void {
-    const status = this.root.querySelector<HTMLElement>('[data-bind="save-status"]');
-    if (status) status.textContent = this.saveStatusLabel();
+    const label = this.saveStatusLabel();
+    this.root.querySelectorAll<HTMLElement>('[data-bind="save-status"], [data-bind="save-modal-status"], [data-terminal-save-status]')
+      .forEach(status => { status.textContent = label; });
+    // Loading renders before autosave. Save transitions must also update the
+    // menu without requiring another gameplay action or a full view refresh.
+    const menu = this.root.querySelector<HTMLElement>('.more-menu');
+    if (menu) {
+      menu.dataset.pending = String(this.saveStatus === 'saving' || this.hasUnsavedChanges);
+      menu.setAttribute('aria-label', `${this.locale === 'ja' ? 'メニュー' : 'Menu'} · ${label}`);
+    }
+    if (this.upperOverlay === 'menu') {
+      const menuStatus = this.root.querySelector<HTMLElement>('[data-upper-overlay] [role="status"]');
+      if (menuStatus) menuStatus.textContent = label;
+    }
   }
 
   private saveState(): boolean {
@@ -5273,6 +5289,7 @@ export class GameUiController {
     try {
       // The constructor validates the snapshot, including terminal states, before replacing the live engine.
       const nextEngine = this.createEngine(snapshot);
+      const previousLocalSave = this.store.load();
       this.engine = nextEngine;
       this.state = nextEngine.getState();
       this.invalidateQueryContext();
@@ -5298,9 +5315,11 @@ export class GameUiController {
       this.saveModalCode = null;
       this.lastSaveTiming = null;
       this.manualSavePending = false;
-      this.lastSavedTurn = migrated ? null : this.state.turn;
-      this.hasUnsavedChanges = migrated;
-      this.saveStatus = migrated ? 'none' : 'saved';
+      // Importing a file is not a successful write to the shared local slot.
+      // A failed autosave must continue to name the actual previous success.
+      this.lastSavedTurn = previousLocalSave.valid && !previousLocalSave.migrated ? previousLocalSave.state?.turn ?? null : null;
+      this.hasUnsavedChanges = true;
+      this.saveStatus = 'none';
       this.resourceAccordion = null;
       this.overviewSections.clear();
       this.crisisExpandedGroups.clear();
@@ -5311,6 +5330,7 @@ export class GameUiController {
       this.renderGame();
       if (shouldAutosaveAfterLoad(migrated)) this.autosave();
       else this.showToast(this.translator()('migratedSaveNotice'));
+      if (this.state.gameOver) this.showStatistics(this.state.result);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       const localized = localizeSaveLoadError(detail, this.locale);
@@ -5515,14 +5535,16 @@ export class GameUiController {
     if (!result || this.root.querySelector('[data-modal="statistics"]')) return;
     const t = this.translator();
     const stats = result.statistics;
-    const finalPopulation = this.state ? populationLocationTotals(this.state).total : 0;
-    const finalFacilities = this.state?.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length ?? 0;
+    const frozenScore = result.terminalScore?.status === 'scored' ? result.terminalScore : null;
+    const finalPopulation = frozenScore?.healthyPopulation ?? (this.state ? populationLocationTotals(this.state).total : 0);
+    const finalFacilities = frozenScore?.healthyInitialFacilities ?? (this.state?.facilities.filter((facility) => facility.owner === 'player' && facility.status === 'owned').length ?? 0);
     const progressHtml = this.state ? renderVictoryProgress(this.state, this.locale) : '';
     const terrainEntries = Object.entries(stats.terrainEntriesByType)
       .map(([terrain, count]) => `${escapeHtml(terrainLabel(terrain as AgentMapTileObservation['terrain'], this.locale))} ${count}`)
       .join(' · ');
     this.root.insertAdjacentHTML('beforeend', `<div class="modal-backdrop" data-modal="statistics"><section class="modal-card floating-card" aria-labelledby="statistics-heading"><p class="eyebrow">${escapeHtml(t('gameOver'))}</p><h2 id="statistics-heading">${escapeHtml(result.outcome === 'won' ? t('victory') : t('defeat'))}</h2><div class="stats-grid"><span>${escapeHtml(t('survivedTurns'))}<b>${result.turn}</b></span><span>${escapeHtml(t('finalPopulation'))}<b>${finalPopulation}</b></span><span>${escapeHtml(t('maxPopulation'))}<b>${stats.maxPopulation}</b></span><span>${escapeHtml(t('finalFacilities'))}<b>${finalFacilities}</b></span><span>${escapeHtml(t('maxFacilities'))}<b>${stats.maxSecuredFacilities}</b></span><span>${escapeHtml(t('civilianLosses'))}<b>${stats.civilianLosses}</b></span><span>${escapeHtml(t('unitLosses'))}<b>${stats.unitLosses}</b></span><span>${escapeHtml(t('infectionLosses'))}<b>${stats.infectionLosses}</b></span><span>${escapeHtml(t('shortageLosses'))}<b>${stats.resourceShortageLosses}</b></span><span>${escapeHtml(t('hordeInterceptions'))}<b>${stats.hordeInterceptions}</b></span><span>${escapeHtml(t('finalHordeSpawned'))}<b>${stats.finalHordeSpawned}</b></span><span>${escapeHtml(t('finalHordeKilled'))}<b>${stats.finalHordeKilled}</b></span><span>${escapeHtml(t('normalZombiesKilled'))}<b>${stats.normalZombiesKilled}</b></span><span>${escapeHtml(t('hordeZombiesKilled'))}<b>${stats.hordeZombiesKilled}</b></span><span>${escapeHtml(t('barbedWireBuilt'))}<b>${stats.barbedWireBuilt}</b></span><span>${escapeHtml(t('barbedWireDestroyed'))}<b>${stats.barbedWireDestroyed}</b></span><span>${escapeHtml(t('barbedWireDamageTaken'))}<b>${stats.barbedWireDamageTaken}</b></span><span>${escapeHtml(t('barbedWireAbsorbedDamage'))}<b>${stats.barbedWireAbsorbedDamage}</b></span><span>${escapeHtml(t('barbedWireEmptyAttackCharges'))}<b>${stats.barbedWireEmptyAttackCharges}</b></span><span>${escapeHtml(t('barbedWireOccupiedAttackCharges'))}<b>${stats.barbedWireOccupiedAttackCharges}</b></span><span>${escapeHtml(t('victoryTurn'))}<b>${stats.victoryTurn ?? '—'}</b></span><span>${escapeHtml(t('defeatReason'))}<b>${escapeHtml(gameOverReasonLabel(result.reason, this.locale))}</b></span></div><p class="muted stats-barbed-wire-scope">${escapeHtml(t('barbedWireStatisticsScope'))}</p><section class="victory-progress stats-victory"><h3>${escapeHtml(t('victoryProgress'))}</h3><div>${progressHtml || `<span class="muted">${escapeHtml(t('unavailable'))}</span>`}</div></section><p class="muted stats-terrain-summary">${escapeHtml(t('terrain'))}: ${terrainEntries}</p><div class="modal-actions"><button class="primary-button" data-action="title">${escapeHtml(t('reset'))}</button><button class="ghost-button" data-action="dismiss-modal">${escapeHtml(t('close'))}</button></div></section></div>`);
     const statisticsGrid = this.root.querySelector<HTMLElement>('[data-modal="statistics"] .stats-grid');
+    statisticsGrid?.insertAdjacentHTML('beforebegin', `${renderTerminalScore(result.terminalScore, this.locale)}<p class="muted" role="status" data-terminal-save-status>${escapeHtml(this.saveStatusLabel())}</p>`);
     statisticsGrid?.insertAdjacentHTML('beforeend', `<span>${escapeHtml(t('finalEconomyShortageLosses'))}<b>${stats.finalEconomyResourceShortageLosses}</b></span><span>${escapeHtml(t('enemyKillsTotal'))}<b>${stats.enemyKillsTotal}</b></span>`);
   }
 

@@ -1,4 +1,5 @@
 import { validateInitialMap } from './initial-map-validation';
+import { validateTerminalScoring } from './terminal-score';
 import { validateAviationState } from './aviation-invariants';
 import { humanAttack, isAirborne, occupiesGroundLayer } from './unit-capabilities';
 import { isHumanUnitType, HUMAN_UNIT_TYPES, isZombieUnitType } from './unit-catalog';
@@ -65,6 +66,7 @@ export function validateInvariants(state: GameState): InvariantResult {
     }
   }
   const config = validateGameConfig(state.config);
+  errors.push(...validateTerminalScoring(state));
   for (const type of HUMAN_UNIT_TYPES) {
     const completed = state.completedProductions?.[type];
     const reserved = state.pendingUnitProductions.filter(o => o.unitType === type).length;

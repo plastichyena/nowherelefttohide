@@ -1,0 +1,59 @@
+{
+  "at": "2026-10-29T06:36:03.559Z",
+  "heavyRetestsPlanned": false,
+  "ownedExecutionSessions": [
+    {
+      "id": 73009,
+      "status": "interrupted",
+      "exitCode": 1
+    },
+    {
+      "id": 54109,
+      "status": "completed",
+      "exitCode": 1
+    },
+    {
+      "id": 43718,
+      "status": "completed",
+      "exitCode": 0
+    },
+    {
+      "id": 99528,
+      "status": "completed",
+      "exitCode": 0
+    },
+    {
+      "id": 39962,
+      "status": "completed",
+      "exitCode": 0
+    },
+    {
+      "id": 35793,
+      "status": "dev server Ctrl+C; execution ended",
+      "exitCode": 1
+    }
+  ],
+  "priorInterruptedOwnedPids": {
+    "ids": [
+      24900,
+      24036,
+      8328,
+      2560
+    ],
+    "allAbsent": true
+  },
+  "preview": {
+    "tabId": "tab_1_1f6a909a-b1af-4ee3-a7d4-6c1aa3616220",
+    "closeRequestSucceeded": true,
+    "afterStatus": {
+      "available": false,
+      "tabId": null
+    }
+  },
+  "allOsDescendantsConfirmedExited": false,
+  "limitations": [
+    "OS process/port enumeration denied (Get-CimInstance earlier; Get-NetTCPConnection HRESULT 0x80041003). No permission/security change or unknown-process termination.",
+    "localhost:5178 TCP probe timed out; not evidence of port shutdown.",
+    "Tab close does not guarantee renderer process cleanup; shared browser host was not terminated."
+  ]
+}

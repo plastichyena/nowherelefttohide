@@ -1,4 +1,5 @@
 import { GAME_VERSION } from './state';
+import { calculateTerminalScore } from './terminal-score';
 import { wireRoutePenalty } from './barbed-wire';
 import { effectiveZombieMovement, updateZombiePursuit } from './zombie-movement';
 import { allocateUnitId } from './state';
@@ -2672,7 +2673,7 @@ function finishGame(state: GameState, outcome: 'won' | 'lost', reason: GameOverR
   state.statistics.hunterZombiesFinal = state.units.filter((unit) => unit.type === 'hunterZombie').length;
   state.gameOver = true;
   state.phase = 'gameOver';
-  state.result = { outcome, reason, turn: state.turn, statistics: JSON.parse(JSON.stringify(state.statistics)) as GameState['statistics'] };
+  state.result = { outcome, reason, turn: state.turn, statistics: JSON.parse(JSON.stringify(state.statistics)) as GameState['statistics'], terminalScore: null };
   emit(state, 'game_over', { outcome, reason });
 }
 
@@ -4671,8 +4672,10 @@ export class GameEngine implements HeadlessGame {
     if (actionError) {
       return { state: this.getState(), events: [], error: actionError, gameOver: this.isGameOver(), result: this.getResult() };
     }
-    settleAirBaseObjective(candidate);
-    recoverRuinedCheckpoints(candidate);
+    if (!candidate.gameOver) {
+      settleAirBaseObjective(candidate);
+      recoverRuinedCheckpoints(candidate);
+    }
     saveRng(candidate, rng);
     synchronizePopulation(candidate);
     if (!candidate.gameOver) checkImmediateGameEnd(candidate);
@@ -4690,6 +4693,12 @@ export class GameEngine implements HeadlessGame {
     }
     emitPlayerKnowledgeChanges(original, candidate);
     try {
+      // The terminal signal stops later phases. Freeze only after the action's
+      // atomic effects and common synchronization have completed, before commit.
+      if (candidate.result) {
+        candidate.result.statistics = JSON.parse(JSON.stringify(candidate.statistics));
+        candidate.result.terminalScore = calculateTerminalScore(candidate, candidate.result.outcome);
+      }
       assertInvariants(candidate);
     } catch (reason) {
       return { state: this.getState(), events: [], error: error(action, 'invariant_failure', reason instanceof Error ? reason.message : 'Invariant failure'), gameOver: this.isGameOver(), result: this.getResult() };

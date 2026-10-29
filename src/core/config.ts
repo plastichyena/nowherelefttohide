@@ -1,4 +1,5 @@
 import { HUMAN_UNIT_TYPES, UNIT_TYPES, UNIT_CATALOG, WAVE_NON_HORDE_TYPES, isHumanUnitType, isUnitType } from './unit-catalog';
+import { DEFAULT_SCORE_COEFFICIENTS, validateScoreCoefficients } from './terminal-score';
 import type {
   DeepPartial,
   EconomyConfig,
@@ -360,6 +361,7 @@ const defaultInitialFacilityPopulation: Record<FacilityId, InitialFacilityPopula
  * independent copy that can be stored in GameState.
  */
 export const DEFAULT_CONFIG: GameConfig = {
+  terminalScore: { ...DEFAULT_SCORE_COEFFICIENTS },
   zombiePursuitMovementBonus: 3,
   objectives: {
     nuclearPowerPlant: { rewardDeadlineTurn: 10, requiresHealthySurvivors: false, failureOnUncapturedFall: false, rewardUnitType: 'specialForces', failureUnitType: 'packZombie' },
@@ -555,6 +557,7 @@ export function validateGameConfig(config: GameConfig): ConfigValidationResult {
     return { valid: false, errors: ['Config must be an object'] };
   }
   if (!['custom', 'una'].includes(config.scenarioId)) errors.push('scenarioId must be custom or una');
+  errors.push(...validateScoreCoefficients(config.terminalScore));
   if (!['fixed', 'random'].includes(config.mapMode)) errors.push('invalid_map_mode: use random or fixed');
   for (const key of ['mapSeed','gameplaySeed'] as const) if (config[key] !== null && !Number.isSafeInteger(config[key])) errors.push(`invalid_seed: ${key} must be null or a safe integer`);
   if (config.mapId !== (config.mapMode === 'fixed' ? DEFAULT_MAP_ID : RANDOM_MAP_ID)) errors.push('mapId does not match mapMode');

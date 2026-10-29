@@ -1,0 +1,121 @@
+{
+  "at": "2026-10-29",
+  "profile": "T3 incognito",
+  "productionUrl": "http://127.0.0.1:4174/",
+  "newGame": {
+    "appVersion": "1.7.3",
+    "seed": 7,
+    "mapMode": "random",
+    "turnAfterEndTurn": 2,
+    "reloadContinueTurn": 2,
+    "autosaveKey": "nowhere-left-to-hide:auto-save:v28:v173"
+  },
+  "bridge": {
+    "infoKeys": [
+      "actionSummarySchema",
+      "scenarios",
+      "actionSchemaVersion",
+      "queryContract",
+      "responseSemantics",
+      "actionPlayGuidance",
+      "appVersion",
+      "gameRulesVersion",
+      "saveFormatVersion",
+      "artifactSchemaVersion",
+      "agentApiVersion",
+      "observationApiVersion",
+      "bridgeApiVersion",
+      "buildId",
+      "methods",
+      "parameterQueries",
+      "actionContracts",
+      "methodSchemas",
+      "recommendedCallOrder",
+      "productionCapacitySchema",
+      "publicInformation",
+      "prohibited",
+      "rules",
+      "minimalExample"
+    ],
+    "appVersion": "1.7.3",
+    "bridgeVersion": "26.0.0",
+    "turnBefore": 2,
+    "turnAfter": 3,
+    "resultKeys": [
+      "summary",
+      "observation",
+      "facilityChanges",
+      "branchFlowChanges",
+      "events",
+      "error",
+      "gameOver",
+      "result"
+    ],
+    "uiSaveUnchanged": true,
+    "uiText": "2\nターン\n行動\n人口\n168\n⋯\n360\n食料\n481\n民需品\n175\n軍需品\n174\n燃料\n80/60\n電力 需/供\n!\n襲撃 T10 · あと8\n感染 13\n⚠ 製油所 生産停止 +2\n◎ 供給\nユニットか施設を選択\n折りたたみ\n▦\n作戦図\n⌂\n内政\n▶\nターン終了"
+  },
+  "fixtureChecks": {
+    "won": {
+      "score": "+17951",
+      "desktop": [
+        1280,
+        800
+      ],
+      "mobile": [
+        390,
+        844
+      ],
+      "horizontalOverflow": false
+    },
+    "lost": {
+      "score": "-1657301",
+      "locale": "en",
+      "mobile": [
+        390,
+        844
+      ],
+      "customConfig": true
+    },
+    "huge": {
+      "score": "+1468173478522781584",
+      "locale": "en",
+      "mobile": [
+        390,
+        844
+      ],
+      "wrapsWithinCards": true
+    },
+    "legacy": {
+      "unmeasured": true,
+      "noticeNewSlotNotWritten": true,
+      "newSlotStillHadHugeFixtureAfterLoad": true
+    },
+    "publicReplay": {
+      "terminalScore": "+17951",
+      "resultPhase": true
+    }
+  },
+  "saveStatusIssue": {
+    "terminalStatus": "保存済み · 最終保存ターン 2",
+    "menu": "メニュー · 未保存の変更あり · 最終保存ターン 2",
+    "savedKeys": [
+      "checksum",
+      "format",
+      "formatVersion",
+      "gameVersion",
+      "mapId",
+      "seed",
+      "state"
+    ],
+    "storedHasWon": true,
+    "storedHasScore": true,
+    "storedBytes": 46108,
+    "bodyWidth": 390,
+    "viewportWidth": 390
+  },
+  "automationLimitations": [
+    "getApiInfo complete result exceeded T3 64000 byte cap; limited fields collected instead",
+    "storage is gzip/Base64URL, not plain JSON; initial JSON.parse probe failed, subsequent gzip decode succeeded",
+    "mobile viewport emulation is not a physical device test"
+  ]
+}

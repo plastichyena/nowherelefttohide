@@ -1,0 +1,188 @@
+{
+  "checkedAt": "2026-10-29T14:10:58.455Z",
+  "appVersion": "1.7.3",
+  "preview": "http://127.0.0.1:4175/",
+  "input": "v173-final-verification.json",
+  "scope": "Controller save-status patch; owned incognito browser, fresh production build. Unchanged Core fixtures generated before patch.",
+  "success": {
+    "menu": "メニュー · 保存済み · 最終保存ターン 2",
+    "pending": "false",
+    "terminal": "保存済み · 最終保存ターン 2",
+    "turn": 2,
+    "total": "17951",
+    "stateHash": "6496d0fa574db6852225e5fb69948c67731f0991e5f13befb78745cfcb046e5f",
+    "rawHash": "beac4850048460071bf2d9487d0fa24b71ef1434f5d2da8667f076650e1ce0cb",
+    "writes": [
+      {
+        "menu": "メニュー · 保存中…",
+        "pending": "true",
+        "failed": false
+      }
+    ]
+  },
+  "failureBaseline": {
+    "menu": "メニュー · 保存済み · 最終保存ターン 1",
+    "pending": "false",
+    "terminal": "保存済み · 最終保存ターン 1",
+    "turn": 1,
+    "total": "-1657301",
+    "stateHash": "04bf84153ada4d4cc87e62d56af70b4f9b43983b9d2ad87b6eb0c64bf0187912",
+    "rawHash": "10fff78ff1461d1a6d42964ec87e715b0f97d427290a025a8ca797ba34ef36cb",
+    "writes": [
+      {
+        "menu": "メニュー · 保存中…",
+        "pending": "true",
+        "failed": false
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 2",
+        "pending": "true",
+        "failed": false
+      }
+    ]
+  },
+  "failure": {
+    "menu": "メニュー · 保存に失敗しました · 最終保存ターン 1",
+    "pending": "true",
+    "terminal": "保存に失敗しました · 最終保存ターン 1",
+    "turn": 1,
+    "total": "-1657301",
+    "stateHash": "04bf84153ada4d4cc87e62d56af70b4f9b43983b9d2ad87b6eb0c64bf0187912",
+    "rawHash": "10fff78ff1461d1a6d42964ec87e715b0f97d427290a025a8ca797ba34ef36cb",
+    "writes": [
+      {
+        "menu": "メニュー · 保存中…",
+        "pending": "true",
+        "failed": false
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 2",
+        "pending": "true",
+        "failed": false
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 1",
+        "pending": "true",
+        "failed": true
+      }
+    ],
+    "previousSlotPreserved": true,
+    "displayedScore": "終局スコア: +17951"
+  },
+  "retry": {
+    "menu": "メニュー · 保存済み · 最終保存ターン 2",
+    "pending": "false",
+    "modal": "保存済み · 最終保存ターン 2",
+    "turn": 2,
+    "total": "17951",
+    "stateHash": "6496d0fa574db6852225e5fb69948c67731f0991e5f13befb78745cfcb046e5f",
+    "rawHash": "beac4850048460071bf2d9487d0fa24b71ef1434f5d2da8667f076650e1ce0cb",
+    "writes": [
+      {
+        "menu": "メニュー · 保存中…",
+        "pending": "true",
+        "failed": false
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 2",
+        "pending": "true",
+        "failed": false
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 1",
+        "pending": "true",
+        "failed": true
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 1",
+        "pending": "true",
+        "failed": false
+      }
+    ]
+  },
+  "retryTerminal": {
+    "menu": "メニュー · 保存済み · 最終保存ターン 2",
+    "pending": "false",
+    "terminal": "保存済み · 最終保存ターン 2",
+    "turn": 2,
+    "total": "17951",
+    "stateHash": "6496d0fa574db6852225e5fb69948c67731f0991e5f13befb78745cfcb046e5f",
+    "rawHash": "beac4850048460071bf2d9487d0fa24b71ef1434f5d2da8667f076650e1ce0cb",
+    "writes": [
+      {
+        "menu": "メニュー · 保存中…",
+        "pending": "true",
+        "failed": false
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 2",
+        "pending": "true",
+        "failed": false
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 1",
+        "pending": "true",
+        "failed": true
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 1",
+        "pending": "true",
+        "failed": false
+      }
+    ]
+  },
+  "legacyReadOnly": {
+    "menu": "Menu · Unsaved changes · Last saved turn 2",
+    "pending": "true",
+    "terminal": "Unsaved changes · Last saved turn 2",
+    "turn": 2,
+    "total": "17951",
+    "stateHash": "6496d0fa574db6852225e5fb69948c67731f0991e5f13befb78745cfcb046e5f",
+    "rawHash": "beac4850048460071bf2d9487d0fa24b71ef1434f5d2da8667f076650e1ce0cb",
+    "writes": [
+      {
+        "menu": "メニュー · 保存中…",
+        "pending": "true",
+        "failed": false
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 2",
+        "pending": "true",
+        "failed": false
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 1",
+        "pending": "true",
+        "failed": true
+      },
+      {
+        "menu": "メニュー · 保存中… · 最終保存ターン 1",
+        "pending": "true",
+        "failed": false
+      }
+    ],
+    "newSlotUnchanged": true,
+    "writesAfter": 4,
+    "legacyUnmeasured": true,
+    "horizontalOverflow": false,
+    "storageHookRestored": true
+  },
+  "screenshot": "v173-final-save-status-ja-mobile.png",
+  "viewports": [
+    {
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "automationFailures": [
+    "Ambiguous save-modal dismiss selector matched two elements; corrected to exact Close button. Subsequent EndTurn timeout was caused by modal remaining open. Neither was a product failure."
+  ],
+  "limitations": [
+    "Browser legacy test imports JSON; old autosave and explicit save are covered by regression tests.",
+    "Physical mobile device was not tested."
+  ]
+}

@@ -1,0 +1,212 @@
+{
+  "at": "2026-10-29T13:46:20.807Z",
+  "baseCommit": "d0b08ccaf5969c00f8d021a2e0c2ff3d880121f3",
+  "branch": "codex/nlth-v1-7-3-security",
+  "applicationVersion": "1.7.3",
+  "publication": "held_by_user_for_original_score_author_fix",
+  "overallAcceptance": "blocked_by_save_menu_status_issue",
+  "uiIssue": "validation/v173-score-save-status-handoff.md",
+  "lockSha256": "fe8fe99da792a4819b4f387dbfd836504e7f60aa34100edfebf3a68709cbcc59",
+  "regression": {
+    "success": true,
+    "files": 149,
+    "fileStatuses": {
+      "passed": 149
+    },
+    "passed": 1304,
+    "failed": 0,
+    "pending": 11,
+    "todo": 0,
+    "startTime": 1793278412478,
+    "failures": []
+  },
+  "regressionInputs": {
+    "count": 471,
+    "unchanged": true,
+    "changed": []
+  },
+  "logs": [
+    {
+      "path": "output/v173-security/baseline-npm-ci.log",
+      "bytes": 546,
+      "sha256": "a42caaebadac4cd962745daa05d8f107f2e58caef882b6d904d77727eca8dfe3"
+    },
+    {
+      "path": "output/v173-security/baseline-exact-npm-ci.log",
+      "bytes": 671,
+      "sha256": "8e6945a7a688c8796d4a6f7e61a73984ab4068b815e00ef49567cc23365258d0"
+    },
+    {
+      "path": "output/v173-security/baseline-linux.log",
+      "bytes": 27,
+      "sha256": "6efe984f584c19935f8af4fd388b63fcb5920b3ec2e33756986307ceb43ba04d"
+    },
+    {
+      "path": "output/v173-security/npm-ci-after.log",
+      "bytes": 589,
+      "sha256": "ec93441aff20294a7c68eb17d5f8a07e3f3f1c3aca42b38f04e25e0535aadc26"
+    },
+    {
+      "path": "output/v173-security/fixed-linux.log",
+      "bytes": 27,
+      "sha256": "5deca600435a228973f98e7c51e933a49ad01cd529ca1d83e1e18ce75bc32efb"
+    },
+    {
+      "path": "output/v173-security/audit-before.json",
+      "bytes": 8061,
+      "sha256": "f12ee78c12be2d2500330757415a58914920037cb4c6a64adc4dcd5700620eac"
+    },
+    {
+      "path": "output/v173-security/audit-after.json",
+      "bytes": 4387,
+      "sha256": "e92e1544a647f97f79c5df086dde2c6d20848930494e6aa6a921bece5e487dca"
+    },
+    {
+      "path": "output/v173-security/audit-production.json",
+      "bytes": 385,
+      "sha256": "f38aec0551f9685642b478ed633b8be615569c443701caa8e559f1078d2ce5b8"
+    },
+    {
+      "path": "output/v173-security/dependency-inventory.json",
+      "bytes": 11426,
+      "sha256": "89836fefd07c1e94246ab0dfa349b0fdaf29c2955c3e84cc3238c054fa7a4fce"
+    },
+    {
+      "path": "output/v173-security/installed-tree.json",
+      "bytes": 17070,
+      "sha256": "74b075bc18b7f15d46184bb2d4401ecdbf33f4878261efe8cd7a0c79f4645ff9"
+    },
+    {
+      "path": "output/v173-security/source-map-before.log",
+      "bytes": 3698,
+      "sha256": "bd7db5a3443d14e6c88fc28e7be0b0475316e58d17cd842b7406efed31d270e1"
+    },
+    {
+      "path": "output/v173-security/security-tests.log",
+      "bytes": 1271,
+      "sha256": "22ec032dda44ebdb22e98112eb16352ce9d2fe1c77cac47996d0c535aced4403"
+    },
+    {
+      "path": "output/v173-security/node-tests.log",
+      "bytes": 3495,
+      "sha256": "054c658ca39a3835b9242b0a451f4a1dc60b43ee73fbb5e00ce6fbe009a39f4c"
+    },
+    {
+      "path": "output/v173-security/assembly-old-node.log",
+      "bytes": 917,
+      "sha256": "42bc44008c8af5c130b4b6280debb3094199278a3f9fff002cbe761df39882ae"
+    },
+    {
+      "path": "output/v173-security/integrated-typecheck.log",
+      "bytes": 60,
+      "sha256": "dee9056a6faa9c9159639a3b2ff9f5f660e802a90af75e5f7dfb99b40c850218"
+    },
+    {
+      "path": "output/v173-security/integrated-build.log",
+      "bytes": 2197,
+      "sha256": "0b15a4324e77029a1f1ccd74f71386d8c5971df4a68df65c8630aa3c9f9eb5e2"
+    },
+    {
+      "path": "output/v173-security/integrated-build-portable.log",
+      "bytes": 220,
+      "sha256": "98a17477070b4eaaba38621c0aaddb232649a7ea5bfc87e0b5388ab58ebad756"
+    },
+    {
+      "path": "output/v173-security/integrated-bridge.log",
+      "bytes": 209,
+      "sha256": "e06804f025930b7bcb01ba3ed05d1e78416d9478aaadef3e631de2db44c1e80b"
+    },
+    {
+      "path": "output/v173-security/integrated-regression.log",
+      "bytes": 103482,
+      "sha256": "0f0ea2d94e4514ad383a3666c09f99465699acbcb714071d077a471dcd88aae1"
+    },
+    {
+      "path": "output/v173-security/integrated-regression.json",
+      "bytes": 466726,
+      "sha256": "a6fabe7847f6a8df99707519ce93012ecc13aba0097f6c2df3e394c50f01f80b"
+    },
+    {
+      "path": "output/v173-security/integrated-fixtures.log",
+      "bytes": 286,
+      "sha256": "9c1b50331b0ce8645cc6d2995ed920359f3d23458908d76a184790119f046a7a"
+    },
+    {
+      "path": "output/v173-security/integrated-assembly.json",
+      "bytes": 831,
+      "sha256": "f112025bd1fe48815608ee6989ce7c00bf2ff89a01309a739c4f7194149bc655"
+    },
+    {
+      "path": "output/v173-security/portable-smoke.log",
+      "bytes": 306,
+      "sha256": "7cfbe81e256db9167df1aea103c2c1d362691d1a97bd0e2f178d8d6216aa5497"
+    },
+    {
+      "path": "output/v173-security/portable-smoke.json",
+      "bytes": 45247,
+      "sha256": "2c1bccf2d6f51b80fb28532d2b339e75e8e57a5bd43a71b17886c27764ce4684"
+    },
+    {
+      "path": "output/v173-security/portable-zip-receipt.json",
+      "bytes": 1593,
+      "sha256": "1463547985d23cc2d12a24c379690c5377867662c24f8f468ecbcde451f9fca3"
+    },
+    {
+      "path": "output/v173-security/preview-batch-receipt.json",
+      "bytes": 323,
+      "sha256": "5f855b40de526c1487d4b32ad3367d8bd8a0bc89a2458224484d1d1142547d1d"
+    },
+    {
+      "path": "output/v173-security/preview-batch-final-receipt.json",
+      "bytes": 691,
+      "sha256": "0fcb0a0ca513e553e5e8d808a62d9abc10abf2b207bf608a36b7f0a9d16688fe"
+    },
+    {
+      "path": "output/v173-security/process-cleanup.json",
+      "bytes": 382,
+      "sha256": "22401c1912e1e8644d4cd6093ee163eb6e152cd6938f93af71771db0b7d18502"
+    },
+    {
+      "path": "output/v173-security/process-final.json",
+      "bytes": 504,
+      "sha256": "4d62f24f391e3b3a1965cc64996c22483e4f789b2725e63a9c810792fe519df5"
+    },
+    {
+      "path": "output/v173-security/controller-origin-check.json",
+      "bytes": 282,
+      "sha256": "011c6685fc525945f4dcaf77253aedaf3ed8260eddbb427b136530256f2a03a0"
+    },
+    {
+      "path": "output/v173-security/preservation-final.json",
+      "bytes": 529,
+      "sha256": "b7c61c5a225c078c0976cedf3c1c05581ca94b87a9013c704058de932adb4943"
+    },
+    {
+      "path": "output/v173-security/final-status.txt",
+      "bytes": 3171,
+      "sha256": "1ba9fe6b04c98634b04c7c918765edbb2f0870a96ad220212b702c3e13d0c398"
+    },
+    {
+      "path": "output/v173-security/final-diff-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "output/v173-security/preservation-hash-recheck.json",
+      "bytes": 368,
+      "sha256": "89670d916adec1c89452ae5b5c91461a8804951c725a00bf822a9012b325d4a4"
+    },
+    {
+      "path": "output/v173-security/preservation-git-recheck.json",
+      "bytes": 4237,
+      "sha256": "5eb57322dd5b00f654c30029e6ab86427c74e5c45d5dd52d579d3b93ce1ff8ae"
+    },
+    {
+      "path": "output/v173-security/doc-links.json",
+      "bytes": 6970,
+      "sha256": "65691f21c150c09b6f2d4856402144083e94ace5c655d5691a9e152e08c63987"
+    }
+  ],
+  "localOnly": true,
+  "ciMonitored": false
+}

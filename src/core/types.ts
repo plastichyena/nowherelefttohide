@@ -783,6 +783,8 @@ export interface GameResult {
   reason: GameOverReason;
   turn: number;
   statistics: GameStatistics;
+  /** Null only inside an uncommitted terminal candidate. Required on committed results. */
+  terminalScore: import('./terminal-score').TerminalScore | null;
 }
 
 export interface ForecastResourceRequirement {
@@ -1078,6 +1080,7 @@ export interface BarbedWireState {
 }
 
 export interface GameState {
+  scoreContext: import('./terminal-score').ScoreContext;
   mapDescriptor: import('./map-generation').MapDescriptor;
   /** Private initialization retry metadata; never exposed in observations. */
   initialEnemyAttempt: number;
@@ -1522,6 +1525,7 @@ export interface NaturalRecoveryConfig {
 }
 
 export interface GameConfig {
+  terminalScore: import('./terminal-score').ScoreCoefficients;
   mapMode: import('./map-generation').MapMode;
   mapSeed: number | null;
   gameplaySeed: number | null;

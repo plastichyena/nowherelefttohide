@@ -65,8 +65,8 @@ function hordeEvent(
 
 describe('controller view models', () => {
   it('derives a visible title-screen version label from APP_VERSION', () => {
-    expect(titleVersionLabel('ja')).toContain('1.7.1');
-    expect(titleVersionLabel('en')).toContain('1.7.1');
+    expect(titleVersionLabel('ja')).toContain('1.7.3');
+    expect(titleVersionLabel('en')).toContain('1.7.3');
     expect(createTranslator('ja')('appVersion')).not.toBe('appVersion');
     expect(createTranslator('en')('appVersion')).not.toBe('appVersion');
   });
@@ -317,21 +317,21 @@ describe('controller view models', () => {
     const detail = 'version mismatch in v1.3.3 save';
     expect(localizeSaveLoadError(detail, 'ja')).toContain('読み込めません');
     expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.7.0以前');
-    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.7.1');
+    expect(localizeSaveLoadError(detail, 'ja')).toContain('v1.7.3');
     expect(localizeSaveLoadError(detail, 'en')).toContain('cannot be loaded');
     expect(localizeSaveLoadError(detail, 'en')).toContain('v1.7.0 or earlier');
-    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.7.1');
+    expect(localizeSaveLoadError(detail, 'en')).toContain('v1.7.3');
     expect(localizeSaveLoadError('checksum mismatch', 'en')).toBe('checksum mismatch');
-    expect(createTranslator('ja')('tipSave')).toContain('ルール版 20.0.0');
-    expect(createTranslator('ja')('tipSave')).toContain('保存形式 27');
-    expect(createTranslator('en')('tipSave')).toContain('Game Rules 20.0.0');
-    expect(createTranslator('en')('tipSave')).toContain('Save Format 27');
+    expect(createTranslator('ja')('tipSave')).toContain('ルール版 21.0.0');
+    expect(createTranslator('ja')('tipSave')).toContain('保存形式 28');
+    expect(createTranslator('en')('tipSave')).toContain('Game Rules 21.0.0');
+    expect(createTranslator('en')('tipSave')).toContain('Save Format 28');
     for (const locale of ['ja', 'en'] as const) {
       const t = createTranslator(locale);
       expect(t('legacySaveNotice')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0 or earlier');
       expect(t('legacySaveError')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0 or earlier');
       expect(t('migrationSaveError')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0-or-earlier');
-      expect(t('migratedSaveNotice')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0-or-earlier');
+      expect(t('migratedSaveNotice')).toContain('v1.7.1');
       expect(t('tipSave')).toContain(locale === 'ja' ? 'v1.7.0以前' : 'v1.7.0-or-earlier');
     }
   });

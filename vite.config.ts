@@ -7,7 +7,8 @@ export default defineConfig({
     sourcemap: true,
   },
   server: {
-    host: '0.0.0.0',
+    // LAN testing is opt-in: npm run dev -- --host 0.0.0.0
+    host: '127.0.0.1',
     // Session artifacts and quarantined files can contain very large trees.
     // They are not source inputs and must not stall the dev/CLI watcher.
     watch: { ignored: ['**/.safe-delete/**', '**/output/**', '**/dist/**'] },

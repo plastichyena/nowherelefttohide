@@ -1,11 +1,13 @@
 # Play Nowhere Left to Hide with an AI
 
-This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.7.1.
+This repository is designed so an external AI/LLM can play the same game rules as a human without reading private `GameState` internals. The current release is v1.7.3.
 
 
-## v1.7.1 presentation and completed-session export
+## v1.7.3 terminal score and compatibility
 
-The human UI uses compact summaries and on-demand details. Replay / Live show unit names alongside their full public IDs; observations, action IDs and original AI comments are unchanged. Completed won/lost Sessions created by v1.7.1 can export a public ZIP through the official CLI. Saves, Sessions, Checkpoints, executable Replays and public Artifacts from v1.7.0 or earlier are rejected without migration or overwriting their source. Compatibility from v1.7.1 onward is a best-effort objective, not a promise that future releases will accept every existing format.
+Official terminal results contain a frozen `terminalScore` (`terminal-assets-v1`). Healthy player-managed people include facilities, human units, pending formations and healthy checkpoint pools, once per person. Unrescued neutral survivors are excluded. Initial facilities are evaluated at the end, including healthy recaptures. New units earn population points but no independent unit-count bonus. Crowding is reference-only, with no score/ranking/tie-break effect. Default weights are 100/300/50; exact points and large totals are decimal strings. Strict comparison requires matching score version, coefficients, Rules, complete Config hash, scenario, seeds, map/generator/fallback and deployment basis.
+
+Wins use A+1 and losses A-P; additional assets improve either outcome. Runner limits and technical failures without a formal Core result remain unscored. Completed current Sessions can export their recorded result through the official CLI. Exact v1.7.1 normal Saves receive validated migration: ongoing games reconstruct the original denominator, completed results remain legacy-unmeasured. Earlier Saves and v1.7.1-or-earlier Sessions, Checkpoints and executable/public Replays are rejected non-destructively. This is format-specific support, not a general version-check bypass.
 
 ## Reading before and after an action
 
@@ -29,7 +31,7 @@ Keep `mapDescriptor`, the effective Config, build identity and saved actual map 
 - A successful accepted action may trigger an attention stop. `expectations.playerUnitHp` must explicitly cover the relevant unit and bounds; expected damage is never approved automatically. Check `accepted`, `replayed`, stop reasons and unexecuted indexes. Query request status before resending; retry with the same request ID and identical payload. A replayed response is not a new execution.
 - Use the formal `result` and reason at Game Over. Progress actions are unavailable. Retrieve the final result and public Artifact/Replay. Zero military population or an enemy at the capital alone does not establish defeat while the current victory/defeat rules say otherwise.
 
-The versioned sections below describe retained mechanics. The current compatibility boundary is the v1.7.1 release boundary.
+The versioned sections below describe retained mechanics. The current compatibility boundary is the v1.7.3 release boundary.
 
 ## v1.6.9 scenarios, IFV and authoritative action summaries
 
@@ -74,7 +76,7 @@ Use the [public play report template](validation/play-report-template.md) to sep
 - If an action response is lost, retry the identical payload and same requestId. On `stale_revision`, obtain status/query, reconsider the action and use a new requestId at that revision.
 - Living wire walls permit at most two adjacent living walls per new/existing wall, including rings. Reveal the new hex, its neighbors and the neighbors of adjacent walls. Zombies choose the fewest traversable hexes with coordinate ties, then spend terrain MP while moving; an adjacent next-step wall can be attacked at MP0 if charges remain, and that movement stops after the attack.
 - Riot Zombie now has HP75; human Riot Police is unchanged. Simple Farms have no count cap, including seven or more, but still require legal land/resources/labor.
-- Normal, Replay and Live viewers share recorded public paths and damage/appearance effects, with a skip control. Core resolves independently of playback. Pause, seek and exit cancel callbacks. Older public artifacts are rejected at the v1.7.1 version boundary.
+- Normal, Replay and Live viewers share recorded public paths and damage/appearance effects, with a skip control. Core resolves independently of playback. Pause, seek and exit cancel callbacks. Older public artifacts are rejected at the v1.7.3 version boundary.
 
 ## v1.6.9 economy, pursuit and public information
 
@@ -84,7 +86,9 @@ Use the [public play report template](validation/play-report-template.md) to sep
 - Checkpoint destinations and every capital-side branch road Hex through them must be currently visible. Read `routeVisibility.missingVisibleHexes`; explored tiles alone do not qualify. Reference routes do not promise a legal unit Move. If `actionRequired=false`, no Move is needed. A different friendly unit occupying the destination still blocks it. After every accepted action, query the current revision again. Adjacent enemies do not alone prohibit withdrawal; read interception and remaining attack charges from the result.
 - The play-turn action ceiling remains 256. On `decision_limit_reached`, read current status, revision, context and relevant queries, then start the next play-turn from that revision. If a submitted request's response is lost, query its request result or retry the exact same request ID and payload; never assign a new ID to an uncertain retry.
 
-Current validation scope is recorded in [v1.7.1 acceptance](validation/v171-acceptance.md). Map-generation evidence is retained in [v1.7.0 acceptance](validation/v170-acceptance.md). Earlier fixed-seed evidence remains in [v1.6.8 acceptance](validation/v168-acceptance.md). Additional external-model seed4 gameplay is separate from the portable external-AI smoke test.
+Current validation, clean installation and remaining security findings are recorded in [v1.7.3 acceptance](https://github.com/plastichyena/nowherelefttohide/blob/main/validation/v173-final-acceptance.md). The previous [v1.7.2 acceptance](https://github.com/plastichyena/nowherelefttohide/blob/main/validation/v172-acceptance.md), including its failed clean install and limited follow-up regression, is retained as historical evidence. Map-generation evidence is retained in [v1.7.0 acceptance](validation/v170-acceptance.md). Earlier fixed-seed evidence remains in [v1.6.8 acceptance](validation/v168-acceptance.md). Additional external-model seed4 gameplay is separate from the portable external-AI smoke test.
+
+The Player package includes its own Node executable; updating system Node does not update an existing ZIP. v1.7.3 packaging requires patched LTS Node 22.23.4+, 24.22.1+, or 26.12.1+ within those major lines. Checkout/CI validation uses 22.23.4. Keep old packages and their Sessions together: v1.7.1 normal Save migration is supported, while cross-version Sessions/Checkpoints/Replay and unpublished v1.7.2 test data are not migrated.
 
 The portable Player packages produced by GitHub Actions contain a bundled Session CLI, a standalone Linux x64 or Windows x64 Node.js runtime, the Session launcher, this guide, build identity, and the required license notices. They deliberately do not contain the repository checkout, `node_modules`, TypeScript, Vite, Vitest, development scripts, or board images. No separate Node.js installation or `npm install` is required after extracting a package.
 
@@ -144,7 +148,7 @@ Live and Replay use the same public board renderer, mode-specific assets, pan/zo
 
 `status.contextHandoff`, each `play-turn` start, and `query --target=context-handoff --revision=N` reconstruct the latest public truth. Automatic derived checkpoints occur every 5 completed Turns or 128 canonical Decisions since the previous automatic checkpoint. Formal legal rejections count; malformed input, reads, previews and requestId retries do not. Manual queries do not reset the automatic counter. Each bounded collection reports totals, omissions and revision-pinned detail queries. Critical warning groups, lineage, locale and Fair Play are retained. Keep human-facing comments and decisionSummary in preferredCommentLocale throughout the Session. After handoff, use the current state and query only needed details instead of rereading old tool output. Complete history, Replay and Artifact remain canonical and intact. Handoff is public information, not private engine state or private reasoning.
 
-Version boundaries: App1.7.1, Rules/State/Config20, Save27, Agent/Observation/Bridge25, Artifact24, Session/Checkpoint21, Action4, Query1.7, Summary2, PlayTurn1.3 and AiSession1.5. Old game continuation is rejected without conversion or overwrite. v1.7.0 and earlier public replay artifacts are rejected non-destructively; keep the original ZIP.
+Version boundaries: App1.7.3, Rules/State/Config21, Save28, Agent/Observation/Bridge26, Artifact25, Session/Checkpoint22, Action4, Query1.7, Summary2, PlayTurn1.3 and AiSession1.5. Only exact v1.7.1 normal Saves have the migration described above. v1.7.1 and earlier public replay artifacts are rejected non-destructively; keep the original ZIP.
 
 ## v1.6.9 decision aids and query discovery
 
@@ -168,7 +172,7 @@ The CLI input file is the filter object itself. In a play-turn query it goes ins
 {"type":"query","target":"strategic-map","expectedRevision":0,"filters":{"collection":"nodes"},"pageSize":100}
 ```
 
-Unknown filters, invalid types and unsupported enum values are errors, not empty successful queries. CLI failures emit `{ "ok": false, "code": "...", "error": "..." }` to stderr and exit nonzero. `RelocateCheckpoint` requires both `checkpointId` and `position`. v1.7.0 and older Saves, Artifacts, Sessions and Checkpoints are incompatible; start a new v1.7.1 game. Wall HP is 20 and Horde Zombie maximum Attack Charge is 4; other zombie types retain their own configuration.
+Unknown filters, invalid types and unsupported enum values are errors, not empty successful queries. CLI failures emit `{ "ok": false, "code": "...", "error": "..." }` to stderr and exit nonzero. `RelocateCheckpoint` requires both `checkpointId` and `position`. v1.7.0 and older Saves and v1.7.1 and older Artifacts, Sessions and Checkpoints are incompatible; start a new v1.7.3 game. Wall HP is 20 and Horde Zombie maximum Attack Charge is 4; other zombie types retain their own configuration.
 
 ## Playing a Session
 
@@ -299,7 +303,7 @@ Use the exact Checkpoint ID returned by `save-checkpoint` or `list-checkpoints`;
 
 Session data defaults to `output/sessions`; pass the same `--root=PATH` to every command to use another root. Active state is committed after each well-formed Decision, so a later `status` continues the same Decision Log and Run Artifact. `artifact --out=PATH` exports one self-contained public Artifact ZIP without placing its full JSON on standard output; the response contains the ZIP path, schema, hash, and count. Use `--keep-directory` only when a directory is also needed. The result is stored in the Artifact stream footer. The ZIP contains `manifest.json`, streaming `artifact.ndjson`, and deduplicated public payloads. If Active data is reported corrupt or incompatible, do not edit private files and do not expect an automatic rollback: list the valid Checkpoints and explicitly create a new branch with `load-checkpoint`.
 
-The Session directory includes a private Save Format 27 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 21 stores immutable generation data, persistent request IDs, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. v1.7.0 and earlier AI Session and Checkpoint data are not migrated; start a new v1.7.1 AI Session and retain old data for use with its old release. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, exact neutral-survivor counts, Screamer radius, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 24.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
+The Session directory includes a private Save Format 28 checkpoint state solely so the runtime can resume deterministically. Session/Checkpoint Schema 22 stores immutable generation data, persistent request IDs, compressed/chunked public payloads, compact Decision records, lossless patches, and hash-chain references so a long history is not repeatedly materialized in ordinary commands. v1.7.1 and earlier AI Session and Checkpoint data are not migrated; start a new v1.7.3 AI Session and retain old data for use with its old release. Do not inspect or use private state, RNG state, hidden enemies/targets, Rejected Refugee counters, exact neutral-survivor counts, Screamer radius, or non-public configuration for decisions. The public Decision Log, CLI JSON, and Artifact Schema 25.0.0 output are the fair-play record; their Decision hash chain detects accidental damage or inconsistency but is not a cryptographic authenticity guarantee against someone rewriting every file coherently.
 
 For a quick built-in-agent smoke test from the repository checkout:
 
@@ -418,7 +422,7 @@ When using the Session CLI, each `step` response also contains `stateDelta`, a p
 
 The AI player should not use `GameEngine.getState()`, `AgentGameAdapter.getDebugState()`, save internals, hidden future random values, or other non-public implementation details to make decisions. Those exist for development and diagnostics, not as player-visible information.
 
-The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.7.1` uses Game Rules `20.0.0`, Agent/Observation/Browser Bridge API `25.0.0`, Random/Fixed Maps `inland-51x51-v1`/`fixed-51x51-v9`, Save Format `27`, Artifact Schema `24.0.0`, Checkpoint/Session Schema `21.0.0`, Play-turn Protocol `1.3.0`, Balanced Agent `15.0.0`, and Random Agent `10.0.0`. Artifact Schema 24.0.0 packages public Wave/Warning/Site Event, Screamer/Army Base/Oil Field state, production-capacity and support-headroom state, Metrics, a lossless public Decision Log, request identity, and lineage without private Checkpoint state. v1.7.0 and earlier Session, Checkpoint and normal Save continuation is rejected without conversion or overwrite. The public viewer rejects v1.7.0 and earlier ZIP artifacts without modifying them.
+The intended information boundary is the same one used by the built-in Agent platform and Human UI: public Observation plus currently legal actions. App `1.7.3` uses Game Rules `21.0.0`, Agent/Observation/Browser Bridge API `26.0.0`, Random/Fixed Maps `inland-51x51-v1`/`fixed-51x51-v9`, Save Format `28`, Artifact Schema `25.0.0`, Checkpoint/Session Schema `22.0.0`, Play-turn Protocol `1.3.0`, Balanced Agent `15.0.0`, and Random Agent `10.0.0`. Artifact Schema 25.0.0 packages public Wave/Warning/Site Event, Screamer/Army Base/Oil Field state, production-capacity and support-headroom state, Metrics, a lossless public Decision Log, request identity, and lineage without private Checkpoint state. v1.7.1 and earlier Sessions, Checkpoints and ZIP artifacts, and v1.7.0 and earlier normal Saves, are rejected without modifying them. Normal v1.7.1 Save migration is the explicit exception described above.
 
 ## Package layout
 

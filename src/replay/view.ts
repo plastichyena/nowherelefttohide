@@ -1,4 +1,5 @@
 import { viewerReferenceText } from '../ui/viewerNames';
+import { renderTerminalScore } from '../ui/terminalScore';
 import { ARTILLERY_ASSETS, HELICOPTER_ASSETS } from '../ui/boardAssets';
 import { PublicBoardRenderer, publicBoardFrame, presentationBoardFrame } from '../ui/publicBoard';
 import { TurnPlayback, turnPresentation, createPlaybackControls } from '../ui/turnPlayback';
@@ -17,6 +18,8 @@ export function showReplay(root: HTMLElement, locale: Locale, exit: () => void):
   root.className = 'app-shell replay-screen';
   root.innerHTML = `<main class="replay-view"><header><h1>${ja ? 'AIリプレイ観戦' : 'Watch AI replay'}</h1><button data-replay="exit">${ja ? 'タイトルへ' : 'Title'}</button></header><div class="replay-file"><label>${ja ? '公開プレイ記録ZIPを選択' : 'Choose public Artifact ZIP'} <input type="file" accept=".zip,application/zip" data-replay="file"></label><button data-replay="cancel">${ja ? '読込中止' : 'Cancel loading'}</button><p role="status" data-replay="status"></p></div><canvas data-replay="board" aria-label="${ja ? 'AIに公開された盤面' : 'Board visible to AI'}"></canvas><section class="public-board-details"></section><nav aria-label="Replay"><button data-replay="prev">◀</button><button data-replay="play">${ja ? '再生' : 'Play'}</button><button data-replay="next">▶</button><label>${ja ? '速度' : 'Speed'} <select data-replay="speed"><option value="0.5">0.5×</option><option selected value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label><label>${ja ? 'ターン' : 'Turn'} <input data-replay="turn" type="number" min="1" value="1"></label><button data-replay="seek">${ja ? '移動' : 'Go'}</button><button data-replay="fit">${ja ? '全体' : 'Fit'}</button></nav><p data-replay="position"></p><p data-replay="health"></p><section class="replay-comment"><h2>${ja ? 'AIの判断コメント' : 'AI decision comment'}</h2><p data-replay="comment"></p><small>${ja ? 'AIのコメントには誤認が含まれる場合があります。' : 'AI comments may contain mistaken assumptions.'}</small></section><section class="replay-log"><h2>${ja ? 'ゲームの結果ログ' : 'Game result log'}</h2><p data-replay="action"></p><small>${ja ? '直近100判断のログを保持します。過去の判断はターン移動で再表示できます。' : 'Keeps logs for 100 Decisions. Seek a turn to revisit older Decisions.'}</small><ol data-replay="events"></ol></section></main>`;
   const legend=document.createElement('details');
+  const terminalScore = document.createElement('section');
+  root.querySelector('[data-replay="position"]')!.after(terminalScore);
   const title=document.createElement('summary');title.textContent=ja?'盤面の凡例':'Board legend';legend.append(title);
   for(const [label,path,description] of [
     [ja?'水面':'Water',BOARD_ASSET_REGISTRY.terrain.water,ja?'青い水面のヘックス。':'Blue water Hex.'],
@@ -48,6 +51,7 @@ export function showReplay(root: HTMLElement, locale: Locale, exit: () => void):
   const render = () => {
     if(!frame||!pkg)return;
     current=resultPhase?frame.after:frame.before;
+    terminalScore.innerHTML = current.gameOver && current.result ? renderTerminalScore(current.result.terminalScore, locale) : '';
     get('position').textContent=`${ja?'ターン':'Turn'} ${current.observation.turn} · ${ja?'判断':'Decision'} ${decision+1}/${pkg.index.length} · ${resultPhase?(ja?'行動結果':'Result'):(ja?'判断直前':'Before decision')}`;
     if (current.gameOver) get('position').textContent += ` · ${current.result?.outcome === 'won' ? (ja?'勝利':'Victory') : (ja?'敗北':'Defeat')} (${current.result?.reason === 'capitalLost' ? (ja?'州都陥落':'Capital lost') : current.result?.reason === 'stateSecured' ? (ja?'州の確保':'State secured') : current.result?.reason ?? ''})`;
     const h=current.observation.endTurnForecast.publicHealth;

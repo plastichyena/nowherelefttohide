@@ -14,7 +14,7 @@ function containsExactObjectKey(value: unknown, key: string): boolean {
 
 describe('AgentGame public boundary', { timeout: 60000 }, () => {
   it('keeps package and public App release metadata aligned', () => {
-    expect(APP_VERSION).toBe('1.7.1');
+    expect(APP_VERSION).toBe('1.7.3');
     expect(packageMetadata.version).toBe(APP_VERSION);
   });
   it('returns a deterministic JSON observation without private random state', () => {
@@ -121,7 +121,10 @@ describe('AgentGame public boundary', { timeout: 60000 }, () => {
     expect(info.appVersion).toBe(APP_VERSION);
     expect(info.gameRulesVersion).toBe(GAME_RULES_VERSION);
     expect(info.observationApiVersion).toBe(OBSERVATION_API_VERSION);
-    expect(info.saveFormatVersion).toBe('27');
+    expect(info.saveFormatVersion).toBe('28');
+    expect(info.rules.v169.ja.compatibility).toContain('v1.7.1通常Saveのみ検証付き移行');
+    expect(info.rules.v169.en.compatibility).toContain('only validated v1.7.1 normal Saves');
+    for (const locale of ['ja', 'en'] as const) expect(info.rules.v169[locale].compatibility).toContain('v1.7.3');
     expect(info.artifactSchemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
     expect(info.buildId).toBe('api-info-test');
     expect(info.publicInformation.join(' ')).toContain('Riot Zombie');

@@ -1,4 +1,5 @@
-import { mapDomainSeed } from '../core/map-generation';
+import { canonicalMapValue, describeMap, mapDomainSeed } from '../core/map-generation';
+import { calculateTerminalScore, createScoreContext, DEFAULT_SCORE_COEFFICIENTS } from '../core/terminal-score';
 import { validateInitialMap } from '../core/initial-map-validation';
 import { APP_VERSION, RANDOM_MAP_ID, SAVE_FORMAT_NUMBER } from '../core/versions';
 import { gzipSync, gunzipSync, strFromU8, strToU8 } from 'fflate';
@@ -17,15 +18,16 @@ import {
 import { GAME_VERSION } from '../core/state';
 import type { GameState, JsonValue } from '../core/types';
 
-/** The sole game-rules version accepted by v1.7.1 saves. */
+/** Current saves use this version; v1.7.1 has a separate, validated migration below. */
 export const CURRENT_GAME_VERSION = GAME_VERSION;
 export const SAVE_GAME_VERSION = CURRENT_GAME_VERSION;
 export const SAVE_FORMAT = 'nowhere-left-to-hide-save';
 export const SAVE_FORMAT_VERSION = SAVE_FORMAT_NUMBER;
-/** v1.7.1 never writes to an earlier autosave namespace. */
-export const DEFAULT_AUTOSAVE_KEY = `nowhere-left-to-hide:auto-save:v${SAVE_FORMAT_NUMBER}:v171`;
+/** Never write to an earlier autosave namespace. */
+export const DEFAULT_AUTOSAVE_KEY = `nowhere-left-to-hide:auto-save:v${SAVE_FORMAT_NUMBER}:v173`;
 /** Read-only compatibility probe for the immediately preceding autosave namespace. */
 export const LEGACY_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v27';
+export const V171_AUTOSAVE_KEY = 'nowhere-left-to-hide:auto-save:v27:v171';
 const OLDER_AUTOSAVE_KEYS = [
   'nowhere-left-to-hide:auto-save:v26',
   'nowhere-left-to-hide:auto-save:v25',
@@ -73,8 +75,8 @@ export interface SaveValidationResult {
   errors: string[];
   state: GameState | null;
   envelope: SaveEnvelope | null;
-  /** Retained for UI compatibility; v1.3 never migrates an older save. */
-  migrated?: false;
+  /** A validated v1.7.1 migration is unsaved until explicitly saved to the new namespace. */
+  migrated?: boolean;
 }
 
 export interface SaveOperationResult {
@@ -550,7 +552,7 @@ function uniqueErrors(errors: string[]): string[] {
 }
 
 function incompatibilityError(found: unknown, subject: string): string {
-  return `${subject} is incompatible with v1.7.1; v1.7.0 or earlier data requires a new v1.7.1 game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
+  return `${subject} is incompatible with v${APP_VERSION}; only exact v1.7.1 normal Saves support validated migration. v1.7.0 or earlier data requires a new v${APP_VERSION} game / Game Rules ${CURRENT_GAME_VERSION} / Save Format ${SAVE_FORMAT_VERSION} (found ${String(found)}; expected ${CURRENT_GAME_VERSION}). 現在のゲーム状態は変更されません。旧Saveは変換・削除・上書きされません。`;
 }
 
 function reject(errors: string[]): SaveValidationResult {
@@ -647,10 +649,10 @@ function hasCanonicalDirectionOrder(directions: unknown[]): boolean {
  * schedule, reserved map perimeter, and warning state an explicit save
  * boundary instead of silently accepting a partial snapshot.
  */
-function validateV144Shape(state: Record<string, unknown>, errors: string[]): void {
+function validateV144Shape(state: Record<string, unknown>, errors: string[], expectedVersion: string = CURRENT_GAME_VERSION): void {
   requireFields(errors, state, 'state', REQUIRED_STATE_FIELDS);
   if (hasOwn(state, 'maxTurns')) errors.push('state.maxTurns is obsolete; use state.finalHordeTurn');
-  if (state.gameVersion !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(state.gameVersion, 'state.gameVersion'));
+  if (state.gameVersion !== expectedVersion) errors.push(incompatibilityError(state.gameVersion, 'state.gameVersion'));
   if (!isSafeInteger(state.seed)) errors.push('state.seed must be a safe integer');
   if (!isInteger(state.turn, 1)) errors.push('state.turn must be a positive integer');
   if (!isInteger(state.finalHordeTurn, 1)) errors.push('state.finalHordeTurn must be a positive integer');
@@ -700,7 +702,7 @@ function validateV144Shape(state: Record<string, unknown>, errors: string[]): vo
     ]);
     if (hasOwn(config, 'maxTurns')) errors.push('state.config.maxTurns is obsolete; use horde.waves');
     if (hasOwn(config, 'finalHordeTurn')) errors.push('state.config.finalHordeTurn is obsolete; derive it from the Final Wave');
-    if (config.version !== CURRENT_GAME_VERSION) errors.push(incompatibilityError(config.version, 'state.config.version'));
+    if (config.version !== expectedVersion) errors.push(incompatibilityError(config.version, 'state.config.version'));
     if (config.mapId !== FIXED_MAP_ID && config.mapId !== RANDOM_MAP_ID) errors.push(`state.config.mapId must be ${FIXED_MAP_ID} or ${RANDOM_MAP_ID}`);
     validateHordeConfigShape(config.horde, state.finalHordeTurn, errors);
     if (!isRecord(config.windPower)) {
@@ -1411,9 +1413,49 @@ function validateStateForSave(state: GameState): string[] {
   return uniqueErrors(errors);
 }
 
+/**
+ * Only the exact v1.7.1/20/27 contract is migrated. Validate the original
+ * envelope, old required fields and descriptor before translating metadata;
+ * then apply every current Config, map and relational invariant. No world,
+ * population, RNG, event or historical result is regenerated.
+ */
+function migrateV171Snapshot(value: Record<string, unknown>): SaveValidationResult {
+  const errors: string[] = [];
+  try {
+    if (value.format !== SAVE_FORMAT || !isRecord(value.state)) return reject(['Invalid v1.7.1 save envelope']);
+    const raw = value.state;
+    const { checksum: savedChecksum, ...payload } = value;
+    if (typeof savedChecksum !== 'string' || checksum(canonicalJson(payload)) !== savedChecksum) errors.push('checksum mismatch');
+    validateV144Shape(raw, errors, '20.0.0');
+    if (raw.gameVersion !== value.gameVersion || raw.mapId !== value.mapId || raw.seed !== value.seed) errors.push('v1.7.1 envelope/state mismatch');
+    if (!isRecord(raw.mapDescriptor) || raw.mapDescriptor.appVersion !== '1.7.1'
+      || raw.mapDescriptor.configVersion !== '20.0.0') errors.push('Only v1.7.1 saves can migrate; v1.7.0 or earlier is unsupported. Original data is unchanged.');
+    if (hasOwn(raw, 'scoreContext') || (isRecord(raw.config) && hasOwn(raw.config, 'terminalScore'))
+      || (isRecord(raw.result) && hasOwn(raw.result, 'terminalScore'))) errors.push('v1.7.1 save contains unexpected scoring fields');
+    if (errors.length) return reject(errors);
+    const state = clone(raw as unknown as GameState);
+    const d = state.mapDescriptor;
+    const expectedOld = { ...describeMap(state.map, state.seed, state.config, d.attempt, d.fallback),
+      appVersion: '1.7.1', configVersion: '20.0.0', build: `1.7.1/${d.mode === 'fixed' ? 'inland-v1' : d.generatorVersion}/inland-settings-v1` };
+    if (canonicalMapValue(expectedOld) !== canonicalMapValue(d)) return reject(['v1.7.1 map descriptor mismatch; original data is unchanged']);
+    state.gameVersion = CURRENT_GAME_VERSION;
+    state.config.version = CURRENT_GAME_VERSION;
+    state.config.terminalScore = { ...DEFAULT_SCORE_COEFFICIENTS };
+    state.mapDescriptor = describeMap(state.map, state.seed, state.config, d.attempt, d.fallback);
+    state.scoreContext = createScoreContext(state, state.gameOver ? 'v1.7.1-finished' : 'v1.7.1-ongoing');
+    if (state.result) state.result.terminalScore = calculateTerminalScore(state, state.result.outcome);
+    errors.push(...validateStateForSave(state));
+    if (errors.length) return reject(errors);
+    return { valid: true, errors: [], state: clone(state), envelope: makeEnvelope(state), migrated: true };
+  } catch (error) {
+    return reject([`v1.7.1 migration rejected: ${error instanceof Error ? error.message : String(error)}; original data is unchanged`]);
+  }
+}
+
 /** Validate a decoded snapshot without mutating the supplied object. */
 export function validateSnapshot(value: unknown): SaveValidationResult {
   if (!isRecord(value)) return reject(['Save envelope must be a JSON object']);
+  if (value.formatVersion === 27 && value.gameVersion === '20.0.0') return migrateV171Snapshot(value);
   const errors: string[] = [];
   if (value.format !== SAVE_FORMAT) errors.push(`unsupported save format: ${String(value.format)}`);
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
@@ -1563,7 +1605,7 @@ export class AutoSaveStore {
 
   constructor(options: { key?: string; storage?: StorageLike | null; onError?: SaveErrorListener } = {}) {
     this.key = options.key ?? DEFAULT_AUTOSAVE_KEY;
-    this.legacyKeys = options.key === undefined ? [LEGACY_AUTOSAVE_KEY, ...OLDER_AUTOSAVE_KEYS] : [];
+    this.legacyKeys = options.key === undefined ? [V171_AUTOSAVE_KEY, LEGACY_AUTOSAVE_KEY, ...OLDER_AUTOSAVE_KEYS] : [];
     this.storage = options.storage === undefined ? browserStorage() : options.storage;
     this.onError = options.onError;
   }
@@ -1621,7 +1663,7 @@ export class AutoSaveStore {
     }
   }
 
-  /** Clears only the current v1.7.1/v27 key; legacy data is deliberately preserved. */
+  /** Clears only the current key; legacy data is deliberately preserved. */
   clear(): void {
     try {
       this.storage?.removeItem?.(this.key);

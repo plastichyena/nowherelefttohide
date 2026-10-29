@@ -99,6 +99,7 @@ function publicResult(result: GameResult | null): AgentGameResult | null {
     outcome: result.outcome,
     reason: result.reason,
     turn: result.turn,
+    terminalScore: result.terminalScore,
     statistics,
   }) as AgentGameResult;
 }

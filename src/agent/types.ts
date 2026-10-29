@@ -716,6 +716,7 @@ export interface AgentApiInfo {
 }
 
 export interface AgentGameResult {
+  terminalScore: import('../core/terminal-score').TerminalScore | null;
   outcome: 'won' | 'lost';
   reason: GameOverReason;
   turn: number;

@@ -1,4 +1,4 @@
-name: AI Portable Player Package v1.7.1
+name: AI Portable Player Package v1.7.3
 
 on:
   workflow_run:
@@ -40,7 +40,7 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: .node-version
           cache: npm
 
       - name: Install locked dependencies for checkout validation
@@ -206,7 +206,7 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: .node-version
           cache: npm
 
       - name: Install locked dependencies for checkout validation

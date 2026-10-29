@@ -29,7 +29,7 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: .node-version
           cache: npm
 
       - name: Install locked dependencies
@@ -45,7 +45,7 @@ jobs:
         run: npx --no-install vitest run --pool=threads --maxWorkers=2 --exclude src/agent/balancedAgent.batch.test.ts --exclude src/agent/balancedAgent.seed198.test.ts
 
       - name: Test release validation report tools
-        run: node --test scripts/normalize-baseline-report.test.mjs scripts/verify-release-baseline.test.mjs scripts/verify-release-reuse.test.mjs scripts/extract-public-evidence.test.mjs
+        run: node --test scripts/normalize-baseline-report.test.mjs scripts/verify-release-baseline.test.mjs scripts/verify-release-reuse.test.mjs scripts/extract-public-evidence.test.mjs scripts/node-security-policy.test.mjs scripts/security-dependencies.test.mjs
 
       - name: Build production bundle
         run: npm run build
@@ -115,7 +115,7 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: .node-version
           cache: npm
 
       - name: Install locked dependencies
@@ -137,7 +137,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
       - run: npx --no-install vitest run src/agent/balancedAgent.seed198.test.ts --pool=threads --maxWorkers=1
@@ -155,7 +155,7 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: .node-version
           cache: npm
 
       - name: Install locked dependencies

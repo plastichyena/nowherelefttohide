@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { basename, join, relative, resolve } from 'node:path';
+import { assertSecureNodeVersion } from './node-security-policy.mjs';
 
 /**
  * Assemble the distributable Player package from a checkout-side build.
@@ -193,12 +194,13 @@ function main(argv = process.argv.slice(2)) {
   }
   const fflateLicenseSource = requiredFile(join(sourceRoot, 'node_modules', 'fflate', 'LICENSE'), 'fflate LICENSE');
 
-  ensureEmptyDirectory(outputRoot);
-  const runtimeRoot = join(outputRoot, 'runtime', 'node');
-  mkdirSync(runtimeRoot, { recursive: true });
   const nodeSource = findNodeExecutable(nodeArgument, platform);
   const nodeLicenseSource = findNodeLicense(nodeSource, optionValue(argv, '--node-license'));
   const nodeVersion = bundledNodeVersion(nodeSource);
+  assertSecureNodeVersion(nodeVersion);
+  ensureEmptyDirectory(outputRoot);
+  const runtimeRoot = join(outputRoot, 'runtime', 'node');
+  mkdirSync(runtimeRoot, { recursive: true });
   const nodeTarget = join(runtimeRoot, platform === 'win-x64' ? 'node.exe' : 'node');
   cpSync(nodeSource, nodeTarget);
   if (platform === 'linux-x64') chmodSync(nodeTarget, 0o755);

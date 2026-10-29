@@ -1,5 +1,6 @@
 import { GameEngine } from './engine';
 import {describeMap} from './map-generation';
+import { createScoreContext } from './terminal-score';
 import { createDefaultConfig } from './config';
 import { createCityPopulationSnapshot, populationLedgerTotal, synchronizePopulation } from './state';
 import type { GameState, HordeComposition, HordeConfig } from './types';
@@ -9,6 +10,8 @@ export function prepareTestSnapshot(state: GameState, preserveNeutralSurvivors =
   // A test that explicitly changes Config must describe that new fixture.
   // Map structure and Config legality are still checked by LoadSnapshot.
   state.mapDescriptor=describeMap(state.map,state.seed,state.config,state.mapDescriptor.attempt,state.mapDescriptor.fallback);
+  // Explicitly staged test Configs have a new start basis; never derive I0 from surviving actors.
+  state.scoreContext = createScoreContext(state);
   if (!preserveNeutralSurvivors) {
     for (const facility of state.facilities) {
       if (facility.owner === 'none' && facility.earlyCaptureSurvivorStatus === 'available') {

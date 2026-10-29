@@ -1,4 +1,5 @@
 import { viewerReferenceText } from '../ui/viewerNames';
+import { renderTerminalScore } from '../ui/terminalScore';
 import type { WebMcpRegistration } from './webmcp';
 import {mapStartFields,bindMapStart,readMapStart,generateGame} from '../ui/map-start';
 import {resolveScenario} from '../core/scenarios';
@@ -109,6 +110,7 @@ export class LiveAiViewer {
         <div class="live-ai-board"><canvas aria-label="${ja?'AIに公開された盤面':'Live AI public board'}"></canvas></div><button type="button" data-live-ai="fit">${ja?'全体':'Fit'}</button><section class="public-board-details"></section>
         <section class="live-ai-current" aria-live="polite">${ja?'「開始」後にWebMCPから操作できます。':'WebMCP client can start after Start.'}</section>
         <pre class="live-ai-result" aria-live="polite"></pre>
+        <section class="live-ai-terminal-score"></section>
         <p class="live-ai-omitted" hidden></p>
         <details><summary>${ja?'判断ログ':'Decision log'}</summary><ol class="live-ai-log"></ol></details>
       </section>`;
@@ -161,6 +163,7 @@ export class LiveAiViewer {
     this.playbackControls.querySelector('strong')!.textContent=ja?'ゾンビターン':'Zombie turn';
     this.playbackControls.querySelector('button')!.textContent=ja?'演出をスキップ':'Skip animation';
     this.board.setLocale(locale());
+    if (this.latestObservation?.gameOver && this.latestObservation.result) this.host.querySelector<HTMLElement>('.live-ai-terminal-score')!.innerHTML = renderTerminalScore(this.latestObservation.result.terminalScore, locale());
     if(!this.session){this.state.textContent=ja?'開始前':'not started';this.current.textContent=ja?'「開始」後にWebMCPから操作できます。':'WebMCP client can start after Start.';}
     this.updateOmitted();
   }
@@ -329,6 +332,8 @@ export class LiveAiViewer {
       try {
       this.board.setLocale(locale());
       this.board.setFrame(publicBoardFrame(observation));
+      this.host.querySelector<HTMLElement>('.live-ai-terminal-score')!.innerHTML = observation.gameOver && observation.result
+        ? renderTerminalScore(observation.result.terminalScore, locale()) : '';
       resolve();
       } catch (error) {
         reject(error);

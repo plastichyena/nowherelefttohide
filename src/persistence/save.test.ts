@@ -148,7 +148,7 @@ describe('v1.6.0 Save Format 17', () => {
     expect(decoded).toMatchObject({ valid: true, errors: [] });
     expect(decoded.envelope).toMatchObject({
       format: SAVE_FORMAT,
-      formatVersion: 27,
+      formatVersion: 28,
       gameVersion: CURRENT_GAME_VERSION,
       mapId: 'fixed-51x51-v9',
       seed: 77,
@@ -261,9 +261,9 @@ describe('v1.6.0 Save Format 17', () => {
     const config = state.config as Record<string, unknown>;
 
     expect(envelope.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(envelope.formatVersion).toBe(27);
-    expect(envelope.gameVersion).toBe('20.0.0');
-    expect(config.version).toBe('20.0.0');
+    expect(envelope.formatVersion).toBe(28);
+    expect(envelope.gameVersion).toBe('21.0.0');
+    expect(config.version).toBe('21.0.0');
     expect(config.mapId).toBe('fixed-51x51-v9');
     expect((state.map as Record<string, unknown>).width).toBe(51);
     expect((state.map as Record<string, unknown>).height).toBe(51);

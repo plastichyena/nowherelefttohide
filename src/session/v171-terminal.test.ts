@@ -57,6 +57,8 @@ describe('v1.7.1 terminal Session export', () => {
     verifyCoreStep(terminalFixtureAction(initial, outcome));
     const terminal = store.load(outcome).privateState as unknown as GameState;
     const publicResult = store.load(outcome).publicState.result;
+    expect(publicResult?.terminalScore).toEqual(terminal.result?.terminalScore);
+    expect(publicResult?.terminalScore?.status).toBe('scored');
     expect(terminal.result).toMatchObject({ outcome, reason: outcome === 'won' ? 'stateSecured' : 'capitalLost' });
     const before = fileHashes(storeRoot);
     const output = join(root, 'terminal.zip');

@@ -1,0 +1,92 @@
+{
+  "at": "2026-10-29T06:36:03.558Z",
+  "finalContentDigest": "ecab77e6d7f943dfc4667da08283a1d2a5ecc6ac7d1ca0e79c3c6ab33d3d637c",
+  "changedSinceFinal": [],
+  "runs": [
+    {
+      "path": "output/v172/full-tests.log",
+      "exitCode": 1,
+      "result": "Interrupted initial run; only named completed-file results are usable",
+      "inputManifest": null,
+      "logCreatedAt": "2026-10-29T05:23:11.000Z",
+      "logWrittenAt": "2026-10-29T05:47:11.668Z",
+      "sha256": "0226ab73a1d5d06aee8bdacf2ca2ae4252cc24b676b29be725ae013472dd042d"
+    },
+    {
+      "path": "output/v172/regression-final.log",
+      "exitCode": 1,
+      "result": "143 passed / 6 failed files; 1296 passed / 8 failed / 11 skipped tests",
+      "inputManifest": "v172-regression-inputs.json",
+      "logCreatedAt": "2026-10-29T05:48:44.308Z",
+      "logWrittenAt": "2026-10-29T06:21:21.499Z",
+      "sha256": "3798a35dbe809dfa5184a1f31615eec87e35a6ff7ae82b07ace39bae71b96c51"
+    },
+    {
+      "path": "output/v172/scoped-final.log",
+      "exitCode": 0,
+      "result": "9 files / 176 tests passed; no timeout, assertion, or runner error; original timeout thresholds",
+      "inputManifest": "v172-inputs-repair-start.json",
+      "logCreatedAt": "2026-10-29T06:22:58.706Z",
+      "logWrittenAt": "2026-10-29T06:26:56.891Z",
+      "sha256": "d6e6b190fba47d104e4e43ef935001431e8511cf2ebe0d74ce7f6950ff5fcfb9"
+    },
+    {
+      "path": "output/v172/typecheck-release-final.log",
+      "exitCode": 0,
+      "result": "TypeScript typecheck",
+      "inputManifest": "v172-inputs-final.json",
+      "logCreatedAt": "2026-10-29T06:28:35.795Z",
+      "logWrittenAt": "2026-10-29T06:28:36.193Z",
+      "sha256": "ef98ba1873b7197b3d7b451572b281902161830c275c100c47d43fdf03c788b1"
+    },
+    {
+      "path": "output/v172/build-final.log",
+      "exitCode": 0,
+      "result": "TypeScript + production Vite build to fresh output/v172/dist-final; existing warnings retained",
+      "inputManifest": "v172-inputs-final.json",
+      "logCreatedAt": "2026-10-29T06:28:50.318Z",
+      "logWrittenAt": "2026-10-29T06:29:09.849Z",
+      "sha256": "75698ca9e8bc183e16027b9dd280622bbbd6fa5457427e17969cb78269e49662"
+    },
+    {
+      "path": "output/v172/browser-bridge-release-final.log",
+      "exitCode": 0,
+      "result": "3 production JS bundles and public agent HTML; static check",
+      "inputManifest": "v172-inputs-final.json",
+      "logCreatedAt": "2026-10-29T06:30:15.727Z",
+      "logWrittenAt": "2026-10-29T06:30:17.253Z",
+      "sha256": "924dc497fb7f268e375e93664448119669c3b15c6bd6b3a8e8abbf2651c4d50c"
+    },
+    {
+      "path": "output/v172/portable-build-final.log",
+      "exitCode": 0,
+      "result": "Portable Session CLI build to fresh output/v172/portable-final",
+      "inputManifest": "v172-inputs-final.json",
+      "logCreatedAt": "2026-10-29T06:30:18.664Z",
+      "logWrittenAt": "2026-10-29T06:30:19.247Z",
+      "sha256": "08f5bd9015c19ca3bf8f6401e29613575a36eb61780960bff2280709a119ee33"
+    },
+    {
+      "path": "output/v172/external-ai-seed1.log",
+      "exitCode": 0,
+      "result": "Earlier real public-API Seed1 terminal/replay smoke, not an external model invocation; exact whole-input manifest not captured at this earlier start",
+      "inputManifest": null,
+      "logCreatedAt": "2026-10-29T05:35:36.952Z",
+      "logWrittenAt": "2026-10-29T05:37:14.342Z",
+      "sha256": "9e4da9c7e822351e32aca06db5422159de7848d8c5ad57a71391b33f2ef1b9e3"
+    }
+  ],
+  "note": "No claim that the final source was rerun through the entire broad suite. Scoped repairs and documentation/build checks are separate. Log timestamps bound output creation/writes, not each worker module-read time.",
+  "cleanNpmCi": {
+    "success": false,
+    "code": "EUSAGE",
+    "preservedLockSha256": "196c97adae2b9db46f0e345e27bf769cd56dfc34bb84542184191318d35b363e"
+  },
+  "packageVersion": "1.7.2",
+  "lockRootVersion": "1.7.1",
+  "legacyBaseline": {
+    "path": "src/testing/fixtures/v169-fixed-baseline.json",
+    "sha256": "37aff2c3cab63de48171700b4d021163d86b6b8f12a5515b8ce701012bc55906",
+    "fixturesUnchanged": true
+  }
+}

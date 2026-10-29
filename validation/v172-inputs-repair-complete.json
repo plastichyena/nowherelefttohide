@@ -1,0 +1,47 @@
+{
+  "phase": "repair-complete",
+  "at": "2026-10-29T06:27:50.291Z",
+  "comparedTo": "v172-regression-inputs.json",
+  "baselineDigest": "7ce38d159e8fb9987b1f87257f30d6f4af4f999df28044567525d5ee5376405b",
+  "contentDigest": "abbd32599b9119803427e2f6154f1768fbf46d3de286224eb44b46ebb27c4fa3",
+  "count": 464,
+  "changed": [
+    {
+      "path": "package.json",
+      "sha256": "765073d41be23da6d71e87fbdea2e7c555d23a13219d1810b1f6ed83f23d657c",
+      "mtime": "2026-10-29T06:22:32.902Z",
+      "previousSha256": "790ba6cd9a1d35efa714eb80e08cfe7a2bbcb9ac39dff49dc4ee38dcc21ed289"
+    },
+    {
+      "path": "scripts/v170-fixed-baseline.ts",
+      "sha256": "e42797d18f5a9343a74d9c965488be73aa9840d9917e99662a146f8912cd92b8",
+      "mtime": "2026-10-29T06:22:33.975Z",
+      "previousSha256": "83b245e5e6a98f53e20db88f7b8c587a387559a57a5e7fbef995517d688ac3c0"
+    },
+    {
+      "path": "src/agent/game.test.ts",
+      "sha256": "8aaa4b9ad090fa4082d50234001edb9076b12ffe227a8b5e89ee745acfa2f106",
+      "mtime": "2026-10-29T06:22:35.968Z",
+      "previousSha256": "4d1d684f2826e26ebfcce9ae17cf1d19b62fc0a3b1aaa8d38da9b686167748bc"
+    },
+    {
+      "path": "src/core/rules-v169.ts",
+      "sha256": "0184e4518959f62373722ceb97f4dd251689ebf609c38dfa11a7fa461ac8f735",
+      "mtime": "2026-10-29T06:22:36.952Z",
+      "previousSha256": "4b248f2ea23172435619c08b0fd086f48218425547eebc4581a214648cda2011"
+    },
+    {
+      "path": "src/core/v160.test.ts",
+      "sha256": "cf498ea9a5261886ccd5c59d881339019b091fe7bd7cdd474af2039fe503c004",
+      "mtime": "2026-10-29T06:22:34.982Z",
+      "previousSha256": "b0760d0fbd064c22d18c15c7a59f954099a5ec3aa9594c00a4f47c48720f50c2"
+    },
+    {
+      "path": "src/persistence/save.ts",
+      "sha256": "829f2fcfa2ea5efa89de4c6be0f76fb27aac954620a591e4b039f0537fe069ae",
+      "mtime": "2026-10-29T06:22:37.942Z",
+      "previousSha256": "e57de0736d5e445fe76678c6d8a2c26542aafbfa6eeca82162706bcc916f5190"
+    }
+  ],
+  "removed": []
+}

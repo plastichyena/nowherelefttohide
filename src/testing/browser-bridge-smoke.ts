@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve, relative, sep } from 'node:path';
 import { BOARD_ASSET_PATHS } from '../ui/boardAssets';
+import { APP_VERSION, GAME_RULES_VERSION, AGENT_API_VERSION, ARTIFACT_SCHEMA_VERSION, CHECKPOINT_SCHEMA_VERSION } from '../core/versions';
 
 const DEFAULT_DIST = 'dist';
 const MAX_BUNDLE_BYTES = 20 * 1024 * 1024;
@@ -101,7 +102,9 @@ function run(): void {
   }
   if (!bundle.includes('Object.freeze')) fail('production bridge API is not frozen');
   for (const marker of [
-    '1.7.0', '20.0.0', '21.0.0', '24.0.0', '25.0.0', 'inland-51x51-v1', 'mapSeed', 'gameplaySeed', 'checkpoint_active_missing', 'BoardTransport', 'scenarioId', 'ifv', 'pursuitMovementBonus', 'unitFoodConsumption', 'reliefSupplyCenter', 'movementSummary', 'multipurposeHelicopter', 'airBase', 'LaunchMilitaryDrone', 'BoardAircraft', 'nlth_preview_actions', 'fieldArtillery', 'AttackHex', 'ChangeUnitMode', 'fixed-51x51-v9', 'specialForces', 'packZombie', 'nuclearPowerPlant', 'context-handoff', 'gasZombie', 'screamerZombie', 'reconTeam', 'armyBase', 'oilField', 'SetPowerSupply',
+    APP_VERSION, GAME_RULES_VERSION, AGENT_API_VERSION, ARTIFACT_SCHEMA_VERSION, CHECKPOINT_SCHEMA_VERSION,
+    'terminalScore', 'terminal-assets-v1', 'healthyPopulation', 'initialPersonnelTotal', 'defeatPenalty',
+    'inland-51x51-v1', 'mapSeed', 'gameplaySeed', 'checkpoint_active_missing', 'BoardTransport', 'scenarioId', 'ifv', 'pursuitMovementBonus', 'unitFoodConsumption', 'reliefSupplyCenter', 'movementSummary', 'multipurposeHelicopter', 'airBase', 'LaunchMilitaryDrone', 'BoardAircraft', 'nlth_preview_actions', 'fieldArtillery', 'AttackHex', 'ChangeUnitMode', 'fixed-51x51-v9', 'specialForces', 'packZombie', 'nuclearPowerPlant', 'context-handoff', 'gasZombie', 'screamerZombie', 'reconTeam', 'armyBase', 'oilField', 'SetPowerSupply',
     'temporaryHousing', 'committedWaveUnitCount', 'pendingCount', 'horde_wave_started', 'horde_spawn_batch', 'nextTurnPenalties', 'housingOutage',
     'BuildConstructibleFacility', 'DecommissionConstructibleFacility', 'TurnAwayCheckpointRefugees',
     'RelocateCheckpoint', 'ActivateCheckpoint', 'roadBranches',
@@ -129,7 +132,7 @@ function run(): void {
     'groundVisionBlockedHexes', 'infectedPopulationConvertedToZombies', 'earlyCaptureSurvivorReward',
     'grandfatheredWaiting', 'waitingRiskPercent', 'checkpoint_policy_changed', 'screamer_scream',
   ]) {
-    if (!bundle.includes(marker)) fail(`production bundle does not contain v1.7.0 schema marker: ${marker}`);
+    if (!bundle.includes(marker)) fail(`production bundle does not contain v${APP_VERSION} schema marker: ${marker}`);
   }
   // Compatibility validation may legitimately retain the names of removed
   // fields so an old Config can be rejected with a useful reason. Only flag

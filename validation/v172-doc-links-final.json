@@ -1,0 +1,274 @@
+{
+  "at": "2026-10-29T06:38:47.581Z",
+  "files": [
+    "README.md",
+    "PLAY_WITH_AI.md",
+    "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+    "validation/v172-acceptance.md"
+  ],
+  "localLinksChecked": 52,
+  "missing": [],
+  "externalOrAnchorLinksNotChecked": 30,
+  "checked": [
+    {
+      "file": "README.md",
+      "target": "validation/v172-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "src/testing/fixtures/v152-performance-evidence.json",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "src/session/play-turn-performance-evidence.json",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "src/testing/fixtures/v153-performance-evidence.json",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "validation/v172-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "src/testing/fixtures/v155-validation-followup.json",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "src/testing/fixtures/v155-release-validation.json",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "PLAY_WITH_AI.md",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "PLAY_WITH_AI.md",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "src/core/versions.ts",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "PLAY_WITH_AI.md",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "LICENSE",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "ADDITIONAL_PERMISSIONS.md",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "ASSETS_LICENSE.md",
+      "exists": true
+    },
+    {
+      "file": "README.md",
+      "target": "THIRD_PARTY_NOTICES",
+      "exists": true
+    },
+    {
+      "file": "PLAY_WITH_AI.md",
+      "target": "validation/play-report-template.md",
+      "exists": true
+    },
+    {
+      "file": "PLAY_WITH_AI.md",
+      "target": "validation/v172-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "PLAY_WITH_AI.md",
+      "target": "validation/v170-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "PLAY_WITH_AI.md",
+      "target": "validation/v168-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "Nowhere Left to Hide PoC v1.7.2 終局スコア アップデート要件案.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v166-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v166-capacity.json",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v167-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v167-balance.json",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v167-recording.json",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v168-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v169-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v170-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v171-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v171-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "Nowhere Left to Hide PoC v1.7.2 終局スコア アップデート要件案.md",
+      "exists": true
+    },
+    {
+      "file": "Doc/Nowhere Left to Hide PoC 現行仕様.md",
+      "target": "../validation/v172-acceptance.md",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-environment.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-environment-final.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-environment.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-regression-inputs.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-inputs-broad-complete.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-inputs-repair-start.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-inputs-repair-complete.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-inputs-final.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "../.github/workflows/ci-pages.yml",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-score-won-ja-mobile.png",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-score-lost-en-mobile.png",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-score-large-en-mobile.png",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-score-legacy-en-mobile.png",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-score-replay-en-mobile.png",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-score-won-en-desktop.png",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-browser-checks.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-verification.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-doc-links.json",
+      "exists": true
+    },
+    {
+      "file": "validation/v172-acceptance.md",
+      "target": "v172-process-status.json",
+      "exists": true
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "ok": true,
+  "commands": [
+    "new",
+    "status",
+    "step",
+    "preview",
+    "play-turn",
+    "save-checkpoint",
+    "list-checkpoints",
+    "load-checkpoint",
+    "query",
+    "artifact"
+  ],
+  "replayMatched": true,
+  "seeds": [
+    {
+      "seed": 1,
+      "decisions": 15,
+      "outcome": "lost",
+      "reason": "capitalLost",
+      "terminalScore": {
+        "coefficients": {
+          "bMax": 50,
+          "wF": 300,
+          "wH": 100
+        },
+        "comparison": {
+          "configHash": "e1d00eaa165d9877da78f375a9d0455c7a880d8265394abe5f49f54552fe215e",
+          "fallback": null,
+          "gameplaySeed": 1,
+          "generatorVersion": "inland-v1",
+          "initialBasisHash": "52b38573cd15f1493866cdce8fb01d9bafa7a328f2bccb3de6dc611222bf4fca",
+          "initialDeployment": "seven-human-units-v1",
+          "mapHash": "102b7a5eae2c8805377c5238f65f43554eefb845d6f60b34366ede11da5d0f56",
+          "mapMode": "random",
+          "mapSeed": 1,
+          "origin": "new",
+          "rootSeed": 1,
+          "rulesVersion": "21.0.0",
+          "scenario": "custom"
+        },
+        "crowding": {
+          "capacity": "0",
+          "excess": "0",
+          "population": "0"
+        },
+        "healthyInitialFacilities": 2,
+        "healthyPopulation": "49",
+        "initialFacilityCount": 28,
+        "initialPersonnel": "35",
+        "initialPersonnelTotal": "45",
+        "points": {
+          "assets": "5538",
+          "defeatPenalty": "1050951",
+          "facilities": "600",
+          "initialPersonnel": "38",
+          "outcomeAdjustment": "-1050951",
+          "population": "4900",
+          "total": "-1045413"
+        },
+        "populationByLocation": {
+          "approved": "4",
+          "facilities": "10",
+          "formations": "0",
+          "screening": "0",
+          "units": "35",
+          "waiting": "0"
+        },
+        "populationLimit": "10425",
+        "status": "scored",
+        "survivingUnits": 6,
+        "version": "terminal-assets-v1"
+      }
+    },
+    {
+      "seed": 7,
+      "decisions": 16,
+      "outcome": "lost",
+      "reason": "capitalLost",
+      "terminalScore": {
+        "coefficients": {
+          "bMax": 50,
+          "wF": 300,
+          "wH": 100
+        },
+        "comparison": {
+          "configHash": "e1d00eaa165d9877da78f375a9d0455c7a880d8265394abe5f49f54552fe215e",
+          "fallback": null,
+          "gameplaySeed": 7,
+          "generatorVersion": "inland-v1",
+          "initialBasisHash": "52b38573cd15f1493866cdce8fb01d9bafa7a328f2bccb3de6dc611222bf4fca",
+          "initialDeployment": "seven-human-units-v1",
+          "mapHash": "a1a635c4a6ee35961653e0206252c792671e7d738b68e0c4111fe927874b5922",
+          "mapMode": "random",
+          "mapSeed": 7,
+          "origin": "new",
+          "rootSeed": 7,
+          "rulesVersion": "21.0.0",
+          "scenario": "custom"
+        },
+        "crowding": {
+          "capacity": "0",
+          "excess": "0",
+          "population": "0"
+        },
+        "healthyInitialFacilities": 2,
+        "healthyPopulation": "45",
+        "initialFacilityCount": 28,
+        "initialPersonnel": "25",
+        "initialPersonnelTotal": "45",
+        "points": {
+          "assets": "5127",
+          "defeatPenalty": "1050951",
+          "facilities": "600",
+          "initialPersonnel": "27",
+          "outcomeAdjustment": "-1050951",
+          "population": "4500",
+          "total": "-1045824"
+        },
+        "populationByLocation": {
+          "approved": "0",
+          "facilities": "20",
+          "formations": "0",
+          "screening": "0",
+          "units": "25",
+          "waiting": "0"
+        },
+        "populationLimit": "10425",
+        "status": "scored",
+        "survivingUnits": 4,
+        "version": "terminal-assets-v1"
+      }
+    }
+  ],
+  "commandSmoke": {
+    "commandCount": 10,
+    "commands": [
+      "new",
+      "status",
+      "step",
+      "preview",
+      "play-turn",
+      "save-checkpoint",
+      "list-checkpoints",
+      "load-checkpoint",
+      "query",
+      "artifact"
+    ],
+    "malformedPreviewRejectedWithoutMutation": true,
+    "checkpointId": "manual-turn-001-d000001-001",
+    "branchArtifact": {
+      "path": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-3-security\\output\\v173-security\\portable-sessions\\command-branch-artifact",
+      "manifestHash": "1ee6adc3921b1e4890562111df6daa6c619a9c2c51067f5bfb7e1c11045272d5",
+      "decisionCount": 1,
+      "acceptedActionCount": 1
+    },
+    "finitePlan": {
+      "sessionId": "portable-finite-plan",
+      "revision": 1
+    },
+    "interactive": {
+      "sessionId": "portable-interactive-plan",
+      "revision": 1
+    }
+  }
+}

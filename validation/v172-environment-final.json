@@ -1,0 +1,119 @@
+{
+  "at": "2026-10-29T06:30:21.831Z",
+  "node": "v22.23.4",
+  "npm": "11.21.0",
+  "worktree": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score",
+  "branch": "codex/nlth-v1-7-2-score",
+  "head": "d0b08ccaf5969c00f8d021a2e0c2ff3d880121f3",
+  "sourceTrackedComparison": {
+    "source": "D:/private/nowherelefttohide",
+    "count": 624,
+    "exact": 279,
+    "lineEndingOnly": 345,
+    "mismatches": [],
+    "errors": []
+  },
+  "lock": {
+    "sha256": "196c97adae2b9db46f0e345e27bf769cd56dfc34bb84542184191318d35b363e",
+    "identicalToSource": true,
+    "rootPackageVersion": "1.7.1",
+    "installedProvenance": "Copy-Item of main node_modules; temporary local test environment; not npm ci",
+    "cleanNpmCi": {
+      "success": false,
+      "code": "EUSAGE",
+      "message": "Missing: @napi-rs/lzma-linux-x64-gnu@ from lock file"
+    },
+    "lzmaLinux": {
+      "version": "1.5.6",
+      "resolved": "https://registry.npmjs.org/@napi-rs/lzma-linux-x64-gnu/-/lzma-linux-x64-gnu-1.5.1.tgz",
+      "integrity": "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==",
+      "cpu": [
+        "x64"
+      ],
+      "dev": true,
+      "libc": [
+        "glibc"
+      ],
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": "^22.20 || ^24.12 || >=25"
+      }
+    },
+    "sourcemapCodec": {
+      "version": "1.5.6",
+      "resolved": "https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.5.tgz",
+      "integrity": "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==",
+      "dev": true,
+      "license": "MIT"
+    }
+  },
+  "packages": [
+    {
+      "name": "typescript",
+      "installed": "5.9.3",
+      "lockVersion": "5.9.3",
+      "loadedFrom": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score\\node_modules\\typescript\\package.json",
+      "sameAsSourceManifest": true
+    },
+    {
+      "name": "vitest",
+      "installed": "3.2.7",
+      "lockVersion": "3.2.7",
+      "loadedFrom": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score\\node_modules\\vitest\\package.json",
+      "sameAsSourceManifest": true
+    },
+    {
+      "name": "vite",
+      "installed": "6.4.3",
+      "lockVersion": "6.4.3",
+      "loadedFrom": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score\\node_modules\\vite\\package.json",
+      "sameAsSourceManifest": true
+    },
+    {
+      "name": "vite-node",
+      "installed": "3.2.4",
+      "lockVersion": "3.2.4",
+      "loadedFrom": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score\\node_modules\\vite-node\\package.json",
+      "sameAsSourceManifest": true
+    },
+    {
+      "name": "esbuild",
+      "installed": "0.25.12",
+      "lockVersion": "0.25.12",
+      "loadedFrom": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score\\node_modules\\esbuild\\package.json",
+      "sameAsSourceManifest": true
+    },
+    {
+      "name": "phaser",
+      "installed": "4.2.1",
+      "lockVersion": "4.2.1",
+      "loadedFrom": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score\\node_modules\\phaser\\package.json",
+      "sameAsSourceManifest": true
+    },
+    {
+      "name": "fflate",
+      "installed": "0.8.3",
+      "lockVersion": "0.8.3",
+      "loadedFrom": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score\\node_modules\\fflate\\package.json",
+      "sameAsSourceManifest": true
+    },
+    {
+      "name": "rollup",
+      "installed": "4.62.5",
+      "lockVersion": "4.62.5",
+      "loadedFrom": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score\\node_modules\\rollup\\package.json",
+      "sameAsSourceManifest": true
+    },
+    {
+      "name": "@types/node",
+      "installed": "22.20.1",
+      "lockVersion": "22.20.1",
+      "loadedFrom": "D:\\private\\t3-code-setup-20261001\\t3-data\\worktrees\\nowherelefttohide\\codex-nlth-v1-7-2-score\\node_modules\\@types\\node\\package.json",
+      "sameAsSourceManifest": true
+    }
+  ]
+}

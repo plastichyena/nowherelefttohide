@@ -30,7 +30,7 @@ it('exports and seeks a self-contained public ZIP, preserving rejection and comm
   expect(service.replayArtifact(manifest.artifactPath).matched).toBe(true);
   const bytes=readFileSync(manifest.artifactPath);
   const sourceHash=sha256Json([...bytes]);
-  for(const appVersion of ['1.7.0','99.0.0']) {
+  for(const appVersion of ['1.7.0','1.7.1','99.0.0']) {
     const entries=unzipSync(bytes);
     const {manifestHash: _oldHash,...recordedManifest}=JSON.parse(strFromU8(entries['manifest.json']!));
     const unsupported={...recordedManifest,appVersion};

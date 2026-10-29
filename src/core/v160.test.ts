@@ -303,9 +303,12 @@ describe('v1.6 Core acceptance', () => {
   });
 
   it('previews the 150-goods Wind decision and rejects an unaffordable second build', () => {
-    const state = testState();
+    // The custom fixture must establish its Config before the fixed start basis.
+    const config = testConfig();
+    config.units.nationalGuard.population = 160;
+    config.facilities.windPowerPlant.production.fixedPowerGeneration = 30;
+    const state = createInitialState(16001, config);
     clearScenarioCheckpoints(state);
-    state.config.units.nationalGuard.population = 160;
     state.units = [createUnit(state, 'fixture-guard', 'nationalGuard', { q: 25, r: 25 })];
     for (const candidate of state.facilities) {
       candidate.owner = 'none';
@@ -319,7 +322,6 @@ describe('v1.6 Core acceptance', () => {
     setFacilityOperating(facility(state, 'farm-2'), 30);
     setFacilityOperating(facility(state, 'farm-3'), 30);
     setFacilityOperating(facility(state, 'farm-4'), 10);
-    state.config.facilities.windPowerPlant.production.fixedPowerGeneration = 30;
     setFacilityOperating(facility(state, 'wind-power-plant-1'), 0);
     state.resources.food = 10_000;
     state.resources.civilianGoods = 273;
